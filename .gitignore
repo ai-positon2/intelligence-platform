@@ -1,0 +1,32 @@
+# Secrets and config
+config.yaml
+service_account.json
+.env
+
+# Database
+data/tracker.db
+data/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Reports (optional: commit or ignore)
+# reports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
