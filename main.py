@@ -586,11 +586,44 @@ def run(
     table.add_row("Mode", "[yellow]DRY RUN[/yellow]" if dry_run else "LIVE")
     console.print(table)
 
-    # ── Auto-push dashboard to GitHub (uncomment to enable) ───────────────────
-    # import subprocess as _sp
-    # _sp.run(["git","add","reports/dashboard.html"], cwd=Path(__file__).parent)
-    # _sp.run(["git","commit","-m","Dashboard refresh"], cwd=Path(__file__).parent)
-    # _sp.run(["git","push"], cwd=Path(__file__).parent)
+    # ── Write weekly-stats.json for Railway /api/weekly-stats endpoint ───────
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    import sqlite3 as _sqlite3
+    _cutoff = (_dt.now(_tz.utc) - _td(days=7)).isoformat()
+    try:
+        _conn = _sqlite3.connect(str(store.db_path))
+        _rows = _conn.execute(
+            "SELECT signal_type, COUNT(*) cnt FROM alerts_sent"
+            " WHERE dry_run=0 AND sent_at >= ? GROUP BY signal_type ORDER BY cnt DESC",
+            (_cutoff,),
+        ).fetchall()
+        _total_signals = _conn.execute(
+            "SELECT COUNT(*) FROM alerts_sent WHERE dry_run=0 AND sent_at >= ?", (_cutoff,)
+        ).fetchone()[0]
+        _companies_count = _conn.execute(
+            "SELECT COUNT(*) FROM companies WHERE is_active=1"
+        ).fetchone()[0]
+        _conn.close()
+        _stats = {
+            "counts": dict(_rows),
+            "total": _total_signals,
+            "companies": _companies_count,
+            "generated_at": _dt.now(_tz.utc).isoformat(),
+            "cutoff": _cutoff,
+        }
+        _stats_path = Path(__file__).parent / "data" / "weekly-stats.json"
+        _stats_path.write_text(_json.dumps(_stats, indent=2))
+        console.print(f"[green]Weekly stats JSON written ({_total_signals} signals)[/green]")
+    except Exception as _e:
+        console.print(f"[yellow]Could not write weekly-stats.json: {_e}[/yellow]")
+
+    # ── Auto-push dashboard to GitHub → triggers Railway redeploy ────────────
+    import subprocess as _sp
+    _proj = Path(__file__).parent
+    _sp.run(["git", "add", "reports/dashboard.html", "data/weekly-stats.json"], cwd=_proj)
+    _sp.run(["git", "commit", "-m", "Dashboard refresh"], cwd=_proj)
+    _sp.run(["git", "push"], cwd=_proj)
 
 
 if __name__ == "__main__":
