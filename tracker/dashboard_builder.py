@@ -948,7 +948,7 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
     </div>
 
     <!-- Option 2: News only -->
-    <div class="refresh-opt" onclick="highlightOpt('opt-news')" style="margin-bottom:0">
+    <div class="refresh-opt" onclick="highlightOpt('opt-news')">
       <div class="refresh-opt-title" id="opt-news">
         <span style="font-size:18px">📰</span>
         <span>Refresh Google News</span>
@@ -959,6 +959,20 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
       </div>
       <code id="cmd-news">python main.py --news-only</code>
       <button class="copy-cmd-btn" onclick="copyCmd('cmd-news', event)">Copy command</button>
+    </div>
+
+    <!-- Option 3: Publish to Railway -->
+    <div class="refresh-opt" onclick="highlightOpt('opt-publish')" style="margin-bottom:0">
+      <div class="refresh-opt-title" id="opt-publish">
+        <span style="font-size:18px">🚀</span>
+        <span>Publish to Live Site</span>
+      </div>
+      <div class="refresh-opt-desc">
+        After running either command above, push the updated dashboard to Railway.<br>
+        Run this from <strong>C:\Users\krishna.l\company-signal-tracker\</strong>
+      </div>
+      <code id="cmd-publish">git add reports/dashboard.html && git commit -m "Update dashboard" && git push</code>
+      <button class="copy-cmd-btn" onclick="copyCmd('cmd-publish', event)">Copy command</button>
     </div>
   </div>
 
