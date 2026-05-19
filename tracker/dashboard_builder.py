@@ -971,7 +971,7 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
         After running either command above, push the updated dashboard to Railway.<br>
         Run this from <strong>C:\Users\krishna.l\company-signal-tracker\</strong>
       </div>
-      <code id="cmd-publish">git add reports/dashboard.html && git commit -m "Update dashboard" && git push</code>
+      <code id="cmd-publish">git add reports/dashboard.html ; git commit -m "Update dashboard" ; git push</code>
       <button class="copy-cmd-btn" onclick="copyCmd('cmd-publish', event)">Copy command</button>
     </div>
   </div>
