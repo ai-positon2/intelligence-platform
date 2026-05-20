@@ -286,6 +286,40 @@ class SnapshotStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def update_source_url_if_empty(
+        self,
+        apollo_id: str,
+        signal_type: str,
+        signal_detail: str,
+        source_url: str,
+    ) -> None:
+        """Patch source_url on the most recent matching alert if it is currently empty.
+
+        Called when dedup blocks re-insertion but we have a better source URL
+        than what was stored on the original record (e.g. a PR Newswire link
+        parsed from the Notes column that wasn't available on the first run).
+        """
+        if not source_url:
+            return
+        with _connect(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE alerts_sent
+                SET    source_url = ?
+                WHERE  id = (
+                    SELECT id FROM alerts_sent
+                    WHERE  apollo_id    = ?
+                      AND  signal_type  = ?
+                      AND  signal_detail = ?
+                      AND  dry_run      = 0
+                    ORDER BY sent_at DESC
+                    LIMIT 1
+                )
+                AND (source_url IS NULL OR source_url = '')
+                """,
+                (source_url, apollo_id, signal_type, signal_detail),
+            )
+
     def reset_alerts(self) -> None:
         with _connect(self.db_path) as conn:
             conn.execute("DELETE FROM alerts_sent")
