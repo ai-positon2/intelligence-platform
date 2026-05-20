@@ -246,7 +246,7 @@ def _detect_sheet_events(
             + (f"Summary: {summary}" if summary else "")
         ).strip()
         events.append(ev(signal_type, "HIGH", headline, detail, new_val=f"{person} — {title}",
-                         source_url=linkedin or sheet_src))
+                         source_url=sheet_src or linkedin))
 
     # ── Acquisition / M&A ─────────────────────────────────────────────────────
     for row in company_signals.get("ma", []):
@@ -363,11 +363,17 @@ def _process_company_sheets(
 
     # ── Dedup, send, record ───────────────────────────────────────────────────
     for event in events:
+        ev_source = getattr(event, 'source_url', '')
         if store.was_alert_sent_recently(apollo_id, event.signal_type, dedup_days,
                                           signal_detail=event.headline):
+            # Already stored — backfill source_url if the existing record is empty
+            if ev_source:
+                store.update_source_url_if_empty(
+                    apollo_id, event.signal_type, event.headline, ev_source
+                )
             continue
         store.record_alert(apollo_id, event.signal_type, event.headline, event.severity, dry_run,
-                             source_url=getattr(event, 'source_url', ''))
+                             source_url=ev_source)
         all_changes.append(event)
         console.print(f"  [[bold]{event.severity}[/bold]] {name}: {event.headline}")
 
