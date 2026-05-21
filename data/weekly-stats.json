@@ -1,13 +1,14 @@
 {
   "counts": {
+    "News Mention": 695,
     "C-Suite Join": 59,
     "Funding Round": 21,
     "Acquisition / M&A": 11,
     "C-Suite Exit": 6,
     "IPO Signal": 1
   },
-  "total": 98,
+  "total": 793,
   "companies": 1251,
-  "generated_at": "2026-05-21T07:32:15.390789+00:00",
-  "cutoff": "2026-05-14T07:32:15.384869+00:00"
+  "generated_at": "2026-05-21T07:46:45.518967+00:00",
+  "cutoff": "2026-05-14T07:46:45.513043+00:00"
 }
