@@ -147,6 +147,7 @@ def build_dashboard(
                     "signal_detail": a.get("signal_detail", ""),
                     "severity": a.get("severity", "LOW"),
                     "sent_at": str(a.get("sent_at", "")),
+                    "signal_date": str(a.get("signal_date") or a.get("sent_at", "")),
                     "source_url": a.get("source_url", ""),
                 }
                 for a in company_alerts
@@ -194,6 +195,7 @@ def build_dashboard(
                 "signal_detail": a.get("signal_detail", ""),
                 "severity": a.get("severity", "LOW"),
                 "sent_at": str(a.get("sent_at", "")),
+                "signal_date": str(a.get("signal_date") or a.get("sent_at", "")),
                 "company_name": a.get("company_name", ""),
                 "domain": a.get("domain", ""),
                 "industry": a.get("industry", ""),
@@ -406,6 +408,13 @@ body.modal-open{overflow:hidden}
 .nav-item .icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
 .sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid var(--border)}
 .sidebar-footer p{color:var(--text2);font-size:11px;text-align:center}
+.sidebar-user{display:flex;align-items:center;gap:9px;padding:8px 4px 10px;margin-bottom:4px}
+.sidebar-user-avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.02em}
+.sidebar-user-info{flex:1;min-width:0}
+.sidebar-user-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-user-role{font-size:11px;color:var(--text2);margin-top:1px}
+.sidebar-logout{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:none;border:1px solid var(--border);color:var(--text2);font-size:14px;text-decoration:none;flex-shrink:0;transition:all .15s;line-height:1}
+.sidebar-logout:hover{border-color:var(--high);color:var(--high);background:rgba(239,68,68,.08)}
 
 /* ── Content ── */
 #content{padding:20px 24px;flex:1}
@@ -894,6 +903,14 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
     </button>
   </div>
   <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="sidebar-user-avatar">KL</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name">Krishna Ladha</div>
+        <div class="sidebar-user-role">Position2</div>
+      </div>
+      <a href="/logout" class="sidebar-logout" title="Sign out">⏻</a>
+    </div>
     <p id="sidebar-gen"></p>
   </div>
 </nav>
@@ -1201,7 +1218,8 @@ function highlight(text, query) {
 
 function relTime(dt) {
   if (!dt) return '';
-  const d = new Date(dt);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(dt).trim());
+  const d = isDateOnly ? new Date(String(dt).trim() + 'T00:00:00') : new Date(dt);
   if (isNaN(d)) return dt;
   const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return 'just now';
@@ -1270,8 +1288,15 @@ function safeUrl(domain) {
 
 function formatFullDate(dt) {
   if (!dt) return '—';
-  const d = new Date(dt);
+  // Date-only strings (YYYY-MM-DD) should display without a time component.
+  // Parsing them as UTC midnight shows a timezone-offset time (e.g. "5:30 AM" in IST).
+  // Treat them as local dates by appending T00:00:00 before parsing.
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(dt).trim());
+  const d = isDateOnly ? new Date(String(dt).trim() + 'T00:00:00') : new Date(dt);
   if (isNaN(d)) return String(dt);
+  if (isDateOnly) {
+    return d.toLocaleString('en-US', {month:'long', day:'numeric', year:'numeric'});
+  }
   return d.toLocaleString('en-US', {month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
 }
 
@@ -1608,7 +1633,7 @@ function renderSignalFeed(containerId, signals) {
         <div class="signal-type">${esc(s.signal_type)}</div>
         <div class="signal-detail" title="${esc(s.signal_detail)}">${esc(detail)}</div>
         <div class="signal-meta">
-          <span class="signal-time">${relTime(s.sent_at)}</span>
+          <span class="signal-time">${relTime(s.signal_date || s.sent_at)}</span>
           <div class="signal-links">
             ${c.linkedin_url ? `<a class="signal-link" href="${esc(c.linkedin_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">LinkedIn</a>` : ''}
             ${domain ? `<a class="signal-link" href="${safeUrl(domain)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Website</a>` : ''}
@@ -1617,7 +1642,7 @@ function renderSignalFeed(containerId, signals) {
         <div class="signal-feed-expand" style="display:none">
           <div style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:6px">${esc(s.signal_detail||'')}</div>
           ${prevNewHtml}
-          <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Detected: <span style="color:var(--text)">${formatFullDate(s.sent_at)}</span></div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Signal Date: <span style="color:var(--text)">${formatFullDate(s.signal_date || s.sent_at)}</span></div>
           <div class="signal-links" style="margin-top:4px">${sourceLink}</div>
         </div>
       </div>
@@ -2284,7 +2309,7 @@ function toggleExpandRow(apolloId, tr) {
         <span class="sev-badge sev-${esc(a.severity)}">${esc(a.severity)}</span>
         <span class="mini-alert-type">${esc(a.signal_type)}</span>
         <span class="mini-alert-detail" title="${esc(a.signal_detail)}">${esc((a.signal_detail||'').substring(0,70))}</span>
-        <span class="mini-alert-time">${relTime(a.sent_at)}</span>
+        <span class="mini-alert-time">${relTime(a.signal_date || a.sent_at)}</span>
         <span class="mini-alert-arrow">&#8599;</span>
       </div>`).join('');
 
@@ -2464,7 +2489,44 @@ function renderModalTab(c, idx) {
   else if (idx === 1) el.innerHTML = renderSignalsTab(c);
   else if (idx === 2) el.innerHTML = renderLeadershipTab(c);
   else if (idx === 3) el.innerHTML = renderTechTab(c);
-  else el.innerHTML = `<div class="placeholder-tab"><p style="font-size:24px;margin-bottom:8px">📰</p><p>News is fetched during the weekly run.</p></div>`;
+  else el.innerHTML = renderNewsTab(c);
+}
+
+function renderNewsTab(c) {
+  const newsAlerts = (c.alerts || []).filter(a => a.signal_type === 'News Mention');
+  if (newsAlerts.length === 0) {
+    return `<div class="placeholder-tab">
+      <p style="font-size:28px;margin-bottom:8px">📰</p>
+      <p style="color:var(--text2)">No news signals yet.</p>
+      <p style="font-size:11px;color:var(--text3);margin-top:4px">Run <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">--news-only</code> to fetch the latest news.</p>
+    </div>`;
+  }
+  const cards = newsAlerts.map(a => {
+    const raw = a.source_url || '';
+    const parsed = _parseStoredSource(raw);
+    const url = parsed.url || (raw.startsWith('http') ? raw : null);
+    const headline = (a.signal_detail || '').replace(/^In the news:\s*/i, '');
+    const dateStr = a.signal_date || a.sent_at || '';
+    const dateFmt = dateStr ? formatFullDate(dateStr) : '—';
+    const relStr = dateStr ? relTime(dateStr) : '';
+    const linkHtml = url
+      ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--blue);text-decoration:none;margin-top:8px"
+           onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+           Read article</a>`
+      : '';
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        <span style="background:var(--bg3);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">News</span>
+        <span style="color:var(--text3);font-size:11px">${esc(dateFmt)}</span>
+        ${relStr ? `<span style="color:var(--text3);font-size:11px">&middot; ${esc(relStr)}</span>` : ''}
+      </div>
+      <p style="font-size:13px;color:var(--text1);line-height:1.45;margin:0">${esc(headline)}</p>
+      ${linkHtml}
+    </div>`;
+  });
+  return `<div style="padding:4px 2px">${cards.join('')}</div>`;
 }
 
 function renderOverviewTab(c) {
@@ -2525,14 +2587,14 @@ function renderSignalsTab(c) {
       <div class="sig-row1">
         <span class="sev-badge sev-${esc(a.severity)}">${esc(a.severity)}</span>
         <strong style="color:var(--blue);font-size:12px">${esc(a.signal_type)}</strong>
-        <span class="sig-time">${relTime(a.sent_at)}</span>
+        <span class="sig-time">${relTime(a.signal_date || a.sent_at)}</span>
         <button id="btn-${uid}" onclick="toggleModalSigExpand('${uid}')" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:inherit;white-space:nowrap">▶ View Details</button>
       </div>
       <div class="sig-detail">${esc((a.signal_detail||'').substring(0,120))}${(a.signal_detail||'').length>120?'…':''}</div>
       <div id="exp-${uid}" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
         <div style="font-size:12px;color:var(--text);line-height:1.6;margin-bottom:6px">${esc(a.signal_detail||'')}</div>
         ${prevNewHtml}
-        <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Detected: <span style="color:var(--text)">${formatFullDate(a.sent_at)}</span></div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Signal Date: <span style="color:var(--text)">${formatFullDate(a.signal_date || a.sent_at)}</span></div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${sourceLink}${verBadge}</div>
       </div>
     </div>`;
@@ -2789,6 +2851,7 @@ function openSigDetailFromExpand(apolloId, idx) {
     signal_detail:a.signal_detail,
     severity:     a.severity,
     sent_at:      a.sent_at,
+    signal_date:  a.signal_date || a.sent_at,
     source_url:   a.source_url || '',
     previous_value: a.previous_value || '',
     new_value:    a.new_value || '',
@@ -2834,8 +2897,8 @@ function openSigDetail(s) {
     ${prevNewHtml}
     <div class="sdm-meta-row">
       <div class="sdm-meta-item">
-        <div class="sdm-section-label">Detected</div>
-        <div class="sdm-meta-val">${formatFullDate(s.sent_at)}</div>
+        <div class="sdm-section-label">Signal Date</div>
+        <div class="sdm-meta-val">${formatFullDate(s.signal_date || s.sent_at)}</div>
       </div>
       ${domain ? `<div class="sdm-meta-item"><div class="sdm-section-label">Domain</div><div class="sdm-meta-val"><a href="${safeUrl(domain)}" target="_blank" rel="noopener" style="color:var(--blue)">${esc(domain)}</a></div></div>` : ''}
     </div>
