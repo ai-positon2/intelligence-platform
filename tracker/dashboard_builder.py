@@ -415,6 +415,8 @@ body.modal-open{overflow:hidden}
 .sidebar-user-role{font-size:11px;color:var(--text2);margin-top:1px}
 .sidebar-logout{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:none;border:1px solid var(--border);color:var(--text2);font-size:14px;text-decoration:none;flex-shrink:0;transition:all .15s;line-height:1}
 .sidebar-logout:hover{border-color:var(--high);color:var(--high);background:rgba(239,68,68,.08)}
+.sidebar-switch-btn{display:flex;align-items:center;gap:7px;width:100%;padding:7px 8px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;transition:all .15s;margin-bottom:8px}
+.sidebar-switch-btn:hover{background:rgba(99,102,241,.16);border-color:rgba(99,102,241,.4);color:#c7d2fe}
 
 /* ── Content ── */
 #content{padding:20px 24px;flex:1}
@@ -903,6 +905,9 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
     </button>
   </div>
   <div class="sidebar-footer">
+    <a href="/accounts" class="sidebar-switch-btn">
+      <span style="font-size:14px">⇄</span> Switch Account
+    </a>
     <div class="sidebar-user">
       <div class="sidebar-user-avatar">KL</div>
       <div class="sidebar-user-info">

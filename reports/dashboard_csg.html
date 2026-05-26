@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSG — Signal Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    .topbar {
+      background: #1a1d27; border-bottom: 1px solid #2d3148;
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; font-size: 16px;
+    }
+    .topbar-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .back-btn {
+      background: none; border: 1px solid #2d3148; border-radius: 6px;
+      color: #94a3b8; font-size: 12px; padding: 5px 14px; cursor: pointer;
+      font-family: inherit; transition: all 0.15s; text-decoration: none;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .back-btn:hover { border-color: #8b5cf6; color: #c4b5fd; }
+
+    .main {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 40px 24px;
+    }
+    .card {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 20px;
+      padding: 52px 48px; max-width: 540px; width: 100%;
+      text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+      position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px; background: linear-gradient(90deg, #8b5cf6, #6366f1);
+    }
+    .card-icon {
+      width: 72px; height: 72px; border-radius: 20px; margin: 0 auto 24px;
+      background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3);
+      display: flex; align-items: center; justify-content: center; font-size: 36px;
+    }
+    h1 { font-size: 24px; font-weight: 700; color: #f1f5f9; margin-bottom: 10px; }
+    .desc { font-size: 15px; color: #64748b; line-height: 1.6; margin-bottom: 36px; }
+
+    .steps { text-align: left; background: #0f1117; border-radius: 12px;
+             border: 1px solid #2d3148; padding: 20px 24px; margin-bottom: 28px; }
+    .steps-title { font-size: 12px; font-weight: 600; color: #8b5cf6;
+                   text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+    .step { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+    .step:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+      background: rgba(139,92,246,.2); border: 1px solid rgba(139,92,246,.3);
+      color: #c4b5fd; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+    .step-text { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+    .step-text strong { color: #e2e8f0; font-weight: 600; }
+    code {
+      display: inline-block; background: #1a1d27; border: 1px solid #2d3148;
+      border-radius: 5px; padding: 2px 8px; font-size: 12px;
+      color: #a5b4fc; font-family: monospace; margin-top: 4px;
+    }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #8b5cf6; font-size: 13px; text-decoration: none;
+      border: 1px solid rgba(139,92,246,.3); border-radius: 8px;
+      padding: 9px 20px; transition: all 0.15s;
+    }
+    .back-link:hover { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.5); }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon">📡</div>
+      <span class="topbar-title">Signal Tracker · CSG</span>
+    </div>
+    <a href="/accounts" class="back-btn">← All Accounts</a>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <div class="card-icon">📡</div>
+      <h1>CSG Dashboard</h1>
+      <p class="desc">
+        This account is ready to be set up.<br>
+        Follow the steps below to generate the CSG intelligence dashboard.
+      </p>
+
+      <div class="steps">
+        <div class="steps-title">Setup Steps</div>
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            <strong>Add your company CSV</strong><br>
+            Place your Apollo export for CSG companies at:<br>
+            <code>apollo-accounts-export-csg.csv</code>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            <strong>Configure the account</strong><br>
+            Update <code>config.yaml</code> with a <code>csg:</code> section
+            pointing to the new CSV and its Google Sheets IDs.
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            <strong>Build the dashboard</strong><br>
+            Run the tracker for CSG:<br>
+            <code>python main.py --account csg --dashboard-only</code>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">
+            <strong>Deploy</strong><br>
+            Push to Railway and the CSG dashboard will go live instantly:<br>
+            <code>git add . &amp;&amp; git commit -m "Add CSG dashboard" &amp;&amp; git push</code>
+          </div>
+        </div>
+      </div>
+
+      <a href="/accounts" class="back-link">← Back to Account Picker</a>
+    </div>
+  </div>
+
+</body>
+</html>
