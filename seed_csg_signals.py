@@ -67,6 +67,19 @@ def _make_id(name: str) -> str:
 
 KNOWN_SIGNALS: dict[str, list[dict]] = {
 
+    # ── Batch A3 (AVer Information → BTO Europe) ─────────────────────────
+    # BigBen Interactive / Nacon: major financial distress event (Feb–Mar 2026)
+    "BigBen Interactive": [
+        {"signal_type": "News Mention",
+         "title": "BigBen Interactive's €43M bank refinancing collapses; Nacon subsidiary files for insolvency and closes four studios",
+         "url": "https://www.globenewswire.com/news-release/2026/02/25/3244264/0/en/PRESS-RELEASE-Bigben-Interactive-announces-that-it-is-today-requesting-the-initiation-of-an-amicable-conciliation-procedure-in-order-to-facilitate-discussions-with-its-financial-cr.html",
+         "date": "2026-02-25"},
+        {"signal_type": "News Mention",
+         "title": "Nacon files for judicial reorganisation; Spiders, Kylotonn, Cyanide and Nacon Tech studios closed",
+         "url": "https://wccftech.com/nacon-files-insolvency-days-before-nacon-connect/",
+         "date": "2026-03-23"},
+    ],
+
     # ── Batch A2 (Andrea Electronics → Avell) ────────────────────────────
     # Aorus (Gigabyte Group) — sub-brand of Gigabyte; signals covered under "Gigabyte"
     "Appotronics Corp Ltd": [
