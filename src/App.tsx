@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Image, Users, Sparkles,
-  RefreshCw, ExternalLink, CheckCircle2, AlertCircle,
+  RefreshCw, ExternalLink, CheckCircle2,
   Clock, Menu, X, TrendingUp, Zap, ArrowRight
 } from 'lucide-react';
 import type { Ad, TabId, NavParams } from './lib/types';
@@ -176,21 +176,63 @@ export default function App() {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-white/5 space-y-3">
-          <div className="flex items-center gap-2">
-            {status === 'live'     && <><span className="live-dot"/><span className="text-emerald-400 text-xs font-medium">Live data</span></>}
-            {status === 'loading'  && <><RefreshCw size={10} className="text-amber-400 animate-spin"/><span className="text-amber-400 text-xs">Syncing…</span></>}
-            {status === 'embedded' && <><Clock size={10} className="text-white/30"/><span className="text-white/30 text-xs">Cached data</span></>}
-            {status === 'error'    && <><AlertCircle size={10} className="text-amber-400"/><span className="text-white/50 text-xs">Cached data</span></>}
+
+          {/* Status badge */}
+          {status === 'live' && (
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <span className="live-dot flex-shrink-0"/>
+              <div className="min-w-0">
+                <p className="text-emerald-400 text-xs font-semibold leading-none">Live data</p>
+                <p className="text-emerald-400/50 text-[10px] mt-0.5">Synced just now</p>
+              </div>
+            </div>
+          )}
+          {status === 'loading' && (
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+              <RefreshCw size={13} className="text-indigo-400 animate-spin flex-shrink-0"/>
+              <div className="min-w-0">
+                <p className="text-indigo-300 text-xs font-semibold leading-none">Syncing…</p>
+                <p className="text-indigo-300/50 text-[10px] mt-0.5">Fetching latest data</p>
+              </div>
+            </div>
+          )}
+          {(status === 'embedded' || status === 'error') && (
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 border border-white/8">
+              <Clock size={13} className="text-white/30 flex-shrink-0"/>
+              <div className="min-w-0">
+                <p className="text-white/50 text-xs font-semibold leading-none">Cached data</p>
+                <p className="text-white/25 text-[10px] mt-0.5">
+                  {status === 'error' ? 'Could not reach sheet' : 'Using embedded snapshot'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mini stats row */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-white/5 border border-white/6 px-3 py-2 text-center">
+              <p className="text-white font-bold text-sm leading-none">{total}</p>
+              <p className="text-white/35 text-[10px] mt-0.5">ads tracked</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/6 px-3 py-2 text-center">
+              <p className="text-white font-bold text-sm leading-none">{competitors}</p>
+              <p className="text-white/35 text-[10px] mt-0.5">competitors</p>
+            </div>
           </div>
-          <p className="text-white/25 text-[10px]">{total} ads · {competitors} competitors<br/>Updated {lastUpdated.toLocaleTimeString()}</p>
+
+          <p className="text-white/20 text-[10px] text-center">
+            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+
+          {/* Action buttons */}
           <div className="flex gap-2">
             <button onClick={loadLive} disabled={status === 'loading'}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/8 hover:bg-white/12 text-white/60 hover:text-white text-xs font-medium transition-all disabled:opacity-40">
-              <RefreshCw size={12} className={status === 'loading' ? 'animate-spin' : ''}/> Refresh
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-indigo-200 text-xs font-semibold transition-all disabled:opacity-40 border border-indigo-500/20">
+              <RefreshCw size={11} className={status === 'loading' ? 'animate-spin' : ''}/> Sync
             </button>
             <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
-               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/8 hover:bg-white/12 text-white/60 hover:text-white text-xs font-medium transition-all">
-              <ExternalLink size={12}/> Sheet
+               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/45 hover:text-white/70 text-xs font-semibold transition-all border border-white/8">
+              <ExternalLink size={11}/> Sheet
             </a>
           </div>
         </div>
