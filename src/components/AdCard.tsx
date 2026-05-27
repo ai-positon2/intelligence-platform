@@ -25,40 +25,50 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden cursor-pointer group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-250 border border-slate-100"
-      style={{ borderTop: `3px solid ${color}` }}
+      className="bg-white rounded-2xl overflow-hidden cursor-pointer group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-250 border border-slate-100 flex flex-col"
+      style={{ borderTop: `3px solid ${color}`, height: '300px' }}
     >
-      {/* Image */}
-      {primary ? (
-        <div className="relative h-40 bg-slate-100 overflow-hidden">
-          <img src={primary} alt="Ad creative"
-               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
-               onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}/>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"/>
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white backdrop-blur-md"
-               style={{ backgroundColor: `${color}cc` }}>
-            {FORMAT_ICONS[fmt]} {fmt}
+      {/* ── Media zone — same height for every card ── */}
+      <div className="relative h-36 flex-shrink-0 overflow-hidden">
+        {primary ? (
+          <>
+            <img
+              src={primary} alt="Ad creative"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
+              onError={e => {
+                const img = e.target as HTMLImageElement;
+                img.style.display = 'none';
+                // show fallback placeholder inside parent
+                const parent = img.parentElement!;
+                parent.style.background = `${color}12`;
+                parent.querySelector('.fallback-icon')?.removeAttribute('style');
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"/>
+          </>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: `${color}12` }}>
+            <div style={{ color: `${color}50` }}>
+              {fmt === 'video' ? <Video size={32}/> : fmt === 'image' ? <ImageIcon size={32}/> : <FileText size={32}/>}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="h-28 flex items-center justify-center relative" style={{ background: `${color}12` }}>
-          <div style={{ color: `${color}60` }}>
-            {fmt === 'video' ? <Video size={32}/> : fmt === 'image' ? <ImageIcon size={32}/> : <FileText size={32}/>}
-          </div>
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white"
-               style={{ backgroundColor: color }}>
-            {FORMAT_ICONS[fmt]} {fmt}
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Body */}
-      <div className="p-4">
+        {/* Format badge — always top-right */}
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white backdrop-blur-md"
+             style={{ backgroundColor: `${color}cc` }}>
+          {FORMAT_ICONS[fmt]} {fmt}
+        </div>
+      </div>
+
+      {/* ── Body — flex-1 so it fills remaining card height ── */}
+      <div className="flex-1 flex flex-col p-4 overflow-hidden">
+
         {/* Domain + date */}
-        <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center justify-between mb-2 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); onDomainClick?.(ad.Domain); }}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-full hover:opacity-80 transition-opacity"
+            className="text-[11px] font-bold px-2.5 py-0.5 rounded-full hover:opacity-80 transition-opacity"
             style={{ background: `${color}18`, color }}
           >
             {ad.Domain.split('.')[0]}
@@ -70,27 +80,29 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
           )}
         </div>
 
-        {/* Headline */}
-        <h3 className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug mb-2">
-          {truncate(headline, 110)}
+        {/* Headline — always 2 lines */}
+        <h3 className="text-sm font-semibold text-slate-800 leading-snug mb-1.5 flex-shrink-0"
+            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {headline}
         </h3>
 
-        {/* Description */}
-        {ad.Description && (
-          <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-            {truncate(ad.Description, 120)}
-          </p>
-        )}
+        {/* Description — fills remaining space, clamped to 2 lines */}
+        <p className="text-xs text-slate-400 leading-relaxed flex-1"
+           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {ad.Description ? truncate(ad.Description, 130) : ' '}
+        </p>
 
-        {/* Footer */}
-        <div className="flex items-center gap-2 pt-2.5 border-t border-slate-100">
-          {ad.CTA && ad.CTA.length < 40 && (
-            <span className="text-[11px] font-semibold text-white px-2.5 py-1 rounded-lg flex-shrink-0"
+        {/* Footer — always at bottom */}
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-2 flex-shrink-0">
+          {ad.CTA && ad.CTA.length < 40 ? (
+            <span className="text-[11px] font-semibold text-white px-2.5 py-1 rounded-lg truncate max-w-[70%]"
                   style={{ backgroundColor: color }}>
               {ad.CTA}
             </span>
+          ) : (
+            <span/>
           )}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center">
             {ad['Destination URL'] && (
               <a
                 href={ad['Destination URL'].startsWith('http') ? ad['Destination URL'] : `https://${ad['Destination URL']}`}
