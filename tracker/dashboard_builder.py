@@ -50,7 +50,13 @@ def build_dashboard(
     store,
     output_path: str | Path,
     max_signal_age_days: int = 90,
+    refresh_opts: list[dict] | None = None,
 ) -> Path:
+    """
+    refresh_opts: optional list of dicts that override the Refresh Dashboard modal.
+    Each dict: {id, icon, title, desc, cmd}
+    Defaults to healthcare commands if not provided.
+    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -254,7 +260,45 @@ def build_dashboard(
         },
     }
 
-    html = _render_html(data_obj)
+    # Build refresh modal options HTML
+    if refresh_opts is None:
+        refresh_opts = [
+            {
+                "id": "opt-sheets",
+                "icon": "📊",
+                "title": "Refresh Sheets",
+                "desc": "Re-reads all Google Sheets signal data and updates HIGH signals only.<br>Fast — no internet news fetch required.",
+                "cmd": "python main.py --sheets-only",
+            },
+            {
+                "id": "opt-news",
+                "icon": "📰",
+                "title": "Refresh Google News",
+                "desc": "Fetches the latest Google News RSS for all companies and updates LOW signals.<br>Takes ~20 minutes for 1,251 companies.",
+                "cmd": "python main.py --news-only",
+            },
+        ]
+
+    refresh_opts_html = ""
+    for i, opt in enumerate(refresh_opts):
+        is_last = (i == len(refresh_opts) - 1)
+        style = ' style="margin-bottom:0"' if is_last else ""
+        cmd_id = "cmd-" + opt["id"].replace("opt-", "")
+        refresh_opts_html += f"""
+    <div class="refresh-opt" onclick="highlightOpt('{opt["id"]}')"{style}>
+      <div class="refresh-opt-title" id="{opt["id"]}">
+        <span style="font-size:18px">{opt["icon"]}</span>
+        <span>{opt["title"]}</span>
+      </div>
+      <div class="refresh-opt-desc">
+        {opt["desc"]}
+      </div>
+      <code id="{cmd_id}">{opt["cmd"]}</code>
+      <button class="copy-cmd-btn" onclick="copyCmd('{cmd_id}', event)">Copy command</button>
+    </div>
+"""
+
+    html = _render_html(data_obj, refresh_opts_html)
     output_path.write_text(html, encoding="utf-8")
     return output_path
 
@@ -263,9 +307,13 @@ def build_dashboard(
 # HTML renderer
 # ---------------------------------------------------------------------------
 
-def _render_html(data_obj: dict) -> str:
+def _render_html(data_obj: dict, refresh_opts_html: str = "") -> str:
     data_json = _safe_json(data_obj)
-    return _HTML_TEMPLATE.replace("__DATA_JSON__", data_json)
+    return (
+        _HTML_TEMPLATE
+        .replace("__DATA_JSON__", data_json)
+        .replace("__REFRESH_OPTS_HTML__", refresh_opts_html)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -955,47 +1003,7 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
     <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">⟳ Refresh Dashboard</div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:18px">Choose what to refresh, then run the command in your terminal</div>
 
-    <!-- Option 1: Sheets only -->
-    <div class="refresh-opt" onclick="highlightOpt('opt-sheets')">
-      <div class="refresh-opt-title" id="opt-sheets">
-        <span style="font-size:18px">📊</span>
-        <span>Refresh Sheets</span>
-      </div>
-      <div class="refresh-opt-desc">
-        Re-reads all Google Sheets signal data and updates HIGH signals only.<br>
-        Fast — no internet news fetch required.
-      </div>
-      <code id="cmd-sheets">python main.py --sheets-only</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-sheets', event)">Copy command</button>
-    </div>
-
-    <!-- Option 2: News only -->
-    <div class="refresh-opt" onclick="highlightOpt('opt-news')">
-      <div class="refresh-opt-title" id="opt-news">
-        <span style="font-size:18px">📰</span>
-        <span>Refresh Google News</span>
-      </div>
-      <div class="refresh-opt-desc">
-        Fetches the latest Google News RSS for all companies and updates LOW signals.<br>
-        Takes ~20 minutes for 1,251 companies.
-      </div>
-      <code id="cmd-news">python main.py --news-only</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-news', event)">Copy command</button>
-    </div>
-
-    <!-- Option 3: Publish to Railway -->
-    <div class="refresh-opt" onclick="highlightOpt('opt-publish')" style="margin-bottom:0">
-      <div class="refresh-opt-title" id="opt-publish">
-        <span style="font-size:18px">🚀</span>
-        <span>Publish to Live Site</span>
-      </div>
-      <div class="refresh-opt-desc">
-        After running either command above, push the updated dashboard to Railway.<br>
-        Run this from <strong>C:\Users\krishna.l\company-signal-tracker\</strong>
-      </div>
-      <code id="cmd-publish">git add reports/dashboard.html ; git commit -m "Update dashboard" ; git push</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-publish', event)">Copy command</button>
-    </div>
+    __REFRESH_OPTS_HTML__
   </div>
 
   <div id="content">

@@ -137,11 +137,36 @@ def build_csg():
     print("Building dashboard -> %s ..." % OUT_PATH)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    csg_refresh_opts = [
+        {
+            "id": "opt-seed",
+            "icon": "🌱",
+            "title": "Re-seed Signals",
+            "desc": "Re-inserts all manually-researched signals from KNOWN_SIGNALS into the database.<br>Safe to re-run — duplicates are automatically skipped.",
+            "cmd": "python seed_csg_signals.py",
+        },
+        {
+            "id": "opt-rebuild",
+            "icon": "⚙️",
+            "title": "Rebuild Dashboard",
+            "desc": "Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or adding new signals.",
+            "cmd": "python build_csg_dashboard.py",
+        },
+        {
+            "id": "opt-publish",
+            "icon": "🚀",
+            "title": "Publish to Live Site",
+            "desc": "After rebuilding the dashboard, push to Railway to go live.<br>Run this from <strong>C:\\Users\\krishna.l\\company-signal-tracker\\</strong>",
+            "cmd": "git add -A ; git commit -m \"Update CSG dashboard\" ; git push",
+        },
+    ]
+
     out = build_dashboard(
         companies_from_csv=companies,
         store=store,
         output_path=OUT_PATH,
         max_signal_age_days=365,
+        refresh_opts=csg_refresh_opts,
     )
 
     print("\n  Dashboard written to: %s" % out)
