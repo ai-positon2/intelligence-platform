@@ -13,11 +13,11 @@ body {
 
 #root { width: 100%; min-height: 100vh; display: flex; }
 
-/* === Dot-grid background === */
+/* === Dot-grid background (dark) === */
 .dot-bg {
-  background-color: #eef2ff;
-  background-image: radial-gradient(#c7d2fe 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-color: #0c1120;
+  background-image: radial-gradient(rgba(99,102,241,0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 /* === Animations === */

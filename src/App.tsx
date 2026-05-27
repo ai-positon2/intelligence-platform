@@ -116,7 +116,7 @@ export default function App() {
   const tabLabel    = NAV.find(n => n.id === tab)?.label ?? '';
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#eef2ff]">
+    <div className="flex h-screen overflow-hidden bg-[#0c1120]">
 
       {/* Mobile overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebar(false)} />}
@@ -200,20 +200,20 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex-shrink-0 bg-white/70 backdrop-blur-md border-b border-slate-200/80 px-5 py-3 flex items-center gap-4 sticky top-0 z-30">
-          <button onClick={() => setSidebar(true)} className="lg:hidden text-slate-500 hover:text-slate-700"><Menu size={20}/></button>
+        <header className="flex-shrink-0 bg-[#0c1120]/95 backdrop-blur-md border-b border-white/8 px-5 py-3 flex items-center gap-4 sticky top-0 z-30">
+          <button onClick={() => setSidebar(true)} className="lg:hidden text-white/50 hover:text-white"><Menu size={20}/></button>
           <div>
-            <h1 className="text-base font-bold text-slate-900 leading-none">{tabLabel}</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Google Ads Transparency Intelligence</p>
+            <h1 className="text-base font-bold text-white leading-none">{tabLabel}</h1>
+            <p className="text-xs text-white/40 mt-0.5">Google Ads Transparency Intelligence</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {status === 'live' && (
-              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 text-emerald-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-500/20">
                 <CheckCircle2 size={11}/> Live
               </div>
             )}
             <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
-               className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200">
+               className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-white/40 hover:text-white/80 px-3 py-1.5 rounded-lg hover:bg-white/8 transition-all border border-white/10">
               <ExternalLink size={12}/> Open Sheet
             </a>
           </div>
