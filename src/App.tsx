@@ -180,11 +180,11 @@ export default function App() {
           {/* Action buttons */}
           <div className="flex gap-2">
             <button onClick={loadLive} disabled={status === 'loading'}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-indigo-200 text-xs font-semibold transition-all disabled:opacity-40 border border-indigo-500/20">
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all disabled:opacity-40 border border-white/8">
               <RefreshCw size={11} className={status === 'loading' ? 'animate-spin' : ''}/> Sync
             </button>
             <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
-               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/45 hover:text-white/70 text-xs font-semibold transition-all border border-white/8">
+               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all border border-white/8">
               <ExternalLink size={11}/> Sheet
             </a>
           </div>
