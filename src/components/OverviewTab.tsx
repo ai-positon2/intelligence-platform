@@ -36,8 +36,8 @@ function Card({ title, subtitle, action, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-      <div className="flex items-start justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+      <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="text-sm font-bold text-slate-800">{title}</h3>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
@@ -104,13 +104,13 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
     <div className="space-y-5">
 
       {/* Row 1 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
 
         {/* Competitor bar — click bar → Competitors tab */}
         <Card title="Ads by Competitor" subtitle="Click a bar to deep-dive"
               action={{ label: 'View all', onClick: () => onNav({ tab: 'competitors' }) }}>
           <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={compData} barSize={36} margin={{ top: 4 }}
+            <BarChart data={compData} barSize={36} maxBarSize={44} barCategoryGap="30%" margin={{ top: 4 }}
                       style={{ cursor: 'pointer' }}>
               <defs>
                 {compData.map((c, i) => (
@@ -120,7 +120,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                   </linearGradient>
                 ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false}/>
               <XAxis dataKey="shortName" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false}/>
               <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false}/>
               <Tooltip content={<DarkTip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }}/>
@@ -151,7 +151,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                 {fmtData.map((_, i) => <Cell key={i} fill={`url(#fg${i})`}/>)}
               </Pie>
               <Legend iconType="circle" iconSize={8}
-                      formatter={v => <span style={{ fontSize: 11, color: '#64748b', cursor: 'pointer' }}>{v}</span>}/>
+                      formatter={v => <span style={{ fontSize: 11, color: '#94a3b8', cursor: 'pointer' }}>{v}</span>}/>
               <Tooltip content={<DarkTip/>}/>
             </PieChart>
           </ResponsiveContainer>
@@ -197,7 +197,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                   </linearGradient>
                 ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)"/>
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={d => d.slice(5)}/>
               <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} allowDecimals={false}/>
               <Tooltip content={<DarkTip/>}/>
@@ -205,7 +205,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                       onClick={(e: unknown) => { const d = e as { value?: string }; if (d.value) onNav({ tab: 'competitors', competitor: d.value }); }}
                       formatter={(v: string) => {
                         const c = COMPETITORS.find(x => x.domain === v);
-                        return <span style={{ fontSize: 10, color: '#64748b', cursor: 'pointer' }}>{c?.name ?? v}</span>;
+                        return <span style={{ fontSize: 10, color: '#94a3b8', cursor: 'pointer' }}>{c?.name ?? v}</span>;
                       }}/>
               {COMPETITORS.map(c => (
                 <Area key={c.domain} type="monotone" dataKey={c.domain} name={c.domain}
@@ -273,7 +273,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
           return (
             <div key={comp.domain}
                  onClick={() => onNav({ tab: 'competitors', competitor: comp.domain })}
-                 className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 card-lift cursor-pointer group hover:border-indigo-200 transition-colors">
+                 className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 card-lift cursor-pointer group hover:border-indigo-200 transition-colors">
               <div className="h-1 rounded-full mb-4 transition-all" style={{ background: `linear-gradient(90deg, ${comp.color}, ${comp.color}50)` }}/>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md"
@@ -284,10 +284,10 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                   <p className="font-bold text-slate-800 text-sm leading-none group-hover:text-indigo-700 transition-colors">{comp.name}</p>
                   <p className="text-xs text-slate-400 mt-0.5 truncate">{comp.domain}</p>
                 </div>
-                <ArrowRight size={15} className="text-slate-200 group-hover:text-indigo-400 transition-colors flex-shrink-0"/>
+                <ArrowRight size={15} className="text-white/20 group-hover:text-indigo-400 transition-colors flex-shrink-0"/>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                {[['Total', compAds.length, '#0f172a'], ['Active', statusAct, comp.color], ['Formats', Object.keys(fmts).length, '#0f172a']].map(([l,v,col],i) => (
+                {[['Total', compAds.length, '#f1f5f9'], ['Active', statusAct, comp.color], ['Formats', Object.keys(fmts).length, '#f1f5f9']].map(([l,v,col],i) => (
                   <div key={i} className="rounded-xl py-2.5" style={{ background: `${comp.color}0a` }}>
                     <p className="text-xl font-black" style={{ color: col as string }}>{v}</p>
                     <p className="text-[10px] text-slate-400">{l}</p>
