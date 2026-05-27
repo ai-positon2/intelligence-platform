@@ -36,8 +36,8 @@ function Card({ title, subtitle, action, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-      <div className="flex items-start justify-between mb-3">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col">
+      <div className="flex items-start justify-between mb-3 flex-shrink-0">
         <div>
           <h3 className="text-sm font-bold text-slate-800">{title}</h3>
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
@@ -49,7 +49,9 @@ function Card({ title, subtitle, action, children }: {
           </button>
         )}
       </div>
-      {children}
+      <div className="flex-1 min-h-0 flex flex-col justify-center">
+        {children}
+      </div>
     </div>
   );
 }
@@ -109,7 +111,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
         {/* Competitor bar — click bar → Competitors tab */}
         <Card title="Ads by Competitor" subtitle="Click a bar to deep-dive"
               action={{ label: 'View all', onClick: () => onNav({ tab: 'competitors' }) }}>
-          <ResponsiveContainer width="100%" height={155}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={180}>
             <BarChart data={compData} barSize={36} maxBarSize={44} barCategoryGap="30%" margin={{ top: 4, bottom: 0 }}
                       style={{ cursor: 'pointer' }}>
               <defs>
@@ -135,7 +137,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
         {/* Format pie — click slice → Gallery filtered */}
         <Card title="Format Distribution" subtitle="Click a slice to filter gallery"
               action={{ label: 'Gallery', onClick: () => onNav({ tab: 'gallery', format: 'all' }) }}>
-          <ResponsiveContainer width="100%" height={155}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={180}>
             <PieChart style={{ cursor: 'pointer' }}>
               <defs>
                 {fmtData.map((f, i) => (
@@ -160,8 +162,8 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
         {/* CTA bars — click → Gallery with search */}
         <Card title="Top CTAs" subtitle="Click a CTA to search gallery"
               action={{ label: 'Browse', onClick: () => onNav({ tab: 'gallery' }) }}>
-          <div className="space-y-3 mt-1">
-            {ctaData.map(({ name, count }, i) => {
+          <div className="space-y-2 w-full">
+            {ctaData.slice(0, 6).map(({ name, count }, i) => {
               const pct = (count / (ctaData[0]?.count || 1)) * 100;
               const cols = ['#6366f1','#8b5cf6','#0ea5e9','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6'];
               const c = cols[i % cols.length];
@@ -172,7 +174,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                     <span className="text-slate-600 truncate mr-2 font-medium group-hover:text-indigo-600 transition-colors">{name}</span>
                     <span className="font-bold text-slate-800 flex-shrink-0">{count}</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700"
                          style={{ width: `${pct}%`, background: c }}/>
                   </div>
