@@ -457,7 +457,7 @@ KNOWN_SIGNALS: dict[str, list[dict]] = {
          "date": "2025-12-01"},
     ],
     "Lite-On": [
-        {"signal_type": "Funding",
+        {"signal_type": "News Mention",
          "title": "Lite-On Technology Plans US$919M Capital Investment in U.S. for AI Energy Infrastructure",
          "url": "https://www.liteon.com/en/news/press-center/lite-on-us-investment",
          "date": "2026-03-01"},
