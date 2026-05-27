@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import email.utils
 import logging
 import re
@@ -9,6 +10,39 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_google_news_url(google_url: str) -> str:
+    """Decode a Google News redirect URL to the actual article URL.
+
+    Google News RSS wraps every article link in a redirect like:
+        https://news.google.com/rss/articles/CBMi<base64>?...
+    The base64 path encodes (among other things) the original article URL.
+    This function extracts it without making any HTTP requests.
+    Returns the original google_url unchanged on any failure.
+    """
+    if not google_url or "news.google.com" not in google_url:
+        return google_url
+    match = re.search(r"/articles/([A-Za-z0-9_=-]+)", google_url)
+    if not match:
+        return google_url
+    encoded = match.group(1)
+    # Restore standard base64 padding
+    padding = (4 - len(encoded) % 4) % 4
+    try:
+        decoded_bytes = base64.urlsafe_b64decode(encoded + "=" * padding)
+        decoded_text = decoded_bytes.decode("utf-8", errors="replace")
+        # The real URL sits inside the decoded bytes — find the first non-Google http(s) URL
+        url_match = re.search(
+            r"https?://(?!news\.google\.com)[^\s\x00-\x1f\"'<>\x80-\xff]{10,}",
+            decoded_text,
+        )
+        if url_match:
+            real_url = url_match.group(0).rstrip(".,;)")
+            return real_url
+    except Exception:
+        pass
+    return google_url
 
 MAX_NEWS_AGE_DAYS = 90
 
@@ -112,9 +146,10 @@ def _rss_articles(
                 discarded += 1
                 continue
             source = entry.get("source")
+            raw_url = entry.get("link", "")
             results.append({
                 "title": entry.get("title", ""),
-                "url": entry.get("link", ""),
+                "url": _decode_google_news_url(raw_url),
                 "summary": entry.get("summary", "")[:300],
                 "source": source.get("title") if isinstance(source, dict) else str(source or ""),
                 "published": pub,
@@ -164,7 +199,7 @@ def get_leadership_from_news(
                 results.append({
                     "name": name,
                     "title": exec_title,
-                    "source_url": entry.get("link", ""),
+                    "source_url": _decode_google_news_url(entry.get("link", "")),
                     "published_date": pub,
                 })
             if len(results) >= max_results:

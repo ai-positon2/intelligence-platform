@@ -23,6 +23,7 @@ class ChangeEvent:
     previous_value: str = ""
     new_value: str = ""
     source_url: str = ""   # Direct link to source (LinkedIn, news article, sheet source URL)
+    signal_date: str = ""  # Actual date of the event (sheet Scan/Announcement date or article pub date)
     detected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -237,28 +238,9 @@ def detect_changes(
                 f"{old_type} / {old_amt}", f"{new_type} / {new_amt}",
             ))
 
-    # 4 & 5. Acquisition / IPO — from injected news_articles
-    for article in new_snapshot.get("news_articles", []):
-        if not is_within_age_limit(article.get("published", ""), max_age_days):
-            continue
-        art_url = article.get("url", "")
-        text = (_str(article.get("title")) + " " + _str(article.get("summary"))).lower()
-        acq_kws = ["acquired", "acquisition", "merger", "acquires"]
-        if any(kw in text for kw in acq_kws) and not any(ev.signal_type == "Acquisition / M&A" for ev in events):
-            events.append(e(
-                "Acquisition / M&A", "HIGH",
-                f"M&A news: {article.get('title', '')[:80]}",
-                article.get("title", ""),
-                source_url=art_url,
-            ))
-        ipo_kws = ["ipo", "going public", "s-1"]
-        if any(kw in text for kw in ipo_kws) and not any(ev.signal_type == "IPO Signal" for ev in events):
-            events.append(e(
-                "IPO Signal", "HIGH",
-                f"IPO news: {article.get('title', '')[:80]}",
-                article.get("title", ""),
-                source_url=art_url,
-            ))
+    # 4 & 5. Acquisition / IPO — sourced from Google Sheets only.
+    # Google News articles are NOT used for M&A or IPO HIGH signals;
+    # all news goes to News Mention (LOW) below.
 
     # 6. Subsidiary Change
     old_sub = _low(old_snapshot.get("subsidiary_of"))
@@ -419,9 +401,8 @@ def detect_changes(
     if old_desc and new_desc and old_desc.strip() != new_desc.strip() and len(new_desc) > 20:
         events.append(e("Description Update", "LOW", "Short description was updated"))
 
-    # 22. News Mention (MEDIUM keywords in news → LOW signal)
+    # 22. News Mention (LOW) — ALL fresh articles go here; never HIGH from news
     medium_kws = sig_cfg.get("news_medium_keywords", [])
-    already_high_news = any(ev.signal_type in ("Acquisition / M&A", "IPO Signal") for ev in events)
     fresh_articles = [
         a for a in new_snapshot.get("news_articles", [])
         if is_within_age_limit(a.get("published", ""), max_age_days)
@@ -429,20 +410,24 @@ def detect_changes(
     for article in fresh_articles:
         text = (_str(article.get("title")) + " " + _str(article.get("summary"))).lower()
         if any(kw.lower() in text for kw in medium_kws) and not any(ev.signal_type == "News Mention" for ev in events):
-            events.append(e(
+            evt = e(
                 "News Mention", "LOW",
                 f"In the news: {article.get('title', '')[:80]}",
                 source_url=article.get("url", ""),
-            ))
+            )
+            evt.signal_date = article.get("published", "")
+            events.append(evt)
             break
 
-    if not already_high_news and fresh_articles and not any(ev.signal_type == "News Mention" for ev in events):
+    if fresh_articles and not any(ev.signal_type == "News Mention" for ev in events):
         art = fresh_articles[0]
-        events.append(e(
+        evt = e(
             "News Mention", "LOW",
             f"In the news: {art.get('title', '')[:80]}",
             source_url=art.get("url", ""),
-        ))
+        )
+        evt.signal_date = art.get("published", "")
+        events.append(evt)
 
     return events
 
@@ -458,10 +443,11 @@ def detect_news_signals(
 ) -> list[ChangeEvent]:
     """Detect signals from news_articles only — no Apollo enrichment needed.
 
-    Checks for:
-      - Acquisition / M&A  (HIGH) — keyword match in article title/summary
-      - IPO Signal          (HIGH) — keyword match in article title/summary
-      - News Mention        (LOW)  — any fresh article (medium keyword boost)
+    Produces:
+      - News Mention (LOW) — any fresh article; medium keywords get priority pick.
+
+    M&A and IPO signals are sourced exclusively from Google Sheets and are NOT
+    generated from news article keywords.
 
     Called by main.py when HIGH signals come from Google Sheets and only
     the news-based LOW path needs to run.
@@ -489,50 +475,29 @@ def detect_news_signals(
         if is_within_age_limit(a.get("published", ""), max_age_days)
     ]
 
-    # Acquisition / M&A from news
-    for article in fresh_articles:
-        art_url = article.get("url", "")
-        text = (_str(article.get("title")) + " " + _str(article.get("summary"))).lower()
-        acq_kws = ["acquired", "acquisition", "merger", "acquires"]
-        if any(kw in text for kw in acq_kws) and not any(
-            ev.signal_type == "Acquisition / M&A" for ev in events
-        ):
-            events.append(e(
-                "Acquisition / M&A", "HIGH",
-                f"M&A news: {article.get('title', '')[:80]}",
-                article.get("title", ""),
-                source_url=art_url,
-            ))
-        # IPO from news
-        ipo_kws = ["ipo", "going public", "s-1"]
-        if any(kw in text for kw in ipo_kws) and not any(
-            ev.signal_type == "IPO Signal" for ev in events
-        ):
-            events.append(e(
-                "IPO Signal", "HIGH",
-                f"IPO news: {article.get('title', '')[:80]}",
-                article.get("title", ""),
-                source_url=art_url,
-            ))
-
-    # News Mention (LOW) — medium keyword match first, then any fresh article
+    # News Mention (LOW) — medium keyword match gets priority, otherwise first article
     for article in fresh_articles:
         text = (_str(article.get("title")) + " " + _str(article.get("summary"))).lower()
         if any(kw.lower() in text for kw in medium_kws) and not any(
             ev.signal_type == "News Mention" for ev in events
         ):
-            events.append(e(
+            evt = e(
                 "News Mention", "LOW",
                 f"In the news: {article.get('title', '')[:80]}",
-            ))
+                source_url=article.get("url", ""),
+            )
+            evt.signal_date = article.get("published", "")
+            events.append(evt)
             break
 
     if fresh_articles and not any(ev.signal_type == "News Mention" for ev in events):
         art = fresh_articles[0]
-        events.append(e(
+        evt = e(
             "News Mention", "LOW",
             f"In the news: {art.get('title', '')[:80]}",
             source_url=art.get("url", ""),
-        ))
+        )
+        evt.signal_date = art.get("published", "")
+        events.append(evt)
 
     return events

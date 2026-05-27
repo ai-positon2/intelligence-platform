@@ -92,7 +92,7 @@ def _detect_sheet_events(
     max_age_days = int(config.get("signals", {}).get("max_signal_age_days", 90))
     events: list[ChangeEvent] = []
 
-    def ev(signal_type, severity, headline, detail="", prev="", new_val="", source_url=""):
+    def ev(signal_type, severity, headline, detail="", prev="", new_val="", source_url="", signal_date=""):
         return ChangeEvent(
             apollo_id=apollo_id,
             company_name=name,
@@ -104,6 +104,7 @@ def _detect_sheet_events(
             previous_value=prev,
             new_value=new_val,
             source_url=source_url,
+            signal_date=signal_date,
         )
 
     def _get(row: dict, *keys: str) -> str:
@@ -127,6 +128,7 @@ def _detect_sheet_events(
     # Maps the raw "Signal Type" column value (normalised) → (signal_type, severity)
     # Applies to ALL sheet types so any sheet can carry any HIGH signal.
     _SIGNAL_TYPE_MAP: dict[str, tuple[str, str]] = {
+        # Funding
         "funding":          ("Funding Round",      "HIGH"),
         "funding_round":    ("Funding Round",      "HIGH"),
         "series_a":         ("Funding Round",      "HIGH"),
@@ -134,19 +136,31 @@ def _detect_sheet_events(
         "series_c":         ("Funding Round",      "HIGH"),
         "series_d":         ("Funding Round",      "HIGH"),
         "seed":             ("Funding Round",      "HIGH"),
+        "grant":            ("Funding Round",      "HIGH"),
+        "debt_financing":   ("Funding Round",      "HIGH"),
+        "debt":             ("Funding Round",      "HIGH"),
+        "credit_facility":  ("Funding Round",      "HIGH"),
+        # IPO / Public offering
         "ipo":              ("IPO Signal",          "HIGH"),
+        "ipo_signal":       ("IPO Signal",          "HIGH"),
         "going_public":     ("IPO Signal",          "HIGH"),
+        "spac":             ("IPO Signal",          "HIGH"),
+        # PUBLIC_OFFERING = shelf/ATM/buyback for already-public companies → Funding Round
+        "public_offering":  ("Funding Round",       "HIGH"),
+        # M&A
         "m_and_a":          ("Acquisition / M&A",  "HIGH"),
         "ma":               ("Acquisition / M&A",  "HIGH"),
         "acquisition":      ("Acquisition / M&A",  "HIGH"),
         "merger":           ("Acquisition / M&A",  "HIGH"),
         "take_private":     ("Acquisition / M&A",  "HIGH"),
+        # C-Suite
         "c_suite_join":     ("C-Suite Join",        "HIGH"),
         "csuite_join":      ("C-Suite Join",        "HIGH"),
         "executive_hire":   ("C-Suite Join",        "HIGH"),
         "c_suite_exit":     ("C-Suite Exit",        "HIGH"),
         "csuite_exit":      ("C-Suite Exit",        "HIGH"),
         "executive_depart": ("C-Suite Exit",        "HIGH"),
+        # Subsidiary
         "subsidiary":       ("Subsidiary Change",   "HIGH"),
         "subsidiary_change":("Subsidiary Change",   "HIGH"),
     }
@@ -162,6 +176,9 @@ def _detect_sheet_events(
         date   = _get(row, "Scan Date", "Raised At", "Announcement Date", "Date")
         if not is_within_age_limit(date, max_age_days):
             continue
+        # For display use the actual event date (Announcement Date / Raised At),
+        # falling back to Scan Date only when no event date is available.
+        event_date = _get(row, "Announcement Date", "Raised At", "Date") or date
         raw_signal_type = _get(row, "Signal Type")
         routed_type, routed_sev = _route_signal_type(
             raw_signal_type, "Funding Round", "HIGH"
@@ -198,6 +215,7 @@ def _detect_sheet_events(
             headline, detail,
             new_val=f"{ftype} / {amount}",
             source_url=src,
+            signal_date=event_date,
         ))
 
     # ── C-Suite Join / Exit ────────────────────────────────────────────────────
@@ -205,6 +223,7 @@ def _detect_sheet_events(
         date    = _get(row, "Scan Date", "Start Date", "Date")
         if not is_within_age_limit(date, max_age_days):
             continue
+        event_date = _get(row, "Start Date", "Date") or date
         action   = _get(row, "Action", "Signal Type").lower().strip()
         person   = _get(row, "Person Name", "Executive Name", "Name")
         title    = _get(row, "Title", "Role", "Position")
@@ -219,11 +238,16 @@ def _detect_sheet_events(
         verb        = "exited" if is_exit else action.capitalize() if action else "Joined"
 
         # ── Extract source URL + name from Notes when no dedicated column
-        # Notes format: "Source: PR Newswire, https://... / Confidence: High / Summary: ..."
-        _url_match = re.search(r'https?://[^\s,|)>"\' ]+', notes)
-        notes_url  = _url_match.group(0).rstrip(".,;") if _url_match else ""
-        # Source name = word(s) before the URL
-        _name_match = re.search(r"(?:Source:\s*)?([\w\s&]+?),?\s*https?://", notes)
+        # Notes format: "Source: Becker's Hospital Review, https://... / Confidence: High / ..."
+        # URL regex: stop only at whitespace or common terminators — NOT at apostrophes
+        _url_match = re.search(r'https?://[^\s)>"\]]+', notes)
+        notes_url  = _url_match.group(0).rstrip(".,;|/'\"") if _url_match else ""
+        # Source name: capture everything after "Source:" up to the comma + URL
+        # Use .+? so apostrophes, hyphens, dots, etc. are included (e.g. "Becker's Hospital Review")
+        _name_match = re.search(r"Source:\s*(.+?)\s*,\s*https?://", notes, re.IGNORECASE)
+        if not _name_match:
+            # Fallback: try pipe separator ("Source: Business Wire | https://...")
+            _name_match = re.search(r"Source:\s*(.+?)\s*[|]\s*https?://", notes, re.IGNORECASE)
         notes_src_name = _name_match.group(1).strip() if _name_match else ""
 
         # Build encoded source: prefer LinkedIn, then sheet Source URL col, then Notes URL
@@ -246,13 +270,14 @@ def _detect_sheet_events(
             + (f"Summary: {summary}" if summary else "")
         ).strip()
         events.append(ev(signal_type, "HIGH", headline, detail, new_val=f"{person} — {title}",
-                         source_url=sheet_src or linkedin))
+                         source_url=sheet_src or linkedin, signal_date=event_date))
 
     # ── Acquisition / M&A ─────────────────────────────────────────────────────
     for row in company_signals.get("ma", []):
         date    = _get(row, "Scan Date", "Announcement Date", "Date")
         if not is_within_age_limit(date, max_age_days):
             continue
+        event_date = _get(row, "Announcement Date", "Date") or date
         summary = _get(row, "Summary", "Description", "Notes")
         src     = _src(row)
         conf    = _get(row, "Confidence")
@@ -263,13 +288,14 @@ def _detect_sheet_events(
             + f"Date: {date}."
             + (f" Confidence: {conf}" if conf else "")
         ).strip()
-        events.append(ev("Acquisition / M&A", "HIGH", headline, detail, source_url=src))
+        events.append(ev("Acquisition / M&A", "HIGH", headline, detail, source_url=src, signal_date=event_date))
 
     # ── IPO Signal ────────────────────────────────────────────────────────────
     for row in company_signals.get("ipo", []):
         date    = _get(row, "Scan Date", "Announcement Date", "Date")
         if not is_within_age_limit(date, max_age_days):
             continue
+        event_date = _get(row, "Announcement Date", "Date") or date
         summary = _get(row, "Summary", "Description", "Notes")
         src     = _src(row)
         conf    = _get(row, "Confidence")
@@ -280,13 +306,14 @@ def _detect_sheet_events(
             + f"Date: {date}."
             + (f" Confidence: {conf}" if conf else "")
         ).strip()
-        events.append(ev("IPO Signal", "HIGH", headline, detail, source_url=src))
+        events.append(ev("IPO Signal", "HIGH", headline, detail, source_url=src, signal_date=event_date))
 
     # ── Subsidiary Change ─────────────────────────────────────────────────────
     for row in company_signals.get("subsidiary", []):
         date       = _get(row, "Scan Date", "Date")
         if not is_within_age_limit(date, max_age_days):
             continue
+        event_date = _get(row, "Date") or date
         old_parent = _get(row, "Old Parent") or "none"
         new_parent = _get(row, "New Parent") or "none"
         summary    = _get(row, "Summary", "Notes")
@@ -302,6 +329,7 @@ def _detect_sheet_events(
             "Subsidiary Change", "HIGH",
             headline, detail,
             prev=old_parent, new_val=new_parent,
+            signal_date=event_date,
         ))
 
     return events
@@ -366,14 +394,15 @@ def _process_company_sheets(
         ev_source = getattr(event, 'source_url', '')
         if store.was_alert_sent_recently(apollo_id, event.signal_type, dedup_days,
                                           signal_detail=event.headline):
-            # Already stored — backfill source_url if the existing record is empty
+            # Already stored — backfill source_url if we now have a better value
             if ev_source:
-                store.update_source_url_if_empty(
+                store.update_source_url_if_better(
                     apollo_id, event.signal_type, event.headline, ev_source
                 )
             continue
         store.record_alert(apollo_id, event.signal_type, event.headline, event.severity, dry_run,
-                             source_url=ev_source)
+                             source_url=ev_source,
+                             signal_date=getattr(event, 'signal_date', None) or None)
         all_changes.append(event)
         console.print(f"  [[bold]{event.severity}[/bold]] {name}: {event.headline}")
 
