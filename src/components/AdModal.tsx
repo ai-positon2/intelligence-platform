@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ExternalLink, Globe, Tag, Lightbulb, ChevronDown, ChevronUp, ImageIcon, FileText, Video } from 'lucide-react';
 import type { Ad } from '../lib/types';
 import { COMPETITOR_COLORS, COMPETITORS } from '../lib/types';
@@ -85,7 +86,7 @@ export function AdModal({ ad, onClose }: AdModalProps) {
     { label: 'Platform',    val: ad.Platform || null },
   ].filter(x => x.val);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 anim-fade-in"
          style={{ background: 'rgba(10,14,35,0.8)', backdropFilter: 'blur(10px)' }}
          onClick={onClose}>
@@ -240,6 +241,7 @@ export function AdModal({ ad, onClose }: AdModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
