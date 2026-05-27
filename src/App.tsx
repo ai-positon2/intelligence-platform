@@ -80,8 +80,25 @@ export default function App() {
   const [ads, setAds]             = useState<Ad[]>(embeddedAds as Ad[]);
   const [tab, setTab]             = useState<TabId>('overview');
   const [status, setStatus]       = useState<DataStatus>('embedded');
-  const [, setLast]               = useState<Date>(new Date());
+  const [lastUpdated, setLast]    = useState<Date>(new Date());
+  const [now, setNow]             = useState<Date>(new Date());
   const [sidebarOpen, setSidebar] = useState(false);
+
+  /* ── Tick every minute so "X mins ago" stays fresh */
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* ── Human-readable "X mins ago" */
+  const timeAgo = (() => {
+    const diff = Math.floor((now.getTime() - lastUpdated.getTime()) / 60_000);
+    if (diff < 1)  return 'just now';
+    if (diff === 1) return '1 min ago';
+    if (diff < 60)  return `${diff} mins ago`;
+    const h = Math.floor(diff / 60);
+    return h === 1 ? '1 hr ago' : `${h} hrs ago`;
+  })();
 
   /* ── Global filter state (controlled across all tabs) */
   const [galleryDomain,   setGalleryDomain]   = useState('all');
@@ -195,21 +212,43 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex-shrink-0 bg-[#0c1120]/95 backdrop-blur-md border-b border-white/8 px-5 py-3 flex items-center gap-4 sticky top-0 z-30">
-          <button onClick={() => setSidebar(true)} className="lg:hidden text-white/50 hover:text-white"><Menu size={20}/></button>
-          <div>
-            <h1 className="text-base font-bold text-white leading-none">{tabLabel}</h1>
-            <p className="text-xs text-white/40 mt-0.5">Google Ads Transparency Intelligence</p>
+        <header className="flex-shrink-0 bg-[#0d1324]/95 backdrop-blur-md border-b border-white/6 px-5 py-0 flex items-center gap-4 sticky top-0 z-30" style={{ minHeight: '52px' }}>
+          <button onClick={() => setSidebar(true)} className="lg:hidden text-white/50 hover:text-white flex-shrink-0"><Menu size={20}/></button>
+
+          {/* Left: breadcrumb-style title */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg animated-gradient flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
+              <Zap size={13} className="text-white"/>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 text-white/25 text-xs">
+              <span>Ad Intelligence</span>
+              <span>/</span>
+            </div>
+            <h1 className="text-sm font-bold text-white leading-none truncate">{tabLabel}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+
+          {/* Right: pills */}
+          <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {/* Updated pill */}
+            <button
+              onClick={loadLive}
+              disabled={status === 'loading'}
+              className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-white/35 hover:text-white/65 px-2.5 py-1.5 rounded-lg hover:bg-white/6 transition-all disabled:opacity-40"
+            >
+              <RefreshCw size={10} className={status === 'loading' ? 'animate-spin text-indigo-400' : ''}/>
+              {status === 'loading' ? 'Syncing…' : `Updated ${timeAgo}`}
+            </button>
+
+            {/* Live badge */}
             {status === 'live' && (
-              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-500/20">
-                <CheckCircle2 size={11}/> Live
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-500/12 text-emerald-400 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-emerald-500/18">
+                <span className="live-dot" style={{ width: 6, height: 6 }}/> Live
               </div>
             )}
+
             <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
-               className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-white/40 hover:text-white/80 px-3 py-1.5 rounded-lg hover:bg-white/8 transition-all border border-white/10">
-              <ExternalLink size={12}/> Open Sheet
+               className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-white/35 hover:text-white/65 px-2.5 py-1.5 rounded-lg hover:bg-white/6 transition-all border border-white/8">
+              <ExternalLink size={11}/> Sheet
             </a>
           </div>
         </header>
