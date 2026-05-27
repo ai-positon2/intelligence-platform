@@ -286,21 +286,26 @@ class SnapshotStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def update_source_url_if_empty(
+    def update_source_url_if_better(
         self,
         apollo_id: str,
         signal_type: str,
         signal_detail: str,
         source_url: str,
     ) -> None:
-        """Patch source_url on the most recent matching alert if it is currently empty.
+        """Patch source_url on the most recent matching alert when we have a better value.
 
-        Called when dedup blocks re-insertion but we have a better source URL
-        than what was stored on the original record (e.g. a PR Newswire link
-        parsed from the Notes column that wasn't available on the first run).
+        "Better" means:
+          - The existing record has no source_url (empty / NULL), OR
+          - The existing record only has a LinkedIn URL but the new value is NOT LinkedIn
+            (i.e. we now have the real press-release / article link from Notes).
+
+        Called when dedup blocks re-insertion so that already-stored alerts get
+        the correct source link without needing a full reset.
         """
         if not source_url:
             return
+        new_is_linkedin = "linkedin.com" in source_url.lower()
         with _connect(self.db_path) as conn:
             conn.execute(
                 """
@@ -308,16 +313,20 @@ class SnapshotStore:
                 SET    source_url = ?
                 WHERE  id = (
                     SELECT id FROM alerts_sent
-                    WHERE  apollo_id    = ?
-                      AND  signal_type  = ?
+                    WHERE  apollo_id     = ?
+                      AND  signal_type   = ?
                       AND  signal_detail = ?
-                      AND  dry_run      = 0
+                      AND  dry_run       = 0
                     ORDER BY sent_at DESC
                     LIMIT 1
                 )
-                AND (source_url IS NULL OR source_url = '')
+                AND (
+                    source_url IS NULL
+                    OR source_url = ''
+                    OR (? = 0 AND lower(source_url) LIKE '%linkedin.com%')
+                )
                 """,
-                (source_url, apollo_id, signal_type, signal_detail),
+                (source_url, apollo_id, signal_type, signal_detail, int(new_is_linkedin)),
             )
 
     def reset_alerts(self) -> None:
