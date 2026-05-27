@@ -54,6 +54,14 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
           </div>
         )}
 
+        {/* Live badge — top-left, only when active */}
+        {ad.Status === 'active' && (
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full text-white bg-emerald-500/90 backdrop-blur-sm z-10">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"/>
+            Live
+          </div>
+        )}
+
         {/* Format badge — always top-right */}
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white backdrop-blur-md"
              style={{ backgroundColor: `${color}cc` }}>
