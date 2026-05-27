@@ -2,12 +2,16 @@
 build_csg_dashboard.py
 ======================
 One-shot script: reads CSG-company-list.xlsx and generates
-reports/dashboard_csg.html -- no database required.
+reports/dashboard_csg.html backed by a persistent SQLite database.
 
-Usage (run locally OR in the bash sandbox):
+Usage:
     python build_csg_dashboard.py
 
-Re-run any time you update the XLSX or want to refresh the dashboard.
+Re-run any time you want to refresh the dashboard. Companies are
+upserted into the DB on every run so new rows in the XLSX appear
+automatically. Signals are written separately via seed_csg_signals.py.
+
+DB path: data/tracker_csg_v2.db  (never touches the corrupted legacy DBs)
 """
 
 from __future__ import annotations
@@ -26,9 +30,11 @@ except ImportError:
     sys.exit(1)
 
 from tracker.dashboard_builder import build_dashboard
+from tracker.snapshot_store import SnapshotStore
 
 XLSX_PATH = ROOT / "CSG-company-list.xlsx"
 OUT_PATH  = ROOT / "reports" / "dashboard_csg.html"
+DB_PATH   = ROOT / "data" / "tracker_csg_v2.db"
 
 COUNTRY_NORM = {
     "PRC":           "China",
@@ -36,36 +42,6 @@ COUNTRY_NORM = {
     "UK":            "United Kingdom",
     "Taiwan/Europe": "Taiwan",
 }
-
-
-class _MockStore:
-    """Mimics SnapshotStore using only in-memory data. No SQLite needed."""
-
-    def __init__(self, companies):
-        self._companies = companies
-
-    def get_all_companies(self):
-        return [
-            {
-                "apollo_id": c["apollo_id"],
-                "name":      c["name"],
-                "domain":    c.get("domain", ""),
-                "industry":  c.get("industry", ""),
-                "city":      c.get("city", ""),
-                "state":     c.get("state", ""),
-                "is_active": 1,
-            }
-            for c in self._companies
-        ]
-
-    def get_latest_snapshot(self, apollo_id):
-        return None
-
-    def get_recent_alerts(self, limit=10000, max_age_days=90):
-        return []
-
-    def get_weekly_runs(self, limit=8):
-        return []
 
 
 def _slugify(text):
@@ -94,9 +70,10 @@ def build_csg():
             skipped += 1
             continue
 
-        raw_name  = str(row[0]).strip()
-        raw_hq    = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-        raw_roles = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+        raw_name   = str(row[0]).strip()
+        raw_hq     = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+        raw_roles  = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+        raw_domain = str(row[3]).strip() if len(row) > 3 and row[3] else ""
 
         country   = COUNTRY_NORM.get(raw_hq, raw_hq)
         apollo_id = _make_id(raw_name)
@@ -105,7 +82,7 @@ def build_csg():
         company = {
             "apollo_id":               apollo_id,
             "name":                    raw_name,
-            "domain":                  "",
+            "domain":                  raw_domain,
             "city":                    country,
             "state":                   "",
             "country":                 country,
@@ -140,10 +117,26 @@ def build_csg():
 
     print("  Loaded %d companies (skipped %d blank rows)" % (len(companies), skipped))
 
+    print("Opening DB -> %s ..." % DB_PATH)
+    store = SnapshotStore(DB_PATH)
+
+    # Upsert every company so new XLSX rows appear in the DB automatically
+    for co in companies:
+        store.upsert_company({
+            "apollo_id": co["apollo_id"],
+            "name":      co["name"],
+            "domain":    co.get("domain", ""),
+            "industry":  co.get("industry", "Technology"),
+            "city":      co.get("city", ""),
+            "state":     co.get("state", ""),
+        })
+
+    alert_count = len(store.get_recent_alerts(limit=100_000, max_age_days=730))
+    print("  Signals in DB:        %d" % alert_count)
+
     print("Building dashboard -> %s ..." % OUT_PATH)
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    store = _MockStore(companies)
     out = build_dashboard(
         companies_from_csv=companies,
         store=store,
