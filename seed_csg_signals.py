@@ -67,6 +67,19 @@ def _make_id(name: str) -> str:
 
 KNOWN_SIGNALS: dict[str, list[dict]] = {
 
+    # ── Batch A1 (Action Electronics → AMPACS Corp) ───────────────────────
+    # Alps Alpine Co Ltd: 2 news signals (Mar 2025)
+    "Alps Alpine Co Ltd": [
+        {"signal_type": "News Mention",
+         "title": "Alps Alpine invests SEK 25M in Acconeer AB, deepening strategic radar-sensor partnership",
+         "url": "https://acconeer.com/mfn_news/acconeer-ab-publ-announces-that-the-directed-share-issue-to-alps-alpine-of-approximately-sek-25-million-is-completed/",
+         "date": "2025-03-06"},
+        {"signal_type": "News Mention",
+         "title": "Alps Alpine to invest ¥10 billion in domestic factory automation to boost production efficiency",
+         "url": "https://www.alpsalpine.com/e/company/",
+         "date": "2025-01-01"},
+    ],
+
     # ── Batch 1 (Acer → Elitegroup Computer Systems) ───────────────────────
     "Acer Inc.": [
         {"signal_type": "Leadership Change",
