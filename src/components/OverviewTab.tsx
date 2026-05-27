@@ -109,8 +109,8 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
         {/* Competitor bar — click bar → Competitors tab */}
         <Card title="Ads by Competitor" subtitle="Click a bar to deep-dive"
               action={{ label: 'View all', onClick: () => onNav({ tab: 'competitors' }) }}>
-          <ResponsiveContainer width="100%" height={190}>
-            <BarChart data={compData} barSize={36} maxBarSize={44} barCategoryGap="30%" margin={{ top: 4 }}
+          <ResponsiveContainer width="100%" height={155}>
+            <BarChart data={compData} barSize={36} maxBarSize={44} barCategoryGap="30%" margin={{ top: 4, bottom: 0 }}
                       style={{ cursor: 'pointer' }}>
               <defs>
                 {compData.map((c, i) => (
@@ -135,7 +135,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
         {/* Format pie — click slice → Gallery filtered */}
         <Card title="Format Distribution" subtitle="Click a slice to filter gallery"
               action={{ label: 'Gallery', onClick: () => onNav({ tab: 'gallery', format: 'all' }) }}>
-          <ResponsiveContainer width="100%" height={190}>
+          <ResponsiveContainer width="100%" height={155}>
             <PieChart style={{ cursor: 'pointer' }}>
               <defs>
                 {fmtData.map((f, i) => (
@@ -145,7 +145,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                   </linearGradient>
                 ))}
               </defs>
-              <Pie data={fmtData} cx="50%" cy="45%" outerRadius={68} innerRadius={28}
+              <Pie data={fmtData} cx="50%" cy="42%" outerRadius={58} innerRadius={24}
                    dataKey="value" labelLine={false} label={PieLabel}
                    onClick={(data: unknown) => { const d = data as { rawName: string }; onNav({ tab: 'gallery', format: d.rawName, domain: 'all', search: '' }); }}>
                 {fmtData.map((_, i) => <Cell key={i} fill={`url(#fg${i})`}/>)}
@@ -187,7 +187,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
       {activity.length > 1 && (
         <Card title="Ad Activity Timeline" subtitle="When competitors were most active"
               action={{ label: 'View Gallery', onClick: () => onNav({ tab: 'gallery' }) }}>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={activity} margin={{ top: 4 }}>
               <defs>
                 {COMPETITORS.map(c => (
