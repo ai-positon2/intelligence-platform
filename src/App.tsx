@@ -220,9 +220,9 @@ export default function App() {
             <div className="w-7 h-7 rounded-lg animated-gradient flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
               <Zap size={13} className="text-white"/>
             </div>
-            <div className="hidden sm:flex items-center gap-1.5 text-white/25 text-xs">
+            <div className="hidden sm:flex items-center gap-1.5 text-white/50 text-xs font-medium">
               <span>Ad Intelligence</span>
-              <span>/</span>
+              <span className="text-white/25">/</span>
             </div>
             <h1 className="text-sm font-bold text-white leading-none truncate">{tabLabel}</h1>
           </div>
