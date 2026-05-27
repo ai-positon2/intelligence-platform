@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Image, Users, Sparkles,
-  RefreshCw, ExternalLink, AlertCircle, CheckCircle2, Clock
+  RefreshCw, ExternalLink, CheckCircle2, AlertCircle,
+  Clock, Menu, X, TrendingUp, Zap
 } from 'lucide-react';
 import type { Ad, TabId } from './lib/types';
-import { StatCard } from './components/StatCard';
+import { COMPETITORS } from './lib/types';
 import { OverviewTab } from './components/OverviewTab';
 import { GalleryTab } from './components/GalleryTab';
 import { CompetitorsTab } from './components/CompetitorsTab';
@@ -12,223 +13,267 @@ import { CreativeTab } from './components/CreativeTab';
 import { fetchSheetData } from './lib/sheets';
 import embeddedAds from './data/ads.json';
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={16} /> },
-  { id: 'gallery', label: 'Ad Gallery', icon: <Image size={16} /> },
-  { id: 'competitors', label: 'Competitors', icon: <Users size={16} /> },
-  { id: 'creative', label: 'Creative Analysis', icon: <Sparkles size={16} /> },
+/* ── Count-up hook ─────────────────────────────────────── */
+function useCountUp(target: number, duration = 1200) {
+  const [val, setVal] = useState(0);
+  const raf = useRef<number>(0);
+  useEffect(() => {
+    let start: number | null = null;
+    const tick = (ts: number) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 4);
+      setVal(Math.round(eased * target));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target, duration]);
+  return val;
+}
+
+/* ── Nav items ─────────────────────────────────────────── */
+const NAV: { id: TabId; label: string; icon: React.ReactNode; desc: string }[] = [
+  { id: 'overview',   label: 'Overview',          icon: <LayoutDashboard size={18} />, desc: 'Charts & summary' },
+  { id: 'gallery',    label: 'Ad Gallery',         icon: <Image size={18} />,           desc: 'Browse all creatives' },
+  { id: 'competitors',label: 'Competitors',        icon: <Users size={18} />,           desc: 'Deep competitor intel' },
+  { id: 'creative',   label: 'Creative Analysis',  icon: <Sparkles size={18} />,        desc: 'Keywords & messaging' },
 ];
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s/edit';
-
 type DataStatus = 'embedded' | 'loading' | 'live' | 'error';
 
+/* ── Gradient stat card ─────────────────────────────────── */
+function GradientCard({
+  value, label, sub, gradient, icon, delay = ''
+}: {
+  value: number; label: string; sub: string;
+  gradient: string; icon: React.ReactNode; delay?: string;
+}) {
+  const count = useCountUp(value);
+  return (
+    <div className={`relative overflow-hidden rounded-2xl p-5 text-white card-lift anim-fade-up ${delay} cursor-default`}
+         style={{ background: gradient }}>
+      {/* shimmer overlay */}
+      <div className="absolute inset-0 stat-shimmer pointer-events-none" />
+      {/* decorative circle */}
+      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+      <div className="absolute -right-2 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
+      {/* icon */}
+      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-4">
+        {icon}
+      </div>
+      {/* content */}
+      <div className="relative">
+        <p className="text-4xl font-black tracking-tight leading-none">{count}</p>
+        <p className="text-sm font-semibold mt-1 text-white/90">{label}</p>
+        <p className="text-xs mt-0.5 text-white/60">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ───────────────────────────────────────────── */
 export default function App() {
   const [ads, setAds] = useState<Ad[]>(embeddedAds as Ad[]);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [dataStatus, setDataStatus] = useState<DataStatus>('embedded');
+  const [tab, setTab] = useState<TabId>('overview');
+  const [status, setStatus] = useState<DataStatus>('embedded');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [errorMsg, setErrorMsg] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const loadLiveData = useCallback(async () => {
-    setDataStatus('loading');
-    setErrorMsg('');
+  const loadLive = useCallback(async () => {
+    setStatus('loading');
     try {
-      const liveAds = await fetchSheetData();
-      if (liveAds.length > 0) {
-        setAds(liveAds);
-        setDataStatus('live');
-        setLastUpdated(new Date());
-      } else {
-        throw new Error('No data returned from sheet');
-      }
-    } catch (err) {
-      console.error('Failed to fetch live data:', err);
-      setDataStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Unknown error');
-      // Keep embedded data
-    }
+      const live = await fetchSheetData();
+      if (live.length > 0) { setAds(live); setStatus('live'); setLastUpdated(new Date()); }
+      else throw new Error('Empty response');
+    } catch { setStatus('error'); }
   }, []);
 
-  // Attempt to load live data on mount
-  useEffect(() => {
-    loadLiveData();
-  }, [loadLiveData]);
+  useEffect(() => { loadLive(); }, [loadLive]);
 
-  // Summary stats
-  const totalAds = ads.length;
-  const activeAds = ads.filter(a => a.Status === 'active').length;
+  /* stats */
+  const total       = ads.length;
+  const active      = ads.filter(a => a.Status === 'active').length;
+  const withImg     = ads.filter(a => a['Image URLs']).length;
   const competitors = [...new Set(ads.map(a => a.Domain).filter(Boolean))].length;
-  const withImages = ads.filter(a => a['Image URLs']).length;
-  const withVideos = ads.filter(a => a.Format?.toLowerCase() === 'video').length;
-  const mostRecent = [...ads]
-    .filter(a => a['Last Shown'])
-    .sort((a, b) => b['Last Shown'].localeCompare(a['Last Shown']))[0];
+
+  const tabLabel = NAV.find(n => n.id === tab)?.label ?? '';
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo / Title */}
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles size={16} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-slate-900 leading-none">Ad Intelligence</h1>
-                <p className="text-xs text-slate-400 leading-none mt-0.5">Competitor Ad Dashboard</p>
-              </div>
+    <div className="flex h-screen overflow-hidden bg-[#eef2ff]">
+
+      {/* ── SIDEBAR ──────────────────────────────────────── */}
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`
+        sidebar fixed lg:static inset-y-0 left-0 z-50 w-64 flex flex-col
+        transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Logo */}
+        <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl animated-gradient flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30">
+              <Zap size={18} className="text-white" />
             </div>
-
-            {/* Nav tabs */}
-            <nav className="hidden md:flex items-center gap-1">
-              {TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-
-            {/* Right: data status + actions */}
-            <div className="flex items-center gap-3">
-              {/* Data status indicator */}
-              <div className="flex items-center gap-2">
-                {dataStatus === 'loading' && (
-                  <div className="flex items-center gap-1.5 text-xs text-amber-600">
-                    <RefreshCw size={12} className="animate-spin" />
-                    <span className="hidden sm:inline">Fetching live data…</span>
-                  </div>
-                )}
-                {dataStatus === 'live' && (
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-600">
-                    <CheckCircle2 size={12} />
-                    <span className="hidden sm:inline">Live data</span>
-                  </div>
-                )}
-                {dataStatus === 'embedded' && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Clock size={12} />
-                    <span className="hidden sm:inline">Cached data</span>
-                  </div>
-                )}
-                {dataStatus === 'error' && (
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500" title={errorMsg}>
-                    <AlertCircle size={12} className="text-amber-400" />
-                    <span className="hidden sm:inline">Using cached data</span>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={loadLiveData}
-                disabled={dataStatus === 'loading'}
-                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200"
-              >
-                <RefreshCw size={12} className={dataStatus === 'loading' ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-
-              <a
-                href={SHEET_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200"
-              >
-                <ExternalLink size={12} />
-                Sheet
-              </a>
+            <div>
+              <p className="text-white font-bold text-sm leading-none">Ad Intelligence</p>
+              <p className="text-white/40 text-xs mt-0.5">Competitor Tracker</p>
             </div>
           </div>
-        </div>
-      </header>
-
-      {/* Mobile nav */}
-      <div className="md:hidden bg-white border-b border-slate-200 px-4 py-2 flex gap-2 overflow-x-auto">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-              activeTab === tab.id
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/40 hover:text-white">
+            <X size={18} />
           </button>
-        ))}
-      </div>
-
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard
-            label="Total Ads Tracked"
-            value={totalAds}
-            sub={`Across ${competitors} competitors`}
-            icon={<LayoutDashboard size={20} />}
-            color="bg-indigo-50 text-indigo-600"
-          />
-          <StatCard
-            label="Active Ads"
-            value={activeAds}
-            sub={`${Math.round((activeAds / totalAds) * 100)}% of total`}
-            icon={<CheckCircle2 size={20} />}
-            color="bg-emerald-50 text-emerald-600"
-          />
-          <StatCard
-            label="Image Creatives"
-            value={withImages}
-            sub={`${withVideos} video ad${withVideos !== 1 ? 's' : ''}`}
-            icon={<Image size={20} />}
-            color="bg-sky-50 text-sky-600"
-          />
-          <StatCard
-            label="Competitors Tracked"
-            value={competitors}
-            sub={mostRecent ? `Last seen ${new Date(mostRecent['Last Shown']).toLocaleDateString()}` : 'Google Ads'}
-            icon={<Users size={20} />}
-            color="bg-purple-50 text-purple-600"
-          />
         </div>
 
-        {/* Tab content */}
-        <div>
-          {activeTab === 'overview' && <OverviewTab ads={ads} />}
-          {activeTab === 'gallery' && <GalleryTab ads={ads} />}
-          {activeTab === 'competitors' && <CompetitorsTab ads={ads} />}
-          {activeTab === 'creative' && <CreativeTab ads={ads} />}
-        </div>
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <p className="text-white/25 text-[10px] font-semibold uppercase tracking-widest px-3 mb-3">Navigation</p>
+          {NAV.map(item => {
+            const active = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setTab(item.id); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group ${
+                  active
+                    ? 'bg-indigo-500/20 text-white'
+                    : 'text-white/45 hover:text-white/80 hover:bg-white/5'
+                }`}
+              >
+                <span className={`flex-shrink-0 transition-colors ${active ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/60'}`}>
+                  {item.icon}
+                </span>
+                <span>
+                  <span className="block text-sm font-medium leading-none">{item.label}</span>
+                  <span className={`block text-[10px] mt-0.5 ${active ? 'text-indigo-300/70' : 'text-white/25'}`}>{item.desc}</span>
+                </span>
+                {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />}
+              </button>
+            );
+          })}
+
+          {/* Competitors section */}
+          <p className="text-white/25 text-[10px] font-semibold uppercase tracking-widest px-3 mt-5 mb-3">Competitors</p>
+          {COMPETITORS.map(c => (
+            <div key={c.domain} className="flex items-center gap-3 px-3 py-2 rounded-xl">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                   style={{ backgroundColor: c.color }}>
+                {c.name[0]}
+              </div>
+              <div className="min-w-0">
+                <p className="text-white/60 text-xs font-medium truncate">{c.name}</p>
+                <p className="text-white/25 text-[10px] truncate">{c.domain}</p>
+              </div>
+            </div>
+          ))}
+        </nav>
 
         {/* Footer */}
-        <footer className="mt-8 pt-6 border-t border-slate-200 text-center">
-          <p className="text-xs text-slate-400">
-            Data sourced from Google Ads Transparency Center •{' '}
-            {dataStatus === 'live' ? (
-              <>Last refreshed {lastUpdated.toLocaleTimeString()}</>
-            ) : (
-              <>Snapshot taken May 27, 2026</>
-            )}
-            {' '}•{' '}
-            <a href={SHEET_URL} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-indigo-700">
-              View source sheet
-            </a>
+        <div className="px-4 py-4 border-t border-white/5 space-y-3">
+          {/* Status */}
+          <div className="flex items-center gap-2">
+            {status === 'live'     && <><span className="live-dot" /><span className="text-emerald-400 text-xs font-medium">Live data</span></>}
+            {status === 'loading'  && <><RefreshCw size={10} className="text-amber-400 animate-spin" /><span className="text-amber-400 text-xs">Syncing…</span></>}
+            {status === 'embedded' && <><Clock size={10} className="text-white/30" /><span className="text-white/30 text-xs">Cached data</span></>}
+            {status === 'error'    && <><AlertCircle size={10} className="text-amber-400" /><span className="text-white/50 text-xs">Cached data</span></>}
+          </div>
+          <p className="text-white/25 text-[10px]">
+            {total} ads · {competitors} competitors<br />
+            Updated {lastUpdated.toLocaleTimeString()}
           </p>
-        </footer>
-      </main>
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={loadLive}
+              disabled={status === 'loading'}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/8 hover:bg-white/12 text-white/60 hover:text-white text-xs font-medium transition-all disabled:opacity-40"
+            >
+              <RefreshCw size={12} className={status === 'loading' ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <a
+              href={SHEET_URL} target="_blank" rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/8 hover:bg-white/12 text-white/60 hover:text-white text-xs font-medium transition-all"
+            >
+              <ExternalLink size={12} /> Sheet
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT ─────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Top bar */}
+        <header className="flex-shrink-0 bg-white/70 backdrop-blur-md border-b border-slate-200/80 px-5 py-3 flex items-center gap-4 sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-700">
+            <Menu size={20} />
+          </button>
+          <div>
+            <h1 className="text-base font-bold text-slate-900 leading-none">{tabLabel}</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Google Ads Transparency Intelligence</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {status === 'live' && (
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 text-emerald-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+                <CheckCircle2 size={11} /> Live
+              </div>
+            )}
+            <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
+               className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-all border border-slate-200">
+              <ExternalLink size={12} /> Open Sheet
+            </a>
+          </div>
+        </header>
+
+        {/* Scrollable body */}
+        <main className="flex-1 overflow-y-auto dot-bg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
+              <GradientCard
+                value={total} label="Total Ads Tracked" sub={`${competitors} competitors`}
+                gradient="linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)"
+                icon={<TrendingUp size={20} className="text-white" />}
+                delay="delay-1"
+              />
+              <GradientCard
+                value={active} label="Active Ads" sub={`${Math.round((active/total)*100)}% of total`}
+                gradient="linear-gradient(135deg, #10b981 0%, #0891b2 100%)"
+                icon={<CheckCircle2 size={20} className="text-white" />}
+                delay="delay-2"
+              />
+              <GradientCard
+                value={withImg} label="Image Creatives" sub={`${ads.filter(a=>a.Format==='video').length} video ads`}
+                gradient="linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)"
+                icon={<Image size={20} className="text-white" />}
+                delay="delay-3"
+              />
+              <GradientCard
+                value={competitors} label="Competitors" sub="Google Ads data"
+                gradient="linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)"
+                icon={<Users size={20} className="text-white" />}
+                delay="delay-4"
+              />
+            </div>
+
+            {/* Tab content */}
+            <div className="anim-fade-up">
+              {tab === 'overview'    && <OverviewTab ads={ads} />}
+              {tab === 'gallery'     && <GalleryTab ads={ads} />}
+              {tab === 'competitors' && <CompetitorsTab ads={ads} />}
+              {tab === 'creative'    && <CreativeTab ads={ads} />}
+            </div>
+
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
