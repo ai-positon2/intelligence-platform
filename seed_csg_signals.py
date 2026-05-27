@@ -67,6 +67,57 @@ def _make_id(name: str) -> str:
 
 KNOWN_SIGNALS: dict[str, list[dict]] = {
 
+    # ── Batch A2 (Andrea Electronics → Avell) ────────────────────────────
+    # Aorus (Gigabyte Group) — sub-brand of Gigabyte; signals covered under "Gigabyte"
+    "Appotronics Corp Ltd": [
+        {"signal_type": "News Mention",
+         "title": "Appotronics and Valeo unveil laser video projection collaboration at Auto Shanghai 2025",
+         "url": "https://www.prnewswire.com/news/appotronics-corporation-ltd./",
+         "date": "2025-04-23"},
+        {"signal_type": "News Mention",
+         "title": "Appotronics signs agreement with Ceres Holographics for holographic laser display technology",
+         "url": "https://www.prnewswire.com/news/appotronics-corporation-ltd./",
+         "date": "2025-06-01"},
+    ],
+    "Archos SA": [
+        {"signal_type": "Acquisition / M&A",
+         "title": "Archos acquires O2i Ingénierie from Prologue Group, targeting €90M revenue by 2026",
+         "url": "https://www.actusnews.com/en/archos/pr/2025/07/01/archos-confirme-l_acquisition-definitive-de-o2i-ingenierie",
+         "date": "2025-07-01"},
+        {"signal_type": "News Mention",
+         "title": "Archos posts 53% revenue growth in 2025, targeting €90M in 2026 with Tempest sovereign production facility",
+         "url": "https://www.ideal-investisseur.fr/en/actions-b/archos-accelerates-53-revenue-growth-in-2025-targeting-eur90m-in-2026/16537.html",
+         "date": "2026-03-01"},
+    ],
+    "Artec Technologies AG": [
+        {"signal_type": "News Mention",
+         "title": "Artec Technologies expands to the Middle East with new Dubai sales office",
+         "url": "https://www.zoominfo.com/c/artec-technologies-ag/372631035",
+         "date": "2025-12-01"},
+    ],
+    "Audio Pixels Holdings Limited": [
+        {"signal_type": "News Mention",
+         "title": "Audio Pixels Holdings delisted from ASX after two-year trading suspension under Listing Rule 17.12",
+         "url": "https://www.tipranks.com/news/company-announcements/audio-pixels-to-be-removed-from-asx-after-two-year-trading-suspension",
+         "date": "2026-03-02"},
+    ],
+    "Audeara Ltd": [
+        {"signal_type": "News Mention",
+         "title": "Audeara wins Small Business Award at 2025 Premier of Queensland's Export Awards",
+         "url": "https://us.audeara.com/pages/investors",
+         "date": "2025-10-01"},
+    ],
+    "Avell": [
+        {"signal_type": "C-Suite Join",
+         "title": "Vladimir Rissardi appointed CEO of Avell, tasked with preparing company for sustainable growth",
+         "url": "https://brazileconomy.com.br/tecnologia/2026/02/avell-faz-reestruturacao-bate-recorde-e-busca-vacuo-do-mercado-premium-de-computadores/",
+         "date": "2024-10-01"},
+        {"signal_type": "News Mention",
+         "title": "Avell closes 2025 with record revenue of R$263M (+25%), corporate segment jumps to 27% of sales mix",
+         "url": "https://brazileconomy.com.br/tecnologia/2026/02/avell-faz-reestruturacao-bate-recorde-e-busca-vacuo-do-mercado-premium-de-computadores/",
+         "date": "2026-02-01"},
+    ],
+
     # ── Batch A1 (Action Electronics → AMPACS Corp) ───────────────────────
     # Alps Alpine Co Ltd: 2 news signals (Mar 2025)
     "Alps Alpine Co Ltd": [
