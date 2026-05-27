@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Image, Users, Sparkles,
   RefreshCw, ExternalLink, CheckCircle2,
-  Clock, Menu, X, TrendingUp, Zap, ArrowRight
+  Menu, X, TrendingUp, Zap, ArrowRight
 } from 'lucide-react';
 import type { Ad, TabId, NavParams } from './lib/types';
 import { COMPETITORS } from './lib/types';
@@ -80,7 +80,7 @@ export default function App() {
   const [ads, setAds]             = useState<Ad[]>(embeddedAds as Ad[]);
   const [tab, setTab]             = useState<TabId>('overview');
   const [status, setStatus]       = useState<DataStatus>('embedded');
-  const [lastUpdated, setLast]    = useState<Date>(new Date());
+  const [, setLast]               = useState<Date>(new Date());
   const [sidebarOpen, setSidebar] = useState(false);
 
   /* ── Global filter state (controlled across all tabs) */
@@ -175,54 +175,7 @@ export default function App() {
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/5 space-y-3">
-
-          {/* Status badge */}
-          {status === 'live' && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <span className="live-dot flex-shrink-0"/>
-              <div className="min-w-0">
-                <p className="text-emerald-400 text-xs font-semibold leading-none">Live data</p>
-                <p className="text-emerald-400/50 text-[10px] mt-0.5">Synced just now</p>
-              </div>
-            </div>
-          )}
-          {status === 'loading' && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-              <RefreshCw size={13} className="text-indigo-400 animate-spin flex-shrink-0"/>
-              <div className="min-w-0">
-                <p className="text-indigo-300 text-xs font-semibold leading-none">Syncing…</p>
-                <p className="text-indigo-300/50 text-[10px] mt-0.5">Fetching latest data</p>
-              </div>
-            </div>
-          )}
-          {(status === 'embedded' || status === 'error') && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 border border-white/8">
-              <Clock size={13} className="text-white/30 flex-shrink-0"/>
-              <div className="min-w-0">
-                <p className="text-white/50 text-xs font-semibold leading-none">Cached data</p>
-                <p className="text-white/25 text-[10px] mt-0.5">
-                  {status === 'error' ? 'Could not reach sheet' : 'Using embedded snapshot'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Mini stats row */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-white/5 border border-white/6 px-3 py-2 text-center">
-              <p className="text-white font-bold text-sm leading-none">{total}</p>
-              <p className="text-white/35 text-[10px] mt-0.5">ads tracked</p>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/6 px-3 py-2 text-center">
-              <p className="text-white font-bold text-sm leading-none">{competitors}</p>
-              <p className="text-white/35 text-[10px] mt-0.5">competitors</p>
-            </div>
-          </div>
-
-          <p className="text-white/20 text-[10px] text-center">
-            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
+        <div className="px-4 py-4 border-t border-white/5 space-y-2">
 
           {/* Action buttons */}
           <div className="flex gap-2">
