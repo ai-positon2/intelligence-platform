@@ -145,7 +145,7 @@ export default function App() {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl animated-gradient flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30">
+            <div className="w-9 h-9 rounded-xl animated-gradient flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30 logo-glow icon-spin-hover">
               <Zap size={18} className="text-white" />
             </div>
             <div>
@@ -170,7 +170,7 @@ export default function App() {
                   <span className="block text-sm font-medium leading-none">{item.label}</span>
                   <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-indigo-300/70' : 'text-white/25'}`}>{item.desc}</span>
                 </span>
-                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />}
+                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 nav-dot" />}
               </button>
             );
           })}
@@ -179,7 +179,7 @@ export default function App() {
           {COMPETITORS.map(c => (
             <button key={c.domain}
                     onClick={() => navigateTo({ tab: 'competitors', competitor: c.domain })}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-all group">
+                    className="comp-item w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-all group">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                    style={{ backgroundColor: c.color }}>{c.name[0]}</div>
               <div className="min-w-0 text-left">
@@ -197,11 +197,11 @@ export default function App() {
           {/* Action buttons */}
           <div className="flex gap-2">
             <button onClick={loadLive} disabled={status === 'loading'}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all disabled:opacity-40 border border-white/8">
-              <RefreshCw size={11} className={status === 'loading' ? 'animate-spin' : ''}/> Sync
+                    className="ripple-btn flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all disabled:opacity-40 border border-white/8 active:scale-95">
+              <RefreshCw size={11} className={status === 'loading' ? 'animate-spin' : 'transition-transform group-hover:rotate-180'}/> Sync
             </button>
             <a href={SHEET_URL} target="_blank" rel="noopener noreferrer"
-               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all border border-white/8">
+               className="ripple-btn flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/6 hover:bg-white/10 text-white/50 hover:text-white/80 text-xs font-semibold transition-all border border-white/8 active:scale-95">
               <ExternalLink size={11}/> Sheet
             </a>
           </div>
@@ -285,7 +285,7 @@ export default function App() {
             </div>
 
             {/* Active tab */}
-            <div className="anim-fade-up">
+            <div key={tab} className="tab-enter">
               {tab === 'overview' && (
                 <OverviewTab ads={ads} onNav={navigateTo} />
               )}
