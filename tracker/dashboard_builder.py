@@ -328,7 +328,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 <title>Signal Tracker Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1296,6 +1296,167 @@ tbody tr>*,.alert-row>*,.signal-row>*,.signal-item>*{position:relative;z-index:1
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   #ev3-mesh-bg,#ev3-noise{display:none}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   v3.5 — Typography Hero + Severity Visual System
+   ═══════════════════════════════════════════════════════════════ */
+
+/* — Display font for headers + KPI numbers — */
+h1,h2,h3,.panel-title,.section-title,.panel-header h3,
+.kpi-number,.kpi-num,.kpi-value,.stat-value,
+#topnav .nav-brand,.brand-name,.logo-text{
+  font-family:'Space Grotesk','Inter',sans-serif;
+  letter-spacing:-.018em;
+}
+
+/* — Hero KPI numbers: bigger, gradient text fill, tabular — */
+.kpi-number{
+  font-size:44px!important;
+  font-weight:700!important;
+  line-height:1!important;
+  letter-spacing:-.035em!important;
+  font-variant-numeric:tabular-nums lining-nums;
+  background:linear-gradient(135deg,#f9fafb 0%,#c7d2fe 45%,#67e8f9 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 14px rgba(99,102,241,.28));
+  margin-bottom:8px!important;
+  transition:transform .25s cubic-bezier(.22,1.4,.36,1),filter .25s;
+}
+.kpi-card:hover .kpi-number{
+  transform:scale(1.03);
+  filter:drop-shadow(0 4px 22px rgba(99,102,241,.45));
+}
+
+/* HIGH severity card: red→amber number gradient */
+.kpi-card.high-card .kpi-number{
+  background:linear-gradient(135deg,#fef3c7 0%,#fca5a5 45%,#ef4444 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 14px rgba(239,68,68,.4));
+}
+.kpi-card.high-card:hover .kpi-number{filter:drop-shadow(0 4px 22px rgba(239,68,68,.6))}
+
+/* — KPI label: micro-caps with animated accent line — */
+.kpi-label{
+  font-size:10px!important;
+  font-weight:600!important;
+  letter-spacing:.14em!important;
+  text-transform:uppercase;
+  color:var(--text2);
+  position:relative;
+  padding-left:16px;
+  display:inline-block;
+}
+.kpi-label::before{
+  content:'';
+  position:absolute;
+  left:0;top:50%;
+  transform:translateY(-50%);
+  width:9px;height:2px;
+  background:linear-gradient(90deg,#6366f1,#22d3ee);
+  border-radius:1px;
+  box-shadow:0 0 8px rgba(99,102,241,.5);
+  transition:width .35s cubic-bezier(.22,1.4,.36,1);
+}
+.kpi-card:hover .kpi-label::before{width:22px}
+.kpi-card.high-card .kpi-label::before{background:linear-gradient(90deg,#f59e0b,#ef4444);box-shadow:0 0 8px rgba(239,68,68,.55)}
+
+/* — Severity left-edge rails on KPI cards — */
+.kpi-card{border-left:3px solid transparent;transition:border-color .25s,background .35s,box-shadow .25s,transform .22s}
+.kpi-card.high-card{
+  border-left-color:var(--high)!important;
+  background:linear-gradient(135deg,#111827 0%,rgba(239,68,68,.08) 100%)!important;
+  box-shadow:inset 12px 0 24px -12px rgba(239,68,68,.18);
+}
+.kpi-card.high-card:hover{box-shadow:inset 12px 0 24px -12px rgba(239,68,68,.28),0 12px 32px rgba(239,68,68,.18)}
+
+/* — Severity rail on signal-item, alert-row, mini-alert (uses existing sev-* classes) — */
+.mini-alert{position:relative;padding-left:14px!important}
+.mini-alert::before{
+  content:'';position:absolute;left:0;top:14%;bottom:14%;
+  width:3px;border-radius:0 3px 3px 0;
+  background:var(--low);opacity:.55;
+  transition:width .22s,opacity .22s,box-shadow .25s;
+}
+.mini-alert.sev-high::before,.mini-alert[data-sev="HIGH"]::before{
+  background:linear-gradient(180deg,#fbbf24,#ef4444);
+  opacity:1;
+  box-shadow:0 0 12px rgba(239,68,68,.55);
+}
+.mini-alert.sev-medium::before,.mini-alert[data-sev="MEDIUM"]::before{
+  background:var(--medium);opacity:.9;
+}
+.mini-alert:hover::before{width:5px}
+
+/* — Severity chips: outlined gradient pills with status dots — */
+.kpi-chip{gap:8px!important}
+.chip-h,.chip-m,.chip-l{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px 3px 8px;
+  border-radius:99px;
+  font-size:10px!important;
+  font-weight:600;
+  letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;
+  border:1px solid;
+  background:rgba(15,23,42,.5);
+  backdrop-filter:blur(4px);
+  transition:transform .15s,box-shadow .2s,border-color .2s;
+}
+.chip-h{color:#fecaca!important;border-color:rgba(239,68,68,.45)}
+.chip-m{color:#fde68a!important;border-color:rgba(245,158,11,.45)}
+.chip-l{color:#d1d5db!important;border-color:rgba(107,114,128,.45)}
+.chip-h::before,.chip-m::before,.chip-l::before{
+  content:'';width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0;
+}
+.chip-h::before{background:#ef4444;box-shadow:0 0 8px #ef4444,0 0 2px #fff}
+.chip-m::before{background:#f59e0b;box-shadow:0 0 6px #f59e0b}
+.chip-l::before{background:#9ca3af}
+.chip-h:hover,.chip-m:hover,.chip-l:hover{transform:translateY(-1px) scale(1.04)}
+.chip-h:hover{border-color:rgba(239,68,68,.75);box-shadow:0 4px 14px rgba(239,68,68,.25)}
+.chip-m:hover{border-color:rgba(245,158,11,.75);box-shadow:0 4px 14px rgba(245,158,11,.25)}
+
+/* — Tabular numerics across data — */
+table td,table th,.stat-value,.kpi-num,.badge-count,.mini-alert-time{
+  font-variant-numeric:tabular-nums lining-nums;
+}
+
+/* — Heading hierarchy polish — */
+h1{font-size:24px;font-weight:700;letter-spacing:-.025em}
+h2{font-size:18px;font-weight:600;letter-spacing:-.018em}
+h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.panel-title,.section-title{font-weight:600;letter-spacing:-.015em}
+
+/* — Badge-count pill refinement — */
+.badge-count{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:20px;height:18px;padding:0 6px;
+  border-radius:9px;
+  background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(139,92,246,.12));
+  border:1px solid rgba(99,102,241,.25);
+  color:#c7d2fe;
+  font-size:10px;font-weight:600;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;
+}
+
+/* — Subtle gradient divider for section headers — */
+h2::after,.section-title::after{
+  content:'';display:block;margin-top:6px;
+  width:32px;height:2px;
+  background:linear-gradient(90deg,#6366f1,#a855f7,#22d3ee,transparent);
+  border-radius:2px;
+  opacity:.7;
+}
+
+/* — H2 inside compact panel headers should not get the divider — */
+.panel-header h2::after,.kpi-modal-header h2::after,#topnav h2::after{display:none}
+
+/* — Subtle status dot before all "HIGH" / "MEDIUM" / "LOW" plain text labels — */
+.severity-high,.sev-high-label,[data-sev="HIGH"]:not(.kpi-card){
+  font-variant-numeric:tabular-nums;
 }
 </style>
 </head>
