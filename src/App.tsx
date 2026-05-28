@@ -110,15 +110,15 @@ function GradientCard({
               style={{ left: s.x, top: s.y, background: s.color, boxShadow: `0 0 8px ${s.color}` }}/>
       ))}
 
-      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">{icon}</div>
+      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">{icon}</div>
       <div className="relative">
-        <p className="text-4xl font-black tracking-tight leading-none num-pop">{count}</p>
+        <p className="text-3xl font-black tracking-tight leading-none num-pop">{count}</p>
         <p className="text-sm font-semibold mt-1 text-white/90">{label}</p>
         <p className="text-xs mt-0.5 text-white/60">{sub}</p>
-        {/* hover hint slides up */}
-        <p className="flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/90 transition-all mt-2 translate-y-1 group-hover:translate-y-0 duration-200">
-          {hint} <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform"/>
-        </p>
+      </div>
+      {/* hover hint — absolutely positioned so it doesn't add to card height */}
+      <div className="absolute bottom-4 left-5 right-5 flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/90 transition-all translate-y-1 group-hover:translate-y-0 duration-200 pointer-events-none">
+        {hint} <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform"/>
       </div>
     </div>
   );
