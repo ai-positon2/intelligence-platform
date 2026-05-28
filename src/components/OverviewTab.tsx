@@ -36,7 +36,7 @@ function Card({ title, subtitle, action, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col card-glow h-full">
       <div className="flex items-start justify-between mb-3 flex-shrink-0">
         <div>
           <h3 className="text-sm font-bold text-slate-800">{title}</h3>
@@ -109,7 +109,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
 
         {/* Competitor bar — click bar → Competitors tab */}
-        <Card title="Ads by Competitor" subtitle="Click a bar to deep-dive"
+        <div className="anim-pop-in delay-1"><Card title="Ads by Competitor" subtitle="Click a bar to deep-dive"
               action={{ label: 'View all', onClick: () => onNav({ tab: 'competitors' }) }}>
           <ResponsiveContainer width="100%" height="100%" minHeight={180}>
             <BarChart data={compData} barSize={36} maxBarSize={44} barCategoryGap="30%" margin={{ top: 4, bottom: 0 }}
@@ -132,10 +132,10 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </Card>
+        </Card></div>
 
         {/* Format pie — click slice → Gallery filtered */}
-        <Card title="Format Distribution" subtitle="Click a slice to filter gallery"
+        <div className="anim-pop-in delay-2"><Card title="Format Distribution" subtitle="Click a slice to filter gallery"
               action={{ label: 'Gallery', onClick: () => onNav({ tab: 'gallery', format: 'all' }) }}>
           <ResponsiveContainer width="100%" height="100%" minHeight={180}>
             <PieChart style={{ cursor: 'pointer' }}>
@@ -157,10 +157,10 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
               <Tooltip content={<DarkTip/>}/>
             </PieChart>
           </ResponsiveContainer>
-        </Card>
+        </Card></div>
 
         {/* CTA bars — click → Gallery with search */}
-        <Card title="Top CTAs" subtitle="Click a CTA to search gallery"
+        <div className="anim-pop-in delay-3"><Card title="Top CTAs" subtitle="Click a CTA to search gallery"
               action={{ label: 'Browse', onClick: () => onNav({ tab: 'gallery' }) }}>
           <div className="space-y-2 w-full">
             {ctaData.slice(0, 6).map(({ name, count }, i) => {
@@ -175,14 +175,14 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
                     <span className="font-bold text-slate-800 flex-shrink-0">{count}</span>
                   </div>
                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
+                    <div className="h-full rounded-full bar-fill"
                          style={{ width: `${pct}%`, background: c }}/>
                   </div>
                 </button>
               );
             })}
           </div>
-        </Card>
+        </Card></div>
       </div>
 
       {/* Timeline */}
@@ -267,7 +267,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
 
       {/* Competitor snapshot cards — click → Competitors tab */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {COMPETITORS.map(comp => {
+        {COMPETITORS.map((comp, ci) => {
           const compAds   = byDomainGroups[comp.domain] || [];
           const fmts      = countByField(compAds, 'Format');
           const lastActive = compAds.filter(a => a['Last Shown']).sort((a,b) => b['Last Shown'].localeCompare(a['Last Shown']))[0]?.['Last Shown'];
@@ -275,7 +275,7 @@ export function OverviewTab({ ads, onNav }: OverviewTabProps) {
           return (
             <div key={comp.domain}
                  onClick={() => onNav({ tab: 'competitors', competitor: comp.domain })}
-                 className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 card-lift cursor-pointer group hover:border-indigo-200 transition-colors">
+                 className={`anim-pop-in delay-${ci + 1} bg-white rounded-2xl border border-slate-100 shadow-sm p-4 card-lift cursor-pointer group active:scale-[0.98] transition-all`}>
               <div className="h-1 rounded-full mb-4 transition-all" style={{ background: `linear-gradient(90deg, ${comp.color}, ${comp.color}50)` }}/>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md"

@@ -25,7 +25,7 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl overflow-hidden cursor-pointer group shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-250 border border-slate-100 flex flex-col"
+      className="bg-white rounded-2xl overflow-hidden cursor-pointer group shadow-sm hover:shadow-xl hover:-translate-y-2 active:scale-[0.98] active:shadow-md transition-all duration-200 border border-slate-100 flex flex-col"
       style={{ borderTop: `3px solid ${color}`, height: '300px' }}
     >
       {/* ── Media zone — same height for every card ── */}
