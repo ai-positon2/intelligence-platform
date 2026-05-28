@@ -694,13 +694,25 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
       <button class="copy-cmd-btn" onclick="copyCmd('cmd-seed', event)">Copy command</button>
     </div>
 
+    <div class="refresh-opt" onclick="highlightOpt('opt-news')">
+      <div class="refresh-opt-title" id="opt-news">
+        <span style="font-size:18px">📰</span>
+        <span>Fetch Google News</span>
+      </div>
+      <div class="refresh-opt-desc">
+        Fetches the latest Google News for all 292 CSG companies (last 90 days).<br>Takes ~6 minutes. Re-running is safe — duplicates are skipped.
+      </div>
+      <code id="cmd-news">python fetch_csg_news.py</code>
+      <button class="copy-cmd-btn" onclick="copyCmd('cmd-news', event)">Copy command</button>
+    </div>
+
     <div class="refresh-opt" onclick="highlightOpt('opt-rebuild')">
       <div class="refresh-opt-title" id="opt-rebuild">
         <span style="font-size:18px">⚙️</span>
         <span>Rebuild Dashboard</span>
       </div>
       <div class="refresh-opt-desc">
-        Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or adding new signals.
+        Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or fetching news.
       </div>
       <code id="cmd-rebuild">python build_csg_dashboard.py</code>
       <button class="copy-cmd-btn" onclick="copyCmd('cmd-rebuild', event)">Copy command</button>

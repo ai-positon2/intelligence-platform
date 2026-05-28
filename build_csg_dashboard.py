@@ -146,10 +146,17 @@ def build_csg():
             "cmd": "python seed_csg_signals.py",
         },
         {
+            "id": "opt-news",
+            "icon": "📰",
+            "title": "Fetch Google News",
+            "desc": "Fetches the latest Google News for all 292 CSG companies (last 90 days).<br>Takes ~6 minutes. Re-running is safe — duplicates are skipped.",
+            "cmd": "python fetch_csg_news.py",
+        },
+        {
             "id": "opt-rebuild",
             "icon": "⚙️",
             "title": "Rebuild Dashboard",
-            "desc": "Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or adding new signals.",
+            "desc": "Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or fetching news.",
             "cmd": "python build_csg_dashboard.py",
         },
         {
