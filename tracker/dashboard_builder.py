@@ -867,6 +867,127 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 .bt-item.active,.bt-item:hover{color:var(--blue)}
 .bt-item .bt-icon{font-size:18px}
 @media(max-width:768px){body{padding-bottom:56px}}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LAYER — no color changes
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── Extra keyframes ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes modalSlideUp{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes modalPopIn{from{opacity:0;transform:translate(-50%,-50%) scale(.88)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes rippleAnim{to{transform:scale(4);opacity:0}}
+@keyframes badgePop{0%{transform:scale(1)}40%{transform:scale(1.35)}70%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes copiedPop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes underlineSlide{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(16,185,129,.55),0 0 0 0 rgba(16,185,129,.2)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0),0 0 0 16px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
+/* ── Section entrance ── */
+.section.active{animation:fadeInUp .32s cubic-bezier(.22,1,.36,1) both}
+
+/* ── KPI cards — stagger + lift ── */
+.kpi-card{animation:fadeInUp .38s cubic-bezier(.22,1,.36,1) both;transition:transform .22s,border-color .22s,box-shadow .22s}
+.kpi-card:nth-child(1){animation-delay:.04s}
+.kpi-card:nth-child(2){animation-delay:.10s}
+.kpi-card:nth-child(3){animation-delay:.16s}
+.kpi-card:nth-child(4){animation-delay:.22s}
+.kpi-card:hover{transform:translateY(-5px);box-shadow:0 12px 32px rgba(59,130,246,.15)}
+.kpi-card.high-card:hover{box-shadow:0 12px 32px rgba(239,68,68,.14)}
+
+/* ── Signal feed items — slide-right on hover ── */
+.signal-item{animation:fadeInUp .28s cubic-bezier(.22,1,.36,1) both;transition:background .15s,border-left-color .15s,transform .18s,box-shadow .18s}
+.signal-item:hover{transform:translateX(5px)}
+.signal-item.sev-high:hover{box-shadow:inset 3px 0 0 var(--high),2px 0 14px rgba(239,68,68,.1)}
+.signal-item.sev-medium:hover{box-shadow:inset 3px 0 0 var(--medium)}
+.signal-item.sev-low:hover{box-shadow:inset 3px 0 0 var(--low)}
+.signal-item:hover .company-avatar{transform:scale(1.1) rotate(3deg)}
+.company-avatar{transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── Chart cards — lift ── */
+.chart-card{transition:transform .22s,box-shadow .22s,border-color .22s}
+.chart-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.3);border-color:rgba(59,130,246,.28)}
+
+/* ── Sidebar nav indicator bar ── */
+.nav-item{position:relative;overflow:hidden}
+.nav-item::before{content:'';position:absolute;left:0;top:15%;height:70%;width:3px;background:var(--blue);border-radius:0 3px 3px 0;transform:scaleY(0);transition:transform .22s cubic-bezier(.22,1,.36,1);transform-origin:center}
+.nav-item.active::before,.nav-item:hover::before{transform:scaleY(1)}
+
+/* ── Buttons — press + hover lift ── */
+.refresh-btn{transition:background .15s,transform .12s,box-shadow .18s}
+.refresh-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(16,185,129,.35)}
+.refresh-btn:active{transform:scale(.94)!important}
+.copy-cmd-btn{transition:background .15s,transform .1s}
+.copy-cmd-btn:hover{transform:translateY(-1px)}
+.copy-cmd-btn:active{transform:scale(.93)}
+.copy-cmd-btn.copied{background:#10b981!important;animation:copiedPop .22s cubic-bezier(.34,1.56,.64,1)}
+.filters-btn{transition:all .18s}
+.filters-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.18)}
+.pag-btn{transition:all .15s}
+.pag-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,.18)}
+.export-btn{transition:all .15s}
+.export-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.18)}
+.modal-btn{transition:all .15s}
+.modal-btn:hover{transform:translateY(-1px)}
+.sidebar-switch-btn{transition:all .2s}
+.sidebar-switch-btn:hover{transform:translateX(4px)}
+.sidebar-logout{transition:all .18s}
+.sidebar-logout:hover{transform:translateY(-1px)}
+
+/* ── Refresh modal options — lift ── */
+.refresh-opt{transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.refresh-opt:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(59,130,246,.14)}
+.refresh-opt:active{transform:scale(.99)}
+
+/* ── Modal boxes ── */
+#modal-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+#kpi-modal-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+#sig-detail-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Table rows — slide right on hover ── */
+.data-table tbody tr{transition:background .12s,transform .16s}
+.data-table tbody tr:hover{transform:translateX(3px)}
+
+/* ── Expanded row ── */
+.expand-inner{animation:fadeInUp .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Mini alerts ── */
+.mini-alert{transition:background .12s,border-color .14s,transform .15s}
+.mini-alert:hover{transform:translateX(4px)}
+
+/* ── Filter tags bounce-in ── */
+.filter-tag{animation:badgePop .3s cubic-bezier(.22,1,.36,1) both;transition:background .15s,transform .15s}
+.filter-tag:hover{transform:translateY(-2px)}
+
+/* ── Signal links ── */
+.signal-link{transition:background .12s,transform .12s,box-shadow .12s}
+.signal-link:hover{transform:translateY(-2px);box-shadow:0 3px 10px rgba(59,130,246,.2)}
+
+/* ── Tab underline slide-in ── */
+.tab-btn{position:relative}
+.tab-btn.active::after{content:'';position:absolute;bottom:0;left:0;height:2px;width:100%;background:var(--blue);transform-origin:left;animation:underlineSlide .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Search glow on focus ── */
+#nav-search{transition:border-color .15s,box-shadow .2s}
+#nav-search:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+#tbl-search{transition:border-color .15s,box-shadow .2s}
+#tbl-search:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.kpi-modal-search input{transition:border-color .15s,box-shadow .2s}
+.kpi-modal-search input:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+
+/* ── KPI modal rows ── */
+.kpi-modal-row{transition:background .15s,transform .15s}
+.kpi-modal-row:hover{transform:translateX(4px)}
+
+/* ── Pulse dot double-ring ── */
+.pulse-dot{animation:pulse-ring 2.2s infinite!important}
+
+/* ── Ripple host ── */
+.ripple-host{position:relative;overflow:hidden}
+.ripple-wave{position:absolute;border-radius:50%;background:rgba(255,255,255,.18);transform:scale(0);animation:rippleAnim .55s linear;pointer-events:none}
+
+/* ── Scroll-reveal ── */
+.sv-init{opacity:0;transform:translateY(16px);transition:opacity .45s cubic-bezier(.22,1,.36,1),transform .45s cubic-bezier(.22,1,.36,1)}
+.sv-init.sv-show{opacity:1;transform:translateY(0)}
 </style>
 </head>
 <body>
@@ -2941,6 +3062,135 @@ function closeKpiModal() {
 function maybeCloseKpiModal(e) {
   if (e.target === document.getElementById('kpi-overlay')) closeKpiModal();
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION ENGINE
+═══════════════════════════════════════════════════════════════════ */
+
+// 1 ── Ripple effect on all interactive elements
+(function() {
+  var RIPPLE_SEL = '.refresh-btn,.copy-cmd-btn,.fp-apply,.fp-reset,.modal-btn,.export-btn,.pag-btn,.nav-item,.bt-item,.refresh-opt,.kpi-modal-row,.filters-btn,.sidebar-switch-btn,.pag-btn';
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest(RIPPLE_SEL);
+    if (!btn) return;
+    btn.classList.add('ripple-host');
+    var rect = btn.getBoundingClientRect();
+    var size = Math.max(rect.width, rect.height) * 2.2;
+    var x = e.clientX - rect.left - size / 2;
+    var y = e.clientY - rect.top - size / 2;
+    var wave = document.createElement('span');
+    wave.className = 'ripple-wave';
+    wave.style.cssText = 'width:'+size+'px;height:'+size+'px;left:'+x+'px;top:'+y+'px';
+    btn.appendChild(wave);
+    wave.addEventListener('animationend', function(){ wave.remove(); });
+  });
+})();
+
+// 2 ── Count-up animation for KPI numbers
+function _animCountUp(el, target, ms) {
+  var start = performance.now();
+  (function tick(now) {
+    var p = Math.min((now - start) / ms, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString();
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = target.toLocaleString();
+  })(start);
+}
+function runCountUps() {
+  document.querySelectorAll('.kpi-number').forEach(function(el) {
+    var n = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(n) && n > 0) _animCountUp(el, n, 900 + Math.random() * 200);
+  });
+}
+
+// 3 ── Stagger signal feed items
+function staggerSignals() {
+  document.querySelectorAll('.signal-feed-list .signal-item').forEach(function(el, i) {
+    el.style.animationDelay = Math.min(i * 38, 700) + 'ms';
+  });
+}
+
+// 4 ── Stagger table rows after render
+function staggerTableRows() {
+  document.querySelectorAll('.data-table tbody tr:not(.expand-row)').forEach(function(tr, i) {
+    tr.style.opacity = '0';
+    tr.style.transform = 'translateY(10px)';
+    var delay = Math.min(i * 16, 480);
+    setTimeout(function() {
+      tr.style.transition = 'opacity .22s ease, transform .22s ease';
+      tr.style.opacity = '';
+      tr.style.transform = '';
+    }, delay);
+  });
+}
+
+// 5 ── Copy button visual feedback
+(function() {
+  var orig = window.copyCmd;
+  window.copyCmd = function(id, event) {
+    orig(id, event);
+    var btn = event.currentTarget || event.target;
+    if (!btn) return;
+    var prev = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = prev;
+      btn.classList.remove('copied');
+    }, 1800);
+  };
+})();
+
+// 6 ── Refresh modal pop animation
+(function() {
+  var orig = window.showRefreshModal;
+  window.showRefreshModal = function() {
+    orig();
+    var m = document.getElementById('refresh-modal');
+    if (!m) return;
+    m.style.animation = 'none';
+    void m.offsetWidth;
+    m.style.animation = 'modalPopIn .24s cubic-bezier(.22,1,.36,1) both';
+  };
+})();
+
+// 7 ── Scroll-reveal for panels and chart cards
+(function() {
+  if (!window.IntersectionObserver) return;
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('sv-show');
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.06 });
+  setTimeout(function() {
+    document.querySelectorAll('.chart-card, .panel').forEach(function(el, i) {
+      el.classList.add('sv-init');
+      el.style.transitionDelay = (i * 55) + 'ms';
+      obs.observe(el);
+    });
+  }, 60);
+})();
+
+// 8 ── Hook renderTable to re-stagger rows on every update
+(function() {
+  var orig = window.renderTable;
+  if (typeof orig !== 'function') return;
+  window.renderTable = function() {
+    orig.apply(this, arguments);
+    setTimeout(staggerTableRows, 60);
+  };
+})();
+
+// 9 ── Init on load
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(runCountUps, 280);
+  setTimeout(staggerSignals, 120);
+  setTimeout(staggerTableRows, 450);
+});
 </script>
 </body>
 </html>"""
