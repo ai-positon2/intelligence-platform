@@ -926,10 +926,7 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 .kpi-card:hover::before,.panel:hover::before{opacity:1}
 .kpi-card>*,.panel>*{position:relative;z-index:2}
 
-/* — D. Conic-gradient rotating border on HIGH severity cards — */
-.kpi-card.ev3-high{position:relative}
-.kpi-card.ev3-high::after{content:'';position:absolute;inset:-2px;border-radius:inherit;padding:2px;background:conic-gradient(from 0deg,#ef4444,#f97316,#fbbf24,#ef4444,transparent 55%,#ef4444);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ev3-conicSpin 5s linear infinite;opacity:.75;pointer-events:none;z-index:3}
-@keyframes ev3-conicSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+/* — D. (removed: conic-gradient rotating border on HIGH cards) — */
 
 /* — E. Severity pulse ring on HIGH badges — */
 .severity-high,.alert-badge.ev3-high,.badge.ev3-high,[data-sev="HIGH"]{position:relative}
@@ -3521,9 +3518,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.body.appendChild(tc);
   }
 
-  setTimeout(function() {
-    window._showToast && window._showToast('Dashboard ready', '✅', 2000);
-  }, 1200);
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3674,10 +3668,6 @@ document.addEventListener('DOMContentLoaded', function() {
     var rebind = debounce(function(){ bindSpotlight(); tagHigh(); bindKpiPulse(); }, 200);
     new MutationObserver(rebind).observe(document.body, { childList: true, subtree: true });
 
-    // —— v3 welcome flourish (after v2 toast) ——
-    setTimeout(function(){
-      window._showToast && window._showToast('Premium animations engaged', '✨', 2400);
-    }, 2400);
   });
 })();
 </script>
