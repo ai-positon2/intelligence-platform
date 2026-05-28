@@ -270,7 +270,10 @@ body {
   border-radius: inherit;
 }
 .spotlight:hover::after { opacity: 1; }
-.spotlight > * { position: relative; z-index: 2; }
+/* Content inside spotlight must sit above the ::after overlay (z-index:1).
+   We use a .spotlight-content wrapper instead of > * to avoid overriding
+   position:absolute on decorative sibling elements inside the card. */
+.spotlight-content { position: relative; z-index: 2; }
 
 /* === Animated active nav indicator === */
 .nav-active-bg {

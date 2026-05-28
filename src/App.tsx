@@ -99,24 +99,29 @@ function GradientCard({
         transform: 'perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1)',
       }}
     >
-      <div className="absolute inset-0 stat-shimmer pointer-events-none" />
-      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none anim-float" />
-      <div className="absolute -right-2 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none anim-breathe" />
+      {/* Decorative absolutes — inline style keeps position:absolute even inside .spotlight */}
+      <div className="stat-shimmer pointer-events-none" style={{ position: 'absolute', inset: 0 }} />
+      <div className="w-28 h-28 rounded-full bg-white/10 pointer-events-none anim-float"
+           style={{ position: 'absolute', right: '-1.5rem', top: '-1.5rem' }} />
+      <div className="w-20 h-20 rounded-full bg-white/5 pointer-events-none anim-breathe"
+           style={{ position: 'absolute', right: '-0.5rem', bottom: '-2rem' }} />
 
       {/* Sparkles on click */}
       {sparkles.map(s => (
         <span key={s.id} className="particle"
-              style={{ left: s.x, top: s.y, background: s.color, boxShadow: `0 0 8px ${s.color}` }}/>
+              style={{ position: 'absolute', left: s.x, top: s.y, background: s.color, boxShadow: `0 0 8px ${s.color}` }}/>
       ))}
 
-      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">{icon}</div>
-      <div className="relative">
+      {/* spotlight-content raises this above the ::after spotlight overlay */}
+      <div className="spotlight-content">
+        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">{icon}</div>
         <p className="text-3xl font-black tracking-tight leading-none num-pop">{count}</p>
         <p className="text-sm font-semibold mt-1 text-white/90">{label}</p>
         <p className="text-xs mt-0.5 text-white/60">{sub}</p>
       </div>
-      {/* hover hint — absolutely positioned so it doesn't add to card height */}
-      <div className="absolute bottom-4 left-5 right-5 flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/90 transition-all translate-y-1 group-hover:translate-y-0 duration-200 pointer-events-none">
+      {/* hover hint — absolutely positioned so it doesn't affect card height */}
+      <div className="flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/90 transition-all translate-y-1 group-hover:translate-y-0 duration-200 pointer-events-none"
+           style={{ position: 'absolute', bottom: '1rem', left: '1.25rem', right: '1.25rem', zIndex: 2 }}>
         {hint} <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform"/>
       </div>
     </div>
