@@ -988,6 +988,239 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 /* ── Scroll-reveal ── */
 .sv-init{opacity:0;transform:translateY(16px);transition:opacity .45s cubic-bezier(.22,1,.36,1),transform .45s cubic-bezier(.22,1,.36,1)}
 .sv-init.sv-show{opacity:1;transform:translateY(0)}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LAYER v2 — maximum delight
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── v2 keyframes ── */
+@keyframes toastIn{from{opacity:0;transform:translateX(110%) scale(.9)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(110%) scale(.85)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.08)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0),0 0 20px rgba(239,68,68,.18)}}
+@keyframes bounceIn{0%{opacity:0;transform:scale(.3)}55%{opacity:1;transform:scale(1.12)}75%{transform:scale(.93)}100%{transform:scale(1)}}
+@keyframes sidebarItem{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInDown{from{opacity:0;transform:translateY(-14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes morphBounce{0%{border-radius:50%;transform:scale(0) rotate(-90deg);opacity:0}60%{border-radius:14px;transform:scale(1.1) rotate(6deg);opacity:1}85%{transform:scale(.96) rotate(-2deg)}100%{border-radius:8px;transform:scale(1) rotate(0)}}
+@keyframes highlightPulse{0%{background:rgba(59,130,246,.25)}100%{background:rgba(59,130,246,.04)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes shimmerMove{0%{background-position:-600px 0}100%{background-position:600px 0}}
+@keyframes drawLine{from{transform:scaleX(0);transform-origin:left}to{transform:scaleX(1);transform-origin:left}}
+@keyframes popIn{0%{opacity:0;transform:scale(.6) rotate(-10deg)}70%{transform:scale(1.08) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes subtleWiggle{0%,100%{transform:rotate(0)}30%{transform:rotate(-3deg)}70%{transform:rotate(3deg)}}
+@keyframes progressGlow{0%,100%{box-shadow:0 0 4px rgba(59,130,246,.5)}50%{box-shadow:0 0 12px rgba(59,130,246,.9),0 0 24px rgba(59,130,246,.3)}}
+@keyframes countDigit{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:translateY(0)}}
+@keyframes expandIn{from{opacity:0;max-height:0;transform:scaleY(.9)}to{opacity:1;max-height:400px;transform:scaleY(1)}}
+
+/* ── Scroll progress bar ── */
+#scroll-progress{
+  position:fixed;top:0;left:0;height:2px;z-index:9999;background:var(--blue);
+  width:0%;box-shadow:0 0 8px rgba(59,130,246,.7);transition:width .08s linear;
+  animation:progressGlow 2.5s ease-in-out infinite
+}
+
+/* ── Scroll-to-top button ── */
+#scroll-top-btn{
+  position:fixed;bottom:76px;right:20px;z-index:900;
+  width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--blue);color:#fff;font-size:18px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 18px rgba(59,130,246,.45);
+  opacity:0;transform:translateY(20px) scale(.6);
+  transition:opacity .26s,transform .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events:none;font-family:inherit;line-height:1
+}
+#scroll-top-btn.visible{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+#scroll-top-btn:hover{transform:translateY(-5px) scale(1.14)!important;box-shadow:0 10px 28px rgba(59,130,246,.6)}
+#scroll-top-btn:active{transform:scale(.88)!important;transition:transform .08s}
+
+/* ── Toast system ── */
+#toast-container{
+  position:fixed;bottom:76px;right:68px;z-index:9998;
+  display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none
+}
+.toast{
+  background:var(--card);border:1px solid var(--border);border-radius:11px;
+  padding:10px 15px;font-size:12px;color:var(--text);
+  box-shadow:0 10px 30px rgba(0,0,0,.3);pointer-events:auto;
+  animation:toastIn .32s cubic-bezier(.22,1,.36,1) both;
+  display:flex;align-items:center;gap:9px;max-width:270px;
+}
+.toast.toast-out{animation:toastOut .26s cubic-bezier(.4,0,1,1) forwards}
+.toast-icon{font-size:15px;flex-shrink:0}
+
+/* ── HIGH severity glow ── */
+.signal-item.sev-high{animation:fadeInUp .28s cubic-bezier(.22,1,.36,1) both,glowPulse 3s 1.5s ease-in-out 3}
+
+/* ── Sidebar nav stagger entrance ── */
+.nav-item:nth-child(1){animation:sidebarItem .35s .05s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(2){animation:sidebarItem .35s .09s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(3){animation:sidebarItem .35s .13s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(4){animation:sidebarItem .35s .17s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(5){animation:sidebarItem .35s .21s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(6){animation:sidebarItem .35s .25s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(7){animation:sidebarItem .35s .29s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(8){animation:sidebarItem .35s .33s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(9){animation:sidebarItem .35s .37s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Active nav item glow background ── */
+.nav-item.active{transition:background .22s,box-shadow .22s}
+.nav-item.active::after{
+  content:'';position:absolute;inset:0;border-radius:8px;
+  background:rgba(59,130,246,.06);pointer-events:none
+}
+
+/* ── Section header animated underline ── */
+.section-header h2{position:relative;display:inline-block}
+.section-header h2::after{
+  content:'';display:block;height:2px;margin-top:3px;
+  background:linear-gradient(90deg,var(--blue),transparent);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .55s cubic-bezier(.22,1,.36,1)
+}
+.section.active .section-header h2::after{transform:scaleX(1)}
+
+/* ── Refresh-opt icon float on hover ── */
+.refresh-opt .ro-icon,.refresh-opt>span:first-child{display:inline-block;transition:transform .3s}
+.refresh-opt:hover .ro-icon,.refresh-opt:hover>span:first-child{animation:float 1.6s ease-in-out infinite}
+
+/* ── Panel hover lift ── */
+.panel{transition:transform .24s cubic-bezier(.22,1,.36,1),box-shadow .24s}
+.panel:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+
+/* ── Table matched search cell ── */
+.tbl-match{animation:highlightPulse 1.4s ease-out forwards;border-radius:3px}
+
+/* ── Sev badge entrance ── */
+.sev-badge{animation:bounceIn .38s cubic-bezier(.34,1.56,.64,1) both;display:inline-block}
+
+/* ── Signal detail avatar morph ── */
+.sdm-avatar{animation:morphBounce .42s cubic-bezier(.34,1.56,.64,1) both}
+
+/* ── KPI modal row left-accent ── */
+.kpi-modal-row{border-left:3px solid transparent;transition:background .15s,transform .15s,border-left-color .18s}
+.kpi-modal-row:hover{transform:translateX(4px);border-left-color:var(--blue)}
+
+/* ── Signal link underline draw ── */
+.signal-link{position:relative}
+.signal-link::after{
+  content:'';position:absolute;bottom:-1px;left:0;
+  width:0;height:1px;background:var(--blue);
+  transition:width .24s cubic-bezier(.22,1,.36,1)
+}
+.signal-link:hover::after{width:100%}
+
+/* ── Table row click ripple ── */
+.data-table tbody tr.row-selected{animation:highlightPulse .85s ease-out forwards}
+
+/* ── Filter chip hover slide ── */
+.ms-option{transition:background .12s,transform .12s,padding-left .12s}
+.ms-option:hover{transform:translateX(4px)}
+.ms-option.sel{animation:badgePop .28s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── 3D tilt host ── */
+.kpi-card{transform-style:preserve-3d;will-change:transform}
+
+/* ── Bottom-tab active icon ── */
+.bt-item.active .bt-icon{animation:bounceIn .32s cubic-bezier(.34,1.56,.64,1) both}
+
+/* ── Export/dropdown menu ── */
+.export-menu{animation:slideInDown .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Shimmer skeleton for loading state ── */
+.skeleton{
+  background:linear-gradient(90deg,var(--border) 25%,var(--hover) 50%,var(--border) 75%);
+  background-size:600px 100%;
+  animation:shimmerMove 1.4s infinite linear;
+  border-radius:4px;color:transparent!important
+}
+
+/* ── Sidebar logo glow ── */
+.sidebar-logo,.sidebar-logo-img{transition:filter .3s,transform .3s}
+.sidebar-logo:hover,.sidebar-logo-img:hover{
+  filter:brightness(1.15) drop-shadow(0 0 6px rgba(59,130,246,.45));
+  transform:scale(1.04)
+}
+
+/* ── Filter panel label hover ── */
+.fp-label{transition:transform .18s;cursor:default}
+.fp-section:hover .fp-label{transform:translateX(3px)}
+
+/* ── Copy button tooltip ── */
+.copy-cmd-btn{position:relative}
+.copy-cmd-btn::before{
+  content:'Copy command';
+  position:absolute;bottom:calc(100% + 7px);left:50%;
+  transform:translateX(-50%) translateY(4px) scale(.9);
+  background:var(--card);border:1px solid var(--border);color:var(--text2);
+  font-size:10px;padding:3px 9px;border-radius:6px;white-space:nowrap;
+  opacity:0;pointer-events:none;
+  transition:opacity .18s,transform .18s;
+  box-shadow:0 4px 12px rgba(0,0,0,.22)
+}
+.copy-cmd-btn:hover::before{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+
+/* ── Expand row animate-in ── */
+.expand-inner{transform-origin:top;animation:expandIn .28s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Expand chevron rotation ── */
+.expand-btn{transition:transform .24s cubic-bezier(.34,1.56,.64,1)!important}
+.expand-btn.ev2-open{transform:rotate(90deg)!important}
+
+/* ── Breathing sidebar badges ── */
+.nav-badge,.sidebar-badge{animation:breathe 2.8s ease-in-out infinite;display:inline-block}
+
+/* ── KPI card button inside ── */
+.kpi-card .kpi-link,.kpi-card button{transition:letter-spacing .2s,opacity .2s}
+.kpi-card:hover .kpi-link,.kpi-card:hover button{letter-spacing:.01em}
+
+/* ── Pagination current-page bounce ── */
+.pag-current{transition:transform .15s cubic-bezier(.34,1.56,.64,1)}
+.pag-current:hover{transform:scale(1.18)}
+
+/* ── SDM source link ── */
+.sdm-body a.modal-btn{transition:transform .18s,box-shadow .18s}
+.sdm-body a.modal-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.2)}
+
+/* ── Sidebar quick-stats pop ── */
+.sidebar-stat{transition:transform .18s,color .18s}
+.sidebar-stat:hover{transform:translateX(4px)}
+
+/* ── Filter section open/close ── */
+.fp-section{transition:background .14s}
+.fp-section:hover{background:rgba(59,130,246,.03);border-radius:8px}
+
+/* ── Chart bar hover tip ── */
+.bar-item{transition:filter .18s,transform .18s}
+.bar-item:hover{filter:brightness(1.15);transform:scaleY(1.04);transform-origin:bottom}
+
+/* ── Company profile modal avatar ── */
+#modal-left .company-avatar{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+#modal-left .company-avatar:hover{transform:scale(1.12) rotate(8deg)}
+
+/* ── Sidebar switch button pop ── */
+.sidebar-switch-btn{transition:all .2s cubic-bezier(.22,1,.36,1)}
+.sidebar-switch-btn:hover{transform:translateX(6px) scale(1.03)}
+
+/* ── Table header sticky shadow ── */
+.data-table thead th{transition:box-shadow .22s}
+.tbl-header-stuck .data-table thead th{box-shadow:0 3px 10px rgba(0,0,0,.2)}
+
+/* ── Nav search expand on focus ── */
+#nav-search{transition:width .25s cubic-bezier(.22,1,.36,1),border-color .15s,box-shadow .2s}
+#nav-search:focus{width:220px!important;box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+
+/* ── Trend percentage badge ── */
+.trend-pos,.trend-neg{transition:transform .18s}
+.trend-pos:hover{transform:scale(1.1)}
+.trend-neg:hover{transform:scale(1.1)}
+
+/* ── Alert count badge pop on update ── */
+.alert-badge,.nav-alert-count{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+
+/* ── miniAlert row hover ── */
+.mini-alert{transition:background .12s,border-color .14s,transform .18s,box-shadow .16s}
+.mini-alert:hover{transform:translateX(5px);box-shadow:2px 0 12px rgba(59,130,246,.12)}
 </style>
 </head>
 <body>
@@ -3190,6 +3423,351 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(runCountUps, 280);
   setTimeout(staggerSignals, 120);
   setTimeout(staggerTableRows, 450);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v2 — maximum delight
+═══════════════════════════════════════════════════════════════════ */
+
+// A ── Scroll progress bar + scroll-to-top button
+(function() {
+  // Progress bar
+  var prog = document.createElement('div');
+  prog.id = 'scroll-progress';
+  document.body.prepend(prog);
+
+  // Scroll-to-top
+  var topBtn = document.createElement('button');
+  topBtn.id = 'scroll-top-btn';
+  topBtn.innerHTML = '&#8679;';
+  topBtn.title = 'Back to top';
+  document.body.appendChild(topBtn);
+  topBtn.addEventListener('click', function() {
+    var mainEl = document.getElementById('main') || window;
+    if (mainEl.scrollTo) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  var mainEl = document.getElementById('main') || document.documentElement;
+  var onScroll = function() {
+    var scrollTop = mainEl.scrollTop || window.scrollY || 0;
+    var scrollMax = (mainEl.scrollHeight || document.body.scrollHeight) - (mainEl.clientHeight || window.innerHeight);
+    var pct = scrollMax > 0 ? (scrollTop / scrollMax) * 100 : 0;
+    prog.style.width = pct + '%';
+    if (scrollTop > 350) topBtn.classList.add('visible');
+    else topBtn.classList.remove('visible');
+  };
+  mainEl.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+// B ── Toast notification system
+window._showToast = function(msg, icon, durationMs) {
+  var container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = (icon ? '<span class="toast-icon">' + icon + '</span>' : '') + '<span>' + msg + '</span>';
+  container.appendChild(t);
+  var dur = durationMs || 2600;
+  setTimeout(function() {
+    t.classList.add('toast-out');
+    t.addEventListener('animationend', function() { if (t.parentNode) t.parentNode.removeChild(t); });
+  }, dur);
+};
+
+// Add toast to the copy action (wraps the v1 patch)
+(function() {
+  if (window._copyCmdToastWrapped) return;
+  window._copyCmdToastWrapped = true;
+  var prev = window.copyCmd;
+  if (typeof prev !== 'function') return;
+  window.copyCmd = function(id, event) {
+    prev(id, event);
+    window._showToast('Command copied to clipboard', '📋', 2000);
+  };
+})();
+
+// C ── 3D perspective tilt on KPI cards
+(function() {
+  function initTilt() {
+    document.querySelectorAll('.kpi-card').forEach(function(card) {
+      if (card._tiltInited) return;
+      card._tiltInited = true;
+      card.addEventListener('mousemove', function(e) {
+        var rect = card.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width - 0.5;
+        var y = (e.clientY - rect.top) / rect.height - 0.5;
+        var tx = -y * 12, ty = x * 12;
+        card.style.transform = 'translateY(-5px) rotateX(' + tx + 'deg) rotateY(' + ty + 'deg) scale(1.02)';
+        card.style.boxShadow = '0 16px 40px rgba(59,130,246,' + (0.1 + Math.abs(x) * 0.12) + ')';
+        card.style.transition = 'box-shadow .1s';
+      });
+      card.addEventListener('mouseleave', function() {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        card.style.transition = 'transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
+})();
+
+// D ── Magnetic attraction on primary action buttons
+(function() {
+  function initMagnetic() {
+    document.querySelectorAll('.refresh-btn, .filters-btn, .export-btn').forEach(function(btn) {
+      if (btn._magInited) return;
+      btn._magInited = true;
+      btn.addEventListener('mousemove', function(e) {
+        var rect = btn.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var dx = (e.clientX - cx) * 0.3;
+        var dy = (e.clientY - cy) * 0.3;
+        btn.style.transform = 'translate(' + dx + 'px,' + dy + 'px) translateY(-2px)';
+        btn.style.transition = 'transform .08s linear';
+      });
+      btn.addEventListener('mouseleave', function() {
+        btn.style.transform = '';
+        btn.style.transition = 'transform .3s cubic-bezier(.22,1,.36,1)';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initMagnetic, 400); });
+})();
+
+// E ── Table row click ripple highlight
+document.addEventListener('click', function(e) {
+  var tr = e.target.closest && e.target.closest('.data-table tbody tr:not(.expand-row)');
+  if (!tr) return;
+  tr.classList.remove('row-selected');
+  void tr.offsetWidth;
+  tr.classList.add('row-selected');
+  setTimeout(function() { tr.classList.remove('row-selected'); }, 900);
+});
+
+// F ── Section crossfade when switching tabs
+(function() {
+  var origShow = window.showSection;
+  if (typeof origShow !== 'function' || window._showSectionV2Wrapped) return;
+  window._showSectionV2Wrapped = true;
+  window.showSection = function(name) {
+    var cur = document.querySelector('.section.active');
+    if (cur && !cur._fading) {
+      cur._fading = true;
+      cur.style.transition = 'opacity .14s ease';
+      cur.style.opacity = '0';
+      setTimeout(function() {
+        cur.style.opacity = '';
+        cur.style.transition = '';
+        cur._fading = false;
+        origShow(name);
+        var next = document.querySelector('.section.active');
+        if (next) {
+          next.style.opacity = '0';
+          next.style.transition = 'opacity .22s ease';
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              next.style.opacity = '1';
+              setTimeout(function() { next.style.opacity = ''; next.style.transition = ''; }, 240);
+            });
+          });
+        }
+      }, 130);
+    } else {
+      origShow(name);
+    }
+  };
+})();
+
+// G ── Search cell highlight on table render
+(function() {
+  var prevRT = window.renderTable;
+  if (typeof prevRT !== 'function') return;
+  window.renderTable = function() {
+    prevRT.apply(this, arguments);
+    var q = (document.getElementById('tbl-search') || {}).value || '';
+    if (!q) return;
+    var ql = q.toLowerCase();
+    setTimeout(function() {
+      document.querySelectorAll('.data-table tbody tr:not(.expand-row) td').forEach(function(td) {
+        if (td.textContent.toLowerCase().includes(ql)) {
+          td.classList.remove('tbl-match');
+          void td.offsetWidth;
+          td.classList.add('tbl-match');
+        }
+      });
+    }, 80);
+  };
+})();
+
+// H ── Expand-row chevron rotation
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest && e.target.closest('.expand-btn');
+  if (!btn) return;
+  setTimeout(function() {
+    // detect expanded state from sibling row
+    var tr = btn.closest('tr');
+    var next = tr && tr.nextElementSibling;
+    var isOpen = next && next.classList.contains('expand-row');
+    if (isOpen) btn.classList.add('ev2-open');
+    else btn.classList.remove('ev2-open');
+  }, 20);
+});
+
+// I ── Sidebar logo hover shimmer
+(function() {
+  var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+  if (!logo) return;
+  logo.addEventListener('mouseenter', function() {
+    logo.style.filter = 'brightness(1.15) drop-shadow(0 0 7px rgba(59,130,246,.5))';
+    logo.style.transform = 'scale(1.05)';
+  });
+  logo.addEventListener('mouseleave', function() {
+    logo.style.filter = '';
+    logo.style.transform = '';
+  });
+})();
+
+// J ── Breathing pulse on nav alert counts
+(function() {
+  document.querySelectorAll('.nav-badge, .sidebar-badge, .nav-alert-count, .alert-badge').forEach(function(b) {
+    b.style.animation = 'breathe 2.8s ease-in-out infinite';
+    b.style.display = 'inline-block';
+  });
+})();
+
+// K ── Stagger sidebar nav items on load
+(function() {
+  document.querySelectorAll('.nav-section .nav-item, #sidebar .nav-item').forEach(function(el, i) {
+    if (!el.style.animationDelay) {
+      el.style.animation = 'sidebarItem .35s ' + (50 + i * 44) + 'ms cubic-bezier(.22,1,.36,1) both';
+    }
+  });
+})();
+
+// L ── Table header sticky shadow on scroll
+(function() {
+  var tbl = document.querySelector('.data-table');
+  if (!tbl) return;
+  var scrollParent = tbl.closest('.panel') || document.getElementById('main') || window;
+  var onTblScroll = function() {
+    var st = scrollParent.scrollTop || 0;
+    if (st > 4) tbl.classList.add('tbl-header-stuck');
+    else tbl.classList.remove('tbl-header-stuck');
+  };
+  scrollParent.addEventListener('scroll', onTblScroll, { passive: true });
+})();
+
+// M ── Re-init tilt + magnetic after section switches
+(function() {
+  var origNavClick = window.showSection;
+  if (typeof origNavClick !== 'function') return;
+  var reinit = function() {
+    setTimeout(function() {
+      document.querySelectorAll('.kpi-card:not([data-tilt])').forEach(function(card) {
+        card._tiltInited = false;
+      });
+    }, 300);
+  };
+  window.addEventListener('hashchange', reinit);
+})();
+
+// N ── Filter panel open shows toast
+(function() {
+  var orig = window.openFilterPanel;
+  if (typeof orig !== 'function' || window._fpToastWrapped) return;
+  window._fpToastWrapped = true;
+  window.openFilterPanel = function() {
+    orig.apply(this, arguments);
+    // subtle panel entrance — CSS handles it, JS just ensures the panel element gets a class
+    var fp = document.getElementById('filter-panel');
+    if (fp) {
+      fp.style.transition = 'transform .28s cubic-bezier(.22,1,.36,1)';
+    }
+  };
+})();
+
+// O ── Apply filters toast
+(function() {
+  var applyBtns = document.querySelectorAll('.fp-apply');
+  applyBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() {
+        window._showToast && window._showToast('Filters applied', '🎯', 1800);
+      }, 60);
+    });
+  });
+})();
+
+// P ── Export action toast
+(function() {
+  document.querySelectorAll('.export-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() {
+        window._showToast && window._showToast('Exporting…', '📤', 1600);
+      }, 80);
+    });
+  });
+})();
+
+// Q ── Smooth number updates when filter changes KPI
+(function() {
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mut) {
+      if (mut.type === 'characterData' || mut.type === 'childList') {
+        var el = mut.target.nodeType === 3 ? mut.target.parentElement : mut.target;
+        if (el && el.classList && el.classList.contains('kpi-number')) {
+          el.style.animation = 'none';
+          void el.offsetWidth;
+          el.style.animation = 'countDigit .28s cubic-bezier(.22,1,.36,1) both';
+        }
+      }
+    });
+  });
+  document.querySelectorAll('.kpi-number').forEach(function(el) {
+    observer.observe(el, { characterData: true, childList: true, subtree: true });
+  });
+})();
+
+// R ── DOMContentLoaded v2 inits
+document.addEventListener('DOMContentLoaded', function() {
+  // Sidebar logo hover (delayed to ensure DOM ready)
+  setTimeout(function() {
+    var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+    if (logo && !logo._logoInited) {
+      logo._logoInited = true;
+      logo.addEventListener('mouseenter', function() {
+        logo.style.animation = 'subtleWiggle .4s ease-in-out';
+        setTimeout(function() { logo.style.animation = ''; }, 420);
+      });
+    }
+  }, 500);
+
+  // Pulse the refresh button once after 3s to draw attention
+  setTimeout(function() {
+    var rb = document.querySelector('.refresh-btn');
+    if (!rb) return;
+    rb.style.animation = 'breathe .6s ease-in-out 3';
+    setTimeout(function() { rb.style.animation = ''; }, 2000);
+  }, 3000);
+
+  // Init toast container
+  if (!document.getElementById('toast-container')) {
+    var tc = document.createElement('div');
+    tc.id = 'toast-container';
+    document.body.appendChild(tc);
+  }
+
+  // Welcome micro-toast
+  setTimeout(function() {
+    window._showToast && window._showToast('Dashboard ready', '✅', 2000);
+  }, 1200);
 });
 </script>
 </body>

@@ -545,6 +545,226 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 .bt-item.active,.bt-item:hover{color:var(--blue)}
 .bt-item .bt-icon{font-size:18px}
 @media(max-width:768px){body{padding-bottom:56px}}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LAYER — no color changes
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── Extra keyframes ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes modalSlideUp{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes modalPopIn{from{opacity:0;transform:translate(-50%,-50%) scale(.88)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes rippleAnim{to{transform:scale(4);opacity:0}}
+@keyframes badgePop{0%{transform:scale(1)}40%{transform:scale(1.35)}70%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes copiedPop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes underlineSlide{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(16,185,129,.55),0 0 0 0 rgba(16,185,129,.2)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0),0 0 0 16px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+@keyframes svReveal{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Section entrance ── */
+.section.active{animation:fadeInUp .32s cubic-bezier(.22,1,.36,1) both}
+
+/* ── KPI cards — stagger + lift ── */
+.kpi-card{animation:fadeInUp .38s cubic-bezier(.22,1,.36,1) both;transition:transform .22s,border-color .22s,box-shadow .22s}
+.kpi-card:nth-child(1){animation-delay:.04s}
+.kpi-card:nth-child(2){animation-delay:.10s}
+.kpi-card:nth-child(3){animation-delay:.16s}
+.kpi-card:nth-child(4){animation-delay:.22s}
+.kpi-card:hover{transform:translateY(-5px);box-shadow:0 12px 32px rgba(59,130,246,.15)}
+.kpi-card.high-card:hover{box-shadow:0 12px 32px rgba(239,68,68,.14)}
+
+/* ── Signal feed items — slide-right on hover ── */
+.signal-item{animation:fadeInUp .28s cubic-bezier(.22,1,.36,1) both;transition:background .15s,border-left-color .15s,transform .18s,box-shadow .18s}
+.signal-item:hover{transform:translateX(5px)}
+.signal-item.sev-high:hover{box-shadow:inset 3px 0 0 var(--high),2px 0 14px rgba(239,68,68,.1)}
+.signal-item.sev-medium:hover{box-shadow:inset 3px 0 0 var(--medium)}
+.signal-item.sev-low:hover{box-shadow:inset 3px 0 0 var(--low)}
+.signal-item:hover .company-avatar{transform:scale(1.1) rotate(3deg)}
+.company-avatar{transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── Chart cards — lift ── */
+.chart-card{transition:transform .22s,box-shadow .22s,border-color .22s}
+.chart-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.3);border-color:rgba(59,130,246,.28)}
+
+/* ── Sidebar nav indicator bar ── */
+.nav-item{position:relative;overflow:hidden}
+.nav-item::before{content:'';position:absolute;left:0;top:15%;height:70%;width:3px;background:var(--blue);border-radius:0 3px 3px 0;transform:scaleY(0);transition:transform .22s cubic-bezier(.22,1,.36,1);transform-origin:center}
+.nav-item.active::before,.nav-item:hover::before{transform:scaleY(1)}
+
+/* ── Buttons — press + hover lift ── */
+.refresh-btn{transition:background .15s,transform .12s,box-shadow .18s}
+.refresh-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(16,185,129,.35)}
+.refresh-btn:active{transform:scale(.94)!important}
+.copy-cmd-btn{transition:background .15s,transform .1s}
+.copy-cmd-btn:hover{transform:translateY(-1px)}
+.copy-cmd-btn:active{transform:scale(.93)}
+.copy-cmd-btn.copied{background:#10b981!important;animation:copiedPop .22s cubic-bezier(.34,1.56,.64,1)}
+.filters-btn{transition:all .18s}
+.filters-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.18)}
+.pag-btn{transition:all .15s}
+.pag-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(59,130,246,.18)}
+.export-btn{transition:all .15s}
+.export-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.18)}
+.modal-btn{transition:all .15s}
+.modal-btn:hover{transform:translateY(-1px)}
+.sidebar-switch-btn{transition:all .2s}
+.sidebar-switch-btn:hover{transform:translateX(4px)}
+.sidebar-logout{transition:all .18s}
+.sidebar-logout:hover{transform:translateY(-1px)}
+
+/* ── Refresh modal options — lift ── */
+.refresh-opt{transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
+.refresh-opt:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(59,130,246,.14)}
+.refresh-opt:active{transform:scale(.99)}
+
+/* ── Modal boxes ── */
+#modal-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+#kpi-modal-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+#sig-detail-box{animation:modalSlideUp .26s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Table rows — slide right on hover ── */
+.data-table tbody tr{transition:background .12s,transform .16s}
+.data-table tbody tr:hover{transform:translateX(3px)}
+
+/* ── Expanded row ── */
+.expand-inner{animation:fadeInUp .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Mini alerts ── */
+.mini-alert{transition:background .12s,border-color .14s,transform .15s}
+.mini-alert:hover{transform:translateX(4px)}
+
+/* ── Filter tags bounce-in ── */
+.filter-tag{animation:badgePop .3s cubic-bezier(.22,1,.36,1) both;transition:background .15s,transform .15s}
+.filter-tag:hover{transform:translateY(-2px)}
+
+/* ── Signal links ── */
+.signal-link{transition:background .12s,transform .12s,box-shadow .12s}
+.signal-link:hover{transform:translateY(-2px);box-shadow:0 3px 10px rgba(59,130,246,.2)}
+
+/* ── Tab underline slide-in ── */
+.tab-btn{position:relative}
+.tab-btn.active::after{content:'';position:absolute;bottom:0;left:0;height:2px;width:100%;background:var(--blue);transform-origin:left;animation:underlineSlide .22s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Search glow on focus ── */
+#nav-search{transition:border-color .15s,box-shadow .2s}
+#nav-search:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+#tbl-search{transition:border-color .15s,box-shadow .2s}
+#tbl-search:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.kpi-modal-search input{transition:border-color .15s,box-shadow .2s}
+.kpi-modal-search input:focus{box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+
+/* ── KPI modal rows ── */
+.kpi-modal-row{transition:background .15s,transform .15s}
+.kpi-modal-row:hover{transform:translateX(4px)}
+
+/* ── Pulse dot double-ring ── */
+.pulse-dot{animation:pulse-ring 2.2s infinite!important}
+
+/* ── Ripple host ── */
+.ripple-host{position:relative;overflow:hidden}
+.ripple-wave{position:absolute;border-radius:50%;background:rgba(255,255,255,.18);transform:scale(0);animation:rippleAnim .55s linear;pointer-events:none}
+
+/* ── Scroll-reveal ── */
+.sv-init{opacity:0;transform:translateY(16px);transition:opacity .45s cubic-bezier(.22,1,.36,1),transform .45s cubic-bezier(.22,1,.36,1)}
+.sv-init.sv-show{opacity:1;transform:translateY(0)}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LAYER v2 — maximum delight
+═══════════════════════════════════════════════════════════════════ */
+
+@keyframes toastIn{from{opacity:0;transform:translateX(110%) scale(.9)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(110%) scale(.85)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.08)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0),0 0 20px rgba(239,68,68,.18)}}
+@keyframes bounceIn{0%{opacity:0;transform:scale(.3)}55%{opacity:1;transform:scale(1.12)}75%{transform:scale(.93)}100%{transform:scale(1)}}
+@keyframes sidebarItem{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInDown{from{opacity:0;transform:translateY(-14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes morphBounce{0%{border-radius:50%;transform:scale(0) rotate(-90deg);opacity:0}60%{border-radius:14px;transform:scale(1.1) rotate(6deg);opacity:1}85%{transform:scale(.96) rotate(-2deg)}100%{border-radius:8px;transform:scale(1) rotate(0)}}
+@keyframes highlightPulse{0%{background:rgba(59,130,246,.25)}100%{background:rgba(59,130,246,.04)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes shimmerMove{0%{background-position:-600px 0}100%{background-position:600px 0}}
+@keyframes popIn{0%{opacity:0;transform:scale(.6) rotate(-10deg)}70%{transform:scale(1.08) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes subtleWiggle{0%,100%{transform:rotate(0)}30%{transform:rotate(-3deg)}70%{transform:rotate(3deg)}}
+@keyframes progressGlow{0%,100%{box-shadow:0 0 4px rgba(59,130,246,.5)}50%{box-shadow:0 0 12px rgba(59,130,246,.9),0 0 24px rgba(59,130,246,.3)}}
+@keyframes countDigit{from{opacity:0;transform:translateY(60%)}to{opacity:1;transform:translateY(0)}}
+@keyframes expandIn{from{opacity:0;max-height:0;transform:scaleY(.9)}to{opacity:1;max-height:400px;transform:scaleY(1)}}
+#scroll-progress{position:fixed;top:0;left:0;height:2px;z-index:9999;background:var(--blue);width:0%;box-shadow:0 0 8px rgba(59,130,246,.7);transition:width .08s linear;animation:progressGlow 2.5s ease-in-out infinite}
+#scroll-top-btn{position:fixed;bottom:76px;right:20px;z-index:900;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;background:var(--blue);color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(59,130,246,.45);opacity:0;transform:translateY(20px) scale(.6);transition:opacity .26s,transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;font-family:inherit;line-height:1}
+#scroll-top-btn.visible{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+#scroll-top-btn:hover{transform:translateY(-5px) scale(1.14)!important;box-shadow:0 10px 28px rgba(59,130,246,.6)}
+#scroll-top-btn:active{transform:scale(.88)!important;transition:transform .08s}
+#toast-container{position:fixed;bottom:76px;right:68px;z-index:9998;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none}
+.toast{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 15px;font-size:12px;color:var(--text);box-shadow:0 10px 30px rgba(0,0,0,.3);pointer-events:auto;animation:toastIn .32s cubic-bezier(.22,1,.36,1) both;display:flex;align-items:center;gap:9px;max-width:270px}
+.toast.toast-out{animation:toastOut .26s cubic-bezier(.4,0,1,1) forwards}
+.toast-icon{font-size:15px;flex-shrink:0}
+.signal-item.sev-high{animation:fadeInUp .28s cubic-bezier(.22,1,.36,1) both,glowPulse 3s 1.5s ease-in-out 3}
+.nav-item:nth-child(1){animation:sidebarItem .35s .05s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(2){animation:sidebarItem .35s .09s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(3){animation:sidebarItem .35s .13s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(4){animation:sidebarItem .35s .17s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(5){animation:sidebarItem .35s .21s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(6){animation:sidebarItem .35s .25s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(7){animation:sidebarItem .35s .29s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(8){animation:sidebarItem .35s .33s cubic-bezier(.22,1,.36,1) both}
+.nav-item:nth-child(9){animation:sidebarItem .35s .37s cubic-bezier(.22,1,.36,1) both}
+.nav-item.active::after{content:'';position:absolute;inset:0;border-radius:8px;background:rgba(59,130,246,.06);pointer-events:none}
+.section-header h2{position:relative;display:inline-block}
+.section-header h2::after{content:'';display:block;height:2px;margin-top:3px;background:linear-gradient(90deg,var(--blue),transparent);transform:scaleX(0);transform-origin:left;transition:transform .55s cubic-bezier(.22,1,.36,1)}
+.section.active .section-header h2::after{transform:scaleX(1)}
+.refresh-opt .ro-icon,.refresh-opt>span:first-child{display:inline-block;transition:transform .3s}
+.refresh-opt:hover .ro-icon,.refresh-opt:hover>span:first-child{animation:float 1.6s ease-in-out infinite}
+.panel{transition:transform .24s cubic-bezier(.22,1,.36,1),box-shadow .24s}
+.panel:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.tbl-match{animation:highlightPulse 1.4s ease-out forwards;border-radius:3px}
+.sev-badge{animation:bounceIn .38s cubic-bezier(.34,1.56,.64,1) both;display:inline-block}
+.sdm-avatar{animation:morphBounce .42s cubic-bezier(.34,1.56,.64,1) both}
+.kpi-modal-row{border-left:3px solid transparent;transition:background .15s,transform .15s,border-left-color .18s}
+.kpi-modal-row:hover{transform:translateX(4px);border-left-color:var(--blue)}
+.signal-link{position:relative}
+.signal-link::after{content:'';position:absolute;bottom:-1px;left:0;width:0;height:1px;background:var(--blue);transition:width .24s cubic-bezier(.22,1,.36,1)}
+.signal-link:hover::after{width:100%}
+.data-table tbody tr.row-selected{animation:highlightPulse .85s ease-out forwards}
+.ms-option{transition:background .12s,transform .12s}
+.ms-option:hover{transform:translateX(4px)}
+.ms-option.sel{animation:badgePop .28s cubic-bezier(.34,1.56,.64,1)}
+.kpi-card{transform-style:preserve-3d;will-change:transform}
+.bt-item.active .bt-icon{animation:bounceIn .32s cubic-bezier(.34,1.56,.64,1) both}
+.export-menu{animation:slideInDown .22s cubic-bezier(.22,1,.36,1) both}
+.skeleton{background:linear-gradient(90deg,var(--border) 25%,var(--hover) 50%,var(--border) 75%);background-size:600px 100%;animation:shimmerMove 1.4s infinite linear;border-radius:4px;color:transparent!important}
+.sidebar-logo,.sidebar-logo-img{transition:filter .3s,transform .3s}
+.sidebar-logo:hover,.sidebar-logo-img:hover{filter:brightness(1.15) drop-shadow(0 0 6px rgba(59,130,246,.45));transform:scale(1.04)}
+.fp-label{transition:transform .18s;cursor:default}
+.fp-section:hover .fp-label{transform:translateX(3px)}
+.copy-cmd-btn{position:relative}
+.copy-cmd-btn::before{content:'Copy command';position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%) translateY(4px) scale(.9);background:var(--card);border:1px solid var(--border);color:var(--text2);font-size:10px;padding:3px 9px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;box-shadow:0 4px 12px rgba(0,0,0,.22)}
+.copy-cmd-btn:hover::before{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+.expand-inner{transform-origin:top;animation:expandIn .28s cubic-bezier(.22,1,.36,1) both}
+.expand-btn{transition:transform .24s cubic-bezier(.34,1.56,.64,1)!important}
+.expand-btn.ev2-open{transform:rotate(90deg)!important}
+.nav-badge,.sidebar-badge{animation:breathe 2.8s ease-in-out infinite;display:inline-block}
+.pag-current{transition:transform .15s cubic-bezier(.34,1.56,.64,1)}
+.pag-current:hover{transform:scale(1.18)}
+.sdm-body a.modal-btn{transition:transform .18s,box-shadow .18s}
+.sdm-body a.modal-btn:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(59,130,246,.2)}
+.sidebar-stat{transition:transform .18s,color .18s}
+.sidebar-stat:hover{transform:translateX(4px)}
+.fp-section{transition:background .14s}
+.fp-section:hover{background:rgba(59,130,246,.03);border-radius:8px}
+.bar-item{transition:filter .18s,transform .18s}
+.bar-item:hover{filter:brightness(1.15);transform:scaleY(1.04);transform-origin:bottom}
+#modal-left .company-avatar{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+#modal-left .company-avatar:hover{transform:scale(1.12) rotate(8deg)}
+.sidebar-switch-btn{transition:all .2s cubic-bezier(.22,1,.36,1)}
+.sidebar-switch-btn:hover{transform:translateX(6px) scale(1.03)}
+.data-table thead th{transition:box-shadow .22s}
+.tbl-header-stuck .data-table thead th{box-shadow:0 3px 10px rgba(0,0,0,.2)}
+#nav-search{transition:width .25s cubic-bezier(.22,1,.36,1),border-color .15s,box-shadow .2s}
+#nav-search:focus{width:220px!important;box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.trend-pos,.trend-neg{transition:transform .18s}
+.trend-pos:hover,.trend-neg:hover{transform:scale(1.1)}
+.alert-badge,.nav-alert-count{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both}
+.mini-alert{transition:background .12s,border-color .14s,transform .18s,box-shadow .16s}
+.mini-alert:hover{transform:translateX(5px);box-shadow:2px 0 12px rgba(59,130,246,.12)}
 </style>
 </head>
 <body>
@@ -2667,6 +2887,431 @@ function closeKpiModal() {
 function maybeCloseKpiModal(e) {
   if (e.target === document.getElementById('kpi-overlay')) closeKpiModal();
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION ENGINE
+═══════════════════════════════════════════════════════════════════ */
+
+// 1 ── Ripple effect on all interactive elements
+(function() {
+  var RIPPLE_SEL = '.refresh-btn,.copy-cmd-btn,.fp-apply,.fp-reset,.modal-btn,.export-btn,.pag-btn,.nav-item,.bt-item,.refresh-opt,.kpi-modal-row,.filters-btn,.sidebar-switch-btn,.pag-btn';
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest(RIPPLE_SEL);
+    if (!btn) return;
+    btn.classList.add('ripple-host');
+    var rect = btn.getBoundingClientRect();
+    var size = Math.max(rect.width, rect.height) * 2.2;
+    var x = e.clientX - rect.left - size / 2;
+    var y = e.clientY - rect.top - size / 2;
+    var wave = document.createElement('span');
+    wave.className = 'ripple-wave';
+    wave.style.cssText = 'width:'+size+'px;height:'+size+'px;left:'+x+'px;top:'+y+'px';
+    btn.appendChild(wave);
+    wave.addEventListener('animationend', function(){ wave.remove(); });
+  });
+})();
+
+// 2 ── Count-up animation for KPI numbers
+function _animCountUp(el, target, ms) {
+  var start = performance.now();
+  (function tick(now) {
+    var p = Math.min((now - start) / ms, 1);
+    var eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString();
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = target.toLocaleString();
+  })(start);
+}
+function runCountUps() {
+  document.querySelectorAll('.kpi-number').forEach(function(el) {
+    var n = parseInt(el.textContent.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(n) && n > 0) _animCountUp(el, n, 900 + Math.random() * 200);
+  });
+}
+
+// 3 ── Stagger signal feed items
+function staggerSignals() {
+  document.querySelectorAll('.signal-feed-list .signal-item').forEach(function(el, i) {
+    el.style.animationDelay = Math.min(i * 38, 700) + 'ms';
+  });
+}
+
+// 4 ── Stagger table rows after render
+function staggerTableRows() {
+  document.querySelectorAll('.data-table tbody tr:not(.expand-row)').forEach(function(tr, i) {
+    tr.style.opacity = '0';
+    tr.style.transform = 'translateY(10px)';
+    var delay = Math.min(i * 16, 480);
+    setTimeout(function() {
+      tr.style.transition = 'opacity .22s ease, transform .22s ease';
+      tr.style.opacity = '';
+      tr.style.transform = '';
+    }, delay);
+  });
+}
+
+// 5 ── Copy button visual feedback
+(function() {
+  var orig = window.copyCmd;
+  window.copyCmd = function(id, event) {
+    orig(id, event);
+    var btn = event.currentTarget || event.target;
+    if (!btn) return;
+    var prev = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = prev;
+      btn.classList.remove('copied');
+    }, 1800);
+  };
+})();
+
+// 6 ── Refresh modal pop animation
+(function() {
+  var orig = window.showRefreshModal;
+  window.showRefreshModal = function() {
+    orig();
+    var m = document.getElementById('refresh-modal');
+    if (!m) return;
+    m.style.animation = 'none';
+    void m.offsetWidth;
+    m.style.animation = 'modalPopIn .24s cubic-bezier(.22,1,.36,1) both';
+  };
+})();
+
+// 7 ── Scroll-reveal for panels and chart cards
+(function() {
+  if (!window.IntersectionObserver) return;
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('sv-show');
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.06 });
+  setTimeout(function() {
+    document.querySelectorAll('.chart-card, .panel').forEach(function(el, i) {
+      el.classList.add('sv-init');
+      el.style.transitionDelay = (i * 55) + 'ms';
+      obs.observe(el);
+    });
+  }, 60);
+})();
+
+// 8 ── Hook renderTable to re-stagger rows on every update
+(function() {
+  var orig = window.renderTable;
+  if (typeof orig !== 'function') return;
+  window.renderTable = function() {
+    orig.apply(this, arguments);
+    setTimeout(staggerTableRows, 60);
+  };
+})();
+
+// 9 ── Init on load
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(runCountUps, 280);
+  setTimeout(staggerSignals, 120);
+  setTimeout(staggerTableRows, 450);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v2 — maximum delight
+═══════════════════════════════════════════════════════════════════ */
+
+// A ── Scroll progress bar + scroll-to-top button
+(function() {
+  var prog = document.createElement('div');
+  prog.id = 'scroll-progress';
+  document.body.prepend(prog);
+
+  var topBtn = document.createElement('button');
+  topBtn.id = 'scroll-top-btn';
+  topBtn.innerHTML = '&#8679;';
+  topBtn.title = 'Back to top';
+  document.body.appendChild(topBtn);
+  topBtn.addEventListener('click', function() {
+    var mainEl = document.getElementById('main') || window;
+    if (mainEl.scrollTo) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  var mainEl = document.getElementById('main') || document.documentElement;
+  var onScroll = function() {
+    var scrollTop = mainEl.scrollTop || window.scrollY || 0;
+    var scrollMax = (mainEl.scrollHeight || document.body.scrollHeight) - (mainEl.clientHeight || window.innerHeight);
+    var pct = scrollMax > 0 ? (scrollTop / scrollMax) * 100 : 0;
+    prog.style.width = pct + '%';
+    if (scrollTop > 350) topBtn.classList.add('visible');
+    else topBtn.classList.remove('visible');
+  };
+  mainEl.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+// B ── Toast notification system
+window._showToast = function(msg, icon, durationMs) {
+  var container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = (icon ? '<span class="toast-icon">' + icon + '</span>' : '') + '<span>' + msg + '</span>';
+  container.appendChild(t);
+  var dur = durationMs || 2600;
+  setTimeout(function() {
+    t.classList.add('toast-out');
+    t.addEventListener('animationend', function() { if (t.parentNode) t.parentNode.removeChild(t); });
+  }, dur);
+};
+
+(function() {
+  if (window._copyCmdToastWrapped) return;
+  window._copyCmdToastWrapped = true;
+  var prev = window.copyCmd;
+  if (typeof prev !== 'function') return;
+  window.copyCmd = function(id, event) {
+    prev(id, event);
+    window._showToast('Command copied to clipboard', '📋', 2000);
+  };
+})();
+
+// C ── 3D perspective tilt on KPI cards
+(function() {
+  function initTilt() {
+    document.querySelectorAll('.kpi-card').forEach(function(card) {
+      if (card._tiltInited) return;
+      card._tiltInited = true;
+      card.addEventListener('mousemove', function(e) {
+        var rect = card.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width - 0.5;
+        var y = (e.clientY - rect.top) / rect.height - 0.5;
+        var tx = -y * 12, ty = x * 12;
+        card.style.transform = 'translateY(-5px) rotateX(' + tx + 'deg) rotateY(' + ty + 'deg) scale(1.02)';
+        card.style.boxShadow = '0 16px 40px rgba(59,130,246,' + (0.1 + Math.abs(x) * 0.12) + ')';
+        card.style.transition = 'box-shadow .1s';
+      });
+      card.addEventListener('mouseleave', function() {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        card.style.transition = 'transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
+})();
+
+// D ── Magnetic attraction on primary buttons
+(function() {
+  function initMagnetic() {
+    document.querySelectorAll('.refresh-btn, .filters-btn, .export-btn').forEach(function(btn) {
+      if (btn._magInited) return;
+      btn._magInited = true;
+      btn.addEventListener('mousemove', function(e) {
+        var rect = btn.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var dx = (e.clientX - cx) * 0.3;
+        var dy = (e.clientY - cy) * 0.3;
+        btn.style.transform = 'translate(' + dx + 'px,' + dy + 'px) translateY(-2px)';
+        btn.style.transition = 'transform .08s linear';
+      });
+      btn.addEventListener('mouseleave', function() {
+        btn.style.transform = '';
+        btn.style.transition = 'transform .3s cubic-bezier(.22,1,.36,1)';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initMagnetic, 400); });
+})();
+
+// E ── Table row click ripple highlight
+document.addEventListener('click', function(e) {
+  var tr = e.target.closest && e.target.closest('.data-table tbody tr:not(.expand-row)');
+  if (!tr) return;
+  tr.classList.remove('row-selected');
+  void tr.offsetWidth;
+  tr.classList.add('row-selected');
+  setTimeout(function() { tr.classList.remove('row-selected'); }, 900);
+});
+
+// F ── Section crossfade
+(function() {
+  var origShow = window.showSection;
+  if (typeof origShow !== 'function' || window._showSectionV2Wrapped) return;
+  window._showSectionV2Wrapped = true;
+  window.showSection = function(name) {
+    var cur = document.querySelector('.section.active');
+    if (cur && !cur._fading) {
+      cur._fading = true;
+      cur.style.transition = 'opacity .14s ease';
+      cur.style.opacity = '0';
+      setTimeout(function() {
+        cur.style.opacity = '';
+        cur.style.transition = '';
+        cur._fading = false;
+        origShow(name);
+        var next = document.querySelector('.section.active');
+        if (next) {
+          next.style.opacity = '0';
+          next.style.transition = 'opacity .22s ease';
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              next.style.opacity = '1';
+              setTimeout(function() { next.style.opacity = ''; next.style.transition = ''; }, 240);
+            });
+          });
+        }
+      }, 130);
+    } else {
+      origShow(name);
+    }
+  };
+})();
+
+// G ── Search cell highlight
+(function() {
+  var prevRT = window.renderTable;
+  if (typeof prevRT !== 'function') return;
+  window.renderTable = function() {
+    prevRT.apply(this, arguments);
+    var q = (document.getElementById('tbl-search') || {}).value || '';
+    if (!q) return;
+    var ql = q.toLowerCase();
+    setTimeout(function() {
+      document.querySelectorAll('.data-table tbody tr:not(.expand-row) td').forEach(function(td) {
+        if (td.textContent.toLowerCase().includes(ql)) {
+          td.classList.remove('tbl-match');
+          void td.offsetWidth;
+          td.classList.add('tbl-match');
+        }
+      });
+    }, 80);
+  };
+})();
+
+// H ── Expand chevron rotation
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest && e.target.closest('.expand-btn');
+  if (!btn) return;
+  setTimeout(function() {
+    var tr = btn.closest('tr');
+    var next = tr && tr.nextElementSibling;
+    var isOpen = next && next.classList.contains('expand-row');
+    if (isOpen) btn.classList.add('ev2-open');
+    else btn.classList.remove('ev2-open');
+  }, 20);
+});
+
+// I ── Sidebar logo shimmer
+(function() {
+  var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+  if (!logo) return;
+  logo.addEventListener('mouseenter', function() {
+    logo.style.filter = 'brightness(1.15) drop-shadow(0 0 7px rgba(59,130,246,.5))';
+    logo.style.transform = 'scale(1.05)';
+  });
+  logo.addEventListener('mouseleave', function() {
+    logo.style.filter = '';
+    logo.style.transform = '';
+  });
+})();
+
+// J ── Breathing pulse on nav badges
+(function() {
+  document.querySelectorAll('.nav-badge, .sidebar-badge, .nav-alert-count, .alert-badge').forEach(function(b) {
+    b.style.animation = 'breathe 2.8s ease-in-out infinite';
+    b.style.display = 'inline-block';
+  });
+})();
+
+// K ── Table header sticky shadow
+(function() {
+  var tbl = document.querySelector('.data-table');
+  if (!tbl) return;
+  var scrollParent = tbl.closest('.panel') || document.getElementById('main') || window;
+  scrollParent.addEventListener('scroll', function() {
+    var st = scrollParent.scrollTop || 0;
+    if (st > 4) tbl.classList.add('tbl-header-stuck');
+    else tbl.classList.remove('tbl-header-stuck');
+  }, { passive: true });
+})();
+
+// L ── Apply filters toast
+(function() {
+  document.querySelectorAll('.fp-apply').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Filters applied', '🎯', 1800); }, 60);
+    });
+  });
+  document.querySelectorAll('.fp-reset').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Filters cleared', '🔄', 1600); }, 60);
+    });
+  });
+})();
+
+// M ── Export toast
+(function() {
+  document.querySelectorAll('.export-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Exporting data…', '📤', 1600); }, 80);
+    });
+  });
+})();
+
+// N ── KPI number morph on mutation
+(function() {
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mut) {
+      var el = mut.target.nodeType === 3 ? mut.target.parentElement : mut.target;
+      if (el && el.classList && el.classList.contains('kpi-number')) {
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = 'countDigit .28s cubic-bezier(.22,1,.36,1) both';
+      }
+    });
+  });
+  document.querySelectorAll('.kpi-number').forEach(function(el) {
+    observer.observe(el, { characterData: true, childList: true, subtree: true });
+  });
+})();
+
+// O ── DOMContentLoaded v2
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+    if (logo && !logo._logoWiggleInited) {
+      logo._logoWiggleInited = true;
+      logo.addEventListener('mouseenter', function() {
+        logo.style.animation = 'subtleWiggle .4s ease-in-out';
+        setTimeout(function() { logo.style.animation = ''; }, 440);
+      });
+    }
+  }, 500);
+
+  setTimeout(function() {
+    var rb = document.querySelector('.refresh-btn');
+    if (!rb) return;
+    rb.style.animation = 'breathe .6s ease-in-out 3';
+    setTimeout(function() { rb.style.animation = ''; }, 2000);
+  }, 3000);
+
+  if (!document.getElementById('toast-container')) {
+    var tc = document.createElement('div');
+    tc.id = 'toast-container';
+    document.body.appendChild(tc);
+  }
+
+  setTimeout(function() {
+    window._showToast && window._showToast('Dashboard ready', '✅', 2000);
+  }, 1200);
+});
 </script>
 </body>
 </html>
