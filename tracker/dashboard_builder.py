@@ -1221,6 +1221,85 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 /* ── miniAlert row hover ── */
 .mini-alert{transition:background .12s,border-color .14s,transform .18s,box-shadow .16s}
 .mini-alert:hover{transform:translateX(5px);box-shadow:2px 0 12px rgba(59,130,246,.12)}
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v3 — Premium Polish Layer
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Base stacking: keep app above background layers */
+#app{position:relative;z-index:1}
+
+/* — A. Animated mesh-gradient backdrop (drifting color blobs) — */
+#ev3-mesh-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:.55}
+#ev3-mesh-bg::before,#ev3-mesh-bg::after,#ev3-mesh-bg>span{content:'';position:absolute;border-radius:50%;filter:blur(110px);will-change:transform}
+#ev3-mesh-bg::before{width:70vw;height:70vw;background:radial-gradient(circle,rgba(99,102,241,.55) 0%,transparent 60%);top:-25%;left:-20%;animation:ev3-meshDrift1 28s ease-in-out infinite alternate}
+#ev3-mesh-bg::after{width:60vw;height:60vw;background:radial-gradient(circle,rgba(34,211,238,.45) 0%,transparent 60%);bottom:-20%;right:-15%;animation:ev3-meshDrift2 32s ease-in-out infinite alternate}
+#ev3-mesh-bg>span{width:55vw;height:55vw;background:radial-gradient(circle,rgba(168,85,247,.4) 0%,transparent 60%);top:30%;left:35%;animation:ev3-meshDrift3 38s ease-in-out infinite alternate}
+@keyframes ev3-meshDrift1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(18vw,12vh) scale(1.2)}}
+@keyframes ev3-meshDrift2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-14vw,-8vh) scale(1.15)}}
+@keyframes ev3-meshDrift3{0%{transform:translate(-10vw,-5vh) scale(1)}100%{transform:translate(10vw,8vh) scale(1.1)}}
+
+/* — B. Film-grain noise overlay — */
+#ev3-noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+
+/* — C. Cursor-spotlight on KPI / panel cards — */
+.kpi-card,.panel{position:relative;overflow:hidden}
+.kpi-card::before,.panel::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(520px circle at var(--ev3-mx,50%) var(--ev3-my,50%),rgba(99,102,241,.14),transparent 45%);opacity:0;transition:opacity .35s ease;pointer-events:none;z-index:1}
+.kpi-card:hover::before,.panel:hover::before{opacity:1}
+.kpi-card>*,.panel>*{position:relative;z-index:2}
+
+/* — D. Conic-gradient rotating border on HIGH severity cards — */
+.kpi-card.ev3-high{position:relative}
+.kpi-card.ev3-high::after{content:'';position:absolute;inset:-2px;border-radius:inherit;padding:2px;background:conic-gradient(from 0deg,#ef4444,#f97316,#fbbf24,#ef4444,transparent 55%,#ef4444);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:ev3-conicSpin 5s linear infinite;opacity:.75;pointer-events:none;z-index:3}
+@keyframes ev3-conicSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+/* — E. Severity pulse ring on HIGH badges — */
+.severity-high,.alert-badge.ev3-high,.badge.ev3-high,[data-sev="HIGH"]{position:relative}
+.severity-high::after,.alert-badge.ev3-high::after,.badge.ev3-high::after,[data-sev="HIGH"]::after{content:'';position:absolute;inset:-3px;border-radius:inherit;border:2px solid rgba(239,68,68,.55);animation:ev3-pulseRing 2.2s ease-out infinite;pointer-events:none}
+@keyframes ev3-pulseRing{0%{transform:scale(.85);opacity:.9}80%{transform:scale(1.5);opacity:0}100%{transform:scale(1.5);opacity:0}}
+
+/* — F. Header shimmer reveal sweep — */
+@keyframes ev3-shimmerSweep{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.ev3-shimmer{background-image:linear-gradient(110deg,currentColor 30%,rgba(255,255,255,.85) 50%,currentColor 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:ev3-shimmerSweep 2.1s ease-out 1 forwards}
+
+/* — G. Modal entrance: scale + blur fade-in — */
+.modal,.modal-content,.kpi-modal,.modal-panel,.sdm-modal,.refresh-modal,.company-modal,#company-modal .panel,#kpi-modal .panel{animation:ev3-modalIn .42s cubic-bezier(.34,1.4,.45,1) both}
+@keyframes ev3-modalIn{0%{transform:scale(.9) translateY(18px);opacity:0;filter:blur(6px)}100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)}}
+.modal-backdrop,.modal-overlay,.kpi-modal-backdrop,#modal-backdrop{animation:ev3-backdropIn .4s ease both}
+@keyframes ev3-backdropIn{0%{opacity:0;backdrop-filter:blur(0)}100%{opacity:1;backdrop-filter:blur(8px) saturate(120%)}}
+
+/* — H. Table row hover glow-sweep — */
+tbody tr,.alert-row,.signal-row,.mini-alert,.signal-item{position:relative}
+tbody tr::after,.alert-row::after,.signal-row::after,.signal-item::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(99,102,241,.1),transparent);transform:translateX(-110%);transition:transform .7s ease;pointer-events:none;z-index:0}
+tbody tr:hover::after,.alert-row:hover::after,.signal-row:hover::after,.signal-item:hover::after{transform:translateX(110%)}
+tbody tr>*,.alert-row>*,.signal-row>*,.signal-item>*{position:relative;z-index:1}
+
+/* — I. Section scroll-reveal fade-up — */
+.ev3-reveal{opacity:0;transform:translateY(22px) scale(.985);transition:opacity .8s cubic-bezier(.22,1,.36,1),transform .8s cubic-bezier(.22,1,.36,1)}
+.ev3-reveal.ev3-in{opacity:1;transform:none}
+
+/* — J. KPI number glow pulse on update — */
+.kpi-number,.kpi-value,.stat-value,.kpi-card .kpi-num{transition:text-shadow .45s ease,color .45s ease}
+.kpi-number.ev3-pulse,.kpi-value.ev3-pulse,.stat-value.ev3-pulse,.kpi-card .kpi-num.ev3-pulse{text-shadow:0 0 28px rgba(99,102,241,.7),0 0 8px rgba(99,102,241,.5)}
+
+/* — K. Toast spring entrance — */
+.toast{animation:ev3-toastSpring .55s cubic-bezier(.34,1.56,.64,1) both!important}
+@keyframes ev3-toastSpring{0%{transform:translateX(120%) scale(.7) rotate(2deg);opacity:0}55%{transform:translateX(-6%) scale(1.04) rotate(-1deg);opacity:1}100%{transform:translateX(0) scale(1) rotate(0);opacity:1}}
+
+/* — L. Sidebar active indicator with gradient glow — */
+.nav-item.active::before,.sidebar-item.active::before,#sidebar .active::before{content:'';position:absolute;left:0;top:8%;bottom:8%;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#6366f1,#a855f7,#22d3ee);box-shadow:0 0 14px rgba(99,102,241,.65);animation:ev3-navSlideIn .4s cubic-bezier(.22,1.4,.36,1) both}
+@keyframes ev3-navSlideIn{0%{transform:scaleY(0);opacity:0}100%{transform:scaleY(1);opacity:1}}
+
+/* — M. Refresh button gentle glow — */
+.refresh-btn,button.refresh,#refresh-btn{position:relative;overflow:hidden}
+.refresh-btn::before,button.refresh::before,#refresh-btn::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.4),transparent);transform:translate(-50%,-50%);transition:width .5s,height .5s}
+.refresh-btn:hover::before,button.refresh:hover::before,#refresh-btn:hover::before{width:200%;height:200%}
+
+/* — N. Reduced-motion respect — */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  #ev3-mesh-bg,#ev3-noise{display:none}
+}
 </style>
 </head>
 <body>
@@ -3769,6 +3848,161 @@ document.addEventListener('DOMContentLoaded', function() {
     window._showToast && window._showToast('Dashboard ready', '✅', 2000);
   }, 1200);
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v3 — Premium Polish Layer
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  if (window._ev3Loaded) return; window._ev3Loaded = true;
+  window._ev3 = {};
+
+  function ready(fn){ if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  function debounce(fn, ms){ var t; return function(){ clearTimeout(t); var a=arguments,s=this; t=setTimeout(function(){fn.apply(s,a)}, ms); }; }
+
+  ready(function(){
+    // —— A+B. Inject background mesh + noise overlay (idempotent) ——
+    if (!document.getElementById('ev3-mesh-bg')) {
+      var m = document.createElement('div'); m.id = 'ev3-mesh-bg';
+      var extra = document.createElement('span'); m.appendChild(extra);
+      document.body.insertBefore(m, document.body.firstChild);
+      var n = document.createElement('div'); n.id = 'ev3-noise';
+      document.body.insertBefore(n, document.body.firstChild);
+    }
+
+    // —— C. Cursor-spotlight on KPI / panel cards ——
+    function bindSpotlight(){
+      document.querySelectorAll('.kpi-card,.panel').forEach(function(el){
+        if (el._ev3Spot) return; el._ev3Spot = true;
+        el.addEventListener('mousemove', function(e){
+          var r = el.getBoundingClientRect();
+          el.style.setProperty('--ev3-mx', ((e.clientX - r.left) / r.width * 100) + '%');
+          el.style.setProperty('--ev3-my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+      });
+    }
+    bindSpotlight();
+
+    // —— D+E. Tag HIGH severity elements for conic border + pulse ring ——
+    function tagHigh(){
+      document.querySelectorAll('.kpi-card').forEach(function(card){
+        var t = (card.textContent || '').toUpperCase();
+        if (/HIGH ALERTS|HIGH SIGNAL|HIGH PRIORITY|CRITICAL/.test(t)) card.classList.add('ev3-high');
+      });
+      document.querySelectorAll('.alert-badge,.badge,.severity').forEach(function(b){
+        var t = (b.textContent || '').toUpperCase().trim();
+        if (t === 'HIGH' || t === 'CRITICAL') b.classList.add('ev3-high');
+      });
+    }
+    tagHigh();
+
+    // —— F. Header shimmer sweep on first reveal ——
+    if ('IntersectionObserver' in window) {
+      var shimObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting && !en.target._ev3Shim) {
+            en.target._ev3Shim = true;
+            en.target.classList.add('ev3-shimmer');
+            setTimeout(function(){ en.target.classList.remove('ev3-shimmer'); }, 2200);
+          }
+        });
+      }, { threshold: 0.3 });
+      document.querySelectorAll('h1, h2, .section-title, .panel-title, .panel-header h3').forEach(function(h){ shimObs.observe(h); });
+    }
+
+    // —— I. Section scroll-reveal fade-up ——
+    if ('IntersectionObserver' in window) {
+      var revObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){ if (en.isIntersecting) en.target.classList.add('ev3-in'); });
+      }, { threshold: 0.08 });
+      document.querySelectorAll('.panel,.kpi-card,.chart-card,.alert-card,.section').forEach(function(el){
+        el.classList.add('ev3-reveal');
+        revObs.observe(el);
+      });
+    }
+
+    // —— J. KPI number pulse glow on text change ——
+    function bindKpiPulse(){
+      document.querySelectorAll('.kpi-number,.kpi-value,.stat-value,.kpi-num,[data-kpi]').forEach(function(el){
+        if (el._ev3KpiBound) return; el._ev3KpiBound = true;
+        var lastVal = el.textContent;
+        new MutationObserver(function(){
+          if (el.textContent !== lastVal) {
+            lastVal = el.textContent;
+            el.classList.add('ev3-pulse');
+            setTimeout(function(){ el.classList.remove('ev3-pulse'); }, 520);
+          }
+        }).observe(el, { childList: true, characterData: true, subtree: true });
+      });
+    }
+    bindKpiPulse();
+
+    // —— Confetti burst on first HIGH badge sighting (once per session) ——
+    function fireConfetti(originEl){
+      if (window._ev3.confettiFired) return;
+      try { if (sessionStorage.getItem('_ev3_confetti')) return; sessionStorage.setItem('_ev3_confetti', '1'); } catch(e){}
+      window._ev3.confettiFired = true;
+      var r = originEl.getBoundingClientRect();
+      var cx = r.left + r.width/2, cy = r.top + r.height/2;
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9998';
+      canvas.width = innerWidth; canvas.height = innerHeight;
+      document.body.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      var colors = ['#ef4444','#f97316','#fbbf24','#6366f1','#22d3ee','#a855f7','#10b981'];
+      var parts = [];
+      for (var i = 0; i < 70; i++) {
+        parts.push({
+          x: cx, y: cy,
+          vx: (Math.random()-.5) * 14,
+          vy: Math.random() * -11 - 3,
+          size: Math.random() * 5 + 3,
+          color: colors[i % colors.length],
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random()-.5) * .35,
+          life: 1
+        });
+      }
+      var t0 = performance.now();
+      function frame(t){
+        var dt = Math.min(32, t - t0) / 16; t0 = t;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var alive = 0;
+        parts.forEach(function(p){
+          p.vy += .38 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= .009 * dt;
+          if (p.life > 0) {
+            alive++;
+            ctx.save();
+            ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+            ctx.globalAlpha = Math.max(0, p.life);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * 1.6);
+            ctx.restore();
+          }
+        });
+        if (alive > 0) requestAnimationFrame(frame);
+        else if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      }
+      requestAnimationFrame(frame);
+    }
+    if ('IntersectionObserver' in window) {
+      var confObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting && en.target.classList.contains('ev3-high')) fireConfetti(en.target);
+        });
+      }, { threshold: 0.6 });
+      setTimeout(function(){ document.querySelectorAll('.ev3-high').forEach(function(el){ confObs.observe(el); }); }, 1800);
+    }
+
+    // —— Re-bind on dynamic content (debounced) ——
+    var rebind = debounce(function(){ bindSpotlight(); tagHigh(); bindKpiPulse(); }, 200);
+    new MutationObserver(rebind).observe(document.body, { childList: true, subtree: true });
+
+    // —— v3 welcome flourish (after v2 toast) ——
+    setTimeout(function(){
+      window._showToast && window._showToast('Premium animations engaged', '✨', 2400);
+    }, 2400);
+  });
+})();
 </script>
 </body>
 </html>"""
