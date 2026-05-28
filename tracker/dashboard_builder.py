@@ -387,7 +387,8 @@ body.modal-open{overflow:hidden}
 #refresh-modal{
   display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:14px;
-  padding:24px;width:440px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.35)
+  padding:24px;width:440px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.35);
+  max-height:90vh;overflow-y:auto
 }
 #refresh-modal-close{
   position:absolute;top:12px;right:14px;background:none;border:none;
