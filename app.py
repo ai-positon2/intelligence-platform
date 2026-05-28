@@ -403,7 +403,11 @@ def dashboard(account_id: str):
     dashboard_path: Path = cfg["dashboard"]
     if not dashboard_path.exists():
         abort(404, f"Dashboard for '{cfg['name']}' not generated yet — run main.py first.")
-    return send_file(str(dashboard_path))
+    response = make_response(send_file(str(dashboard_path)))
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/health")
