@@ -3157,12 +3157,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // A ── Scroll progress bar + scroll-to-top button
 (function() {
-  // Progress bar
   var prog = document.createElement('div');
   prog.id = 'scroll-progress';
   document.body.prepend(prog);
 
-  // Scroll-to-top
   var topBtn = document.createElement('button');
   topBtn.id = 'scroll-top-btn';
   topBtn.innerHTML = '&#8679;';
@@ -3206,7 +3204,6 @@ window._showToast = function(msg, icon, durationMs) {
   }, dur);
 };
 
-// Add toast to the copy action (wraps the v1 patch)
 (function() {
   if (window._copyCmdToastWrapped) return;
   window._copyCmdToastWrapped = true;
@@ -3243,7 +3240,7 @@ window._showToast = function(msg, icon, durationMs) {
   document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
 })();
 
-// D ── Magnetic attraction on primary action buttons
+// D ── Magnetic attraction on primary buttons
 (function() {
   function initMagnetic() {
     document.querySelectorAll('.refresh-btn, .filters-btn, .export-btn').forEach(function(btn) {
@@ -3277,7 +3274,7 @@ document.addEventListener('click', function(e) {
   setTimeout(function() { tr.classList.remove('row-selected'); }, 900);
 });
 
-// F ── Section crossfade when switching tabs
+// F ── Section crossfade
 (function() {
   var origShow = window.showSection;
   if (typeof origShow !== 'function' || window._showSectionV2Wrapped) return;
@@ -3311,7 +3308,7 @@ document.addEventListener('click', function(e) {
   };
 })();
 
-// G ── Search cell highlight on table render
+// G ── Search cell highlight
 (function() {
   var prevRT = window.renderTable;
   if (typeof prevRT !== 'function') return;
@@ -3332,12 +3329,11 @@ document.addEventListener('click', function(e) {
   };
 })();
 
-// H ── Expand-row chevron rotation
+// H ── Expand chevron rotation
 document.addEventListener('click', function(e) {
   var btn = e.target.closest && e.target.closest('.expand-btn');
   if (!btn) return;
   setTimeout(function() {
-    // detect expanded state from sibling row
     var tr = btn.closest('tr');
     var next = tr && tr.nextElementSibling;
     var isOpen = next && next.classList.contains('expand-row');
@@ -3346,7 +3342,7 @@ document.addEventListener('click', function(e) {
   }, 20);
 });
 
-// I ── Sidebar logo hover shimmer
+// I ── Sidebar logo shimmer
 (function() {
   var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
   if (!logo) return;
@@ -3360,7 +3356,7 @@ document.addEventListener('click', function(e) {
   });
 })();
 
-// J ── Breathing pulse on nav alert counts
+// J ── Breathing pulse on nav badges
 (function() {
   document.querySelectorAll('.nav-badge, .sidebar-badge, .nav-alert-count, .alert-badge').forEach(function(b) {
     b.style.animation = 'breathe 2.8s ease-in-out infinite';
@@ -3368,91 +3364,50 @@ document.addEventListener('click', function(e) {
   });
 })();
 
-// K ── Stagger sidebar nav items on load
-(function() {
-  document.querySelectorAll('.nav-section .nav-item, #sidebar .nav-item').forEach(function(el, i) {
-    if (!el.style.animationDelay) {
-      el.style.animation = 'sidebarItem .35s ' + (50 + i * 44) + 'ms cubic-bezier(.22,1,.36,1) both';
-    }
-  });
-})();
-
-// L ── Table header sticky shadow on scroll
+// K ── Table header sticky shadow
 (function() {
   var tbl = document.querySelector('.data-table');
   if (!tbl) return;
   var scrollParent = tbl.closest('.panel') || document.getElementById('main') || window;
-  var onTblScroll = function() {
+  scrollParent.addEventListener('scroll', function() {
     var st = scrollParent.scrollTop || 0;
     if (st > 4) tbl.classList.add('tbl-header-stuck');
     else tbl.classList.remove('tbl-header-stuck');
-  };
-  scrollParent.addEventListener('scroll', onTblScroll, { passive: true });
+  }, { passive: true });
 })();
 
-// M ── Re-init tilt + magnetic after section switches
+// L ── Apply filters toast
 (function() {
-  var origNavClick = window.showSection;
-  if (typeof origNavClick !== 'function') return;
-  var reinit = function() {
-    setTimeout(function() {
-      document.querySelectorAll('.kpi-card:not([data-tilt])').forEach(function(card) {
-        card._tiltInited = false;
-      });
-    }, 300);
-  };
-  window.addEventListener('hashchange', reinit);
-})();
-
-// N ── Filter panel open shows toast
-(function() {
-  var orig = window.openFilterPanel;
-  if (typeof orig !== 'function' || window._fpToastWrapped) return;
-  window._fpToastWrapped = true;
-  window.openFilterPanel = function() {
-    orig.apply(this, arguments);
-    // subtle panel entrance — CSS handles it, JS just ensures the panel element gets a class
-    var fp = document.getElementById('filter-panel');
-    if (fp) {
-      fp.style.transition = 'transform .28s cubic-bezier(.22,1,.36,1)';
-    }
-  };
-})();
-
-// O ── Apply filters toast
-(function() {
-  var applyBtns = document.querySelectorAll('.fp-apply');
-  applyBtns.forEach(function(btn) {
+  document.querySelectorAll('.fp-apply').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      setTimeout(function() {
-        window._showToast && window._showToast('Filters applied', '🎯', 1800);
-      }, 60);
+      setTimeout(function() { window._showToast && window._showToast('Filters applied', '🎯', 1800); }, 60);
+    });
+  });
+  document.querySelectorAll('.fp-reset').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Filters cleared', '🔄', 1600); }, 60);
     });
   });
 })();
 
-// P ── Export action toast
+// M ── Export toast
 (function() {
   document.querySelectorAll('.export-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      setTimeout(function() {
-        window._showToast && window._showToast('Exporting…', '📤', 1600);
-      }, 80);
+      setTimeout(function() { window._showToast && window._showToast('Exporting data…', '📤', 1600); }, 80);
     });
   });
 })();
 
-// Q ── Smooth number updates when filter changes KPI
+// N ── KPI number morph on mutation
 (function() {
   var observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mut) {
-      if (mut.type === 'characterData' || mut.type === 'childList') {
-        var el = mut.target.nodeType === 3 ? mut.target.parentElement : mut.target;
-        if (el && el.classList && el.classList.contains('kpi-number')) {
-          el.style.animation = 'none';
-          void el.offsetWidth;
-          el.style.animation = 'countDigit .28s cubic-bezier(.22,1,.36,1) both';
-        }
+      var el = mut.target.nodeType === 3 ? mut.target.parentElement : mut.target;
+      if (el && el.classList && el.classList.contains('kpi-number')) {
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = 'countDigit .28s cubic-bezier(.22,1,.36,1) both';
       }
     });
   });
@@ -3461,21 +3416,19 @@ document.addEventListener('click', function(e) {
   });
 })();
 
-// R ── DOMContentLoaded v2 inits
+// O ── DOMContentLoaded v2
 document.addEventListener('DOMContentLoaded', function() {
-  // Sidebar logo hover (delayed to ensure DOM ready)
   setTimeout(function() {
     var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
-    if (logo && !logo._logoInited) {
-      logo._logoInited = true;
+    if (logo && !logo._logoWiggleInited) {
+      logo._logoWiggleInited = true;
       logo.addEventListener('mouseenter', function() {
         logo.style.animation = 'subtleWiggle .4s ease-in-out';
-        setTimeout(function() { logo.style.animation = ''; }, 420);
+        setTimeout(function() { logo.style.animation = ''; }, 440);
       });
     }
   }, 500);
 
-  // Pulse the refresh button once after 3s to draw attention
   setTimeout(function() {
     var rb = document.querySelector('.refresh-btn');
     if (!rb) return;
@@ -3483,14 +3436,12 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() { rb.style.animation = ''; }, 2000);
   }, 3000);
 
-  // Init toast container
   if (!document.getElementById('toast-container')) {
     var tc = document.createElement('div');
     tc.id = 'toast-container';
     document.body.appendChild(tc);
   }
 
-  // Welcome micro-toast
   setTimeout(function() {
     window._showToast && window._showToast('Dashboard ready', '✅', 2000);
   }, 1200);
