@@ -1338,30 +1338,15 @@ h1,h2,h3,.panel-title,.section-title,.panel-header h3,
 }
 .kpi-card.high-card:hover .kpi-number{filter:drop-shadow(0 4px 22px rgba(239,68,68,.6))}
 
-/* — KPI label: micro-caps with animated accent line — */
+/* — KPI label: micro-caps (accent line removed) — */
 .kpi-label{
   font-size:10px!important;
   font-weight:600!important;
   letter-spacing:.14em!important;
   text-transform:uppercase;
   color:var(--text2);
-  position:relative;
-  padding-left:16px;
   display:inline-block;
 }
-.kpi-label::before{
-  content:'';
-  position:absolute;
-  left:0;top:50%;
-  transform:translateY(-50%);
-  width:9px;height:2px;
-  background:linear-gradient(90deg,#6366f1,#22d3ee);
-  border-radius:1px;
-  box-shadow:0 0 8px rgba(99,102,241,.5);
-  transition:width .35s cubic-bezier(.22,1.4,.36,1);
-}
-.kpi-card:hover .kpi-label::before{width:22px}
-.kpi-card.high-card .kpi-label::before{background:linear-gradient(90deg,#f59e0b,#ef4444);box-shadow:0 0 8px rgba(239,68,68,.55)}
 
 /* — Severity left-edge rails on KPI cards — */
 .kpi-card{border-left:3px solid transparent;transition:border-color .25s,background .35s,box-shadow .25s,transform .22s}
