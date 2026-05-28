@@ -91,7 +91,7 @@ export function AdModal({ ad, onClose }: AdModalProps) {
          style={{ background: 'rgba(10,14,35,0.8)', backdropFilter: 'blur(10px)' }}
          onClick={onClose}>
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden"
+        className="modal-anim bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden"
         style={{ height: 'min(620px, 88vh)', boxShadow: `0 40px 80px -12px rgba(0,0,0,.5), 0 0 0 1px ${color}25` }}
         onClick={e => e.stopPropagation()}
       >
@@ -159,7 +159,7 @@ export function AdModal({ ad, onClose }: AdModalProps) {
             {ad['Destination URL'] && (
               <a href={ad['Destination URL'].startsWith('http') ? ad['Destination URL'] : `https://${ad['Destination URL']}`}
                  target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl hover:opacity-90 transition-opacity"
+                 className="cta-shine flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl"
                  style={{ background: `${color}12`, color }}>
                 <Globe size={11}/>
                 <span className="truncate">{truncate(ad['Destination URL'].replace(/https?:\/\//, ''), 38)}</span>

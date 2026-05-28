@@ -34,7 +34,8 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
           <>
             <img
               src={primary} alt="Ad creative"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
+              className="img-fade-in w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+              onLoad={e => (e.target as HTMLImageElement).classList.add('loaded')}
               onError={e => {
                 const img = e.target as HTMLImageElement;
                 img.style.display = 'none';
@@ -56,15 +57,15 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
 
         {/* Live badge — top-left, only when active */}
         {ad.Status === 'active' && (
-          <div className="absolute top-2.5 left-2.5 flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full text-white bg-emerald-500/90 backdrop-blur-sm z-10">
+          <div className="anim-badge-in absolute top-2.5 left-2.5 flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full text-white bg-emerald-500/90 backdrop-blur-sm z-10">
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"/>
             Live
           </div>
         )}
 
         {/* Format badge — always top-right */}
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white backdrop-blur-md"
-             style={{ backgroundColor: `${color}cc` }}>
+        <div className="anim-badge-in absolute top-2.5 right-2.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white backdrop-blur-md transition-transform group-hover:scale-110"
+             style={{ backgroundColor: `${color}cc`, animationDelay: '0.08s' }}>
           {FORMAT_ICONS[fmt]} {fmt}
         </div>
       </div>
@@ -103,7 +104,7 @@ export function AdCard({ ad, onClick, onDomainClick }: AdCardProps) {
         {/* Footer — always at bottom */}
         <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-2 flex-shrink-0">
           {ad.CTA && ad.CTA.length < 40 ? (
-            <span className="text-[11px] font-semibold text-white px-2.5 py-1 rounded-lg truncate max-w-[70%]"
+            <span className="cta-shine text-[11px] font-semibold text-white px-2.5 py-1 rounded-lg truncate max-w-[70%] inline-block"
                   style={{ backgroundColor: color }}>
               {ad.CTA}
             </span>

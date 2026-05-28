@@ -51,24 +51,73 @@ function GradientCard({
   delay?: string; hint: string; onClick: () => void;
 }) {
   const count = useCountUp(value);
+  const [sparkles, setSparkles] = useState<Array<{ id: number; x: number; y: number; color: string }>>([]);
+  const sparkleId = useRef(0);
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`);
+    const rx = ((e.clientY - r.top) / r.height - 0.5) * -4;
+    const ry = ((e.clientX - r.left) / r.width  - 0.5) *  4;
+    e.currentTarget.style.setProperty('--rx', `${rx}deg`);
+    e.currentTarget.style.setProperty('--ry', `${ry}deg`);
+  };
+  const handleLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.setProperty('--rx', '0deg');
+    e.currentTarget.style.setProperty('--ry', '0deg');
+  };
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const cx = e.clientX - r.left;
+    const cy = e.clientY - r.top;
+    const colors = ['#fff', '#fef08a', '#bef264', '#fda4af'];
+    const newSparkles = Array.from({ length: 10 }, (_, i) => {
+      const angle = (i / 10) * Math.PI * 2;
+      const dist = 30 + Math.random() * 40;
+      return {
+        id: sparkleId.current++,
+        x: cx + Math.cos(angle) * dist,
+        y: cy + Math.sin(angle) * dist,
+        color: colors[i % colors.length],
+      };
+    });
+    setSparkles(s => [...s, ...newSparkles]);
+    setTimeout(() => setSparkles(s => s.filter(sp => !newSparkles.find(n => n.id === sp.id))), 700);
+    onClick();
+  };
+
   return (
     <div
-      onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl p-5 text-white cursor-pointer anim-fade-up ${delay}
-                  group transition-all duration-200 hover:scale-[1.03] hover:shadow-2xl`}
-      style={{ background: gradient }}
+      onClick={handleClick}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      className={`spotlight shine-on-hover relative overflow-hidden rounded-2xl p-5 text-white cursor-pointer anim-fade-up ${delay}
+                  group transition-all duration-300 hover:shadow-2xl active:scale-[0.97]`}
+      style={{
+        background: gradient,
+        transform: 'perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1)',
+        transformStyle: 'preserve-3d',
+      }}
     >
       <div className="absolute inset-0 stat-shimmer pointer-events-none" />
-      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-      <div className="absolute -right-2 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
-      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-4">{icon}</div>
+      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none anim-float" />
+      <div className="absolute -right-2 -bottom-8 w-20 h-20 rounded-full bg-white/5 pointer-events-none anim-breathe" />
+
+      {/* Sparkles on click */}
+      {sparkles.map(s => (
+        <span key={s.id} className="particle"
+              style={{ left: s.x, top: s.y, background: s.color, boxShadow: `0 0 8px ${s.color}` }}/>
+      ))}
+
+      <div className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">{icon}</div>
       <div className="relative">
-        <p className="text-4xl font-black tracking-tight leading-none">{count}</p>
+        <p className="text-4xl font-black tracking-tight leading-none num-pop">{count}</p>
         <p className="text-sm font-semibold mt-1 text-white/90">{label}</p>
         <p className="text-xs mt-0.5 text-white/60">{sub}</p>
-        {/* hover hint */}
-        <p className="flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/80 transition-all mt-2">
-          {hint} <ArrowRight size={11} />
+        {/* hover hint slides up */}
+        <p className="flex items-center gap-1 text-[11px] font-semibold text-white/0 group-hover:text-white/90 transition-all mt-2 translate-y-1 group-hover:translate-y-0 duration-200">
+          {hint} <ArrowRight size={11} className="group-hover:translate-x-1 transition-transform"/>
         </p>
       </div>
     </div>
@@ -163,9 +212,9 @@ export default function App() {
             const isActive = tab === item.id;
             return (
               <button key={item.id} onClick={() => { setTab(item.id); setSidebar(false); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 group
-                        ${isActive ? 'bg-indigo-500/20 text-white' : 'text-white/45 hover:text-white/80 hover:bg-white/5'}`}>
-                <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-indigo-400' : 'text-white/30 group-hover:text-white/60'}`}>{item.icon}</span>
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 group relative
+                        ${isActive ? 'bg-indigo-500/20 text-white nav-active-bg' : 'text-white/45 hover:text-white/80 hover:bg-white/5'}`}>
+                <span className={`flex-shrink-0 transition-all duration-300 ${isActive ? 'text-indigo-400 scale-110' : 'text-white/30 group-hover:text-white/60 group-hover:scale-110 group-hover:-rotate-6'}`}>{item.icon}</span>
                 <span>
                   <span className="block text-sm font-medium leading-none">{item.label}</span>
                   <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-indigo-300/70' : 'text-white/25'}`}>{item.desc}</span>
@@ -224,7 +273,11 @@ export default function App() {
               <span className="text-[13px] text-white/70">Ad Intelligence</span>
               <span className="text-xs text-white/30">/</span>
             </div>
-            <h1 className="text-sm font-bold text-white leading-none truncate">{tabLabel}</h1>
+            <h1 key={tab} className="title-reveal text-sm font-bold text-white leading-none truncate">
+              {tabLabel.split(' ').map((w, i) => (
+                <span key={i} style={{ animationDelay: `${i * 0.06}s`, marginRight: '0.25rem' }}>{w}</span>
+              ))}
+            </h1>
           </div>
 
           {/* Right: pills */}
@@ -254,7 +307,7 @@ export default function App() {
         </header>
 
         {/* Scrollable body */}
-        <main className="flex-1 overflow-y-auto dot-bg">
+        <main className="flex-1 overflow-y-auto dot-bg bg-orbs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
             {/* Clickable stat cards */}

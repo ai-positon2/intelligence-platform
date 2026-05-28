@@ -74,13 +74,13 @@ function InsightStrip({ ads }: { ads: Ad[] }) {
                : `${Math.round(days / 30)}mo ago`;
   }
 
-  const tile = 'bg-white border border-slate-100 rounded-2xl p-4 shadow-sm';
+  const tile = 'card-glow bg-white border border-slate-100 rounded-2xl p-4 shadow-sm anim-pop-in';
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
 
       {/* 1 · Activity */}
-      <div className={tile}>
+      <div className={`${tile} delay-1`}>
         <div className="flex items-center gap-1.5 mb-3">
           <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center">
             <Zap size={11} className="text-emerald-600"/>
@@ -101,7 +101,7 @@ function InsightStrip({ ads }: { ads: Ad[] }) {
       </div>
 
       {/* 2 · Creative Mix */}
-      <div className={tile}>
+      <div className={`${tile} delay-2`}>
         <div className="flex items-center gap-1.5 mb-3">
           <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center">
             <ImageIcon size={11} className="text-indigo-600"/>
@@ -129,7 +129,7 @@ function InsightStrip({ ads }: { ads: Ad[] }) {
       </div>
 
       {/* 3 · Top CTA */}
-      <div className={tile}>
+      <div className={`${tile} delay-3`}>
         <div className="flex items-center gap-1.5 mb-3">
           <div className="w-6 h-6 rounded-lg bg-violet-50 flex items-center justify-center">
             <Target size={11} className="text-violet-600"/>
@@ -155,7 +155,7 @@ function InsightStrip({ ads }: { ads: Ad[] }) {
       </div>
 
       {/* 4 · Timeline */}
-      <div className={tile}>
+      <div className={`${tile} delay-4`}>
         <div className="flex items-center gap-1.5 mb-3">
           <div className="w-6 h-6 rounded-lg bg-sky-50 flex items-center justify-center">
             <Clock size={11} className="text-sky-600"/>
@@ -266,8 +266,8 @@ function PatternChips({ ads }: { ads: Ad[] }) {
     <div className="flex flex-wrap gap-2 mb-5">
       {chips.map((c, i) => (
         <span key={i}
-              className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border"
-              style={{ color: c.color, background: `${c.color}10`, borderColor: `${c.color}28` }}>
+              className="chip-pop inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full border hover:scale-105 transition-transform cursor-default"
+              style={{ color: c.color, background: `${c.color}10`, borderColor: `${c.color}28`, animationDelay: `${i * 0.07}s` }}>
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: c.color }}/>
           {c.text}
         </span>
@@ -425,25 +425,25 @@ export function GalleryTab({
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <span className="text-xs text-slate-400 font-medium">Filtered:</span>
           {domain !== 'all' && (
-            <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+            <span className="chip-pop flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
               {COMPETITORS.find(c => c.domain === domain)?.name ?? domain}
-              <button onClick={() => setDomain('all')} className="hover:text-indigo-900 ml-0.5">
+              <button onClick={() => setDomain('all')} className="hover:text-indigo-900 ml-0.5 hover:rotate-90 transition-transform">
                 <X size={10}/>
               </button>
             </span>
           )}
           {format !== 'all' && (
-            <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 capitalize">
+            <span className="chip-pop flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 capitalize">
               {format} ads
-              <button onClick={() => setFormat('all')} className="hover:text-emerald-900 ml-0.5">
+              <button onClick={() => setFormat('all')} className="hover:text-emerald-900 ml-0.5 hover:rotate-90 transition-transform">
                 <X size={10}/>
               </button>
             </span>
           )}
           {search && (
-            <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+            <span className="chip-pop flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
               "{search}"
-              <button onClick={() => setSearch('')} className="hover:text-amber-900 ml-0.5">
+              <button onClick={() => setSearch('')} className="hover:text-amber-900 ml-0.5 hover:rotate-90 transition-transform">
                 <X size={10}/>
               </button>
             </span>
@@ -492,9 +492,9 @@ export function GalleryTab({
             ))}
           </div>
 
-          <div className="flex-1 min-w-48 relative ml-auto">
+          <div className="flex-1 min-w-48 relative ml-auto search-expand rounded-xl">
             <Search size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform group-focus-within:scale-110"/>
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search headlines, CTAs, keywords…"
@@ -584,8 +584,8 @@ export function GalleryTab({
 
       {/* Content */}
       {sorted.length === 0 ? (
-        <div className="text-center py-24 bg-white rounded-2xl border border-dashed border-slate-200">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+        <div className="anim-pop-in text-center py-24 bg-white rounded-2xl border border-dashed border-slate-200">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4 anim-float">
             <Search size={28} className="text-slate-300"/>
           </div>
           <p className="font-bold text-slate-600 text-lg">No ads match your filters</p>
