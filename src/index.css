@@ -4,21 +4,57 @@
 
 * { box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
-  background-color: #0c1120;
+  background-color: #090c18;
 }
 
 #root { width: 100%; min-height: 100vh; display: flex; }
 
-/* === Dot-grid background (dark) === */
+/* === Living dark gradient background === */
 .dot-bg {
-  background-color: #0c1120;
-  background-image: radial-gradient(rgba(99,102,241,0.18) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-color: #090c18;
+  background-image:
+    radial-gradient(rgba(129,140,248,0.11) 1px, transparent 1px),
+    radial-gradient(ellipse 70% 55% at 12% -8%,  rgba(99,102,241,0.22), transparent 60%),
+    radial-gradient(ellipse 60% 55% at 105% 38%, rgba(139,92,246,0.18), transparent 55%),
+    radial-gradient(ellipse 80% 60% at -5% 108%, rgba(14,165,233,0.12), transparent 55%),
+    linear-gradient(155deg, #0b1024 0%, #0a0d1c 38%, #0d0a20 68%, #090d1e 100%);
+  background-size: 26px 26px, 180% 180%, 180% 180%, 180% 180%, 100% 100%;
+  background-position: 0 0, 0% 0%, 100% 50%, 0% 100%, 0 0;
+  animation: bgDrift 28s ease-in-out infinite;
+}
+@keyframes bgDrift {
+  0%, 100% { background-position: 0 0, 0% 0%,  100% 50%, 0% 100%, 0 0; }
+  50%      { background-position: 0 0, 18% 22%, 82% 38%, 16% 88%, 0 0; }
+}
+
+/* === Animated gradient accent line under header === */
+.header-glow { position: relative; }
+.header-glow::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.55) 30%, rgba(139,92,246,0.65) 50%, rgba(14,165,233,0.5) 70%, transparent 100%);
+  background-size: 200% 100%;
+  animation: gradientShift 7s linear infinite;
+  pointer-events: none;
+}
+
+/* === Respect reduced-motion preference === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* === Animations === */
@@ -209,22 +245,24 @@ body {
   content: '';
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
   pointer-events: none;
   z-index: 0;
 }
 .bg-orbs::before {
-  width: 340px; height: 340px;
-  top: -120px; left: -80px;
-  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
-  animation: blob 18s ease-in-out infinite;
+  width: 440px; height: 440px;
+  top: -150px; left: -110px;
+  background: radial-gradient(circle, #6366f1 0%, #818cf8 32%, transparent 70%);
+  filter: blur(95px);
+  opacity: 0.42;
+  animation: blob 20s ease-in-out infinite;
 }
 .bg-orbs::after {
-  width: 420px; height: 420px;
-  top: 35%; right: -120px;
-  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
-  animation: blobSlow 24s ease-in-out infinite;
+  width: 480px; height: 480px;
+  top: 30%; right: -150px;
+  background: radial-gradient(circle, #8b5cf6 0%, #6366f1 36%, transparent 70%);
+  filter: blur(105px);
+  opacity: 0.34;
+  animation: blobSlow 26s ease-in-out infinite;
 }
 .bg-orbs > * { position: relative; z-index: 1; }
 
@@ -495,8 +533,9 @@ body {
   transition-duration: 0.08s;
 }
 
-/* === Card glow (charts / panels) === */
+/* === Card glow (charts / panels) — animated gradient border on hover === */
 .card-glow {
+  position: relative;
   transition: transform 0.22s cubic-bezier(.22,.68,0,1.2), box-shadow 0.22s ease, border-color 0.22s ease;
 }
 .card-glow:hover {
@@ -504,6 +543,24 @@ body {
   box-shadow: 0 16px 44px rgba(0,0,0,0.4), 0 0 0 1px rgba(99,102,241,0.15) !important;
   border-color: rgba(99,102,241,0.18) !important;
 }
+.card-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(130deg, rgba(99,102,241,0.55), rgba(139,92,246,0.45) 45%, rgba(14,165,233,0.45));
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  animation: gradientShift 6s ease infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+.card-glow:hover::before { opacity: 1; }
 
 /* === Stat card shimmer === */
 .stat-shimmer {
