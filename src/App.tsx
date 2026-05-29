@@ -263,7 +263,7 @@ export default function App() {
       </aside>
 
       {/* ── MAIN ──────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0c1120]">
 
         {/* Top bar */}
         <header className="flex-shrink-0 bg-[#0d1324]/95 backdrop-blur-md border-b border-white/6 px-5 py-0 flex items-center gap-4 sticky top-0 z-30" style={{ minHeight: '52px' }}>
