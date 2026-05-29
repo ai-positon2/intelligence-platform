@@ -87,6 +87,16 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "mitac.com":         {"employees": 7200,   "annual_revenue": None,            "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a3b78a42b29e0001d88831/picture"},
     "nec.com":           {"employees": 105000, "annual_revenue": 22_451_085_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a48164e5f58c00018640d3/picture"},
     "nzxt.com":          {"employees": 280,    "annual_revenue": 191_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aced8ba259920001efdc44/picture"},
+
+    # ── Batch 4: rows 41-46 (Apollo 2026-05-29) ──
+    # Realme is private (no publicly_traded_symbol from Apollo).
+    # Turtle Beach (HEAR) verified public — Apollo market_cap present but ticker missing (stale).
+    "quantatw.com":      {"employees": 57000, "annual_revenue": 67_601_128_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66f9ce4b2fbf000001524166/picture"},
+    "razer.com":         {"employees": 1600,  "annual_revenue": 1_619_590_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69abfb6713601100018de8c3/picture"},
+    "realme.com":        {"employees": 4100,  "annual_revenue": 16_153_000,      "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b2751b0959e80001c1c1d0/picture"},
+    "turtlebeach.com":   {"employees": 300,   "annual_revenue": 319_914_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a057df43c3d550001701576/picture"},
+    "uei.com":           {"employees": 3900,  "annual_revenue": 368_288_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a968216ee59100017c8f05/picture"},
+    "vuzix.com":         {"employees": 76,    "annual_revenue": 6_280_000,       "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6959e692063e300001b8e972/picture"},
 }
 
 
