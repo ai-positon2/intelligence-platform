@@ -106,6 +106,15 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "zoom.co.jp":        {"employees": 17,    "annual_revenue": 14_200_000,      "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/670b1f99cc2d4b000118354f/picture"},
     "zotac.com":         {"employees": 42,    "annual_revenue": 210_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6910d6eb110ba2000159c84d/picture"},
     "zspace.com":        {"employees": 78,    "annual_revenue": 27_858_000,      "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695b91989831320001ad4fa0/picture"},
+
+    # ── Batch 6: rows 52-56 (Apollo 2026-05-29) ──
+    # AVer: Apollo returned US sub (averusa.com); parent ticker TWSE:3669 retained.
+    # Casper: Apollo returned $370K revenue — suspiciously low for a 400-person Turkish OEM; logo/emp used, revenue flagged.
+    "asrock.com":        {"employees": 600,   "annual_revenue": 1_522_795_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6877592d5b97cd0001ea335d/picture"},
+    "aver.com":          {"employees": 140,   "annual_revenue": 83_653_000,      "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69083dd46e6d940001d56c20/picture"},
+    "casper.com.tr":     {"employees": 400,   "annual_revenue": 370_000,         "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6844452949b7070001e554a7/picture"},
+    "cyberpowerpc.com":  {"employees": 92,    "annual_revenue": 100_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695b3f10c8a4d50001cfbd8a/picture"},
+    "ecs.com.tw":        {"employees": 81,    "annual_revenue": 752_127_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69afa5c209bcea0001b4f080/picture"},
 }
 
 
