@@ -97,6 +97,15 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "turtlebeach.com":   {"employees": 300,   "annual_revenue": 319_914_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a057df43c3d550001701576/picture"},
     "uei.com":           {"employees": 3900,  "annual_revenue": 368_288_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a968216ee59100017c8f05/picture"},
     "vuzix.com":         {"employees": 76,    "annual_revenue": 6_280_000,       "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6959e692063e300001b8e972/picture"},
+
+    # ── Batch 5: rows 47-51 (Apollo 2026-05-29) ──
+    # Zoom Corp: Apollo returned US subsidiary (zoomcorp.com, 17 emp) — parent is Zoom Corp Japan (TSE:6770). Revenue/emp are sub-only.
+    # ZOTAC: Apollo returned US subsidiary — parent PC Partner Ltd is HKSE-listed; sub treated as Private.
+    "wortmann.de":       {"employees": 270,   "annual_revenue": 1_042_000_000,   "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6959b865eb51f100018977cb/picture"},
+    "mi.com":            {"employees": 57000, "annual_revenue": 54_992_238_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ace7b94ef6d600015e585b/picture"},
+    "zoom.co.jp":        {"employees": 17,    "annual_revenue": 14_200_000,      "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/670b1f99cc2d4b000118354f/picture"},
+    "zotac.com":         {"employees": 42,    "annual_revenue": 210_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6910d6eb110ba2000159c84d/picture"},
+    "zspace.com":        {"employees": 78,    "annual_revenue": 27_858_000,      "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695b91989831320001ad4fa0/picture"},
 }
 
 
