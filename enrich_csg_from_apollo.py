@@ -73,6 +73,20 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "hcltech.com":       {"employees": 226000, "annual_revenue": 14_349_613_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66d5cf75b1074b00019df202/picture"},
     "honor.com":         {"employees": 5600,   "annual_revenue": 12_714_000_000,  "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a904a7a3533e0001fd216c/picture"},
     "hpe.com":           {"employees": 61000,  "annual_revenue": 34_296_000_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69abfdbffc976200014662fb/picture"},
+
+    # ── Batch 3: rows 31-40 (Apollo 2026-05-29) ──
+    # MiTAC verified public manually (TWSE:3706 — Apollo's flag missing).
+    # Huawei / IGEL / Lava / MAINGEAR / NZXT are private.
+    "huawei.com":        {"employees": 208000, "annual_revenue": 118_103_000_000, "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6963ef6bc3dc3000014b36e2/picture"},
+    "igel.com":          {"employees": 380,    "annual_revenue": 150_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b4ed98d9d24f0001e4b60c/picture"},
+    "koss.com":          {"employees": 28,     "annual_revenue": 12_624_000,      "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b261671adc540001444be9/picture"},
+    "lavamobiles.com":   {"employees": 5000,   "annual_revenue": 279_470_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a4fb47647a8e00017b89d2/picture"},
+    "lge.com":           {"employees": 35000,  "annual_revenue": 61_520_883_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a8122a622d2b00012d0168/picture"},
+    "logitech.com":      {"employees": 7300,   "annual_revenue": 4_554_900_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ac32d445172b00019ef26f/picture"},
+    "maingear.com":      {"employees": 30,     "annual_revenue": 7_000_000,       "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/67153758f2ead900017557db/picture"},
+    "mitac.com":         {"employees": 7200,   "annual_revenue": None,            "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a3b78a42b29e0001d88831/picture"},
+    "nec.com":           {"employees": 105000, "annual_revenue": 22_451_085_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a48164e5f58c00018640d3/picture"},
+    "nzxt.com":          {"employees": 280,    "annual_revenue": 191_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aced8ba259920001efdc44/picture"},
 }
 
 
