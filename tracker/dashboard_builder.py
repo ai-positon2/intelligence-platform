@@ -4101,63 +4101,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     bindKpiPulse();
 
-    // —— Confetti burst on first HIGH badge sighting (once per session) ——
-    function fireConfetti(originEl){
-      if (window._ev3.confettiFired) return;
-      try { if (sessionStorage.getItem('_ev3_confetti')) return; sessionStorage.setItem('_ev3_confetti', '1'); } catch(e){}
-      window._ev3.confettiFired = true;
-      var r = originEl.getBoundingClientRect();
-      var cx = r.left + r.width/2, cy = r.top + r.height/2;
-      var canvas = document.createElement('canvas');
-      canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9998';
-      canvas.width = innerWidth; canvas.height = innerHeight;
-      document.body.appendChild(canvas);
-      var ctx = canvas.getContext('2d');
-      var colors = ['#ef4444','#f97316','#fbbf24','#6366f1','#22d3ee','#a855f7','#10b981'];
-      var parts = [];
-      for (var i = 0; i < 70; i++) {
-        parts.push({
-          x: cx, y: cy,
-          vx: (Math.random()-.5) * 14,
-          vy: Math.random() * -11 - 3,
-          size: Math.random() * 5 + 3,
-          color: colors[i % colors.length],
-          rot: Math.random() * Math.PI * 2,
-          vr: (Math.random()-.5) * .35,
-          life: 1
-        });
-      }
-      var t0 = performance.now();
-      function frame(t){
-        var dt = Math.min(32, t - t0) / 16; t0 = t;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        var alive = 0;
-        parts.forEach(function(p){
-          p.vy += .38 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= .009 * dt;
-          if (p.life > 0) {
-            alive++;
-            ctx.save();
-            ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-            ctx.globalAlpha = Math.max(0, p.life);
-            ctx.fillStyle = p.color;
-            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * 1.6);
-            ctx.restore();
-          }
-        });
-        if (alive > 0) requestAnimationFrame(frame);
-        else if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-      }
-      requestAnimationFrame(frame);
-    }
-    if ('IntersectionObserver' in window) {
-      var confObs = new IntersectionObserver(function(entries){
-        entries.forEach(function(en){
-          if (en.isIntersecting && en.target.classList.contains('ev3-high')) fireConfetti(en.target);
-        });
-      }, { threshold: 0.6 });
-      setTimeout(function(){ document.querySelectorAll('.ev3-high').forEach(function(el){ confObs.observe(el); }); }, 1800);
-    }
-
     // —— Re-bind on dynamic content (debounced) ——
     var rebind = debounce(function(){ bindSpotlight(); tagHigh(); bindKpiPulse(); }, 200);
     new MutationObserver(rebind).observe(document.body, { childList: true, subtree: true });
