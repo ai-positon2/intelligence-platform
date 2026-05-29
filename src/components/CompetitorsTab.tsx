@@ -185,7 +185,7 @@ function CompetitiveLandscape({ allAds, activeComp, onSelect }: {
           const active     = allAds.filter(a => a.Domain === comp.domain && a.Status === 'active').length;
           const sharePct   = Math.round((count / totalAll) * 100);
           const barPct     = (count / maxCount) * 100;
-          const isSelected = comp.domain === activeComp;
+          const isSelected = activeComp !== 'all' && comp.domain === activeComp;
 
           return (
             <button key={comp.domain} onClick={() => onSelect(comp.domain)}
@@ -285,29 +285,55 @@ export function CompetitorsTab({
 }: CompetitorsTabProps) {
   const [selectedAd, setSelectedAd] = useState<Ad | null>(null);
 
-  const byDomain  = getAdsByDomain(ads);
-  const comp      = COMPETITORS.find(c => c.domain === activeCompetitor)!;
-  const compAds   = byDomain[activeCompetitor] || [];
-  const enriched  = compAds.find(a => a['Website Summary'] || a.Services || a['Messaging Angle']);
-  const allKW     = [...new Set(compAds.flatMap(a => getKeywords(a)).map(k => k.toLowerCase()))];
-  const fmtCounts = countByField(compAds, 'Format');
-  const ctaList   = [...new Set(
+  const byDomain   = getAdsByDomain(ads);
+  const isAll      = activeCompetitor === 'all';
+  const comp       = COMPETITORS.find(c => c.domain === activeCompetitor);
+  const compAds    = isAll ? [] : (byDomain[activeCompetitor] || []);
+  const enriched   = compAds.find(a => a['Website Summary'] || a.Services || a['Messaging Angle']);
+  const allKW      = [...new Set(compAds.flatMap(a => getKeywords(a)).map(k => k.toLowerCase()))];
+  const fmtCounts  = countByField(compAds, 'Format');
+  const ctaList    = [...new Set(
     compAds.map(a => a.CTA).filter((c): c is string => !!c && c.length < 45),
   )];
-  const msgAngles = enriched?.['Messaging Angle']?.split(';').map(s => s.trim()).filter(Boolean) ?? [];
-  const recentAds = [...compAds]
+  const msgAngles  = enriched?.['Messaging Angle']?.split(';').map(s => s.trim()).filter(Boolean) ?? [];
+  const recentAds  = [...compAds]
     .filter(a => a['Last Shown'])
     .sort((a, b) => b['Last Shown'].localeCompare(a['Last Shown']))
     .slice(0, 8);
-  const statusAct = compAds.filter(a => a.Status === 'active').length;
-
-  if (!comp) return null;
+  const statusAct  = compAds.filter(a => a.Status === 'active').length;
+  const totalActive = ads.filter(a => a.Status === 'active').length;
 
   return (
     <div>
 
       {/* ── Competitor selector ── */}
       <div className="flex flex-wrap gap-3 mb-6">
+
+        {/* All Competitors button */}
+        <button onClick={() => setActiveCompetitor('all')}
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 card-lift"
+                style={isAll
+                  ? { background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderColor: '#6366f1', color: 'white', boxShadow: '0 8px 25px -5px #6366f155' }
+                  : { background: 'white', borderColor: '#6366f130', color: '#6366f1' }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black flex-shrink-0"
+               style={isAll ? { background: 'rgba(255,255,255,0.25)', color: 'white' } : { background: '#6366f118', color: '#6366f1' }}>
+            All
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-bold leading-none">All Competitors</p>
+            <p className="text-[10px] mt-0.5 opacity-70">{ads.length} total ads</p>
+          </div>
+          <div className="ml-2 text-right flex-shrink-0">
+            <span className="block text-xs font-black px-2 py-0.5 rounded-full"
+                  style={isAll ? { background: 'rgba(255,255,255,0.2)', color: 'white' } : { background: '#6366f120', color: '#6366f1' }}>
+              {ads.length}
+            </span>
+            {totalActive > 0 && (
+              <span className="block text-[9px] font-semibold mt-0.5 opacity-80">{totalActive} live</span>
+            )}
+          </div>
+        </button>
+
         {COMPETITORS.map(c => {
           const cnt   = (byDomain[c.domain] || []).length;
           const act   = (byDomain[c.domain] || []).filter(a => a.Status === 'active').length;
@@ -348,21 +374,73 @@ export function CompetitorsTab({
         })}
       </div>
 
-      {/* ── Insight strip ── */}
-      <CompInsightStrip compAds={compAds} allAds={ads} comp={comp}/>
+      {/* ── All Competitors view ── */}
+      {isAll && (
+        <>
+          <CompetitiveLandscape allAds={ads} activeComp="all" onSelect={setActiveCompetitor}/>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-2">
+            {COMPETITORS.map((c, ci) => {
+              const cAds      = byDomain[c.domain] || [];
+              const fmts      = countByField(cAds, 'Format');
+              const active    = cAds.filter(a => a.Status === 'active').length;
+              const lastShown = [...cAds].filter(a => a['Last Shown']).sort((a,b) => b['Last Shown'].localeCompare(a['Last Shown']))[0]?.['Last Shown'];
+              return (
+                <div key={c.domain}
+                     onClick={() => setActiveCompetitor(c.domain)}
+                     className={`anim-pop-in delay-${ci+1} bg-white rounded-2xl border border-slate-100 shadow-sm p-4 card-lift cursor-pointer group active:scale-[0.98] transition-all`}>
+                  <div className="h-1 rounded-full mb-4" style={{ background: `linear-gradient(90deg,${c.color},${c.color}50)` }}/>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md"
+                         style={{ background: `linear-gradient(135deg,${c.color},${c.color}aa)` }}>
+                      {c.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-800 text-sm leading-none group-hover:text-indigo-700 transition-colors">{c.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate">{c.domain}</p>
+                    </div>
+                    <ArrowRight size={15} className="text-slate-200 group-hover:text-indigo-400 transition-colors flex-shrink-0"/>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                    {([['Total', cAds.length, '#f1f5f9'], ['Active', active, c.color], ['Formats', Object.keys(fmts).length, '#f1f5f9']] as [string, number, string][]).map(([l,v,col]) => (
+                      <div key={l} className="rounded-xl py-2.5" style={{ background: `${c.color}0a` }}>
+                        <p className="text-xl font-black" style={{ color: col }}>{v}</p>
+                        <p className="text-[10px] text-slate-400">{l}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {lastShown && (
+                    <p className="text-center text-[10px] text-slate-400 mb-3">
+                      Last active: <strong className="text-slate-600">{new Date(lastShown).toLocaleDateString()}</strong>
+                    </p>
+                  )}
+                  <div className="flex gap-1.5 flex-wrap justify-center">
+                    {Object.entries(fmts).map(([fmt]) => (
+                      <button key={fmt}
+                              onClick={e => { e.stopPropagation(); onNav({ tab: 'gallery', domain: c.domain, format: fmt }); }}
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize hover:opacity-80 transition-opacity"
+                              style={{ background: `${c.color}18`, color: c.color }}>
+                        {fmt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
-      {/* ── Competitive landscape ── */}
-      <CompetitiveLandscape
-        allAds={ads}
-        activeComp={activeCompetitor}
-        onSelect={setActiveCompetitor}
-      />
+      {/* ── Single-competitor view ── */}
+      {!isAll && comp && (
+        <>
+          <CompInsightStrip compAds={compAds} allAds={ads} comp={comp}/>
+          <CompetitiveLandscape allAds={ads} activeComp={activeCompetitor} onSelect={setActiveCompetitor}/>
+          <CompPatternChips compAds={compAds} comp={comp}/>
+        </>
+      )}
 
-      {/* ── Pattern chips ── */}
-      <CompPatternChips compAds={compAds} comp={comp}/>
-
-      {/* ── Main 3-col grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ── Main 3-col grid (single competitor only) ── */}
+      {!isAll && comp && <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* LEFT: intel */}
         <div className="space-y-4">
@@ -555,7 +633,7 @@ export function CompetitorsTab({
           </div>
         </div>
 
-      </div>
+      </div>}
 
       {selectedAd && <AdModal ad={selectedAd} onClose={() => setSelectedAd(null)}/>}
     </div>
