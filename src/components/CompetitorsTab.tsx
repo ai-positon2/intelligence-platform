@@ -471,9 +471,9 @@ export function CompetitorsTab({
 
               <div className="grid grid-cols-3 gap-2 text-center mb-4">
                 {([
-                  ['Total Ads', compAds.length,                  '#0f172a' ],
+                  ['Total Ads', compAds.length,                  '#f1f5f9' ],
                   ['Active',    statusAct,                        comp.color],
-                  ['Formats',   Object.keys(fmtCounts).length,   '#0f172a' ],
+                  ['Formats',   Object.keys(fmtCounts).length,   '#f1f5f9' ],
                 ] as [string, number, string][]).map(([l, v, col]) => (
                   <div key={l} className="rounded-xl py-3 px-1"
                        style={{ background: `${comp.color}0a` }}>
