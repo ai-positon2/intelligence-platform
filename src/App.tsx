@@ -203,7 +203,7 @@ export default function App() {
               <Zap size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Ad Intelligence</p>
+              <p className="gradient-text-anim font-bold text-sm leading-none">Ad Intelligence</p>
               <p className="text-white/40 text-xs mt-0.5">Competitor Tracker</p>
             </div>
           </div>
@@ -266,7 +266,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0c1120]">
 
         {/* Top bar */}
-        <header className="flex-shrink-0 bg-[#0d1324]/95 backdrop-blur-md border-b border-white/6 px-5 py-0 flex items-center gap-4 sticky top-0 z-30" style={{ minHeight: '52px' }}>
+        <header className="header-glow flex-shrink-0 bg-[#0d1324]/95 backdrop-blur-md border-b border-white/6 px-5 py-0 flex items-center gap-4 sticky top-0 z-30" style={{ minHeight: '52px' }}>
           <button onClick={() => setSidebar(true)} className="lg:hidden text-white/50 hover:text-white flex-shrink-0"><Menu size={20}/></button>
 
           {/* Left: breadcrumb-style title */}
