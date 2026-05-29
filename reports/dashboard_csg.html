@@ -3299,4 +3299,523 @@ function staggerTableRows() {
     tr.style.transform = 'translateY(10px)';
     var delay = Math.min(i * 16, 480);
     setTimeout(function() {
-      tr.style.transition = 'opacity .22s ease, transform .22s ease'
+      tr.style.transition = 'opacity .22s ease, transform .22s ease';
+      tr.style.opacity = '';
+      tr.style.transform = '';
+    }, delay);
+  });
+}
+
+// 5 ── Copy button visual feedback
+(function() {
+  var orig = window.copyCmd;
+  window.copyCmd = function(id, event) {
+    orig(id, event);
+    var btn = event.currentTarget || event.target;
+    if (!btn) return;
+    var prev = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = prev;
+      btn.classList.remove('copied');
+    }, 1800);
+  };
+})();
+
+// 6 ── Refresh modal pop animation
+(function() {
+  var orig = window.showRefreshModal;
+  window.showRefreshModal = function() {
+    orig();
+    var m = document.getElementById('refresh-modal');
+    if (!m) return;
+    m.style.animation = 'none';
+    void m.offsetWidth;
+    m.style.animation = 'modalPopIn .24s cubic-bezier(.22,1,.36,1) both';
+  };
+})();
+
+// 7 ── Scroll-reveal for panels and chart cards
+(function() {
+  if (!window.IntersectionObserver) return;
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('sv-show');
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.06 });
+  setTimeout(function() {
+    document.querySelectorAll('.chart-card, .panel').forEach(function(el, i) {
+      el.classList.add('sv-init');
+      el.style.transitionDelay = (i * 55) + 'ms';
+      obs.observe(el);
+    });
+  }, 60);
+})();
+
+// 8 ── Hook renderTable to re-stagger rows on every update
+(function() {
+  var orig = window.renderTable;
+  if (typeof orig !== 'function') return;
+  window.renderTable = function() {
+    orig.apply(this, arguments);
+    setTimeout(staggerTableRows, 60);
+  };
+})();
+
+// 9 ── Init on load
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(runCountUps, 280);
+  setTimeout(staggerSignals, 120);
+  setTimeout(staggerTableRows, 450);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v2 — maximum delight
+═══════════════════════════════════════════════════════════════════ */
+
+// A ── Scroll progress bar + scroll-to-top button
+(function() {
+  var prog = document.createElement('div');
+  prog.id = 'scroll-progress';
+  document.body.prepend(prog);
+
+  var topBtn = document.createElement('button');
+  topBtn.id = 'scroll-top-btn';
+  topBtn.innerHTML = '&#8679;';
+  topBtn.title = 'Back to top';
+  document.body.appendChild(topBtn);
+  topBtn.addEventListener('click', function() {
+    var mainEl = document.getElementById('main') || window;
+    if (mainEl.scrollTo) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  var mainEl = document.getElementById('main') || document.documentElement;
+  var onScroll = function() {
+    var scrollTop = mainEl.scrollTop || window.scrollY || 0;
+    var scrollMax = (mainEl.scrollHeight || document.body.scrollHeight) - (mainEl.clientHeight || window.innerHeight);
+    var pct = scrollMax > 0 ? (scrollTop / scrollMax) * 100 : 0;
+    prog.style.width = pct + '%';
+    if (scrollTop > 350) topBtn.classList.add('visible');
+    else topBtn.classList.remove('visible');
+  };
+  mainEl.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+// B ── Toast notification system
+window._showToast = function(msg, icon, durationMs) {
+  var container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = (icon ? '<span class="toast-icon">' + icon + '</span>' : '') + '<span>' + msg + '</span>';
+  container.appendChild(t);
+  var dur = durationMs || 2600;
+  setTimeout(function() {
+    t.classList.add('toast-out');
+    t.addEventListener('animationend', function() { if (t.parentNode) t.parentNode.removeChild(t); });
+  }, dur);
+};
+
+(function() {
+  if (window._copyCmdToastWrapped) return;
+  window._copyCmdToastWrapped = true;
+  var prev = window.copyCmd;
+  if (typeof prev !== 'function') return;
+  window.copyCmd = function(id, event) {
+    prev(id, event);
+    window._showToast('Command copied to clipboard', '📋', 2000);
+  };
+})();
+
+// C ── 3D perspective tilt on KPI cards
+(function() {
+  function initTilt() {
+    document.querySelectorAll('.kpi-card').forEach(function(card) {
+      if (card._tiltInited) return;
+      card._tiltInited = true;
+      card.addEventListener('mousemove', function(e) {
+        var rect = card.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width - 0.5;
+        var y = (e.clientY - rect.top) / rect.height - 0.5;
+        var tx = -y * 12, ty = x * 12;
+        card.style.transform = 'translateY(-5px) rotateX(' + tx + 'deg) rotateY(' + ty + 'deg) scale(1.02)';
+        card.style.boxShadow = '0 16px 40px rgba(59,130,246,' + (0.1 + Math.abs(x) * 0.12) + ')';
+        card.style.transition = 'box-shadow .1s';
+      });
+      card.addEventListener('mouseleave', function() {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        card.style.transition = 'transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
+})();
+
+// D ── Magnetic attraction on primary buttons
+(function() {
+  function initMagnetic() {
+    document.querySelectorAll('.refresh-btn, .filters-btn, .export-btn').forEach(function(btn) {
+      if (btn._magInited) return;
+      btn._magInited = true;
+      btn.addEventListener('mousemove', function(e) {
+        var rect = btn.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        var dx = (e.clientX - cx) * 0.3;
+        var dy = (e.clientY - cy) * 0.3;
+        btn.style.transform = 'translate(' + dx + 'px,' + dy + 'px) translateY(-2px)';
+        btn.style.transition = 'transform .08s linear';
+      });
+      btn.addEventListener('mouseleave', function() {
+        btn.style.transform = '';
+        btn.style.transition = 'transform .3s cubic-bezier(.22,1,.36,1)';
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initMagnetic, 400); });
+})();
+
+// E ── Table row click ripple highlight
+document.addEventListener('click', function(e) {
+  var tr = e.target.closest && e.target.closest('.data-table tbody tr:not(.expand-row)');
+  if (!tr) return;
+  tr.classList.remove('row-selected');
+  void tr.offsetWidth;
+  tr.classList.add('row-selected');
+  setTimeout(function() { tr.classList.remove('row-selected'); }, 900);
+});
+
+// F ── Section crossfade
+(function() {
+  var origShow = window.showSection;
+  if (typeof origShow !== 'function' || window._showSectionV2Wrapped) return;
+  window._showSectionV2Wrapped = true;
+  window.showSection = function(name) {
+    var cur = document.querySelector('.section.active');
+    if (cur && !cur._fading) {
+      cur._fading = true;
+      cur.style.transition = 'opacity .14s ease';
+      cur.style.opacity = '0';
+      setTimeout(function() {
+        cur.style.opacity = '';
+        cur.style.transition = '';
+        cur._fading = false;
+        origShow(name);
+        var next = document.querySelector('.section.active');
+        if (next) {
+          next.style.opacity = '0';
+          next.style.transition = 'opacity .22s ease';
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              next.style.opacity = '1';
+              setTimeout(function() { next.style.opacity = ''; next.style.transition = ''; }, 240);
+            });
+          });
+        }
+      }, 130);
+    } else {
+      origShow(name);
+    }
+  };
+})();
+
+// G ── Search cell highlight
+(function() {
+  var prevRT = window.renderTable;
+  if (typeof prevRT !== 'function') return;
+  window.renderTable = function() {
+    prevRT.apply(this, arguments);
+    var q = (document.getElementById('tbl-search') || {}).value || '';
+    if (!q) return;
+    var ql = q.toLowerCase();
+    setTimeout(function() {
+      document.querySelectorAll('.data-table tbody tr:not(.expand-row) td').forEach(function(td) {
+        if (td.textContent.toLowerCase().includes(ql)) {
+          td.classList.remove('tbl-match');
+          void td.offsetWidth;
+          td.classList.add('tbl-match');
+        }
+      });
+    }, 80);
+  };
+})();
+
+// H ── Expand chevron rotation
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest && e.target.closest('.expand-btn');
+  if (!btn) return;
+  setTimeout(function() {
+    var tr = btn.closest('tr');
+    var next = tr && tr.nextElementSibling;
+    var isOpen = next && next.classList.contains('expand-row');
+    if (isOpen) btn.classList.add('ev2-open');
+    else btn.classList.remove('ev2-open');
+  }, 20);
+});
+
+// I ── Sidebar logo shimmer
+(function() {
+  var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+  if (!logo) return;
+  logo.addEventListener('mouseenter', function() {
+    logo.style.filter = 'brightness(1.15) drop-shadow(0 0 7px rgba(59,130,246,.5))';
+    logo.style.transform = 'scale(1.05)';
+  });
+  logo.addEventListener('mouseleave', function() {
+    logo.style.filter = '';
+    logo.style.transform = '';
+  });
+})();
+
+// J ── Breathing pulse on nav badges
+(function() {
+  document.querySelectorAll('.nav-badge, .sidebar-badge, .nav-alert-count, .alert-badge').forEach(function(b) {
+    b.style.animation = 'breathe 2.8s ease-in-out infinite';
+    b.style.display = 'inline-block';
+  });
+})();
+
+// K ── Table header sticky shadow
+(function() {
+  var tbl = document.querySelector('.data-table');
+  if (!tbl) return;
+  var scrollParent = tbl.closest('.panel') || document.getElementById('main') || window;
+  scrollParent.addEventListener('scroll', function() {
+    var st = scrollParent.scrollTop || 0;
+    if (st > 4) tbl.classList.add('tbl-header-stuck');
+    else tbl.classList.remove('tbl-header-stuck');
+  }, { passive: true });
+})();
+
+// L ── Apply filters toast
+(function() {
+  document.querySelectorAll('.fp-apply').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Filters applied', '🎯', 1800); }, 60);
+    });
+  });
+  document.querySelectorAll('.fp-reset').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Filters cleared', '🔄', 1600); }, 60);
+    });
+  });
+})();
+
+// M ── Export toast
+(function() {
+  document.querySelectorAll('.export-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() { window._showToast && window._showToast('Exporting data…', '📤', 1600); }, 80);
+    });
+  });
+})();
+
+// N ── KPI number morph on mutation
+(function() {
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mut) {
+      var el = mut.target.nodeType === 3 ? mut.target.parentElement : mut.target;
+      if (el && el.classList && el.classList.contains('kpi-number')) {
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = 'countDigit .28s cubic-bezier(.22,1,.36,1) both';
+      }
+    });
+  });
+  document.querySelectorAll('.kpi-number').forEach(function(el) {
+    observer.observe(el, { characterData: true, childList: true, subtree: true });
+  });
+})();
+
+// O ── DOMContentLoaded v2
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    var logo = document.querySelector('.sidebar-logo, #sidebar-logo, .sidebar-logo-img');
+    if (logo && !logo._logoWiggleInited) {
+      logo._logoWiggleInited = true;
+      logo.addEventListener('mouseenter', function() {
+        logo.style.animation = 'subtleWiggle .4s ease-in-out';
+        setTimeout(function() { logo.style.animation = ''; }, 440);
+      });
+    }
+  }, 500);
+
+  setTimeout(function() {
+    var rb = document.querySelector('.refresh-btn');
+    if (!rb) return;
+    rb.style.animation = 'breathe .6s ease-in-out 3';
+    setTimeout(function() { rb.style.animation = ''; }, 2000);
+  }, 3000);
+
+  if (!document.getElementById('toast-container')) {
+    var tc = document.createElement('div');
+    tc.id = 'toast-container';
+    document.body.appendChild(tc);
+  }
+
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATION ENGINE v3 — Premium Polish Layer
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  if (window._ev3Loaded) return; window._ev3Loaded = true;
+  window._ev3 = {};
+
+  function ready(fn){ if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  function debounce(fn, ms){ var t; return function(){ clearTimeout(t); var a=arguments,s=this; t=setTimeout(function(){fn.apply(s,a)}, ms); }; }
+
+  ready(function(){
+    // —— A+B. Inject background mesh + noise overlay (idempotent) ——
+    if (!document.getElementById('ev3-mesh-bg')) {
+      var m = document.createElement('div'); m.id = 'ev3-mesh-bg';
+      var extra = document.createElement('span'); m.appendChild(extra);
+      document.body.insertBefore(m, document.body.firstChild);
+      var n = document.createElement('div'); n.id = 'ev3-noise';
+      document.body.insertBefore(n, document.body.firstChild);
+    }
+
+    // —— C. Cursor-spotlight on KPI / panel cards ——
+    function bindSpotlight(){
+      document.querySelectorAll('.kpi-card,.panel').forEach(function(el){
+        if (el._ev3Spot) return; el._ev3Spot = true;
+        el.addEventListener('mousemove', function(e){
+          var r = el.getBoundingClientRect();
+          el.style.setProperty('--ev3-mx', ((e.clientX - r.left) / r.width * 100) + '%');
+          el.style.setProperty('--ev3-my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+      });
+    }
+    bindSpotlight();
+
+    // —— D+E. Tag HIGH severity elements for conic border + pulse ring ——
+    function tagHigh(){
+      document.querySelectorAll('.kpi-card').forEach(function(card){
+        var t = (card.textContent || '').toUpperCase();
+        if (/HIGH ALERTS|HIGH SIGNAL|HIGH PRIORITY|CRITICAL/.test(t)) card.classList.add('ev3-high');
+      });
+      document.querySelectorAll('.alert-badge,.badge,.severity').forEach(function(b){
+        var t = (b.textContent || '').toUpperCase().trim();
+        if (t === 'HIGH' || t === 'CRITICAL') b.classList.add('ev3-high');
+      });
+    }
+    tagHigh();
+
+    // —— F. Header shimmer sweep on first reveal ——
+    if ('IntersectionObserver' in window) {
+      var shimObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting && !en.target._ev3Shim) {
+            en.target._ev3Shim = true;
+            en.target.classList.add('ev3-shimmer');
+            setTimeout(function(){ en.target.classList.remove('ev3-shimmer'); }, 2200);
+          }
+        });
+      }, { threshold: 0.3 });
+      document.querySelectorAll('h1, h2, .section-title, .panel-title, .panel-header h3').forEach(function(h){ shimObs.observe(h); });
+    }
+
+    // —— I. Section scroll-reveal fade-up ——
+    if ('IntersectionObserver' in window) {
+      var revObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){ if (en.isIntersecting) en.target.classList.add('ev3-in'); });
+      }, { threshold: 0.08 });
+      document.querySelectorAll('.panel,.kpi-card,.chart-card,.alert-card,.section').forEach(function(el){
+        el.classList.add('ev3-reveal');
+        revObs.observe(el);
+      });
+    }
+
+    // —— J. KPI number pulse glow on text change ——
+    function bindKpiPulse(){
+      document.querySelectorAll('.kpi-number,.kpi-value,.stat-value,.kpi-num,[data-kpi]').forEach(function(el){
+        if (el._ev3KpiBound) return; el._ev3KpiBound = true;
+        var lastVal = el.textContent;
+        new MutationObserver(function(){
+          if (el.textContent !== lastVal) {
+            lastVal = el.textContent;
+            el.classList.add('ev3-pulse');
+            setTimeout(function(){ el.classList.remove('ev3-pulse'); }, 520);
+          }
+        }).observe(el, { childList: true, characterData: true, subtree: true });
+      });
+    }
+    bindKpiPulse();
+
+    // —— Confetti burst on first HIGH badge sighting (once per session) ——
+    function fireConfetti(originEl){
+      if (window._ev3.confettiFired) return;
+      try { if (sessionStorage.getItem('_ev3_confetti')) return; sessionStorage.setItem('_ev3_confetti', '1'); } catch(e){}
+      window._ev3.confettiFired = true;
+      var r = originEl.getBoundingClientRect();
+      var cx = r.left + r.width/2, cy = r.top + r.height/2;
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9998';
+      canvas.width = innerWidth; canvas.height = innerHeight;
+      document.body.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      var colors = ['#ef4444','#f97316','#fbbf24','#6366f1','#22d3ee','#a855f7','#10b981'];
+      var parts = [];
+      for (var i = 0; i < 70; i++) {
+        parts.push({
+          x: cx, y: cy,
+          vx: (Math.random()-.5) * 14,
+          vy: Math.random() * -11 - 3,
+          size: Math.random() * 5 + 3,
+          color: colors[i % colors.length],
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random()-.5) * .35,
+          life: 1
+        });
+      }
+      var t0 = performance.now();
+      function frame(t){
+        var dt = Math.min(32, t - t0) / 16; t0 = t;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var alive = 0;
+        parts.forEach(function(p){
+          p.vy += .38 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= .009 * dt;
+          if (p.life > 0) {
+            alive++;
+            ctx.save();
+            ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+            ctx.globalAlpha = Math.max(0, p.life);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size * 1.6);
+            ctx.restore();
+          }
+        });
+        if (alive > 0) requestAnimationFrame(frame);
+        else if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      }
+      requestAnimationFrame(frame);
+    }
+    if ('IntersectionObserver' in window) {
+      var confObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if (en.isIntersecting && en.target.classList.contains('ev3-high')) fireConfetti(en.target);
+        });
+      }, { threshold: 0.6 });
+      setTimeout(function(){ document.querySelectorAll('.ev3-high').forEach(function(el){ confObs.observe(el); }); }, 1800);
+    }
+
+    // —— Re-bind on dynamic content (debounced) ——
+    var rebind = debounce(function(){ bindSpotlight(); tagHigh(); bindKpiPulse(); }, 200);
+    new MutationObserver(rebind).observe(document.body, { childList: true, subtree: true });
+
+  });
+})();
+</script>
+</body>
+</html>
