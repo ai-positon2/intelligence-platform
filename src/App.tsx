@@ -97,6 +97,7 @@ function GradientCard({
       style={{
         background: gradient,
         transform: 'perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1)',
+        minHeight: '190px',
       }}
     >
       {/* Decorative absolutes — inline style keeps position:absolute even inside .spotlight */}
