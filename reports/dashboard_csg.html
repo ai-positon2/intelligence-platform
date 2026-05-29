@@ -1662,15 +1662,10 @@ function _normSpark(arr) {
 }
 
 function countUp(el, target, duration=1200) {
-  const start = performance.now();
-  const step = ts => {
-    const p = Math.min((ts-start)/duration, 1);
-    const ease = 1 - Math.pow(1-p, 3);
-    el.textContent = Math.round(ease * target).toLocaleString();
-    if (p < 1) requestAnimationFrame(step);
-    else el.textContent = target.toLocaleString();
-  };
-  requestAnimationFrame(step);
+  // Animation disabled — set final value instantly so mid-animation
+  // captures (and the v3 scroll-reveal hiding the card while it animates)
+  // can't make the displayed number look smaller than the true KPI value.
+  if (!isNaN(target)) el.textContent = target.toLocaleString();
 }
 
 // ── Refresh modal ────────────────────────────────────────────────────────────
