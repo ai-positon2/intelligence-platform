@@ -312,7 +312,7 @@ export default function App() {
         </header>
 
         {/* Scrollable body */}
-        <main className="flex-1 overflow-y-auto dot-bg bg-orbs">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden dot-bg bg-orbs">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
             {/* Clickable stat cards */}
