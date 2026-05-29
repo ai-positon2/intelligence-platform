@@ -187,7 +187,7 @@ export default function App() {
   const tabLabel    = NAV.find(n => n.id === tab)?.label ?? '';
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0c1120]">
+    <div className="flex h-screen w-full overflow-hidden bg-[#0c1120]">
 
       {/* Mobile overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebar(false)} />}
