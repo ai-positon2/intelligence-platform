@@ -115,6 +115,18 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "casper.com.tr":     {"employees": 400,   "annual_revenue": 370_000,         "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6844452949b7070001e554a7/picture"},
     "cyberpowerpc.com":  {"employees": 92,    "annual_revenue": 100_000_000,     "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695b3f10c8a4d50001cfbd8a/picture"},
     "ecs.com.tw":        {"employees": 81,    "annual_revenue": 752_127_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69afa5c209bcea0001b4f080/picture"},
+
+    # ── Batch 7: rows 57-62 (Apollo 2026-05-29) ──
+    # Gateway: Apollo returned wrong entity (Pakistani fashion brand) — skipped entirely.
+    # Getac: revenue null from Apollo; MiTAC subsidiary, not independently listed.
+    # Hasee: Apollo emp (40) contradicts own description (3,000+) — logo only.
+    # Hyundai Technology: revenue null; private US consumer electronics brand.
+    # iRobot: Amazon acquisition blocked by EU 2024; restructured; no current ticker in Apollo.
+    "getac.com":              {"employees": 710,   "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a42e4f2613c90001227559/picture"},
+    "hasee.com":              {"employees": None,  "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/67134566c8afdb0001da30cf/picture"},
+    "hyundaitechnology.com":  {"employees": 34,    "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69d69101e3f31d0001526053/picture"},
+    "inventec.com":           {"employees": 29000, "annual_revenue": 22_001_920_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a01184f26452f00017dd126/picture"},
+    "irobot.com":             {"employees": 550,   "annual_revenue": 546_998_000,    "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a4edf027d3a30001354b5b/picture"},
 }
 
 
