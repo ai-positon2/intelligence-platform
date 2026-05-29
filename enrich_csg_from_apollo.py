@@ -37,17 +37,42 @@ OVERRIDE_JSON = Path(__file__).parent / "apollo_enrichments.json"
 # under "bigben.eu" — that's why earlier extraction said they were missing.
 # We now have employees + revenue for all 10.
 DEFAULT_ENRICHMENTS: dict[str, dict] = {
+    # ── Batch 1: top 10 CSG companies by signal count (Apollo 2026-05-28) ──
     # domain -> {employees, annual_revenue, latest_funding_type, logo_url}
-    "baslerweb.com":  {"employees": 890,    "annual_revenue": 263_183_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a965620ccc4f0001cef321/picture"},
-    "brother.com":    {"employees": 2200,   "annual_revenue": 3_000_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b39c8dc7f5cc0001471e76/picture"},
-    "samsung.com":    {"employees": 127000, "annual_revenue": 230_084_404_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a06550fae34cf0001bd103f/picture"},
-    "sharp.com":      {"employees": 19000,  "annual_revenue": 2_400_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aeb37f150740000187a929/picture"},
-    "alpsalpine.com": {"employees": 29000,  "annual_revenue": 6_644_560_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a3c8e801f31000011fb7ec/picture"},
-    "apple.com":      {"employees": 164000, "annual_revenue": 416_161_000_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69afbb99ba3131000126d493/picture"},
-    "bigben.fr":      {"employees": 490,    "annual_revenue": 312_000_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ad89d8e0c9cd0001e78e21/picture"},
-    "casio.com":      {"employees": 590,    "annual_revenue": 1_776_947_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a529a146d4870001a75528/picture"},
-    "compal.com":     {"employees": 44000,  "annual_revenue": 27_722_035_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a41c681c0fd700017ae0d4/picture"},
-    "corsair.com":    {"employees": 2600,   "annual_revenue": 1_472_480_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ae8cd16138a6000139a662/picture"},
+    "baslerweb.com":     {"employees": 890,    "annual_revenue": 263_183_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a965620ccc4f0001cef321/picture"},
+    "brother.com":       {"employees": 2200,   "annual_revenue": 3_000_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b39c8dc7f5cc0001471e76/picture"},
+    "samsung.com":       {"employees": 127000, "annual_revenue": 230_084_404_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a06550fae34cf0001bd103f/picture"},
+    "sharp.com":         {"employees": 19000,  "annual_revenue": 2_400_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aeb37f150740000187a929/picture"},
+    "alpsalpine.com":    {"employees": 29000,  "annual_revenue": 6_644_560_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a3c8e801f31000011fb7ec/picture"},
+    "apple.com":         {"employees": 164000, "annual_revenue": 416_161_000_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69afbb99ba3131000126d493/picture"},
+    "bigben.fr":         {"employees": 490,    "annual_revenue": 312_000_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ad89d8e0c9cd0001e78e21/picture"},
+    "casio.com":         {"employees": 590,    "annual_revenue": 1_776_947_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a529a146d4870001a75528/picture"},
+    "compal.com":        {"employees": 44000,  "annual_revenue": 27_722_035_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a41c681c0fd700017ae0d4/picture"},
+    "corsair.com":       {"employees": 2600,   "annual_revenue": 1_472_480_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ae8cd16138a6000139a662/picture"},
+
+    # ── Batch 2: rows 11-30 (Apollo 2026-05-29) ──
+    # Kontron AG + Acer verified public manually (Apollo flag missing).
+    # Honor / Framework / Emdoor / Geo are private — latest_funding_type left None.
+    "gigabyte.com":      {"employees": 6500,   "annual_revenue": 8_338_701_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a6ba32dd3ccc0001bd2c88/picture"},
+    "hp.com":            {"employees": 58000,  "annual_revenue": 55_295_000_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69c470f4ca51920001367f8c/picture"},
+    "kontron.com":       {"employees": 6900,   "annual_revenue": None,            "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ad7932c1310b00011e3c51/picture"},
+    "motorola.com":      {"employees": 25000,  "annual_revenue": 2_100_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69c42ea82f7d460001e14c72/picture"},
+    "nokia.com":         {"employees": 79000,  "annual_revenue": 23_069_553_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b29de1574c8f000100a62d/picture"},
+    "sony.com":          {"employees": 113000, "annual_revenue": 89_155_541_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aab40769fedc00010a5014/picture"},
+    "whirlpool.com.br":  {"employees": 20000,  "annual_revenue": 2_289_795_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/60f45c74e2469d000148aeb7/picture"},
+    "acer.com":          {"employees": 9100,   "annual_revenue": 8_723_000_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aaa139c1853b0001dd959b/picture"},
+    "cellularline.com":  {"employees": None,   "annual_revenue": 125_215_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6203b6785e8a340001d22bae/picture"},
+    "dell.com":          {"employees": 108000, "annual_revenue": 113_538_000_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/681f833e71dab200011b0477/picture"},
+    "emdoor.com":        {"employees": 88,     "annual_revenue": None,            "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/68e653d0588b090001309984/picture"},
+    "epson.com":         {"employees": 930,    "annual_revenue": 9_129_812_000,   "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b4d8438fe2750001cf64a7/picture"},
+    "foxconn.com":       {"employees": 633000, "annual_revenue": 258_491_666_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b281f7848480000185734b/picture"},
+    "frame.work":        {"employees": 63,     "annual_revenue": 33_300_000,      "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69acea3436f7d000015bb308/picture"},
+    "fujitsu.com":       {"employees": 124000, "annual_revenue": 21_951_259_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a03ec75aab5dc0001c558e0/picture"},
+    "geo.co.uk":         {"employees": 7,      "annual_revenue": None,            "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66eba5ca503cb5000103fd35/picture"},
+    "hamiltonbeach.com": {"employees": 660,    "annual_revenue": 612_500_000,     "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b3bc62d1be6b0001fa3864/picture"},
+    "hcltech.com":       {"employees": 226000, "annual_revenue": 14_349_613_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66d5cf75b1074b00019df202/picture"},
+    "honor.com":         {"employees": 5600,   "annual_revenue": 12_714_000_000,  "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a904a7a3533e0001fd216c/picture"},
+    "hpe.com":           {"employees": 61000,  "annual_revenue": 34_296_000_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69abfdbffc976200014662fb/picture"},
 }
 
 
