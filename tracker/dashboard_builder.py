@@ -1752,6 +1752,37 @@ h2::after,.section-title::after{
 <script>
 const DATA = __DATA_JSON__;
 
+// ── Signal dedup ────────────────────────────────────────────────────────────
+// Collapse duplicate signals on (apollo_id | signal_type | first 80 chars of detail),
+// keeping the row with the most recent sent_at. Also re-derives per-type counts
+// in DATA.kpis so the KPI strip stays consistent with the modal & feed lists.
+(function _dedupSignalsOnce(){
+  if (!Array.isArray(DATA.signals)) return;
+  const seen = new Map();
+  for (const r of DATA.signals) {
+    const detail = (r.signal_detail || '').trim().substring(0, 80).toLowerCase();
+    const key = (r.apollo_id || '') + '|' + (r.signal_type || '') + '|' + detail;
+    const prev = seen.get(key);
+    if (!prev) { seen.set(key, r); continue; }
+    const prevT = new Date(prev.sent_at || prev.signal_date || 0).getTime() || 0;
+    const curT  = new Date(r.sent_at    || r.signal_date    || 0).getTime() || 0;
+    if (curT >= prevT) seen.set(key, r);
+  }
+  const before = DATA.signals.length;
+  DATA.signals = Array.from(seen.values());
+  const after = DATA.signals.length;
+  // Recompute signal-type counts so the KPI strip matches modal totals.
+  const k = DATA.kpis || (DATA.kpis = {});
+  k.signals_this_week = after;
+  const countType = (t) => DATA.signals.filter(s => s.signal_type === t).length;
+  k.csuite_changes  = DATA.signals.filter(s => s.signal_type === 'C-Suite Join' || s.signal_type === 'C-Suite Exit').length;
+  k.funding_signals = countType('Funding Round');
+  k.ma_signals      = countType('Acquisition / M&A');
+  k.ipo_signals     = countType('IPO Signal');
+  k.news_signals    = countType('News Mention');
+  if (before !== after && window.console) console.info('[dedup] signals: ' + before + ' -> ' + after);
+})();
+
 // ── State ──────────────────────────────────────────────────────────────────
 let tableData = [];
 let currentPage = 1;
