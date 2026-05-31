@@ -133,6 +133,17 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "j-display.com":     {"employees": 4600,  "annual_revenue": 1_261_357_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695c944753c3e90001ae4431/picture"},
     "kyocera.com":       {"employees": 80000, "annual_revenue": 13_514_809_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ad4de05ce3bd0001b47ab7/picture"},
     "lg.com":            {"employees": 35000, "annual_revenue": 61_520_883_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a8122a622d2b00012d0168/picture"},
+
+    # ── Batch 9: rows 66-71 (Apollo 2026-05-29) ──
+    # Machenike: emp=6 from Apollo is wrong (gaming laptop brand); logo only.
+    # Olidata: Apollo returned empty — skipped entirely.
+    # OverPowered (walmart.com): Walmart-exclusive gaming brand, no standalone entity; parent Walmart data used.
+    # Panasonic Toughbook (panasonic.com/toughbook): product line; Panasonic parent data used.
+    "machenike.com":          {"employees": None,    "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6709ed0bffc4bd00016d4c73/picture"},
+    "microcenter.com":        {"employees": 2600,    "annual_revenue": 2_400_000_000,  "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69aeb54955cc3600010135db/picture"},
+    "multilaser.com.br":      {"employees": 5000,    "annual_revenue": 549_000_000,    "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/68739c2578281600010483a8/picture"},
+    "walmart.com":            {"employees": 2100000, "annual_revenue": 648_100_000_000,"latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/683a93ae8ea32a00017f4e6c/picture"},
+    "panasonic.com/toughbook": {"employees": 208000, "annual_revenue": 65_700_000_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66e733ffcf04820001040ede/picture"},
 }
 
 
