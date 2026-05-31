@@ -127,6 +127,12 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "hyundaitechnology.com":  {"employees": 34,    "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69d69101e3f31d0001526053/picture"},
     "inventec.com":           {"employees": 29000, "annual_revenue": 22_001_920_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/6a01184f26452f00017dd126/picture"},
     "irobot.com":             {"employees": 550,   "annual_revenue": 546_998_000,    "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a4edf027d3a30001354b5b/picture"},
+
+    # ── Batch 8: rows 63-65 (Apollo 2026-05-29) ──
+    # LG (lg.com): same Apollo entity as lge.com (already in Batch 3) — identical data applied to the second CSG entry.
+    "j-display.com":     {"employees": 4600,  "annual_revenue": 1_261_357_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/695c944753c3e90001ae4431/picture"},
+    "kyocera.com":       {"employees": 80000, "annual_revenue": 13_514_809_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ad4de05ce3bd0001b47ab7/picture"},
+    "lg.com":            {"employees": 35000, "annual_revenue": 61_520_883_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a8122a622d2b00012d0168/picture"},
 }
 
 
