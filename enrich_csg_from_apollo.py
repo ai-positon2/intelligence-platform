@@ -144,6 +144,21 @@ DEFAULT_ENRICHMENTS: dict[str, dict] = {
     "multilaser.com.br":      {"employees": 5000,    "annual_revenue": 549_000_000,    "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/68739c2578281600010483a8/picture"},
     "walmart.com":            {"employees": 2100000, "annual_revenue": 648_100_000_000,"latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/683a93ae8ea32a00017f4e6c/picture"},
     "panasonic.com/toughbook": {"employees": 208000, "annual_revenue": 65_700_000_000, "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/66e733ffcf04820001040ede/picture"},
+
+    # ── Batch 10: rows 72-84 (Apollo 2026-05-29) ──
+    # Positivo: Apollo returned Grupo Positivo (holding); subsidiary POSI3 is the listed entity.
+    # RCA: Apollo returned RCA Talentos (Brazilian HR co.) — logo only, no financials.
+    # Rinnai: Apollo emp=54 wrong (actual ~6,500); revenue $3.1B is group-level.
+    # Skyworth: Apollo returned Skyworth Digital (000810.SZ sub), not Skyworth Group (0751.HK parent).
+    # Vant, VIT: Apollo returned empty — skipped.
+    "positivo.com.br":    {"employees": 7500,  "annual_revenue": 219_000_000,    "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/679f2ec2260d3d000152d9f9/picture"},
+    "rca.com":            {"employees": None,  "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/63edac09a4ccae0001634980/picture"},
+    "rinnai.co.jp":       {"employees": None,  "annual_revenue": 3_071_906_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/63edac0a998f12000100b12d/picture"},
+    "skyworth.com":       {"employees": 4600,  "annual_revenue": 1_260_661_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69ac0a4dfc9762000146c5f8/picture"},
+    "sonos.com":          {"employees": 1800,  "annual_revenue": 1_443_276_000,  "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69b3e6b7af4e510001056fc5/picture"},
+    "tuxedocomputers.com":{"employees": 20,    "annual_revenue": None,           "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/67494385b80fc00001b55c57/picture"},
+    "valvesoftware.com":  {"employees": 350,   "annual_revenue": 16_200_000_000, "latest_funding_type": None,     "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69a39927f2d2ad00010ecf9a/picture"},
+    "viomi.com":          {"employees": 750,   "annual_revenue": 346_227_000,    "latest_funding_type": "Public", "logo_url": "https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69acafb9fb30c8000168aaad/picture"},
 }
 
 
