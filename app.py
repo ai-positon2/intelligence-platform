@@ -168,59 +168,84 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Company Signal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-      background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}}
-    .topbar{{background:#1a1d27;border-bottom:1px solid #2d3148;padding:0 32px;height:56px;
-      display:flex;align-items:center;justify-content:space-between}}
+    body{{font-family:'Space Grotesk',sans-serif;background:#070910;color:#e2e8f0;
+      min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}}
+    .bg-grid{{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(99,102,241,.03) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(99,102,241,.03) 1px,transparent 1px);
+      background-size:48px 48px}}
+    .bg-glow{{position:fixed;border-radius:50%;filter:blur(130px);pointer-events:none;z-index:0;
+      width:700px;height:700px;top:-200px;left:-150px;background:rgba(99,102,241,.06)}}
+    .topbar{{position:relative;z-index:10;height:62px;padding:0 32px;
+      display:flex;align-items:center;justify-content:space-between;
+      background:rgba(7,9,16,.8);backdrop-filter:blur(16px);
+      border-bottom:1px solid rgba(255,255,255,.05)}}
     .tl{{display:flex;align-items:center}}
     .brand{{display:flex;align-items:center;gap:10px;text-decoration:none}}
-    .brand-icon{{width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
-      border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}}
+    .brand-icon{{width:34px;height:34px;border-radius:9px;
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      display:flex;align-items:center;justify-content:center;font-size:16px;
+      box-shadow:0 0 14px rgba(99,102,241,.3)}}
     .brand-name{{font-size:15px;font-weight:700;color:#f1f5f9}}
-    .bc{{display:flex;align-items:center;gap:8px;margin-left:16px;padding-left:16px;
-      border-left:1px solid #2d3148}}
-    .bc a{{font-size:12px;color:#3d4460;text-decoration:none}}
-    .bc a:hover{{color:#94a3b8}}
-    .bc-sep{{font-size:12px;color:#1e2235}}
-    .bc-cur{{font-size:12px;font-weight:600;color:#818cf8}}
-    .logout-btn{{background:none;border:1px solid #2d3148;border-radius:6px;
-      color:#64748b;font-size:12px;padding:5px 12px;cursor:pointer;
-      font-family:inherit;transition:all .15s;text-decoration:none}}
-    .logout-btn:hover{{border-color:#ef4444;color:#ef4444}}
-    .main{{flex:1;display:flex;flex-direction:column;align-items:center;padding:60px 24px 40px}}
-    .heading{{font-size:26px;font-weight:700;color:#f1f5f9;margin-bottom:8px}}
-    .sub{{font-size:15px;color:#64748b;margin-bottom:48px}}
-    .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,340px));
-      gap:20px;justify-content:center;width:100%;max-width:760px}}
-    .card{{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;
-      padding:28px;cursor:pointer;text-decoration:none;
-      display:flex;flex-direction:column;gap:16px;
-      transition:border-color .2s,box-shadow .2s,transform .15s;
-      position:relative;overflow:hidden}}
-    .card::before{{content:'';position:absolute;top:0;left:0;right:0;
-      height:3px;background:var(--accent);border-radius:16px 16px 0 0}}
-    .card:hover{{border-color:var(--accent);box-shadow:0 8px 40px rgba(0,0,0,.4);transform:translateY(-2px)}}
-    .card-icon{{width:52px;height:52px;border-radius:14px;
-      background:color-mix(in srgb,var(--accent) 15%,transparent);
-      border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
-      display:flex;align-items:center;justify-content:center;font-size:26px}}
-    .card-name{{font-size:20px;font-weight:700;color:#f1f5f9}}
-    .card-desc{{font-size:13px;color:#64748b;line-height:1.5;flex:1}}
+    .bc{{display:flex;align-items:center;gap:8px;margin-left:18px;padding-left:18px;
+      border-left:1px solid rgba(255,255,255,.07)}}
+    .bc a{{font-size:13px;color:#2d3450;text-decoration:none;transition:color .15s}}
+    .bc a:hover{{color:#64748b}}
+    .bc-sep{{font-size:13px;color:#1a1d27}}
+    .bc-cur{{font-size:13px;font-weight:600;color:#818cf8}}
+    .sign-out{{font-size:12px;color:#3d4460;text-decoration:none;
+      padding:6px 14px;border:1px solid rgba(255,255,255,.07);border-radius:8px;
+      transition:all .15s}}
+    .sign-out:hover{{color:#ef4444;border-color:rgba(239,68,68,.4)}}
+    .main{{flex:1;position:relative;z-index:1;
+      display:flex;flex-direction:column;align-items:center;padding:72px 24px 48px}}
+    .label{{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+      color:#6366f1;margin-bottom:10px;display:flex;align-items:center;gap:8px}}
+    .label::before,.label::after{{content:'';display:block;width:20px;height:1px;background:rgba(99,102,241,.4)}}
+    .heading{{font-size:32px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
+      margin-bottom:6px;text-align:center}}
+    .sub{{font-size:14px;color:#2d3450;margin-bottom:52px}}
+    .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,360px));
+      gap:20px;justify-content:center;width:100%;max-width:780px}}
+    .card{{background:rgba(13,15,23,.9);border:1px solid rgba(255,255,255,.07);
+      border-radius:22px;overflow:hidden;text-decoration:none;color:inherit;
+      display:flex;flex-direction:column;
+      transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,border-color .2s}}
+    .card:hover{{transform:translateY(-5px);
+      box-shadow:0 24px 64px rgba(0,0,0,.55),0 0 0 1px var(--glow)}}
+    .card-band{{height:3px;background:var(--accent)}}
+    .card-thumb{{height:110px;background:var(--thumb);position:relative;
+      display:flex;align-items:center;justify-content:center;overflow:hidden}}
+    .card-thumb-icon{{font-size:44px;opacity:.2}}
+    .card-thumb::after{{content:'';position:absolute;inset:0;
+      background:linear-gradient(to bottom,transparent 30%,rgba(13,15,23,.95) 100%)}}
+    .card-badge{{position:absolute;top:10px;right:10px;z-index:1;
+      font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+      padding:3px 9px;border-radius:999px;display:flex;align-items:center;gap:4px;
+      background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399}}
+    .badge-dot{{width:5px;height:5px;border-radius:50%;background:currentColor;
+      animation:bpulse 2s infinite}}
+    @keyframes bpulse{{0%,100%{{box-shadow:0 0 0 0 rgba(52,211,153,.5)}}
+      50%{{box-shadow:0 0 0 3px rgba(52,211,153,0)}}}}
+    .card-body{{padding:20px 24px 22px;flex:1;display:flex;flex-direction:column}}
+    .card-name{{font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em;margin-bottom:8px}}
+    .card-desc{{font-size:13px;color:#2d3450;line-height:1.65;flex:1;margin-bottom:20px}}
     .card-footer{{display:flex;align-items:center;justify-content:space-between;
-      border-top:1px solid #2d3148;padding-top:14px}}
-    .status{{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500}}
-    .dot{{width:7px;height:7px;border-radius:50%;background:#10b981;
-      animation:pulse 2s infinite}}
-    @keyframes pulse{{0%,100%{{box-shadow:0 0 0 0 rgba(16,185,129,.4)}}
-      50%{{box-shadow:0 0 0 5px rgba(16,185,129,0)}}}}
-    .arrow{{font-size:18px;color:var(--accent);opacity:.7;transition:opacity .15s,transform .15s}}
+      border-top:1px solid rgba(255,255,255,.05);padding-top:16px}}
+    .stat{{font-size:12px;color:#2d3450}}
+    .stat span{{color:var(--accent-text);font-weight:600}}
+    .arrow{{font-size:16px;color:var(--accent-text);opacity:0;transition:opacity .15s,transform .15s}}
     .card:hover .arrow{{opacity:1;transform:translateX(3px)}}
-    .foot{{margin-top:40px;font-size:12px;color:#3d4460}}
+    .foot{{margin-top:48px;font-size:12px;color:#13151f}}
   </style>
 </head>
 <body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
   <div class="topbar">
     <div class="tl">
       <a href="/hub" class="brand">
@@ -233,11 +258,12 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
         <span class="bc-cur">Signal Tracker</span>
       </div>
     </div>
-    <a href="/logout" class="logout-btn">Sign out</a>
+    <a href="/logout" class="sign-out">Sign out</a>
   </div>
   <div class="main">
+    <div class="label">Company Intelligence</div>
     <h1 class="heading">Company Signal Tracker</h1>
-    <p class="sub">Choose a company list to open</p>
+    <p class="sub">Choose a company list to open the dashboard</p>
     <div class="grid">{account_cards}</div>
     <p class="foot">Position2 · Internal use only</p>
   </div>
@@ -247,28 +273,38 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
 
 def _build_account_card(account_id, cfg):
     path = cfg["dashboard"]
+    accent = cfg["accent"]
+    # derive thumb gradient from accent colour
+    thumb_map = {"#3b82f6": "linear-gradient(135deg,#172554,#1e3a8a)",
+                 "#8b5cf6": "linear-gradient(135deg,#2e1065,#1e1b4b)"}
+    thumb = thumb_map.get(accent, f"linear-gradient(135deg,#0d0f17,#1a1d27)")
     if path.exists():
         count = _read_company_count(path)
         return (
-            f'<a class="card" href="/dashboard/{account_id}" style="--accent:{cfg["accent"]}">'
-            f'<div class="card-icon">{cfg["icon"]}</div>'
-            f'<div><div class="card-name">{cfg["name"]}</div>'
-            f'<div class="card-desc">{cfg["description"]}</div></div>'
+            f'<a class="card" href="/dashboard/{account_id}" '
+            f'style="--accent:{accent};--glow:rgba(99,102,241,.25);'
+            f'--thumb:{thumb};--accent-text:{accent}">'
+            f'<div class="card-band"></div>'
+            f'<div class="card-thumb"><div class="card-thumb-icon">{cfg["icon"]}</div>'
+            f'<div class="card-badge"><span class="badge-dot"></span>Live</div></div>'
+            f'<div class="card-body">'
+            f'<div class="card-name">{cfg["name"]}</div>'
+            f'<div class="card-desc">{cfg["description"]}</div>'
             f'<div class="card-footer">'
-            f'<div class="status"><span class="dot"></span>'
-            f'<span style="color:#10b981">{count} companies · Live</span></div>'
-            f'<span class="arrow">→</span></div></a>'
+            f'<div class="stat"><span>{count}</span> companies tracked</div>'
+            f'<span class="arrow">→</span></div></div></a>'
         )
     return (
-        f'<div class="card" style="--accent:{cfg["accent"]};cursor:default">'
-        f'<div class="card-icon">{cfg["icon"]}</div>'
-        f'<div><div class="card-name">{cfg["name"]}</div>'
-        f'<div class="card-desc">{cfg["description"]}</div></div>'
+        f'<div class="card" style="--accent:{accent};--glow:rgba(99,102,241,.15);'
+        f'--thumb:{thumb};--accent-text:{accent};opacity:.5;cursor:default">'
+        f'<div class="card-band"></div>'
+        f'<div class="card-thumb"><div class="card-thumb-icon">{cfg["icon"]}</div></div>'
+        f'<div class="card-body">'
+        f'<div class="card-name">{cfg["name"]}</div>'
+        f'<div class="card-desc">{cfg["description"]}</div>'
         f'<div class="card-footer">'
-        f'<div class="status"><span style="width:7px;height:7px;border-radius:50%;'
-        f'background:#f59e0b;display:inline-block"></span>'
-        f'<span style="color:#f59e0b">Not generated yet</span></div>'
-        f'</div></div>'
+        f'<div class="stat" style="color:#f59e0b">Not generated yet</div>'
+        f'</div></div></div>'
     )
 
 
