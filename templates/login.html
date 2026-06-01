@@ -6,158 +6,269 @@
   <title>Sign In — Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0a0c14;
+      font-family: 'Space Grotesk', sans-serif;
+      background: #070910;
       min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
       overflow: hidden;
-      position: relative;
     }
 
-    /* Ambient background blobs */
-    .bg-blob {
-      position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0;
+    /* ── Animated background ── */
+    .bg {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(99,102,241,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 70%, rgba(139,92,246,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 60% at 60% 10%, rgba(59,130,246,0.05) 0%, transparent 60%);
     }
-    .bg-blob-1 {
-      width: 500px; height: 500px; top: -150px; left: -100px;
-      background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
-      animation: drift1 28s ease-in-out infinite;
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
     }
-    .bg-blob-2 {
-      width: 400px; height: 400px; bottom: -100px; right: -80px;
-      background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%);
-      animation: drift2 34s ease-in-out infinite;
+    .bg-glow {
+      position: fixed; z-index: 0; border-radius: 50%; filter: blur(120px);
+      animation: glow-drift 20s ease-in-out infinite;
     }
-    @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,30px)} }
-    @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,-20px)} }
+    .bg-glow-1 { width: 700px; height: 700px; top: -250px; left: -200px; background: rgba(99,102,241,0.08); }
+    .bg-glow-2 { width: 500px; height: 500px; bottom: -150px; right: -100px; background: rgba(139,92,246,0.07); animation-delay: -10s; }
+    @keyframes glow-drift {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%      { transform: translate(30px,20px) scale(1.05); }
+      66%      { transform: translate(-20px,30px) scale(0.97); }
+    }
 
-    .card {
+    /* ── Layout ── */
+    .left-panel {
       position: relative; z-index: 1;
-      background: #13151f;
-      border: 1px solid rgba(99,102,241,0.2);
-      border-radius: 20px;
-      padding: 48px 44px 44px;
-      width: 100%; max-width: 420px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      padding: 60px 64px;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      display: none;
     }
+    @media (min-width: 960px) { .left-panel { display: flex; } }
 
-    /* Logo */
-    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
-    .logo-icon {
-      width: 44px; height: 44px;
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      border-radius: 12px;
+    .right-panel {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 480px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 22px; flex-shrink: 0;
-      box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+      padding: 40px 32px;
     }
-    .logo-text { display: flex; flex-direction: column; }
-    .logo-name { font-size: 16px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.01em; }
-    .logo-by   { font-size: 11px; color: #4b5470; margin-top: 1px; }
+    @media (min-width: 960px) { .right-panel { min-width: 480px; } }
 
-    /* Heading */
-    .heading  { font-size: 24px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; letter-spacing: -0.02em; }
-    .subhead  { font-size: 14px; color: #5a6380; margin-bottom: 36px; line-height: 1.5; }
+    /* ── Left panel content ── */
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 64px; }
+    .brand-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 24px rgba(99,102,241,0.4);
+    }
+    .brand-name { font-size: 17px; font-weight: 700; color: #f1f5f9; }
+    .brand-sub  { font-size: 12px; color: #3d4460; margin-top: 1px; }
 
-    /* Divider */
+    .left-heading {
+      font-size: 42px; font-weight: 700; color: #f1f5f9;
+      line-height: 1.15; letter-spacing: -0.03em; margin-bottom: 20px;
+    }
+    .left-heading span {
+      background: linear-gradient(135deg, #818cf8, #c4b5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .left-sub {
+      font-size: 15px; color: #4b5470; line-height: 1.7; max-width: 420px; margin-bottom: 48px;
+    }
+
+    .feature-list { display: flex; flex-direction: column; gap: 16px; }
+    .feature {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px; padding: 14px 18px;
+    }
+    .feature-icon {
+      width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    .fi-blue   { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2); }
+    .fi-purple { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.2); }
+    .fi-green  { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.2); }
+    .feature-text { font-size: 13px; color: #94a3b8; line-height: 1.4; }
+    .feature-text strong { color: #f1f5f9; font-weight: 600; display: block; margin-bottom: 2px; }
+
+    /* ── Sign-in card ── */
+    .signin-card {
+      width: 100%; max-width: 380px;
+      background: rgba(19,21,31,0.9);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 44px 40px 40px;
+      box-shadow:
+        0 0 0 1px rgba(99,102,241,0.1),
+        0 40px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+    }
+
+    .card-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+    .card-brand-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      box-shadow: 0 0 16px rgba(99,102,241,0.35);
+    }
+    .card-brand-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .card-brand-sub  { font-size: 11px; color: #3d4460; }
+
+    .card-title { font-size: 26px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .card-sub   { font-size: 13px; color: #4b5470; line-height: 1.6; margin-bottom: 36px; }
+
+    /* Google button wrapper */
+    .google-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+
     .divider {
-      display: flex; align-items: center; gap: 12px;
-      margin-bottom: 28px;
+      width: 100%; display: flex; align-items: center; gap: 12px; margin: 24px 0 0;
     }
-    .divider-line { flex: 1; height: 1px; background: #1e2235; }
-    .divider-text { font-size: 12px; color: #3d4460; }
+    .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+    .divider-text { font-size: 11px; color: #2d3450; }
 
-    /* Google sign-in container */
-    .google-btn-wrap {
-      display: flex; justify-content: center;
-      margin-bottom: 8px;
-    }
-
-    /* Error state */
     .error-msg {
-      background: rgba(239,68,68,.1);
-      border: 1px solid rgba(239,68,68,.25);
-      border-radius: 10px; padding: 12px 16px;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 10px; padding: 12px 14px;
       font-size: 13px; color: #fca5a5;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       display: flex; align-items: center; gap: 8px;
     }
 
-    .footer {
-      margin-top: 32px;
-      text-align: center;
-      font-size: 12px; color: #2d3450;
-    }
+    .footer { margin-top: 28px; text-align: center; font-size: 11px; color: #1e2235; }
 
-    /* Loading state overlay */
+    /* Loading */
     .loading-overlay {
-      display: none;
-      position: fixed; inset: 0; z-index: 999;
-      background: rgba(10,12,20,0.85);
-      align-items: center; justify-content: center;
-      flex-direction: column; gap: 16px;
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(7,9,16,0.9); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center; flex-direction: column; gap: 16px;
     }
     .loading-overlay.active { display: flex; }
     .spinner {
-      width: 36px; height: 36px; border-radius: 50%;
-      border: 3px solid rgba(99,102,241,0.2);
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.15);
       border-top-color: #6366f1;
-      animation: spin 0.7s linear infinite;
+      animation: spin 0.65s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text { color: #94a3b8; font-size: 14px; }
+    .loading-text { color: #4b5470; font-size: 13px; }
   </style>
 </head>
 <body>
 
-  <div class="bg-blob bg-blob-1"></div>
-  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
 
   <div class="loading-overlay" id="loading">
     <div class="spinner"></div>
     <div class="loading-text">Signing you in…</div>
   </div>
 
-  <div class="card">
-    <div class="logo">
-      <div class="logo-icon">📡</div>
-      <div class="logo-text">
-        <div class="logo-name">Platform</div>
-        <div class="logo-by">by Position2</div>
+  <!-- Left panel (desktop only) -->
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-icon">📡</div>
+      <div>
+        <div class="brand-name">Platform</div>
+        <div class="brand-sub">by Position2</div>
       </div>
     </div>
 
-    <h1 class="heading">Welcome back</h1>
-    <p class="subhead">Sign in with your Google account to access your dashboards.</p>
+    <h1 class="left-heading">Intelligence<br/>for <span>every channel.</span></h1>
+    <p class="left-sub">
+      One platform for PPC and SEO intelligence — company signals, ad monitoring,
+      competitor insights, and more. Built for the Position2 team.
+    </p>
 
-    {% if error %}
-    <div class="error-msg">⚠ {{ error }}</div>
-    {% endif %}
-
-    <div class="google-btn-wrap">
-      <!-- Google Identity Services button -->
-      <div id="g_id_onload"
-           data-client_id="{{ google_client_id }}"
-           data-callback="handleCredentialResponse"
-           data-auto_prompt="false">
+    <div class="feature-list">
+      <div class="feature">
+        <div class="feature-icon fi-blue">📡</div>
+        <div class="feature-text">
+          <strong>Company Signal Tracker</strong>
+          Real-time funding, C-suite, and M&A signals across 1,500+ companies.
+        </div>
       </div>
-      <div class="g_id_signin"
-           data-type="standard"
-           data-shape="rectangular"
-           data-theme="filled_blue"
-           data-text="signin_with"
-           data-size="large"
-           data-logo_alignment="left"
-           data-width="336">
+      <div class="feature">
+        <div class="feature-icon fi-purple">🎯</div>
+        <div class="feature-text">
+          <strong>Ad Intelligence</strong>
+          Monitor competitor ad creatives and spend signals. Coming soon.
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon fi-green">🌿</div>
+        <div class="feature-text">
+          <strong>SEO Dashboard</strong>
+          Rankings, backlinks, and organic visibility tracking. Coming soon.
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="footer">Internal use only · Position2</div>
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="signin-card">
+
+      <div class="card-brand">
+        <div class="card-brand-icon">📡</div>
+        <div>
+          <div class="card-brand-name">Platform</div>
+          <div class="card-brand-sub">by Position2</div>
+        </div>
+      </div>
+
+      <h2 class="card-title">Welcome back</h2>
+      <p class="card-sub">Sign in with your Google account to access your dashboards.</p>
+
+      {% if error %}
+      <div class="error-msg">⚠ {{ error }}</div>
+      {% endif %}
+
+      <div class="google-wrap">
+        <div id="g_id_onload"
+             data-client_id="{{ google_client_id }}"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-shape="rectangular"
+             data-theme="filled_blue"
+             data-text="signin_with"
+             data-size="large"
+             data-logo_alignment="left"
+             data-width="300">
+        </div>
+        <div class="divider">
+          <div class="divider-line"></div>
+          <span class="divider-text">Internal use only</span>
+          <div class="divider-line"></div>
+        </div>
+      </div>
+
+      <div class="footer">Position2 · {{ "2026" }}</div>
+    </div>
   </div>
 
   <script>
@@ -170,9 +281,8 @@
       })
       .then(r => r.json())
       .then(data => {
-        if (data.success) {
-          window.location.href = data.redirect || '/hub';
-        } else {
+        if (data.success) window.location.href = data.redirect || '/hub';
+        else {
           document.getElementById('loading').classList.remove('active');
           alert('Sign-in failed: ' + (data.error || 'Unknown error'));
         }
