@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PPC Dashboards — Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0c14; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+      position: relative; overflow-x: hidden;
+    }
+    .bg-blob { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0; }
+    .bg-blob-1 {
+      width: 600px; height: 600px; top: -200px; left: -150px;
+      background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+      animation: drift1 32s ease-in-out infinite;
+    }
+    @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(50px,40px)} }
+
+    /* ── Topbar ── */
+    .topbar {
+      position: relative; z-index: 10;
+      background: rgba(19,21,31,0.8); backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 0 32px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 0; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .topbar-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 17px;
+    }
+    .topbar-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+
+    .breadcrumb {
+      display: flex; align-items: center; gap: 8px;
+      margin-left: 20px; padding-left: 20px;
+      border-left: 1px solid rgba(255,255,255,0.1);
+    }
+    .breadcrumb-item { font-size: 13px; color: #3d4460; text-decoration: none; }
+    .breadcrumb-item:hover { color: #94a3b8; }
+    .breadcrumb-sep  { font-size: 13px; color: #1e2235; }
+    .breadcrumb-current { font-size: 13px; font-weight: 600; color: #818cf8; }
+
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .user-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px; padding: 5px 14px 5px 5px;
+    }
+    .user-avatar {
+      width: 28px; height: 28px; border-radius: 50%; overflow: hidden;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-name { font-size: 13px; font-weight: 500; color: #cbd5e1; }
+    .logout-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+      color: #5a6380; font-size: 12px; padding: 6px 14px; cursor: pointer;
+      font-family: inherit; transition: all 0.15s; text-decoration: none;
+    }
+    .logout-btn:hover { border-color: rgba(239,68,68,0.5); color: #ef4444; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1; position: relative; z-index: 1;
+      padding: 56px 40px 48px; max-width: 1100px; margin: 0 auto; width: 100%;
+    }
+
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #818cf8; margin-bottom: 10px;
+    }
+    .heading { font-size: 30px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .subhead { font-size: 14px; color: #4b5470; margin-bottom: 48px; }
+
+    /* ── Dashboard grid ── */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .dash-card {
+      background: #13151f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 18px; padding: 28px 26px 22px;
+      text-decoration: none; color: inherit;
+      display: flex; flex-direction: column;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
+      position: relative; overflow: hidden;
+    }
+    .dash-card.active {
+      cursor: pointer;
+    }
+    .dash-card.active:hover {
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.1);
+      transform: translateY(-3px);
+    }
+    .dash-card.coming-soon {
+      cursor: default; opacity: 0.55;
+    }
+
+    .dash-card-top-bar {
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      border-radius: 18px 18px 0 0;
+    }
+    .dash-card.active .dash-card-top-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+
+    .dash-card-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 20px; flex-shrink: 0;
+    }
+    .dash-card.active   .dash-card-icon { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25); }
+    .dash-card.coming-soon .dash-card-icon { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+
+    .dash-card-name {
+      font-size: 16px; font-weight: 700; color: #f1f5f9;
+      letter-spacing: -0.01em; margin-bottom: 8px;
+    }
+    .dash-card-desc {
+      font-size: 12px; color: #3d4460; line-height: 1.6; flex: 1; margin-bottom: 22px;
+    }
+
+    .dash-card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;
+    }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-dot.live { background: #10b981; animation: pulse-dot 2s infinite; }
+    .status-dot.soon { background: #f59e0b; }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(16,185,129,0); }
+    }
+    .status-live { color: #10b981; }
+    .status-soon { color: #f59e0b; }
+
+    .dash-arrow { font-size: 16px; color: #818cf8; opacity: 0.5; transition: opacity 0.15s, transform 0.15s; }
+    .dash-card.active:hover .dash-arrow { opacity: 1; transform: translateX(3px); }
+
+    .cs-badge {
+      position: absolute; top: 14px; right: 14px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+      background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+      color: #f59e0b; border-radius: 999px; padding: 3px 9px;
+    }
+
+    .footer-note { margin-top: 48px; font-size: 12px; color: #1e2235; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="bg-blob bg-blob-1"></div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/hub" class="topbar-brand">
+        <div class="topbar-icon">📡</div>
+        <span class="topbar-name">Platform</span>
+      </a>
+      <div class="breadcrumb">
+        <a href="/hub" class="breadcrumb-item">Hub</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">PPC</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-pill">
+        <div class="user-avatar">
+          {% if user.picture %}
+            <img src="{{ user.picture }}" alt="{{ user.name }}" />
+          {% else %}
+            {{ (user.name or 'U')[:2]|upper }}
+          {% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or user.email }}</span>
+      </div>
+      <a href="/logout" class="logout-btn">Sign out</a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="section-label">Paid Acquisition</div>
+    <h1 class="heading">PPC Dashboards</h1>
+    <p class="subhead">Select a dashboard to open it.</p>
+
+    <div class="dash-grid">
+
+      <!-- 1. Company Signal Tracker -->
+      <a href="/accounts" class="dash-card active">
+        <div class="dash-card-top-bar"></div>
+        <div class="dash-card-icon">📡</div>
+        <div class="dash-card-name">Company Signal Tracker</div>
+        <div class="dash-card-desc">
+          Track funding rounds, C-suite changes, M&A, IPOs, and news signals
+          across healthcare and CSG company lists in real time.
+        </div>
+        <div class="dash-card-footer">
+          <div class="status-pill">
+            <span class="status-dot live"></span>
+            <span class="status-live">Live</span>
+          </div>
+          <span class="dash-arrow">→</span>
+        </div>
+      </a>
+
+      <!-- 2. Ad Intelligence -->
+      <div class="dash-card coming-soon">
+        <span class="cs-badge">Coming soon</span>
+        <div class="dash-card-icon">🎯</div>
+        <div class="dash-card-name">Ad Intelligence</div>
+        <div class="dash-card-desc">
+          Monitor competitor ad creatives, messaging, and spend signals
+          across Google, Meta, and LinkedIn.
+        </div>
+        <div class="dash-card-footer">
+          <div class="status-pill">
+            <span class="status-dot soon"></span>
+            <span class="status-soon">Coming soon</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. LinkedIn Scraper -->
+      <div class="dash-card coming-soon">
+        <span class="cs-badge">Coming soon</span>
+        <div class="dash-card-icon">🔗</div>
+        <div class="dash-card-name">LinkedIn Scraper</div>
+        <div class="dash-card-desc">
+          Extract and enrich LinkedIn data — company updates, job posts,
+          and decision-maker signals for targeting.
+        </div>
+        <div class="dash-card-footer">
+          <div class="status-pill">
+            <span class="status-dot soon"></span>
+            <span class="status-soon">Coming soon</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Anonymous Website Visitors -->
+      <div class="dash-card coming-soon">
+        <span class="cs-badge">Coming soon</span>
+        <div class="dash-card-icon">👁</div>
+        <div class="dash-card-name">Anonymous Visitors</div>
+        <div class="dash-card-desc">
+          De-anonymize website visitors — identify companies browsing
+          your site and surface high-intent accounts for outreach.
+        </div>
+        <div class="dash-card-footer">
+          <div class="status-pill">
+            <span class="status-dot soon"></span>
+            <span class="status-soon">Coming soon</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="footer-note">Position2 · Internal use only</p>
+  </div>
+
+</body>
+</html>
