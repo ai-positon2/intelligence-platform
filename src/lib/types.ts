@@ -35,7 +35,7 @@ export interface Ad {
 }
 
 export type AdFormat = 'image' | 'text' | 'video' | 'all';
-export type TabId = 'overview' | 'gallery' | 'competitors' | 'creative';
+export type TabId = 'insights' | 'overview' | 'gallery' | 'competitors' | 'creative';
 
 /** Cross-tab navigation params — any subset can be passed */
 export interface NavParams {

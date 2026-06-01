@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  LayoutDashboard, Image, Users, Sparkles,
+  LayoutDashboard, Image, Users, Sparkles, Brain,
   RefreshCw, ExternalLink, CheckCircle2,
   Menu, X, TrendingUp, Zap, ArrowRight
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { OverviewTab }    from './components/OverviewTab';
 import { GalleryTab }     from './components/GalleryTab';
 import { CompetitorsTab } from './components/CompetitorsTab';
 import { CreativeTab }    from './components/CreativeTab';
+import { InsightsTab }   from './components/InsightsTab';
 import { fetchSheetData } from './lib/sheets';
 import embeddedAds from './data/ads.json';
 
@@ -33,8 +34,9 @@ function useCountUp(target: number, duration = 1200) {
 
 /* ── Nav tabs ─────────────────────────────────────────── */
 const NAV: { id: TabId; label: string; icon: React.ReactNode; desc: string }[] = [
-  { id: 'overview',    label: 'Overview',         icon: <LayoutDashboard size={18}/>, desc: 'Charts & summary'     },
-  { id: 'gallery',     label: 'Ad Gallery',        icon: <Image           size={18}/>, desc: 'Browse all creatives' },
+  { id: 'insights',    label: 'Insights',          icon: <Brain           size={18}/>, desc: 'Market intelligence'   },
+  { id: 'overview',    label: 'Overview',          icon: <LayoutDashboard size={18}/>, desc: 'Charts & summary'      },
+  { id: 'gallery',     label: 'Ad Gallery',        icon: <Image           size={18}/>, desc: 'Browse all creatives'  },
   { id: 'competitors', label: 'Competitors',       icon: <Users           size={18}/>, desc: 'Deep competitor intel' },
   { id: 'creative',    label: 'Creative Analysis', icon: <Sparkles        size={18}/>, desc: 'Keywords & messaging'  },
 ];
@@ -132,7 +134,7 @@ function GradientCard({
 /* ── Main App ─────────────────────────────────────────── */
 export default function App() {
   const [ads, setAds]             = useState<Ad[]>(embeddedAds as Ad[]);
-  const [tab, setTab]             = useState<TabId>('overview');
+  const [tab, setTab]             = useState<TabId>('insights');
   const [status, setStatus]       = useState<DataStatus>('embedded');
   const [lastUpdated, setLast]    = useState<Date>(new Date());
   const [now, setNow]             = useState<Date>(new Date());
@@ -344,6 +346,9 @@ export default function App() {
 
             {/* Active tab */}
             <div key={tab} className="tab-enter">
+              {tab === 'insights' && (
+                <InsightsTab ads={ads} onNav={navigateTo} />
+              )}
               {tab === 'overview' && (
                 <OverviewTab ads={ads} onNav={navigateTo} />
               )}
