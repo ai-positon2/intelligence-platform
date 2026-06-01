@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0c14;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient background blobs */
+    .bg-blob {
+      position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0;
+    }
+    .bg-blob-1 {
+      width: 500px; height: 500px; top: -150px; left: -100px;
+      background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+      animation: drift1 28s ease-in-out infinite;
+    }
+    .bg-blob-2 {
+      width: 400px; height: 400px; bottom: -100px; right: -80px;
+      background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%);
+      animation: drift2 34s ease-in-out infinite;
+    }
+    @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,30px)} }
+    @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-30px,-20px)} }
+
+    .card {
+      position: relative; z-index: 1;
+      background: #13151f;
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 20px;
+      padding: 48px 44px 44px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    /* Logo */
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+    }
+    .logo-text { display: flex; flex-direction: column; }
+    .logo-name { font-size: 16px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.01em; }
+    .logo-by   { font-size: 11px; color: #4b5470; margin-top: 1px; }
+
+    /* Heading */
+    .heading  { font-size: 24px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; letter-spacing: -0.02em; }
+    .subhead  { font-size: 14px; color: #5a6380; margin-bottom: 36px; line-height: 1.5; }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 28px;
+    }
+    .divider-line { flex: 1; height: 1px; background: #1e2235; }
+    .divider-text { font-size: 12px; color: #3d4460; }
+
+    /* Google sign-in container */
+    .google-btn-wrap {
+      display: flex; justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    /* Error state */
+    .error-msg {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.25);
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 13px; color: #fca5a5;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 12px; color: #2d3450;
+    }
+
+    /* Loading state overlay */
+    .loading-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(10,12,20,0.85);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+    }
+    .loading-overlay.active { display: flex; }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.2);
+      border-top-color: #6366f1;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: #94a3b8; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Signing you in…</div>
+  </div>
+
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">📡</div>
+      <div class="logo-text">
+        <div class="logo-name">Platform</div>
+        <div class="logo-by">by Position2</div>
+      </div>
+    </div>
+
+    <h1 class="heading">Welcome back</h1>
+    <p class="subhead">Sign in with your Google account to access your dashboards.</p>
+
+    {% if error %}
+    <div class="error-msg">⚠ {{ error }}</div>
+    {% endif %}
+
+    <div class="google-btn-wrap">
+      <!-- Google Identity Services button -->
+      <div id="g_id_onload"
+           data-client_id="{{ google_client_id }}"
+           data-callback="handleCredentialResponse"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-shape="rectangular"
+           data-theme="filled_blue"
+           data-text="signin_with"
+           data-size="large"
+           data-logo_alignment="left"
+           data-width="336">
+      </div>
+    </div>
+
+    <div class="footer">Internal use only · Position2</div>
+  </div>
+
+  <script>
+    function handleCredentialResponse(response) {
+      document.getElementById('loading').classList.add('active');
+      fetch('/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          window.location.href = data.redirect || '/hub';
+        } else {
+          document.getElementById('loading').classList.remove('active');
+          alert('Sign-in failed: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(() => {
+        document.getElementById('loading').classList.remove('active');
+        alert('Network error. Please try again.');
+      });
+    }
+  </script>
+</body>
+</html>

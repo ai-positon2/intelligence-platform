@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO Dashboards — Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0c14; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+      position: relative; overflow-x: hidden;
+    }
+    .bg-blob { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0; }
+    .bg-blob-1 {
+      width: 600px; height: 600px; top: -200px; right: -100px;
+      background: radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%);
+      animation: drift1 36s ease-in-out infinite;
+    }
+    @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-40px,30px)} }
+
+    /* ── Topbar ── */
+    .topbar {
+      position: relative; z-index: 10;
+      background: rgba(19,21,31,0.8); backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 0 32px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 0; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .topbar-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 17px;
+    }
+    .topbar-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .breadcrumb {
+      display: flex; align-items: center; gap: 8px;
+      margin-left: 20px; padding-left: 20px;
+      border-left: 1px solid rgba(255,255,255,0.1);
+    }
+    .breadcrumb-item { font-size: 13px; color: #3d4460; text-decoration: none; }
+    .breadcrumb-item:hover { color: #94a3b8; }
+    .breadcrumb-sep  { font-size: 13px; color: #1e2235; }
+    .breadcrumb-current { font-size: 13px; font-weight: 600; color: #34d399; }
+
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .user-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px; padding: 5px 14px 5px 5px;
+    }
+    .user-avatar {
+      width: 28px; height: 28px; border-radius: 50%; overflow: hidden;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-name { font-size: 13px; font-weight: 500; color: #cbd5e1; }
+    .logout-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+      color: #5a6380; font-size: 12px; padding: 6px 14px; cursor: pointer;
+      font-family: inherit; transition: all 0.15s; text-decoration: none;
+    }
+    .logout-btn:hover { border-color: rgba(239,68,68,0.5); color: #ef4444; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1; position: relative; z-index: 1;
+      padding: 56px 40px 48px; max-width: 1100px; margin: 0 auto; width: 100%;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #34d399; margin-bottom: 10px;
+    }
+    .heading { font-size: 30px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .subhead { font-size: 14px; color: #4b5470; margin-bottom: 48px; }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .dash-card {
+      background: #13151f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 18px; padding: 28px 26px 22px;
+      text-decoration: none; color: inherit;
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+      cursor: default; opacity: 0.55;
+    }
+    .dash-card-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 20px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    }
+    .dash-card-name { font-size: 16px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.01em; margin-bottom: 8px; }
+    .dash-card-desc { font-size: 12px; color: #3d4460; line-height: 1.6; flex: 1; margin-bottom: 22px; }
+    .dash-card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;
+    }
+    .status-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; }
+    .cs-badge {
+      position: absolute; top: 14px; right: 14px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+      background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+      color: #f59e0b; border-radius: 999px; padding: 3px 9px;
+    }
+
+    .footer-note { margin-top: 48px; font-size: 12px; color: #1e2235; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="bg-blob bg-blob-1"></div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/hub" class="topbar-brand">
+        <div class="topbar-icon">📡</div>
+        <span class="topbar-name">Platform</span>
+      </a>
+      <div class="breadcrumb">
+        <a href="/hub" class="breadcrumb-item">Hub</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">SEO</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-pill">
+        <div class="user-avatar">
+          {% if user.picture %}
+            <img src="{{ user.picture }}" alt="{{ user.name }}" />
+          {% else %}
+            {{ (user.name or 'U')[:2]|upper }}
+          {% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or user.email }}</span>
+      </div>
+      <a href="/logout" class="logout-btn">Sign out</a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="section-label">Organic Growth</div>
+    <h1 class="heading">SEO Dashboards</h1>
+    <p class="subhead">Organic intelligence dashboards — coming soon.</p>
+
+    <div class="dash-grid">
+
+      <div class="dash-card">
+        <span class="cs-badge">Coming soon</span>
+        <div class="dash-card-icon">🌿</div>
+        <div class="dash-card-name">SEO Dashboard</div>
+        <div class="dash-card-desc">
+          Keyword rankings, backlink monitoring, content performance,
+          and competitor organic visibility analysis.
+        </div>
+        <div class="dash-card-footer">
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span style="color:#f59e0b">Coming soon</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="footer-note">Position2 · Internal use only</p>
+  </div>
+
+</body>
+</html>
