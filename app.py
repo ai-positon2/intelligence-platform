@@ -1,19 +1,27 @@
-"""Minimal web server for the Signal Tracker dashboard on Railway."""
+"""Platform hub server — Google Sign-In + multi-dashboard routing."""
 
 import os
 import json
 from pathlib import Path
 from functools import wraps
+
 from flask import (
     Flask, send_file, abort, jsonify,
-    request, session, redirect, url_for, make_response
+    request, session, redirect, url_for,
+    make_response, render_template,
 )
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
 
-# ── Account registry ───────────────────────────────────────────────────────────
-# Add / rename accounts here. Each entry maps an account_id → config dict.
+# ── Google OAuth ────────────────────────────────────────────────────────────────
+# Set GOOGLE_CLIENT_ID in Railway → Variables.
+# Setup: console.cloud.google.com → APIs & Services → Credentials
+#        → Create OAuth 2.0 Client ID → Web application
+#        → Authorised JavaScript origins: https://signals.position2.com
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+# ── Account registry ────────────────────────────────────────────────────────────
 ACCOUNTS = {
     "healthcare": {
         "name":        "Healthcare",
@@ -31,411 +39,249 @@ ACCOUNTS = {
     },
 }
 
-# ── Credentials ────────────────────────────────────────────────────────────────
-_VALID_EMAIL    = "krishna.ladha@position2.com"
-_VALID_PASSWORD = "signals@P2"
-
-# ── Auth helpers ───────────────────────────────────────────────────────────────
-def _check_credentials(email: str, password: str) -> bool:
-    return email == _VALID_EMAIL and password == _VALID_PASSWORD
+# ── Auth helpers ────────────────────────────────────────────────────────────────
+def _get_user():
+    """Return current user dict or None."""
+    return session.get("google_user")
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("login", next=request.path))
+        if not _get_user():
+            return redirect(url_for("login_page"))
         return f(*args, **kwargs)
     return decorated
 
-# ── Login page HTML ────────────────────────────────────────────────────────────
-_LOGIN_HTML = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Signal Tracker — Login</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f1117; color: #e2e8f0;
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    }
-    .card {
-      background: #1a1d27; border: 1px solid #2d3148; border-radius: 16px;
-      padding: 48px 44px 40px; width: 100%; max-width: 420px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
-    }
-    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
-    .logo-icon {
-      width: 40px; height: 40px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border-radius: 10px; display: flex; align-items: center;
-      justify-content: center; font-size: 20px; flex-shrink: 0;
-    }
-    .logo-title { font-size: 17px; font-weight: 700; color: #f1f5f9; }
-    .logo-sub   { font-size: 12px; color: #64748b; margin-top: 2px; }
-    h1       { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
-    .subtitle{ font-size: 14px; color: #64748b; margin-bottom: 32px; }
-    .field   { margin-bottom: 18px; }
-    label    { display: block; font-size: 13px; font-weight: 500; color: #94a3b8; margin-bottom: 7px; }
-    input {
-      width: 100%; padding: 11px 14px; background: #0f1117;
-      border: 1px solid #2d3148; border-radius: 8px; color: #f1f5f9;
-      font-size: 14px; outline: none; transition: border-color 0.15s;
-    }
-    input::placeholder { color: #3d4460; }
-    input:focus { border-color: #6366f1; }
-    .error-msg {
-      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35);
-      border-radius: 8px; padding: 11px 14px; font-size: 13px; color: #fca5a5;
-      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
-    }
-    .btn {
-      width: 100%; padding: 12px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border: none; border-radius: 8px; color: #fff;
-      font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px;
-      transition: opacity 0.15s, transform 0.1s; letter-spacing: 0.01em;
-    }
-    .btn:hover  { opacity: 0.9; }
-    .btn:active { transform: scale(0.99); }
-    .footer { margin-top: 28px; text-align: center; font-size: 12px; color: #3d4460; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">
-      <div class="logo-icon">📡</div>
-      <div>
-        <div class="logo-title">Signal Tracker</div>
-        <div class="logo-sub">Position2 · Company Intelligence</div>
-      </div>
-    </div>
-    <h1>Welcome back</h1>
-    <p class="subtitle">Sign in to access your signal dashboards</p>
-    {error_block}
-    <form method="POST" action="/login">
-      <input type="hidden" name="next" value="{next_url}" />
-      <div class="field">
-        <label for="email">Email address</label>
-        <input type="email" id="email" name="email"
-               placeholder="you@position2.com" value="{prefill_email}"
-               autocomplete="email" required />
-      </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password"
-               placeholder="••••••••••" autocomplete="current-password" required />
-      </div>
-      <button type="submit" class="btn">Sign in →</button>
-    </form>
-    <div class="footer">Internal use only · Position2</div>
-  </div>
-</body>
-</html>"""
+# ── Google Sign-In ──────────────────────────────────────────────────────────────
+@app.route("/auth/google", methods=["POST"])
+def auth_google():
+    credential = (request.json or {}).get("credential", "")
+    if not credential:
+        return jsonify({"success": False, "error": "No credential"}), 400
 
-# ── Account picker page HTML ───────────────────────────────────────────────────
-_ACCOUNTS_HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Signal Tracker — Select Account</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f1117; color: #e2e8f0;
-      min-height: 100vh; display: flex; flex-direction: column;
-    }
-
-    /* ── Top bar ── */
-    .topbar {
-      background: #1a1d27; border-bottom: 1px solid #2d3148;
-      padding: 0 32px; height: 56px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .topbar-brand { display: flex; align-items: center; gap: 10px; }
-    .topbar-icon {
-      width: 32px; height: 32px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      border-radius: 8px; display: flex; align-items: center;
-      justify-content: center; font-size: 16px;
-    }
-    .topbar-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
-    .topbar-user  { display: flex; align-items: center; gap: 10px; }
-    .user-avatar  {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: #fff;
-    }
-    .user-name  { font-size: 13px; font-weight: 500; color: #f1f5f9; }
-    .logout-btn {
-      background: none; border: 1px solid #2d3148; border-radius: 6px;
-      color: #64748b; font-size: 12px; padding: 5px 12px; cursor: pointer;
-      font-family: inherit; transition: all 0.15s; text-decoration: none;
-    }
-    .logout-btn:hover { border-color: #ef4444; color: #ef4444; }
-
-    /* ── Main content ── */
-    .main {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; padding: 60px 24px 40px;
-    }
-    .heading     { font-size: 26px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
-    .subheading  { font-size: 15px; color: #64748b; margin-bottom: 48px; }
-
-    /* ── Account cards ── */
-    .accounts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 340px));
-      gap: 20px; justify-content: center; width: 100%; max-width: 760px;
-    }
-    .account-card {
-      background: #1a1d27; border: 1px solid #2d3148; border-radius: 16px;
-      padding: 28px 28px 24px; cursor: pointer; text-decoration: none;
-      display: flex; flex-direction: column; gap: 16px;
-      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
-      position: relative; overflow: hidden;
-    }
-    .account-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0;
-      height: 3px; background: var(--accent); border-radius: 16px 16px 0 0;
-    }
-    .account-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-      transform: translateY(-2px);
-    }
-    .card-icon {
-      width: 52px; height: 52px; border-radius: 14px;
-      background: color-mix(in srgb, var(--accent) 15%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-      display: flex; align-items: center; justify-content: center; font-size: 26px;
-    }
-    .card-name   { font-size: 20px; font-weight: 700; color: #f1f5f9; }
-    .card-desc   { font-size: 13px; color: #64748b; line-height: 1.5; flex: 1; }
-    .card-footer {
-      display: flex; align-items: center; justify-content: space-between;
-      border-top: 1px solid #2d3148; padding-top: 14px; margin-top: 4px;
-    }
-    .card-status {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 12px; font-weight: 500;
-    }
-    .status-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-    }
-    .status-dot.live   { background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,.4); animation: pulse 2s infinite; }
-    .status-dot.setup  { background: #f59e0b; }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
-      50%      { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
-    }
-    .card-arrow {
-      font-size: 18px; color: var(--accent); opacity: 0.7;
-      transition: opacity 0.15s, transform 0.15s;
-    }
-    .account-card:hover .card-arrow { opacity: 1; transform: translateX(3px); }
-
-    /* ── Not-ready overlay ── */
-    .account-card.not-ready { cursor: default; }
-    .account-card.not-ready:hover { transform: none; box-shadow: none; }
-    .not-ready-badge {
-      position: absolute; top: 16px; right: 16px;
-      background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.3);
-      color: #f59e0b; font-size: 10px; font-weight: 700; border-radius: 999px;
-      padding: 3px 10px; letter-spacing: .04em;
-    }
-
-    .footer-note { margin-top: 40px; font-size: 12px; color: #3d4460; }
-  </style>
-</head>
-<body>
-
-  <!-- Top bar -->
-  <div class="topbar">
-    <div class="topbar-brand">
-      <div class="topbar-icon">📡</div>
-      <span class="topbar-title">Signal Tracker</span>
-    </div>
-    <div class="topbar-user">
-      <div class="user-avatar">KL</div>
-      <span class="user-name">Krishna Ladha</span>
-      <a href="/logout" class="logout-btn">Sign out</a>
-    </div>
-  </div>
-
-  <!-- Main -->
-  <div class="main">
-    <h1 class="heading">Select an Account</h1>
-    <p class="subheading">Choose which intelligence dashboard you want to open</p>
-
-    <div class="accounts-grid">
-      {account_cards}
-    </div>
-
-    <p class="footer-note">Position2 · Internal use only</p>
-  </div>
-
-</body>
-</html>"""
-
-def _build_account_card(account_id: str, cfg: dict) -> str:
-    dashboard_path: Path = cfg["dashboard"]
-    is_ready = dashboard_path.exists()
-
-    if is_ready:
-        # Read company count from the generated dashboard meta if possible
-        company_count = _read_company_count(dashboard_path)
-        status_html = f"""<span class="status-dot live"></span>
-          <span style="color:#10b981">{company_count} companies · Live</span>"""
-        card_cls  = ""
-        badge_html = ""
-        href_attr = f'href="/dashboard/{account_id}"'
-        arrow = f'<span class="card-arrow">→</span>'
+    if not GOOGLE_CLIENT_ID:
+        # Dev mode: decode without verification (localhost only)
+        import base64, json as _j
+        try:
+            pad = credential.split(".")[1]
+            pad += "=" * (-len(pad) % 4)
+            idinfo = _j.loads(base64.urlsafe_b64decode(pad))
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 401
     else:
-        status_html = '<span class="status-dot setup"></span><span style="color:#f59e0b">Setup required</span>'
-        card_cls   = "not-ready"
-        badge_html = '<span class="not-ready-badge">NOT SET UP</span>'
-        href_attr  = ""
-        arrow = ""
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport import requests as greq
+            idinfo = id_token.verify_oauth2_token(credential, greq.Request(), GOOGLE_CLIENT_ID)
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 401
 
-    tag = "a" if is_ready else "div"
+    session["google_user"] = {
+        "email":      idinfo.get("email", ""),
+        "name":       idinfo.get("name", ""),
+        "given_name": idinfo.get("given_name", ""),
+        "picture":    idinfo.get("picture", ""),
+    }
+    session.permanent = True
+    return jsonify({"success": True, "redirect": "/hub"})
 
-    return f"""
-    <{tag} class="account-card {card_cls}" {href_attr}
-        style="--accent:{cfg['accent']}">
-      {badge_html}
-      <div class="card-icon">{cfg['icon']}</div>
-      <div>
-        <div class="card-name">{cfg['name']}</div>
-        <div class="card-desc">{cfg['description']}</div>
-      </div>
-      <div class="card-footer">
-        <div class="card-status">{status_html}</div>
-        {arrow}
-      </div>
-    </{tag}>"""
+# ── Core routes ─────────────────────────────────────────────────────────────────
+@app.route("/")
+def index():
+    return redirect(url_for("hub") if _get_user() else url_for("login_page"))
 
-
-def _read_company_count(dashboard_path: Path) -> str:
-    """Quick scan of the generated HTML to extract total_companies from embedded JSON."""
-    try:
-        text = dashboard_path.read_text(encoding="utf-8", errors="ignore")
-        marker = '"total_companies":'
-        idx = text.find(marker)
-        if idx == -1:
-            return "—"
-        snippet = text[idx + len(marker):idx + len(marker) + 10].strip().split(",")[0].strip()
-        return snippet if snippet.isdigit() else "—"
-    except Exception:
-        return "—"
-
-
-# ── Routes ─────────────────────────────────────────────────────────────────────
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if session.get("logged_in"):
-        return redirect(url_for("accounts"))
-
-    error_block   = ""
-    prefill_email = ""
-    next_url      = request.args.get("next", "/accounts") or "/accounts"
-
-    if request.method == "POST":
-        email    = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
-        next_url = request.form.get("next", "/accounts") or "/accounts"
-
-        if _check_credentials(email, password):
-            session["logged_in"] = True
-            session["user"]      = email
-            session.permanent    = True
-            if not next_url.startswith("/"):
-                next_url = "/accounts"
-            return redirect(next_url)
-        else:
-            prefill_email = email
-            error_block = (
-                '<div class="error-msg">'
-                '⚠ Incorrect email or password. Please try again.'
-                '</div>'
-            )
-
-    html = (_LOGIN_HTML
-            .replace("{error_block}",   error_block)
-            .replace("{next_url}",      next_url)
-            .replace("{prefill_email}", prefill_email))
-    return make_response(html, 200)
-
+@app.route("/login")
+def login_page():
+    if _get_user():
+        return redirect(url_for("hub"))
+    return render_template("login.html", google_client_id=GOOGLE_CLIENT_ID,
+                           error=request.args.get("error", ""))
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for("login_page"))
 
-
-@app.route("/")
+# ── Hub pages ───────────────────────────────────────────────────────────────────
+@app.route("/hub")
 @login_required
-def index():
-    return redirect(url_for("accounts"))
+def hub():
+    return render_template("hub.html", user=_get_user())
 
+@app.route("/ppc")
+@login_required
+def ppc():
+    return render_template("ppc.html", user=_get_user())
 
+@app.route("/seo")
+@login_required
+def seo():
+    return render_template("seo.html", user=_get_user())
+
+# ── Company Signal Tracker ───────────────────────────────────────────────────────
 @app.route("/accounts")
 @login_required
 def accounts():
-    cards_html = "".join(
-        _build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items()
-    )
-    html = _ACCOUNTS_HTML_TEMPLATE.replace("{account_cards}", cards_html)
-    return make_response(html, 200)
-
+    cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
+    return make_response(_ACCOUNTS_HTML.replace("{account_cards}", cards_html), 200)
 
 @app.route("/dashboard/<account_id>")
 @login_required
 def dashboard(account_id: str):
     cfg = ACCOUNTS.get(account_id)
-    if cfg is None:
+    if not cfg:
         abort(404, f"Unknown account '{account_id}'")
-    dashboard_path: Path = cfg["dashboard"]
-    if not dashboard_path.exists():
-        abort(404, f"Dashboard for '{cfg['name']}' not generated yet — run main.py first.")
-    response = make_response(send_file(str(dashboard_path)))
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+    path: Path = cfg["dashboard"]
+    if not path.exists():
+        abort(404, f"Dashboard for '{cfg['name']}' not generated yet.")
+    resp = make_response(send_file(str(path)))
+    resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
+                         "Pragma": "no-cache", "Expires": "0"})
+    return resp
 
-
+# ── Health + API ─────────────────────────────────────────────────────────────────
 @app.route("/health")
 def health():
-    """Public health check — no auth required."""
-    return jsonify({
-        "status": "ok",
-        "accounts": {
-            aid: {"name": cfg["name"], "dashboard_exists": cfg["dashboard"].exists()}
-            for aid, cfg in ACCOUNTS.items()
-        }
-    })
-
+    return jsonify({"status": "ok", "accounts": {
+        aid: {"name": cfg["name"], "dashboard_exists": cfg["dashboard"].exists()}
+        for aid, cfg in ACCOUNTS.items()
+    }})
 
 @app.route("/api/weekly-stats")
 @app.route("/api/weekly-stats/<account_id>")
 @login_required
 def weekly_stats(account_id: str = "healthcare"):
     cfg = ACCOUNTS.get(account_id)
-    if cfg is None:
+    if not cfg:
         return jsonify({"error": f"Unknown account '{account_id}'"}), 404
-    stats_json = Path(__file__).parent / "data" / f"weekly-stats-{account_id}.json"
-    # Fall back to legacy filename for healthcare account
-    if not stats_json.exists() and account_id == "healthcare":
-        stats_json = Path(__file__).parent / "data" / "weekly-stats.json"
-    if not stats_json.exists():
-        return jsonify({"error": f"weekly-stats for '{account_id}' not found — run main.py first"}), 503
-    return jsonify(json.loads(stats_json.read_text()))
+    p = Path(__file__).parent / "data" / f"weekly-stats-{account_id}.json"
+    if not p.exists() and account_id == "healthcare":
+        p = Path(__file__).parent / "data" / "weekly-stats.json"
+    if not p.exists():
+        return jsonify({"error": "Not found"}), 503
+    return jsonify(json.loads(p.read_text()))
+
+# ── Account picker HTML ──────────────────────────────────────────────────────────
+_ACCOUNTS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Company Signal Tracker</title>
+  <style>
+    *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}}
+    .topbar{{background:#1a1d27;border-bottom:1px solid #2d3148;padding:0 32px;height:56px;
+      display:flex;align-items:center;justify-content:space-between}}
+    .tl{{display:flex;align-items:center}}
+    .brand{{display:flex;align-items:center;gap:10px;text-decoration:none}}
+    .brand-icon{{width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}}
+    .brand-name{{font-size:15px;font-weight:700;color:#f1f5f9}}
+    .bc{{display:flex;align-items:center;gap:8px;margin-left:16px;padding-left:16px;
+      border-left:1px solid #2d3148}}
+    .bc a{{font-size:12px;color:#3d4460;text-decoration:none}}
+    .bc a:hover{{color:#94a3b8}}
+    .bc-sep{{font-size:12px;color:#1e2235}}
+    .bc-cur{{font-size:12px;font-weight:600;color:#818cf8}}
+    .logout-btn{{background:none;border:1px solid #2d3148;border-radius:6px;
+      color:#64748b;font-size:12px;padding:5px 12px;cursor:pointer;
+      font-family:inherit;transition:all .15s;text-decoration:none}}
+    .logout-btn:hover{{border-color:#ef4444;color:#ef4444}}
+    .main{{flex:1;display:flex;flex-direction:column;align-items:center;padding:60px 24px 40px}}
+    .heading{{font-size:26px;font-weight:700;color:#f1f5f9;margin-bottom:8px}}
+    .sub{{font-size:15px;color:#64748b;margin-bottom:48px}}
+    .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,340px));
+      gap:20px;justify-content:center;width:100%;max-width:760px}}
+    .card{{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;
+      padding:28px;cursor:pointer;text-decoration:none;
+      display:flex;flex-direction:column;gap:16px;
+      transition:border-color .2s,box-shadow .2s,transform .15s;
+      position:relative;overflow:hidden}}
+    .card::before{{content:'';position:absolute;top:0;left:0;right:0;
+      height:3px;background:var(--accent);border-radius:16px 16px 0 0}}
+    .card:hover{{border-color:var(--accent);box-shadow:0 8px 40px rgba(0,0,0,.4);transform:translateY(-2px)}}
+    .card-icon{{width:52px;height:52px;border-radius:14px;
+      background:color-mix(in srgb,var(--accent) 15%,transparent);
+      border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+      display:flex;align-items:center;justify-content:center;font-size:26px}}
+    .card-name{{font-size:20px;font-weight:700;color:#f1f5f9}}
+    .card-desc{{font-size:13px;color:#64748b;line-height:1.5;flex:1}}
+    .card-footer{{display:flex;align-items:center;justify-content:space-between;
+      border-top:1px solid #2d3148;padding-top:14px}}
+    .status{{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500}}
+    .dot{{width:7px;height:7px;border-radius:50%;background:#10b981;
+      animation:pulse 2s infinite}}
+    @keyframes pulse{{0%,100%{{box-shadow:0 0 0 0 rgba(16,185,129,.4)}}
+      50%{{box-shadow:0 0 0 5px rgba(16,185,129,0)}}}}
+    .arrow{{font-size:18px;color:var(--accent);opacity:.7;transition:opacity .15s,transform .15s}}
+    .card:hover .arrow{{opacity:1;transform:translateX(3px)}}
+    .foot{{margin-top:40px;font-size:12px;color:#3d4460}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="tl">
+      <a href="/hub" class="brand">
+        <div class="brand-icon">📡</div>
+        <span class="brand-name">Platform</span>
+      </a>
+      <div class="bc">
+        <a href="/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/ppc">PPC</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Signal Tracker</span>
+      </div>
+    </div>
+    <a href="/logout" class="logout-btn">Sign out</a>
+  </div>
+  <div class="main">
+    <h1 class="heading">Company Signal Tracker</h1>
+    <p class="sub">Choose a company list to open</p>
+    <div class="grid">{account_cards}</div>
+    <p class="foot">Position2 · Internal use only</p>
+  </div>
+</body>
+</html>"""
+
+
+def _build_account_card(account_id, cfg):
+    path = cfg["dashboard"]
+    if path.exists():
+        count = _read_company_count(path)
+        return (
+            f'<a class="card" href="/dashboard/{account_id}" style="--accent:{cfg["accent"]}">'
+            f'<div class="card-icon">{cfg["icon"]}</div>'
+            f'<div><div class="card-name">{cfg["name"]}</div>'
+            f'<div class="card-desc">{cfg["description"]}</div></div>'
+            f'<div class="card-footer">'
+            f'<div class="status"><span class="dot"></span>'
+            f'<span style="color:#10b981">{count} companies · Live</span></div>'
+            f'<span class="arrow">→</span></div></a>'
+        )
+    return (
+        f'<div class="card" style="--accent:{cfg["accent"]};cursor:default">'
+        f'<div class="card-icon">{cfg["icon"]}</div>'
+        f'<div><div class="card-name">{cfg["name"]}</div>'
+        f'<div class="card-desc">{cfg["description"]}</div></div>'
+        f'<div class="card-footer">'
+        f'<div class="status"><span style="width:7px;height:7px;border-radius:50%;'
+        f'background:#f59e0b;display:inline-block"></span>'
+        f'<span style="color:#f59e0b">Not generated yet</span></div>'
+        f'</div></div>'
+    )
+
+
+def _read_company_count(path: Path) -> str:
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        idx = text.find('"total_companies":')
+        if idx == -1:
+            return "—"
+        snippet = text[idx + 18:idx + 28].strip().split(",")[0].strip()
+        return snippet if snippet.isdigit() else "—"
+    except Exception:
+        return "—"
 
 
 if __name__ == "__main__":
