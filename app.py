@@ -306,6 +306,7 @@ def seo():
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 AD_INTELLIGENCE_URL = "https://ad-intelligence-production-be71.up.railway.app"
+SERP_RESEARCHER_URL  = "https://serp-content-researcher-production-a947.up.railway.app"
 
 @app.route("/ppc/ad-intelligence")
 @login_required
@@ -317,6 +318,18 @@ def ad_intelligence():
         breadcrumb=[("Hub", "/hub"), ("PPC", "/ppc")],
         current="Ad Intelligence",
         accent="#f59e0b",
+    )
+
+@app.route("/seo/serp-researcher")
+@login_required
+def serp_researcher():
+    return render_template("embed.html",
+        user=_get_user(),
+        title="SERP Content Researcher",
+        embed_url=SERP_RESEARCHER_URL,
+        breadcrumb=[("Hub", "/hub"), ("SEO", "/seo")],
+        current="SERP Researcher",
+        accent="#34d399",
     )
 
 # ── Company Signal Tracker ───────────────────────────────────────────────────────
