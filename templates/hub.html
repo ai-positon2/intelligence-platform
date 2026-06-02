@@ -11,22 +11,25 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Space Grotesk', sans-serif;
-      background: #070910; color: #e2e8f0;
-      min-height: 100vh; display: flex; flex-direction: column;
-      overflow-x: hidden;
+      color: #e2e8f0; min-height: 100vh;
+      display: flex; flex-direction: column; overflow-x: hidden;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 0%,   rgba(99,102,241,0.14) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 60%,  rgba(139,92,246,0.11) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 60% at 50% 100%, rgba(30,27,75,0.45)   0%, transparent 70%),
+        linear-gradient(160deg, #080b18 0%, #0a0d1a 40%, #070912 100%);
     }
 
-    /* Background */
+    /* Dot grid */
     .bg-grid {
       position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image:
-        linear-gradient(rgba(99,102,241,0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99,102,241,0.035) 1px, transparent 1px);
-      background-size: 48px 48px;
+      background-image: radial-gradient(circle, rgba(99,102,241,0.13) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: radial-gradient(ellipse 85% 85% at 50% 40%, black 30%, transparent 100%);
     }
     .bg-glow { position: fixed; border-radius: 50%; filter: blur(130px); pointer-events: none; z-index: 0; }
-    .bg-glow-1 { width: 800px; height: 800px; top: -300px; left: -200px; background: rgba(99,102,241,0.07); animation: gdrift 28s ease-in-out infinite; }
-    .bg-glow-2 { width: 600px; height: 600px; bottom: -200px; right: -100px; background: rgba(139,92,246,0.06); animation: gdrift 36s ease-in-out infinite reverse; }
+    .bg-glow-1 { width: 800px; height: 800px; top: -300px; left: -200px; background: rgba(99,102,241,0.09); animation: gdrift 28s ease-in-out infinite; }
+    .bg-glow-2 { width: 600px; height: 600px; bottom: -200px; right: -100px; background: rgba(139,92,246,0.08); animation: gdrift 36s ease-in-out infinite reverse; }
     @keyframes gdrift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(40px,30px)} }
 
     /* ── Topbar ── */
@@ -89,7 +92,7 @@
       line-height: 1.15;
     }
     .main-sub {
-      font-size: 15px; color: #3d4460; margin-bottom: 64px; text-align: center;
+      font-size: 15px; color: #64748b; margin-bottom: 64px; text-align: center;
     }
 
     /* ── Cards ── */
@@ -125,9 +128,9 @@
       background: linear-gradient(to bottom, transparent 40%, rgba(13,15,23,0.95) 100%);
     }
     .card-preview-icon {
-      font-size: 52px; opacity: 0.25;
-      filter: blur(0px);
+      font-size: 56px; opacity: 0.45;
       position: relative; z-index: 1;
+      filter: drop-shadow(0 0 24px rgba(255,255,255,0.15));
     }
 
     /* Floating badge on preview */
@@ -156,7 +159,7 @@
       letter-spacing: -0.02em; margin-bottom: 10px;
     }
     .card-desc {
-      font-size: 13px; color: #3d4460; line-height: 1.7;
+      font-size: 13px; color: #94a3b8; line-height: 1.7;
       flex: 1; margin-bottom: 24px;
     }
 
@@ -165,7 +168,7 @@
       border-top: 1px solid rgba(255,255,255,0.05); padding-top: 18px;
     }
     .card-meta { display: flex; align-items: center; gap: 16px; }
-    .card-stat { font-size: 12px; color: #2d3450; }
+    .card-stat { font-size: 12px; color: #64748b; }
     .card-stat span { color: var(--card-accent); font-weight: 600; }
 
     .card-cta {
