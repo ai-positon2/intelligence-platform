@@ -191,7 +191,7 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not _get_user():
-            return redirect(url_for("login_page"))
+            return redirect(url_for("login_page") + "?error=Your+session+expired.+Please+sign+in+again.")
         return f(*args, **kwargs)
     return decorated
 
@@ -229,47 +229,6 @@ def auth_google():
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     return jsonify({"success": True, "redirect": "/hub"})
 
-# ── Sheet diagnostic endpoint ───────────────────────────────────────────────────
-@app.route("/debug/sheet-test")
-def sheet_test():
-    """Diagnose login sheet logging. Remove after fixing."""
-    result = {"sheet_id": bool(LOGIN_LOG_SHEET_ID), "sa_json_env": bool(os.environ.get("GOOGLE_SA_JSON")), "sa_file": Path(_SA_JSON).exists()}
-    try:
-        import json as _j
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-
-        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
-        if not sa_str:
-            return jsonify({"error": "GOOGLE_SA_JSON env var is empty", **result})
-
-        try:
-            sa_info = _j.loads(sa_str)
-            result["json_parsed"] = True
-            result["client_email"] = sa_info.get("client_email", "missing")
-        except Exception as e:
-            return jsonify({"error": f"JSON parse failed: {e}", "json_preview": sa_str[:80], **result})
-
-        creds = service_account.Credentials.from_service_account_info(
-            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        result["creds_ok"] = True
-
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
-        r = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="A1:A1").execute()
-        result["sheet_read_ok"] = True
-        result["sheet_value"] = r.get("values", [])
-
-        # Try a test write
-        svc.spreadsheets().values().append(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="A1",
-            valueInputOption="RAW", insertDataOption="INSERT_ROWS",
-            body={"values": [["DIAGNOSTIC TEST", "OK"]]}).execute()
-        result["write_ok"] = True
-
-        return jsonify({"status": "ALL OK — sheet logging should work", **result})
-    except Exception as e:
-        return jsonify({"error": str(e), **result})
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
 @app.route("/")
@@ -468,6 +427,7 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Company Signal Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
@@ -584,6 +544,7 @@ def _build_account_card(account_id, cfg):
     thumb = thumb_map.get(accent, f"linear-gradient(135deg,#0d0f17,#1a1d27)")
     if path.exists():
         count = _read_company_count(path)
+        refreshed = _read_last_refreshed(path)
         return (
             f'<a class="card" href="/dashboard/{account_id}" '
             f'style="--accent:{accent};--glow:rgba(99,102,241,.25);'
@@ -595,7 +556,7 @@ def _build_account_card(account_id, cfg):
             f'<div class="card-name">{cfg["name"]}</div>'
             f'<div class="card-desc">{cfg["description"]}</div>'
             f'<div class="card-footer">'
-            f'<div class="stat"><span>{count}</span> companies tracked</div>'
+            f'<div class="stat"><span>{count}</span> companies · <span style="color:#64748b;font-weight:400">refreshed {refreshed}</span></div>'
             f'<span class="arrow">→</span></div></div></a>'
         )
     return (
@@ -610,6 +571,15 @@ def _build_account_card(account_id, cfg):
         f'<div class="stat" style="color:#f59e0b">Not generated yet</div>'
         f'</div></div></div>'
     )
+
+
+def _read_last_refreshed(path: Path) -> str:
+    try:
+        mtime = path.stat().st_mtime
+        dt = datetime.fromtimestamp(mtime, tz=IST)
+        return dt.strftime("%-d %b %Y, %-I:%M %p IST")
+    except Exception:
+        return "unknown"
 
 
 def _read_company_count(path: Path) -> str:
