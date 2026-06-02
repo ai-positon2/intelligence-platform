@@ -2,6 +2,10 @@
 
 import os
 import json
+import uuid
+import logging
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from functools import wraps
 
@@ -10,6 +14,8 @@ from flask import (
     request, session, redirect, url_for,
     make_response, render_template,
 )
+
+log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
@@ -20,6 +26,127 @@ app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod
 #        → Create OAuth 2.0 Client ID → Web application
 #        → Authorised JavaScript origins: https://signals.position2.com
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+# Google Sheet ID for login tracking (set LOGIN_LOG_SHEET_ID in Railway Variables).
+# Create a new Google Sheet, share it with the service account email (Editor),
+# then paste the sheet ID here (from its URL: /spreadsheets/d/<ID>/edit).
+LOGIN_LOG_SHEET_ID = os.environ.get("LOGIN_LOG_SHEET_ID", "")
+_SA_JSON = str(Path(__file__).parent / "service_account.json")
+
+# ── Login logger ────────────────────────────────────────────────────────────────
+def _parse_ua(ua: str) -> tuple[str, str, str, str]:
+    """Return (browser_name, browser_version, os_name, device_type) from User-Agent."""
+    ua = ua or ""
+    # Device type
+    if re.search(r"Mobile|Android|iPhone|iPod", ua, re.I):
+        device = "Mobile"
+    elif re.search(r"iPad|Tablet", ua, re.I):
+        device = "Tablet"
+    else:
+        device = "Desktop"
+    # OS
+    if re.search(r"Windows NT", ua):
+        os_name = "Windows"
+    elif re.search(r"Mac OS X", ua):
+        os_name = "macOS"
+    elif re.search(r"Android", ua):
+        os_name = "Android"
+    elif re.search(r"iPhone|iPad", ua):
+        os_name = "iOS"
+    elif re.search(r"Linux", ua):
+        os_name = "Linux"
+    else:
+        os_name = "Unknown"
+    # Browser (order matters — Chrome must come before Safari)
+    m = re.search(r"Edg(?:e)?/([\d.]+)", ua)
+    if m: return "Edge", m.group(1), os_name, device
+    m = re.search(r"OPR/([\d.]+)", ua)
+    if m: return "Opera", m.group(1), os_name, device
+    m = re.search(r"Firefox/([\d.]+)", ua)
+    if m: return "Firefox", m.group(1), os_name, device
+    m = re.search(r"Chrome/([\d.]+)", ua)
+    if m: return "Chrome", m.group(1), os_name, device
+    m = re.search(r"Version/([\d.]+).*Safari", ua)
+    if m: return "Safari", m.group(1), os_name, device
+    return "Unknown", "", os_name, device
+
+
+def _log_login_to_sheet(user: dict) -> None:
+    """Append one login row to the tracking Google Sheet. Fails silently."""
+    if not LOGIN_LOG_SHEET_ID or not Path(_SA_JSON).exists():
+        return
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        creds = service_account.Credentials.from_service_account_file(
+            _SA_JSON,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+        now = datetime.now(timezone.utc)
+        ua_raw  = request.headers.get("User-Agent", "")
+        browser, bv, os_name, device = _parse_ua(ua_raw)
+        ip = (request.headers.get("X-Forwarded-For", "") or
+              request.headers.get("X-Real-IP", "") or
+              request.remote_addr or "")
+        ip = ip.split(",")[0].strip()  # X-Forwarded-For can be a list
+
+        # 20 columns — add header row automatically on first write
+        row = [
+            now.strftime("%Y-%m-%d %H:%M:%S UTC"),   # 1  Timestamp
+            now.strftime("%Y-%m-%d"),                  # 2  Date
+            now.strftime("%H:%M:%S"),                  # 3  Time (UTC)
+            now.strftime("%A"),                         # 4  Day of Week
+            now.strftime("%H"),                         # 5  Hour (0-23, UTC)
+            user.get("email", ""),                      # 6  Email
+            user.get("name", ""),                       # 7  Full Name
+            user.get("given_name", ""),                 # 8  First Name
+            user.get("picture", ""),                    # 9  Profile Picture URL
+            ip,                                         # 10 IP Address
+            browser,                                    # 11 Browser
+            bv,                                         # 12 Browser Version
+            os_name,                                    # 13 Operating System
+            device,                                     # 14 Device Type
+            ua_raw[:200],                               # 15 User Agent (truncated)
+            request.referrer or "direct",               # 16 Referrer
+            "/hub",                                     # 17 Landing Page
+            "Google OAuth",                             # 18 Auth Method
+            str(uuid.uuid4())[:8],                      # 19 Session ID (short)
+            "signals.position2.com",                    # 20 Platform
+        ]
+
+        # Check if header row exists; if sheet is empty, prepend it
+        result = svc.spreadsheets().values().get(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1:A1"
+        ).execute()
+        if not result.get("values"):
+            header = [[
+                "Timestamp (UTC)", "Date", "Time (UTC)", "Day of Week", "Hour",
+                "Email", "Full Name", "First Name", "Profile Picture",
+                "IP Address", "Browser", "Browser Version", "OS", "Device",
+                "User Agent", "Referrer", "Landing Page", "Auth Method",
+                "Session ID", "Platform",
+            ]]
+            svc.spreadsheets().values().append(
+                spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="Sheet1!A1",
+                valueInputOption="RAW",
+                body={"values": header},
+            ).execute()
+
+        svc.spreadsheets().values().append(
+            spreadsheetId=LOGIN_LOG_SHEET_ID,
+            range="Sheet1!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
+
+    except Exception as e:
+        log.warning("Login sheet log failed: %s", e)
+
 
 # ── Account registry ────────────────────────────────────────────────────────────
 ACCOUNTS = {
@@ -83,6 +210,7 @@ def auth_google():
         "picture":    idinfo.get("picture", ""),
     }
     session.permanent = True
+    _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     return jsonify({"success": True, "redirect": "/hub"})
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
