@@ -309,7 +309,7 @@ def serp_researcher():
 @login_required
 def accounts():
     cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
-    return make_response(_ACCOUNTS_HTML.replace("{account_cards}", cards_html), 200)
+    return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
 @app.route("/dashboard/<account_id>")
 @login_required
@@ -503,8 +503,8 @@ def weekly_stats(account_id: str = "healthcare"):
         return jsonify({"error": "Not found"}), 503
     return jsonify(json.loads(p.read_text()))
 
-# ── Account picker HTML ──────────────────────────────────────────────────────────
-_ACCOUNTS_HTML = """<!DOCTYPE html>
+# ── Account picker moved to templates/accounts.html ─────────────────────────────
+_ACCOUNTS_HTML_UNUSED = """
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>

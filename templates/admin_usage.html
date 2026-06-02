@@ -50,12 +50,16 @@
       text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
       background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: #818cf8;
     }
-    .tr { display: flex; align-items: center; gap: 10px; }
+    .tr { display: flex; align-items: center; }
+    .user-menu { position: relative; }
     .user-pill {
       display: flex; align-items: center; gap: 8px;
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
       border-radius: 999px; padding: 3px 12px 3px 3px;
+      cursor: pointer; user-select: none; transition: background .15s, border-color .15s;
     }
+    .user-pill:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); }
+    .user-pill.open  { background: rgba(255,255,255,.07); border-color: rgba(99,102,241,.35); }
     .avatar {
       width: 26px; height: 26px; border-radius: 50%; overflow: hidden;
       background: linear-gradient(135deg,#6366f1,#8b5cf6);
@@ -64,12 +68,30 @@
     }
     .avatar img { width: 100%; height: 100%; object-fit: cover; }
     .uname { font-size: 12px; color: #64748b; }
-    .sign-out {
-      font-size: 11px; color: #3d4460; text-decoration: none;
-      padding: 5px 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 7px;
-      transition: all .15s;
+    .pill-chevron { font-size: 9px; color: #3d4460; margin-left: 2px; transition: transform .2s; }
+    .user-pill.open .pill-chevron { transform: rotate(180deg); }
+    .user-dropdown {
+      display: none; position: absolute; top: calc(100% + 10px); right: 0;
+      width: 220px; z-index: 100;
+      background: rgba(13,15,25,0.97); border: 1px solid rgba(255,255,255,.09);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,.6), 0 0 0 1px rgba(99,102,241,.08);
+      backdrop-filter: blur(20px); animation: dd-in .15s cubic-bezier(.34,1.56,.64,1);
     }
-    .sign-out:hover { color: #ef4444; border-color: rgba(239,68,68,.4); }
+    @keyframes dd-in { from{opacity:0;transform:translateY(-6px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .user-dropdown.open { display: block; }
+    .dd-header { padding: 14px 16px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .dd-name  { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 2px; }
+    .dd-email { font-size: 11px; color: #3d4460; }
+    .dd-items { padding: 6px; }
+    .dd-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
+      font-size: 13px; color: #94a3b8; text-decoration: none; transition: background .12s, color .12s;
+    }
+    .dd-item:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+    .dd-item-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+    .dd-divider { height: 1px; background: rgba(255,255,255,.05); margin: 4px 6px; }
+    .dd-item.danger:hover { background: rgba(239,68,68,.08); color: #f87171; }
 
     /* ── Main ── */
     .main { flex: 1; position: relative; z-index: 1; padding: 48px 40px 60px; max-width: 1200px; margin: 0 auto; width: 100%; }
@@ -176,14 +198,27 @@
       <span class="admin-badge">Admin</span>
     </div>
     <div class="tr">
-      <div class="user-pill">
-        <div class="avatar">
-          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
-          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
         </div>
-        <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">
+            <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
+            <div class="dd-divider"></div>
+            <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
+          </div>
+        </div>
       </div>
-      <a href="/logout" class="sign-out">Sign out</a>
     </div>
   </div>
 
@@ -351,6 +386,12 @@
   </div>
 
   <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
     function switchTab(name, btn) {
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
