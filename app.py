@@ -168,18 +168,14 @@ ACCOUNTS = {
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
 def _get_user():
-    """Return current user dict — always returns a guest user for demo mode."""
-    return session.get("google_user") or {
-        "email": "demo@position2.com",
-        "name": "Demo User",
-        "given_name": "Demo",
-        "picture": "",
-    }
+    """Return current user dict or None."""
+    return session.get("google_user")
 
 def login_required(f):
-    """Auth disabled for demo — all routes are publicly accessible."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        if not _get_user():
+            return redirect(url_for("login_page"))
         return f(*args, **kwargs)
     return decorated
 
@@ -220,11 +216,14 @@ def auth_google():
 # ── Core routes ─────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return redirect(url_for("hub"))
+    return redirect(url_for("hub") if _get_user() else url_for("login_page"))
 
 @app.route("/login")
 def login_page():
-    return redirect(url_for("hub"))
+    if _get_user():
+        return redirect(url_for("hub"))
+    return render_template("login.html", google_client_id=GOOGLE_CLIENT_ID,
+                           error=request.args.get("error", ""))
 
 @app.route("/logout")
 def logout():
