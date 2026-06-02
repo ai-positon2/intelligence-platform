@@ -246,6 +246,21 @@ def ppc():
 def seo():
     return render_template("seo.html", user=_get_user())
 
+# ── Embedded dashboards ─────────────────────────────────────────────────────────
+AD_INTELLIGENCE_URL = "https://ad-intelligence-production-be71.up.railway.app"
+
+@app.route("/ppc/ad-intelligence")
+@login_required
+def ad_intelligence():
+    return render_template("embed.html",
+        user=_get_user(),
+        title="Ad Intelligence",
+        embed_url=AD_INTELLIGENCE_URL,
+        breadcrumb=[("Hub", "/hub"), ("PPC", "/ppc")],
+        current="Ad Intelligence",
+        accent="#f59e0b",
+    )
+
 # ── Company Signal Tracker ───────────────────────────────────────────────────────
 @app.route("/accounts")
 @login_required
