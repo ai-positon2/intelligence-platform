@@ -18,6 +18,9 @@
     "recharts": "^3.8.1",
     "serve": "^14.2.4"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
