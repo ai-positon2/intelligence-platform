@@ -73,16 +73,29 @@ def _parse_ua(ua: str) -> tuple[str, str, str, str]:
 
 def _log_login_to_sheet(user: dict) -> None:
     """Append one login row to the tracking Google Sheet. Fails silently."""
-    if not LOGIN_LOG_SHEET_ID or not Path(_SA_JSON).exists():
+    if not LOGIN_LOG_SHEET_ID:
         return
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
+        import json as _json
 
-        creds = service_account.Credentials.from_service_account_file(
-            _SA_JSON,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        )
+        # Prefer env var (Railway) over local file
+        sa_json_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if sa_json_str:
+            sa_info = _json.loads(sa_json_str)
+            creds = service_account.Credentials.from_service_account_info(
+                sa_info,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            )
+        elif Path(_SA_JSON).exists():
+            creds = service_account.Credentials.from_service_account_file(
+                _SA_JSON,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"],
+            )
+        else:
+            log.warning("Login sheet: no credentials found (set GOOGLE_SA_JSON env var)")
+            return
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
 
         now = datetime.now(timezone.utc)
@@ -212,6 +225,48 @@ def auth_google():
     session.permanent = True
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     return jsonify({"success": True, "redirect": "/hub"})
+
+# ── Sheet diagnostic endpoint ───────────────────────────────────────────────────
+@app.route("/debug/sheet-test")
+def sheet_test():
+    """Diagnose login sheet logging. Remove after fixing."""
+    result = {"sheet_id": bool(LOGIN_LOG_SHEET_ID), "sa_json_env": bool(os.environ.get("GOOGLE_SA_JSON")), "sa_file": Path(_SA_JSON).exists()}
+    try:
+        import json as _j
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if not sa_str:
+            return jsonify({"error": "GOOGLE_SA_JSON env var is empty", **result})
+
+        try:
+            sa_info = _j.loads(sa_str)
+            result["json_parsed"] = True
+            result["client_email"] = sa_info.get("client_email", "missing")
+        except Exception as e:
+            return jsonify({"error": f"JSON parse failed: {e}", "json_preview": sa_str[:80], **result})
+
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        result["creds_ok"] = True
+
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        r = svc.spreadsheets().values().get(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1:A1").execute()
+        result["sheet_read_ok"] = True
+        result["sheet_value"] = r.get("values", [])
+
+        # Try a test write
+        svc.spreadsheets().values().append(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1",
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS",
+            body={"values": [["DIAGNOSTIC TEST", "OK"]]}).execute()
+        result["write_ok"] = True
+
+        return jsonify({"status": "ALL OK — sheet logging should work", **result})
+    except Exception as e:
+        return jsonify({"error": str(e), **result})
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
 @app.route("/")
