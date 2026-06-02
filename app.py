@@ -132,7 +132,7 @@ def _log_login_to_sheet(user: dict) -> None:
 
         # Check if header row exists; if sheet is empty, prepend it
         result = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1:A1"
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="A1:A1"
         ).execute()
         if not result.get("values"):
             header = [[
@@ -144,14 +144,14 @@ def _log_login_to_sheet(user: dict) -> None:
             ]]
             svc.spreadsheets().values().append(
                 spreadsheetId=LOGIN_LOG_SHEET_ID,
-                range="Sheet1!A1",
+                range="A1",
                 valueInputOption="RAW",
                 body={"values": header},
             ).execute()
 
         svc.spreadsheets().values().append(
             spreadsheetId=LOGIN_LOG_SHEET_ID,
-            range="Sheet1!A1",
+            range="A1",
             valueInputOption="RAW",
             insertDataOption="INSERT_ROWS",
             body={"values": [row]},
@@ -253,13 +253,13 @@ def sheet_test():
 
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
         r = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1:A1").execute()
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="A1:A1").execute()
         result["sheet_read_ok"] = True
         result["sheet_value"] = r.get("values", [])
 
         # Try a test write
         svc.spreadsheets().values().append(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Sheet1!A1",
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="A1",
             valueInputOption="RAW", insertDataOption="INSERT_ROWS",
             body={"values": [["DIAGNOSTIC TEST", "OK"]]}).execute()
         result["write_ok"] = True
