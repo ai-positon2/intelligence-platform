@@ -5,7 +5,7 @@ import json
 import uuid
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from functools import wraps
 
@@ -16,6 +16,9 @@ from flask import (
 )
 
 log = logging.getLogger(__name__)
+
+# Indian Standard Time = UTC+5:30
+IST = timezone(timedelta(hours=5, minutes=30))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
@@ -98,7 +101,7 @@ def _log_login_to_sheet(user: dict) -> None:
             return
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(IST)
         ua_raw  = request.headers.get("User-Agent", "")
         browser, bv, os_name, device = _parse_ua(ua_raw)
         ip = (request.headers.get("X-Forwarded-For", "") or
@@ -108,11 +111,11 @@ def _log_login_to_sheet(user: dict) -> None:
 
         # 20 columns — add header row automatically on first write
         row = [
-            now.strftime("%Y-%m-%d %H:%M:%S UTC"),   # 1  Timestamp
+            now.strftime("%Y-%m-%d %H:%M:%S IST"),   # 1  Timestamp
             now.strftime("%Y-%m-%d"),                  # 2  Date
-            now.strftime("%H:%M:%S"),                  # 3  Time (UTC)
+            now.strftime("%H:%M:%S"),                  # 3  Time (IST)
             now.strftime("%A"),                         # 4  Day of Week
-            now.strftime("%H"),                         # 5  Hour (0-23, UTC)
+            now.strftime("%H"),                         # 5  Hour (0-23, IST)
             user.get("email", ""),                      # 6  Email
             user.get("name", ""),                       # 7  Full Name
             user.get("given_name", ""),                 # 8  First Name
@@ -136,7 +139,7 @@ def _log_login_to_sheet(user: dict) -> None:
         ).execute()
         if not result.get("values"):
             header = [[
-                "Timestamp (UTC)", "Date", "Time (UTC)", "Day of Week", "Hour",
+                "Timestamp (IST)", "Date", "Time (IST)", "Day of Week", "Hour (IST)",
                 "Email", "Full Name", "First Name", "Profile Picture",
                 "IP Address", "Browser", "Browser Version", "OS", "Device",
                 "User Agent", "Referrer", "Landing Page", "Auth Method",
@@ -342,7 +345,14 @@ def dashboard(account_id: str):
 def track_page():
     """Record page view duration to Google Sheet 'Page Views' tab."""
     try:
-        data    = request.json or {}
+        # sendBeacon sends text/plain, not application/json — handle both
+        data = request.json
+        if data is None:
+            try:
+                data = json.loads(request.get_data(as_text=True))
+            except Exception:
+                data = {}
+        data    = data or {}
         page    = data.get("page", "unknown")
         seconds = int(data.get("seconds", 0))
         email   = data.get("email", "")
@@ -353,9 +363,9 @@ def track_page():
         mins, secs = divmod(seconds, 60)
         duration_fmt = f"{mins}m {secs}s" if mins else f"{secs}s"
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(IST)
         row = [
-            now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            now.strftime("%Y-%m-%d %H:%M:%S IST"),
             now.strftime("%Y-%m-%d"),
             now.strftime("%H:%M:%S"),
             now.strftime("%A"),
@@ -393,7 +403,7 @@ def track_page():
             if not existing.get("values"):
                 raise Exception("empty")
         except Exception:
-            header = [["Timestamp (UTC)","Date","Time","Day","Email","Page Title",
+            header = [["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
                        "Page URL","Seconds","Duration","IP","Browser","OS","Device"]]
             try:
                 svc.spreadsheets().batchUpdate(
