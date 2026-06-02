@@ -24,7 +24,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod
 # Set GOOGLE_CLIENT_ID in Railway → Variables.
 # Setup: console.cloud.google.com → APIs & Services → Credentials
 #        → Create OAuth 2.0 Client ID → Web application
-#        → Authorised JavaScript origins: https://signals.position2.com
+#        → Authorised JavaScript origins: https://intelligence.position2.com
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 
 # Google Sheet ID for login tracking (set LOGIN_LOG_SHEET_ID in Railway Variables).
@@ -114,7 +114,7 @@ def _log_login_to_sheet(user: dict) -> None:
             "/hub",                                     # 17 Landing Page
             "Google OAuth",                             # 18 Auth Method
             str(uuid.uuid4())[:8],                      # 19 Session ID (short)
-            "signals.position2.com",                    # 20 Platform
+            "intelligence.position2.com",               # 20 Platform
         ]
 
         # Check if header row exists; if sheet is empty, prepend it
