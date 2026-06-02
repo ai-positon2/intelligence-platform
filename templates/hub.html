@@ -279,5 +279,23 @@
 
     <p class="footer-note">Position2 · Internal use only</p>
   </div>
+
+  <script>
+    (function(){
+      var _start = Date.now(), _sent = false;
+      function _send(){
+        if(_sent) return; _sent = true;
+        var s = Math.round((Date.now()-_start)/1000);
+        navigator.sendBeacon('/api/track', JSON.stringify({
+          page: window.location.pathname,
+          title: 'Hub',
+          seconds: s,
+          email: '{{ user.email if user else "" }}'
+        }));
+      }
+      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
+      window.addEventListener('beforeunload', _send);
+    })();
+  </script>
 </body>
 </html>

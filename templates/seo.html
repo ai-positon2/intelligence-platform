@@ -182,5 +182,20 @@
     <p class="footer-note">Position2 · Internal use only</p>
   </div>
 
+  <script>
+    (function(){
+      var _start = Date.now(), _sent = false;
+      function _send(){
+        if(_sent) return; _sent = true;
+        navigator.sendBeacon('/api/track', JSON.stringify({
+          page: window.location.pathname, title: 'SEO Dashboards',
+          seconds: Math.round((Date.now()-_start)/1000),
+          email: '{{ user.email if user else "" }}'
+        }));
+      }
+      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
+      window.addEventListener('beforeunload', _send);
+    })();
+  </script>
 </body>
 </html>

@@ -338,6 +338,85 @@ def dashboard(account_id: str):
     return resp
 
 # ── Health + API ─────────────────────────────────────────────────────────────────
+@app.route("/api/track", methods=["POST"])
+def track_page():
+    """Record page view duration to Google Sheet 'Page Views' tab."""
+    try:
+        data    = request.json or {}
+        page    = data.get("page", "unknown")
+        seconds = int(data.get("seconds", 0))
+        email   = data.get("email", "")
+        title   = data.get("title", page)
+        if seconds < 1:
+            return jsonify({"ok": True})
+
+        mins, secs = divmod(seconds, 60)
+        duration_fmt = f"{mins}m {secs}s" if mins else f"{secs}s"
+
+        now = datetime.now(timezone.utc)
+        row = [
+            now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            now.strftime("%Y-%m-%d"),
+            now.strftime("%H:%M:%S"),
+            now.strftime("%A"),
+            email,
+            title,
+            page,
+            seconds,
+            duration_fmt,
+            (request.headers.get("X-Forwarded-For","") or request.remote_addr or "").split(",")[0].strip(),
+            _parse_ua(request.headers.get("User-Agent",""))[0],   # browser
+            _parse_ua(request.headers.get("User-Agent",""))[2],   # OS
+            _parse_ua(request.headers.get("User-Agent",""))[3],   # device
+        ]
+
+        if not LOGIN_LOG_SHEET_ID:
+            return jsonify({"ok": True})
+
+        import json as _j
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        sa_str = os.environ.get("GOOGLE_SA_JSON","")
+        if not sa_str:
+            return jsonify({"ok": True})
+
+        sa_info = _j.loads(sa_str)
+        creds   = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+        # Auto-create header on first write to Page Views tab
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1:A1").execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            header = [["Timestamp (UTC)","Date","Time","Day","Email","Page Title",
+                       "Page URL","Seconds","Duration","IP","Browser","OS","Device"]]
+            try:
+                svc.spreadsheets().batchUpdate(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests":[{"addSheet":{"properties":{"title":"Page Views"}}}]}
+                ).execute()
+            except Exception:
+                pass
+            svc.spreadsheets().values().append(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1",
+                valueInputOption="RAW", body={"values": header}).execute()
+
+        svc.spreadsheets().values().append(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A1",
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS",
+            body={"values": [row]}).execute()
+
+    except Exception as e:
+        log.warning("Page track failed: %s", e)
+
+    return jsonify({"ok": True})
+
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "accounts": {
