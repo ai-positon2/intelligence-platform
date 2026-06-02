@@ -229,38 +229,6 @@ def auth_google():
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     return jsonify({"success": True, "redirect": "/hub"})
 
-# ── One-shot sheet clear endpoint (remove after use) ───────────────────────────
-@app.route("/admin/clear-sheet")
-def clear_sheet():
-    """Clear both Login Tracker and Page Views tabs. One-time use — remove after."""
-    try:
-        import json as _j
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-
-        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
-        if not sa_str:
-            return jsonify({"error": "GOOGLE_SA_JSON not set"}), 500
-
-        sa_info = _j.loads(sa_str)
-        creds = service_account.Credentials.from_service_account_info(
-            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
-
-        cleared = []
-        for rng in ["A1:Z5000", "Page Views!A1:Z5000"]:
-            try:
-                svc.spreadsheets().values().clear(
-                    spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng, body={}
-                ).execute()
-                cleared.append(rng)
-            except Exception as e:
-                cleared.append(f"{rng} ERROR: {e}")
-
-        return jsonify({"cleared": cleared, "status": "done — remove this endpoint now"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 # ── Sheet diagnostic endpoint ───────────────────────────────────────────────────
 @app.route("/debug/sheet-test")
 def sheet_test():
