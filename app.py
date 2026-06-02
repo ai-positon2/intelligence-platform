@@ -449,14 +449,18 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Space Grotesk',sans-serif;background:#070910;color:#e2e8f0;
-      min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+    body{font-family:'Space Grotesk',sans-serif;color:#e2e8f0;
+      min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;
+      background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(99,102,241,.13) 0%,transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 60%,rgba(139,92,246,.10) 0%,transparent 55%),
+        radial-gradient(ellipse 50% 60% at 50% 100%,rgba(30,27,75,.45) 0%,transparent 70%),
+        linear-gradient(160deg,#080b18 0%,#0a0d1a 40%,#070912 100%)}
     .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
-      background-image:linear-gradient(rgba(99,102,241,.03) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(99,102,241,.03) 1px,transparent 1px);
-      background-size:48px 48px}
+      background-image:radial-gradient(circle,rgba(99,102,241,.12) 1px,transparent 1px);
+      background-size:36px 36px;
+      mask-image:radial-gradient(ellipse 85% 85% at 50% 40%,black 30%,transparent 100%)}
     .bg-glow{position:fixed;border-radius:50%;filter:blur(130px);pointer-events:none;z-index:0;
-      width:700px;height:700px;top:-200px;left:-150px;background:rgba(99,102,241,.06)}
+      width:700px;height:700px;top:-200px;left:-150px;background:rgba(99,102,241,.08)}
     .topbar{position:relative;z-index:10;height:62px;padding:0 32px;
       display:flex;align-items:center;justify-content:space-between;
       background:rgba(7,9,16,.8);backdrop-filter:blur(16px);
@@ -485,7 +489,7 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
     .label::before,.label::after{content:'';display:block;width:20px;height:1px;background:rgba(99,102,241,.4)}
     .heading{font-size:32px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
       margin-bottom:6px;text-align:center}
-    .sub{font-size:14px;color:#2d3450;margin-bottom:52px}
+    .sub{font-size:14px;color:#64748b;margin-bottom:52px}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,360px));
       gap:20px;justify-content:center;width:100%;max-width:780px}
     .card{background:rgba(13,15,23,.9);border:1px solid rgba(255,255,255,.07);
@@ -497,7 +501,7 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
     .card-band{height:3px;background:var(--accent)}
     .card-thumb{height:110px;background:var(--thumb);position:relative;
       display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .card-thumb-icon{font-size:44px;opacity:.2}
+    .card-thumb-icon{font-size:44px;opacity:.45;filter:drop-shadow(0 0 20px rgba(255,255,255,.15))}
     .card-thumb::after{content:'';position:absolute;inset:0;
       background:linear-gradient(to bottom,transparent 30%,rgba(13,15,23,.95) 100%)}
     .card-badge{position:absolute;top:10px;right:10px;z-index:1;
@@ -510,10 +514,10 @@ _ACCOUNTS_HTML = """<!DOCTYPE html>
       50%{box-shadow:0 0 0 3px rgba(52,211,153,0)}}
     .card-body{padding:20px 24px 22px;flex:1;display:flex;flex-direction:column}
     .card-name{font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em;margin-bottom:8px}
-    .card-desc{font-size:13px;color:#2d3450;line-height:1.65;flex:1;margin-bottom:20px}
+    .card-desc{font-size:13px;color:#94a3b8;line-height:1.65;flex:1;margin-bottom:20px}
     .card-footer{display:flex;align-items:center;justify-content:space-between;
-      border-top:1px solid rgba(255,255,255,.05);padding-top:16px}
-    .stat{font-size:12px;color:#2d3450}
+      border-top:1px solid rgba(255,255,255,.07);padding-top:16px}
+    .stat{font-size:12px;color:#64748b}
     .stat span{color:var(--accent-text);font-weight:600}
     .arrow{font-size:16px;color:var(--accent-text);opacity:0;transition:opacity .15s,transform .15s}
     .card:hover .arrow{opacity:1;transform:translateX(3px)}
