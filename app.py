@@ -183,6 +183,8 @@ ACCOUNTS = {
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
+ADMIN_EMAILS = {"krishna.ladha@position2.com"}
+
 def _get_user():
     """Return current user dict or None."""
     return session.get("google_user")
@@ -192,6 +194,17 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if not _get_user():
             return redirect(url_for("login_page") + "?error=Your+session+expired.+Please+sign+in+again.")
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = _get_user()
+        if not user:
+            return redirect(url_for("login_page") + "?error=Your+session+expired.+Please+sign+in+again.")
+        if user.get("email", "").lower() not in ADMIN_EMAILS:
+            abort(403)
         return f(*args, **kwargs)
     return decorated
 
@@ -397,6 +410,76 @@ def track_page():
         log.warning("Page track failed: %s", e)
 
     return jsonify({"ok": True})
+
+
+@app.route("/admin/usage")
+@admin_required
+def admin_usage():
+    """Usage dashboard — logins + page views from Google Sheet."""
+    def _fetch(tab_range):
+        try:
+            import json as _j
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+            if not sa_str or not LOGIN_LOG_SHEET_ID:
+                return []
+            sa_info = _j.loads(sa_str)
+            creds = service_account.Credentials.from_service_account_info(
+                sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+            svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+            r = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
+            return r.get("values", [])
+        except Exception as e:
+            log.warning("admin_usage sheet read failed: %s", e)
+            return []
+
+    def col(row, i, default=""):
+        return row[i] if len(row) > i else default
+
+    login_rows = _fetch("A1:T1000")
+    page_rows  = _fetch("Page Views!A1:M2000")
+
+    login_data = login_rows[1:] if len(login_rows) > 1 else []
+    page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
+
+    # Stats
+    unique_users     = len({col(r, 5) for r in login_data if col(r, 5)})
+    total_logins     = len(login_data)
+    total_page_views = len(page_data)
+
+    # Top pages by visit count
+    page_counts: dict = {}
+    for r in page_data:
+        t = col(r, 5)  # Page Title
+        if t:
+            page_counts[t] = page_counts.get(t, 0) + 1
+    top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+
+    # Logins per day (last 14 days)
+    from collections import Counter
+    login_days = Counter(col(r, 1) for r in login_data if col(r, 1))
+    sorted_days = sorted(login_days.items())[-14:]
+
+    login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
+                    "browser": col(r,10), "os": col(r,12), "device": col(r,13)}
+                   for r in reversed(login_data)][:100]
+
+    page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
+                    "url": col(r,6), "duration": col(r,8)}
+                   for r in reversed(page_data)][:200]
+
+    return render_template("admin_usage.html",
+        user=_get_user(),
+        total_logins=total_logins,
+        unique_users=unique_users,
+        total_page_views=total_page_views,
+        top_pages=top_pages,
+        login_days=sorted_days,
+        login_table=login_table,
+        page_table=page_table,
+    )
 
 
 @app.route("/health")
