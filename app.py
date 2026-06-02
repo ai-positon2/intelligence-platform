@@ -22,6 +22,11 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
+app.permanent_session_lifetime = timedelta(days=7)
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template("403.html"), 403
 
 # ── Google OAuth ────────────────────────────────────────────────────────────────
 # Set GOOGLE_CLIENT_ID in Railway → Variables.
@@ -412,10 +417,8 @@ def track_page():
     return jsonify({"ok": True})
 
 
-@app.route("/admin/usage")
-@admin_required
-def admin_usage():
-    """Usage dashboard — logins + page views from Google Sheet."""
+def _fetch_usage_data() -> dict:
+    """Fetch login + page view data from Sheets. Shared by shell and data endpoints."""
     def _fetch(tab_range):
         try:
             import json as _j
@@ -440,24 +443,20 @@ def admin_usage():
 
     login_rows = _fetch("A1:T1000")
     page_rows  = _fetch("Page Views!A1:M2000")
-
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
 
-    # Stats
     unique_users     = len({col(r, 5) for r in login_data if col(r, 5)})
     total_logins     = len(login_data)
     total_page_views = len(page_data)
 
-    # Top pages by visit count
     page_counts: dict = {}
     for r in page_data:
-        t = col(r, 5)  # Page Title
+        t = col(r, 5)
         if t:
             page_counts[t] = page_counts.get(t, 0) + 1
     top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:8]
 
-    # Logins per day (last 14 days)
     from collections import Counter
     login_days = Counter(col(r, 1) for r in login_data if col(r, 1))
     sorted_days = sorted(login_days.items())[-14:]
@@ -465,21 +464,28 @@ def admin_usage():
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
                     "browser": col(r,10), "os": col(r,12), "device": col(r,13)}
                    for r in reversed(login_data)][:100]
-
     page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
                     "url": col(r,6), "duration": col(r,8)}
                    for r in reversed(page_data)][:200]
 
-    return render_template("admin_usage.html",
-        user=_get_user(),
-        total_logins=total_logins,
-        unique_users=unique_users,
-        total_page_views=total_page_views,
-        top_pages=top_pages,
-        login_days=sorted_days,
-        login_table=login_table,
-        page_table=page_table,
-    )
+    return dict(total_logins=total_logins, unique_users=unique_users,
+                total_page_views=total_page_views, top_pages=top_pages,
+                login_days=sorted_days, login_table=login_table, page_table=page_table)
+
+
+@app.route("/admin/usage")
+@admin_required
+def admin_usage():
+    """Shell page — renders instantly, JS fetches /admin/usage/data async."""
+    return render_template("admin_usage.html", user=_get_user())
+
+
+@app.route("/admin/usage/data")
+@admin_required
+def admin_usage_data():
+    """JSON data endpoint called by the admin usage shell page."""
+    data = _fetch_usage_data()
+    return jsonify(data)
 
 
 @app.route("/health")
@@ -660,7 +666,9 @@ def _read_last_refreshed(path: Path) -> str:
     try:
         mtime = path.stat().st_mtime
         dt = datetime.fromtimestamp(mtime, tz=IST)
-        return dt.strftime("%-d %b %Y, %-I:%M %p IST")
+        d = dt.strftime("%d %b %Y").lstrip("0")
+        t = dt.strftime("%I:%M %p").lstrip("0")
+        return f"{d}, {t} IST"
     except Exception:
         return "unknown"
 
