@@ -98,6 +98,26 @@
       position: relative; overflow: hidden;
       cursor: default; opacity: 0.55;
     }
+    .dash-card.active {
+      cursor: pointer; opacity: 1;
+      transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s, border-color 0.2s;
+    }
+    .dash-card.active:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(52,211,153,0.2);
+      border-color: rgba(52,211,153,0.2);
+    }
+    .dash-card.active .dash-card-desc { color: #64748b; }
+    .live-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #34d399;
+      animation: livepulse 2s infinite;
+    }
+    @keyframes livepulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5); }
+      50%      { box-shadow: 0 0 0 3px rgba(52,211,153,0); }
+    }
+    .card-arrow { font-size: 14px; color: #34d399; opacity: 0; transition: opacity 0.15s, transform 0.15s; }
+    .dash-card.active:hover .card-arrow { opacity: 1; transform: translateX(3px); }
     .dash-card-icon {
       width: 52px; height: 52px; border-radius: 14px;
       display: flex; align-items: center; justify-content: center;
@@ -157,25 +177,25 @@
   <div class="main">
     <div class="section-label">Organic Growth</div>
     <h1 class="heading">SEO Dashboards</h1>
-    <p class="subhead">Organic intelligence dashboards — coming soon.</p>
+    <p class="subhead">Organic intelligence dashboards for keyword and content research.</p>
 
     <div class="dash-grid">
 
-      <div class="dash-card">
-        <span class="cs-badge">Coming soon</span>
-        <div class="dash-card-icon">🌿</div>
-        <div class="dash-card-name">SEO Dashboard</div>
+      <a href="/seo/serp-researcher" class="dash-card active">
+        <div class="dash-card-icon" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.15)">🔍</div>
+        <div class="dash-card-name">SERP Content Researcher</div>
         <div class="dash-card-desc">
-          Keyword rankings, backlink monitoring, content performance,
-          and competitor organic visibility analysis.
+          Analyse SERPs, research content opportunities, and surface
+          keyword and topic insights for organic growth.
         </div>
         <div class="dash-card-footer">
           <div class="status-pill">
-            <span class="status-dot"></span>
-            <span style="color:#f59e0b">Coming soon</span>
+            <span class="live-dot"></span>
+            <span style="color:#34d399">Live</span>
           </div>
+          <span class="card-arrow">→</span>
         </div>
-      </div>
+      </a>
 
     </div>
 
