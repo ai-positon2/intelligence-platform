@@ -218,6 +218,14 @@
       --card-glow: 0 0 40px rgba(14,165,233,0.10);
       --arrow-color: #38bdf8;
     }
+    .c-job {
+      --band: linear-gradient(90deg,#ec4899,#f43f5e,#fb923c);
+      --thumb: linear-gradient(135deg,#1f0015 0%,#2d0a1a 100%);
+      --icon-glow: rgba(236,72,153,0.5);
+      --card-border: rgba(236,72,153,0.35);
+      --card-glow: 0 0 40px rgba(236,72,153,0.10);
+      --arrow-color: #f472b6;
+    }
     .c-visitors {
       --band: linear-gradient(90deg,#10b981,#06b6d4,#0ea5e9);
       --thumb: linear-gradient(135deg,#001a12 0%,#001e28 100%);
@@ -343,7 +351,31 @@
         </div>
       </div>
 
-      <!-- 4. Anonymous Website Visitors -->
+      <!-- 4. Job Change Alert -->
+      <div class="dash-card soon c-job">
+        <div class="card-band"></div>
+        <div class="card-thumb">
+          <div class="card-thumb-icon">🔔</div>
+          <div class="card-thumb-badge tb-soon">
+            <span class="tb-dot"></span> Coming soon
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Job Change Alert</div>
+          <div class="card-desc">
+            Get notified when key decision-makers at target accounts change roles —
+            the best time to reach out is within days of a job change.
+          </div>
+          <div class="card-footer">
+            <div class="card-tags">
+              <span class="tag">Triggers</span>
+              <span class="tag">Alerts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Anonymous Website Visitors -->
       <div class="dash-card soon c-visitors">
         <div class="card-band"></div>
         <div class="card-thumb">
