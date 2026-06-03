@@ -1100,18 +1100,18 @@ CHATBOT_FUNCTIONS = [
     },
 ]
 
-CHATBOT_FUNCTION_MAP = {
-    "get_anonymous_visitors":  _chatbot_get_anonymous_visitors,
-    "get_signal_tracker":      _chatbot_get_signal_tracker,
-    "get_ad_intelligence_data": get_ad_intelligence_data,
-}
-
-
 @app.route("/api/ppc-chat", methods=["POST"])
 @login_required
 def ppc_chat():
     """PPC AI assistant — OpenAI function calling over live platform data."""
     from openai import OpenAI
+
+    # Built here (not at module level) so get_ad_intelligence_data is guaranteed defined
+    _fn_map = {
+        "get_anonymous_visitors":   _chatbot_get_anonymous_visitors,
+        "get_signal_tracker":       _chatbot_get_signal_tracker,
+        "get_ad_intelligence_data": get_ad_intelligence_data,
+    }
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
@@ -1176,7 +1176,7 @@ RULES:
             for tool_call in msg.tool_calls:
                 fn_name = tool_call.function.name
                 fn_args = json.loads(tool_call.function.arguments)
-                fn = CHATBOT_FUNCTION_MAP.get(fn_name)
+                fn = _fn_map.get(fn_name)
                 result = fn(**fn_args) if fn else {"error": f"Unknown function: {fn_name}"}
                 messages.append({
                     "role":        "tool",
