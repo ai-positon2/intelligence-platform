@@ -1,0 +1,444 @@
+<!-- ── PPC AI Chat Widget ─────────────────────────────────────────────────── -->
+<style>
+  /* ── Floating trigger button ── */
+  #ppc-chat-trigger {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 0 rgba(99,102,241,0.4);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+    animation: ppc-pulse 3s ease-in-out infinite;
+  }
+  #ppc-chat-trigger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 28px rgba(99,102,241,0.65), 0 0 0 0 rgba(99,102,241,0);
+  }
+  #ppc-chat-trigger.open { transform: scale(0.92); animation: none; }
+  #ppc-chat-trigger svg { transition: transform 0.25s, opacity 0.2s; }
+  #ppc-trigger-icon-chat  { position: absolute; }
+  #ppc-trigger-icon-close { position: absolute; opacity: 0; transform: rotate(-90deg); }
+  #ppc-chat-trigger.open #ppc-trigger-icon-chat  { opacity: 0; transform: rotate(90deg); }
+  #ppc-chat-trigger.open #ppc-trigger-icon-close { opacity: 1; transform: rotate(0deg); }
+  @keyframes ppc-pulse {
+    0%,100% { box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 0 rgba(99,102,241,0.4); }
+    50%      { box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 10px rgba(99,102,241,0); }
+  }
+
+  /* ── Notification badge ── */
+  #ppc-chat-badge {
+    position: absolute; top: -2px; right: -2px;
+    width: 14px; height: 14px; border-radius: 50%; border: 2px solid #080b18;
+    background: #ef4444; display: none;
+  }
+  #ppc-chat-badge.show { display: block; }
+
+  /* ── Panel ── */
+  #ppc-chat-panel {
+    position: fixed; bottom: 96px; right: 28px; z-index: 9998;
+    width: 380px; height: 540px;
+    background: linear-gradient(170deg, #0d1124 0%, #0a0e1e 100%);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+    display: flex; flex-direction: column; overflow: hidden;
+    transform: translateY(16px) scale(0.97); opacity: 0; pointer-events: none;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
+  }
+  #ppc-chat-panel.open {
+    transform: translateY(0) scale(1); opacity: 1; pointer-events: all;
+  }
+  @media (max-width: 440px) {
+    #ppc-chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 88px; }
+    #ppc-chat-trigger { right: 16px; bottom: 16px; }
+  }
+
+  /* ── Panel header ── */
+  #ppc-chat-header {
+    flex-shrink: 0; padding: 14px 16px 12px;
+    background: rgba(99,102,241,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ppc-chat-avatar {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px rgba(99,102,241,0.4);
+  }
+  .ppc-chat-avatar svg { width: 18px; height: 18px; }
+  .ppc-chat-header-text { flex: 1; min-width: 0; }
+  .ppc-chat-title { font-size: 13px; font-weight: 700; color: #f1f5f9; line-height: 1; margin-bottom: 3px; font-family: 'Space Grotesk', sans-serif; }
+  .ppc-chat-subtitle { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 4px; font-family: 'Space Grotesk', sans-serif; }
+  .ppc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; flex-shrink: 0; animation: ppc-livepulse 2s infinite; }
+  @keyframes ppc-livepulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .ppc-chat-close {
+    width: 28px; height: 28px; border: none; border-radius: 8px; cursor: pointer;
+    background: rgba(255,255,255,0.05); color: #475569; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s; flex-shrink: 0;
+  }
+  .ppc-chat-close:hover { background: rgba(255,255,255,0.1); color: #94a3b8; }
+
+  /* ── Messages area ── */
+  #ppc-chat-messages {
+    flex: 1; overflow-y: auto; padding: 14px 14px 6px;
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+  }
+  #ppc-chat-messages::-webkit-scrollbar { width: 3px; }
+  #ppc-chat-messages::-webkit-scrollbar-track { background: transparent; }
+  #ppc-chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  /* ── Message bubbles ── */
+  .ppc-msg { display: flex; gap: 8px; animation: ppc-msgin 0.25s ease both; }
+  @keyframes ppc-msgin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .ppc-msg.user { flex-direction: row-reverse; }
+  .ppc-msg-avatar {
+    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; align-self: flex-end;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .ppc-msg-bubble {
+    max-width: 82%; padding: 9px 12px; border-radius: 14px;
+    font-size: 12.5px; line-height: 1.6; font-family: 'Space Grotesk', sans-serif;
+  }
+  .ppc-msg.assistant .ppc-msg-bubble {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07);
+    color: #cbd5e1; border-bottom-left-radius: 4px;
+  }
+  .ppc-msg.user .ppc-msg-bubble {
+    background: rgba(99,102,241,0.18); border: 1px solid rgba(99,102,241,0.25);
+    color: #c7d2fe; border-bottom-right-radius: 4px;
+  }
+  /* Markdown-like formatting in bubbles */
+  .ppc-msg-bubble strong { color: #f1f5f9; font-weight: 700; }
+  .ppc-msg-bubble ul { margin: 4px 0 0 14px; padding: 0; }
+  .ppc-msg-bubble li { margin-bottom: 2px; }
+
+  /* ── Loading dots ── */
+  .ppc-loading-dots { display: flex; gap: 4px; padding: 4px 2px; align-items: center; }
+  .ppc-loading-dots span {
+    width: 6px; height: 6px; border-radius: 50%; background: #6366f1;
+    animation: ppc-dot 1.2s ease-in-out infinite;
+  }
+  .ppc-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ppc-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes ppc-dot { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  /* ── Suggested questions ── */
+  #ppc-chat-suggestions {
+    flex-shrink: 0; padding: 6px 14px 10px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .ppc-suggestion {
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    padding: 5px 11px; border-radius: 999px;
+    background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25);
+    color: #a5b4fc; transition: all 0.15s; font-family: 'Space Grotesk', sans-serif;
+    white-space: nowrap;
+  }
+  .ppc-suggestion:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.45); color: #c7d2fe; }
+
+  /* ── Input area ── */
+  #ppc-chat-input-area {
+    flex-shrink: 0; padding: 10px 12px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  #ppc-chat-input {
+    flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px; padding: 9px 13px; font-size: 13px;
+    color: #e2e8f0; outline: none; resize: none; min-height: 38px; max-height: 90px;
+    font-family: 'Space Grotesk', sans-serif; line-height: 1.5;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    overflow-y: auto;
+  }
+  #ppc-chat-input::placeholder { color: rgba(255,255,255,0.2); }
+  #ppc-chat-input:focus {
+    border-color: rgba(99,102,241,0.45);
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+  }
+  #ppc-chat-send {
+    width: 36px; height: 36px; border: none; border-radius: 10px; cursor: pointer; flex-shrink: 0;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, opacity 0.15s;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.4);
+  }
+  #ppc-chat-send:hover { transform: scale(1.08); }
+  #ppc-chat-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  #ppc-chat-send svg { width: 16px; height: 16px; }
+
+  /* ── Welcome message ── */
+  .ppc-welcome {
+    text-align: center; padding: 12px 8px 4px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .ppc-welcome-icon {
+    width: 44px; height: 44px; border-radius: 14px; margin: 0 auto 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+  }
+  .ppc-welcome h4 { font-size: 13px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+  .ppc-welcome p  { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+</style>
+
+<!-- Trigger button -->
+<button id="ppc-chat-trigger" onclick="ppcChatToggle()" title="PPC Assistant" aria-label="Open PPC Assistant">
+  <span id="ppc-chat-badge"></span>
+  <!-- Chat icon -->
+  <svg id="ppc-trigger-icon-chat" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
+    <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+  <!-- Close icon -->
+  <svg id="ppc-trigger-icon-close" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+    <path stroke="#fff" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
+  </svg>
+</button>
+
+<!-- Chat panel -->
+<div id="ppc-chat-panel" role="dialog" aria-label="PPC Assistant">
+
+  <!-- Header -->
+  <div id="ppc-chat-header">
+    <div class="ppc-chat-avatar">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          d="M12 2a9 9 0 0 1 9 9c0 3.9-2.5 7.2-6 8.5V21l-3-1-3 1v-1.5C5.5 18.2 3 14.9 3 11a9 9 0 0 1 9-9z"/>
+        <circle cx="9" cy="11" r="1" fill="#fff"/>
+        <circle cx="12" cy="11" r="1" fill="#fff"/>
+        <circle cx="15" cy="11" r="1" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="ppc-chat-header-text">
+      <div class="ppc-chat-title">PPC Assistant</div>
+      <div class="ppc-chat-subtitle">
+        <span class="ppc-live-dot"></span>
+        GPT-4o mini · Live data
+      </div>
+    </div>
+    <button class="ppc-chat-close" onclick="ppcChatToggle()" aria-label="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24">
+        <path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div id="ppc-chat-messages"></div>
+
+  <!-- Suggested questions -->
+  <div id="ppc-chat-suggestions">
+    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Who visited us this week?</span>
+    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Any funding rounds in healthcare?</span>
+    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">What ads is Inspire Aesthetics running?</span>
+    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Show VP+ level visitors</span>
+  </div>
+
+  <!-- Input -->
+  <div id="ppc-chat-input-area">
+    <textarea id="ppc-chat-input" placeholder="Ask anything about your PPC data…" rows="1"
+      onkeydown="ppcChatKeydown(event)" oninput="ppcAutoResize(this)"></textarea>
+    <button id="ppc-chat-send" onclick="ppcChatSend()" aria-label="Send">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+          d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var _ppcHistory = [];
+  var _ppcLoading = false;
+  var _ppcFirstOpen = true;
+
+  window.ppcChatToggle = function() {
+    var trigger = document.getElementById('ppc-chat-trigger');
+    var panel   = document.getElementById('ppc-chat-panel');
+    var isOpen  = panel.classList.contains('open');
+
+    trigger.classList.toggle('open', !isOpen);
+    panel.classList.toggle('open', !isOpen);
+
+    if (!isOpen) {
+      // First open — show welcome
+      if (_ppcFirstOpen) {
+        _ppcFirstOpen = false;
+        _ppcShowWelcome();
+      }
+      setTimeout(function() {
+        document.getElementById('ppc-chat-input').focus();
+      }, 300);
+      // Clear badge
+      document.getElementById('ppc-chat-badge').classList.remove('show');
+    }
+  };
+
+  function _ppcShowWelcome() {
+    var msgs = document.getElementById('ppc-chat-messages');
+    var el = document.createElement('div');
+    el.className = 'ppc-welcome';
+    el.innerHTML =
+      '<div class="ppc-welcome-icon">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">' +
+          '<path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>' +
+        '</svg>' +
+      '</div>' +
+      '<h4>PPC Intelligence Assistant</h4>' +
+      '<p>Ask me about anonymous visitors,<br>competitor ads, or signal tracker data.</p>';
+    msgs.appendChild(el);
+  }
+
+  window.ppcSendSuggestion = function(el) {
+    document.getElementById('ppc-chat-suggestions').style.display = 'none';
+    document.getElementById('ppc-chat-input').value = el.textContent;
+    ppcChatSend();
+  };
+
+  window.ppcAutoResize = function(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 90) + 'px';
+  };
+
+  window.ppcChatKeydown = function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ppcChatSend();
+    }
+  };
+
+  window.ppcChatSend = function() {
+    if (_ppcLoading) return;
+    var input = document.getElementById('ppc-chat-input');
+    var msg   = (input.value || '').trim();
+    if (!msg) return;
+
+    // Hide suggestions after first message
+    document.getElementById('ppc-chat-suggestions').style.display = 'none';
+
+    input.value = '';
+    input.style.height = 'auto';
+
+    _ppcAppendMessage('user', msg);
+    _ppcHistory.push({ role: 'user', content: msg });
+
+    var loadEl = _ppcAppendLoading();
+    _ppcLoading = true;
+    document.getElementById('ppc-chat-send').disabled = true;
+
+    fetch('/api/ppc-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, history: _ppcHistory.slice(-8) }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      loadEl.remove();
+      var answer = data.answer || 'No response received.';
+      _ppcAppendMessage('assistant', answer);
+      _ppcHistory.push({ role: 'assistant', content: answer });
+    })
+    .catch(function(err) {
+      loadEl.remove();
+      _ppcAppendMessage('assistant', '⚠️ Could not reach the server. Please try again.');
+    })
+    .finally(function() {
+      _ppcLoading = false;
+      document.getElementById('ppc-chat-send').disabled = false;
+      document.getElementById('ppc-chat-input').focus();
+    });
+  };
+
+  function _ppcAppendMessage(role, text) {
+    var msgs    = document.getElementById('ppc-chat-messages');
+    var initials = role === 'user' ? 'You' : 'AI';
+    var wrap    = document.createElement('div');
+    wrap.className = 'ppc-msg ' + role;
+
+    var avatar = document.createElement('div');
+    avatar.className = 'ppc-msg-avatar';
+    avatar.textContent = initials;
+
+    var bubble = document.createElement('div');
+    bubble.className = 'ppc-msg-bubble';
+    bubble.innerHTML = _ppcFormat(text);
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    msgs.appendChild(wrap);
+    msgs.scrollTop = msgs.scrollHeight;
+    return wrap;
+  }
+
+  function _ppcAppendLoading() {
+    var msgs = document.getElementById('ppc-chat-messages');
+    var wrap = document.createElement('div');
+    wrap.className = 'ppc-msg assistant';
+
+    var avatar = document.createElement('div');
+    avatar.className = 'ppc-msg-avatar';
+    avatar.textContent = 'AI';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'ppc-msg-bubble';
+    bubble.innerHTML =
+      '<div class="ppc-loading-dots">' +
+        '<span></span><span></span><span></span>' +
+      '</div>';
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    msgs.appendChild(wrap);
+    msgs.scrollTop = msgs.scrollHeight;
+    return wrap;
+  }
+
+  function _ppcFormat(text) {
+    // Bold: **text**
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Bullet points: lines starting with - or •
+    var lines = text.split('\n');
+    var out = [], inList = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var isBullet = /^[\-•]\s+/.test(line.trim());
+      if (isBullet) {
+        if (!inList) { out.push('<ul>'); inList = true; }
+        out.push('<li>' + line.trim().replace(/^[\-•]\s+/, '') + '</li>');
+      } else {
+        if (inList) { out.push('</ul>'); inList = false; }
+        if (line.trim()) out.push('<p style="margin:2px 0">' + line + '</p>');
+        else if (i > 0) out.push('<br>');
+      }
+    }
+    if (inList) out.push('</ul>');
+    return out.join('');
+  }
+
+  // Close panel when clicking outside
+  document.addEventListener('click', function(e) {
+    var panel   = document.getElementById('ppc-chat-panel');
+    var trigger = document.getElementById('ppc-chat-trigger');
+    if (panel && panel.classList.contains('open') &&
+        !panel.contains(e.target) && !trigger.contains(e.target)) {
+      ppcChatToggle();
+    }
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var panel = document.getElementById('ppc-chat-panel');
+      if (panel && panel.classList.contains('open')) ppcChatToggle();
+    }
+  });
+})();
+</script>
+<!-- ── End PPC Chat Widget ─────────────────────────────────────────────────── -->

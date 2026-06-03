@@ -13,5 +13,87 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- PPC Chat Widget -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      #ppc-chat-trigger{position:fixed;bottom:28px;right:28px;z-index:9999;width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);box-shadow:0 4px 20px rgba(99,102,241,.5);display:flex;align-items:center;justify-content:center;transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;animation:ppc-pulse 3s ease-in-out infinite}
+      #ppc-chat-trigger:hover{transform:scale(1.1)}
+      #ppc-chat-trigger.open{transform:scale(.92);animation:none}
+      #ppc-chat-trigger svg{transition:transform .25s,opacity .2s}
+      #ppc-trigger-icon-chat{position:absolute}
+      #ppc-trigger-icon-close{position:absolute;opacity:0;transform:rotate(-90deg)}
+      #ppc-chat-trigger.open #ppc-trigger-icon-chat{opacity:0;transform:rotate(90deg)}
+      #ppc-chat-trigger.open #ppc-trigger-icon-close{opacity:1;transform:rotate(0deg)}
+      @keyframes ppc-pulse{0%,100%{box-shadow:0 4px 20px rgba(99,102,241,.5),0 0 0 0 rgba(99,102,241,.4)}50%{box-shadow:0 4px 20px rgba(99,102,241,.5),0 0 0 10px rgba(99,102,241,0)}}
+      #ppc-chat-panel{position:fixed;bottom:96px;right:28px;z-index:9998;width:380px;height:540px;background:linear-gradient(170deg,#0d1124 0%,#0a0e1e 100%);border:1px solid rgba(99,102,241,.2);border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;transform:translateY(16px) scale(.97);opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s ease}
+      #ppc-chat-panel.open{transform:translateY(0) scale(1);opacity:1;pointer-events:all}
+      @media(max-width:440px){#ppc-chat-panel{width:calc(100vw - 24px);right:12px;bottom:88px}#ppc-chat-trigger{right:16px;bottom:16px}}
+      #ppc-chat-header{flex-shrink:0;padding:14px 16px 12px;background:rgba(99,102,241,.08);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px}
+      .ppc-chat-avatar{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(99,102,241,.4)}
+      .ppc-chat-title{font-size:13px;font-weight:700;color:#f1f5f9;line-height:1;margin-bottom:3px;font-family:'Space Grotesk',sans-serif}
+      .ppc-chat-subtitle{font-size:10px;color:#64748b;display:flex;align-items:center;gap:4px;font-family:'Space Grotesk',sans-serif}
+      .ppc-live-dot{width:6px;height:6px;border-radius:50%;background:#10b981;flex-shrink:0;animation:ppc-livepulse 2s infinite}
+      @keyframes ppc-livepulse{0%,100%{opacity:1}50%{opacity:.4}}
+      .ppc-chat-close{width:28px;height:28px;border:none;border-radius:8px;cursor:pointer;background:rgba(255,255,255,.05);color:#475569;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;flex-shrink:0}
+      .ppc-chat-close:hover{background:rgba(255,255,255,.1);color:#94a3b8}
+      #ppc-chat-messages{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+      #ppc-chat-messages::-webkit-scrollbar{width:3px}
+      #ppc-chat-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+      .ppc-msg{display:flex;gap:8px;animation:ppc-msgin .25s ease both}
+      @keyframes ppc-msgin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      .ppc-msg.user{flex-direction:row-reverse}
+      .ppc-msg-avatar{width:26px;height:26px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;align-self:flex-end;font-family:'Space Grotesk',sans-serif}
+      .ppc-msg-bubble{max-width:82%;padding:9px 12px;border-radius:14px;font-size:12.5px;line-height:1.6;font-family:'Space Grotesk',sans-serif}
+      .ppc-msg.assistant .ppc-msg-bubble{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#cbd5e1;border-bottom-left-radius:4px}
+      .ppc-msg.user .ppc-msg-bubble{background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.25);color:#c7d2fe;border-bottom-right-radius:4px}
+      .ppc-msg-bubble strong{color:#f1f5f9;font-weight:700}
+      .ppc-msg-bubble ul{margin:4px 0 0 14px;padding:0}
+      .ppc-msg-bubble li{margin-bottom:2px}
+      .ppc-loading-dots{display:flex;gap:4px;padding:4px 2px;align-items:center}
+      .ppc-loading-dots span{width:6px;height:6px;border-radius:50%;background:#6366f1;animation:ppc-dot 1.2s ease-in-out infinite}
+      .ppc-loading-dots span:nth-child(2){animation-delay:.2s}
+      .ppc-loading-dots span:nth-child(3){animation-delay:.4s}
+      @keyframes ppc-dot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+      #ppc-chat-suggestions{flex-shrink:0;padding:6px 14px 10px;display:flex;flex-wrap:wrap;gap:6px}
+      .ppc-suggestion{font-size:11px;font-weight:500;cursor:pointer;padding:5px 11px;border-radius:999px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;transition:all .15s;font-family:'Space Grotesk',sans-serif;white-space:nowrap}
+      .ppc-suggestion:hover{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.45);color:#c7d2fe}
+      #ppc-chat-input-area{flex-shrink:0;padding:10px 12px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:8px;align-items:flex-end}
+      #ppc-chat-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:9px 13px;font-size:13px;color:#e2e8f0;outline:none;resize:none;min-height:38px;max-height:90px;font-family:'Space Grotesk',sans-serif;line-height:1.5;transition:border-color .15s,box-shadow .15s;overflow-y:auto}
+      #ppc-chat-input::placeholder{color:rgba(255,255,255,.2)}
+      #ppc-chat-input:focus{border-color:rgba(99,102,241,.45);box-shadow:0 0 0 2px rgba(99,102,241,.12)}
+      #ppc-chat-send{width:36px;height:36px;border:none;border-radius:10px;cursor:pointer;flex-shrink:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;transition:transform .15s,opacity .15s;box-shadow:0 2px 8px rgba(99,102,241,.4)}
+      #ppc-chat-send:hover{transform:scale(1.08)}
+      #ppc-chat-send:disabled{opacity:.4;cursor:not-allowed;transform:none}
+      .ppc-welcome{text-align:center;padding:12px 8px 4px;font-family:'Space Grotesk',sans-serif}
+      .ppc-welcome-icon{width:44px;height:44px;border-radius:14px;margin:0 auto 10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(99,102,241,.4)}
+      .ppc-welcome h4{font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px}
+      .ppc-welcome p{font-size:11.5px;color:#64748b;line-height:1.5}
+    </style>
+    <button id="ppc-chat-trigger" onclick="ppcChatToggle()" title="PPC Assistant">
+      <svg id="ppc-trigger-icon-chat" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <svg id="ppc-trigger-icon-close" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div id="ppc-chat-panel">
+      <div id="ppc-chat-header">
+        <div class="ppc-chat-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 2a9 9 0 0 1 9 9c0 3.9-2.5 7.2-6 8.5V21l-3-1-3 1v-1.5C5.5 18.2 3 14.9 3 11a9 9 0 0 1 9-9z"/><circle cx="9" cy="11" r="1" fill="#fff"/><circle cx="12" cy="11" r="1" fill="#fff"/><circle cx="15" cy="11" r="1" fill="#fff"/></svg></div>
+        <div style="flex:1;min-width:0"><div class="ppc-chat-title">PPC Assistant</div><div class="ppc-chat-subtitle"><span class="ppc-live-dot"></span>GPT-4o mini &middot; Live data</div></div>
+        <button class="ppc-chat-close" onclick="ppcChatToggle()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div id="ppc-chat-messages"></div>
+      <div id="ppc-chat-suggestions">
+        <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Who visited us this week?</span>
+        <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Any funding rounds in healthcare?</span>
+        <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">What ads is Inspire Aesthetics running?</span>
+        <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Show VP+ level visitors</span>
+      </div>
+      <div id="ppc-chat-input-area">
+        <textarea id="ppc-chat-input" placeholder="Ask anything about your PPC data..." rows="1" onkeydown="ppcChatKeydown(event)" oninput="ppcAutoResize(this)"></textarea>
+        <button id="ppc-chat-send" onclick="ppcChatSend()"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      </div>
+    </div>
+    <script>
+    (function(){var _h=[],_l=false,_f=true;window.ppcChatToggle=function(){var t=document.getElementById('ppc-chat-trigger'),p=document.getElementById('ppc-chat-panel'),o=p.classList.contains('open');t.classList.toggle('open',!o);p.classList.toggle('open',!o);if(!o){if(_f){_f=false;_W();}setTimeout(function(){document.getElementById('ppc-chat-input').focus();},300);}};function _W(){var m=document.getElementById('ppc-chat-messages'),e=document.createElement('div');e.className='ppc-welcome';e.innerHTML='<div class="ppc-welcome-icon"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h4>PPC Intelligence Assistant</h4><p>Ask me about anonymous visitors,<br>competitor ads, or signal tracker data.</p>';m.appendChild(e);}window.ppcSendSuggestion=function(el){document.getElementById('ppc-chat-suggestions').style.display='none';document.getElementById('ppc-chat-input').value=el.textContent;ppcChatSend();};window.ppcAutoResize=function(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,90)+'px';};window.ppcChatKeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ppcChatSend();}};window.ppcChatSend=function(){if(_l)return;var inp=document.getElementById('ppc-chat-input'),msg=(inp.value||'').trim();if(!msg)return;document.getElementById('ppc-chat-suggestions').style.display='none';inp.value='';inp.style.height='auto';_M('user',msg);_h.push({role:'user',content:msg});var ld=_L();_l=true;document.getElementById('ppc-chat-send').disabled=true;fetch('/api/ppc-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:_h.slice(-8)})}).then(function(r){return r.json();}).then(function(d){ld.remove();var a=d.answer||'No response.';_M('assistant',a);_h.push({role:'assistant',content:a});}).catch(function(){ld.remove();_M('assistant','⚠️ Could not reach the server.');}).finally(function(){_l=false;document.getElementById('ppc-chat-send').disabled=false;document.getElementById('ppc-chat-input').focus();});};function _M(role,text){var m=document.getElementById('ppc-chat-messages'),w=document.createElement('div');w.className='ppc-msg '+role;var av=document.createElement('div');av.className='ppc-msg-avatar';av.textContent=role==='user'?'You':'AI';var b=document.createElement('div');b.className='ppc-msg-bubble';b.innerHTML=_F(text);w.appendChild(av);w.appendChild(b);m.appendChild(w);m.scrollTop=m.scrollHeight;return w;}function _L(){var m=document.getElementById('ppc-chat-messages'),w=document.createElement('div');w.className='ppc-msg assistant';var av=document.createElement('div');av.className='ppc-msg-avatar';av.textContent='AI';var b=document.createElement('div');b.className='ppc-msg-bubble';b.innerHTML='<div class="ppc-loading-dots"><span></span><span></span><span></span></div>';w.appendChild(av);w.appendChild(b);m.appendChild(w);m.scrollTop=m.scrollHeight;return w;}function _F(t){t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');var ls=t.split('\n'),out=[],il=false;for(var i=0;i<ls.length;i++){var l=ls[i],ib=/^[\-•]\s+/.test(l.trim());if(ib){if(!il){out.push('<ul>');il=true;}out.push('<li>'+l.trim().replace(/^[\-•]\s+/,'')+'</li>');}else{if(il){out.push('</ul>');il=false;}if(l.trim())out.push('<p style="margin:2px 0">'+l+'</p>');}}if(il)out.push('</ul>');return out.join('');}document.addEventListener('click',function(e){var p=document.getElementById('ppc-chat-panel'),t=document.getElementById('ppc-chat-trigger');if(p&&p.classList.contains('open')&&!p.contains(e.target)&&!t.contains(e.target))ppcChatToggle();});document.addEventListener('keydown',function(e){if(e.key==='Escape'){var p=document.getElementById('ppc-chat-panel');if(p&&p.classList.contains('open'))ppcChatToggle();}});})();
+    </script>
   </body>
 </html>

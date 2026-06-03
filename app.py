@@ -869,6 +869,338 @@ def _read_company_count(path: Path) -> str:
         return "—"
 
 
+# ── Chatbot data functions ────────────────────────────────────────────────────
+
+def _chatbot_get_anonymous_visitors(date_from=None, date_to=None, company=None,
+                                     seniority=None, industry=None, limit=20):
+    """Fetch targeted anonymous visitor rows for the chatbot."""
+    try:
+        import json as _j
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if not sa_str:
+            return {"error": "No Google credentials configured"}
+
+        sa_info = _j.loads(sa_str)
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+        r = svc.spreadsheets().values().get(
+            spreadsheetId=ANON_VISITORS_SHEET_ID,
+            range="People Enriched!A:K"
+        ).execute()
+        rows = r.get("values", [])
+
+        def col(row, i, default=""):
+            return row[i] if len(row) > i else default
+
+        people = []
+        for row in rows[1:]:
+            name = col(row, 0)
+            if not name or name == "Unavailable":
+                continue
+            time_str = col(row, 6)
+            people.append({
+                "name":     name,
+                "title":    col(row, 1),
+                "email":    col(row, 2),
+                "company":  col(row, 3),
+                "location": col(row, 4),
+                "pages":    col(row, 5),
+                "date":     time_str[:10] if time_str else "",
+                "industry": _clean_industry(col(row, 8)),
+                "website":  col(row, 10),
+                "time_raw": time_str,
+            })
+
+        # Newest first
+        people.sort(key=lambda x: x.get("time_raw", ""), reverse=True)
+
+        if date_from:
+            people = [p for p in people if p["date"] >= date_from]
+        if date_to:
+            people = [p for p in people if p["date"] <= date_to]
+        if company:
+            c = company.lower()
+            people = [p for p in people
+                      if c in p.get("company", "").lower()
+                      or c in p.get("website", "").lower()]
+        if industry:
+            people = [p for p in people
+                      if industry.lower() in p.get("industry", "").lower()]
+        if seniority:
+            s = seniority.lower()
+            _seniority_map = {
+                "c-suite":   ["ceo", "cmo", "coo", "cto", "cfo", "cro", "cpo", "ciso", "chief"],
+                "vp":        ["vp", "vice president"],
+                "director":  ["director"],
+                "manager":   ["manager"],
+                "president": ["president"],
+            }
+            keywords = _seniority_map.get(s, [s])
+            people = [p for p in people
+                      if any(kw in p.get("title", "").lower() for kw in keywords)]
+
+        result = people[:limit]
+        return {
+            "total_matching": len(people),
+            "returned": len(result),
+            "people": [
+                {
+                    "name":          p["name"],
+                    "title":         p["title"],
+                    "company":       p["company"],
+                    "industry":      p["industry"],
+                    "location":      p["location"],
+                    "date_visited":  p["date"],
+                    "pages_viewed":  p["pages"],
+                }
+                for p in result
+            ],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _chatbot_get_signal_tracker(account="healthcare", signal_type=None,
+                                 company=None, severity=None, limit=20):
+    """Query Signal Tracker SQLite for buying signals."""
+    db_map = {
+        "healthcare": Path(__file__).parent / "data" / "tracker.db",
+        "csg":        Path(__file__).parent / "data" / "tracker_csg_v2.db",
+    }
+    db_path = db_map.get(account, db_map["healthcare"])
+    if not db_path.exists():
+        return {"error": f"Database not found for account '{account}'"}
+
+    try:
+        import sqlite3 as _sql
+        conn = _sql.connect(str(db_path))
+        conn.row_factory = _sql.Row
+
+        conditions = ["a.dry_run = 0"]
+        params: list = []
+        if signal_type:
+            conditions.append("a.signal_type = ?")
+            params.append(signal_type)
+        if severity:
+            conditions.append("a.severity = ?")
+            params.append(severity.upper())
+        if company:
+            conditions.append("c.name LIKE ?")
+            params.append(f"%{company}%")
+
+        where = " AND ".join(conditions)
+        query = f"""
+            SELECT c.name, c.domain, c.industry, c.city, c.state,
+                   a.signal_type, a.signal_detail, a.severity, a.signal_date
+            FROM alerts_sent a
+            JOIN companies c ON a.apollo_id = c.apollo_id
+            WHERE {where}
+            ORDER BY a.signal_date DESC
+            LIMIT ?
+        """
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        signals = [
+            {
+                "company":       r["name"],
+                "domain":        r["domain"],
+                "industry":      r["industry"],
+                "location":      f"{r['city']}, {r['state']}".strip(", "),
+                "signal_type":   r["signal_type"],
+                "signal_detail": r["signal_detail"],
+                "severity":      r["severity"],
+                "signal_date":   r["signal_date"],
+            }
+            for r in rows
+        ]
+        return {"account": account, "total_returned": len(signals), "signals": signals}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ── OpenAI chatbot definitions ────────────────────────────────────────────────
+
+CHATBOT_FUNCTIONS = [
+    {
+        "name": "get_anonymous_visitors",
+        "description": (
+            "Get people who visited position2.com — identified and enriched via Apollo. "
+            "Use for: who visited, how many, which companies, seniority levels, industry breakdown, "
+            "recent visitors, visitors in a date range."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "date_from": {"type": "string", "description": "Start date YYYY-MM-DD"},
+                "date_to":   {"type": "string", "description": "End date YYYY-MM-DD"},
+                "company":   {"type": "string", "description": "Filter by company name or website domain"},
+                "seniority": {
+                    "type": "string",
+                    "description": "Filter by seniority: 'c-suite', 'vp', 'director', 'manager', or any title keyword",
+                },
+                "industry":  {"type": "string", "description": "Filter by industry keyword"},
+                "limit":     {"type": "integer", "description": "Max results (default 20)"},
+            },
+        },
+    },
+    {
+        "name": "get_signal_tracker",
+        "description": (
+            "Get buying signals from the Signal Tracker — companies showing funding rounds, "
+            "C-suite changes, M&A, news mentions, or IPO signals. "
+            "Use for: prospect intelligence, hot accounts, recent high signals, outbound prioritization."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "account": {
+                    "type": "string",
+                    "enum": ["healthcare", "csg"],
+                    "description": "Which tracker — 'healthcare' (1,251 companies) or 'csg' (294 companies). Default: healthcare",
+                },
+                "signal_type": {
+                    "type": "string",
+                    "description": (
+                        "Filter by signal type: 'Funding Round', 'C-Suite Join', 'C-Suite Exit', "
+                        "'Acquisition / M&A', 'News Mention', 'IPO Signal'"
+                    ),
+                },
+                "company":  {"type": "string", "description": "Filter by company name"},
+                "severity": {"type": "string", "enum": ["HIGH", "LOW"], "description": "HIGH = funding/C-suite/M&A; LOW = news"},
+                "limit":    {"type": "integer", "description": "Max results (default 20)"},
+            },
+        },
+    },
+    {
+        "name": "get_ad_intelligence_data",
+        "description": (
+            "Fetch competitor ad data from Ad Intelligence. "
+            "Competitors tracked: Inspire Aesthetics, Dr. Dana MD, Sono Bello. "
+            "Use for: what ads competitors are running, CTAs, ad formats, keywords targeted, "
+            "messaging angles, active vs inactive ads, when ads were last seen."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "competitor": {"type": "string", "description": "Competitor name or domain (e.g. 'Inspire Aesthetics', 'sonobello')"},
+                "format":     {"type": "string", "enum": ["image", "text", "video"], "description": "Ad format filter"},
+                "status":     {"type": "string", "enum": ["active", "inactive"], "description": "Ad status filter"},
+                "keyword":    {"type": "string", "description": "Search word in headline/description/keywords"},
+                "limit":      {"type": "integer", "description": "Max ads to return (default 20)"},
+            },
+        },
+    },
+]
+
+CHATBOT_FUNCTION_MAP = {
+    "get_anonymous_visitors":  _chatbot_get_anonymous_visitors,
+    "get_signal_tracker":      _chatbot_get_signal_tracker,
+    "get_ad_intelligence_data": get_ad_intelligence_data,
+}
+
+
+@app.route("/api/ppc-chat", methods=["POST"])
+@login_required
+def ppc_chat():
+    """PPC AI assistant — OpenAI function calling over live platform data."""
+    from openai import OpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return jsonify({"answer": "⚠️ OpenAI API key not configured. Add `OPENAI_API_KEY` to Railway Variables."}), 200
+
+    oai = OpenAI(api_key=api_key)
+
+    data = request.json or {}
+    user_message = data.get("message", "").strip()
+    history = data.get("history", [])[-8:]   # last 8 turns for context window
+
+    if not user_message:
+        return jsonify({"answer": "Please ask a question."}), 200
+
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+
+    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B digital marketing agency.
+You help the internal team analyze live data from three dashboards. Always call a function to fetch real data before answering — never guess numbers or make up results.
+
+AVAILABLE DATA:
+1. ANONYMOUS VISITORS — People identified visiting position2.com (enriched via Apollo).
+   Columns: name, job title, company, industry, location, date visited, pages viewed.
+   Use for: who visited, visitor counts, company breakdown, seniority, industry trends.
+
+2. SIGNAL TRACKER — Healthcare companies (1,251) tracked for buying signals.
+   Signal types (HIGH severity): Funding Round, C-Suite Join, C-Suite Exit, Acquisition/M&A, IPO Signal.
+   Signal types (LOW severity): News Mention.
+   Use for: hot prospect accounts, recent signals, outbound targeting.
+
+3. AD INTELLIGENCE — Competitor ads tracked (Inspire Aesthetics, Dr. Dana MD, Sono Bello).
+   Columns: headline, description, CTA, format (image/text/video), status (active/inactive), keywords, messaging angle, first/last shown dates.
+   Use for: competitor ad strategy, CTA patterns, messaging themes, format mix.
+
+RULES:
+- Call a function FIRST for any data question. Never answer from memory.
+- Today is {today}. Resolve relative dates ("yesterday" = {(datetime.now(IST) - timedelta(days=1)).strftime('%Y-%m-%d')}, "this week" starts {(datetime.now(IST) - timedelta(days=datetime.now(IST).weekday())).strftime('%Y-%m-%d')}).
+- Be concise. Use bullet points. Bold key numbers with **n**.
+- Cap lists at 10 items unless user asks for more.
+- If data is empty or unavailable, say so clearly."""
+
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += history
+    messages.append({"role": "user", "content": user_message})
+
+    tools = [{"type": "function", "function": f} for f in CHATBOT_FUNCTIONS]
+
+    try:
+        resp = oai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            max_tokens=900,
+            temperature=0.2,
+        )
+
+        msg = resp.choices[0].message
+
+        if msg.tool_calls:
+            messages.append(msg)
+
+            for tool_call in msg.tool_calls:
+                fn_name = tool_call.function.name
+                fn_args = json.loads(tool_call.function.arguments)
+                fn = CHATBOT_FUNCTION_MAP.get(fn_name)
+                result = fn(**fn_args) if fn else {"error": f"Unknown function: {fn_name}"}
+                messages.append({
+                    "role":        "tool",
+                    "tool_call_id": tool_call.id,
+                    "content":     json.dumps(result),
+                })
+
+            final = oai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_tokens=900,
+                temperature=0.2,
+            )
+            answer = final.choices[0].message.content
+        else:
+            answer = msg.content
+
+        return jsonify({"answer": answer})
+
+    except Exception as e:
+        log.warning("PPC chat error: %s", e)
+        return jsonify({"answer": f"Something went wrong: {str(e)}"}), 200
+
+
 # ── Ad Intelligence data helper (for chatbot) ────────────────────────────────
 def get_ad_intelligence_data(competitor=None, format=None, status=None,
                               keyword=None, limit=50):
