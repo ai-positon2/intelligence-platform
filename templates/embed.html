@@ -45,8 +45,16 @@
       color: {{ accent }};
     }
 
-    .topbar-right { display: flex; align-items: center; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
     .user-menu { position: relative; }
+    .newtab-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+      font-family: inherit; cursor: pointer; text-decoration: none;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+      color: #64748b; transition: all .15s; white-space: nowrap;
+    }
+    .newtab-btn:hover { background: rgba(255,255,255,.1); color: #e2e8f0; border-color: rgba(255,255,255,.18); }
     .user-pill {
       display: flex; align-items: center; gap: 8px;
       background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
@@ -140,13 +148,9 @@
       </div>
     </div>
     <div class="topbar-right">
-      <div class="user-pill">
-        <div class="user-avatar">
-          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
-          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
-        </div>
-        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
-      </div>
+      <a href="{{ embed_url }}" target="_blank" rel="noopener" class="newtab-btn" title="Open in new tab if the tool shows a login error">
+        ↗ Open in new tab
+      </a>
       <div class="user-menu" id="userMenu">
         <div class="user-pill" id="userPill" onclick="toggleMenu()">
           <div class="user-avatar">
@@ -162,7 +166,7 @@
             <div class="dd-email">{{ user.email }}</div>
           </div>
           <div class="dd-items">
-            {% if user.email == 'krishna.ladha@position2.com' %}
+            {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
             <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
             <div class="dd-divider"></div>
             {% endif %}

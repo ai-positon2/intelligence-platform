@@ -197,7 +197,7 @@
             <div class="dd-email">{{ user.email }}</div>
           </div>
           <div class="dd-items">
-            {% if user.email == 'krishna.ladha@position2.com' %}
+            {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
             <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
             <div class="dd-divider"></div>
             {% endif %}
