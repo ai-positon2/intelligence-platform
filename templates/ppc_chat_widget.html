@@ -1,443 +1,533 @@
-<!-- ── PPC AI Chat Widget ─────────────────────────────────────────────────── -->
+<!-- ── PPC AI Chat Widget v2 ───────────────────────────────────────────────── -->
 <style>
-  /* ── Floating trigger button ── */
-  #ppc-chat-trigger {
-    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
-    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 0 rgba(99,102,241,0.4);
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
-    animation: ppc-pulse 3s ease-in-out infinite;
-  }
-  #ppc-chat-trigger:hover {
-    transform: scale(1.1);
-    box-shadow: 0 8px 28px rgba(99,102,241,0.65), 0 0 0 0 rgba(99,102,241,0);
-  }
-  #ppc-chat-trigger.open { transform: scale(0.92); animation: none; }
-  #ppc-chat-trigger svg { transition: transform 0.25s, opacity 0.2s; }
-  #ppc-trigger-icon-chat  { position: absolute; }
-  #ppc-trigger-icon-close { position: absolute; opacity: 0; transform: rotate(-90deg); }
-  #ppc-chat-trigger.open #ppc-trigger-icon-chat  { opacity: 0; transform: rotate(90deg); }
-  #ppc-chat-trigger.open #ppc-trigger-icon-close { opacity: 1; transform: rotate(0deg); }
-  @keyframes ppc-pulse {
-    0%,100% { box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 0 rgba(99,102,241,0.4); }
-    50%      { box-shadow: 0 4px 20px rgba(99,102,241,0.5), 0 0 0 10px rgba(99,102,241,0); }
-  }
+/* ── Trigger ─────────────────────────────────────────────────────────────── */
+#ppc-wrap {
+  position: fixed; bottom: 28px; right: 28px; z-index: 10000;
+}
+#ppc-btn {
+  position: relative; width: 58px; height: 58px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s;
+  box-shadow: 0 8px 32px rgba(99,102,241,.45), 0 0 0 0 rgba(99,102,241,.35);
+  animation: ppc-btn-pulse 2.8s ease-in-out infinite;
+}
+#ppc-btn:hover { transform: scale(1.12); box-shadow: 0 12px 40px rgba(99,102,241,.65), 0 0 0 8px rgba(99,102,241,.08); }
+#ppc-btn.open  { transform: scale(.9); animation: none; }
+@keyframes ppc-btn-pulse {
+  0%,100% { box-shadow: 0 8px 32px rgba(99,102,241,.45), 0 0 0 0   rgba(99,102,241,.3); }
+  50%      { box-shadow: 0 8px 32px rgba(99,102,241,.45), 0 0 0 10px rgba(99,102,241,0); }
+}
+.ppc-ico { position: absolute; transition: all .3s cubic-bezier(.34,1.56,.64,1); }
+#ppc-ico-chat  { opacity:1; transform:scale(1) rotate(0deg); }
+#ppc-ico-close { opacity:0; transform:scale(.4) rotate(-90deg); }
+#ppc-btn.open #ppc-ico-chat  { opacity:0; transform:scale(.4) rotate(90deg); }
+#ppc-btn.open #ppc-ico-close { opacity:1; transform:scale(1) rotate(0deg); }
 
-  /* ── Notification badge ── */
-  #ppc-chat-badge {
-    position: absolute; top: -2px; right: -2px;
-    width: 14px; height: 14px; border-radius: 50%; border: 2px solid #080b18;
-    background: #ef4444; display: none;
-  }
-  #ppc-chat-badge.show { display: block; }
+/* Tooltip */
+#ppc-tip {
+  position: absolute; bottom: calc(100% + 10px); right: 0;
+  background: rgba(10,12,28,.97); border: 1px solid rgba(99,102,241,.3);
+  color: #c7d2fe; font-size: 11px; font-weight: 600;
+  font-family: 'Space Grotesk', sans-serif;
+  padding: 5px 12px; border-radius: 8px; white-space: nowrap;
+  pointer-events: none; opacity: 0; transform: translateY(6px);
+  transition: all .2s; box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+#ppc-wrap:hover #ppc-tip { opacity: 1; transform: translateY(0); }
 
-  /* ── Panel ── */
-  #ppc-chat-panel {
-    position: fixed; bottom: 96px; right: 28px; z-index: 9998;
-    width: 380px; height: 540px;
-    background: linear-gradient(170deg, #0d1124 0%, #0a0e1e 100%);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 20px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
-    display: flex; flex-direction: column; overflow: hidden;
-    transform: translateY(16px) scale(0.97); opacity: 0; pointer-events: none;
-    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
-  }
-  #ppc-chat-panel.open {
-    transform: translateY(0) scale(1); opacity: 1; pointer-events: all;
-  }
-  @media (max-width: 440px) {
-    #ppc-chat-panel { width: calc(100vw - 24px); right: 12px; bottom: 88px; }
-    #ppc-chat-trigger { right: 16px; bottom: 16px; }
-  }
+/* ── Panel border (animated gradient ring) ─────────────────────────────── */
+#ppc-border {
+  position: fixed; bottom: 100px; right: 28px; z-index: 9999;
+  width: 400px; border-radius: 22px; padding: 1px;
+  background: linear-gradient(135deg, rgba(99,102,241,.7), rgba(139,92,246,.6), rgba(6,182,212,.5), rgba(99,102,241,.7));
+  background-size: 300% 300%;
+  animation: ppc-border-shift 5s ease infinite;
+  transform: translateY(18px) scale(.95); opacity: 0; pointer-events: none;
+  transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+  box-shadow: 0 32px 80px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.1);
+}
+#ppc-border.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: all; }
+@keyframes ppc-border-shift {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@media (max-width: 460px) {
+  #ppc-border { width: calc(100vw - 20px); right: 10px; bottom: 84px; }
+  #ppc-wrap   { right: 16px; bottom: 16px; }
+}
 
-  /* ── Panel header ── */
-  #ppc-chat-header {
-    flex-shrink: 0; padding: 14px 16px 12px;
-    background: rgba(99,102,241,0.08);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .ppc-chat-avatar {
-    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 12px rgba(99,102,241,0.4);
-  }
-  .ppc-chat-avatar svg { width: 18px; height: 18px; }
-  .ppc-chat-header-text { flex: 1; min-width: 0; }
-  .ppc-chat-title { font-size: 13px; font-weight: 700; color: #f1f5f9; line-height: 1; margin-bottom: 3px; font-family: 'Space Grotesk', sans-serif; }
-  .ppc-chat-subtitle { font-size: 10px; color: #64748b; display: flex; align-items: center; gap: 4px; font-family: 'Space Grotesk', sans-serif; }
-  .ppc-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; flex-shrink: 0; animation: ppc-livepulse 2s infinite; }
-  @keyframes ppc-livepulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .ppc-chat-close {
-    width: 28px; height: 28px; border: none; border-radius: 8px; cursor: pointer;
-    background: rgba(255,255,255,0.05); color: #475569; font-size: 14px;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.15s, color 0.15s; flex-shrink: 0;
-  }
-  .ppc-chat-close:hover { background: rgba(255,255,255,0.1); color: #94a3b8; }
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+#ppc-panel {
+  border-radius: 21px; overflow: hidden;
+  background: rgba(7, 9, 22, 0.98);
+  backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
+  display: flex; flex-direction: column; height: 560px;
+  position: relative;
+  font-family: 'Space Grotesk', sans-serif;
+}
+/* Background orbs */
+#ppc-panel::before {
+  content:''; position:absolute; top:-80px; left:-80px;
+  width:260px; height:260px; border-radius:50%; pointer-events:none; z-index:0;
+  background: radial-gradient(circle, rgba(99,102,241,.14) 0%, transparent 70%);
+}
+#ppc-panel::after {
+  content:''; position:absolute; bottom:-60px; right:-60px;
+  width:220px; height:220px; border-radius:50%; pointer-events:none; z-index:0;
+  background: radial-gradient(circle, rgba(139,92,246,.10) 0%, transparent 70%);
+}
 
-  /* ── Messages area ── */
-  #ppc-chat-messages {
-    flex: 1; overflow-y: auto; padding: 14px 14px 6px;
-    display: flex; flex-direction: column; gap: 10px;
-    scroll-behavior: smooth;
-  }
-  #ppc-chat-messages::-webkit-scrollbar { width: 3px; }
-  #ppc-chat-messages::-webkit-scrollbar-track { background: transparent; }
-  #ppc-chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+/* ── Header ────────────────────────────────────────────────────────────── */
+#ppc-hdr {
+  flex-shrink: 0; padding: 16px 16px 0; position: relative; z-index: 1;
+}
+.ppc-hdr-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.ppc-av {
+  width: 40px; height: 40px; border-radius: 13px; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.2), 0 6px 20px rgba(99,102,241,.35);
+  animation: ppc-av-glow 3s ease-in-out infinite;
+}
+@keyframes ppc-av-glow {
+  0%,100% { box-shadow: 0 0 0 3px rgba(99,102,241,.2), 0 6px 20px rgba(99,102,241,.35); }
+  50%      { box-shadow: 0 0 0 5px rgba(99,102,241,.28), 0 6px 28px rgba(99,102,241,.5); }
+}
+.ppc-hdr-info { flex: 1; min-width: 0; }
+.ppc-hdr-title { font-size: 14px; font-weight: 700; color: #f1f5f9; line-height: 1; margin-bottom: 4px; }
+.ppc-hdr-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748b; }
+.ppc-live { width: 6px; height: 6px; border-radius: 50%; background: #10b981; flex-shrink: 0;
+  animation: ppc-live-pulse 2s ease-in-out infinite; }
+@keyframes ppc-live-pulse {
+  0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(16,185,129,.5); }
+  50%      { opacity:.7; box-shadow: 0 0 0 4px rgba(16,185,129,0); }
+}
+.ppc-x {
+  width: 30px; height: 30px; border: none; border-radius: 9px; cursor: pointer;
+  background: rgba(255,255,255,.05); color: #475569;
+  display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0;
+}
+.ppc-x:hover { background: rgba(255,255,255,.1); color: #94a3b8; }
 
-  /* ── Message bubbles ── */
-  .ppc-msg { display: flex; gap: 8px; animation: ppc-msgin 0.25s ease both; }
-  @keyframes ppc-msgin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-  .ppc-msg.user { flex-direction: row-reverse; }
-  .ppc-msg-avatar {
-    width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: #fff; align-self: flex-end;
-    font-family: 'Space Grotesk', sans-serif;
-  }
-  .ppc-msg-bubble {
-    max-width: 82%; padding: 9px 12px; border-radius: 14px;
-    font-size: 12.5px; line-height: 1.6; font-family: 'Space Grotesk', sans-serif;
-  }
-  .ppc-msg.assistant .ppc-msg-bubble {
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.07);
-    color: #cbd5e1; border-bottom-left-radius: 4px;
-  }
-  .ppc-msg.user .ppc-msg-bubble {
-    background: rgba(99,102,241,0.18); border: 1px solid rgba(99,102,241,0.25);
-    color: #c7d2fe; border-bottom-right-radius: 4px;
-  }
-  /* Markdown-like formatting in bubbles */
-  .ppc-msg-bubble strong { color: #f1f5f9; font-weight: 700; }
-  .ppc-msg-bubble ul { margin: 4px 0 0 14px; padding: 0; }
-  .ppc-msg-bubble li { margin-bottom: 2px; }
+/* Data pills */
+#ppc-pills {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.ppc-pill {
+  font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+  color: #475569; display: flex; align-items: center; gap: 4px;
+  transition: all .15s; cursor: default;
+}
+.ppc-pill:hover {
+  background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.3); color: #a5b4fc;
+}
 
-  /* ── Loading dots ── */
-  .ppc-loading-dots { display: flex; gap: 4px; padding: 4px 2px; align-items: center; }
-  .ppc-loading-dots span {
-    width: 6px; height: 6px; border-radius: 50%; background: #6366f1;
-    animation: ppc-dot 1.2s ease-in-out infinite;
-  }
-  .ppc-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .ppc-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes ppc-dot { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+/* ── Messages ──────────────────────────────────────────────────────────── */
+#ppc-msgs {
+  flex: 1; overflow-y: auto; padding: 14px 14px 6px;
+  display: flex; flex-direction: column; gap: 12px;
+  scroll-behavior: smooth; position: relative; z-index: 1;
+}
+#ppc-msgs::-webkit-scrollbar { width: 3px; }
+#ppc-msgs::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
 
-  /* ── Suggested questions ── */
-  #ppc-chat-suggestions {
-    flex-shrink: 0; padding: 6px 14px 10px;
-    display: flex; flex-wrap: wrap; gap: 6px;
-  }
-  .ppc-suggestion {
-    font-size: 11px; font-weight: 500; cursor: pointer;
-    padding: 5px 11px; border-radius: 999px;
-    background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25);
-    color: #a5b4fc; transition: all 0.15s; font-family: 'Space Grotesk', sans-serif;
-    white-space: nowrap;
-  }
-  .ppc-suggestion:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.45); color: #c7d2fe; }
+/* ── Welcome ───────────────────────────────────────────────────────────── */
+#ppc-welcome {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 14px 6px 8px; text-align: center;
+}
+.ppc-wlc-orb {
+  width: 58px; height: 58px; border-radius: 18px; margin-bottom: 14px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+  box-shadow: 0 8px 32px rgba(99,102,241,.45), 0 0 0 5px rgba(99,102,241,.12);
+  animation: ppc-orb-float 3.5s ease-in-out infinite;
+}
+@keyframes ppc-orb-float {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+.ppc-wlc-title { font-size: 15px; font-weight: 700; color: #f1f5f9; margin-bottom: 5px; }
+.ppc-wlc-sub   { font-size: 12px; color: #475569; line-height: 1.65; margin-bottom: 18px; }
 
-  /* ── Input area ── */
-  #ppc-chat-input-area {
-    flex-shrink: 0; padding: 10px 12px 14px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    display: flex; gap: 8px; align-items: flex-end;
-  }
-  #ppc-chat-input {
-    flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 12px; padding: 9px 13px; font-size: 13px;
-    color: #e2e8f0; outline: none; resize: none; min-height: 38px; max-height: 90px;
-    font-family: 'Space Grotesk', sans-serif; line-height: 1.5;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    overflow-y: auto;
-  }
-  #ppc-chat-input::placeholder { color: rgba(255,255,255,0.2); }
-  #ppc-chat-input:focus {
-    border-color: rgba(99,102,241,0.45);
-    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
-  }
-  #ppc-chat-send {
-    width: 36px; height: 36px; border: none; border-radius: 10px; cursor: pointer; flex-shrink: 0;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.15s, opacity 0.15s;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.4);
-  }
-  #ppc-chat-send:hover { transform: scale(1.08); }
-  #ppc-chat-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  #ppc-chat-send svg { width: 16px; height: 16px; }
+/* Suggestion grid */
+.ppc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; width: 100%; }
+.ppc-chip {
+  font-size: 11.5px; font-weight: 500; padding: 10px 11px; border-radius: 13px;
+  cursor: pointer; text-align: left; line-height: 1.4;
+  background: rgba(99,102,241,.07); border: 1px solid rgba(99,102,241,.16);
+  color: #94a3b8; transition: all .2s cubic-bezier(.34,1.56,.64,1);
+}
+.ppc-chip:hover {
+  background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.38);
+  color: #c7d2fe; transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99,102,241,.2);
+}
+.ppc-chip:active { transform: translateY(0); }
+.ppc-chip-ico { display: block; font-size: 17px; margin-bottom: 4px; }
 
-  /* ── Welcome message ── */
-  .ppc-welcome {
-    text-align: center; padding: 12px 8px 4px;
-    font-family: 'Space Grotesk', sans-serif;
-  }
-  .ppc-welcome-icon {
-    width: 44px; height: 44px; border-radius: 14px; margin: 0 auto 10px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 16px rgba(99,102,241,0.4);
-  }
-  .ppc-welcome h4 { font-size: 13px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
-  .ppc-welcome p  { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+/* ── Message rows ──────────────────────────────────────────────────────── */
+.ppc-row { display: flex; gap: 9px; animation: ppc-msg-in .3s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes ppc-msg-in {
+  from { opacity:0; transform: translateY(12px) scale(.96); }
+  to   { opacity:1; transform: translateY(0)    scale(1);   }
+}
+.ppc-row.user { flex-direction: row-reverse; }
+
+.ppc-row-av {
+  width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0; align-self: flex-end;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.ppc-row.assistant .ppc-row-av {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 2px 8px rgba(99,102,241,.3);
+}
+.ppc-row.user .ppc-row-av {
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+  color: #94a3b8; font-size: 10px; font-weight: 700;
+}
+
+.ppc-bwrap { display: flex; flex-direction: column; max-width: 80%; }
+.ppc-row.user .ppc-bwrap { align-items: flex-end; }
+
+.ppc-bubble {
+  padding: 10px 14px; border-radius: 16px; font-size: 13px; line-height: 1.7;
+}
+.ppc-row.assistant .ppc-bubble {
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+  border-left: 2px solid #6366f1; color: #cbd5e1; border-bottom-left-radius: 5px;
+}
+.ppc-row.user .ppc-bubble {
+  background: linear-gradient(135deg, rgba(99,102,241,.22) 0%, rgba(139,92,246,.18) 100%);
+  border: 1px solid rgba(99,102,241,.28); color: #c7d2fe; border-bottom-right-radius: 5px;
+}
+.ppc-bubble strong { color: #f1f5f9; font-weight: 700; }
+.ppc-bubble ul { margin: 5px 0 2px 16px; padding: 0; }
+.ppc-bubble li { margin-bottom: 3px; color: #94a3b8; }
+.ppc-bubble p  { margin: 3px 0; }
+.ppc-bubble p:first-child { margin-top: 0; }
+.ppc-bubble p:last-child  { margin-bottom: 0; }
+
+.ppc-ts { font-size: 10px; color: rgba(255,255,255,.18); margin-top: 3px; padding: 0 3px; }
+
+/* ── Typing ────────────────────────────────────────────────────────────── */
+.ppc-typing {
+  display: flex; align-items: center; gap: 9px; padding: 10px 14px;
+}
+.ppc-wave { display: flex; gap: 3px; align-items: center; }
+.ppc-wave span {
+  display: block; width: 4px; border-radius: 3px;
+  background: linear-gradient(180deg, #8b5cf6, #6366f1);
+  animation: ppc-wave-anim 1s ease-in-out infinite;
+}
+.ppc-wave span:nth-child(1) { height: 8px;  animation-delay: 0s; }
+.ppc-wave span:nth-child(2) { height: 14px; animation-delay: .1s; }
+.ppc-wave span:nth-child(3) { height: 10px; animation-delay: .2s; }
+.ppc-wave span:nth-child(4) { height: 16px; animation-delay: .15s; }
+.ppc-wave span:nth-child(5) { height: 8px;  animation-delay: .05s; }
+@keyframes ppc-wave-anim {
+  0%,100% { transform: scaleY(.5); opacity: .5; }
+  50%      { transform: scaleY(1);  opacity: 1; }
+}
+.ppc-typing-lbl { font-size: 11px; color: #475569; font-style: italic; }
+
+/* ── Input area ────────────────────────────────────────────────────────── */
+#ppc-input-area {
+  flex-shrink: 0; padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255,255,255,.06); position: relative; z-index: 1;
+}
+#ppc-input-row {
+  display: flex; gap: 8px; align-items: flex-end;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px; padding: 9px 9px 9px 14px;
+  transition: border-color .2s, box-shadow .2s;
+}
+#ppc-input-row:focus-within {
+  border-color: rgba(99,102,241,.5);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.1);
+}
+#ppc-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 13px; color: #e2e8f0; resize: none; padding: 0; line-height: 1.6;
+  font-family: 'Space Grotesk', sans-serif;
+  max-height: 96px; min-height: 22px; overflow-y: auto;
+}
+#ppc-input::placeholder { color: rgba(255,255,255,.2); }
+#ppc-send {
+  width: 34px; height: 34px; border: none; border-radius: 10px; cursor: pointer; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 12px rgba(99,102,241,.45);
+  transition: all .2s cubic-bezier(.34,1.56,.64,1);
+}
+#ppc-send:hover:not(:disabled) { transform: scale(1.1); box-shadow: 0 4px 18px rgba(99,102,241,.65); }
+#ppc-send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+#ppc-hint {
+  font-size: 10px; color: rgba(255,255,255,.13); text-align: center; margin-top: 7px;
+  letter-spacing: .02em;
+}
 </style>
 
-<!-- Trigger button -->
-<button id="ppc-chat-trigger" onclick="ppcChatToggle()" title="PPC Assistant" aria-label="Open PPC Assistant">
-  <span id="ppc-chat-badge"></span>
-  <!-- Chat icon -->
-  <svg id="ppc-trigger-icon-chat" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
-    <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-      d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-  </svg>
-  <!-- Close icon -->
-  <svg id="ppc-trigger-icon-close" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
-    <path stroke="#fff" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
-  </svg>
-</button>
+<!-- Trigger -->
+<div id="ppc-wrap">
+  <button id="ppc-btn" onclick="ppcOpen()" aria-label="Open PPC Assistant">
+    <svg class="ppc-ico" id="ppc-ico-chat" width="22" height="22" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <svg class="ppc-ico" id="ppc-ico-close" width="20" height="20" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke="#fff" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
+    </svg>
+  </button>
+  <div id="ppc-tip">PPC Assistant</div>
+</div>
 
-<!-- Chat panel -->
-<div id="ppc-chat-panel" role="dialog" aria-label="PPC Assistant">
+<!-- Panel -->
+<div id="ppc-border">
+  <div id="ppc-panel">
 
-  <!-- Header -->
-  <div id="ppc-chat-header">
-    <div class="ppc-chat-avatar">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-          d="M12 2a9 9 0 0 1 9 9c0 3.9-2.5 7.2-6 8.5V21l-3-1-3 1v-1.5C5.5 18.2 3 14.9 3 11a9 9 0 0 1 9-9z"/>
-        <circle cx="9" cy="11" r="1" fill="#fff"/>
-        <circle cx="12" cy="11" r="1" fill="#fff"/>
-        <circle cx="15" cy="11" r="1" fill="#fff"/>
-      </svg>
-    </div>
-    <div class="ppc-chat-header-text">
-      <div class="ppc-chat-title">PPC Assistant</div>
-      <div class="ppc-chat-subtitle">
-        <span class="ppc-live-dot"></span>
-        GPT-4o mini · Live data
+    <!-- Header -->
+    <div id="ppc-hdr">
+      <div class="ppc-hdr-row">
+        <div class="ppc-av">⚡</div>
+        <div class="ppc-hdr-info">
+          <div class="ppc-hdr-title">PPC Assistant</div>
+          <div class="ppc-hdr-status">
+            <span class="ppc-live"></span>Live · GPT-4o mini
+          </div>
+        </div>
+        <button class="ppc-x" onclick="ppcOpen()" aria-label="Close">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="ppc-pills">
+        <span class="ppc-pill">👁 Anonymous Visitors</span>
+        <span class="ppc-pill">📡 Signal Tracker</span>
+        <span class="ppc-pill">🎯 Ad Intelligence</span>
       </div>
     </div>
-    <button class="ppc-chat-close" onclick="ppcChatToggle()" aria-label="Close">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24">
-        <path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
-      </svg>
-    </button>
-  </div>
 
-  <!-- Messages -->
-  <div id="ppc-chat-messages"></div>
+    <!-- Messages -->
+    <div id="ppc-msgs"></div>
 
-  <!-- Suggested questions -->
-  <div id="ppc-chat-suggestions">
-    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Who visited us this week?</span>
-    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Any funding rounds in healthcare?</span>
-    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">What ads is Inspire Aesthetics running?</span>
-    <span class="ppc-suggestion" onclick="ppcSendSuggestion(this)">Show VP+ level visitors</span>
-  </div>
+    <!-- Input -->
+    <div id="ppc-input-area">
+      <div id="ppc-input-row">
+        <textarea id="ppc-input" rows="1" placeholder="Ask anything about your PPC data…"></textarea>
+        <button id="ppc-send" aria-label="Send">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+      <div id="ppc-hint">↵ Send &nbsp;·&nbsp; Shift+↵ New line</div>
+    </div>
 
-  <!-- Input -->
-  <div id="ppc-chat-input-area">
-    <textarea id="ppc-chat-input" placeholder="Ask anything about your PPC data…" rows="1"
-      onkeydown="ppcChatKeydown(event)" oninput="ppcAutoResize(this)"></textarea>
-    <button id="ppc-chat-send" onclick="ppcChatSend()" aria-label="Send">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-          d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-      </svg>
-    </button>
   </div>
 </div>
 
 <script>
-(function() {
-  var _ppcHistory = [];
-  var _ppcLoading = false;
-  var _ppcFirstOpen = true;
+(function () {
+  var _hist = [], _busy = false, _fresh = true;
 
-  window.ppcChatToggle = function() {
-    var trigger = document.getElementById('ppc-chat-trigger');
-    var panel   = document.getElementById('ppc-chat-panel');
-    var isOpen  = panel.classList.contains('open');
-
-    trigger.classList.toggle('open', !isOpen);
-    panel.classList.toggle('open', !isOpen);
-
+  /* ── Toggle ── */
+  window.ppcOpen = function () {
+    var btn    = document.getElementById('ppc-btn');
+    var border = document.getElementById('ppc-border');
+    var isOpen = border.classList.contains('open');
+    btn.classList.toggle('open', !isOpen);
+    border.classList.toggle('open', !isOpen);
     if (!isOpen) {
-      // First open — show welcome
-      if (_ppcFirstOpen) {
-        _ppcFirstOpen = false;
-        _ppcShowWelcome();
-      }
-      setTimeout(function() {
-        document.getElementById('ppc-chat-input').focus();
-      }, 300);
-      // Clear badge
-      document.getElementById('ppc-chat-badge').classList.remove('show');
+      if (_fresh) { _fresh = false; _welcome(); }
+      setTimeout(function () { document.getElementById('ppc-input').focus(); }, 380);
     }
   };
 
-  function _ppcShowWelcome() {
-    var msgs = document.getElementById('ppc-chat-messages');
+  /* ── Welcome screen ── */
+  function _welcome() {
+    var msgs = document.getElementById('ppc-msgs');
     var el = document.createElement('div');
-    el.className = 'ppc-welcome';
+    el.id = 'ppc-welcome';
     el.innerHTML =
-      '<div class="ppc-welcome-icon">' +
-        '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">' +
-          '<path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>' +
-        '</svg>' +
-      '</div>' +
-      '<h4>PPC Intelligence Assistant</h4>' +
-      '<p>Ask me about anonymous visitors,<br>competitor ads, or signal tracker data.</p>';
+      '<div class="ppc-wlc-orb">⚡</div>' +
+      '<div class="ppc-wlc-title">What do you want to know?</div>' +
+      '<div class="ppc-wlc-sub">Ask me anything — visitors, competitor ads,<br>buying signals, and more.</div>' +
+      '<div class="ppc-grid">' +
+        _chip('👥', 'Who visited us this week?') +
+        _chip('💰', 'Recent funding rounds?') +
+        _chip('🎯', "Inspire Aesthetics' active ads?") +
+        _chip('👔', 'Show VP+ level visitors') +
+      '</div>';
     msgs.appendChild(el);
   }
 
-  window.ppcSendSuggestion = function(el) {
-    document.getElementById('ppc-chat-suggestions').style.display = 'none';
-    document.getElementById('ppc-chat-input').value = el.textContent;
-    ppcChatSend();
+  function _chip(emoji, q) {
+    return '<div class="ppc-chip" data-q="' + q.replace(/"/g, '&quot;') + '" onclick="ppcSugg(this)">' +
+      '<span class="ppc-chip-ico">' + emoji + '</span>' + q + '</div>';
+  }
+
+  window.ppcSugg = function (el) {
+    var q = el.getAttribute('data-q');
+    document.getElementById('ppc-input').value = q;
+    ppcSend();
   };
 
-  window.ppcAutoResize = function(el) {
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 90) + 'px';
-  };
-
-  window.ppcChatKeydown = function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      ppcChatSend();
-    }
-  };
-
-  window.ppcChatSend = function() {
-    if (_ppcLoading) return;
-    var input = document.getElementById('ppc-chat-input');
-    var msg   = (input.value || '').trim();
+  /* ── Send ── */
+  window.ppcSend = function () {
+    if (_busy) return;
+    var inp = document.getElementById('ppc-input');
+    var msg = (inp.value || '').trim();
     if (!msg) return;
 
-    // Hide suggestions after first message
-    document.getElementById('ppc-chat-suggestions').style.display = 'none';
+    var wlc = document.getElementById('ppc-welcome');
+    if (wlc) wlc.remove();
 
-    input.value = '';
-    input.style.height = 'auto';
+    inp.value = ''; inp.style.height = 'auto';
 
-    _ppcAppendMessage('user', msg);
-    _ppcHistory.push({ role: 'user', content: msg });
+    _addMsg('user', msg);
+    _hist.push({ role: 'user', content: msg });
 
-    var loadEl = _ppcAppendLoading();
-    _ppcLoading = true;
-    document.getElementById('ppc-chat-send').disabled = true;
+    var loader = _addLoader();
+    _setBusy(true);
 
     fetch('/api/ppc-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, history: _ppcHistory.slice(-8) }),
+      body: JSON.stringify({ message: msg, history: _hist.slice(-8) }),
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      loadEl.remove();
-      var answer = data.answer || 'No response received.';
-      _ppcAppendMessage('assistant', answer);
-      _ppcHistory.push({ role: 'assistant', content: answer });
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      loader.remove();
+      var ans = d.answer || 'No response.';
+      _addMsg('assistant', ans);
+      _hist.push({ role: 'assistant', content: ans });
     })
-    .catch(function(err) {
-      loadEl.remove();
-      _ppcAppendMessage('assistant', '⚠️ Could not reach the server. Please try again.');
+    .catch(function () {
+      loader.remove();
+      _addMsg('assistant', '⚠️ Connection error. Please try again.');
     })
-    .finally(function() {
-      _ppcLoading = false;
-      document.getElementById('ppc-chat-send').disabled = false;
-      document.getElementById('ppc-chat-input').focus();
+    .finally(function () {
+      _setBusy(false);
+      document.getElementById('ppc-input').focus();
     });
   };
 
-  function _ppcAppendMessage(role, text) {
-    var msgs    = document.getElementById('ppc-chat-messages');
-    var initials = role === 'user' ? 'You' : 'AI';
-    var wrap    = document.createElement('div');
-    wrap.className = 'ppc-msg ' + role;
-
-    var avatar = document.createElement('div');
-    avatar.className = 'ppc-msg-avatar';
-    avatar.textContent = initials;
-
-    var bubble = document.createElement('div');
-    bubble.className = 'ppc-msg-bubble';
-    bubble.innerHTML = _ppcFormat(text);
-
-    wrap.appendChild(avatar);
-    wrap.appendChild(bubble);
-    msgs.appendChild(wrap);
-    msgs.scrollTop = msgs.scrollHeight;
-    return wrap;
+  function _setBusy(state) {
+    _busy = state;
+    var btn = document.getElementById('ppc-send');
+    btn.disabled = state;
+    btn.innerHTML = state
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation:ppc-spin .8s linear infinite"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.25)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>'
+      : '<svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
   }
 
-  function _ppcAppendLoading() {
-    var msgs = document.getElementById('ppc-chat-messages');
-    var wrap = document.createElement('div');
-    wrap.className = 'ppc-msg assistant';
+  /* ── Message helpers ── */
+  function _addMsg(role, text) {
+    var msgs = document.getElementById('ppc-msgs');
+    var row  = document.createElement('div');
+    row.className = 'ppc-row ' + role;
 
-    var avatar = document.createElement('div');
-    avatar.className = 'ppc-msg-avatar';
-    avatar.textContent = 'AI';
+    var av = document.createElement('div');
+    av.className = 'ppc-row-av';
+    av.textContent = role === 'assistant' ? '⚡' : 'You';
+
+    var bwrap = document.createElement('div');
+    bwrap.className = 'ppc-bwrap';
 
     var bubble = document.createElement('div');
-    bubble.className = 'ppc-msg-bubble';
+    bubble.className = 'ppc-bubble';
+    bubble.innerHTML = _fmt(text);
+
+    var ts = document.createElement('div');
+    ts.className = 'ppc-ts';
+    ts.textContent = _now();
+
+    bwrap.appendChild(bubble);
+    bwrap.appendChild(ts);
+    row.appendChild(av);
+    row.appendChild(bwrap);
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+    return row;
+  }
+
+  function _addLoader() {
+    var msgs = document.getElementById('ppc-msgs');
+    var row  = document.createElement('div');
+    row.className = 'ppc-row assistant';
+
+    var av = document.createElement('div');
+    av.className = 'ppc-row-av';
+    av.textContent = '⚡';
+
+    var bwrap = document.createElement('div');
+    bwrap.className = 'ppc-bwrap';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'ppc-bubble ppc-typing';
     bubble.innerHTML =
-      '<div class="ppc-loading-dots">' +
-        '<span></span><span></span><span></span>' +
-      '</div>';
+      '<div class="ppc-wave"><span></span><span></span><span></span><span></span><span></span></div>' +
+      '<span class="ppc-typing-lbl">Analyzing data…</span>';
 
-    wrap.appendChild(avatar);
-    wrap.appendChild(bubble);
-    msgs.appendChild(wrap);
+    bwrap.appendChild(bubble);
+    row.appendChild(av);
+    row.appendChild(bwrap);
+    msgs.appendChild(row);
     msgs.scrollTop = msgs.scrollHeight;
-    return wrap;
+    return row;
   }
 
-  function _ppcFormat(text) {
-    // Bold: **text**
-    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // Bullet points: lines starting with - or •
-    var lines = text.split('\n');
-    var out = [], inList = false;
+  /* ── Formatting ── */
+  function _fmt(t) {
+    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    var lines = t.split('\n'), out = [], list = false;
     for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      var isBullet = /^[\-•]\s+/.test(line.trim());
+      var l = lines[i], isBullet = /^[\-\*•]\s+/.test(l.trim());
       if (isBullet) {
-        if (!inList) { out.push('<ul>'); inList = true; }
-        out.push('<li>' + line.trim().replace(/^[\-•]\s+/, '') + '</li>');
+        if (!list) { out.push('<ul>'); list = true; }
+        out.push('<li>' + l.trim().replace(/^[\-\*•]\s+/, '') + '</li>');
       } else {
-        if (inList) { out.push('</ul>'); inList = false; }
-        if (line.trim()) out.push('<p style="margin:2px 0">' + line + '</p>');
-        else if (i > 0) out.push('<br>');
+        if (list) { out.push('</ul>'); list = false; }
+        if (l.trim()) out.push('<p>' + l + '</p>');
       }
     }
-    if (inList) out.push('</ul>');
+    if (list) out.push('</ul>');
     return out.join('');
   }
 
-  // Close panel when clicking outside
-  document.addEventListener('click', function(e) {
-    var panel   = document.getElementById('ppc-chat-panel');
-    var trigger = document.getElementById('ppc-chat-trigger');
-    if (panel && panel.classList.contains('open') &&
-        !panel.contains(e.target) && !trigger.contains(e.target)) {
-      ppcChatToggle();
-    }
-  });
+  function _now() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return h + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
+  }
 
-  // Close on Escape
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      var panel = document.getElementById('ppc-chat-panel');
-      if (panel && panel.classList.contains('open')) ppcChatToggle();
-    }
+  /* ── Spinner keyframe (injected once) ── */
+  (function () {
+    var s = document.createElement('style');
+    s.textContent = '@keyframes ppc-spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+  })();
+
+  /* ── Events ── */
+  document.getElementById('ppc-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ppcSend(); }
+  });
+  document.getElementById('ppc-input').addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 96) + 'px';
+  });
+  document.getElementById('ppc-send').addEventListener('click', ppcSend);
+  document.addEventListener('click', function (e) {
+    var b = document.getElementById('ppc-border'), w = document.getElementById('ppc-wrap');
+    if (b && b.classList.contains('open') && !b.contains(e.target) && !w.contains(e.target)) ppcOpen();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { var b = document.getElementById('ppc-border'); if (b && b.classList.contains('open')) ppcOpen(); }
   });
 })();
 </script>
