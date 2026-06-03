@@ -286,7 +286,7 @@ def seo():
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 AD_INTELLIGENCE_URL = "https://ad-intelligence-production-be71.up.railway.app"
-SERP_RESEARCHER_URL  = "https://serp-content-researcher-production-a947.up.railway.app"
+_SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
 
 @app.route("/ppc/ad-intelligence")
 @login_required
@@ -303,10 +303,12 @@ def ad_intelligence():
 @app.route("/seo/serp-researcher")
 @login_required
 def serp_researcher():
+    pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
+    embed_url = f"{_SERP_BASE}{'?pt=' + pt if pt else ''}"
     return render_template("embed.html",
         user=_get_user(),
         title="SERP Content Researcher",
-        embed_url=SERP_RESEARCHER_URL,
+        embed_url=embed_url,
         breadcrumb=[("Hub", "/hub"), ("SEO", "/seo")],
         current="SERP Researcher",
         accent="#34d399",
