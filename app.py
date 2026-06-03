@@ -1223,7 +1223,7 @@ If filters return 0 results, suggest a broader query. Example: "No results for V
 
     try:
         resp = oai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=messages,
             tools=tools,
             tool_choice="auto",
@@ -1248,7 +1248,7 @@ If filters return 0 results, suggest a broader query. Example: "No results for V
                 })
 
             final = oai.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=messages,
                 max_tokens=1000,
                 temperature=0.15,
