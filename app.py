@@ -606,7 +606,7 @@ def _fetch_anon_visitors_data() -> dict:
         total_people=len(people_table),
         unique_companies=len(company_table),
         top_industries=top_industries,
-        people_table=people_table[:500],
+        people_table=people_table,
         company_table=company_table,
     )
 
