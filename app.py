@@ -446,10 +446,19 @@ def _fetch_usage_data() -> dict:
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
 
+    from collections import Counter
+
     unique_users     = len({col(r, 5) for r in login_data if col(r, 5)})
     total_logins     = len(login_data)
     total_page_views = len(page_data)
 
+    # Total time spent across all page views
+    total_secs = sum(int(col(r, 7)) for r in page_data if col(r, 7).isdigit())
+    h, rem = divmod(total_secs, 3600)
+    m = rem // 60
+    total_time_fmt = f"{h}h {m}m" if h else (f"{m}m" if m else "—")
+
+    # Top pages
     page_counts: dict = {}
     for r in page_data:
         t = col(r, 5)
@@ -457,9 +466,32 @@ def _fetch_usage_data() -> dict:
             page_counts[t] = page_counts.get(t, 0) + 1
     top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:8]
 
-    from collections import Counter
+    # Logins per day (last 14 days)
     login_days = Counter(col(r, 1) for r in login_data if col(r, 1))
     sorted_days = sorted(login_days.items())[-14:]
+
+    # Browser breakdown (from logins)
+    browser_counts = Counter(col(r, 10) for r in login_data if col(r, 10))
+    browser_breakdown = browser_counts.most_common(5)
+
+    # Per-user activity
+    user_map: dict = {}
+    for r in login_data:
+        e = col(r, 5)
+        if not e: continue
+        if e not in user_map:
+            user_map[e] = {"email": e, "name": col(r, 6), "logins": 0,
+                           "last_seen": col(r, 0), "total_secs": 0}
+        user_map[e]["logins"] += 1
+        user_map[e]["last_seen"] = col(r, 0)   # rows are oldest→newest; last row = most recent
+    for r in page_data:
+        e = col(r, 4)
+        if e in user_map and col(r, 7).isdigit():
+            user_map[e]["total_secs"] += int(col(r, 7))
+    for u in user_map.values():
+        s = u["total_secs"]; uh, ur = divmod(s, 3600); um = ur // 60
+        u["time_fmt"] = f"{uh}h {um}m" if uh else (f"{um}m" if um else "—")
+    user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
 
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
                     "browser": col(r,10), "os": col(r,12), "device": col(r,13)}
@@ -469,8 +501,10 @@ def _fetch_usage_data() -> dict:
                    for r in reversed(page_data)][:200]
 
     return dict(total_logins=total_logins, unique_users=unique_users,
-                total_page_views=total_page_views, top_pages=top_pages,
-                login_days=sorted_days, login_table=login_table, page_table=page_table)
+                total_page_views=total_page_views, total_time_fmt=total_time_fmt,
+                top_pages=top_pages, login_days=sorted_days,
+                browser_breakdown=browser_breakdown, user_activity=user_activity,
+                login_table=login_table, page_table=page_table)
 
 
 @app.route("/admin/usage")
