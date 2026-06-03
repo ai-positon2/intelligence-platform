@@ -10,10 +10,11 @@ from pathlib import Path
 from functools import wraps
 
 from flask import (
-    Flask, send_file, abort, jsonify,
+    Flask, send_file, send_from_directory, abort, jsonify,
     request, session, redirect, url_for,
     make_response, render_template,
 )
+import requests
 
 log = logging.getLogger(__name__)
 
@@ -289,20 +290,28 @@ def seo():
     return render_template("seo.html", user=_get_user())
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
-AD_INTELLIGENCE_URL = "https://ad-intelligence-production-be71.up.railway.app"
 _SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
 
+# ── Ad Intelligence (built React app served directly — no iframe) ────────────
+AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
+
 @app.route("/ppc/ad-intelligence")
+@app.route("/ppc/ad-intelligence/")
 @login_required
 def ad_intelligence():
-    return render_template("embed.html",
-        user=_get_user(),
-        title="Ad Intelligence",
-        embed_url=AD_INTELLIGENCE_URL,
-        breadcrumb=[("Hub", "/hub"), ("PPC", "/ppc")],
-        current="Ad Intelligence",
-        accent="#f59e0b",
-    )
+    return send_from_directory("ad_intelligence", "index.html")
+
+@app.route("/ppc/ad-intelligence/assets/<path:filename>")
+def ad_intelligence_assets(filename):
+    return send_from_directory("ad_intelligence/assets", filename)
+
+@app.route("/ppc/ad-intelligence/favicon.svg")
+def ad_intelligence_favicon():
+    return send_from_directory("ad_intelligence", "favicon.svg")
+
+@app.route("/ppc/ad-intelligence/icons.svg")
+def ad_intelligence_icons():
+    return send_from_directory("ad_intelligence", "icons.svg")
 
 _SEO_TOOLS = {
     "seo-geo-audit":          ("/seo-geo-audit",          "SEO & GEO Audit"),
@@ -858,6 +867,81 @@ def _read_company_count(path: Path) -> str:
         return snippet if snippet.isdigit() else "—"
     except Exception:
         return "—"
+
+
+# ── Ad Intelligence data helper (for chatbot) ────────────────────────────────
+def get_ad_intelligence_data(competitor=None, format=None, status=None,
+                              keyword=None, limit=50):
+    """
+    Fetch competitor ad data from the Ad Intelligence Google Sheet.
+    Uses the same public gviz endpoint the React app uses — no API key needed.
+
+    Args:
+        competitor : filter by competitor name or domain
+                     (e.g. 'Inspire Aesthetics', 'sonobello', 'drdanamd')
+        format     : 'image', 'text', or 'video'
+        status     : 'active' or 'inactive'
+        keyword    : word to search in headline / description / keywords
+        limit      : max rows to return (default 50)
+    """
+    url = f"https://docs.google.com/spreadsheets/d/{AD_INTEL_SHEET_ID}/gviz/tq?tqx=out:json"
+    try:
+        res = requests.get(url, timeout=10)
+        text = res.text
+        # Strip JSONP wrapper: /*O_o*/ google.visualization.Query.setResponse({...});
+        json_str = re.sub(r"^[^{]*", "", text)
+        json_str = re.sub(r"\);\s*$", "", json_str)
+        parsed = json.loads(json_str)
+        table = parsed.get("table", {})
+        headers = [c.get("label", "") for c in table.get("cols", [])]
+        ads = []
+        for row in table.get("rows", []):
+            obj = {}
+            cells = row.get("c", [])
+            for i, h in enumerate(headers):
+                cell = cells[i] if i < len(cells) else None
+                obj[h] = str(cell["v"]) if cell and cell.get("v") is not None else ""
+            if obj.get("Domain") and obj.get("Domain") != "Domain":
+                ads.append(obj)
+    except Exception as e:
+        return {"error": str(e), "ads": []}
+
+    if competitor:
+        c = competitor.lower()
+        ads = [a for a in ads if c in a.get("Domain", "").lower()
+               or c in a.get("Advertiser Name", "").lower()]
+    if format:
+        ads = [a for a in ads if a.get("Format", "").lower() == format.lower()]
+    if status:
+        ads = [a for a in ads if a.get("Status", "").lower() == status.lower()]
+    if keyword:
+        kw = keyword.lower()
+        ads = [a for a in ads if kw in a.get("Headline", "").lower()
+               or kw in a.get("Description", "").lower()
+               or kw in a.get("Full Ad Text", "").lower()
+               or kw in a.get("Keywords", "").lower()]
+
+    return {
+        "total": len(ads),
+        "competitors": list({a.get("Domain") for a in ads}),
+        "ads": [
+            {
+                "competitor":      a.get("Advertiser Name") or a.get("Domain"),
+                "domain":          a.get("Domain"),
+                "format":          a.get("Format"),
+                "status":          a.get("Status"),
+                "headline":        a.get("Headline"),
+                "description":     a.get("Description"),
+                "cta":             a.get("CTA"),
+                "keywords":        a.get("Keywords"),
+                "messaging_angle": a.get("Messaging Angle"),
+                "first_shown":     a.get("First Shown"),
+                "last_shown":      a.get("Last Shown"),
+                "platform":        a.get("Platform"),
+            }
+            for a in ads[:limit]
+        ],
+    }
 
 
 if __name__ == "__main__":
