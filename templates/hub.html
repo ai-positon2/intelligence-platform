@@ -371,12 +371,9 @@
       function _send(){
         if(_sent) return; _sent = true;
         var s = Math.round((Date.now()-_start)/1000);
-        navigator.sendBeacon('/api/track', JSON.stringify({
-          page: window.location.pathname,
-          title: 'Hub',
-          seconds: s,
-          email: '{{ user.email if user else "" }}'
-        }));
+        fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({page: window.location.pathname, title: 'Hub', seconds: s,
+          email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
       }
       document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
       window.addEventListener('beforeunload', _send);
