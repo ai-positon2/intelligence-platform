@@ -525,6 +525,21 @@ def admin_usage_data():
     return jsonify(data)
 
 
+def _clean_industry(raw: str) -> str:
+    """Strip JSON array brackets from industry field, return first value only."""
+    if not raw or raw == "Unavailable":
+        return "—"
+    if raw.startswith('['):
+        try:
+            import json as _j
+            lst = _j.loads(raw)
+            return lst[0].strip() if lst else raw
+        except Exception:
+            # fallback: strip brackets and quotes manually
+            return raw.strip('[]').split(',')[0].strip().strip('"\'')
+    return raw
+
+
 def _fetch_anon_visitors_data() -> dict:
     """Fetch people + company data from the Anonymous Visitors Google Sheet."""
     def _fetch(tab_range):
@@ -595,7 +610,7 @@ def _fetch_anon_visitors_data() -> dict:
             "email":    col(r, 2),
             "location": col(r, 4),
             "pages":    col(r, 5),
-            "industry": col(r, 8),
+            "industry": _clean_industry(col(r, 8)),
             "website":  col(r, 10),
             "date":     time_str[:10] if time_str else "",
             "time_raw": time_str,

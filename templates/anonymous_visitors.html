@@ -167,8 +167,16 @@
     .tbl-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 999px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead { position: sticky; top: 0; z-index: 2; }
-    thead th { padding: 11px 16px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(14,17,27,.99); white-space: nowrap; }
-    thead th:first-child, tbody td:first-child { width: 240px; max-width: 240px; }
+    thead th { padding: 11px 16px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(14,17,27,.99); white-space: nowrap; overflow: hidden; }
+    /* Fixed column widths — prevents overflow into adjacent cells */
+    #pane-people table { table-layout: fixed; }
+    #pane-people col.c-person   { width: 240px; }
+    #pane-people col.c-sen      { width: 120px; }
+    #pane-people col.c-company  { width: 130px; }
+    #pane-people col.c-location { width: 200px; }
+    #pane-people col.c-industry { width: 180px; }
+    #pane-people col.c-pages    { width:  74px; }
+    #pane-people col.c-date     { width: 110px; }
     tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); transition: background .1s; }
     tbody tr:hover { background: rgba(52,211,153,.05); }
     tbody td { padding: 11px 16px; color: #94a3b8; white-space: nowrap; }
@@ -474,23 +482,30 @@
     /* ── Render: people table ── */
     function renderPeople(rows){
       if(!rows||!rows.length)return'<div class="empty">No matching visitors found.</div>';
+      var cols='<colgroup>'+
+        '<col class="c-person"><col class="c-sen"><col class="c-company">'+
+        '<col class="c-location"><col class="c-industry"><col class="c-pages"><col class="c-date">'+
+        '</colgroup>';
       var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Pages</th><th>Date</th></tr></thead>';
       var b='<tbody>'+rows.map(function(p,i){
         var sen=getSeniority(p.title);
         return'<tr style="animation:row-in .25s ease '+(i*6)+'ms both">'+
-          '<td><div class="person-cell">'+
-            '<div class="person-av">'+initials(p.name)+'</div>'+
-            '<div><div class="person-name">'+p.name+'</div><div class="person-title">'+p.title+'</div></div>'+
+          '<td style="overflow:hidden"><div class="person-cell">'+
+            '<div class="person-av" style="flex-shrink:0">'+initials(p.name)+'</div>'+
+            '<div style="min-width:0;overflow:hidden">'+
+              '<div class="person-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.name+'</div>'+
+              '<div class="person-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.title+'</div>'+
+            '</div>'+
           '</div></td>'+
           '<td><span class="seniority-badge '+senClass(sen)+'">'+sen+'</span></td>'+
           '<td>'+(p.website?'<span class="domain-pill">'+p.website+'</span>':'—')+'</td>'+
-          '<td>'+p.location+'</td>'+
-          '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;color:#cbd5e1">'+p.industry+'</td>'+
+          '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.location+'</td>'+
+          '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbd5e1">'+p.industry+'</td>'+
           '<td><span class="pages-pill '+pagesClass(p.pages)+'">'+p.pages+'</span></td>'+
-          '<td style="color:#64748b">'+p.date+'</td>'+
+          '<td style="color:#64748b;white-space:nowrap">'+p.date+'</td>'+
         '</tr>';
       }).join('')+'</tbody>';
-      return'<div class="tbl-wrap"><table>'+h+b+'</table></div>';
+      return'<div class="tbl-wrap"><table>'+cols+h+b+'</table></div>';
     }
 
     /* ── Render: companies table ── */
