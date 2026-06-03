@@ -300,17 +300,34 @@ def ad_intelligence():
         accent="#f59e0b",
     )
 
-@app.route("/seo/serp-researcher")
+_SEO_TOOLS = {
+    "seo-geo-audit":          ("/seo-geo-audit",          "SEO & GEO Audit"),
+    "article-recommendation": ("/article-recommendation", "Article Recommendation"),
+    "content-enhancement":    ("/content-enhancement",    "Content Enhancement"),
+    "content-research":       ("/content-research",       "Content Research"),
+    "keyword-research":       ("/keyword-research",       "Keyword Research"),
+    "agent-readiness-audit":  ("/agent-readiness-audit",  "Agent Readiness Audit"),
+    "image-alt-audit":        ("/image-alt-audit",        "Image Alt Tag Audit"),
+    "knowledge-base":         ("/kb",                     "Knowledge Base"),
+    "team-insights":          ("/team-insights",          "Team Insights"),
+    "serp-researcher":        ("/",                       "SERP Content Researcher"),
+}
+
+@app.route("/seo/<tool_slug>")
 @login_required
-def serp_researcher():
+def seo_tool(tool_slug: str):
+    if tool_slug not in _SEO_TOOLS:
+        abort(404)
+    tool_path, tool_name = _SEO_TOOLS[tool_slug]
     pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
-    embed_url = f"{_SERP_BASE}{'?pt=' + pt if pt else ''}"
+    sep = "?" if "?" not in tool_path else "&"
+    embed_url = f"{_SERP_BASE}{tool_path}{sep + 'pt=' + pt if pt else ''}"
     return render_template("embed.html",
         user=_get_user(),
-        title="SERP Content Researcher",
+        title=tool_name,
         embed_url=embed_url,
         breadcrumb=[("Hub", "/hub"), ("SEO", "/seo")],
-        current="SERP Researcher",
+        current=tool_name,
         accent="#34d399",
     )
 
