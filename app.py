@@ -35,6 +35,9 @@ def forbidden(e):
 #        → Authorised JavaScript origins: https://intelligence.position2.com
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 
+# Anonymous Visitors Google Sheet
+ANON_VISITORS_SHEET_ID = "1y5_ef9Df5v8PVuGs60DzzlzE1ZJLxwvB5MQsB6ug458"
+
 # Google Sheet ID for login tracking (set LOGIN_LOG_SHEET_ID in Railway Variables).
 # Create a new Google Sheet, share it with the service account email (Editor),
 # then paste the sheet ID here (from its URL: /spreadsheets/d/<ID>/edit).
@@ -520,6 +523,106 @@ def admin_usage_data():
     """JSON data endpoint called by the admin usage shell page."""
     data = _fetch_usage_data()
     return jsonify(data)
+
+
+def _fetch_anon_visitors_data() -> dict:
+    """Fetch people + company data from the Anonymous Visitors Google Sheet."""
+    def _fetch(tab_range):
+        try:
+            import json as _j
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+            if not sa_str:
+                return []
+            sa_info = _j.loads(sa_str)
+            creds = service_account.Credentials.from_service_account_info(
+                sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+            svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+            r = svc.spreadsheets().values().get(
+                spreadsheetId=ANON_VISITORS_SHEET_ID, range=tab_range).execute()
+            return r.get("values", [])
+        except Exception as e:
+            log.warning("anon_visitors sheet read failed: %s", e)
+            return []
+
+    def col(row, i, default=""):
+        return row[i] if len(row) > i else default
+
+    people_rows  = _fetch("People Enriched!A:K")
+    company_rows = _fetch("Visitors By Company!A:J")
+
+    people_data  = people_rows[1:]  if len(people_rows)  > 1 else []
+    company_data = company_rows[1:] if len(company_rows) > 1 else []
+
+    from collections import Counter
+    ind_counter = Counter()
+    for r in company_data:
+        ind = col(r, 7)
+        if ind and ind != "Unavailable":
+            ind_counter[ind] += 1
+    top_industries = ind_counter.most_common(8)
+
+    # Deduplicated companies list
+    seen, company_table = set(), []
+    for r in company_data:
+        name = col(r, 0)
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        company_table.append({
+            "name":      name,
+            "website":   col(r, 2),
+            "city":      col(r, 3),
+            "state":     col(r, 4),
+            "country":   col(r, 5),
+            "industry":  col(r, 7),
+            "employees": col(r, 8),
+            "revenue":   col(r, 9),
+        })
+    company_table.sort(key=lambda x: x["name"])
+
+    # People list — sorted newest first
+    people_table = []
+    for r in people_data:
+        name = col(r, 0)
+        if not name or name == "Unavailable":
+            continue
+        time_str = col(r, 6)
+        people_table.append({
+            "name":     name,
+            "title":    col(r, 1),
+            "email":    col(r, 2),
+            "location": col(r, 4),
+            "pages":    col(r, 5),
+            "industry": col(r, 8),
+            "website":  col(r, 10),
+            "date":     time_str[:10] if time_str else "",
+            "time_raw": time_str,
+        })
+    people_table.sort(key=lambda x: x.get("time_raw", ""), reverse=True)
+
+    return dict(
+        total_people=len(people_table),
+        unique_companies=len(company_table),
+        top_industries=top_industries,
+        people_table=people_table[:500],
+        company_table=company_table,
+    )
+
+
+@app.route("/ppc/anonymous-visitors")
+@login_required
+def anonymous_visitors():
+    """Anonymous Visitors dashboard shell — loads data async."""
+    return render_template("anonymous_visitors.html", user=_get_user())
+
+
+@app.route("/ppc/anonymous-visitors/data")
+@login_required
+def anonymous_visitors_data():
+    """JSON data endpoint for the Anonymous Visitors dashboard."""
+    return jsonify(_fetch_anon_visitors_data())
 
 
 @app.route("/health")
