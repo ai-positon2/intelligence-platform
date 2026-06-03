@@ -869,55 +869,73 @@ def _read_company_count(path: Path) -> str:
         return "—"
 
 
+# ── Shared Sheets helper ──────────────────────────────────────────────────────
+
+def _sheets_service():
+    """Return an authenticated Google Sheets service, or raise on failure."""
+    import json as _j
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
+    sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+    if not sa_str:
+        raise RuntimeError("GOOGLE_SA_JSON env var not set")
+    sa_info = _j.loads(sa_str)
+    creds = service_account.Credentials.from_service_account_info(
+        sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+
 # ── Chatbot data functions ────────────────────────────────────────────────────
 
 def _chatbot_get_anonymous_visitors(date_from=None, date_to=None, company=None,
                                      seniority=None, industry=None, limit=20):
     """Fetch targeted anonymous visitor rows for the chatbot."""
     try:
-        import json as _j
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-
-        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
-        if not sa_str:
-            return {"error": "No Google credentials configured"}
-
-        sa_info = _j.loads(sa_str)
-        creds = service_account.Credentials.from_service_account_info(
-            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
-
+        svc = _sheets_service()
         r = svc.spreadsheets().values().get(
             spreadsheetId=ANON_VISITORS_SHEET_ID,
-            range="People Enriched!A:K"
+            range="People Enriched!A:L"
         ).execute()
         rows = r.get("values", [])
+        if not rows:
+            return {"status": "empty", "message": "Sheet returned no data", "people": []}
 
-        def col(row, i, default=""):
-            return row[i] if len(row) > i else default
+        # Header-based mapping — robust to column reordering
+        headers = [h.strip().lower() for h in rows[0]]
+
+        def _h(row, *names):
+            """Get the first matching column value by header name."""
+            for name in names:
+                for i, h in enumerate(headers):
+                    if name in h and i < len(row):
+                        return row[i]
+            return ""
 
         people = []
         for row in rows[1:]:
-            name = col(row, 0)
-            if not name or name == "Unavailable":
+            name = _h(row, "name", "full name")
+            if not name or name.strip().lower() in ("", "unavailable", "n/a"):
                 continue
-            time_str = col(row, 6)
+            time_str = _h(row, "time", "date", "timestamp", "visited", "last seen")
+            industry_raw = _h(row, "industry", "sector")
             people.append({
                 "name":     name,
-                "title":    col(row, 1),
-                "email":    col(row, 2),
-                "company":  col(row, 3),
-                "location": col(row, 4),
-                "pages":    col(row, 5),
+                "title":    _h(row, "title", "job title", "position", "role"),
+                "email":    _h(row, "email"),
+                "company":  _h(row, "company", "organization", "employer", "account"),
+                "location": _h(row, "location", "city", "region", "country"),
+                "pages":    _h(row, "pages", "page", "url", "viewed"),
                 "date":     time_str[:10] if time_str else "",
-                "industry": _clean_industry(col(row, 8)),
-                "website":  col(row, 10),
+                "industry": _clean_industry(industry_raw),
+                "website":  _h(row, "website", "domain", "web", "url"),
                 "time_raw": time_str,
             })
 
         # Newest first
         people.sort(key=lambda x: x.get("time_raw", ""), reverse=True)
+
+        total_before_filter = len(people)
 
         if date_from:
             people = [p for p in people if p["date"] >= date_from]
@@ -945,24 +963,31 @@ def _chatbot_get_anonymous_visitors(date_from=None, date_to=None, company=None,
                       if any(kw in p.get("title", "").lower() for kw in keywords)]
 
         result = people[:limit]
+        # Industry breakdown
+        from collections import Counter as _C
+        industry_counts = dict(_C(p["industry"] for p in people if p["industry"]).most_common(5))
         return {
-            "total_matching": len(people),
+            "status": "ok",
+            "total_in_sheet": total_before_filter,
+            "total_matching_filters": len(people),
             "returned": len(result),
+            "top_industries": industry_counts,
             "people": [
                 {
-                    "name":          p["name"],
-                    "title":         p["title"],
-                    "company":       p["company"],
-                    "industry":      p["industry"],
-                    "location":      p["location"],
-                    "date_visited":  p["date"],
-                    "pages_viewed":  p["pages"],
+                    "name":         p["name"],
+                    "title":        p["title"],
+                    "company":      p["company"],
+                    "industry":     p["industry"],
+                    "location":     p["location"],
+                    "date_visited": p["date"],
+                    "pages_viewed": p["pages"],
                 }
                 for p in result
             ],
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"status": "error", "error": str(e),
+                "hint": "Check that GOOGLE_SA_JSON is set and the sheet is accessible."}
 
 
 def _chatbot_get_signal_tracker(account="healthcare", signal_type=None,
@@ -1091,7 +1116,7 @@ CHATBOT_FUNCTIONS = [
             "type": "object",
             "properties": {
                 "competitor": {"type": "string", "description": "Competitor name or domain (e.g. 'Inspire Aesthetics', 'sonobello')"},
-                "format":     {"type": "string", "enum": ["image", "text", "video"], "description": "Ad format filter"},
+                "ad_format":  {"type": "string", "enum": ["image", "text", "video"], "description": "Ad format filter"},
                 "status":     {"type": "string", "enum": ["active", "inactive"], "description": "Ad status filter"},
                 "keyword":    {"type": "string", "description": "Search word in headline/description/keywords"},
                 "limit":      {"type": "integer", "description": "Max ads to return (default 20)"},
@@ -1126,31 +1151,69 @@ def ppc_chat():
     if not user_message:
         return jsonify({"answer": "Please ask a question."}), 200
 
-    today = datetime.now(IST).strftime("%Y-%m-%d")
+    now_ist     = datetime.now(IST)
+    today       = now_ist.strftime("%Y-%m-%d")
+    yesterday   = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
+    week_start  = (now_ist - timedelta(days=now_ist.weekday())).strftime("%Y-%m-%d")
+    month_start = now_ist.strftime("%Y-%m-01")
+    year_start  = now_ist.strftime("%Y-01-01")
 
-    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B digital marketing agency.
-You help the internal team analyze live data from three dashboards. Always call a function to fetch real data before answering — never guess numbers or make up results.
+    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B digital marketing agency. You are sharp, analytical, and direct — not a data dump machine.
 
-AVAILABLE DATA:
-1. ANONYMOUS VISITORS — People identified visiting position2.com (enriched via Apollo).
-   Columns: name, job title, company, industry, location, date visited, pages viewed.
-   Use for: who visited, visitor counts, company breakdown, seniority, industry trends.
+TODAY IS {today}.
+DATE SHORTCUTS (resolve before calling functions):
+- "today"      → date_from={today},     date_to={today}
+- "yesterday"  → date_from={yesterday}, date_to={yesterday}
+- "this week"  → date_from={week_start}, date_to={today}
+- "this month" → date_from={month_start}, date_to={today}
+- "this year"  → date_from={year_start}, date_to={today}
+- "last 7 days"→ date_from={(now_ist - timedelta(days=7)).strftime('%Y-%m-%d')}, date_to={today}
+- "last 30 days"→date_from={(now_ist - timedelta(days=30)).strftime('%Y-%m-%d')}, date_to={today}
 
-2. SIGNAL TRACKER — Healthcare companies (1,251) tracked for buying signals.
-   Signal types (HIGH severity): Funding Round, C-Suite Join, C-Suite Exit, Acquisition/M&A, IPO Signal.
-   Signal types (LOW severity): News Mention.
-   Use for: hot prospect accounts, recent signals, outbound targeting.
+════ DATA SOURCES ════
 
-3. AD INTELLIGENCE — Competitor ads tracked (Inspire Aesthetics, Dr. Dana MD, Sono Bello).
-   Columns: headline, description, CTA, format (image/text/video), status (active/inactive), keywords, messaging angle, first/last shown dates.
-   Use for: competitor ad strategy, CTA patterns, messaging themes, format mix.
+1. ANONYMOUS VISITORS  (function: get_anonymous_visitors)
+   People who visited position2.com, identified and enriched via Apollo.
+   Fields: name, job title, company, industry, location, date visited, pages viewed.
+   Use for: who visited, total counts, seniority breakdown, industry mix, individual lookups.
 
-RULES:
-- Call a function FIRST for any data question. Never answer from memory.
-- Today is {today}. Resolve relative dates ("yesterday" = {(datetime.now(IST) - timedelta(days=1)).strftime('%Y-%m-%d')}, "this week" starts {(datetime.now(IST) - timedelta(days=datetime.now(IST).weekday())).strftime('%Y-%m-%d')}).
-- Be concise. Use bullet points. Bold key numbers with **n**.
-- Cap lists at 10 items unless user asks for more.
-- If data is empty or unavailable, say so clearly."""
+2. SIGNAL TRACKER  (function: get_signal_tracker)
+   1,251 healthcare companies monitored for buying intent signals.
+   HIGH signals: Funding Round, C-Suite Join, C-Suite Exit, Acquisition/M&A, IPO Signal
+   LOW signals: News Mention
+   Use for: hot accounts, outbound targeting, prospect prioritisation.
+
+3. AD INTELLIGENCE  (function: get_ad_intelligence_data)
+   Competitor ads tracked for Inspire Aesthetics, Dr. Dana MD, Sono Bello.
+   Fields: headline, CTA, format (image/text/video), status (active/inactive),
+           keywords, messaging angle, value proposition, first/last shown dates.
+   Use for: competitor strategy, messaging gaps, CTA analysis, format mix.
+
+════ CRITICAL RULES ════
+
+RULE 1 — ALWAYS FETCH FIRST
+Call the function before answering any data question. Never guess or recall numbers. No exceptions.
+
+RULE 2 — HANDLE ERRORS HONESTLY
+- If result has {{"status": "error"}}: say "I couldn't fetch the data: [reason]". Do NOT say "no records".
+- If result has {{"status": "ok"}} but the people/ads/signals list is empty: say "The data loaded but no records matched that filter."
+- Never confuse a fetch error with an empty result set.
+
+RULE 3 — BE ANALYTICAL, NOT A LIST-READER
+Don't just dump a list. Extract the insight:
+  ✓ "**14 companies** visited this week. Most interesting: 3 are healthcare tech firms — matching your target vertical."
+  ✗ "Here are the companies: Acme, Betasoft, ..."
+When you have numbers, calculate percentages, spot outliers, highlight what's actionable.
+
+RULE 4 — FORMAT WELL
+- Bold key numbers: **23 visitors**, **4 funding rounds**
+- Use bullets for lists longer than 3 items
+- Lead with the most interesting finding, not the most obvious one
+- Keep responses under 200 words unless detail is explicitly asked for
+
+RULE 5 — BE SPECIFIC
+If filters return 0 results, suggest a broader query. Example: "No results for VP-level this week — want me to check this month instead?"
+"""
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history
@@ -1160,12 +1223,12 @@ RULES:
 
     try:
         resp = oai.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=messages,
             tools=tools,
             tool_choice="auto",
-            max_tokens=900,
-            temperature=0.2,
+            max_tokens=1000,
+            temperature=0.15,
         )
 
         msg = resp.choices[0].message
@@ -1177,18 +1240,18 @@ RULES:
                 fn_name = tool_call.function.name
                 fn_args = json.loads(tool_call.function.arguments)
                 fn = _fn_map.get(fn_name)
-                result = fn(**fn_args) if fn else {"error": f"Unknown function: {fn_name}"}
+                result = fn(**fn_args) if fn else {"status": "error", "error": f"Unknown function: {fn_name}"}
                 messages.append({
-                    "role":        "tool",
+                    "role":         "tool",
                     "tool_call_id": tool_call.id,
-                    "content":     json.dumps(result),
+                    "content":      json.dumps(result),
                 })
 
             final = oai.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=messages,
-                max_tokens=900,
-                temperature=0.2,
+                max_tokens=1000,
+                temperature=0.15,
             )
             answer = final.choices[0].message.content
         else:
@@ -1202,75 +1265,108 @@ RULES:
 
 
 # ── Ad Intelligence data helper (for chatbot) ────────────────────────────────
-def get_ad_intelligence_data(competitor=None, format=None, status=None,
+def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
                               keyword=None, limit=50):
     """
-    Fetch competitor ad data from the Ad Intelligence Google Sheet.
-    Uses the same public gviz endpoint the React app uses — no API key needed.
+    Fetch competitor ad data from the Ad Intelligence Google Sheet via service account.
+    The sheet must be shared with signal-tracker@signal-tracker-496308.iam.gserviceaccount.com
 
     Args:
         competitor : filter by competitor name or domain
-                     (e.g. 'Inspire Aesthetics', 'sonobello', 'drdanamd')
-        format     : 'image', 'text', or 'video'
+        ad_format  : 'image', 'text', or 'video'
         status     : 'active' or 'inactive'
-        keyword    : word to search in headline / description / keywords
+        keyword    : search in headline / description / keywords
         limit      : max rows to return (default 50)
     """
-    url = f"https://docs.google.com/spreadsheets/d/{AD_INTEL_SHEET_ID}/gviz/tq?tqx=out:json"
     try:
-        res = requests.get(url, timeout=10)
-        text = res.text
-        # Strip JSONP wrapper: /*O_o*/ google.visualization.Query.setResponse({...});
-        json_str = re.sub(r"^[^{]*", "", text)
-        json_str = re.sub(r"\);\s*$", "", json_str)
-        parsed = json.loads(json_str)
-        table = parsed.get("table", {})
-        headers = [c.get("label", "") for c in table.get("cols", [])]
-        ads = []
-        for row in table.get("rows", []):
-            obj = {}
-            cells = row.get("c", [])
-            for i, h in enumerate(headers):
-                cell = cells[i] if i < len(cells) else None
-                obj[h] = str(cell["v"]) if cell and cell.get("v") is not None else ""
-            if obj.get("Domain") and obj.get("Domain") != "Domain":
-                ads.append(obj)
+        svc = _sheets_service()
+        # Read header row first to map columns robustly
+        r_hdr = svc.spreadsheets().values().get(
+            spreadsheetId=AD_INTEL_SHEET_ID, range="A1:AH1").execute()
+        headers = [c.strip() for c in (r_hdr.get("values") or [[]])[0]]
+
+        r_data = svc.spreadsheets().values().get(
+            spreadsheetId=AD_INTEL_SHEET_ID, range="A2:AH2000").execute()
+        data_rows = r_data.get("values") or []
+
     except Exception as e:
-        return {"error": str(e), "ads": []}
+        err = str(e)
+        if "403" in err or "permission" in err.lower() or "not found" in err.lower():
+            return {
+                "status": "error",
+                "error": "Ad Intelligence sheet not shared with the service account.",
+                "fix": "Share Google Sheet ID 16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s "
+                       "with signal-tracker@signal-tracker-496308.iam.gserviceaccount.com (Viewer access).",
+            }
+        return {"status": "error", "error": err}
+
+    def _v(row, col_name):
+        try:
+            idx = headers.index(col_name)
+            return row[idx] if idx < len(row) else ""
+        except ValueError:
+            return ""
+
+    ads = []
+    for row in data_rows:
+        domain = _v(row, "Domain")
+        if not domain or domain == "Domain":
+            continue
+        ads.append({
+            "competitor":      _v(row, "Advertiser Name") or domain,
+            "domain":          domain,
+            "format":          _v(row, "Format"),
+            "platform":        _v(row, "Platform"),
+            "status":          _v(row, "Status"),
+            "headline":        _v(row, "Headline"),
+            "description":     _v(row, "Description"),
+            "full_text":       _v(row, "Full Ad Text"),
+            "cta":             _v(row, "CTA"),
+            "keywords":        _v(row, "Keywords"),
+            "messaging_angle": _v(row, "Messaging Angle"),
+            "value_prop":      _v(row, "Value Proposition"),
+            "offer":           _v(row, "Offer"),
+            "first_shown":     _v(row, "First Shown"),
+            "last_shown":      _v(row, "Last Shown"),
+            "regions":         _v(row, "Regions Served"),
+        })
+
+    total_before = len(ads)
 
     if competitor:
         c = competitor.lower()
-        ads = [a for a in ads if c in a.get("Domain", "").lower()
-               or c in a.get("Advertiser Name", "").lower()]
-    if format:
-        ads = [a for a in ads if a.get("Format", "").lower() == format.lower()]
+        ads = [a for a in ads if c in a["domain"].lower() or c in a["competitor"].lower()]
+    if ad_format:
+        ads = [a for a in ads if a["format"].lower() == ad_format.lower()]
     if status:
-        ads = [a for a in ads if a.get("Status", "").lower() == status.lower()]
+        ads = [a for a in ads if a["status"].lower() == status.lower()]
     if keyword:
         kw = keyword.lower()
-        ads = [a for a in ads if kw in a.get("Headline", "").lower()
-               or kw in a.get("Description", "").lower()
-               or kw in a.get("Full Ad Text", "").lower()
-               or kw in a.get("Keywords", "").lower()]
+        ads = [a for a in ads if
+               kw in a["headline"].lower() or kw in a["description"].lower()
+               or kw in a["full_text"].lower() or kw in a["keywords"].lower()]
+
+    from collections import Counter as _C
+    format_counts  = dict(_C(a["format"]  for a in ads if a["format"]).most_common())
+    status_counts  = dict(_C(a["status"]  for a in ads if a["status"]).most_common())
+    comp_counts    = dict(_C(a["competitor"] for a in ads if a["competitor"]).most_common())
+    top_ctas       = [c for c, _ in _C(a["cta"] for a in ads if a["cta"] and len(a["cta"]) < 50).most_common(5)]
+    top_keywords   = [k.strip() for k, _ in _C(
+        kw.strip() for a in ads for kw in a["keywords"].split(",") if kw.strip()
+    ).most_common(10)]
 
     return {
-        "total": len(ads),
-        "competitors": list({a.get("Domain") for a in ads}),
+        "status": "ok",
+        "total_in_sheet": total_before,
+        "total_matching_filters": len(ads),
+        "returned": min(len(ads), limit),
+        "by_competitor": comp_counts,
+        "by_format": format_counts,
+        "by_status": status_counts,
+        "top_ctas": top_ctas,
+        "top_keywords": top_keywords,
         "ads": [
-            {
-                "competitor":      a.get("Advertiser Name") or a.get("Domain"),
-                "domain":          a.get("Domain"),
-                "format":          a.get("Format"),
-                "status":          a.get("Status"),
-                "headline":        a.get("Headline"),
-                "description":     a.get("Description"),
-                "cta":             a.get("CTA"),
-                "keywords":        a.get("Keywords"),
-                "messaging_angle": a.get("Messaging Angle"),
-                "first_shown":     a.get("First Shown"),
-                "last_shown":      a.get("Last Shown"),
-                "platform":        a.get("Platform"),
-            }
+            {k: v for k, v in a.items() if k != "full_text"}
             for a in ads[:limit]
         ],
     }
