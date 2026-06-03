@@ -240,8 +240,12 @@ def auth_google():
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 401
 
+    email = idinfo.get("email", "")
+    if not email.lower().endswith("@position2.com"):
+        return jsonify({"success": False, "error": "Access restricted to Position2 accounts only."}), 403
+
     session["google_user"] = {
-        "email":      idinfo.get("email", ""),
+        "email":      email,
         "name":       idinfo.get("name", ""),
         "given_name": idinfo.get("given_name", ""),
         "picture":    idinfo.get("picture", ""),

@@ -375,9 +375,9 @@
           <h2 class="card-title">Welcome back</h2>
           <p class="card-sub">Sign in with your Google account to access your dashboards.</p>
 
-          {% if error %}
-          <div class="error-msg">⚠ {{ error }}</div>
-          {% endif %}
+          <div class="error-msg" id="error-banner" style="display:{% if error %}flex{% else %}none{% endif %}">
+            ⚠ {{ error or '' }}
+          </div>
 
           <div class="google-wrap">
             <div class="google-btn-glow"></div>
@@ -422,7 +422,14 @@
         if (data.success) window.location.href = data.redirect || '/hub';
         else {
           document.getElementById('loading').classList.remove('active');
-          alert('Sign-in failed: ' + (data.error || 'Unknown error'));
+          // Show the error in the styled banner rather than a bare alert
+          var banner = document.getElementById('error-banner');
+          if (banner) {
+            banner.textContent = '⚠ ' + (data.error || 'Sign-in failed.');
+            banner.style.display = 'flex';
+          } else {
+            alert(data.error || 'Sign-in failed.');
+          }
         }
       })
       .catch(() => {
