@@ -762,9 +762,9 @@
     return '';
   }
 
-  function _downloadText(text, filename) {
-    var BOM  = '﻿';  // UTF-8 BOM — makes Excel open CSV with correct encoding
-    var blob = new Blob([BOM + text], { type: 'text/csv;charset=utf-8;' });
+  function _downloadText(text, filename, mime) {
+    var BOM  = mime === 'text/csv' ? '﻿' : '';  // UTF-8 BOM for CSV only
+    var blob = new Blob([BOM + text], { type: (mime || 'text/csv') + ';charset=utf-8;' });
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
     a.href = url; a.download = filename;
@@ -774,8 +774,8 @@
   }
 
   function _addDownloadBtn(container, text, fmt) {
-    var ext  = (fmt === 'json') ? 'json' : (fmt === 'table') ? 'md' : 'csv';
-    var mime = (fmt === 'json') ? 'application/json' : 'text/csv';
+    var ext  = fmt === 'json' ? 'json' : fmt === 'table' ? 'md' : 'csv';
+    var mime = fmt === 'json' ? 'application/json' : fmt === 'table' ? 'text/markdown' : 'text/csv';
     var name = 'ppc_export_' + new Date().toISOString().slice(0,10) + '.' + ext;
     var btn  = document.createElement('button');
     btn.innerHTML = '⬇ Download .' + ext.toUpperCase();
@@ -784,7 +784,7 @@
       'font-family:\'Space Grotesk\',sans-serif;transition:all .15s;display:block;';
     btn.onmouseover = function(){ this.style.background='rgba(99,102,241,.25)'; };
     btn.onmouseout  = function(){ this.style.background='rgba(99,102,241,.12)'; };
-    btn.onclick = function(){ _downloadText(text, name); };
+    btn.onclick = function(){ _downloadText(text, name, mime); };
     container.appendChild(btn);
   }
 
@@ -812,10 +812,18 @@
 
     // Intercept memory commands — handle locally, no API call needed
     if (msg && !_file && _handleMemoryCommand(msg)) {
-      _addMsg('user', msg);
+      // Add user bubble FIRST, then let _handleMemoryCommand add the assistant reply
+      // But _handleMemoryCommand already ran above — so we need to insert user BEFORE the last assistant row
       var msgs2 = document.getElementById('ppc-msgs');
-      var rows2 = msgs2.querySelectorAll('.ppc-row');
-      if (rows2.length >= 2) msgs2.insertBefore(rows2[rows2.length-2], rows2[rows2.length-1]);
+      var userRow = _addMsg('user', msg);              // user bubble (added last)
+      _hist.push({ role: 'user', content: msg });
+      _saveHist();
+      // Move user bubble before the assistant bubble that was just added by _handleMemoryCommand
+      var allRows = msgs2.querySelectorAll('.ppc-row');
+      if (allRows.length >= 2) {
+        var assistantRow = allRows[allRows.length - 2]; // second to last = assistant
+        msgs2.insertBefore(userRow, assistantRow);      // put user before assistant
+      }
       return;
     }
 
@@ -867,9 +875,10 @@
 
       // Only show download UI if answer actually looks like structured data
       // (has multiple lines with commas/pipes, not just an error or prose)
+      // Check start of response for error indicators (not the whole string — companies can have "error" in their name)
+      var firstLine = ans.split('\n')[0].toLowerCase();
       var looksLikeData = fmt && ans.length > 20 &&
-        !ans.toLowerCase().includes('error') &&
-        !ans.toLowerCase().includes('failed') &&
+        !/^(error|export failed|something went wrong|⚠)/.test(firstLine) &&
         (ans.split('\n').filter(function(l){ return l.includes(',') || l.includes('|'); }).length > 1);
 
       if (looksLikeData) {
@@ -885,7 +894,9 @@
       } else {
         _addMsg('assistant', ans);
       }
-      _hist.push({ role: 'assistant', content: ans });
+      // Truncate very long replies (e.g. CSV exports) before storing to avoid localStorage bloat
+      var storedAns = ans.length > 800 ? ans.slice(0, 800) + '…[truncated for history]' : ans;
+      _hist.push({ role: 'assistant', content: storedAns });
       _saveHist();
     })
     .catch(function () {
@@ -973,7 +984,12 @@
   }
 
   /* ── Format ── */
+  function _esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   function _fmt(t) {
+    t = _esc(t);
     t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     var lines = t.split('\n'), out = [], list = false;
     for (var i = 0; i < lines.length; i++) {

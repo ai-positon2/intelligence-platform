@@ -15,6 +15,8 @@ from flask import (
     make_response, render_template,
 )
 import requests
+from collections import Counter
+from openai import OpenAI
 
 log = logging.getLogger(__name__)
 
@@ -964,8 +966,7 @@ def _chatbot_get_anonymous_visitors(date_from=None, date_to=None, company=None,
 
         result = people[:limit]
         # Industry breakdown
-        from collections import Counter as _C
-        industry_counts = dict(_C(p["industry"] for p in people if p["industry"]).most_common(5))
+        industry_counts = dict(Counter(p["industry"] for p in people if p["industry"]).most_common(5))
         return {
             "status": "ok",
             "total_in_sheet": total_before_filter,
@@ -1126,7 +1127,7 @@ CHATBOT_FUNCTIONS = [
 ]
 
 _PPC_CTX_CACHE: dict = {"data": None, "ts": 0.0}
-_PPC_CTX_TTL = 0     # 0 = no cache, fetch fresh on every request
+_PPC_CTX_TTL = 60    # seconds — refresh every 60s; keeps data fresh without hammering APIs
 
 
 def _build_ppc_context() -> str:
@@ -1134,8 +1135,8 @@ def _build_ppc_context() -> str:
     Fetch ALL data from every source — no row limits.
     Cached for _PPC_CTX_TTL seconds so repeated chat messages are instant.
     """
-    import time as _t
-    now = _t.time()
+    import time as _time
+    now = _time.time()
     if _PPC_CTX_CACHE["data"] and now - _PPC_CTX_CACHE["ts"] < _PPC_CTX_TTL:
         return _PPC_CTX_CACHE["data"]
 
@@ -1231,8 +1232,7 @@ def _build_ppc_context() -> str:
                 f"{c['location']} | employees: {c['employees']} | revenue: {c['revenue']}"
             )
 
-        from collections import Counter as _C
-        industry_counts = dict(_C(p["industry"] for p in people_out if p["industry"]).most_common(8))
+        industry_counts = dict(Counter(p["industry"] for p in people_out if p["industry"]).most_common(8))
 
         parts.append(
             f"=== ANONYMOUS VISITORS ===\n"
@@ -1251,7 +1251,6 @@ def _build_ppc_context() -> str:
     # ── 2. Signal Tracker — ALL signals, no limit ─────────────────────────
     try:
         import sqlite3 as _sql
-        from collections import Counter as _C
 
         db_path = Path(__file__).parent / "data" / "tracker.db"
         if not db_path.exists():
@@ -1259,32 +1258,32 @@ def _build_ppc_context() -> str:
         else:
             conn = _sql.connect(str(db_path))
             conn.row_factory = _sql.Row
+            try:
+                all_sigs = conn.execute("""
+                    SELECT c.name, c.domain, c.industry, c.city, c.state,
+                           a.signal_type, a.signal_detail, a.severity, a.signal_date
+                    FROM alerts_sent a
+                    JOIN companies c ON a.apollo_id = c.apollo_id
+                    WHERE a.dry_run = 0
+                    ORDER BY a.signal_date DESC
+                """).fetchall()
+            finally:
+                conn.close()
 
-            # All signals, ordered newest first
-            all_sigs = conn.execute("""
-                SELECT c.name, c.domain, c.industry, c.city, c.state,
-                       a.signal_type, a.signal_detail, a.severity, a.signal_date
-                FROM alerts_sent a
-                JOIN companies c ON a.apollo_id = c.apollo_id
-                WHERE a.dry_run = 0
-                ORDER BY a.signal_date DESC
-            """).fetchall()
-
-            # Summary counts
-            sig_counts = dict(_C(r["signal_type"] for r in all_sigs).most_common())
+            sig_counts = dict(Counter(r["signal_type"] for r in all_sigs).most_common())
             comp_count = len({r["name"] for r in all_sigs})
 
             sig_lines = []
             for r in all_sigs:
-                date = (r["signal_date"] or "")[:16]
+                date   = (r["signal_date"] or "")[:16]
                 detail = (r["signal_detail"] or "")[:120]
-                loc = f"{r['city']}, {r['state']}".strip(", ")
+                city   = r["city"] or ""
+                state  = r["state"] or ""
+                loc    = ", ".join(filter(None, [city, state]))
                 sig_lines.append(
                     f"• {r['name']} | {r['industry']} | {loc} | "
                     f"{r['signal_type']} [{r['severity']}] | {date} | {detail}"
                 )
-
-            conn.close()
 
             parts.append(
                 f"=== SIGNAL TRACKER (Healthcare — 1,251 companies monitored) ===\n"
@@ -1339,9 +1338,7 @@ def _build_ppc_context() -> str:
 @app.route("/api/ppc-chat", methods=["POST"])
 @login_required
 def ppc_chat():
-    """PPC AI assistant — context injection (no function calling, works with any model)."""
-    from openai import OpenAI
-
+    """PPC AI assistant — context injection."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         return jsonify({"answer": "⚠️ Add `OPENAI_API_KEY` to Railway Variables."}), 200
@@ -1371,16 +1368,16 @@ def ppc_chat():
         user_message = f"Please analyse the attached file '{file_name}' and summarise the key information."
 
     # ── Detect format keyword in the user's message itself ───────────────────
-    import re as _re
     _fmt_map = {
-        r'\bexcel\b|\bxlsx\b':       'excel',
-        r'\bcsv\b':                  'csv',
-        r'\bjson\b':                  'json',
+        r'\bexcel\b|\bxlsx\b':                              'excel',
+        r'\bcsv\b':                                         'csv',
+        r'\bjson\b':                                        'json',
         r'\btable format\b|\bin a table\b|\bspreadsheet\b': 'table',
+        r'\bbullet\b|\blist format\b':                      'bullet',
     }
     if not export_fmt:
         for pattern, fmt in _fmt_map.items():
-            if _re.search(pattern, user_message, _re.I):
+            if re.search(pattern, user_message, re.I):
                 export_fmt = fmt
                 break
 
@@ -1500,7 +1497,7 @@ CSV/EXCEL EXPORT RULES:
         resp = oai.chat.completions.create(
             model=_model,
             messages=messages,
-            max_completion_tokens=1200,
+            max_completion_tokens=2000,
             temperature=0.1,
         )
         answer = resp.choices[0].message.content
@@ -1734,12 +1731,11 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
                kw in a["headline"].lower() or kw in a["description"].lower()
                or kw in a["full_text"].lower() or kw in a["keywords"].lower()]
 
-    from collections import Counter as _C
-    format_counts  = dict(_C(a["format"]  for a in ads if a["format"]).most_common())
-    status_counts  = dict(_C(a["status"]  for a in ads if a["status"]).most_common())
-    comp_counts    = dict(_C(a["competitor"] for a in ads if a["competitor"]).most_common())
-    top_ctas       = [c for c, _ in _C(a["cta"] for a in ads if a["cta"] and len(a["cta"]) < 50).most_common(5)]
-    top_keywords   = [k.strip() for k, _ in _C(
+    format_counts  = dict(Counter(a["format"]  for a in ads if a["format"]).most_common())
+    status_counts  = dict(Counter(a["status"]  for a in ads if a["status"]).most_common())
+    comp_counts    = dict(Counter(a["competitor"] for a in ads if a["competitor"]).most_common())
+    top_ctas       = [c for c, _ in Counter(a["cta"] for a in ads if a["cta"] and len(a["cta"]) < 50).most_common(5)]
+    top_keywords   = [k.strip() for k, _ in Counter(
         kw.strip() for a in ads for kw in a["keywords"].split(",") if kw.strip()
     ).most_common(10)]
 
