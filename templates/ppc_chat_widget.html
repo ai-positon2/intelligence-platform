@@ -763,7 +763,8 @@
   }
 
   function _downloadText(text, filename) {
-    var blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
+    var BOM  = '﻿';  // UTF-8 BOM — makes Excel open CSV with correct encoding
+    var blob = new Blob([BOM + text], { type: 'text/csv;charset=utf-8;' });
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
     a.href = url; a.download = filename;

@@ -1438,11 +1438,22 @@ TODAY: {today} | THIS WEEK: {week_start} to {today} | YESTERDAY: {(now_ist - tim
 
 INSTRUCTIONS:
 - Answer every question fully using the live data below. Never say "I can't access" when data is provided.
-- If asked for "last 10 companies in excel" — pull the last 10 companies AND return them in the requested format. Never ask for clarification when the request is clear.
-- "Excel format", "CSV", "table", "JSON" = format the output that way. Not about any Google Sheet.
+- Never ask for clarification when the request is clear. Deliver the answer immediately.
+- "Excel format", "CSV", "table", "JSON" = format the output that way. Nothing to do with any Google Sheet.
 - If a data section shows ⚠ Error, say that source is unavailable but answer from what's available.
 - Be analytical: bold **key numbers**, use bullets for lists, lead with the most useful insight.
-- For general PPC/marketing questions, answer from knowledge directly.{fmt_instruction}
+- For general PPC/marketing questions, answer from knowledge directly.
+
+COMPANIES vs PEOPLE — CRITICAL:
+- "companies that visited" → use COMPANIES THAT VISITED section. Return company-level rows only (Company, Website, Industry, Location, Employees, Revenue). Do NOT mix in individual people.
+- "visitors" or "people that visited" → use INDIVIDUAL VISITORS section. Return person-level rows (Name, Title, Company, Industry, Location, Date).
+- Never mix people and companies in the same output.
+
+CSV/EXCEL EXPORT RULES:
+- Use clean, meaningful column headers (e.g. "Company Name", "Website", "Industry", "Location" — not "field1", "field2").
+- Remove all special characters like em-dashes from cell values — replace with a hyphen or remove.
+- Do not wrap values in quotes unless they contain commas.
+- Output ONLY the CSV rows — no intro text, no explanation, no markdown fences.{fmt_instruction}
 
 ══════════════════════════ LIVE DATA ══════════════════════════
 {ppc_context}
