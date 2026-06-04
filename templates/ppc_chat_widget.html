@@ -788,6 +788,76 @@
     container.appendChild(btn);
   }
 
+  /* Build a scrollable HTML table preview from CSV text */
+  function _buildTablePreview(csv) {
+    var lines = csv.trim().split('\n').filter(function(l){ return l.trim(); });
+    if (lines.length < 2) {
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'font-size:11px;color:#94a3b8;margin-top:8px;white-space:pre-wrap;font-family:monospace;';
+      pre.textContent = csv.slice(0, 800);
+      return pre;
+    }
+
+    function parseRow(line) {
+      var cols = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+      return cols;
+    }
+
+    var headers = parseRow(lines[0]);
+    var dataRows = lines.slice(1, 11); // show max 10 rows in preview
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'overflow-x:auto;margin-top:10px;border-radius:10px;border:1px solid rgba(255,255,255,.08);';
+
+    var tbl = document.createElement('table');
+    tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:11px;font-family:\'Space Grotesk\',sans-serif;min-width:400px;';
+
+    // Header
+    var thead = document.createElement('thead');
+    var hrow  = document.createElement('tr');
+    headers.forEach(function(h) {
+      var th = document.createElement('th');
+      th.textContent = h.replace(/^"|"$/g, '');
+      th.style.cssText = 'padding:7px 10px;text-align:left;color:#818cf8;font-weight:700;' +
+        'background:rgba(99,102,241,.12);border-bottom:1px solid rgba(99,102,241,.2);white-space:nowrap;';
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    tbl.appendChild(thead);
+
+    // Body
+    var tbody = document.createElement('tbody');
+    dataRows.forEach(function(line, ri) {
+      var cells = parseRow(line);
+      var tr = document.createElement('tr');
+      tr.style.background = ri % 2 === 0 ? 'rgba(255,255,255,.02)' : 'transparent';
+      cells.forEach(function(val) {
+        var td = document.createElement('td');
+        td.textContent = val.replace(/^"|"$/g, '') || '—';
+        td.style.cssText = 'padding:6px 10px;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,.05);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    wrap.appendChild(tbl);
+
+    if (lines.length > 11) {
+      var note = document.createElement('div');
+      note.style.cssText = 'font-size:10px;color:#475569;padding:6px 10px;text-align:center;';
+      note.textContent = '+ ' + (lines.length - 11) + ' more rows — download to see all';
+      wrap.appendChild(note);
+    }
+    return wrap;
+  }
+
   function _fileIco(name) {
     var ext = (name.split('.').pop() || '').toLowerCase();
     var map = {pdf:'📄', docx:'📝', doc:'📝', xlsx:'📊', xls:'📊',
@@ -884,12 +954,7 @@
       if (looksLikeData) {
         var row = _addMsg('assistant', '✅ Here\'s your data:');
         var bubble = row.querySelector('.ppc-bubble');
-        var pre = document.createElement('pre');
-        pre.style.cssText = 'background:rgba(0,0,0,.3);border-radius:8px;padding:10px;' +
-          'font-size:11px;color:#94a3b8;overflow-x:auto;margin-top:8px;white-space:pre-wrap;' +
-          'max-height:200px;overflow-y:auto;font-family:monospace;line-height:1.5;';
-        pre.textContent = ans.slice(0, 1200) + (ans.length > 1200 ? '\n...' : '');
-        bubble.appendChild(pre);
+        bubble.appendChild(_buildTablePreview(ans));
         _addDownloadBtn(bubble, ans, fmt || 'csv');
       } else {
         _addMsg('assistant', ans);

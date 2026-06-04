@@ -1215,34 +1215,37 @@ def _build_ppc_context() -> str:
                 "revenue":   _cv(row, "revenue", "arr", "mrr"),
             })
 
-        # Build people lines
-        p_lines = []
-        for i, p in enumerate(people_out, 1):
-            co_display = p["website"] or "—"
-            p_lines.append(
-                f"{i}. {p['name']} | {p['title']} | {co_display} | "
-                f"{p['industry']} | {p['location']} | {p['date']}"
-            )
-
-        # Build company lines
+        # Company lines — fields explicitly labelled so GPT never guesses column order
         c_lines = []
         for i, c in enumerate(companies_out, 1):
             c_lines.append(
-                f"{i}. {c['company']} | {c['website']} | {c['industry']} | "
-                f"{c['location']} | employees: {c['employees']} | revenue: {c['revenue']}"
+                f"{i}. Company={c['company']} | Website={c['website']} | "
+                f"Industry={c['industry']} | Location={c['location']} | "
+                f"Employees={c['employees']} | Revenue={c['revenue']}"
+            )
+
+        # People lines — completely separate block with different field set
+        p_lines = []
+        for i, p in enumerate(people_out, 1):
+            p_lines.append(
+                f"{i}. Name={p['name']} | Title={p['title']} | "
+                f"CompanyWebsite={p['website']} | Industry={p['industry']} | "
+                f"Location={p['location']} | DateVisited={p['date']}"
             )
 
         industry_counts = dict(Counter(p["industry"] for p in people_out if p["industry"]).most_common(8))
 
+        # COMPANIES block comes FIRST so GPT reads it first for "company" queries
         parts.append(
-            f"=== ANONYMOUS VISITORS ===\n"
-            f"Total individual visitors: {len(people_out)}\n"
-            f"Unique companies: {len(companies_out)}\n"
-            f"Industry breakdown: {industry_counts}\n\n"
-            f"--- INDIVIDUAL VISITORS (all {len(people_out)}, newest first) ---\n"
-            + "\n".join(p_lines)
-            + f"\n\n--- COMPANIES THAT VISITED (all {len(companies_out)}) ---\n"
+            f"=== VISITOR DATA ===\n"
+            f"Summary: {len(people_out)} individual visitors from {len(companies_out)} unique companies\n"
+            f"Top industries: {industry_counts}\n\n"
+            f"--- SECTION A: COMPANIES THAT VISITED ({len(companies_out)} unique companies) ---\n"
+            f"USE THIS SECTION when asked about COMPANIES. Columns: Company, Website, Industry, Location, Employees, Revenue\n"
             + "\n".join(c_lines)
+            + f"\n\n--- SECTION B: INDIVIDUAL VISITORS ({len(people_out)} people, newest first) ---\n"
+            f"USE THIS SECTION when asked about VISITORS or PEOPLE. Columns: Name, Title, CompanyWebsite, Industry, Location, DateVisited\n"
+            + "\n".join(p_lines)
         )
 
     except Exception as e:
@@ -1441,16 +1444,16 @@ INSTRUCTIONS:
 - Be analytical: bold **key numbers**, use bullets for lists, lead with the most useful insight.
 - For general PPC/marketing questions, answer from knowledge directly.
 
-COMPANIES vs PEOPLE — CRITICAL:
-- "companies that visited" → use COMPANIES THAT VISITED section. Return company-level rows only (Company, Website, Industry, Location, Employees, Revenue). Do NOT mix in individual people.
-- "visitors" or "people that visited" → use INDIVIDUAL VISITORS section. Return person-level rows (Name, Title, Company, Industry, Location, Date).
-- Never mix people and companies in the same output.
+DATA SECTION RULES — NEVER MIX THESE:
+- Asked about COMPANIES → use SECTION A only. Columns: Company Name, Website, Industry, Location, Employees, Revenue. Never include individual people names.
+- Asked about VISITORS/PEOPLE → use SECTION B only. Columns: Name, Title, Company Website, Industry, Location, Date Visited.
+- "last 10 companies" = first 10 rows of SECTION A. "last 10 visitors" = first 10 rows of SECTION B.
 
 CSV/EXCEL EXPORT RULES:
-- Use clean, meaningful column headers (e.g. "Company Name", "Website", "Industry", "Location" — not "field1", "field2").
-- Remove all special characters like em-dashes from cell values — replace with a hyphen or remove.
-- Do not wrap values in quotes unless they contain commas.
-- Output ONLY the CSV rows — no intro text, no explanation, no markdown fences.{fmt_instruction}
+- Output ONLY the CSV rows. No intro text, no explanation, no markdown fences, no code blocks.
+- Use meaningful headers: "Company Name", "Website", "Industry", "Location", "Employees", "Revenue" — never "field1", "field2".
+- Include ONLY the columns that make sense for the query (e.g. company query = 6 columns, no extra).
+- Replace em-dashes (—) with a hyphen or leave blank. Quote values that contain commas.{fmt_instruction}
 
 ══════════════════════════ LIVE DATA ══════════════════════════
 {ppc_context}
@@ -1737,6 +1740,29 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
     top_ctas       = [c for c, _ in Counter(a["cta"] for a in ads if a["cta"] and len(a["cta"]) < 50).most_common(5)]
     top_keywords   = [k.strip() for k, _ in Counter(
         kw.strip() for a in ads for kw in a["keywords"].split(",") if kw.strip()
+    ).most_common(10)]
+
+    return {
+        "status": "ok",
+        "total_in_sheet": total_before,
+        "total_matching_filters": len(ads),
+        "returned": min(len(ads), limit),
+        "by_competitor": comp_counts,
+        "by_format": format_counts,
+        "by_status": status_counts,
+        "top_ctas": top_ctas,
+        "top_keywords": top_keywords,
+        "ads": [
+            {k: v for k, v in a.items() if k != "full_text"}
+            for a in ads[:limit]
+        ],
+    }
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+)
     ).most_common(10)]
 
     return {
