@@ -1776,6 +1776,149 @@ def insights_generate(account_id):
         return jsonify({"error": str(e)}), 500
 
 
+
+# ── Signal Tracker Insights API ───────────────────────────────────────────────
+@app.route("/api/insights-meta/<account_id>")
+@login_required
+def insights_meta(account_id):
+    import sqlite3
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"}), 404
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        industries   = [r[0] for r in conn.execute(
+            "SELECT DISTINCT industry FROM companies WHERE industry IS NOT NULL AND industry!=''  ORDER BY industry LIMIT 60"
+        ).fetchall()]
+        signal_types = [r[0] for r in conn.execute(
+            "SELECT DISTINCT signal_type FROM alerts_sent WHERE dry_run=0 ORDER BY signal_type"
+        ).fetchall()]
+        counts = {r[0]: r[1] for r in conn.execute(
+            "SELECT signal_type, COUNT(*) cnt FROM alerts_sent WHERE dry_run=0 GROUP BY signal_type ORDER BY cnt DESC"
+        ).fetchall()}
+        total     = conn.execute("SELECT COUNT(*) FROM alerts_sent WHERE dry_run=0").fetchone()[0]
+        companies = conn.execute("SELECT COUNT(DISTINCT apollo_id) FROM alerts_sent WHERE dry_run=0").fetchone()[0]
+        conn.close()
+        return jsonify({"industries": industries, "signal_types": signal_types,
+                        "counts": counts, "total_signals": total, "total_companies": companies})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/insights/<account_id>")
+@login_required
+def insights_generate(account_id):
+    import sqlite3, re as _re
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"}), 404
+    api_key = os.environ.get("OPENAI_API_KEY","")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"}), 500
+
+    signal_types = request.args.getlist("signal_type")
+    severities   = request.args.getlist("severity")
+    days         = int(request.args.get("days", 90))
+    industry     = request.args.get("industry","")
+
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        conds = ["a.dry_run = 0"]; params = []
+        if signal_types:
+            conds.append("a.signal_type IN (%s)" % ",".join("?"*len(signal_types))); params.extend(signal_types)
+        if severities:
+            conds.append("a.severity IN (%s)" % ",".join("?"*len(severities))); params.extend(severities)
+        if days > 0:
+            conds.append("a.signal_date >= date('now',?)"); params.append("-%d days" % days)
+        if industry:
+            conds.append("c.industry LIKE ?"); params.append("%"+industry+"%")
+        where = " AND ".join(conds)
+        rows = conn.execute(
+            "SELECT c.name,c.domain,c.industry,c.city,c.state,"
+            "a.signal_type,a.signal_detail,a.severity,a.signal_date "
+            "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+            "WHERE "+where+" ORDER BY CASE a.severity WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,"
+            "a.signal_date DESC LIMIT 200", params
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return jsonify({"error": "No signals found for those filters."}), 200
+
+        signals = [dict(r) for r in rows]
+        n_sig = len(signals); n_co = len(set(s["name"] for s in signals))
+        acct  = "Healthcare" if account_id == "healthcare" else "CSG"
+
+        by_co = {}
+        for s in signals:
+            co = s["name"]
+            if co not in by_co:
+                by_co[co] = {"domain": s.get("domain",""), "industry": s.get("industry",""), "sigs":[]}
+            by_co[co]["sigs"].append(s)
+
+        ctx_lines = []
+        for co, info in sorted(by_co.items(),
+            key=lambda x: (-sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"), -len(x[1]["sigs"])))[:60]:
+            sig_str = " | ".join(
+                "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                    ": "+s["signal_detail"][:80] if s.get("signal_detail") else "")
+                for s in info["sigs"][:5])
+            ctx_lines.append("[%s | %s | %s] %d sigs — %s" % (
+                co, info["domain"], info["industry"], len(info["sigs"]), sig_str))
+
+        schema = (
+            '{"brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, total revenue opp, ONE sales action.",'
+            +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","est_value":"$X-Y","call_timing":"Call today|Call this week|Warm email first"}],'
+            +'  "market_pulse":["specific data-backed observation citing companies"],'
+            +'  "strategic_moves":[{"move":"title","rationale":"signal-backed reason","impact":"$X-Y pipeline","owner":"BDR|Account Exec|Marketing|Leadership"}],'
+            +'  "pipeline_estimate":{"total":"$X-Y","high_conviction":"$X-Y","top_services":["SEO"],"win_window":"Next 30|60|90 days"},'
+            +'  "pipeline":[{"name":"","domain":"","intent_score":85,"signals":["type"],"why_now":"","service_fit":["SEO"],"opportunity":"$X-Y","next_step":""}],'
+            +'  "actions":[{"rank":1,"type":"outreach","company":"","action":"","reason":"","revenue_impact":"$X","deadline":"Today","urgency":"HIGH"}],'
+            +'  "outreach":[{"company":"","domain":"","timing":"now","signal_hook":"","subject":"","opening":"","talking_points":[""],"cta":""}],'
+            +'  "themes":[{"theme":"","count":0,"companies":[""],"campaign_angle":""}],'
+            +'  "risks":[{"company":"","flag":"","implication":""}]}'
+        )
+
+        system_prompt = (
+            "You are the Chief Revenue Officer of Position2, a B2B digital marketing agency. "
+            "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
+            "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
+            "Brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
+            "Be specific: name companies, cite signals, give $ numbers. No fluff. "
+            "Return ONLY valid JSON (no markdown): "+schema+" "
+            "RULES: week_priority=top 6 by urgency; pipeline=top 8 scored 0-100; "
+            "actions=6 ranked; outreach=8 personalised with <55-char subjects; "
+            "themes=4; risks=2-3 only if real. "
+            "Every field must cite actual signal data. Generic = failure."
+        )
+
+        from openai import OpenAI
+        oai  = OpenAI(api_key=api_key)
+        resp = oai.chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
+            messages=[
+                {"role":"system","content":system_prompt},
+                {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
+            ],
+            max_completion_tokens=5500,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else raw
+        s2=raw.find("{"); e2=raw.rfind("}")
+        if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
+        insights = json.loads(raw)
+        return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/ppc-chat-debug")
 @login_required
 def ppc_chat_debug():
