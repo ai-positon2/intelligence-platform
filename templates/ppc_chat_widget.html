@@ -830,12 +830,11 @@
     // Build payload — MUST be defined before export detection references it
     var payload = { message: msg || '', history: _hist.slice(-12), memories: _memories };
 
-    // Detect export / format request — attach to payload after it's defined
+    // Detect export / format request
     var exportFmt = _detectExportFormat(msg);
     if (exportFmt && !_file) {
       payload.export_format = exportFmt;
-      var lastAi = _getLastAiText();
-      if (lastAi) { payload.source_text = lastAi; }
+      // Never pass source_text automatically — GPT has full history and can reformat from it
     }
     if (_file) {
       payload.file_name      = _file.name;
@@ -863,22 +862,27 @@
     .then(function (d) {
       loader.remove();
       var ans = d.answer || 'No response received.';
-      var fmt = d.detected_format || d.export_format || '';
-      var isCsv = d.is_csv || fmt === 'csv' || fmt === 'excel';
-      var isExport = d.is_export || (fmt && (isCsv || fmt === 'json' || fmt === 'table'));
+      var fmt = d.detected_format || '';
 
-      var row = _addMsg('assistant', isExport ? '✅ Here\'s your data:' : ans);
-      if (isExport && d.answer) {
+      // Only show download UI if answer actually looks like structured data
+      // (has multiple lines with commas/pipes, not just an error or prose)
+      var looksLikeData = fmt && ans.length > 20 &&
+        !ans.toLowerCase().includes('error') &&
+        !ans.toLowerCase().includes('failed') &&
+        (ans.split('\n').filter(function(l){ return l.includes(',') || l.includes('|'); }).length > 1);
+
+      if (looksLikeData) {
+        var row = _addMsg('assistant', '✅ Here\'s your data:');
         var bubble = row.querySelector('.ppc-bubble');
         var pre = document.createElement('pre');
         pre.style.cssText = 'background:rgba(0,0,0,.3);border-radius:8px;padding:10px;' +
           'font-size:11px;color:#94a3b8;overflow-x:auto;margin-top:8px;white-space:pre-wrap;' +
           'max-height:200px;overflow-y:auto;font-family:monospace;line-height:1.5;';
-        pre.textContent = d.answer.slice(0, 1200) + (d.answer.length > 1200 ? '\n...' : '');
+        pre.textContent = ans.slice(0, 1200) + (ans.length > 1200 ? '\n...' : '');
         bubble.appendChild(pre);
-        _addDownloadBtn(bubble, d.answer, fmt || 'csv');
-      } else if (!isExport) {
-        // normal response — nothing extra needed
+        _addDownloadBtn(bubble, ans, fmt || 'csv');
+      } else {
+        _addMsg('assistant', ans);
       }
       _hist.push({ role: 'assistant', content: ans });
       _saveHist();
