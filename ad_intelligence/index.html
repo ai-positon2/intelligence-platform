@@ -32,7 +32,7 @@
   border:none; cursor:pointer;
   background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 60%,#a78bfa 100%);
   display:flex; align-items:center; justify-content:center;
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
   box-shadow:0 8px 32px rgba(99,102,241,.5);
   animation:ppc-pulse 3s ease-in-out infinite;
 }
@@ -43,7 +43,7 @@
   opacity:.55; filter:blur(2px);
 }
 #ppc-btn:hover { transform:scale(1.12); box-shadow:0 12px 40px rgba(99,102,241,.7); }
-#ppc-btn.open  { transform:scale(.9); animation:none; }
+#ppc-btn.open  { opacity:0; pointer-events:none; transform:scale(.8); }
 @keyframes ppc-pulse {
   0%,100%{box-shadow:0 8px 32px rgba(99,102,241,.5),0 0 0 0 rgba(99,102,241,.35)}
   50%     {box-shadow:0 8px 32px rgba(99,102,241,.5),0 0 0 12px rgba(99,102,241,0)}
@@ -420,10 +420,7 @@
         <div class="ppc-av">⚡</div>
         <div class="ppc-hdr-info">
           <div class="ppc-hdr-title">PPC Assistant</div>
-          <div class="ppc-hdr-status">
-            <span class="ppc-live"></span>
           </div>
-        </div>
         <div class="ppc-hdr-btns">
           <!-- Expand toggle -->
           <button class="ppc-hbtn" id="ppc-expand-btn" onclick="ppcToggleExpand()" aria-label="Expand">
@@ -849,5 +846,6 @@
 })();
 </script>
 <!-- ── End PPC Chat Widget ─────────────────────────────────────────────────── -->
+                                                              
   </body>
 </html>
