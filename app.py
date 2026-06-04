@@ -1404,7 +1404,7 @@ def ppc_chat():
         try:
             resp = oai.chat.completions.create(
                 model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=reformat_messages, max_tokens=2000, temperature=0)
+                messages=reformat_messages, max_completion_tokens=2000, temperature=0)
             formatted = resp.choices[0].message.content.strip()
             is_csv = export_fmt in ("csv", "excel")
             return jsonify({"answer": formatted, "is_export": True,
@@ -1489,7 +1489,7 @@ INSTRUCTIONS:
         resp = oai.chat.completions.create(
             model=_model,
             messages=messages,
-            max_tokens=1200,
+            max_completion_tokens=1200,
             temperature=0.1,
         )
         answer = resp.choices[0].message.content
