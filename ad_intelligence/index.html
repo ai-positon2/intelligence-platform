@@ -344,6 +344,53 @@
 .ppc-hint-txt{font-size:10px;color:rgba(255,255,255,.13);letter-spacing:.02em}
 #ppc-char-count{font-size:10px;color:rgba(255,255,255,.13);transition:color .2s}
 #ppc-char-count.warn{color:rgba(245,158,11,.5)}
+
+/* ── Attach button ──────────────────────────────────────────────────────── */
+#ppc-attach-btn{
+  width:32px;height:32px;border:none;border-radius:9px;cursor:pointer;flex-shrink:0;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  color:#64748b;display:flex;align-items:center;justify-content:center;
+  transition:all .2s cubic-bezier(.34,1.56,.64,1);
+}
+#ppc-attach-btn:hover{
+  background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.35);
+  color:#a5b4fc;transform:scale(1.08) rotate(-8deg);
+}
+#ppc-attach-btn.has-file{
+  background:rgba(99,102,241,.18);border-color:rgba(99,102,241,.4);color:#818cf8;
+}
+
+/* ── File pill ──────────────────────────────────────────────────────────── */
+#ppc-file-pill{
+  display:none;align-items:center;gap:7px;
+  margin-top:7px;padding:6px 10px;border-radius:10px;
+  background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);
+  animation:ppc-msg-in .25s both;
+}
+#ppc-file-pill.show{display:flex}
+.ppc-file-ico{font-size:14px;flex-shrink:0}
+#ppc-file-label{
+  flex:1;min-width:0;font-size:11.5px;font-weight:600;
+  color:#a5b4fc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-family:'Space Grotesk',sans-serif;
+}
+.ppc-file-size{font-size:10px;color:#475569;flex-shrink:0}
+#ppc-file-remove{
+  width:18px;height:18px;border:none;border-radius:5px;cursor:pointer;
+  background:rgba(255,255,255,.07);color:#64748b;
+  display:flex;align-items:center;justify-content:center;font-size:12px;
+  transition:all .15s;flex-shrink:0;padding:0;
+}
+#ppc-file-remove:hover{background:rgba(239,68,68,.2);color:#f87171}
+
+/* Upload spinner */
+.ppc-file-uploading .ppc-file-ico{animation:ppc-spin .7s linear infinite;display:inline-block}
+
+/* Supported types label */
+#ppc-supported{
+  font-size:9.5px;color:rgba(255,255,255,.1);text-align:center;
+  margin-top:5px;letter-spacing:.01em;
+}
 </style>
 
 <!-- Trigger -->
@@ -409,7 +456,14 @@
     <!-- Input -->
     <div id="ppc-input-area">
       <div id="ppc-input-row">
-        <textarea id="ppc-input" rows="1" placeholder="Ask anything about your PPC data…"></textarea>
+        <!-- Attach button -->
+        <button id="ppc-attach-btn" onclick="ppcAttachClick()" title="Attach file" aria-label="Attach file">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
+            <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
+        <textarea id="ppc-input" rows="1" placeholder="Ask anything — or attach a file…"></textarea>
         <button id="ppc-send" aria-label="Send">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
             <path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
@@ -417,11 +471,30 @@
           </svg>
         </button>
       </div>
+
+      <!-- Attached file pill -->
+      <div id="ppc-file-pill">
+        <span class="ppc-file-ico">📎</span>
+        <span id="ppc-file-label">file.pdf</span>
+        <span class="ppc-file-size" id="ppc-file-size"></span>
+        <button id="ppc-file-remove" onclick="ppcRemoveFile()" aria-label="Remove file">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+            <path stroke="currentColor" stroke-width="3" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
       <div id="ppc-hint">
         <span class="ppc-hint-txt">↵ Send &nbsp;·&nbsp; Shift+↵ New line</span>
         <span id="ppc-char-count"></span>
       </div>
+      <div id="ppc-supported">PDF · DOCX · XLSX · PPTX · CSV · TXT · PNG · JPG · and more</div>
     </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="ppc-file-input" style="display:none"
+      accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp,.pptx,.ppt"
+      onchange="ppcFileSelected(this)"/>
 
   </div>
 </div>
@@ -432,10 +505,12 @@
 <script>
 (function () {
   /* ── State ── */
-  var _hist    = [];
-  var _busy    = false;
-  var _fresh   = true;
-  var _expanded= false;
+  var _hist      = [];
+  var _busy      = false;
+  var _fresh     = true;
+  var _expanded  = false;
+  var _file      = null;   // {name, is_image, mime, base64, content, chars, truncated}
+  var _uploading = false;
 
   /* ── Open / close ── */
   window.ppcOpen = function () {
@@ -501,186 +576,80 @@
     msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
   };
 
-  /* ── Send ── */
-  window.ppcSend = function () {
-    if (_busy) return;
-    var inp = document.getElementById('ppc-input');
-    var msg = (inp.value || '').trim();
-    if (!msg) return;
-
-    var wlc = document.getElementById('ppc-welcome');
-    if (wlc) { wlc.style.animation = 'ppc-msg-in .3s reverse both'; setTimeout(function(){wlc.remove();},280); }
-
-    inp.value = ''; inp.style.height = 'auto';
-    _updateCharCount('');
-
-    _addMsg('user', msg);
-    _hist.push({ role: 'user', content: msg });
-
-    var loader = _addLoader();
-    _setBusy(true);
-
-    fetch('/api/ppc-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, history: _hist.slice(-6) }),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      loader.remove();
-      var ans = d.answer || 'No response received.';
-      _addMsg('assistant', ans);
-      _hist.push({ role: 'assistant', content: ans });
-    })
-    .catch(function () {
-      loader.remove();
-      _addMsg('assistant', '⚠️ Connection error — please try again.');
-    })
-    .finally(function () {
-      _setBusy(false);
-      document.getElementById('ppc-input').focus();
-    });
+  /* ── File attachment ── */
+  window.ppcAttachClick = function () {
+    document.getElementById('ppc-file-input').click();
   };
 
-  /* ── Busy state ── */
-  function _setBusy(state) {
-    _busy = state;
-    var btn = document.getElementById('ppc-send');
-    btn.disabled = state;
-    btn.innerHTML = state
-      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation:ppc-spin .75s linear infinite"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.25)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>'
-      : '<svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
+  window.ppcFileSelected = function (inp) {
+    var file = inp.files[0];
+    if (!file) return;
+    inp.value = '';   // allow re-selecting same file
+    if (_uploading) return;
+    _uploading = true;
+
+    // Show uploading state
+    _setFilePill('⏳', file.name + ' — uploading…', '', true);
+    document.getElementById('ppc-attach-btn').classList.add('has-file');
+
+    var fd = new FormData();
+    fd.append('file', file);
+
+    fetch('/api/ppc-upload', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          _clearFilePill();
+          _addMsg('assistant', '⚠️ Could not read file: ' + data.error);
+          return;
+        }
+        _file = data;
+        var size = data.is_image ? _fmtBytes(data.base64 ? Math.round(data.base64.length * 0.75) : 0)
+                                 : _fmtChars(data.chars);
+        var ico  = data.is_image ? '🖼️' : _fileIco(data.name);
+        _setFilePill(ico, data.name, size, false);
+        if (data.truncated) {
+          _addMsg('assistant', '⚠️ The file is very large — only the first 40,000 characters were read. The rest was trimmed.');
+        }
+      })
+      .catch(function () {
+        _clearFilePill();
+        _addMsg('assistant', '⚠️ Upload failed. Check your connection and try again.');
+      })
+      .finally(function () { _uploading = false; });
+  };
+
+  window.ppcRemoveFile = function () {
+    _file = null;
+    _clearFilePill();
+    document.getElementById('ppc-attach-btn').classList.remove('has-file');
+  };
+
+  function _setFilePill(ico, label, size, uploading) {
+    var pill = document.getElementById('ppc-file-pill');
+    pill.className = 'show' + (uploading ? ' ppc-file-uploading' : '');
+    document.querySelector('.ppc-file-ico').textContent = ico;
+    document.getElementById('ppc-file-label').textContent = label;
+    document.getElementById('ppc-file-size').textContent = size;
   }
 
-  /* ── Add message ── */
-  function _addMsg(role, text) {
-    var msgs = document.getElementById('ppc-msgs');
-    var row  = document.createElement('div');
-    row.className = 'ppc-row ' + role;
-
-    var av = document.createElement('div');
-    av.className = 'ppc-row-av';
-    av.textContent = role === 'assistant' ? '⚡' : 'You';
-
-    var bwrap = document.createElement('div');
-    bwrap.className = 'ppc-bwrap';
-
-    var bubble = document.createElement('div');
-    bubble.className = 'ppc-bubble';
-    bubble.innerHTML = _fmt(text);
-
-    var ts = document.createElement('div');
-    ts.className = 'ppc-ts';
-    ts.textContent = _now();
-
-    bwrap.appendChild(bubble);
-    bwrap.appendChild(ts);
-    row.appendChild(av);
-    row.appendChild(bwrap);
-    msgs.appendChild(row);
-    _scrollCheck();
-    return row;
+  function _clearFilePill() {
+    document.getElementById('ppc-file-pill').className = '';
+    document.getElementById('ppc-attach-btn').classList.remove('has-file');
+    _file = null;
   }
 
-  /* ── Typing indicator ── */
-  function _addLoader() {
-    var msgs = document.getElementById('ppc-msgs');
-    var row  = document.createElement('div');
-    row.className = 'ppc-row assistant';
-    var av   = document.createElement('div');
-    av.className = 'ppc-row-av'; av.textContent = '⚡';
-    var bwrap = document.createElement('div');
-    bwrap.className = 'ppc-bwrap';
-    var bubble = document.createElement('div');
-    bubble.className = 'ppc-bubble ppc-typing';
-    bubble.innerHTML =
-      '<div class="ppc-wave"><span></span><span></span><span></span><span></span><span></span></div>' +
-      '<span class="ppc-typing-txt">Thinking…</span>';
-    bwrap.appendChild(bubble);
-    row.appendChild(av); row.appendChild(bwrap);
-    msgs.appendChild(row);
-    _scrollCheck();
-    return row;
+  function _fileIco(name) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    var map = {pdf:'📄', docx:'📝', doc:'📝', xlsx:'📊', xls:'📊',
+               csv:'📋', pptx:'📑', ppt:'📑', txt:'📄', json:'📄', md:'📄'};
+    return map[ext] || '📎';
   }
+  function _fmtBytes(b) { return b > 1048576 ? (b/1048576).toFixed(1)+'MB' : Math.round(b/1024)+'KB'; }
+  function _fmtChars(n) { return n >= 1000 ? (n/1000).toFixed(0)+'k chars' : n+' chars'; }
 
-  /* ── Scroll logic ── */
-  function _scrollCheck() {
-    var msgs = document.getElementById('ppc-msgs');
-    var btn  = document.getElementById('ppc-scroll-btn');
-    var atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
-    if (atBottom) {
-      msgs.scrollTop = msgs.scrollHeight;
-      btn.classList.remove('show');
-    } else {
-      btn.classList.add('show');
-    }
-  }
-
-  /* ── Format ── */
-  function _fmt(t) {
-    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    var lines = t.split('\n'), out = [], list = false;
-    for (var i = 0; i < lines.length; i++) {
-      var l = lines[i], isBullet = /^[\-\*•]\s+/.test(l.trim());
-      if (isBullet) {
-        if (!list) { out.push('<ul>'); list = true; }
-        out.push('<li>' + l.trim().replace(/^[\-\*•]\s+/, '') + '</li>');
-      } else {
-        if (list) { out.push('</ul>'); list = false; }
-        if (l.trim()) out.push('<p>' + l + '</p>');
-      }
-    }
-    if (list) out.push('</ul>');
-    return out.join('');
-  }
-
-  function _now() {
-    var d = new Date(), h = d.getHours(), m = d.getMinutes();
-    var ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12;
-    return h + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
-  }
-
-  function _updateCharCount(val) {
-    var el = document.getElementById('ppc-char-count');
-    if (!el) return;
-    if (!val) { el.textContent = ''; return; }
-    el.textContent = val.length;
-    el.classList.toggle('warn', val.length > 300);
-  }
-
-  /* ── Events ── */
-  var inp = document.getElementById('ppc-input');
-  inp.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ppcSend(); }
-  });
-  inp.addEventListener('input', function () {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-    _updateCharCount(this.value);
-  });
-
-  document.getElementById('ppc-send').addEventListener('click', ppcSend);
-
-  document.getElementById('ppc-msgs').addEventListener('scroll', function () {
-    var btn = document.getElementById('ppc-scroll-btn');
-    var atBottom = this.scrollHeight - this.scrollTop - this.clientHeight < 60;
-    btn.classList.toggle('show', !atBottom);
-  });
-
-  document.addEventListener('click', function (e) {
-    var b = document.getElementById('ppc-border');
-    var w = document.getElementById('ppc-wrap');
-    if (b && b.classList.contains('open') && !b.contains(e.target) && !w.contains(e.target)) ppcOpen();
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      var b = document.getElementById('ppc-border');
-      if (b && b.classList.contains('open')) ppcOpen();
-    }
-  });
-})();
-</script>
-<!-- ── End PPC Chat Widget ─────────────────────────────────────────────────── -->
+  /* ── Send ── */
+  window.ppcSend = function () {
+    if (_busy || _uploading) re
   </body>
 </html>

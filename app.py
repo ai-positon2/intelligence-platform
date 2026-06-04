@@ -1348,12 +1348,24 @@ def ppc_chat():
 
     oai = OpenAI(api_key=api_key)
 
-    body = request.json or {}
+    body         = request.json or {}
     user_message = body.get("message", "").strip()
     history      = body.get("history", [])[-6:]
 
-    if not user_message:
+    # ── Attached file (optional) ────────────────────────────────────────────
+    file_name     = body.get("file_name", "")
+    file_content  = body.get("file_content", "")   # extracted text
+    file_is_image = body.get("file_is_image", False)
+    file_mime     = body.get("file_mime", "image/png")
+    file_base64   = body.get("file_base64", "")
+    file_truncated= body.get("file_truncated", False)
+    has_file      = bool(file_name)
+
+    if not user_message and not has_file:
         return jsonify({"answer": "Please ask a question."}), 200
+
+    if not user_message and has_file:
+        user_message = f"Please analyse the attached file '{file_name}' and summarise the key information."
 
     # ── Pre-fetch all live data (cached 4 min) ─────────────────────────────
     ppc_context = _build_ppc_context()
@@ -1385,19 +1397,173 @@ HOW TO ANSWER:
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history
-    messages.append({"role": "user", "content": user_message})
+
+    # ── Build user turn — plain text or multimodal (image) ─────────────────
+    if file_is_image and file_base64:
+        # Vision: send image alongside the question
+        trunc_note = " (image sent in full)"
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text",
+                 "text": f"I've attached an image: '{file_name}'\n{user_message}"},
+                {"type": "image_url",
+                 "image_url": {"url": f"data:{file_mime};base64,{file_base64}", "detail": "high"}},
+            ],
+        })
+    elif file_content:
+        # Text file: prepend content clearly labelled
+        trunc_note = f"\n\n⚠️ File was large — showing first {_MAX_TEXT_CHARS:,} characters." if file_truncated else ""
+        file_block = (
+            f"📎 ATTACHED FILE: {file_name}{trunc_note}\n"
+            f"{'─'*60}\n"
+            f"{file_content}\n"
+            f"{'─'*60}\n\n"
+            f"User question about this file: {user_message}"
+        )
+        messages.append({"role": "user", "content": file_block})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
     try:
         resp = oai.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
-            max_tokens=600,
+            max_tokens=800,
             temperature=0.1,
         )
         return jsonify({"answer": resp.choices[0].message.content})
     except Exception as e:
         log.warning("PPC chat error: %s", e)
         return jsonify({"answer": f"Something went wrong: {str(e)}"}), 200
+
+
+# ── File extraction helpers ───────────────────────────────────────────────────
+
+def _extract_pdf(data: bytes) -> str:
+    import pdfplumber, io
+    parts = []
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for i, page in enumerate(pdf.pages, 1):
+            text = page.extract_text()
+            if text and text.strip():
+                parts.append(f"[Page {i}]\n{text.strip()}")
+            # Extract tables too
+            for table in page.extract_tables():
+                rows = [" | ".join(str(c) if c else "" for c in row) for row in table if any(c for c in row)]
+                if rows:
+                    parts.append("\n".join(rows))
+    return "\n\n".join(parts) or "(No text could be extracted from this PDF)"
+
+
+def _extract_docx(data: bytes) -> str:
+    import docx, io
+    doc = docx.Document(io.BytesIO(data))
+    parts = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            style = para.style.name if para.style else ""
+            prefix = "# " if "Heading 1" in style else "## " if "Heading" in style else ""
+            parts.append(prefix + para.text)
+    for table in doc.tables:
+        for row in table.rows:
+            cells = " | ".join(c.text.strip() for c in row.cells)
+            if cells.strip():
+                parts.append(cells)
+    return "\n".join(parts) or "(No text found in document)"
+
+
+def _extract_xlsx(data: bytes) -> str:
+    import openpyxl, io
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    parts = []
+    for sheet in wb.worksheets:
+        parts.append(f"=== Sheet: {sheet.title} ===")
+        for row in sheet.iter_rows(values_only=True):
+            vals = [str(v).strip() if v is not None else "" for v in row]
+            if any(v for v in vals):
+                parts.append(" | ".join(vals))
+    return "\n".join(parts) or "(No data found in spreadsheet)"
+
+
+def _extract_pptx(data: bytes) -> str:
+    from pptx import Presentation
+    import io
+    prs = Presentation(io.BytesIO(data))
+    parts = []
+    for i, slide in enumerate(prs.slides, 1):
+        slide_parts = []
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text.strip():
+                slide_parts.append(shape.text.strip())
+        if slide_parts:
+            parts.append(f"--- Slide {i} ---\n" + "\n".join(slide_parts))
+    return "\n\n".join(parts) or "(No text found in presentation)"
+
+
+_IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp", "bmp"}
+_IMAGE_MIME  = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                "gif": "image/gif",  "webp": "image/webp", "bmp": "image/bmp"}
+_MAX_FILE_BYTES  = 20 * 1024 * 1024   # 20 MB
+_MAX_TEXT_CHARS  = 40_000             # truncate extracted text at 40k chars
+
+
+@app.route("/api/ppc-upload", methods=["POST"])
+@login_required
+def ppc_upload():
+    """Parse an uploaded file and return its extracted content for the chatbot."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    f        = request.files["file"]
+    filename = f.filename or "upload"
+    ext      = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    data     = f.read()
+
+    if len(data) > _MAX_FILE_BYTES:
+        return jsonify({"error": f"File too large — max {_MAX_FILE_BYTES // 1024 // 1024} MB"}), 400
+    if not ext:
+        return jsonify({"error": "File has no extension — cannot detect type"}), 400
+
+    try:
+        # ── Images → return base64 for vision API ──────────────────────────
+        if ext in _IMAGE_EXTS:
+            import base64 as _b64
+            b64  = _b64.b64encode(data).decode()
+            mime = _IMAGE_MIME.get(ext, "image/png")
+            return jsonify({"is_image": True, "name": filename, "mime": mime, "base64": b64})
+
+        # ── Text-based files → extract and return text ─────────────────────
+        if ext == "pdf":
+            content = _extract_pdf(data)
+        elif ext in ("docx", "doc"):
+            content = _extract_docx(data)
+        elif ext in ("xlsx", "xls"):
+            content = _extract_xlsx(data)
+        elif ext == "pptx":
+            content = _extract_pptx(data)
+        elif ext in ("csv", "txt", "md", "json", "xml", "html", "htm"):
+            content = data.decode("utf-8", errors="replace")
+        else:
+            return jsonify({"error": f"Unsupported file type .{ext}. Supported: PDF, DOCX, XLSX, PPTX, CSV, TXT, PNG, JPG, and more."}), 400
+
+        # Truncate if huge
+        truncated = False
+        if len(content) > _MAX_TEXT_CHARS:
+            content   = content[:_MAX_TEXT_CHARS]
+            truncated = True
+
+        return jsonify({
+            "is_image": False,
+            "name":      filename,
+            "content":   content,
+            "chars":     len(content),
+            "truncated": truncated,
+        })
+
+    except Exception as e:
+        log.warning("ppc_upload error for %s: %s", filename, e)
+        return jsonify({"error": f"Could not parse '{filename}': {str(e)}"}), 500
 
 
 @app.route("/api/ppc-chat-debug")
