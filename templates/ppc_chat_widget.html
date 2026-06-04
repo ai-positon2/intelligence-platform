@@ -818,17 +818,6 @@
       return;
     }
 
-    // Detect export / format request
-    var exportFmt = _detectExportFormat(msg);
-    if (exportFmt && !_file) {
-      var lastAi = _getLastAiText();
-      if (lastAi) {
-        payload.export_format = exportFmt;
-        payload.source_text   = lastAi;
-        payload.message       = msg;
-      }
-    }
-
     // Build display message
     var displayMsg = msg;
     if (_file) displayMsg = (_file.is_image ? '🖼️ ' : _fileIco(_file.name) + ' ') + _file.name + (msg ? '\n' + msg : '');
@@ -838,8 +827,16 @@
     _hist.push({ role: 'user', content: histMsg });
     _saveHist();
 
-    // Build payload — include persistent memories
+    // Build payload — MUST be defined before export detection references it
     var payload = { message: msg || '', history: _hist.slice(-12), memories: _memories };
+
+    // Detect export / format request — attach to payload after it's defined
+    var exportFmt = _detectExportFormat(msg);
+    if (exportFmt && !_file) {
+      payload.export_format = exportFmt;
+      var lastAi = _getLastAiText();
+      if (lastAi) { payload.source_text = lastAi; }
+    }
     if (_file) {
       payload.file_name      = _file.name;
       payload.file_is_image  = _file.is_image;
