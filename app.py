@@ -1706,7 +1706,7 @@ def insights_generate(account_id):
             params.append("%" + industry + "%")
         where = " AND ".join(conds)
         rows = conn.execute(
-            "SELECT c.name, c.domain, c.industry, c.city, c.state, c.employee_count, "
+            "SELECT c.name, c.domain, c.industry, c.city, c.state, "
             "a.signal_type, a.signal_detail, a.severity, a.signal_date "
             "FROM alerts_sent a JOIN companies c ON a.apollo_id = c.apollo_id "
             "WHERE " + where + " ORDER BY "
