@@ -1651,15 +1651,21 @@ def insights_meta(account_id):
     import sqlite3
     from pathlib import Path
     db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
-              "csg": Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
     db_path = db_map.get(account_id)
     if not db_path or not db_path.exists():
         return jsonify({"error": "Unknown account"}), 404
     try:
         conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
-        industries   = [r[0] for r in conn.execute("SELECT DISTINCT industry FROM companies WHERE industry IS NOT NULL AND industry!='' ORDER BY industry LIMIT 60").fetchall()]
-        signal_types = [r[0] for r in conn.execute("SELECT DISTINCT signal_type FROM alerts_sent WHERE dry_run=0 ORDER BY signal_type").fetchall()]
-        counts = {r[0]:r[1] for r in conn.execute("SELECT signal_type,COUNT(*) cnt FROM alerts_sent WHERE dry_run=0 GROUP BY signal_type ORDER BY cnt DESC").fetchall()}
+        industries   = [r[0] for r in conn.execute(
+            "SELECT DISTINCT industry FROM companies WHERE industry IS NOT NULL AND industry!='' ORDER BY industry LIMIT 60"
+        ).fetchall()]
+        signal_types = [r[0] for r in conn.execute(
+            "SELECT DISTINCT signal_type FROM alerts_sent WHERE dry_run=0 ORDER BY signal_type"
+        ).fetchall()]
+        counts = {r[0]: r[1] for r in conn.execute(
+            "SELECT signal_type,COUNT(*) cnt FROM alerts_sent WHERE dry_run=0 GROUP BY signal_type ORDER BY cnt DESC"
+        ).fetchall()}
         total     = conn.execute("SELECT COUNT(*) FROM alerts_sent WHERE dry_run=0").fetchone()[0]
         companies = conn.execute("SELECT COUNT(DISTINCT apollo_id) FROM alerts_sent WHERE dry_run=0").fetchone()[0]
         conn.close()
@@ -1672,181 +1678,100 @@ def insights_meta(account_id):
 @app.route("/api/insights/<account_id>")
 @login_required
 def insights_generate(account_id):
-    import sqlite3
+    import sqlite3, re as _re
     from pathlib import Path
     db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
-              "csg": Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
     db_path = db_map.get(account_id)
     if not db_path or not db_path.exists():
         return jsonify({"error": "Unknown account"}), 404
-
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = os.environ.get("OPENAI_API_KEY","")
     if not api_key:
         return jsonify({"error": "OpenAI API key not configured"}), 500
 
     signal_types = request.args.getlist("signal_type")
     severities   = request.args.getlist("severity")
     days         = int(request.args.get("days", 90))
-    industry     = request.args.get("industry", "")
+    industry     = request.args.get("industry","")
 
     try:
         conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
         conds = ["a.dry_run = 0"]; params = []
         if signal_types:
-            conds.append("a.signal_type IN (%s)" % ",".join("?"*len(signal_types)))
-            params.extend(signal_types)
+            conds.append("a.signal_type IN (%s)" % ",".join("?"*len(signal_types))); params.extend(signal_types)
         if severities:
-            conds.append("a.severity IN (%s)" % ",".join("?"*len(severities)))
-            params.extend(severities)
+            conds.append("a.severity IN (%s)" % ",".join("?"*len(severities))); params.extend(severities)
         if days > 0:
-            conds.append("a.signal_date >= date('now', ?)")
-            params.append("-%d days" % days)
+            conds.append("a.signal_date >= date('now',?)"); params.append("-%d days" % days)
         if industry:
-            conds.append("c.industry LIKE ?")
-            params.append("%" + industry + "%")
+            conds.append("c.industry LIKE ?"); params.append("%"+industry+"%")
         where = " AND ".join(conds)
         rows = conn.execute(
-            "SELECT c.name, c.domain, c.industry, c.city, c.state, "
-            "a.signal_type, a.signal_detail, a.severity, a.signal_date "
-            "FROM alerts_sent a JOIN companies c ON a.apollo_id = c.apollo_id "
-            "WHERE " + where + " ORDER BY "
-            "CASE a.severity WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, "
+            "SELECT c.name,c.domain,c.industry,c.city,c.state,"
+            "a.signal_type,a.signal_detail,a.severity,a.signal_date "
+            "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+            "WHERE "+where+" ORDER BY CASE a.severity WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,"
             "a.signal_date DESC LIMIT 200", params
         ).fetchall()
         conn.close()
-
         if not rows:
-            return jsonify({"error": "No signals found. Try broadening your filters."}), 200
+            return jsonify({"error": "No signals found for those filters."}), 200
 
         signals = [dict(r) for r in rows]
-        n_sig   = len(signals)
-        n_co    = len(set(s["name"] for s in signals))
-        acct    = "Healthcare" if account_id == "healthcare" else "CSG"
+        n_sig = len(signals); n_co = len(set(s["name"] for s in signals))
+        acct  = "Healthcare" if account_id == "healthcare" else "CSG"
 
-        # Group signals by company for richer context
         by_co = {}
         for s in signals:
-            co = s["name"]
-            if co not in by_co:
-                by_co[co] = {"domain": s["domain"], "industry": s["industry"], "sigs": []}
-            by_co[co]["sigs"].append(s)
+            if s["name"] not in by_co:
+                by_co[s["name"]] = {"domain": s.get("domain",""), "industry": s.get("industry",""), "sigs":[]}
+            by_co[s["name"]]["sigs"].append(s)
 
-        # Build context: top companies with all their signals
-        context_lines = []
-        for co, info in sorted(by_co.items(), key=lambda x: (
-            -sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"),
-            -len(x[1]["sigs"])
-        ))[:60]:
-            sig_summary = "; ".join(
-                "%s(%s:%s)" % (s["signal_type"], s["severity"], s["signal_date"])
-                + ((" - " + (s["signal_detail"] or "")[:80]) if s["signal_detail"] else "")
-                for s in info["sigs"][:5]
-            )
-            context_lines.append("CO: %s | %s | %s signals | %s" % (
-                co, info.get("domain","n/a"), len(info["sigs"]), sig_summary
-            ))
+        ctx_lines = []
+        for co, info in sorted(by_co.items(),
+            key=lambda x: (-sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"), -len(x[1]["sigs"])))[:60]:
+            sig_str = "; ".join(
+                "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                                  (": "+s["signal_detail"][:70]) if s.get("signal_detail") else "")
+                for s in info["sigs"][:4])
+            ctx_lines.append("CO: %s | %s | %d sigs | %s" % (co, info["domain"], len(info["sigs"]), sig_str))
 
-        signal_context = "\n".join(context_lines)
-        agency = "Position2 (a B2B digital marketing agency offering SEO, Performance Marketing/PPC, Content Strategy, Brand/Website, and Revenue Operations)"
-
-        system_prompt = """You are a senior revenue intelligence analyst at """ + agency + """.
-Analyse these """ + str(n_co) + """ companies from the """ + acct + """ market and their buying signals.
-Return ONLY valid JSON (no markdown, no extra text). Be SPECIFIC — use real company names, real signal details, real numbers.
-DO NOT give generic advice. Every insight must be anchored to actual signals in the data.
-
-Return this exact JSON structure:
-{
-  "summary": "3-4 sentence executive summary citing specific companies and signal patterns. Mention the most notable opportunities and urgency.",
-  "meta": {
-    "signal_velocity_trend": "accelerating|stable|slowing",
-    "top_theme": "one-phrase description of the dominant pattern",
-    "total_opportunity": "$X-Y range estimate based on realistic deal sizes"
-  },
-  "kpis": {
-    "high_priority": <integer count of companies with score>=70>,
-    "avg_intent": <float 0-100 average intent score>,
-    "estimated_value": "$X-Y",
-    "hot_industries": ["industry1", "industry2"]
-  },
-  "pipeline": [
-    {
-      "name": "Company Name",
-      "domain": "domain.com",
-      "intent_score": <0-100 based on signal recency, severity, count, and type>,
-      "signals": ["Signal Type 1", "Signal Type 2"],
-      "why_now": "Specific reason tied to their actual signals — cite the signal detail",
-      "service_fit": ["SEO", "Performance Marketing"],
-      "opportunity": "$X-Y",
-      "next_step": "Specific immediate action for the sales team"
-    }
-  ],
-  "actions": [
-    {
-      "rank": 1,
-      "type": "outreach|campaign|meeting|proposal|alert",
-      "company": "Company Name or 'All'",
-      "action": "Specific action — what exactly to do",
-      "reason": "Why this matters commercially — cite signals",
-      "revenue_impact": "$X-Y potential",
-      "deadline": "Within 48h|This week|This month",
-      "urgency": "HIGH|MEDIUM"
-    }
-  ],
-  "outreach": [
-    {
-      "company": "Company Name",
-      "domain": "domain.com",
-      "timing": "now|soon|watch",
-      "signal_hook": "The specific signal that makes outreach timely",
-      "subject": "Compelling email subject line (under 60 chars) referencing their specific situation",
-      "opening": "2-sentence opening that demonstrates you know their situation (reference their signal)",
-      "talking_points": ["Point 1 tied to their signals", "Point 2 on service value", "Point 3 on urgency/timing"],
-      "cta": "Specific low-friction call to action"
-    }
-  ],
-  "themes": [
-    {
-      "theme": "Short theme name",
-      "count": <number of companies showing this pattern>,
-      "companies": ["Co1", "Co2", "Co3"],
-      "campaign_angle": "Specific marketing/outreach angle for this cohort"
-    }
-  ],
-  "risks": [
-    {
-      "company": "Company Name",
-      "flag": "Short flag description",
-      "implication": "What this means for engagement strategy"
-    }
-  ]
-}
-
-Rules:
-- pipeline: top 8 companies, scored rigorously. intent_score 80-100=critical, 60-79=high, 40-59=medium
-- actions: 6-8 items, most urgent first, SPECIFIC not generic
-- outreach: top 8 companies ready for contact, subject lines must be compelling and personalised
-- themes: 3-5 cross-company patterns with campaign angles
-- risks: 2-4 flags only if genuinely relevant
-- Be brutally specific. Generic answers will fail."""
-
+        system_prompt = (
+            "You are a senior revenue analyst at Position2 (B2B digital marketing agency: SEO, PPC, Content, Brand, RevOps). "
+            "Analyse "+str(n_co)+" "+acct+" market companies and return ONLY valid compact JSON — no markdown, no extra text, no line breaks inside strings. "
+            "JSON must be complete and valid. Use this EXACT structure:\n"
+            '{"summary":"3-4 sentences citing specific companies and patterns",'
+            '"meta":{"signal_velocity_trend":"accelerating|stable|slowing","top_theme":"phrase","total_opportunity":"$X-Y"},'
+            '"kpis":{"high_priority":0,"avg_intent":0.0,"estimated_value":"$X-Y","hot_industries":["a","b"]},'
+            '"pipeline":[{"name":"","domain":"","intent_score":85,"signals":["type1"],"why_now":"specific reason","service_fit":["SEO","PPC"],"opportunity":"$X-Y","next_step":"action"}],'
+            '"actions":[{"rank":1,"type":"outreach","company":"","action":"","reason":"","revenue_impact":"$X","deadline":"48h","urgency":"HIGH"}],'
+            '"outreach":[{"company":"","domain":"","timing":"now","signal_hook":"","subject":"under 55 chars","opening":"2 sentences","talking_points":["a","b","c"],"cta":""}],'
+            '"themes":[{"theme":"","count":0,"companies":["a","b"],"campaign_angle":""}],'
+            '"risks":[{"company":"","flag":"","implication":""}]}\n'
+            "RULES: pipeline=top 8 scored rigorously; actions=6 specific ranked; outreach=8 personalised; themes=4; risks=2-3 only if real. "
+            "intent_score: 80-100=critical, 60-79=high, 40-59=medium. Every field must cite actual signal data."
+        )
         from openai import OpenAI
         oai  = OpenAI(api_key=api_key)
         resp = oai.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+            model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": "Analyse these %d signals from %d companies:\n\n%s" % (n_sig, n_co, signal_context)},
+                {"role":"system","content":system_prompt},
+                {"role":"user","content":"Analyse %d signals from %d companies:\n\n%s" % (n_sig, n_co, "\n".join(ctx_lines))},
             ],
-            max_completion_tokens=4000,
+            max_completion_tokens=5000,
         )
         raw = resp.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-            raw = raw.strip()
+        # Robust JSON extraction
+        if "```" in raw:
+            m = _re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+            raw = m.group(1).strip() if m else raw
+        # Find first { and last }
+        start = raw.find("{"); end = raw.rfind("}")
+        if start != -1 and end != -1:
+            raw = raw[start:end+1]
         insights = json.loads(raw)
-        return jsonify({"ok": True, "signals_analyzed": n_sig, "companies_analyzed": n_co, "insights": insights})
-
+        return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
