@@ -805,23 +805,29 @@
     container.appendChild(btn);
   }
 
-  function _fileIco(name) {
-    var ext = (name.split('.').pop() || '').toLowerCase();
-    var map = {pdf:'📄', docx:'📝', doc:'📝', xlsx:'📊', xls:'📊',
-               csv:'📋', pptx:'📑', ppt:'📑', txt:'📄', json:'📄', md:'📄'};
-    return map[ext] || '📎';
-  }
-  function _fmtBytes(b) { return b > 1048576 ? (b/1048576).toFixed(1)+'MB' : Math.round(b/1024)+'KB'; }
-  function _fmtChars(n) { return n >= 1000 ? (n/1000).toFixed(0)+'k chars' : n+' chars'; }
+  /* Build a scrollable HTML table preview from CSV text */
+  function _buildTablePreview(csv) {
+    var lines = csv.trim().split('\n').filter(function(l){ return l.trim(); });
+    if (lines.length < 2) {
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'font-size:11px;color:#94a3b8;margin-top:8px;white-space:pre-wrap;font-family:monospace;';
+      pre.textContent = csv.slice(0, 800);
+      return pre;
+    }
 
-  /* ── Send ── */
-  window.ppcSend = function () {
-    if (_busy || _uploading) return;
-    var inp = document.getElementById('ppc-input');
-    var msg = (inp.value || '').trim();
-    if (!msg && !_file) return;
+    function parseRow(line) {
+      var cols = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+      return cols;
+    }
 
-    var wlc = document.getElementById('ppc-welcome');
-    if (wlc) { wlc.style.animation = 'ppc-msg-in .3s reverse both'; setTimeo
+    var headers = parseRow(lines[0]);
+    var da
   </body>
 </html>
