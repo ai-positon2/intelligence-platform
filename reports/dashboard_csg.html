@@ -1193,6 +1193,10 @@ h2::after,.section-title::after{
     <button class="nav-item" id="nav-trends" onclick="showSection('trends',this)">
       <span class="icon">📈</span> Trends <span class="badge-count" id="snav-trends"></span>
     </button>
+    <button class="nav-item" id="nav-insights" onclick="showSection('insights',this);insOnTabOpen()">
+      <span class="icon">✨</span> Insights
+      <span style="margin-left:auto;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;letter-spacing:.04em;flex-shrink:0">AI</span>
+    </button>
   </div>
   <div class="sidebar-footer">
     <a href="/accounts" class="sidebar-switch-btn">
@@ -3799,5 +3803,639 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     INSIGHTS TAB — Position2 Signal Intelligence  (injected block)
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Insights layout ──────────────────────────────────────────────────────── */
+#section-insights{padding:0}
+.ins-topbar{position:sticky;top:56px;z-index:80;background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px 12px}
+.ins-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.ins-title{font-size:18px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
+.ins-title-ai{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;letter-spacing:.04em}
+
+/* ── Generate button ──────────────────────────────────────────────────────── */
+.ins-gen-btn{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#6366f1 0%,#a855f7 60%,#22d3ee 100%);background-size:200% 200%;animation:ins-grad-shift 4s ease infinite;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;padding:9px 20px;box-shadow:0 4px 24px rgba(99,102,241,.45);transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden}
+.ins-gen-btn:hover{transform:translateY(-1px);box-shadow:0 8px 32px rgba(99,102,241,.65)}
+.ins-gen-btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+.ins-gen-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transform:translateX(-100%);transition:none}
+.ins-gen-btn:not(:disabled):hover::after{animation:ins-shine .55s ease forwards}
+@keyframes ins-shine{to{transform:translateX(100%)}}
+@keyframes ins-grad-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.ins-gen-icon{animation:ins-sparkle 2.5s ease-in-out infinite}
+@keyframes ins-sparkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.25) rotate(12deg)}}
+.ins-gen-badge{font-size:9px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.25);font-weight:600;letter-spacing:.04em}
+.ins-gen-btn-lg{display:inline-flex;align-items:center;gap:10px;margin-top:24px;background:linear-gradient(135deg,#6366f1,#a855f7);border:none;border-radius:12px;color:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;padding:13px 32px;box-shadow:0 6px 32px rgba(99,102,241,.5);transition:transform .15s,box-shadow .15s}
+.ins-gen-btn-lg:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(99,102,241,.65)}
+
+/* ── Filter bar ───────────────────────────────────────────────────────────── */
+.ins-filters{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.ins-filter-group{display:flex;flex-direction:column;gap:5px}
+.ins-filter-label{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.ins-chips{display:flex;gap:5px;flex-wrap:wrap}
+.ins-chip{font-size:11px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap}
+.ins-chip:hover{border-color:var(--blue);color:var(--blue)}
+.ins-chip.active{color:#fff;border-color:transparent}
+.ins-chip-type.active{background:rgba(59,130,246,.8)}
+.ins-chip-high.active{background:rgba(239,68,68,.8)}
+.ins-chip-med.active{background:rgba(245,158,11,.8)}
+.ins-chip-low.active{background:rgba(107,114,128,.65)}
+.ins-select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 30px 5px 10px;font-size:12px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .15s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.ins-select:focus{border-color:var(--blue)}
+.ins-select option{background:#1a2035}
+.ins-stats-pill{margin-left:auto;align-self:flex-end;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:999px;padding:5px 14px;font-size:11px;color:#a5b4fc;font-weight:500;white-space:nowrap;animation:ins-pill-glow 3s ease-in-out infinite}
+@keyframes ins-pill-glow{0%,100%{box-shadow:0 0 0 rgba(99,102,241,0)}50%{box-shadow:0 0 12px rgba(99,102,241,.25)}}
+
+/* ── Content area ─────────────────────────────────────────────────────────── */
+.ins-content{padding:22px 24px;min-height:calc(100vh - 200px)}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.ins-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;text-align:center;position:relative}
+.ins-empty-orb-wrap{position:relative;margin-bottom:36px}
+.ins-empty-orb{width:96px;height:96px;border-radius:28px;background:linear-gradient(135deg,#1e1b4b,#2d1b69,#0f172a);border:1px solid rgba(99,102,241,.35);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(99,102,241,.3),0 0 120px rgba(168,85,247,.12);animation:ins-orb-float 4s ease-in-out infinite;position:relative;z-index:2}
+@keyframes ins-orb-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.ins-ring{position:absolute;border-radius:50%;border:1px solid;top:50%;left:50%;transform:translate(-50%,-50%)}
+.ins-ring-1{width:156px;height:156px;border-color:rgba(99,102,241,.22);animation:ins-ring-pulse 3s ease-in-out infinite}
+.ins-ring-2{width:230px;height:230px;border-color:rgba(99,102,241,.12);animation:ins-ring-pulse 3s ease-in-out .5s infinite}
+.ins-ring-3{width:310px;height:310px;border-color:rgba(99,102,241,.06);animation:ins-ring-pulse 3s ease-in-out 1s infinite}
+@keyframes ins-ring-pulse{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.35;transform:translate(-50%,-50%) scale(1.04)}}
+.ins-empty h2{font-size:21px;font-weight:700;color:var(--text);margin-bottom:10px}
+.ins-empty p{font-size:13px;color:var(--text2);max-width:420px;line-height:1.65}
+
+/* ── Loading state ────────────────────────────────────────────────────────── */
+.ins-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;gap:28px}
+.ins-load-orb{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(99,102,241,.55);animation:ins-load-pulse 1.6s ease-in-out infinite}
+@keyframes ins-load-pulse{0%,100%{box-shadow:0 0 40px rgba(99,102,241,.55)}50%{box-shadow:0 0 80px rgba(99,102,241,.9),0 0 120px rgba(168,85,247,.4)}}
+.ins-load-steps{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ins-load-step{font-size:13px;color:var(--text2);padding:6px 20px;border-radius:999px;border:1px solid var(--border);transition:all .4s ease}
+.ins-load-step.active{color:var(--text);background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.4);box-shadow:0 0 16px rgba(99,102,241,.2);animation:ins-step-pulse 1.3s ease-in-out infinite}
+@keyframes ins-step-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.ins-load-bar-wrap{width:300px;height:3px;background:var(--border);border-radius:999px;overflow:hidden}
+.ins-load-bar{height:100%;width:0;background:linear-gradient(90deg,#6366f1,#a855f7,#22d3ee);border-radius:999px;animation:ins-progress 9s ease-in-out forwards}
+@keyframes ins-progress{0%{width:0}25%{width:30%}55%{width:62%}80%{width:83%}100%{width:93%}}
+
+/* ── Summary card ─────────────────────────────────────────────────────────── */
+.ins-summary-card{background:linear-gradient(135deg,rgba(99,102,241,.12) 0%,rgba(168,85,247,.08) 50%,rgba(34,211,238,.06) 100%);border:1px solid rgba(99,102,241,.3);border-radius:16px;padding:22px 24px;margin-bottom:28px;position:relative;overflow:hidden;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both}
+.ins-summary-card::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.15) 0%,transparent 70%);pointer-events:none}
+.ins-summary-label{font-size:10px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.ins-summary-label::before{content:'';width:18px;height:2px;background:linear-gradient(90deg,#6366f1,#a855f7);border-radius:1px}
+.ins-summary-text{font-size:14px;line-height:1.75;color:var(--text);margin-bottom:14px}
+.ins-summary-meta{display:flex;gap:10px;flex-wrap:wrap}
+.ins-meta-chip{font-size:11px;color:#a5b4fc;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);border-radius:999px;padding:3px 12px;font-weight:500}
+
+/* ── Section headers ──────────────────────────────────────────────────────── */
+.ins-sec-hdr{display:flex;align-items:center;gap:10px;margin:26px 0 13px}
+.ins-sec-icon{font-size:17px}
+.ins-sec-title{font-size:15px;font-weight:700;color:var(--text)}
+.ins-sec-sub{font-size:11px;color:var(--text2);margin-left:2px}
+
+/* ── Hot companies ────────────────────────────────────────────────────────── */
+.ins-hot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px}
+@media(max-width:1000px){.ins-hot-grid{grid-template-columns:repeat(2,1fr)}}
+.ins-hot-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 16px;transition:border-color .2s,box-shadow .2s,transform .2s;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both;position:relative;overflow:hidden;cursor:default}
+.ins-hot-card:hover{border-color:var(--blue);box-shadow:0 0 22px rgba(59,130,246,.14);transform:translateY(-2px)}
+.ins-hot-card.pri-HIGH{border-color:rgba(239,68,68,.3);background:linear-gradient(135deg,#111827,rgba(239,68,68,.05))}
+.ins-hot-card.pri-HIGH:hover{border-color:rgba(239,68,68,.6);box-shadow:0 0 22px rgba(239,68,68,.18)}
+.ins-hot-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ins-hot-av{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.ins-hot-info{flex:1;min-width:0}
+.ins-hot-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ins-hot-domain{font-size:10px;color:var(--text2)}
+.ins-pri-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.04em;flex-shrink:0}
+.pri-badge-HIGH{background:rgba(239,68,68,.15);color:var(--high)}
+.pri-badge-MEDIUM{background:rgba(245,158,11,.15);color:var(--medium)}
+.pri-badge-LOW{background:rgba(107,114,128,.15);color:var(--low)}
+.ins-hot-signal{font-size:11px;color:var(--blue);font-weight:500;margin-bottom:5px}
+.ins-hot-reason{font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:9px}
+.ins-hot-action{font-size:11px;color:#10b981;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:7px;padding:5px 9px;line-height:1.4;display:flex;align-items:flex-start;gap:5px}
+.ins-hot-action::before{content:'→';flex-shrink:0}
+
+/* ── Key insights grid ────────────────────────────────────────────────────── */
+.ins-insight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:1100px){.ins-insight-grid{grid-template-columns:repeat(2,1fr)}}
+.ins-insight-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:16px;transition:border-color .2s,transform .2s;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both;cursor:default}
+.ins-insight-card:hover{border-color:rgba(99,102,241,.4);transform:translateY(-2px)}
+.ins-insight-icon{font-size:26px;margin-bottom:10px}
+.ins-insight-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px}
+.ins-insight-detail{font-size:11px;color:var(--text2);line-height:1.6}
+.ins-cat{margin-top:10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:999px;display:inline-block}
+.ins-cat-funding{background:rgba(245,158,11,.12);color:var(--medium)}
+.ins-cat-executive{background:rgba(59,130,246,.12);color:var(--blue)}
+.ins-cat-acquisition{background:rgba(239,68,68,.12);color:var(--high)}
+.ins-cat-growth{background:rgba(16,185,129,.12);color:var(--green)}
+.ins-cat-risk{background:rgba(239,68,68,.12);color:var(--high)}
+.ins-cat-opportunity{background:rgba(99,102,241,.12);color:#a5b4fc}
+
+/* ── Two-col ──────────────────────────────────────────────────────────────── */
+.ins-two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:900px){.ins-two-col{grid-template-columns:1fr}}
+
+/* ── Urgent actions ───────────────────────────────────────────────────────── */
+.ins-action-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;transition:border-color .2s;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both}
+.ins-action-item.urg-HIGH{border-left:3px solid var(--high)}
+.ins-action-item.urg-MEDIUM{border-left:3px solid var(--medium)}
+.ins-rank{width:22px;height:22px;border-radius:6px;flex-shrink:0;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a5b4fc}
+.ins-action-body{flex:1;min-width:0}
+.ins-action-text{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.ins-action-co{font-size:10px;color:var(--blue);font-weight:500;margin-bottom:2px}
+.ins-action-why{font-size:11px;color:var(--text2);line-height:1.4}
+.ins-action-foot{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ins-timing{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600;background:rgba(16,185,129,.1);color:var(--green)}
+.ins-urg{font-size:9px;padding:2px 7px;border-radius:4px;font-weight:600}
+.ins-urg-HIGH{background:rgba(239,68,68,.12);color:var(--high)}
+.ins-urg-MEDIUM{background:rgba(245,158,11,.12);color:var(--medium)}
+
+/* ── Patterns ─────────────────────────────────────────────────────────────── */
+.ins-pattern-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both}
+.ins-pattern-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.ins-pattern-text{font-size:12px;font-weight:600;color:var(--text);flex:1}
+.ins-pattern-count{font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(59,130,246,.12);color:var(--blue);white-space:nowrap}
+.ins-pattern-impl{font-size:11px;color:var(--text2);line-height:1.5}
+
+/* ── Outreach grid ────────────────────────────────────────────────────────── */
+.ins-outreach-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:36px}
+@media(max-width:1200px){.ins-outreach-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.ins-outreach-grid{grid-template-columns:repeat(2,1fr)}}
+.ins-outreach-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;transition:border-color .2s,transform .2s;animation:ins-card-in .5s cubic-bezier(.22,1,.36,1) both;cursor:default}
+.ins-outreach-card:hover{border-color:var(--blue);transform:translateY(-2px)}
+.ins-timing-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;margin-bottom:8px;display:inline-block}
+.t-now{background:rgba(239,68,68,.12);color:var(--high)}
+.t-soon{background:rgba(245,158,11,.12);color:var(--medium)}
+.t-watch{background:rgba(107,114,128,.12);color:var(--low)}
+.ins-outreach-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.ins-outreach-domain{font-size:10px;color:var(--text2);margin-bottom:8px}
+.ins-outreach-angle{font-size:11px;color:var(--blue);font-style:italic;margin-bottom:5px;line-height:1.45}
+.ins-outreach-context{font-size:10px;color:var(--text2);line-height:1.4}
+
+/* ── Error state ──────────────────────────────────────────────────────────── */
+.ins-err{display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px 24px;text-align:center}
+.ins-err-icon{font-size:36px}
+.ins-err-msg{font-size:13px;color:var(--text2);max-width:400px;line-height:1.6}
+.ins-retry-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;border-radius:8px;padding:7px 20px;font-size:12px;font-weight:500;font-family:inherit;transition:border-color .15s,color .15s}
+.ins-retry-btn:hover{border-color:var(--blue);color:var(--blue)}
+
+/* ── Shared animation ─────────────────────────────────────────────────────── */
+@keyframes ins-card-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.ins-s1{animation-delay:.04s}.ins-s2{animation-delay:.08s}.ins-s3{animation-delay:.12s}
+.ins-s4{animation-delay:.16s}.ins-s5{animation-delay:.20s}.ins-s6{animation-delay:.24s}
+.ins-s7{animation-delay:.28s}.ins-s8{animation-delay:.32s}
+</style>
+
+<!-- ── Section HTML ────────────────────────────────────────────────────────── -->
+<div id="section-insights" class="section">
+
+  <!-- Sticky top bar: title + generate btn + filters -->
+  <div class="ins-topbar">
+    <div class="ins-title-row">
+      <div class="ins-title">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/>
+          </ellipse>
+          <circle cx="12" cy="12" r="2.4" fill="#a5b4fc">
+            <animate attributeName="r" values="2.4;2.9;2.4" dur="3s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        AI Insights
+        <span class="ins-title-ai">GPT</span>
+      </div>
+      <button class="ins-gen-btn" id="ins-gen-btn" onclick="insGenerate()">
+        <span class="ins-gen-icon">✨</span>
+        Generate Insights
+        <span class="ins-gen-badge">GPT-5.4</span>
+      </button>
+    </div>
+
+    <div class="ins-filters">
+      <!-- Signal Type chips -->
+      <div class="ins-filter-group">
+        <div class="ins-filter-label">Signal Type</div>
+        <div class="ins-chips" id="ins-type-chips">
+          <span class="ins-chip ins-chip-type" style="font-size:10px;color:var(--text2);padding:4px 8px;border:none">Loading…</span>
+        </div>
+      </div>
+      <!-- Severity -->
+      <div class="ins-filter-group">
+        <div class="ins-filter-label">Severity</div>
+        <div class="ins-chips">
+          <button class="ins-chip ins-chip-high active" data-sev="HIGH" onclick="insToggleSev(this)">HIGH</button>
+          <button class="ins-chip ins-chip-med active"  data-sev="MEDIUM" onclick="insToggleSev(this)">MEDIUM</button>
+          <button class="ins-chip ins-chip-low active"  data-sev="LOW" onclick="insToggleSev(this)">LOW</button>
+        </div>
+      </div>
+      <!-- Date Range -->
+      <div class="ins-filter-group">
+        <div class="ins-filter-label">Date Range</div>
+        <select class="ins-select" id="ins-days">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90" selected>Last 90 days</option>
+          <option value="365">Last 12 months</option>
+          <option value="0">All time</option>
+        </select>
+      </div>
+      <!-- Industry -->
+      <div class="ins-filter-group">
+        <div class="ins-filter-label">Industry</div>
+        <select class="ins-select" id="ins-industry">
+          <option value="">All Industries</option>
+        </select>
+      </div>
+      <!-- Stats pill -->
+      <div class="ins-stats-pill" id="ins-stats-pill">Loading data…</div>
+    </div>
+  </div>
+
+  <!-- Main content area -->
+  <div class="ins-content" id="ins-content">
+
+    <!-- Empty state -->
+    <div id="ins-empty" class="ins-empty">
+      <div class="ins-empty-orb-wrap">
+        <div class="ins-empty-orb">
+          <svg width="52" height="52" fill="none" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.4">
+              <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.4">
+              <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.4">
+              <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/>
+            </ellipse>
+            <circle cx="12" cy="12" r="2.8" fill="#c4b5fd">
+              <animate attributeName="r" values="2.8;3.4;2.8" dur="3s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="1;0.7;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        </div>
+        <div class="ins-ring ins-ring-1"></div>
+        <div class="ins-ring ins-ring-2"></div>
+        <div class="ins-ring ins-ring-3"></div>
+      </div>
+      <h2>AI-Powered Signal Intelligence</h2>
+      <p>Apply filters and click <strong style="color:var(--text)">Generate Insights</strong> to get a GPT analysis of buying signals — hot companies, patterns, urgent actions, and personalised outreach angles.</p>
+      <button class="ins-gen-btn-lg" onclick="insGenerate()">✨ Generate Insights</button>
+    </div>
+
+    <!-- Loading state -->
+    <div id="ins-loading" style="display:none" class="ins-loading">
+      <div class="ins-load-orb">
+        <svg width="38" height="38" fill="none" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.4">
+            <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/>
+          </ellipse>
+          <circle cx="12" cy="12" r="2.4" fill="white"/>
+        </svg>
+      </div>
+      <div class="ins-load-steps">
+        <div class="ins-load-step active" id="ins-step-1">📡 Reading signals across all companies…</div>
+        <div class="ins-load-step" id="ins-step-2">🔍 Identifying patterns and opportunities…</div>
+        <div class="ins-load-step" id="ins-step-3">✨ Generating insights and recommendations…</div>
+      </div>
+      <div class="ins-load-bar-wrap"><div class="ins-load-bar" id="ins-load-bar"></div></div>
+    </div>
+
+    <!-- Results -->
+    <div id="ins-results" style="display:none">
+
+      <!-- Summary -->
+      <div class="ins-summary-card" id="ins-summary-card">
+        <div class="ins-summary-label">Executive Summary</div>
+        <div class="ins-summary-text" id="ins-summary-text"></div>
+        <div class="ins-summary-meta" id="ins-summary-meta"></div>
+      </div>
+
+      <!-- Hot companies -->
+      <div class="ins-sec-hdr">
+        <span class="ins-sec-icon">🔥</span>
+        <span class="ins-sec-title">Hot Companies</span>
+        <span class="ins-sec-sub">Most actionable targets right now</span>
+      </div>
+      <div class="ins-hot-grid" id="ins-hot-grid"></div>
+
+      <!-- Key insights -->
+      <div class="ins-sec-hdr">
+        <span class="ins-sec-icon">💡</span>
+        <span class="ins-sec-title">Key Insights</span>
+        <span class="ins-sec-sub">Patterns and opportunities across the portfolio</span>
+      </div>
+      <div class="ins-insight-grid" id="ins-insight-grid"></div>
+
+      <!-- Urgent actions + Patterns -->
+      <div class="ins-two-col" style="margin-top:26px">
+        <div>
+          <div class="ins-sec-hdr" style="margin-top:0">
+            <span class="ins-sec-icon">⚡</span>
+            <span class="ins-sec-title">Urgent Actions</span>
+          </div>
+          <div id="ins-urgent-list"></div>
+        </div>
+        <div>
+          <div class="ins-sec-hdr" style="margin-top:0">
+            <span class="ins-sec-icon">📊</span>
+            <span class="ins-sec-title">Signal Patterns</span>
+          </div>
+          <div id="ins-patterns-list"></div>
+        </div>
+      </div>
+
+      <!-- Outreach targets -->
+      <div class="ins-sec-hdr">
+        <span class="ins-sec-icon">🎯</span>
+        <span class="ins-sec-title">Outreach Targets</span>
+        <span class="ins-sec-sub">Ready to contact with personalised angles</span>
+      </div>
+      <div class="ins-outreach-grid" id="ins-outreach-grid"></div>
+
+    </div><!-- /ins-results -->
+  </div><!-- /ins-content -->
+</div><!-- /section-insights -->
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+//  INSIGHTS TAB — JavaScript
+// ══════════════════════════════════════════════════════════════════════════════
+
+(function() {
+  var _insMeta   = null;   // cache of meta response
+  var _insLoaded = false;  // has meta been loaded?
+
+  /* ── Helpers ────────────────────────────────────────────────────────────── */
+  function _accountId() {
+    var m = window.location.pathname.match(/\/dashboard\/([^\/]+)/);
+    return m ? m[1] : 'healthcare';
+  }
+
+  function _esc(s) {
+    return String(s||'')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  function _initials(name) {
+    return (name||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();
+  }
+
+  /* ── Tab open hook ──────────────────────────────────────────────────────── */
+  window.insOnTabOpen = function() {
+    if (!_insLoaded) _loadMeta();
+  };
+
+  function _loadMeta() {
+    _insLoaded = true;
+    fetch('/api/insights-meta/' + _accountId())
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        _insMeta = data;
+        _renderTypeChips(data.signal_types || [], data.counts || {});
+        _renderIndustries(data.industries || []);
+        var pill = document.getElementById('ins-stats-pill');
+        if (pill) pill.textContent = (data.total_signals||0).toLocaleString() + ' signals · ' + (data.total_companies||0).toLocaleString() + ' companies';
+      })
+      .catch(function(e){
+        var pill = document.getElementById('ins-stats-pill');
+        if (pill) pill.textContent = 'Data unavailable';
+      });
+  }
+
+  function _renderTypeChips(types, counts) {
+    var wrap = document.getElementById('ins-type-chips');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    types.forEach(function(t) {
+      var btn = document.createElement('button');
+      btn.className = 'ins-chip ins-chip-type active';
+      btn.setAttribute('data-type', t);
+      btn.onclick = function() { insToggleType(this); };
+      var label = t.replace(/_/g,' ');
+      var cnt   = counts[t] ? ' <span style="opacity:.65;font-size:9px">('+counts[t]+')</span>' : '';
+      btn.innerHTML = _esc(label) + cnt;
+      wrap.appendChild(btn);
+    });
+  }
+
+  function _renderIndustries(list) {
+    var sel = document.getElementById('ins-industry');
+    if (!sel) return;
+    list.forEach(function(ind) {
+      var opt = document.createElement('option');
+      opt.value = ind; opt.textContent = ind;
+      sel.appendChild(opt);
+    });
+  }
+
+  /* ── Filter toggles ─────────────────────────────────────────────────────── */
+  window.insToggleSev = function(btn) {
+    btn.classList.toggle('active');
+  };
+
+  window.insToggleType = function(btn) {
+    btn.classList.toggle('active');
+  };
+
+  /* ── Generate ───────────────────────────────────────────────────────────── */
+  window.insGenerate = function() {
+    if (!_insLoaded) _loadMeta();
+
+    var btn = document.getElementById('ins-gen-btn');
+    btn.disabled = true;
+
+    // Build query string
+    var params = new URLSearchParams();
+    document.querySelectorAll('#ins-type-chips .ins-chip-type.active').forEach(function(c) {
+      params.append('signal_type', c.getAttribute('data-type'));
+    });
+    document.querySelectorAll('.ins-chip-high.active,.ins-chip-med.active,.ins-chip-low.active').forEach(function(c) {
+      params.append('severity', c.getAttribute('data-sev'));
+    });
+    var days = document.getElementById('ins-days');
+    if (days) params.set('days', days.value);
+    var ind  = document.getElementById('ins-industry');
+    if (ind && ind.value) params.set('industry', ind.value);
+
+    // Show loading
+    _showState('loading');
+    _startLoadSteps();
+
+    // Reset progress bar by cloning
+    var bar = document.getElementById('ins-load-bar');
+    if (bar) { var nb = bar.cloneNode(true); bar.parentNode.replaceChild(nb, bar); }
+
+    fetch('/api/insights/' + _accountId() + '?' + params.toString())
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        if (data.error) { _showError(data.error); return; }
+        _renderResults(data);
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        _showError('Network error: ' + e.message);
+      });
+  };
+
+  function _showState(state) {
+    ['ins-empty','ins-loading','ins-results'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    var target = document.getElementById('ins-' + state);
+    if (target) target.style.display = '';
+  }
+
+  function _showError(msg) {
+    _showState('empty');
+    var empty = document.getElementById('ins-empty');
+    if (!empty) return;
+    // Replace empty state with error temporarily
+    var existing = empty.querySelector('.ins-err');
+    if (existing) existing.remove();
+    var div = document.createElement('div');
+    div.className = 'ins-err';
+    div.innerHTML = '<div class="ins-err-icon">⚠️</div>'
+      + '<div class="ins-err-msg">' + _esc(msg) + '</div>'
+      + '<button class="ins-retry-btn" onclick="insGenerate()">↩ Try Again</button>';
+    empty.appendChild(div);
+    _showState('empty');
+  }
+
+  var _stepTimer = null;
+  function _startLoadSteps() {
+    var steps = ['ins-step-1','ins-step-2','ins-step-3'];
+    var cur = 0;
+    steps.forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove('active'); });
+    var el0 = document.getElementById(steps[0]); if(el0) el0.classList.add('active');
+    clearInterval(_stepTimer);
+    _stepTimer = setInterval(function() {
+      var el = document.getElementById(steps[cur]); if(el) el.classList.remove('active');
+      cur++;
+      if (cur >= steps.length) { clearInterval(_stepTimer); return; }
+      var nel = document.getElementById(steps[cur]); if(nel) nel.classList.add('active');
+    }, 3000);
+  }
+
+  /* ── Render Results ─────────────────────────────────────────────────────── */
+  function _renderResults(data) {
+    clearInterval(_stepTimer);
+    var ins = data.insights || {};
+
+    // Summary
+    var sumText = document.getElementById('ins-summary-text');
+    var sumMeta = document.getElementById('ins-summary-meta');
+    if (sumText) sumText.textContent = ins.summary || '';
+    if (sumMeta) {
+      sumMeta.innerHTML =
+        '<span class="ins-meta-chip">📊 ' + (data.signals_analyzed||0) + ' signals analysed</span>' +
+        '<span class="ins-meta-chip">🏢 ' + (data.companies_analyzed||0) + ' companies</span>' +
+        '<span class="ins-meta-chip">🤖 GPT-powered</span>';
+    }
+
+    // Hot companies
+    var hotGrid = document.getElementById('ins-hot-grid');
+    if (hotGrid && ins.hot_companies) {
+      hotGrid.innerHTML = ins.hot_companies.slice(0,6).map(function(co,i) {
+        var priClass = 'pri-' + (co.priority||'LOW');
+        var badgeClass = 'pri-badge-' + (co.priority||'LOW');
+        return '<div class="ins-hot-card ' + priClass + ' ins-s' + (i+1) + '">' +
+          '<div class="ins-hot-hdr">' +
+            '<div class="ins-hot-av">' + _esc(_initials(co.name)) + '</div>' +
+            '<div class="ins-hot-info">' +
+              '<div class="ins-hot-name">' + _esc(co.name||'') + '</div>' +
+              '<div class="ins-hot-domain">' + _esc(co.domain||'') + '</div>' +
+            '</div>' +
+            '<span class="ins-pri-badge ' + badgeClass + '">' + _esc(co.priority||'') + '</span>' +
+          '</div>' +
+          '<div class="ins-hot-signal">⚡ ' + _esc(co.top_signal||'') + '</div>' +
+          '<div class="ins-hot-reason">' + _esc(co.reason||'') + '</div>' +
+          '<div class="ins-hot-action">' + _esc(co.action||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Key insights
+    var insGrid = document.getElementById('ins-insight-grid');
+    if (insGrid && ins.key_insights) {
+      insGrid.innerHTML = ins.key_insights.slice(0,6).map(function(ki,i) {
+        var cat = (ki.category||'opportunity').toLowerCase();
+        return '<div class="ins-insight-card ins-s' + (i+1) + '">' +
+          '<div class="ins-insight-icon">' + (ki.icon||'💡') + '</div>' +
+          '<div class="ins-insight-title">' + _esc(ki.title||'') + '</div>' +
+          '<div class="ins-insight-detail">' + _esc(ki.detail||'') + '</div>' +
+          '<span class="ins-cat ins-cat-' + _esc(cat) + '">' + _esc(cat) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Urgent actions
+    var urgList = document.getElementById('ins-urgent-list');
+    if (urgList && ins.urgent_actions) {
+      urgList.innerHTML = ins.urgent_actions.slice(0,6).map(function(a,i) {
+        var urgClass = 'urg-' + (a.urgency||'MEDIUM');
+        return '<div class="ins-action-item ' + urgClass + ' ins-s' + (i+1) + '">' +
+          '<div class="ins-rank">' + (a.rank||i+1) + '</div>' +
+          '<div class="ins-action-body">' +
+            '<div class="ins-action-text">' + _esc(a.action||'') + '</div>' +
+            (a.company && a.company!=='All' ? '<div class="ins-action-co">🏢 ' + _esc(a.company) + '</div>' : '') +
+            '<div class="ins-action-why">' + _esc(a.why||'') + '</div>' +
+            '<div class="ins-action-foot">' +
+              '<span class="ins-timing">' + _esc(a.timing||'') + '</span>' +
+              '<span class="ins-urg ins-urg-' + (a.urgency||'MEDIUM') + '">' + _esc(a.urgency||'') + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Patterns
+    var patList = document.getElementById('ins-patterns-list');
+    if (patList && ins.patterns) {
+      patList.innerHTML = ins.patterns.slice(0,5).map(function(p,i) {
+        return '<div class="ins-pattern-item ins-s' + (i+1) + '">' +
+          '<div class="ins-pattern-row">' +
+            '<div class="ins-pattern-text">' + _esc(p.pattern||'') + '</div>' +
+            (p.count ? '<span class="ins-pattern-count">' + p.count + 'x</span>' : '') +
+          '</div>' +
+          '<div class="ins-pattern-impl">' + _esc(p.implication||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Outreach targets
+    var outGrid = document.getElementById('ins-outreach-grid');
+    if (outGrid && ins.outreach_targets) {
+      outGrid.innerHTML = ins.outreach_targets.slice(0,8).map(function(ot,i) {
+        var t = (ot.timing||'watch').toLowerCase();
+        return '<div class="ins-outreach-card ins-s' + (i+1) + '">' +
+          '<span class="ins-timing-badge t-' + _esc(t) + '">' + t.toUpperCase() + '</span>' +
+          '<div class="ins-outreach-name">' + _esc(ot.company||'') + '</div>' +
+          '<div class="ins-outreach-domain">' + _esc(ot.domain||'') + '</div>' +
+          '<div class="ins-outreach-angle">"' + _esc(ot.angle||'') + '"</div>' +
+          '<div class="ins-outreach-context">' + _esc(ot.context||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    _showState('results');
+    // smooth scroll to top of content
+    var content = document.getElementById('ins-content');
+    if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+})();
+</script>
+
 </body>
 </html>
