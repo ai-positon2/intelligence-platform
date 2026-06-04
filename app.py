@@ -1762,3 +1762,25 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
+    return {
+        "status": "ok",
+        "total_in_sheet": total_before,
+        "total_matching_filters": len(ads),
+        "returned": min(len(ads), limit),
+        "by_competitor": comp_counts,
+        "by_format": format_counts,
+        "by_status": status_counts,
+        "top_ctas": top_ctas,
+        "top_keywords": top_keywords,
+        "ads": [
+            {k: v for k, v in a.items() if k != "full_text"}
+            for a in ads[:limit]
+        ],
+    }
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+rt)
