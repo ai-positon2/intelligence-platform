@@ -1126,7 +1126,7 @@ CHATBOT_FUNCTIONS = [
 ]
 
 _PPC_CTX_CACHE: dict = {"data": None, "ts": 0.0}
-_PPC_CTX_TTL = 240   # seconds (4 min cache)
+_PPC_CTX_TTL = 0     # 0 = no cache, fetch fresh on every request
 
 
 def _build_ppc_context() -> str:
@@ -1402,10 +1402,9 @@ def ppc_chat():
             {"role": "user", "content": f"{instruction}\n\nDATA TO REFORMAT:\n{source_text}"},
         ]
         try:
-            try:
-                resp = oai.chat.completions.create(model="gpt-4.1", messages=reformat_messages, max_tokens=2000, temperature=0)
-            except Exception:
-                resp = oai.chat.completions.create(model="gpt-4o-mini", messages=reformat_messages, max_tokens=2000, temperature=0)
+            resp = oai.chat.completions.create(
+                model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=reformat_messages, max_tokens=2000, temperature=0)
             formatted = resp.choices[0].message.content.strip()
             is_csv = export_fmt in ("csv", "excel")
             return jsonify({"answer": formatted, "is_export": True,
@@ -1483,20 +1482,16 @@ INSTRUCTIONS:
     else:
         messages.append({"role": "user", "content": user_message})
 
-    # Try best available model, fall back if not on this project's tier
-    def _chat(model):
-        return oai.chat.completions.create(
-            model=model, messages=messages, max_tokens=1200, temperature=0.1)
+    # Use best model available for this project
+    _model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
     try:
-        try:
-            resp = _chat("gpt-4.1")
-        except Exception:
-            try:
-                resp = _chat("gpt-4o")
-            except Exception:
-                resp = _chat("gpt-4o-mini")
-
+        resp = oai.chat.completions.create(
+            model=_model,
+            messages=messages,
+            max_tokens=1200,
+            temperature=0.1,
+        )
         answer = resp.choices[0].message.content
         return jsonify({
             "answer":          answer,
