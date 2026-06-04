@@ -672,7 +672,7 @@
     el.id    = 'ppc-welcome';
     el.innerHTML =
       '<div class="ppc-orb-wrap">' +
-        '<div class="ppc-wlc-orb">⚡</div>' +
+        '<div class="ppc-wlc-orb"><svg width="36" height="36" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#fff"/><circle cx="12" cy="12" r="1.1" fill="rgba(99,102,241,0.7)"/></svg></div>' +
         '<div class="ppc-orb-ring"></div>' +
         '<div class="ppc-orb-ring2"></div>' +
       '</div>' +
@@ -951,7 +951,11 @@
 
     var av = document.createElement('div');
     av.className = 'ppc-row-av';
-    av.textContent = role === 'assistant' ? '⚡' : 'You';
+    if (role === 'assistant') {
+      av.innerHTML = '<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/><circle cx="12" cy="12" r="1" fill="rgba(99,102,241,0.7)"/></svg>';
+    } else {
+      av.textContent = 'You';
+    }
 
     var bwrap = document.createElement('div');
     bwrap.className = 'ppc-bwrap';
@@ -979,7 +983,7 @@
     var row  = document.createElement('div');
     row.className = 'ppc-row assistant';
     var av   = document.createElement('div');
-    av.className = 'ppc-row-av'; av.textContent = '⚡';
+    av.className = 'ppc-row-av'; av.innerHTML = '<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.8"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/><circle cx="12" cy="12" r="1" fill="rgba(99,102,241,0.7)"/></svg>';
     var bwrap = document.createElement('div');
     bwrap.className = 'ppc-bwrap';
     var bubble = document.createElement('div');
