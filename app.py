@@ -1125,143 +1125,173 @@ CHATBOT_FUNCTIONS = [
     },
 ]
 
+_PPC_CTX_CACHE: dict = {"data": None, "ts": 0.0}
+_PPC_CTX_TTL = 240   # seconds (4 min cache)
+
+
+def _build_ppc_context() -> str:
+    """
+    Fetch all three data sources and return a single readable text block.
+    Cached for _PPC_CTX_TTL seconds so repeated messages stay fast.
+    """
+    import time as _t
+    now = _t.time()
+    if _PPC_CTX_CACHE["data"] and now - _PPC_CTX_CACHE["ts"] < _PPC_CTX_TTL:
+        return _PPC_CTX_CACHE["data"]
+
+    parts = []
+
+    # ── 1. Anonymous Visitors ──────────────────────────────────────────────
+    try:
+        v = _chatbot_get_anonymous_visitors(limit=150)
+        if v.get("status") == "ok":
+            people = v.get("people", [])
+            rows = []
+            for i, p in enumerate(people[:80], 1):
+                company = p.get("company") or p.get("website") or "Unknown"
+                rows.append(
+                    f"{i}. {p['name']} | {p['title']} | {company} | "
+                    f"{p['industry']} | {p['location']} | visited {p['date_visited']}"
+                )
+            parts.append(
+                f"=== ANONYMOUS VISITORS ===\n"
+                f"Total in sheet: {v['total_in_sheet']} people\n"
+                f"Top industries: {v.get('top_industries', {})}\n\n"
+                f"All visitors (newest first):\n" + "\n".join(rows)
+            )
+        else:
+            parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Error: {v.get('error')}\n{v.get('hint','')}")
+    except Exception as e:
+        parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Could not fetch: {e}")
+
+    # ── 2. Signal Tracker ─────────────────────────────────────────────────
+    try:
+        s = _chatbot_get_signal_tracker(limit=60)
+        if "signals" in s:
+            rows = []
+            for sig in s["signals"][:50]:
+                date = (sig.get("signal_date") or "")[:10]
+                detail = (sig.get("signal_detail") or "")[:100]
+                rows.append(
+                    f"• {sig['company']} ({sig['industry']}) | "
+                    f"{sig['signal_type']} [{sig['severity']}] | {date} | {detail}"
+                )
+            parts.append(
+                f"=== SIGNAL TRACKER (Healthcare) ===\n"
+                f"Signals returned: {s['total_returned']}\n\n"
+                + "\n".join(rows)
+            )
+        else:
+            parts.append(f"=== SIGNAL TRACKER ===\n⚠ Error: {s.get('error')}")
+    except Exception as e:
+        parts.append(f"=== SIGNAL TRACKER ===\n⚠ Could not fetch: {e}")
+
+    # ── 3. Ad Intelligence ────────────────────────────────────────────────
+    try:
+        a = get_ad_intelligence_data(limit=120)
+        if a.get("status") == "ok":
+            rows = []
+            for ad in a.get("ads", [])[:80]:
+                rows.append(
+                    f"• {ad['competitor']} | {ad['format']} | {ad['status']} | "
+                    f"'{ad['headline']}' | CTA: {ad['cta']} | "
+                    f"keywords: {ad['keywords'][:60]} | last seen: {ad['last_shown']}"
+                )
+            parts.append(
+                f"=== AD INTELLIGENCE ===\n"
+                f"Total ads: {a['total_in_sheet']} | "
+                f"By competitor: {a['by_competitor']} | "
+                f"By format: {a['by_format']} | By status: {a['by_status']}\n"
+                f"Top CTAs: {a['top_ctas']}\n"
+                f"Top keywords: {a['top_keywords']}\n\n"
+                f"All ads:\n" + "\n".join(rows)
+            )
+        else:
+            fix = a.get("fix", "")
+            parts.append(
+                f"=== AD INTELLIGENCE ===\n⚠ Error: {a.get('error')}\n"
+                f"{'ACTION NEEDED: ' + fix if fix else ''}"
+            )
+    except Exception as e:
+        parts.append(f"=== AD INTELLIGENCE ===\n⚠ Could not fetch: {e}")
+
+    ctx = "\n\n" + "\n\n".join(parts)
+    _PPC_CTX_CACHE["data"] = ctx
+    _PPC_CTX_CACHE["ts"] = now
+    return ctx
+
+
 @app.route("/api/ppc-chat", methods=["POST"])
 @login_required
 def ppc_chat():
-    """PPC AI assistant — OpenAI function calling over live platform data."""
+    """PPC AI assistant — context injection (no function calling, works with any model)."""
     from openai import OpenAI
-
-    # Built here (not at module level) so get_ad_intelligence_data is guaranteed defined
-    _fn_map = {
-        "get_anonymous_visitors":   _chatbot_get_anonymous_visitors,
-        "get_signal_tracker":       _chatbot_get_signal_tracker,
-        "get_ad_intelligence_data": get_ad_intelligence_data,
-    }
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
-        return jsonify({"answer": "⚠️ OpenAI API key not configured. Add `OPENAI_API_KEY` to Railway Variables."}), 200
+        return jsonify({"answer": "⚠️ Add `OPENAI_API_KEY` to Railway Variables."}), 200
 
     oai = OpenAI(api_key=api_key)
 
-    data = request.json or {}
-    user_message = data.get("message", "").strip()
-    history = data.get("history", [])[-8:]   # last 8 turns for context window
+    body = request.json or {}
+    user_message = body.get("message", "").strip()
+    history      = body.get("history", [])[-6:]
 
     if not user_message:
         return jsonify({"answer": "Please ask a question."}), 200
 
-    now_ist     = datetime.now(IST)
-    today       = now_ist.strftime("%Y-%m-%d")
-    yesterday   = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
-    week_start  = (now_ist - timedelta(days=now_ist.weekday())).strftime("%Y-%m-%d")
-    month_start = now_ist.strftime("%Y-%m-01")
-    year_start  = now_ist.strftime("%Y-01-01")
+    # ── Pre-fetch all live data (cached 4 min) ─────────────────────────────
+    ppc_context = _build_ppc_context()
 
-    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B digital marketing agency. You are sharp, analytical, and direct — not a data dump machine.
+    now_ist    = datetime.now(IST)
+    today      = now_ist.strftime("%Y-%m-%d")
+    week_start = (now_ist - timedelta(days=now_ist.weekday())).strftime("%Y-%m-%d")
 
-TODAY IS {today}.
-DATE SHORTCUTS (resolve before calling functions):
-- "today"      → date_from={today},     date_to={today}
-- "yesterday"  → date_from={yesterday}, date_to={yesterday}
-- "this week"  → date_from={week_start}, date_to={today}
-- "this month" → date_from={month_start}, date_to={today}
-- "this year"  → date_from={year_start}, date_to={today}
-- "last 7 days"→ date_from={(now_ist - timedelta(days=7)).strftime('%Y-%m-%d')}, date_to={today}
-- "last 30 days"→date_from={(now_ist - timedelta(days=30)).strftime('%Y-%m-%d')}, date_to={today}
+    system_prompt = f"""You are the PPC Intelligence Assistant for Position2 (a B2B marketing agency). \
+You have the full live dataset below — answer every question directly from it.
 
-════ DATA SOURCES ════
+TODAY: {today}  |  WEEK STARTED: {week_start}
+"This week" means from {week_start} to {today}.
+"Last 3" means the 3 most recent rows.
+"Yesterday" means {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}.
 
-1. ANONYMOUS VISITORS  (function: get_anonymous_visitors)
-   People who visited position2.com, identified and enriched via Apollo.
-   Fields: name, job title, company, industry, location, date visited, pages viewed.
-   Use for: who visited, total counts, seniority breakdown, industry mix, individual lookups.
+HOW TO ANSWER:
+• Read the data section that matches the question (Visitors, Signals, or Ads).
+• Give a direct, specific answer. Use **bold** for numbers. Bullet points for lists.
+• Be analytical — don't just list, find the insight (e.g. "3 of the 5 are C-Suite from healthcare").
+• If a section shows "⚠ Error", tell the user that data source is unavailable and why.
+• Keep responses under 180 words unless the user asks for detail.
+• For "last N companies/visitors/ads", count from the top of the relevant list (it's newest-first).
 
-2. SIGNAL TRACKER  (function: get_signal_tracker)
-   1,251 healthcare companies monitored for buying intent signals.
-   HIGH signals: Funding Round, C-Suite Join, C-Suite Exit, Acquisition/M&A, IPO Signal
-   LOW signals: News Mention
-   Use for: hot accounts, outbound targeting, prospect prioritisation.
-
-3. AD INTELLIGENCE  (function: get_ad_intelligence_data)
-   Competitor ads tracked for Inspire Aesthetics, Dr. Dana MD, Sono Bello.
-   Fields: headline, CTA, format (image/text/video), status (active/inactive),
-           keywords, messaging angle, value proposition, first/last shown dates.
-   Use for: competitor strategy, messaging gaps, CTA analysis, format mix.
-
-════ CRITICAL RULES ════
-
-RULE 1 — ALWAYS FETCH FIRST
-Call the function before answering any data question. Never guess or recall numbers. No exceptions.
-
-RULE 2 — HANDLE ERRORS HONESTLY
-- If result has {{"status": "error"}}: say "I couldn't fetch the data: [reason]". Do NOT say "no records".
-- If result has {{"status": "ok"}} but the people/ads/signals list is empty: say "The data loaded but no records matched that filter."
-- Never confuse a fetch error with an empty result set.
-
-RULE 3 — BE ANALYTICAL, NOT A LIST-READER
-Don't just dump a list. Extract the insight:
-  ✓ "**14 companies** visited this week. Most interesting: 3 are healthcare tech firms — matching your target vertical."
-  ✗ "Here are the companies: Acme, Betasoft, ..."
-When you have numbers, calculate percentages, spot outliers, highlight what's actionable.
-
-RULE 4 — FORMAT WELL
-- Bold key numbers: **23 visitors**, **4 funding rounds**
-- Use bullets for lists longer than 3 items
-- Lead with the most interesting finding, not the most obvious one
-- Keep responses under 200 words unless detail is explicitly asked for
-
-RULE 5 — BE SPECIFIC
-If filters return 0 results, suggest a broader query. Example: "No results for VP-level this week — want me to check this month instead?"
+══════════════════════════ LIVE DATA ══════════════════════════
+{ppc_context}
+═══════════════════════════════════════════════════════════════
 """
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history
     messages.append({"role": "user", "content": user_message})
 
-    tools = [{"type": "function", "function": f} for f in CHATBOT_FUNCTIONS]
-
     try:
         resp = oai.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
-            tools=tools,
-            tool_choice="auto",
-            max_tokens=1000,
-            temperature=0.15,
+            max_tokens=600,
+            temperature=0.1,
         )
-
-        msg = resp.choices[0].message
-
-        if msg.tool_calls:
-            messages.append(msg)
-
-            for tool_call in msg.tool_calls:
-                fn_name = tool_call.function.name
-                fn_args = json.loads(tool_call.function.arguments)
-                fn = _fn_map.get(fn_name)
-                result = fn(**fn_args) if fn else {"status": "error", "error": f"Unknown function: {fn_name}"}
-                messages.append({
-                    "role":         "tool",
-                    "tool_call_id": tool_call.id,
-                    "content":      json.dumps(result),
-                })
-
-            final = oai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                max_tokens=1000,
-                temperature=0.15,
-            )
-            answer = final.choices[0].message.content
-        else:
-            answer = msg.content
-
-        return jsonify({"answer": answer})
-
+        return jsonify({"answer": resp.choices[0].message.content})
     except Exception as e:
         log.warning("PPC chat error: %s", e)
         return jsonify({"answer": f"Something went wrong: {str(e)}"}), 200
+
+
+@app.route("/api/ppc-chat-debug")
+@login_required
+def ppc_chat_debug():
+    """Shows exactly what data the chatbot sees — use to diagnose blank/wrong answers."""
+    _PPC_CTX_CACHE["ts"] = 0   # force refresh
+    ctx = _build_ppc_context()
+    return f"<pre style='font-size:12px;padding:20px'>{ctx}</pre>", 200
 
 
 # ── Ad Intelligence data helper (for chatbot) ────────────────────────────────
