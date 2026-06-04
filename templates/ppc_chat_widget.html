@@ -381,16 +381,20 @@
 
 <!-- Trigger -->
 <div id="ppc-wrap">
-  <button id="ppc-btn" onclick="ppcOpen()" aria-label="Open PPC Assistant">
-    <svg class="ppc-ico" id="ppc-ico-chat" width="23" height="23" fill="none" viewBox="0 0 24 24">
-      <path stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-        d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  <button id="ppc-btn" onclick="ppcOpen()" aria-label="Open Kairo">
+    <svg class="ppc-ico" id="ppc-ico-chat" width="24" height="24" fill="none" viewBox="0 0 24 24">
+      <!-- Kairo atom logo -->
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75"/>
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75" transform="rotate(60 12 12)"/>
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75" transform="rotate(-60 12 12)"/>
+      <circle cx="12" cy="12" r="2.4" fill="#fff"/>
+      <circle cx="12" cy="12" r="1.1" fill="rgba(99,102,241,0.7)"/>
     </svg>
     <svg class="ppc-ico" id="ppc-ico-close" width="20" height="20" fill="none" viewBox="0 0 24 24">
       <path stroke="#fff" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/>
     </svg>
   </button>
-  <div id="ppc-tip">PPC Assistant</div>
+  <div id="ppc-tip">Kairo</div>
 </div>
 
 <!-- Panel -->
@@ -400,9 +404,17 @@
     <!-- Header -->
     <div id="ppc-hdr">
       <div class="ppc-hdr-top">
-        <div class="ppc-av">⚡</div>
+        <div class="ppc-av">
+          <svg width="27" height="27" fill="none" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7"/>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7" transform="rotate(60 12 12)"/>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7" transform="rotate(-60 12 12)"/>
+            <circle cx="12" cy="12" r="2.5" fill="white"/>
+            <circle cx="12" cy="12" r="1.1" fill="rgba(99,102,241,0.65)"/>
+          </svg>
+        </div>
         <div class="ppc-hdr-info">
-          <div class="ppc-hdr-title">PPC Assistant</div>
+          <div class="ppc-hdr-title">Kairo</div>
           </div>
         <div class="ppc-hdr-btns">
           <!-- Memory button -->
