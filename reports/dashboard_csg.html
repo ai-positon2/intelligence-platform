@@ -4430,5 +4430,440 @@ window.siCopy=function(btn,id){
 })();
 </script>
 
+
+
+<!-- ═══ INSIGHTS INTERACTIVE PATCH v2 ══════════════════════════════════════ -->
+<style>
+/* ── Clickable card base ───────────────────────────────────────────────────*/
+.si-co-card,.si-email-card,.si-tl-item{cursor:pointer!important;position:relative}
+.si-co-card .si-xhint,.si-email-card .si-xhint,.si-tl-item .si-xhint{
+  position:absolute;bottom:12px;right:14px;font-size:10px;font-weight:500;
+  color:#334155;opacity:0;transition:opacity .2s;pointer-events:none;
+  display:flex;align-items:center;gap:4px
+}
+.si-co-card:hover .si-xhint,.si-email-card:hover .si-xhint,.si-tl-item:hover .si-xhint{opacity:1}
+.si-co-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important}
+.si-email-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important}
+.si-tl-item:hover .si-tl-card{border-color:#334155!important}
+.si-co-card.active,.si-email-card.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca,0 8px 24px rgba(67,56,202,.2)!important}
+.si-tl-item.active .si-tl-card{border-color:#4338ca!important}
+
+/* ── Overlay ───────────────────────────────────────────────────────────────*/
+.si-ov2{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:398;
+  opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(3px)}
+.si-ov2.show{opacity:1;pointer-events:all}
+
+/* ── Drawer ────────────────────────────────────────────────────────────────*/
+.si-drw{
+  position:fixed;top:0;right:-540px;width:520px;max-width:94vw;height:100vh;
+  background:#0b1120;border-left:1px solid #1e293b;z-index:399;
+  transition:right .3s cubic-bezier(.22,1,.36,1);
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:-20px 0 60px rgba(0,0,0,.5)
+}
+.si-drw.show{right:0}
+.si-drw-top{
+  display:flex;align-items:center;gap:10px;padding:14px 18px;
+  border-bottom:1px solid #1e293b;flex-shrink:0;background:#0b1120
+}
+.si-drw-close{
+  background:none;border:1px solid #1e293b;border-radius:7px;
+  color:#475569;cursor:pointer;font-size:13px;line-height:1;
+  padding:5px 9px;transition:all .15s;flex-shrink:0
+}
+.si-drw-close:hover{border-color:#334155;color:#94a3b8}
+.si-drw-label{font-size:12px;font-weight:600;color:#e2e8f0;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.si-drw-body{flex:1;overflow-y:auto;padding:20px 20px 32px}
+.si-drw-body::-webkit-scrollbar{width:4px}
+.si-drw-body::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+
+/* Drawer sections */
+.si-ds{margin-bottom:18px}
+.si-ds-lbl{font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;
+  letter-spacing:.09em;margin-bottom:8px}
+.si-ds-val{font-size:13px;color:#94a3b8;line-height:1.7}
+
+/* Score block */
+.si-score-blk{display:flex;align-items:center;gap:16px;background:#0f172a;
+  border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:18px}
+.si-score-ring-lg{flex-shrink:0}
+.si-score-rinfo{flex:1;min-width:0}
+.si-score-rlbl{font-size:12px;font-weight:600;margin-bottom:5px}
+.si-score-rbar{height:4px;background:#1e293b;border-radius:999px;overflow:hidden;margin-bottom:8px}
+.si-score-rfill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.si-score-rwhy{font-size:12px;color:#475569;line-height:1.6}
+
+/* Signal pills */
+.si-sig-pills{display:flex;flex-direction:column;gap:6px}
+.si-sig-pill{display:flex;align-items:center;gap:8px;background:#0f172a;
+  border:1px solid #1e293b;border-radius:8px;padding:8px 12px}
+.si-sig-ptype{font-size:11px;font-weight:600;color:#60a5fa;flex:1}
+.si-sev-pip-H{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(220,38,38,.1);color:#f87171}
+.si-sev-pip-M{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(217,119,6,.08);color:#fcd34d}
+.si-sev-pip-L{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:#1e293b;color:#475569}
+
+/* Service / tag chips */
+.si-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.si-chip-grn{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;
+  background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.si-chip-ind{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;
+  background:#0f172a;color:#64748b;border:1px solid #1e293b}
+
+/* Revenue big */
+.si-rev-big{font-size:26px;font-weight:800;color:#fbbf24;letter-spacing:-.04em;margin-top:2px}
+
+/* Next step box */
+.si-next-box{background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);
+  border-radius:9px;padding:12px 14px;font-size:13px;color:#a5b4fc;line-height:1.6}
+
+/* Email preview */
+.si-ep{background:#0f172a;border:1px solid #1e293b;border-radius:10px;overflow:hidden}
+.si-ep-chrome{background:#0a0e1a;border-bottom:1px solid #1e293b;
+  padding:9px 14px;display:flex;align-items:center;gap:5px}
+.si-ep-dot{width:9px;height:9px;border-radius:50%}
+.si-ep-body{padding:16px;font-size:13px;color:#64748b;line-height:1.75}
+.si-ep-subject{font-size:14px;font-weight:700;color:#e2e8f0;
+  padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #1e293b;letter-spacing:-.01em}
+.si-ep-para{color:#64748b;margin-bottom:10px}
+.si-ep-ul{list-style:none;padding:0;margin:8px 0 12px}
+.si-ep-ul li{display:flex;gap:8px;padding:3px 0;color:#64748b}
+.si-ep-ul li::before{content:'✓';color:#059669;font-weight:700;flex-shrink:0}
+.si-ep-cta{color:#818cf8;padding-top:10px;border-top:1px solid #1e293b}
+
+/* Action buttons */
+.si-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding-top:6px}
+.si-btn{display:inline-flex;align-items:center;gap:6px;background:#0f172a;
+  border:1px solid #1e293b;border-radius:7px;color:#64748b;cursor:pointer;
+  font-family:inherit;font-size:11px;font-weight:500;padding:7px 12px;transition:all .15s}
+.si-btn:hover{border-color:#334155;color:#94a3b8}
+.si-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}
+.si-btn.prim:hover{background:#3730a3}
+.si-btn.ok{border-color:#065f46;color:#34d399}
+
+/* Urgency colors */
+.si-urg-badge-H{display:inline-block;font-size:9px;font-weight:700;padding:3px 8px;
+  border-radius:5px;background:rgba(220,38,38,.1);color:#f87171;letter-spacing:.04em}
+.si-urg-badge-M{display:inline-block;font-size:9px;font-weight:700;padding:3px 8px;
+  border-radius:5px;background:rgba(217,119,6,.08);color:#fcd34d;letter-spacing:.04em}
+</style>
+
+<!-- Overlay + Drawer DOM -->
+<div class="si-ov2" id="si-ov2" onclick="siDrwClose()"></div>
+<div class="si-drw" id="si-drw">
+  <div class="si-drw-top">
+    <button class="si-drw-close" onclick="siDrwClose()">✕</button>
+    <div class="si-drw-label" id="si-drw-label"></div>
+  </div>
+  <div class="si-drw-body" id="si-drw-body"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── Stored data (populated after GPT response) ────────────────────────── */
+window._ID = {pip:[], acts:[], out:[]};
+
+/* ── Helpers ───────────────────────────────────────────────────────────── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
+var AVC=['#4338ca','#0e7490','#059669','#7c3aed','#b45309','#0284c7','#dc2626','#4338ca'];
+
+/* ── Drawer open/close ─────────────────────────────────────────────────── */
+window.siDrwClose = function(){
+  document.getElementById('si-drw').classList.remove('show');
+  document.getElementById('si-ov2').classList.remove('show');
+  document.querySelectorAll('.si-co-card.active,.si-email-card.active,.si-tl-item.active')
+    .forEach(function(el){el.classList.remove('active');});
+};
+function siDrwOpen(title, html){
+  document.getElementById('si-drw-label').textContent = title;
+  document.getElementById('si-drw-body').innerHTML = html;
+  document.getElementById('si-drw').classList.add('show');
+  document.getElementById('si-ov2').classList.add('show');
+  document.getElementById('si-drw-body').scrollTop = 0;
+  /* Trigger score bar animation */
+  setTimeout(function(){
+    document.querySelectorAll('.si-score-rfill[data-w]').forEach(function(el){
+      el.style.width = el.getAttribute('data-w') + '%';
+    });
+  }, 80);
+}
+
+/* ── SVG ring for drawer ───────────────────────────────────────────────── */
+function drwRing(sc, color){
+  var r=40, c2=2*Math.PI*r, off=c2*(1-sc/100);
+  return '<svg class="si-score-ring-lg" width="100" height="100" viewBox="0 0 100 100">'
+    +'<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="#1e293b" stroke-width="8"/>'
+    +'<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="8"'
+    +' stroke-linecap="round" stroke-dasharray="'+c2+'" stroke-dashoffset="'+c2+'"'
+    +' transform="rotate(-90 50 50)">'
+    +'<animate attributeName="stroke-dashoffset" from="'+c2+'" to="'+off+'" dur="1s" fill="freeze"/>'
+    +'</circle>'
+    +'<text x="50" y="54" text-anchor="middle" fill="'+color+'" font-size="20" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
+    +'<text x="50" y="68" text-anchor="middle" fill="#334155" font-size="9" font-family="Inter,sans-serif">/100</text>'
+    +'</svg>';
+}
+
+/* ── Pipeline drawer ───────────────────────────────────────────────────── */
+function showPipeline(d, avColor){
+  var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
+  var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+  var lbl=sc>=80?'<span style="color:#f87171">🔥 Critical Intent</span>':sc>=60?'<span style="color:#fbbf24">⚡ High Intent</span>':'<span style="color:#818cf8">👀 Watching</span>';
+
+  var sigs=(d.signals||[]).map(function(s,i){
+    var raw=d._rawSignals&&d._rawSignals[i];
+    var sev=(raw&&raw.severity)||'';
+    var cls='si-sev-pip-'+(sev||'L').charAt(0);
+    return '<div class="si-sig-pill"><span class="si-sig-ptype">'+esc(s)+'</span>'
+      +(sev?'<span class="'+cls+'">'+esc(sev)+'</span>':'')
+      +(raw&&raw.signal_date?'<span style="font-size:10px;color:#1e293b">'+esc(raw.signal_date)+'</span>':'')
+    +'</div>';
+  }).join('');
+
+  var svcs=(d.service_fit||[]).map(function(s){return '<span class="si-chip-grn">'+esc(s)+'</span>';}).join('');
+
+  var html=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+      +'<div style="width:48px;height:48px;border-radius:12px;background:'+avColor+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.name))+'</div>'
+      +'<div>'
+        +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(d.name)+'</div>'
+        +(d.domain?'<div style="font-size:11px;color:#334155;margin-top:2px">'+esc(d.domain)+'</div>':'')
+      +'</div>'
+    +'</div>'
+
+    +'<div class="si-score-blk">'
+      +drwRing(sc,rc)
+      +'<div class="si-score-rinfo">'
+        +'<div class="si-score-rlbl">'+lbl+'</div>'
+        +'<div class="si-score-rbar"><div class="si-score-rfill" style="width:0;background:'+rc+'" data-w="'+sc+'"></div></div>'
+        +'<div class="si-score-rwhy">'+esc(d.why_now||'')+'</div>'
+      +'</div>'
+    +'</div>'
+
+    +(sigs?'<div class="si-ds"><div class="si-ds-lbl">Detected Signals</div><div class="si-sig-pills">'+sigs+'</div></div>':'')
+    +(svcs?'<div class="si-ds"><div class="si-ds-lbl">Service Fit</div><div class="si-chip-row">'+svcs+'</div></div>':'')
+
+    +(d.opportunity?
+      '<div class="si-ds"><div class="si-ds-lbl">Revenue Opportunity</div>'
+        +'<div class="si-rev-big">'+esc(d.opportunity)+'</div>'
+      +'</div>':'')
+
+    +'<div class="si-ds"><div class="si-ds-lbl">Recommended Action</div>'
+      +'<div class="si-next-box">'+esc(d.next_step||'')+'</div>'
+    +'</div>'
+
+    +'<div class="si-drw-btns">'
+      +'<button class="si-btn prim" onclick="siGotoCo(\''+esc(d.name)+'\')">Find in Companies →</button>'
+      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.next_step||'')+'\')">Copy Action</button>'
+    +'</div>';
+
+  siDrwOpen(d.name, html);
+}
+
+/* ── Actions drawer ────────────────────────────────────────────────────── */
+function showAction(d){
+  var hi=d.urgency==='HIGH';
+  var html=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+      +'<span class="si-urg-badge-'+(hi?'H':'M')+'">'+esc(d.urgency||'MEDIUM')+'</span>'
+      +(d.deadline?'<span style="font-size:11px;color:#334155">⏱ '+esc(d.deadline)+'</span>':'')
+      +(d.type?'<span style="font-size:11px;color:#475569">'+esc(d.type)+'</span>':'')
+    +'</div>'
+
+    +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:18px;letter-spacing:-.02em">'+esc(d.action||'')+'</div>'
+
+    +(d.company&&d.company!=='All'?
+      '<div class="si-ds"><div class="si-ds-lbl">Company</div>'
+        +'<div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(d.company)+'</div>'
+      +'</div>':'')
+
+    +'<div class="si-ds"><div class="si-ds-lbl">Why This Matters</div>'
+      +'<div class="si-ds-val">'+esc(d.reason||'')+'</div>'
+    +'</div>'
+
+    +(d.revenue_impact?
+      '<div class="si-ds"><div class="si-ds-lbl">Revenue Impact</div>'
+        +'<div class="si-rev-big">'+esc(d.revenue_impact)+'</div>'
+      +'</div>':'')
+
+    +'<div class="si-drw-btns">'
+      +(d.company&&d.company!=='All'?'<button class="si-btn prim" onclick="siGotoCo(\''+esc(d.company)+'\')">Find Company →</button>':'')
+      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.action||'')+'\')">Copy Action</button>'
+      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.reason||'')+'\')">Copy Reason</button>'
+    +'</div>';
+
+  siDrwOpen('Action #'+(d.rank||''), html);
+}
+
+/* ── Outreach drawer ───────────────────────────────────────────────────── */
+function showOutreach(d){
+  var tpsHtml=(d.talking_points||[]).map(function(tp){return '<li>'+esc(tp)+'</li>';}).join('');
+  var full='Subject: '+(d.subject||'')+'\n\n'+(d.opening||'')+'\n\n'+(d.talking_points||[]).join('\n')+(d.cta?'\n\n→ '+d.cta:'');
+  var fid='fe_'+Math.random().toString(36).substr(2,7);
+
+  var html=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+      +'<div style="width:40px;height:40px;border-radius:10px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.company))+'</div>'
+      +'<div>'
+        +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em">'+esc(d.company||'')+'</div>'
+        +(d.domain?'<div style="font-size:11px;color:#334155">'+esc(d.domain)+'</div>':'')
+      +'</div>'
+      +((d.timing)?'<span style="margin-left:auto;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:'+(d.timing==='now'?'rgba(220,38,38,.1)':'rgba(217,119,6,.08)')+';color:'+(d.timing==='now'?'#f87171':'#fcd34d')+'">'+d.timing.toUpperCase()+'</span>':'')
+    +'</div>'
+
+    +(d.signal_hook?
+      '<div style="font-size:12px;color:#475569;padding:8px 12px;border-left:2px solid #312e81;background:rgba(49,46,129,.06);margin-bottom:16px;line-height:1.6;font-style:italic">'+esc(d.signal_hook)+'</div>'
+      :'')
+
+    +'<div class="si-ep" style="margin-bottom:16px">'
+      +'<div class="si-ep-chrome">'
+        +'<div class="si-ep-dot" style="background:#7f1d1d"></div>'
+        +'<div class="si-ep-dot" style="background:#78350f"></div>'
+        +'<div class="si-ep-dot" style="background:#14532d"></div>'
+        +'<span style="flex:1;text-align:center;font-size:11px;color:#334155">Email Preview</span>'
+      +'</div>'
+      +'<div class="si-ep-body">'
+        +(d.subject?'<div class="si-ep-subject">'+esc(d.subject)+'</div>':'')
+        +(d.opening?'<p class="si-ep-para">'+esc(d.opening)+'</p>':'')
+        +(tpsHtml?'<ul class="si-ep-ul">'+tpsHtml+'</ul>':'')
+        +(d.cta?'<p class="si-ep-cta">→ '+esc(d.cta)+'</p>':'')
+      +'</div>'
+    +'</div>'
+
+    +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
+
+    +'<div class="si-drw-btns">'
+      +'<button class="si-btn prim" onclick="siCpId(this,\''+fid+'\')">Copy Full Email</button>'
+      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.subject||'')+'\')">Copy Subject</button>'
+      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.opening||'')+'\')">Copy Opening</button>'
+    +'</div>';
+
+  siDrwOpen('Outreach → '+d.company, html);
+}
+
+/* ── Button helpers ────────────────────────────────────────────────────── */
+window.siCp = function(btn, text){
+  navigator.clipboard&&navigator.clipboard.writeText(text).then(function(){
+    var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
+    setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
+  });
+};
+window.siCpId = function(btn, id){
+  var el=document.getElementById(id);
+  if(el) window.siCp(btn, el.value||el.textContent);
+};
+window.siGotoCo = function(name){
+  siDrwClose();
+  var s=document.getElementById('nav-search');
+  if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
+  var cb=document.getElementById('nav-companies');if(cb)cb.click();
+};
+
+/* ── Attach click handlers to cards ────────────────────────────────────── */
+function attachCards(){
+  /* Pipeline */
+  var pipCards = document.querySelectorAll('#si-pip .si-co-card:not([data-si-idx])');
+  pipCards.forEach(function(card, i){
+    var d = window._ID.pip[i];
+    if(!d) return;
+    card.setAttribute('data-si-idx', i);
+    var hint = document.createElement('span');
+    hint.className = 'si-xhint'; hint.textContent = 'View details →';
+    card.appendChild(hint);
+    card.onclick = function(e){
+      if(e.target.closest('a,button,input')) return;
+      document.querySelectorAll('.si-co-card.active').forEach(function(el){el.classList.remove('active');});
+      card.classList.add('active');
+      showPipeline(d, AVC[i % AVC.length]);
+    };
+  });
+
+  /* Actions */
+  var actItems = document.querySelectorAll('#si-acts .si-tl-item:not([data-si-idx])');
+  actItems.forEach(function(item, i){
+    var d = window._ID.acts[i];
+    if(!d) return;
+    item.setAttribute('data-si-idx', i);
+    var hint = document.createElement('span');
+    hint.className = 'si-xhint'; hint.textContent = 'View context →';
+    item.appendChild(hint);
+    item.onclick = function(e){
+      if(e.target.closest('a,button,input')) return;
+      document.querySelectorAll('.si-tl-item.active').forEach(function(el){el.classList.remove('active');});
+      item.classList.add('active');
+      showAction(d);
+    };
+  });
+
+  /* Outreach */
+  var outCards = document.querySelectorAll('#si-out .si-email-card:not([data-si-idx])');
+  outCards.forEach(function(card, i){
+    var d = window._ID.out[i];
+    if(!d) return;
+    card.setAttribute('data-si-idx', i);
+    var hint = document.createElement('span');
+    hint.className = 'si-xhint'; hint.textContent = 'View full email →';
+    card.appendChild(hint);
+    card.onclick = function(e){
+      if(e.target.closest('a,button,input')) return;
+      document.querySelectorAll('.si-email-card.active').forEach(function(el){el.classList.remove('active');});
+      card.classList.add('active');
+      showOutreach(d);
+    };
+  });
+}
+
+/* ── Intercept siGenerate to capture response data ─────────────────────── */
+(function waitForGenerate(){
+  if(typeof window.siGenerate !== 'function'){
+    setTimeout(waitForGenerate, 100); return;
+  }
+  var _orig = window.siGenerate;
+  window.siGenerate = function(){
+    /* Wrap fetch to capture the response */
+    var _origFetch = window.fetch;
+    window.fetch = function(url, opts){
+      var p = _origFetch.apply(this, arguments);
+      if(typeof url === 'string' && url.indexOf('/api/insights/') > -1){
+        return p.then(function(resp){
+          resp.clone().json().then(function(data){
+            var ins = data && data.insights;
+            if(!ins) return;
+            window._ID.pip  = (ins.pipeline || []).slice(0, 9);
+            window._ID.acts = ins.actions  || [];
+            window._ID.out  = ins.outreach || [];
+            /* Attach handlers after DOM renders */
+            [400,700,1200].forEach(function(delay){
+              setTimeout(attachCards, delay);
+            });
+          }).catch(function(){});
+          return resp;
+        });
+      }
+      return p;
+    };
+    _orig();
+    setTimeout(function(){ window.fetch = _origFetch; }, 15000);
+  };
+
+  /* Also patch siTab to re-attach after switching tabs */
+  if(typeof window.siTab === 'function'){
+    var _origTab = window.siTab;
+    window.siTab = function(btn){
+      _origTab(btn);
+      setTimeout(attachCards, 150);
+    };
+  }
+})();
+
+/* Escape key */
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') siDrwClose();
+});
+})();
+</script>
+
 </body>
 </html>
