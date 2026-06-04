@@ -1131,8 +1131,8 @@ _PPC_CTX_TTL = 240   # seconds (4 min cache)
 
 def _build_ppc_context() -> str:
     """
-    Fetch all three data sources and return a single readable text block.
-    Cached for _PPC_CTX_TTL seconds so repeated messages stay fast.
+    Fetch ALL data from every source — no row limits.
+    Cached for _PPC_CTX_TTL seconds so repeated chat messages are instant.
     """
     import time as _t
     now = _t.time()
@@ -1141,76 +1141,191 @@ def _build_ppc_context() -> str:
 
     parts = []
 
-    # ── 1. Anonymous Visitors ──────────────────────────────────────────────
+    # ── 1. Anonymous Visitors — ALL rows from BOTH tabs ────────────────────
     try:
-        v = _chatbot_get_anonymous_visitors(limit=150)
-        if v.get("status") == "ok":
-            people = v.get("people", [])
-            rows = []
-            for i, p in enumerate(people[:80], 1):
-                company = p.get("company") or p.get("website") or "Unknown"
-                rows.append(
-                    f"{i}. {p['name']} | {p['title']} | {company} | "
-                    f"{p['industry']} | {p['location']} | visited {p['date_visited']}"
-                )
-            parts.append(
-                f"=== ANONYMOUS VISITORS ===\n"
-                f"Total in sheet: {v['total_in_sheet']} people\n"
-                f"Top industries: {v.get('top_industries', {})}\n\n"
-                f"All visitors (newest first):\n" + "\n".join(rows)
+        svc = _sheets_service()
+
+        # ---- Tab 1: People Enriched (individual visitors) ----------------
+        r_people = svc.spreadsheets().values().get(
+            spreadsheetId=ANON_VISITORS_SHEET_ID,
+            range="People Enriched!A:L"
+        ).execute()
+        people_rows = r_people.get("values", [])
+
+        # Read header row to map columns by name
+        headers = [h.strip().lower() for h in (people_rows[0] if people_rows else [])]
+
+        def _hv(row, *names):
+            for name in names:
+                for i, h in enumerate(headers):
+                    if name in h and i < len(row):
+                        v = row[i].strip()
+                        if v and v.lower() not in ("", "unavailable", "n/a", "none"):
+                            return v
+            return ""
+
+        people_out = []
+        for row in people_rows[1:]:
+            name = _hv(row, "name", "full name")
+            if not name:
+                continue
+            time_str = _hv(row, "time", "date", "timestamp", "identified", "visited", "seen", "first")
+            people_out.append({
+                "name":     name,
+                "title":    _hv(row, "title", "job title", "position", "role"),
+                "email":    _hv(row, "email"),
+                "location": _hv(row, "location", "city", "country", "region"),
+                "pages":    _hv(row, "pages", "page", "url"),
+                "date":     time_str[:10] if time_str else "",
+                "industry": _clean_industry(_hv(row, "industry", "sector", "vertical")),
+                "website":  _hv(row, "website", "domain", "company website", "web"),
+                "time_raw": time_str,
+            })
+        people_out.sort(key=lambda x: x.get("time_raw", ""), reverse=True)
+
+        # ---- Tab 2: Visitors By Company (company-level data) --------------
+        r_comp = svc.spreadsheets().values().get(
+            spreadsheetId=ANON_VISITORS_SHEET_ID,
+            range="Visitors By Company!A:J"
+        ).execute()
+        comp_rows = r_comp.get("values", [])
+        comp_hdrs = [h.strip().lower() for h in (comp_rows[0] if comp_rows else [])]
+
+        def _cv(row, *names):
+            for name in names:
+                for i, h in enumerate(comp_hdrs):
+                    if name in h and i < len(row):
+                        v = row[i].strip()
+                        if v and v.lower() not in ("", "unavailable", "n/a", "none"):
+                            return v
+            return ""
+
+        companies_out = []
+        for row in comp_rows[1:]:
+            co = _cv(row, "company", "name", "organization") or (row[0].strip() if row else "")
+            if not co:
+                continue
+            companies_out.append({
+                "company":   co,
+                "website":   _cv(row, "website", "domain", "url") or (row[2].strip() if len(row) > 2 else ""),
+                "location":  " ".join(filter(None, [_cv(row, "city"), _cv(row, "state"), _cv(row, "country")])),
+                "industry":  _clean_industry(_cv(row, "industry", "sector")),
+                "employees": _cv(row, "employee", "size", "headcount"),
+                "revenue":   _cv(row, "revenue", "arr", "mrr"),
+            })
+
+        # Build people lines
+        p_lines = []
+        for i, p in enumerate(people_out, 1):
+            co_display = p["website"] or "—"
+            p_lines.append(
+                f"{i}. {p['name']} | {p['title']} | {co_display} | "
+                f"{p['industry']} | {p['location']} | {p['date']}"
             )
-        else:
-            parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Error: {v.get('error')}\n{v.get('hint','')}")
+
+        # Build company lines
+        c_lines = []
+        for i, c in enumerate(companies_out, 1):
+            c_lines.append(
+                f"{i}. {c['company']} | {c['website']} | {c['industry']} | "
+                f"{c['location']} | employees: {c['employees']} | revenue: {c['revenue']}"
+            )
+
+        from collections import Counter as _C
+        industry_counts = dict(_C(p["industry"] for p in people_out if p["industry"]).most_common(8))
+
+        parts.append(
+            f"=== ANONYMOUS VISITORS ===\n"
+            f"Total individual visitors: {len(people_out)}\n"
+            f"Unique companies: {len(companies_out)}\n"
+            f"Industry breakdown: {industry_counts}\n\n"
+            f"--- INDIVIDUAL VISITORS (all {len(people_out)}, newest first) ---\n"
+            + "\n".join(p_lines)
+            + f"\n\n--- COMPANIES THAT VISITED (all {len(companies_out)}) ---\n"
+            + "\n".join(c_lines)
+        )
+
     except Exception as e:
         parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Could not fetch: {e}")
 
-    # ── 2. Signal Tracker ─────────────────────────────────────────────────
+    # ── 2. Signal Tracker — ALL signals, no limit ─────────────────────────
     try:
-        s = _chatbot_get_signal_tracker(limit=60)
-        if "signals" in s:
-            rows = []
-            for sig in s["signals"][:50]:
-                date = (sig.get("signal_date") or "")[:10]
-                detail = (sig.get("signal_detail") or "")[:100]
-                rows.append(
-                    f"• {sig['company']} ({sig['industry']}) | "
-                    f"{sig['signal_type']} [{sig['severity']}] | {date} | {detail}"
-                )
-            parts.append(
-                f"=== SIGNAL TRACKER (Healthcare) ===\n"
-                f"Signals returned: {s['total_returned']}\n\n"
-                + "\n".join(rows)
-            )
+        import sqlite3 as _sql
+        from collections import Counter as _C
+
+        db_path = Path(__file__).parent / "data" / "tracker.db"
+        if not db_path.exists():
+            parts.append("=== SIGNAL TRACKER ===\n⚠ Database not on Railway — commit data/tracker.db to git")
         else:
-            parts.append(f"=== SIGNAL TRACKER ===\n⚠ Error: {s.get('error')}")
+            conn = _sql.connect(str(db_path))
+            conn.row_factory = _sql.Row
+
+            # All signals, ordered newest first
+            all_sigs = conn.execute("""
+                SELECT c.name, c.domain, c.industry, c.city, c.state,
+                       a.signal_type, a.signal_detail, a.severity, a.signal_date
+                FROM alerts_sent a
+                JOIN companies c ON a.apollo_id = c.apollo_id
+                WHERE a.dry_run = 0
+                ORDER BY a.signal_date DESC
+            """).fetchall()
+
+            # Summary counts
+            sig_counts = dict(_C(r["signal_type"] for r in all_sigs).most_common())
+            comp_count = len({r["name"] for r in all_sigs})
+
+            sig_lines = []
+            for r in all_sigs:
+                date = (r["signal_date"] or "")[:16]
+                detail = (r["signal_detail"] or "")[:120]
+                loc = f"{r['city']}, {r['state']}".strip(", ")
+                sig_lines.append(
+                    f"• {r['name']} | {r['industry']} | {loc} | "
+                    f"{r['signal_type']} [{r['severity']}] | {date} | {detail}"
+                )
+
+            conn.close()
+
+            parts.append(
+                f"=== SIGNAL TRACKER (Healthcare — 1,251 companies monitored) ===\n"
+                f"Total signals: {len(all_sigs)} across {comp_count} companies\n"
+                f"By type: {sig_counts}\n\n"
+                f"--- ALL SIGNALS (newest first) ---\n"
+                + "\n".join(sig_lines)
+            )
+
     except Exception as e:
         parts.append(f"=== SIGNAL TRACKER ===\n⚠ Could not fetch: {e}")
 
-    # ── 3. Ad Intelligence ────────────────────────────────────────────────
+    # ── 3. Ad Intelligence — ALL ads ─────────────────────────────────────
     try:
-        a = get_ad_intelligence_data(limit=120)
+        a = get_ad_intelligence_data(limit=5000)   # effectively unlimited
         if a.get("status") == "ok":
-            rows = []
-            for ad in a.get("ads", [])[:80]:
-                rows.append(
+            ad_lines = []
+            for ad in a.get("ads", []):
+                ad_lines.append(
                     f"• {ad['competitor']} | {ad['format']} | {ad['status']} | "
-                    f"'{ad['headline']}' | CTA: {ad['cta']} | "
-                    f"keywords: {ad['keywords'][:60]} | last seen: {ad['last_shown']}"
+                    f"headline: '{ad['headline']}' | CTA: {ad['cta']} | "
+                    f"keywords: {ad['keywords'][:80]} | "
+                    f"angle: {ad['messaging_angle'][:60]} | "
+                    f"first: {ad['first_shown']} | last: {ad['last_shown']}"
                 )
             parts.append(
                 f"=== AD INTELLIGENCE ===\n"
-                f"Total ads: {a['total_in_sheet']} | "
-                f"By competitor: {a['by_competitor']} | "
-                f"By format: {a['by_format']} | By status: {a['by_status']}\n"
+                f"Total ads tracked: {a['total_in_sheet']}\n"
+                f"By competitor: {a['by_competitor']}\n"
+                f"By format: {a['by_format']}\n"
+                f"By status: {a['by_status']}\n"
                 f"Top CTAs: {a['top_ctas']}\n"
                 f"Top keywords: {a['top_keywords']}\n\n"
-                f"All ads:\n" + "\n".join(rows)
+                f"--- ALL ADS ---\n"
+                + "\n".join(ad_lines)
             )
         else:
             fix = a.get("fix", "")
             parts.append(
-                f"=== AD INTELLIGENCE ===\n⚠ Error: {a.get('error')}\n"
-                f"{'ACTION NEEDED: ' + fix if fix else ''}"
+                f"=== AD INTELLIGENCE ===\n⚠ {a.get('error','Error')}\n"
+                + (f"ACTION: {fix}" if fix else "")
             )
     except Exception as e:
         parts.append(f"=== AD INTELLIGENCE ===\n⚠ Could not fetch: {e}")
