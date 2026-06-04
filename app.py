@@ -1350,12 +1350,14 @@ def ppc_chat():
 
     body         = request.json or {}
     user_message = body.get("message", "").strip()
-    history      = body.get("history", [])[-12:]   # up to 12 turns of context
-    memories     = body.get("memories", [])         # persistent facts saved by user
+    history      = body.get("history", [])[-12:]
+    memories     = body.get("memories", [])
+    source_text  = body.get("source_text", "")   # previous AI response to reformat
+    export_fmt   = body.get("export_format", "")  # "csv", "excel", "table", "json", etc.
 
     # ── Attached file (optional) ────────────────────────────────────────────
     file_name     = body.get("file_name", "")
-    file_content  = body.get("file_content", "")   # extracted text
+    file_content  = body.get("file_content", "")
     file_is_image = body.get("file_is_image", False)
     file_mime     = body.get("file_mime", "image/png")
     file_base64   = body.get("file_base64", "")
@@ -1368,6 +1370,37 @@ def ppc_chat():
     if not user_message and has_file:
         user_message = f"Please analyse the attached file '{file_name}' and summarise the key information."
 
+    # ── FORMAT / EXPORT REQUEST — handle separately, no PPC context needed ──
+    # Triggered when user asks to reformat the previous response as CSV/Excel/table/JSON
+    if export_fmt and source_text:
+        fmt_instructions = {
+            "csv":   "Convert the data to clean CSV with a header row. Use comma separators. Output ONLY the CSV — no explanation, no markdown, no code block.",
+            "excel": "Convert the data to clean CSV with a header row (Excel-compatible). Use comma separators. Output ONLY the CSV data — no explanation, no markdown, no code block.",
+            "table": "Format the data as a clean markdown table with aligned columns and a header row. Output ONLY the table.",
+            "json":  "Convert the data to valid JSON array of objects. Output ONLY the JSON — no explanation, no markdown.",
+            "bullet":"Reformat the data as a clean bulleted list. Output ONLY the list.",
+        }
+        instruction = fmt_instructions.get(export_fmt, f"Reformat the data as {export_fmt}. Output ONLY the reformatted data.")
+        reformat_messages = [
+            {"role": "system", "content":
+             "You are a data formatter. Your only job is to reformat data exactly as instructed. "
+             "Never add explanations, apologies, or commentary. Output ONLY the requested format."},
+            {"role": "user", "content": f"{instruction}\n\nDATA TO REFORMAT:\n{source_text}"},
+        ]
+        try:
+            resp = oai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=reformat_messages,
+                max_tokens=2000,
+                temperature=0,
+            )
+            formatted = resp.choices[0].message.content.strip()
+            is_csv = export_fmt in ("csv", "excel")
+            return jsonify({"answer": formatted, "is_export": True,
+                            "export_format": export_fmt, "is_csv": is_csv})
+        except Exception as e:
+            return jsonify({"answer": f"Export failed: {str(e)}"}), 200
+
     # ── Pre-fetch all live data (cached 4 min) ─────────────────────────────
     ppc_context = _build_ppc_context()
 
@@ -1376,33 +1409,46 @@ def ppc_chat():
     week_start = (now_ist - timedelta(days=now_ist.weekday())).strftime("%Y-%m-%d")
 
     system_prompt = f"""You are the PPC Intelligence Assistant for Position2 (a B2B marketing agency). \
-You have the full live dataset below — answer every question directly from it.
+You are sharp, helpful, and always give accurate answers based on the live data below.
 
 TODAY: {today}  |  WEEK STARTED: {week_start}
-"This week" means from {week_start} to {today}.
-"Last 3" means the 3 most recent rows.
-"Yesterday" means {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}.
+"This week" = {week_start} to {today}. "Yesterday" = {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}.
+"Last N" = take the first N rows from the relevant list (data is newest-first).
 
-HOW TO ANSWER:
-• Read the data section that matches the question (Visitors, Signals, or Ads).
-• Give a direct, specific answer. Use **bold** for numbers. Bullet points for lists.
-• Be analytical — don't just list, find the insight (e.g. "3 of the 5 are C-Suite from healthcare").
-• If a section shows "⚠ Error", tell the user that data source is unavailable and why.
-• Keep responses under 180 words unless the user asks for detail.
-• For "last N companies/visitors/ads", count from the top of the relevant list (it's newest-first).
+════ HOW TO ANSWER ════
+
+RULE 1 — READ FROM THE DATA
+Look at the correct section (VISITORS, SIGNALS, or ADS) and pull exact facts.
+Never make up numbers or say "I cannot access" when data is already provided below.
+
+RULE 2 — FORMAT REQUESTS ARE ABOUT OUTPUT, NOT DATA SOURCES
+If the user says "give me this in Excel", "CSV format", "as a table", "export this", "download" —
+they want the PREVIOUS ANSWER reformatted. Respond: "Sure! What data specifically would you like exported?"
+or summarise the relevant data in a tabular format.
+NEVER confuse "Excel format" with the Ad Intelligence Google Sheet or any data source error.
+
+RULE 3 — BE ANALYTICAL
+Don't just list. Highlight the most interesting finding. Bold **key numbers**.
+Bullet points for lists. Keep under 180 words unless asked for more detail.
+
+RULE 4 — IF DATA IS MISSING
+If a section has ⚠ Error, say that specific source is unavailable — but still answer from other sources.
+Never refuse to answer entirely just because one source has an error.
+
+RULE 5 — GENERAL QUESTIONS
+For general PPC/marketing questions not needing live data, answer directly from knowledge.
+Don't say "I only have access to..." — just answer helpfully.
 
 ══════════════════════════ LIVE DATA ══════════════════════════
 {ppc_context}
 ═══════════════════════════════════════════════════════════════
 """
 
-    # Append persistent memories to system prompt
+    # Persistent memories
     if memories:
-        memory_block = "\n\n════ USER'S SAVED MEMORIES ════\n" + \
-                       "\n".join(f"• {m}" for m in memories[:30]) + \
-                       "\n(These are facts the user explicitly asked you to remember. " \
-                       "Always factor them into your answers.)"
-        system_prompt += memory_block
+        system_prompt += "\n\n════ SAVED MEMORIES ════\n" + \
+                         "\n".join(f"• {m}" for m in memories[:30]) + \
+                         "\n(Always factor these into answers.)"
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history

@@ -742,6 +742,51 @@
     _file = null;
   }
 
+  /* ── Export helpers ── */
+  function _detectExportFormat(msg) {
+    var m = msg.toLowerCase();
+    if (/excel|xlsx/.test(m))             return 'excel';
+    if (/\bcsv\b/.test(m))                return 'csv';
+    if (/\bjson\b/.test(m))               return 'json';
+    if (/\btable\b|\bspreadsheet\b/.test(m)) return 'table';
+    if (/bullet|list format/.test(m))     return 'bullet';
+    return null;
+  }
+
+  function _getLastAiText() {
+    var bubbles = document.querySelectorAll('.ppc-row.assistant .ppc-bubble');
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var t = bubbles[i].innerText || bubbles[i].textContent;
+      if (t && t.length > 20 && !t.includes('Thinking')) return t.trim();
+    }
+    return '';
+  }
+
+  function _downloadText(text, filename) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function _addDownloadBtn(container, text, fmt) {
+    var ext  = (fmt === 'json') ? 'json' : (fmt === 'table') ? 'md' : 'csv';
+    var mime = (fmt === 'json') ? 'application/json' : 'text/csv';
+    var name = 'ppc_export_' + new Date().toISOString().slice(0,10) + '.' + ext;
+    var btn  = document.createElement('button');
+    btn.innerHTML = '⬇ Download .' + ext.toUpperCase();
+    btn.style.cssText = 'margin-top:8px;padding:5px 12px;border-radius:8px;border:1px solid rgba(99,102,241,.4);' +
+      'background:rgba(99,102,241,.12);color:#a5b4fc;font-size:11px;font-weight:600;cursor:pointer;' +
+      'font-family:\'Space Grotesk\',sans-serif;transition:all .15s;display:block;';
+    btn.onmouseover = function(){ this.style.background='rgba(99,102,241,.25)'; };
+    btn.onmouseout  = function(){ this.style.background='rgba(99,102,241,.12)'; };
+    btn.onclick = function(){ _downloadText(text, name); };
+    container.appendChild(btn);
+  }
+
   function _fileIco(name) {
     var ext = (name.split('.').pop() || '').toLowerCase();
     var map = {pdf:'📄', docx:'📝', doc:'📝', xlsx:'📊', xls:'📊',
@@ -766,12 +811,22 @@
 
     // Intercept memory commands — handle locally, no API call needed
     if (msg && !_file && _handleMemoryCommand(msg)) {
-      _addMsg('user', msg);     // show what user typed
-      var msgs = document.getElementById('ppc-msgs');
-      // Move the user msg before the assistant response (already appended by _handleMemoryCommand)
-      var rows = msgs.querySelectorAll('.ppc-row');
-      if (rows.length >= 2) msgs.insertBefore(rows[rows.length-2], rows[rows.length-1]);
+      _addMsg('user', msg);
+      var msgs2 = document.getElementById('ppc-msgs');
+      var rows2 = msgs2.querySelectorAll('.ppc-row');
+      if (rows2.length >= 2) msgs2.insertBefore(rows2[rows2.length-2], rows2[rows2.length-1]);
       return;
+    }
+
+    // Detect export / format request
+    var exportFmt = _detectExportFormat(msg);
+    if (exportFmt && !_file) {
+      var lastAi = _getLastAiText();
+      if (lastAi) {
+        payload.export_format = exportFmt;
+        payload.source_text   = lastAi;
+        payload.message       = msg;
+      }
     }
 
     // Build display message
@@ -811,7 +866,18 @@
     .then(function (d) {
       loader.remove();
       var ans = d.answer || 'No response received.';
-      _addMsg('assistant', ans);
+      var row = _addMsg('assistant', d.is_export ? '✅ Here\'s your formatted data:' : ans);
+      if (d.is_export && d.answer) {
+        // Show the formatted data in a code-like block + download button
+        var bubble = row.querySelector('.ppc-bubble');
+        var pre = document.createElement('pre');
+        pre.style.cssText = 'background:rgba(0,0,0,.3);border-radius:8px;padding:10px;' +
+          'font-size:11px;color:#94a3b8;overflow-x:auto;margin-top:8px;white-space:pre-wrap;' +
+          'max-height:160px;overflow-y:auto;font-family:monospace;';
+        pre.textContent = d.answer.slice(0, 800) + (d.answer.length > 800 ? '\n...' : '');
+        bubble.appendChild(pre);
+        _addDownloadBtn(bubble, d.answer, d.export_format || 'csv');
+      }
       _hist.push({ role: 'assistant', content: ans });
       _saveHist();
     })

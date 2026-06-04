@@ -759,6 +759,51 @@
     _file = null;
   }
 
+  /* ── Export helpers ── */
+  function _detectExportFormat(msg) {
+    var m = msg.toLowerCase();
+    if (/excel|xlsx/.test(m))             return 'excel';
+    if (/\bcsv\b/.test(m))                return 'csv';
+    if (/\bjson\b/.test(m))               return 'json';
+    if (/\btable\b|\bspreadsheet\b/.test(m)) return 'table';
+    if (/bullet|list format/.test(m))     return 'bullet';
+    return null;
+  }
+
+  function _getLastAiText() {
+    var bubbles = document.querySelectorAll('.ppc-row.assistant .ppc-bubble');
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var t = bubbles[i].innerText || bubbles[i].textContent;
+      if (t && t.length > 20 && !t.includes('Thinking')) return t.trim();
+    }
+    return '';
+  }
+
+  function _downloadText(text, filename) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function _addDownloadBtn(container, text, fmt) {
+    var ext  = (fmt === 'json') ? 'json' : (fmt === 'table') ? 'md' : 'csv';
+    var mime = (fmt === 'json') ? 'application/json' : 'text/csv';
+    var name = 'ppc_export_' + new Date().toISOString().slice(0,10) + '.' + ext;
+    var btn  = document.createElement('button');
+    btn.innerHTML = '⬇ Download .' + ext.toUpperCase();
+    btn.style.cssText = 'margin-top:8px;padding:5px 12px;border-radius:8px;border:1px solid rgba(99,102,241,.4);' +
+      'background:rgba(99,102,241,.12);color:#a5b4fc;font-size:11px;font-weight:600;cursor:pointer;' +
+      'font-family:\'Space Grotesk\',sans-serif;transition:all .15s;display:block;';
+    btn.onmouseover = function(){ this.style.background='rgba(99,102,241,.25)'; };
+    btn.onmouseout  = function(){ this.style.background='rgba(99,102,241,.12)'; };
+    btn.onclick = function(){ _downloadText(text, name); };
+    container.appendChild(btn);
+  }
+
   function _fileIco(name) {
     var ext = (name.split('.').pop() || '').toLowerCase();
     var map = {pdf:'📄', docx:'📝', doc:'📝', xlsx:'📊', xls:'📊',
@@ -781,63 +826,6 @@
     inp.value = ''; inp.style.height = 'auto';
     _updateCharCount('');
 
-    // Intercept memory commands — handle locally, no API call needed
-    if (msg && !_file && _handleMemoryCommand(msg)) {
-      _addMsg('user', msg);     // show what user typed
-      var msgs = document.getElementById('ppc-msgs');
-      // Move the user msg before the assistant response (already appended by _handleMemoryCommand)
-      var rows = msgs.querySelectorAll('.ppc-row');
-      if (rows.length >= 2) msgs.insertBefore(rows[rows.length-2], rows[rows.length-1]);
-      return;
-    }
-
-    // Build display message
-    var displayMsg = msg;
-    if (_file) displayMsg = (_file.is_image ? '🖼️ ' : _fileIco(_file.name) + ' ') + _file.name + (msg ? '\n' + msg : '');
-    _addMsg('user', displayMsg || 'Analyse this file.');
-
-    var histMsg = msg || 'Analyse this file.';
-    _hist.push({ role: 'user', content: histMsg });
-    _saveHist();
-
-    // Build payload — include persistent memories
-    var payload = { message: msg || '', history: _hist.slice(-12), memories: _memories };
-    if (_file) {
-      payload.file_name      = _file.name;
-      payload.file_is_image  = _file.is_image;
-      payload.file_truncated = _file.truncated || false;
-      if (_file.is_image) {
-        payload.file_mime   = _file.mime;
-        payload.file_base64 = _file.base64;
-      } else {
-        payload.file_content = _file.content;
-      }
-      // Clear after send
-      _clearFilePill();
-    }
-
-    var loader = _addLoader();
-    _setBusy(true);
-
-    fetch('/api/ppc-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      loader.remove();
-      var ans = d.answer || 'No response received.';
-      _addMsg('assistant', ans);
-      _hist.push({ role: 'assistant', content: ans });
-      _saveHist();
-    })
-    .catch(function () {
-      loader.remove();
-      _addMsg('assistant', '⚠️ Connection error — please try again.');
-    })
-    .finally(function () {
-      _setBusy(false);
-      document.getElementBy
+    // Intercept memory c
   </body>
 </html>
