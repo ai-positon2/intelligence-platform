@@ -4432,6 +4432,8 @@ window.siCopy=function(btn,id){
 
 
 
+
+
 <!-- ═══ INSIGHTS INTERACTIVE PATCH v2 ══════════════════════════════════════ -->
 <style>
 /* ── Clickable card base ───────────────────────────────────────────────────*/
@@ -4862,6 +4864,559 @@ function attachCards(){
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape') siDrwClose();
 });
+})();
+</script>
+
+<!-- ═══ LEADERSHIP INSIGHTS PATCH ════════════════════════════════════════════ -->
+<style>
+/* ── Auto-generate state ────────────────────────────────────────────────────*/
+.si-auto-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:420px;gap:18px;text-align:center}
+.si-auto-orb{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#4338ca,#7c3aed);
+  display:flex;align-items:center;justify-content:center;
+  animation:si-aorb 1.6s ease-in-out infinite}
+@keyframes si-aorb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5),0 0 24px rgba(67,56,202,.4)}
+  50%{box-shadow:0 0 0 10px rgba(67,56,202,0),0 0 48px rgba(67,56,202,.7)}}
+.si-auto-title{font-size:15px;font-weight:600;color:#e2e8f0;letter-spacing:-.02em}
+.si-auto-sub{font-size:12px;color:#334155;max-width:320px;line-height:1.65}
+.si-auto-dots{display:flex;gap:5px;align-items:center}
+.si-auto-dots span{width:5px;height:5px;border-radius:50%;background:#4338ca;
+  animation:si-dot 1.2s ease-in-out infinite}
+.si-auto-dots span:nth-child(2){animation-delay:.2s}
+.si-auto-dots span:nth-child(3){animation-delay:.4s}
+@keyframes si-dot{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
+/* ── AI badge ────────────────────────────────────────────────────────────────*/
+.si-ai-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;
+  padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.12);color:#818cf8;
+  border:1px solid rgba(67,56,202,.22);letter-spacing:.04em;flex-shrink:0}
+
+/* ── Executive brief card ────────────────────────────────────────────────────*/
+.si-exec-card{
+  position:relative;overflow:hidden;border-radius:14px;padding:22px 24px;
+  margin-bottom:18px;animation:si-up .35s ease both;
+  background:linear-gradient(135deg,rgba(67,56,202,.18) 0%,rgba(124,58,237,.12) 50%,rgba(29,78,216,.08) 100%);
+}
+.si-exec-card::before{
+  content:'';position:absolute;inset:0;border-radius:14px;padding:1px;
+  background:linear-gradient(135deg,rgba(99,102,241,.5),rgba(139,92,246,.25),rgba(59,130,246,.2));
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
+}
+.si-exec-card::after{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;
+  border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.14) 0%,transparent 65%);pointer-events:none}
+.si-exec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.si-exec-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
+.si-exec-text{font-size:15px;line-height:1.8;color:#e2e8f0;margin-bottom:14px;font-weight:400;letter-spacing:-.01em}
+.si-exec-chips{display:flex;gap:7px;flex-wrap:wrap}
+.si-exec-chip{font-size:11px;padding:4px 12px;border-radius:7px;font-weight:500;
+  background:#0f172a;border:1px solid #1e293b;color:#64748b;display:flex;align-items:center;gap:5px}
+.si-exec-chip.acc{border-color:rgba(99,102,241,.3);color:#818cf8;background:rgba(67,56,202,.08)}
+.si-exec-chip.gold{border-color:rgba(251,191,36,.25);color:#fbbf24;background:rgba(251,191,36,.06)}
+.si-exec-chip.grn{border-color:rgba(5,150,105,.2);color:#34d399;background:rgba(5,150,105,.06)}
+
+/* ── Section header with AI badge ───────────────────────────────────────────*/
+.si-sec-row{display:flex;align-items:center;gap:8px;margin:20px 0 10px}
+.si-sec-title{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em}
+.si-sec-line{flex:1;height:1px;background:#1e293b}
+
+/* ── Priority calls grid ─────────────────────────────────────────────────────*/
+.si-priority-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
+@media(max-width:1100px){.si-priority-grid{grid-template-columns:repeat(2,1fr)}}
+.si-pcard{
+  background:#0f172a;border:1px solid #1e293b;border-radius:12px;
+  padding:14px 15px;display:flex;flex-direction:column;gap:10px;
+  transition:border-color .2s,transform .2s,box-shadow .2s;
+  animation:si-up .35s ease both;cursor:pointer;position:relative;overflow:hidden
+}
+.si-pcard:hover{border-color:#334155;transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.si-pcard.rank-1{border-color:rgba(239,68,68,.25)}
+.si-pcard.rank-1:hover{border-color:rgba(239,68,68,.5);box-shadow:0 8px 28px rgba(239,68,68,.1)}
+.si-pcard.rank-2,.si-pcard.rank-3{border-color:rgba(245,158,11,.15)}
+.si-pcard-hdr{display:flex;align-items:center;gap:9px}
+.si-pcard-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.si-pcard-rank{position:absolute;top:10px;right:12px;font-size:9px;font-weight:800;
+  color:#1e293b;letter-spacing:.04em}
+.si-pcard-name{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-pcard-domain{font-size:10px;color:#334155}
+.si-pcard-signal{font-size:11px;color:#64748b;line-height:1.5;
+  padding:7px 9px;background:#0a0e1a;border-radius:7px;border-left:2px solid #312e81}
+.si-pcard-pitch{font-size:12px;font-weight:600;color:#a5b4fc;line-height:1.5}
+.si-pcard-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.si-pcard-svc{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;
+  background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.si-pcard-val{font-size:11px;font-weight:700;color:#fbbf24}
+.si-pcard-timing{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px}
+.si-pcard-timing.now{background:rgba(239,68,68,.1);color:#f87171}
+.si-pcard-timing.week{background:rgba(245,158,11,.08);color:#fcd34d}
+.si-pcard-timing.email{background:#1e293b;color:#475569}
+
+/* ── Market pulse + Strategic moves ─────────────────────────────────────────*/
+.si-pulse-list{display:flex;flex-direction:column;gap:7px}
+.si-pulse-item{display:flex;gap:10px;align-items:flex-start;
+  background:#0f172a;border:1px solid #1e293b;border-radius:9px;
+  padding:10px 12px;transition:border-color .2s;animation:si-up .35s ease both}
+.si-pulse-item:hover{border-color:#334155}
+.si-pulse-dot{width:6px;height:6px;border-radius:50%;background:#6366f1;flex-shrink:0;margin-top:5px}
+.si-pulse-text{font-size:12px;color:#94a3b8;line-height:1.6}
+
+.si-moves-list{display:flex;flex-direction:column;gap:7px}
+.si-move-card{background:#0f172a;border:1px solid #1e293b;border-radius:9px;
+  padding:11px 13px;transition:border-color .2s;animation:si-up .35s ease both}
+.si-move-card:hover{border-color:#334155}
+.si-move-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}
+.si-move-title{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;line-height:1.3}
+.si-move-owner{font-size:9px;font-weight:700;padding:2px 8px;border-radius:5px;
+  background:#1e293b;color:#475569;flex-shrink:0;white-space:nowrap}
+.si-move-rationale{font-size:11px;color:#475569;line-height:1.5;margin-bottom:6px}
+.si-move-impact{font-size:11px;font-weight:700;color:#34d399}
+
+/* ── Pipeline estimate banner ────────────────────────────────────────────────*/
+.si-pe-banner{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+  background:#0f172a;border:1px solid #1e293b;border-radius:12px;
+  padding:16px 20px;margin-bottom:18px;animation:si-up .35s ease both
+}
+.si-pe-item{text-align:center}
+.si-pe-val{font-size:20px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:4px}
+.si-pe-lbl{font-size:10px;color:#334155;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+
+/* ── Pipeline card improvements ──────────────────────────────────────────────*/
+.si-co-card{transition:border-color .2s,transform .2s,box-shadow .2s!important}
+.si-co-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;
+  box-shadow:0 10px 32px rgba(0,0,0,.4)!important}
+.si-co-card.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca,0 8px 24px rgba(67,56,202,.2)!important}
+
+/* ── Action item improvements ────────────────────────────────────────────────*/
+.si-tl-item{transition:transform .15s!important}
+.si-tl-item:hover{transform:translateX(2px)!important}
+.si-tl-item.active .si-tl-card{border-color:#4338ca!important}
+
+/* ── Outreach card improvements ──────────────────────────────────────────────*/
+.si-email-card{transition:border-color .2s,transform .2s,box-shadow .2s!important}
+.si-email-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;
+  box-shadow:0 10px 32px rgba(0,0,0,.4)!important}
+.si-email-card.active{border-color:#4338ca!important}
+
+/* ── KPI card improvements ───────────────────────────────────────────────────*/
+.si-kpi{background:linear-gradient(135deg,#0f172a,#111827)!important;
+  border-color:#1e293b!important;transition:border-color .2s,transform .2s!important}
+.si-kpi:hover{border-color:#334155!important;transform:translateY(-1px)!important}
+.si-kpi-val{background:linear-gradient(135deg,#f1f5f9,#94a3b8);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text}
+
+/* Regenerate button (smaller, after first run) */
+.si-regen-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;
+  border:1px solid #1e293b;border-radius:7px;color:#475569;cursor:pointer;
+  font-family:inherit;font-size:11px;font-weight:500;padding:6px 12px;transition:all .15s}
+.si-regen-btn:hover{border-color:#334155;color:#94a3b8}
+</style>
+
+<script>
+(function(){
+'use strict';
+
+var _autoTriggered = false;
+
+/* ── Override insOnTabOpen to auto-generate ─────────────────────────────── */
+(function waitForInsOnTabOpen(){
+  if(typeof window.insOnTabOpen !== 'function'){
+    setTimeout(waitForInsOnTabOpen, 80); return;
+  }
+  var _origOpen = window.insOnTabOpen;
+  window.insOnTabOpen = function(){
+    _origOpen(); // load meta
+    if(!_autoTriggered){
+      _autoTriggered = true;
+      // Show immediate "analysing" state, then auto-generate
+      _showAutoLoader();
+      setTimeout(function(){
+        if(typeof window.siGenerate === 'function') window.siGenerate();
+      }, 400);
+    }
+  };
+})();
+
+function _showAutoLoader(){
+  var empty = document.getElementById('si-empty');
+  var load  = document.getElementById('si-loading');
+  if(empty) empty.style.display = 'none';
+  if(load)  load.style.display  = 'none';
+
+  var ov = document.getElementById('si-ov');
+  if(ov) ov.style.display = 'none';
+
+  // Create or reuse auto-loader
+  var existing = document.getElementById('si-auto-loader');
+  if(existing){ existing.style.display='flex'; return; }
+
+  var el = document.createElement('div');
+  el.id = 'si-auto-loader';
+  el.className = 'si-auto-loading';
+  el.innerHTML =
+    '<div class="si-auto-orb">'
+      +'<svg width="28" height="28" fill="none" viewBox="0 0 24 24">'
+        +'<ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">'
+          +'<animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/>'
+        +'</ellipse>'
+        +'<ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">'
+          +'<animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/>'
+        +'</ellipse>'
+        +'<circle cx="12" cy="12" r="2" fill="white"/>'
+      +'</svg>'
+    +'</div>'
+    +'<div class="si-auto-title">Analysing signals with GPT…</div>'
+    +'<div class="si-auto-sub">Reading '
+      +(window._ID&&window._ID._statText||'signals across all companies')
+      +' and generating leadership insights.</div>'
+    +'<div class="si-auto-dots"><span></span><span></span><span></span></div>';
+
+  var panel = document.getElementById('si-p-overview');
+  if(panel) panel.insertBefore(el, panel.firstChild);
+}
+
+/* ── Override _ov (overview renderer) to show leadership layout ─────────── */
+(function waitForSiGenerate(){
+  if(typeof window.siGenerate !== 'function'){
+    setTimeout(waitForSiGenerate, 100); return;
+  }
+
+  var _origGen = window.siGenerate;
+  window.siGenerate = function(){
+    // Hide auto-loader and show loading
+    var al = document.getElementById('si-auto-loader');
+    if(al) al.style.display = 'none';
+
+    // Intercept fetch to capture data
+    var _origFetch = window.fetch;
+    window.fetch = function(url, opts){
+      var p = _origFetch.apply(this, arguments);
+      if(typeof url === 'string' && url.indexOf('/api/insights/') > -1){
+        return p.then(function(resp){
+          resp.clone().json().then(function(data){
+            if(data && data.insights){
+              window._ID = window._ID || {};
+              window._ID.pip  = (data.insights.pipeline  || []).slice(0,9);
+              window._ID.acts =  data.insights.actions   || [];
+              window._ID.out  =  data.insights.outreach  || [];
+              setTimeout(function(){
+                _renderLeadershipOv(data);
+                _attachCards();
+              }, 500);
+            }
+          }).catch(function(){});
+          return resp;
+        });
+      }
+      return p;
+    };
+
+    _origGen();
+    setTimeout(function(){ window.fetch = _origFetch; }, 20000);
+  };
+})();
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function ini(n){ return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase(); }
+var AVC=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46'];
+
+function svcColor(svc){
+  var map={SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'};
+  return map[svc]||'#64748b';
+}
+function timingClass(t){
+  if(!t)return 'email';
+  t=t.toLowerCase();
+  if(t.includes('today'))return 'now';
+  if(t.includes('week'))return 'week';
+  return 'email';
+}
+
+function _renderLeadershipOv(data){
+  var ins = data.insights || {};
+
+  /* Hide generic overview, render leadership view */
+  var ov = document.getElementById('si-ov');
+  var al = document.getElementById('si-auto-loader');
+  if(al) al.style.display = 'none';
+  if(!ov) return;
+
+  var pe = ins.pipeline_estimate || {};
+  var wp = ins.week_priority || [];
+  var mp = ins.market_pulse  || [];
+  var sm = ins.strategic_moves || [];
+  var vel = (ins.meta && ins.meta.signal_velocity_trend) || 'stable';
+  var velC = vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
+
+  ov.innerHTML =
+    /* ── Executive Brief ── */
+    '<div class="si-exec-card">'
+      +'<div class="si-exec-hdr">'
+        +'<div class="si-exec-lbl">Executive Brief</div>'
+        +'<span class="si-ai-pill">✦ GPT Analysis</span>'
+      +'</div>'
+      +'<div class="si-exec-text">'+esc(ins.brief||ins.summary||'')+'</div>'
+      +'<div class="si-exec-chips">'
+        +'<span class="si-exec-chip">📊 '+data.signals_analyzed.toLocaleString()+' signals</span>'
+        +'<span class="si-exec-chip">🏢 '+data.companies_analyzed.toLocaleString()+' companies</span>'
+        +'<span class="si-exec-chip acc" style="color:'+velC+'">'+{accelerating:'🚀 Accelerating',stable:'→ Stable',slowing:'⚠ Slowing'}[vel]+'</span>'
+        +(pe.total?'<span class="si-exec-chip gold">💰 '+esc(pe.total)+' opportunity</span>':'')
+        +(pe.win_window?'<span class="si-exec-chip grn">⏱ '+esc(pe.win_window)+'</span>':'')
+      +'</div>'
+    +'</div>'
+
+    /* ── Pipeline Estimate ── */
+    +(pe.total?
+      '<div class="si-pe-banner">'
+        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.total)+'</div><div class="si-pe-lbl">Total Pipeline</div></div>'
+        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.high_conviction||'—')+'</div><div class="si-pe-lbl">High Conviction</div></div>'
+        +'<div class="si-pe-item"><div class="si-pe-val">'+(pe.top_services||[]).slice(0,2).join(' · ')+'</div><div class="si-pe-lbl">Top Services</div></div>'
+        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.win_window||'—')+'</div><div class="si-pe-lbl">Win Window</div></div>'
+      +'</div>'
+      :'')
+
+    /* ── Priority Calls ── */
+    +(wp.length?
+      '<div class="si-sec-row"><span class="si-sec-title">Priority Calls This Week</span><span class="si-ai-pill">AI-ranked</span><span class="si-sec-line"></span></div>'
+      +'<div class="si-priority-grid">'
+        +wp.slice(0,6).map(function(p,i){
+          var av=AVC[i%AVC.length];
+          var tc=timingClass(p.call_timing);
+          var rankCls=i===0?'rank-1':i<=2?'rank-2 rank-3':'';
+          return '<div class="si-pcard '+rankCls+'" style="animation-delay:'+(i*.05)+'s" data-si-pw="'+i+'">'
+            +'<span class="si-pcard-rank">#'+(p.rank||i+1)+'</span>'
+            +'<div class="si-pcard-hdr">'
+              +'<div class="si-pcard-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
+              +'<div style="flex:1;min-width:0">'
+                +'<div class="si-pcard-name">'+esc(p.company||'')+'</div>'
+                +'<div class="si-pcard-domain">'+esc(p.domain||'')+'</div>'
+              +'</div>'
+            +'</div>'
+            +'<div class="si-pcard-signal">'+esc(p.signal||'')+'</div>'
+            +'<div class="si-pcard-pitch">'+esc(p.pitch||'')+'</div>'
+            +'<div class="si-pcard-foot">'
+              +(p.service?'<span class="si-pcard-svc" style="color:'+svcColor(p.service)+'">'+esc(p.service)+'</span>':'')
+              +(p.est_value?'<span class="si-pcard-val">'+esc(p.est_value)+'</span>':'')
+              +(p.call_timing?'<span class="si-pcard-timing '+tc+'">'+esc(p.call_timing)+'</span>':'')
+            +'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+      :'')
+
+    /* ── Market Pulse + Strategic Moves ── */
+    +(mp.length||sm.length?
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">'
+        +(mp.length?
+          '<div>'
+            +'<div class="si-sec-row"><span class="si-sec-title">Market Pulse</span><span class="si-ai-pill">AI-observed</span><span class="si-sec-line"></span></div>'
+            +'<div class="si-pulse-list">'
+              +mp.slice(0,5).map(function(obs,i){
+                return '<div class="si-pulse-item" style="animation-delay:'+(i*.06)+'s">'
+                  +'<div class="si-pulse-dot"></div>'
+                  +'<div class="si-pulse-text">'+esc(obs)+'</div>'
+                +'</div>';
+              }).join('')
+            +'</div>'
+          +'</div>'
+          :'')
+        +(sm.length?
+          '<div>'
+            +'<div class="si-sec-row"><span class="si-sec-title">Strategic Moves</span><span class="si-ai-pill">AI-recommended</span><span class="si-sec-line"></span></div>'
+            +'<div class="si-moves-list">'
+              +sm.slice(0,4).map(function(m,i){
+                return '<div class="si-move-card" style="animation-delay:'+(i*.07)+'s">'
+                  +'<div class="si-move-top">'
+                    +'<div class="si-move-title">'+esc(m.move||'')+'</div>'
+                    +'<span class="si-move-owner">'+esc(m.owner||'')+'</span>'
+                  +'</div>'
+                  +'<div class="si-move-rationale">'+esc(m.rationale||'')+'</div>'
+                  +(m.impact?'<div class="si-move-impact">'+esc(m.impact)+'</div>':'')
+                +'</div>';
+              }).join('')
+            +'</div>'
+          +'</div>'
+          :'')
+      +'</div>'
+      :'')
+
+    /* ── Themes + Risks ── */
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">'
+      +'<div id="si-themes-ldr"></div>'
+      +'<div id="si-risks-ldr"></div>'
+    +'</div>'
+
+    /* ── KPI row ── */
+    +'<div class="si-kpi-row" id="si-kpis" style="margin-top:20px"></div>'
+
+    /* ── Regenerate ── */
+    +'<div style="display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #1e293b">'
+      +'<span style="font-size:11px;color:#1e293b">Auto-generated from '+data.signals_analyzed+' signals</span>'
+      +'<button class="si-regen-btn" onclick="siGenerate()">↺ Regenerate</button>'
+    +'</div>';
+
+  ov.style.display = 'block';
+
+  /* Fill themes */
+  var tc = document.getElementById('si-themes-ldr');
+  if(tc && ins.themes){
+    tc.innerHTML='<div class="si-block"><div class="si-block-title">Signal Themes</div>'
+      +(ins.themes||[]).slice(0,4).map(function(t){
+        var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="si-co">'+esc(c)+'</span>';}).join('');
+        return '<div class="si-theme"><div class="si-theme-n">'+(t.count||'')+'x</div>'
+          +'<div><div class="si-theme-name">'+esc(t.theme||'')+'</div>'
+          +'<div class="si-theme-angle">'+esc(t.campaign_angle||'')+'</div>'
+          +(cos?'<div class="si-co-list">'+cos+'</div>':'')+'</div></div>';
+      }).join('')+'</div>';
+  }
+
+  /* Fill risks */
+  var rc = document.getElementById('si-risks-ldr');
+  if(rc){
+    var risks=ins.risks||[];
+    var h='<div class="si-block"><div class="si-block-title">Attention Flags</div>';
+    if(risks.length){
+      h+=risks.slice(0,4).map(function(r){
+        return '<div class="si-risk"><div class="si-risk-dot"></div><div>'
+          +'<div class="si-risk-co">'+esc(r.company||'')+'</div>'
+          +'<div class="si-risk-flag">'+esc(r.flag||'')+'</div>'
+          +'<div class="si-risk-impl">'+esc(r.implication||'')+'</div>'
+        +'</div></div>';
+      }).join('');
+    } else {
+      h+='<div style="font-size:12px;color:#1e293b;padding:14px 0;text-align:center">No critical flags</div>';
+    }
+    rc.innerHTML=h+'</div>';
+  }
+
+  /* KPIs */
+  var kg = document.getElementById('si-kpis');
+  if(kg){
+    var kp=ins.kpis||{};
+    var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
+    var avg=kp.avg_intent?Math.round(kp.avg_intent):null;
+    var cards=[
+      {val:kp.high_priority||hot,raw:kp.high_priority||hot,lbl:'High-Priority',sub:'Intent ≥ 70'},
+      {val:avg?avg+' / 100':'—',raw:avg,lbl:'Avg Intent',sub:'Across pipeline'},
+      {val:(ins.actions||[]).length,raw:(ins.actions||[]).length,lbl:'Actions',sub:'This week'},
+      {val:pe.total||'—',raw:null,lbl:'Revenue',sub:'Est. opportunity'},
+    ];
+    kg.innerHTML=cards.map(function(k,i){
+      var v=k.raw!==null&&k.raw!==undefined?'<span id="si-kv'+i+'">0</span>'+(i===1?' / 100':''):esc(String(k.val));
+      return '<div class="si-kpi" style="animation-delay:'+(i*.06)+'s"><div class="si-kpi-val">'+v+'</div>'
+        +'<div class="si-kpi-label">'+esc(k.lbl)+'</div>'
+        +'<div class="si-kpi-sub">'+esc(k.sub)+'</div></div>';
+    }).join('');
+    cards.forEach(function(k,i){
+      if(k.raw!==null&&k.raw!==undefined){
+        setTimeout(function(){
+          var el=document.getElementById('si-kv'+i);
+          if(!el)return;
+          var n=k.raw,dur=900,t0=null;
+          (function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);
+            el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);})(performance.now());
+          requestAnimationFrame(function(ts){t0=ts;});
+        }, 200+i*60);
+      }
+    });
+  }
+
+  /* Priority cards — make clickable */
+  setTimeout(function(){
+    document.querySelectorAll('.si-pcard[data-si-pw]').forEach(function(card){
+      var idx=parseInt(card.getAttribute('data-si-pw'));
+      var pw=(ins.week_priority||[])[idx];
+      if(!pw)return;
+      card.onclick=function(){
+        if(typeof window.siDrwOpen==='function'){
+          document.querySelectorAll('.si-pcard').forEach(function(c){c.classList.remove('active');});
+          card.style.borderColor='#4338ca';
+          var html=
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+              +'<div style="width:40px;height:40px;border-radius:10px;background:'+AVC[idx%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff">'+esc(ini(pw.company))+'</div>'
+              +'<div><div style="font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em">'+esc(pw.company)+'</div>'
+                +'<div style="font-size:11px;color:#334155">'+esc(pw.domain||'')+'</div></div>'
+              +(pw.call_timing?'<span style="margin-left:auto;font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171">'+esc(pw.call_timing)+'</span>':'')
+            +'</div>'
+            +'<div class="si-ds"><div class="si-ds-lbl">Why This Week</div>'
+              +'<div style="font-size:13px;color:#94a3b8;line-height:1.7;background:#0f172a;border:1px solid #1e293b;border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:12px 14px">'+esc(pw.signal||'')+'</div>'
+            +'</div>'
+            +'<div class="si-ds"><div class="si-ds-lbl">What to Pitch</div>'
+              +'<div style="font-size:14px;font-weight:600;color:#a5b4fc;line-height:1.6;padding:10px 12px;background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);border-radius:8px">'+esc(pw.pitch||'')+'</div>'
+            +'</div>'
+            +(pw.est_value?'<div class="si-ds"><div class="si-ds-lbl">Est. Value</div><div style="font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em">'+esc(pw.est_value)+'</div></div>':'')
+            +'<div class="si-drw-btns">'
+              +'<button class="si-btn prim" onclick="siGotoCo(\''+esc(pw.company)+'\')">Find in Companies →</button>'
+              +'<button class="si-btn" onclick="siCp(this,\''+esc(pw.pitch||'')+'\')">Copy Pitch</button>'
+            +'</div>';
+          window.siDrwOpen('Priority #'+(pw.rank||idx+1)+' — '+pw.company, html);
+        }
+      };
+    });
+  }, 200);
+}
+
+/* ── Reattach interactive card handlers ─────────────────────────────────── */
+function _attachCards(){
+  /* Pipeline */
+  document.querySelectorAll('#si-pip .si-co-card:not([data-si-idx])').forEach(function(card,i){
+    var d=window._ID&&window._ID.pip&&window._ID.pip[i];
+    if(!d)return;
+    card.setAttribute('data-si-idx',i);
+    var h=document.createElement('span');h.className='si-xhint';h.textContent='View details →';
+    card.appendChild(h);
+    card.onclick=function(e){
+      if(e.target.closest('a,button,input'))return;
+      document.querySelectorAll('.si-co-card.active').forEach(function(c){c.classList.remove('active');});
+      card.classList.add('active');
+      if(typeof window.siPipClick==='function')window.siPipClick(card,d);
+      else if(typeof window.siDrwOpen==='function'){
+        var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
+        var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+        window.siDrwOpen(d.name,'<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Intent score: <strong style="color:'+rc+';font-size:18px">'+sc+'</strong>/100</div>'
+          +'<div style="font-size:13px;color:#64748b;line-height:1.7">'+esc(d.why_now||'')+'</div>'
+          +(d.next_step?'<div style="margin-top:14px;background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);border-radius:8px;padding:12px;font-size:13px;color:#a5b4fc">→ '+esc(d.next_step)+'</div>':''));
+      }
+    };
+  });
+  /* Actions */
+  document.querySelectorAll('#si-acts .si-tl-item:not([data-si-idx])').forEach(function(item,i){
+    var d=window._ID&&window._ID.acts&&window._ID.acts[i];
+    if(!d)return;
+    item.setAttribute('data-si-idx',i);
+    var h=document.createElement('span');h.className='si-xhint';h.textContent='View context →';
+    item.appendChild(h);
+    item.onclick=function(e){
+      if(e.target.closest('a,button,input'))return;
+      document.querySelectorAll('.si-tl-item.active').forEach(function(c){c.classList.remove('active');});
+      item.classList.add('active');
+      if(typeof window.siActClick==='function')window.siActClick(item,d);
+    };
+  });
+  /* Outreach */
+  document.querySelectorAll('#si-out .si-email-card:not([data-si-idx])').forEach(function(card,i){
+    var d=window._ID&&window._ID.out&&window._ID.out[i];
+    if(!d)return;
+    card.setAttribute('data-si-idx',i);
+    var h=document.createElement('span');h.className='si-xhint';h.textContent='View full email →';
+    card.appendChild(h);
+    card.onclick=function(e){
+      if(e.target.closest('a,button,input'))return;
+      document.querySelectorAll('.si-email-card.active').forEach(function(c){c.classList.remove('active');});
+      card.classList.add('active');
+      if(typeof window.siOutClick==='function')window.siOutClick(card,d);
+    };
+  });
+}
+
+/* Patch siTab to re-attach handlers on switch */
+(function waitForSiTab(){
+  if(typeof window.siTab!=='function'){setTimeout(waitForSiTab,100);return;}
+  var _ot=window.siTab;
+  window.siTab=function(btn){_ot(btn);setTimeout(_attachCards,150);};
+})();
 })();
 </script>
 
