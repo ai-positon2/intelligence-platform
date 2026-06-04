@@ -77,10 +77,14 @@
   background:linear-gradient(135deg,rgba(99,102,241,.8),rgba(139,92,246,.65),rgba(6,182,212,.5),rgba(99,102,241,.8));
   background-size:300% 300%; animation:ppc-grad 5s ease infinite;
   opacity:0; transform:translateY(20px) scale(.94); pointer-events:none;
-  transition:transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s, width .35s cubic-bezier(.34,1.56,.64,1), height .35s cubic-bezier(.34,1.56,.64,1);
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1), opacity .3s,
+             top .4s cubic-bezier(.34,1.56,.64,1), bottom .4s cubic-bezier(.34,1.56,.64,1);
   box-shadow:0 32px 80px rgba(0,0,0,.75),0 0 80px rgba(99,102,241,.12),inset 0 1px 0 rgba(255,255,255,.06);
 }
 #ppc-border.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
+/* Expanded: anchor top + bottom so panel fills full height */
+#ppc-border.expanded{top:12px;bottom:12px;height:auto}
+#ppc-border.expanded #ppc-panel{height:100%}
 @keyframes ppc-grad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @media(max-width:480px){
   #ppc-border{width:calc(100vw - 16px)!important;right:8px;bottom:82px}
@@ -97,7 +101,7 @@
   height:560px;
   transition:height .35s cubic-bezier(.34,1.56,.64,1);
 }
-#ppc-border.expanded #ppc-panel{height:min(85vh, 860px)}
+/* expanded panel height controlled by #ppc-border top/bottom anchoring */
 
 /* Orbs */
 #ppc-panel::before{
@@ -417,7 +421,7 @@
         <div class="ppc-hdr-info">
           <div class="ppc-hdr-title">PPC Assistant</div>
           <div class="ppc-hdr-status">
-            <span class="ppc-live"></span>Live · Connected
+            <span class="ppc-live"></span>
           </div>
         </div>
         <div class="ppc-hdr-btns">
@@ -651,6 +655,199 @@
     if (!msg && !_file) return;
 
     var wlc = document.getElementById('ppc-welcome');
-    if (wlc) { wlc.style.animation = 'ppc-msg-in
+    if (wlc) { wlc.style.animation = 'ppc-msg-in .3s reverse both'; setTimeout(function(){wlc.remove();},280); }
+
+    inp.value = ''; inp.style.height = 'auto';
+    _updateCharCount('');
+
+    // Build display message
+    var displayMsg = msg;
+    if (_file) displayMsg = (_file.is_image ? '🖼️ ' : _fileIco(_file.name) + ' ') + _file.name + (msg ? '\n' + msg : '');
+    _addMsg('user', displayMsg || 'Analyse this file.');
+
+    var histMsg = msg || 'Analyse this file.';
+    _hist.push({ role: 'user', content: histMsg });
+
+    // Build payload
+    var payload = { message: msg || '', history: _hist.slice(-6) };
+    if (_file) {
+      payload.file_name      = _file.name;
+      payload.file_is_image  = _file.is_image;
+      payload.file_truncated = _file.truncated || false;
+      if (_file.is_image) {
+        payload.file_mime   = _file.mime;
+        payload.file_base64 = _file.base64;
+      } else {
+        payload.file_content = _file.content;
+      }
+      // Clear after send
+      _clearFilePill();
+    }
+
+    var loader = _addLoader();
+    _setBusy(true);
+
+    fetch('/api/ppc-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      loader.remove();
+      var ans = d.answer || 'No response received.';
+      _addMsg('assistant', ans);
+      _hist.push({ role: 'assistant', content: ans });
+    })
+    .catch(function () {
+      loader.remove();
+      _addMsg('assistant', '⚠️ Connection error — please try again.');
+    })
+    .finally(function () {
+      _setBusy(false);
+      document.getElementById('ppc-input').focus();
+    });
+  };
+
+  /* ── Busy state ── */
+  function _setBusy(state) {
+    _busy = state;
+    var btn = document.getElementById('ppc-send');
+    btn.disabled = state;
+    btn.innerHTML = state
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation:ppc-spin .75s linear infinite"><circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,.25)" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>'
+      : '<svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
+  }
+
+  /* ── Add message ── */
+  function _addMsg(role, text) {
+    var msgs = document.getElementById('ppc-msgs');
+    var row  = document.createElement('div');
+    row.className = 'ppc-row ' + role;
+
+    var av = document.createElement('div');
+    av.className = 'ppc-row-av';
+    av.textContent = role === 'assistant' ? '⚡' : 'You';
+
+    var bwrap = document.createElement('div');
+    bwrap.className = 'ppc-bwrap';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'ppc-bubble';
+    bubble.innerHTML = _fmt(text);
+
+    var ts = document.createElement('div');
+    ts.className = 'ppc-ts';
+    ts.textContent = _now();
+
+    bwrap.appendChild(bubble);
+    bwrap.appendChild(ts);
+    row.appendChild(av);
+    row.appendChild(bwrap);
+    msgs.appendChild(row);
+    _scrollCheck();
+    return row;
+  }
+
+  /* ── Typing indicator ── */
+  function _addLoader() {
+    var msgs = document.getElementById('ppc-msgs');
+    var row  = document.createElement('div');
+    row.className = 'ppc-row assistant';
+    var av   = document.createElement('div');
+    av.className = 'ppc-row-av'; av.textContent = '⚡';
+    var bwrap = document.createElement('div');
+    bwrap.className = 'ppc-bwrap';
+    var bubble = document.createElement('div');
+    bubble.className = 'ppc-bubble ppc-typing';
+    bubble.innerHTML =
+      '<div class="ppc-wave"><span></span><span></span><span></span><span></span><span></span></div>' +
+      '<span class="ppc-typing-txt">Thinking…</span>';
+    bwrap.appendChild(bubble);
+    row.appendChild(av); row.appendChild(bwrap);
+    msgs.appendChild(row);
+    _scrollCheck();
+    return row;
+  }
+
+  /* ── Scroll logic ── */
+  function _scrollCheck() {
+    var msgs = document.getElementById('ppc-msgs');
+    var btn  = document.getElementById('ppc-scroll-btn');
+    var atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
+    if (atBottom) {
+      msgs.scrollTop = msgs.scrollHeight;
+      btn.classList.remove('show');
+    } else {
+      btn.classList.add('show');
+    }
+  }
+
+  /* ── Format ── */
+  function _fmt(t) {
+    t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    var lines = t.split('\n'), out = [], list = false;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i], isBullet = /^[\-\*•]\s+/.test(l.trim());
+      if (isBullet) {
+        if (!list) { out.push('<ul>'); list = true; }
+        out.push('<li>' + l.trim().replace(/^[\-\*•]\s+/, '') + '</li>');
+      } else {
+        if (list) { out.push('</ul>'); list = false; }
+        if (l.trim()) out.push('<p>' + l + '</p>');
+      }
+    }
+    if (list) out.push('</ul>');
+    return out.join('');
+  }
+
+  function _now() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12;
+    return h + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
+  }
+
+  function _updateCharCount(val) {
+    var el = document.getElementById('ppc-char-count');
+    if (!el) return;
+    if (!val) { el.textContent = ''; return; }
+    el.textContent = val.length;
+    el.classList.toggle('warn', val.length > 300);
+  }
+
+  /* ── Events ── */
+  var inp = document.getElementById('ppc-input');
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ppcSend(); }
+  });
+  inp.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+    _updateCharCount(this.value);
+  });
+
+  document.getElementById('ppc-send').addEventListener('click', ppcSend);
+
+  document.getElementById('ppc-msgs').addEventListener('scroll', function () {
+    var btn = document.getElementById('ppc-scroll-btn');
+    var atBottom = this.scrollHeight - this.scrollTop - this.clientHeight < 60;
+    btn.classList.toggle('show', !atBottom);
+  });
+
+  document.addEventListener('click', function (e) {
+    var b = document.getElementById('ppc-border');
+    var w = document.getElementById('ppc-wrap');
+    if (b && b.classList.contains('open') && !b.contains(e.target) && !w.contains(e.target)) ppcOpen();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var b = document.getElementById('ppc-border');
+      if (b && b.classList.contains('open')) ppcOpen();
+    }
+  });
+})();
+</script>
+<!-- ── End PPC Chat Widget ─────────────────────────────────────────────────── -->
   </body>
 </html>
