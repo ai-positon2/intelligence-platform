@@ -382,11 +382,17 @@
 <!-- Trigger -->
 <div id="ppc-wrap">
   <button id="ppc-btn" onclick="ppcOpen()" aria-label="Open Kairo">
-    <svg class="ppc-ico" id="ppc-ico-chat" width="24" height="24" fill="none" viewBox="0 0 24 24">
+    <svg class="ppc-ico" id="ppc-ico-chat" width="32" height="32" fill="none" viewBox="0 0 24 24">
       <!-- Kairo atom logo -->
-      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75"/>
-      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75" transform="rotate(60 12 12)"/>
-      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75" transform="rotate(-60 12 12)"/>
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75">
+        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75">
+        <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/>
+      </ellipse>
+      <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.75">
+        <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/>
+      </ellipse>
       <circle cx="12" cy="12" r="2.4" fill="#fff"/>
       <circle cx="12" cy="12" r="1.1" fill="rgba(99,102,241,0.7)"/>
     </svg>
@@ -405,10 +411,16 @@
     <div id="ppc-hdr">
       <div class="ppc-hdr-top">
         <div class="ppc-av">
-          <svg width="27" height="27" fill="none" viewBox="0 0 24 24">
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7"/>
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7" transform="rotate(60 12 12)"/>
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7" transform="rotate(-60 12 12)"/>
+          <svg width="34" height="34" fill="none" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7">
+              <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="6s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7">
+              <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="8s" repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,0.93)" stroke-width="1.7">
+              <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="10s" repeatCount="indefinite"/>
+            </ellipse>
             <circle cx="12" cy="12" r="2.5" fill="white"/>
             <circle cx="12" cy="12" r="1.1" fill="rgba(99,102,241,0.65)"/>
           </svg>
