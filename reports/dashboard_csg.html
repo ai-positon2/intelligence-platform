@@ -4434,989 +4434,781 @@ window.siCopy=function(btn,id){
 
 
 
-<!-- ═══ INSIGHTS INTERACTIVE PATCH v2 ══════════════════════════════════════ -->
+
+
+
+
+<!-- ═══ INSIGHTS VISUAL OVERHAUL ════════════════════════════════════════════ -->
 <style>
-/* ── Clickable card base ───────────────────────────────────────────────────*/
-.si-co-card,.si-email-card,.si-tl-item{cursor:pointer!important;position:relative}
-.si-co-card .si-xhint,.si-email-card .si-xhint,.si-tl-item .si-xhint{
-  position:absolute;bottom:12px;right:14px;font-size:10px;font-weight:500;
-  color:#334155;opacity:0;transition:opacity .2s;pointer-events:none;
-  display:flex;align-items:center;gap:4px
+/* ── Background ─────────────────────────────────────────────────────────────*/
+#section-insights .si-body{
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 15%,rgba(67,56,202,.18) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 35% at 85% 80%,rgba(124,58,237,.14) 0%,transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%,rgba(15,23,42,.8) 0%,transparent 70%),
+    linear-gradient(160deg,#020817 0%,#080c18 50%,#020817 100%);
+  min-height:calc(100vh - 120px)
 }
-.si-co-card:hover .si-xhint,.si-email-card:hover .si-xhint,.si-tl-item:hover .si-xhint{opacity:1}
-.si-co-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important}
-.si-email-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important}
-.si-tl-item:hover .si-tl-card{border-color:#334155!important}
-.si-co-card.active,.si-email-card.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca,0 8px 24px rgba(67,56,202,.2)!important}
-.si-tl-item.active .si-tl-card{border-color:#4338ca!important}
 
-/* ── Overlay ───────────────────────────────────────────────────────────────*/
-.si-ov2{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:398;
-  opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(3px)}
-.si-ov2.show{opacity:1;pointer-events:all}
-
-/* ── Drawer ────────────────────────────────────────────────────────────────*/
-.si-drw{
-  position:fixed;top:0;right:-540px;width:520px;max-width:94vw;height:100vh;
-  background:#0b1120;border-left:1px solid #1e293b;z-index:399;
-  transition:right .3s cubic-bezier(.22,1,.36,1);
-  display:flex;flex-direction:column;overflow:hidden;
-  box-shadow:-20px 0 60px rgba(0,0,0,.5)
+/* ── Metric tiles ───────────────────────────────────────────────────────────*/
+.si-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1000px){.si-tiles{grid-template-columns:repeat(2,1fr)}}
+.si-tile{
+  border-radius:14px;padding:16px 18px;cursor:pointer;position:relative;overflow:hidden;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(12px);transition:border-color .2s,transform .2s,box-shadow .2s;
+  animation:vf-up .35s ease both
 }
-.si-drw.show{right:0}
-.si-drw-top{
-  display:flex;align-items:center;gap:10px;padding:14px 18px;
-  border-bottom:1px solid #1e293b;flex-shrink:0;background:#0b1120
+.si-tile:hover{border-color:rgba(255,255,255,.14);transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.si-tile-icon{font-size:20px;margin-bottom:10px;display:block}
+.si-tile-val{font-size:26px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:4px}
+.si-tile-lbl{font-size:11px;color:#475569;font-weight:500;letter-spacing:.02em}
+.si-tile-glow{position:absolute;bottom:-20px;right:-20px;width:90px;height:90px;border-radius:50%;opacity:.12;pointer-events:none}
+.si-tile-trend{position:absolute;top:14px;right:14px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px}
+.si-tile-trend.up{background:rgba(16,185,129,.12);color:#34d399}
+.si-tile-trend.down{background:rgba(239,68,68,.1);color:#f87171}
+.si-tile-trend.flat{background:#1e293b;color:#475569}
+
+/* ── Compact brief ──────────────────────────────────────────────────────────*/
+.si-brief-compact{
+  border-radius:14px;padding:16px 20px;margin-bottom:14px;cursor:pointer;
+  background:linear-gradient(135deg,rgba(67,56,202,.14),rgba(124,58,237,.08));
+  border:1px solid rgba(99,102,241,.2);position:relative;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;animation:vf-up .35s .08s ease both
 }
-.si-drw-close{
-  background:none;border:1px solid #1e293b;border-radius:7px;
-  color:#475569;cursor:pointer;font-size:13px;line-height:1;
-  padding:5px 9px;transition:all .15s;flex-shrink:0
+.si-brief-compact:hover{border-color:rgba(99,102,241,.4);box-shadow:0 8px 32px rgba(67,56,202,.15)}
+.si-brief-compact::after{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;
+  border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.12) 0%,transparent 70%);pointer-events:none}
+.si-brief-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.si-brief-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
+.si-brief-ai{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.2);color:#a5b4fc}
+.si-brief-text{font-size:13px;line-height:1.65;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.si-brief-expand{position:absolute;bottom:14px;right:16px;font-size:11px;color:#4338ca;font-weight:600}
+
+/* ── Compact priority cards ─────────────────────────────────────────────────*/
+.si-pri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1100px){.si-pri-grid{grid-template-columns:repeat(2,1fr)}}
+.si-pc2{
+  border-radius:12px;padding:13px 14px;cursor:pointer;position:relative;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(8px);transition:all .2s;animation:vf-up .35s ease both;
+  display:flex;flex-direction:column;gap:7px
 }
-.si-drw-close:hover{border-color:#334155;color:#94a3b8}
-.si-drw-label{font-size:12px;font-weight:600;color:#e2e8f0;flex:1;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.si-drw-body{flex:1;overflow-y:auto;padding:20px 20px 32px}
-.si-drw-body::-webkit-scrollbar{width:4px}
-.si-drw-body::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+.si-pc2:hover{border-color:rgba(255,255,255,.15);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.si-pc2.r1{border-color:rgba(239,68,68,.2);background:rgba(127,29,29,.06)}
+.si-pc2.r1:hover{border-color:rgba(239,68,68,.4)}
+.si-pc2-top{display:flex;align-items:center;gap:9px}
+.si-pc2-av{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.si-pc2-name{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.si-pc2-timing{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;flex-shrink:0}
+.si-pc2-t-today{background:rgba(239,68,68,.15);color:#f87171}
+.si-pc2-t-week{background:rgba(245,158,11,.1);color:#fbbf24}
+.si-pc2-t-email{background:#1e293b;color:#475569}
+.si-pc2-signal{font-size:10px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-pc2-foot{display:flex;align-items:center;justify-content:space-between}
+.si-pc2-svc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.si-pc2-val{font-size:11px;font-weight:700;color:#fbbf24}
+.si-pc2-arr{color:#334155;font-size:12px}
 
-/* Drawer sections */
-.si-ds{margin-bottom:18px}
-.si-ds-lbl{font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;
-  letter-spacing:.09em;margin-bottom:8px}
-.si-ds-val{font-size:13px;color:#94a3b8;line-height:1.7}
+/* ── Infographic panels ─────────────────────────────────────────────────────*/
+.si-infog-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:1000px){.si-infog-row{grid-template-columns:1fr 1fr}}
+.si-infog-card{
+  border-radius:14px;padding:16px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(8px);animation:vf-up .35s ease both
+}
+.si-infog-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
 
-/* Score block */
-.si-score-blk{display:flex;align-items:center;gap:16px;background:#0f172a;
-  border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:18px}
-.si-score-ring-lg{flex-shrink:0}
-.si-score-rinfo{flex:1;min-width:0}
-.si-score-rlbl{font-size:12px;font-weight:600;margin-bottom:5px}
-.si-score-rbar{height:4px;background:#1e293b;border-radius:999px;overflow:hidden;margin-bottom:8px}
-.si-score-rfill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
-.si-score-rwhy{font-size:12px;color:#475569;line-height:1.6}
+/* Pipeline confidence gauge */
+.si-gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.si-gauge-sub{font-size:11px;color:#475569;text-align:center}
 
-/* Signal pills */
-.si-sig-pills{display:flex;flex-direction:column;gap:6px}
-.si-sig-pill{display:flex;align-items:center;gap:8px;background:#0f172a;
-  border:1px solid #1e293b;border-radius:8px;padding:8px 12px}
-.si-sig-ptype{font-size:11px;font-weight:600;color:#60a5fa;flex:1}
-.si-sev-pip-H{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(220,38,38,.1);color:#f87171}
-.si-sev-pip-M{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(217,119,6,.08);color:#fcd34d}
-.si-sev-pip-L{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:#1e293b;color:#475569}
+/* Signal type bars */
+.si-sig-bars{display:flex;flex-direction:column;gap:7px}
+.si-sig-bar-row{display:flex;align-items:center;gap:8px}
+.si-sig-bar-lbl{font-size:10px;color:#64748b;width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-sig-bar-track{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
+.si-sig-bar-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.si-sig-bar-cnt{font-size:10px;color:#475569;min-width:28px;text-align:right;flex-shrink:0}
 
-/* Service / tag chips */
-.si-chip-row{display:flex;gap:6px;flex-wrap:wrap}
-.si-chip-grn{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;
-  background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.si-chip-ind{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;
-  background:#0f172a;color:#64748b;border:1px solid #1e293b}
+/* Intent tiers */
+.si-tier-list{display:flex;flex-direction:column;gap:6px}
+.si-tier-row{display:flex;align-items:center;gap:8px}
+.si-tier-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.si-tier-lbl{font-size:11px;color:#64748b;flex:1}
+.si-tier-bar-track{width:80px;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
+.si-tier-bar-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.si-tier-cnt{font-size:11px;font-weight:700;min-width:20px;text-align:right}
 
-/* Revenue big */
-.si-rev-big{font-size:26px;font-weight:800;color:#fbbf24;letter-spacing:-.04em;margin-top:2px}
+/* ── Compact pipeline cards ──────────────────────────────────────────────────*/
+.si-pip-compact{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:1100px){.si-pip-compact{grid-template-columns:repeat(2,1fr)}}
+.si-pico{
+  border-radius:13px;padding:14px;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);transition:all .2s;animation:vf-up .35s ease both;
+  display:flex;flex-direction:column;gap:9px
+}
+.si-pico:hover{border-color:rgba(255,255,255,.14);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.si-pico.hot{border-color:rgba(239,68,68,.18)}
+.si-pico.hot:hover{border-color:rgba(239,68,68,.4);box-shadow:0 10px 28px rgba(239,68,68,.1)}
+.si-pico.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca!important}
+.si-pico-top{display:flex;align-items:center;gap:10px}
+.si-pico-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.si-pico-info{flex:1;min-width:0}
+.si-pico-name{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.si-pico-domain{font-size:10px;color:#334155}
+.si-pico-score-row{display:flex;align-items:center;gap:10px}
+.si-pico-score-wrap{flex-shrink:0}
+.si-pico-score-right{flex:1;min-width:0}
+.si-pico-score-lbl{font-size:10px;font-weight:600;margin-bottom:3px}
+.si-pico-track{height:4px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
+.si-pico-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.si-pico-foot{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.si-pico-badge{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.15)}
+.si-pico-svc{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.si-pico-arr{margin-left:auto;color:#1e293b;font-size:13px;transition:color .15s}
+.si-pico:hover .si-pico-arr{color:#64748b}
 
-/* Next step box */
-.si-next-box{background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);
-  border-radius:9px;padding:12px 14px;font-size:13px;color:#a5b4fc;line-height:1.6}
+/* ── Compact action rows ─────────────────────────────────────────────────────*/
+.si-act-compact{display:flex;flex-direction:column;gap:7px}
+.si-aco{
+  border-radius:10px;padding:11px 14px;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);transition:all .2s;animation:vf-up .35s ease both;
+  display:flex;align-items:center;gap:12px
+}
+.si-aco:hover{border-color:rgba(255,255,255,.13);transform:translateX(3px)}
+.si-aco.active{border-color:#4338ca!important}
+.si-aco.hi{border-left:2px solid rgba(239,68,68,.5)}
+.si-aco.med{border-left:2px solid rgba(245,158,11,.4)}
+.si-aco-rank{width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#475569;flex-shrink:0}
+.si-aco-ico{font-size:14px;flex-shrink:0}
+.si-aco-body{flex:1;min-width:0}
+.si-aco-action{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.si-aco-co{font-size:10px;color:#475569}
+.si-aco-right{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.si-aco-dl{font-size:10px;font-weight:600;padding:2px 8px;border-radius:5px;background:#0a0e1a;color:#475569;border:1px solid #1e293b;white-space:nowrap}
+.si-aco-urg{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.si-aco-urg.H{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.6)}
+.si-aco-urg.M{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.5)}
+.si-aco-arr{color:#1e293b;font-size:12px;transition:color .15s;flex-shrink:0}
+.si-aco:hover .si-aco-arr{color:#64748b}
 
-/* Email preview */
-.si-ep{background:#0f172a;border:1px solid #1e293b;border-radius:10px;overflow:hidden}
-.si-ep-chrome{background:#0a0e1a;border-bottom:1px solid #1e293b;
-  padding:9px 14px;display:flex;align-items:center;gap:5px}
-.si-ep-dot{width:9px;height:9px;border-radius:50%}
-.si-ep-body{padding:16px;font-size:13px;color:#64748b;line-height:1.75}
-.si-ep-subject{font-size:14px;font-weight:700;color:#e2e8f0;
-  padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #1e293b;letter-spacing:-.01em}
-.si-ep-para{color:#64748b;margin-bottom:10px}
-.si-ep-ul{list-style:none;padding:0;margin:8px 0 12px}
-.si-ep-ul li{display:flex;gap:8px;padding:3px 0;color:#64748b}
-.si-ep-ul li::before{content:'✓';color:#059669;font-weight:700;flex-shrink:0}
-.si-ep-cta{color:#818cf8;padding-top:10px;border-top:1px solid #1e293b}
+/* ── Compact outreach cards ──────────────────────────────────────────────────*/
+.si-out-compact{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(max-width:900px){.si-out-compact{grid-template-columns:1fr}}
+.si-oco{
+  border-radius:12px;overflow:hidden;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);transition:all .2s;animation:vf-up .35s ease both
+}
+.si-oco:hover{border-color:rgba(255,255,255,.14);transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.si-oco.active{border-color:#4338ca!important}
+.si-oco-chrome{background:rgba(0,0,0,.3);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 12px;display:flex;align-items:center;gap:5px}
+.si-oco-dot{width:8px;height:8px;border-radius:50%}
+.si-oco-to{font-size:10px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px}
+.si-oco-t{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
+.si-oco-t.now{background:rgba(239,68,68,.15);color:#f87171}
+.si-oco-t.soon{background:rgba(245,158,11,.1);color:#fbbf24}
+.si-oco-t.watch{background:#1e293b;color:#475569}
+.si-oco-body{padding:11px 13px}
+.si-oco-subj{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:5px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-oco-hook{font-size:10px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px}
+.si-oco-foot{display:flex;align-items:center;justify-content:space-between}
+.si-oco-copy{background:none;border:1px solid #1e293b;border-radius:5px;color:#334155;cursor:pointer;font-size:9px;font-weight:600;padding:3px 9px;font-family:inherit;transition:all .15s}
+.si-oco-copy:hover{border-color:#4338ca;color:#818cf8}
+.si-oco-copy.ok{border-color:#065f46;color:#34d399}
+.si-oco-arr{color:#1e293b;font-size:12px}
+.si-oco:hover .si-oco-arr{color:#64748b}
 
-/* Action buttons */
-.si-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding-top:6px}
-.si-btn{display:inline-flex;align-items:center;gap:6px;background:#0f172a;
-  border:1px solid #1e293b;border-radius:7px;color:#64748b;cursor:pointer;
-  font-family:inherit;font-size:11px;font-weight:500;padding:7px 12px;transition:all .15s}
-.si-btn:hover{border-color:#334155;color:#94a3b8}
-.si-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}
-.si-btn.prim:hover{background:#3730a3}
-.si-btn.ok{border-color:#065f46;color:#34d399}
+/* ── Loading / auto-loading ─────────────────────────────────────────────────*/
+.si-auto-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;gap:16px;text-align:center}
+.si-auto-orb{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:vf-orb 1.6s ease-in-out infinite}
+@keyframes vf-orb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5),0 0 20px rgba(67,56,202,.4)}50%{box-shadow:0 0 0 10px rgba(67,56,202,0),0 0 40px rgba(67,56,202,.7)}}
+.si-auto-dots{display:flex;gap:5px}.si-auto-dots span{width:5px;height:5px;border-radius:50%;background:#4338ca;animation:vf-dot 1.2s ease-in-out infinite}
+.si-auto-dots span:nth-child(2){animation-delay:.2s}.si-auto-dots span:nth-child(3){animation-delay:.4s}
+@keyframes vf-dot{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+.si-auto-label{font-size:14px;font-weight:600;color:#e2e8f0;letter-spacing:-.01em}
+.si-auto-sub{font-size:12px;color:#334155;max-width:300px;line-height:1.6}
 
-/* Urgency colors */
-.si-urg-badge-H{display:inline-block;font-size:9px;font-weight:700;padding:3px 8px;
-  border-radius:5px;background:rgba(220,38,38,.1);color:#f87171;letter-spacing:.04em}
-.si-urg-badge-M{display:inline-block;font-size:9px;font-weight:700;padding:3px 8px;
-  border-radius:5px;background:rgba(217,119,6,.08);color:#fcd34d;letter-spacing:.04em}
+/* ── Drawer (full detail) ───────────────────────────────────────────────────*/
+.vf-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
+.vf-overlay.on{opacity:1;pointer-events:all}
+.vf-drawer{position:fixed;top:0;right:-540px;width:520px;max-width:94vw;height:100vh;z-index:399;
+  background:linear-gradient(160deg,#080c18 0%,#0c1020 100%);
+  border-left:1px solid rgba(255,255,255,.07);
+  transition:right .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:-24px 0 80px rgba(0,0,0,.7)}
+.vf-drawer.on{right:0}
+.vf-drw-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;background:rgba(0,0,0,.3)}
+.vf-drw-close{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#475569;cursor:pointer;font-size:13px;padding:5px 9px;transition:all .15s}
+.vf-drw-close:hover{border-color:rgba(255,255,255,.15);color:#94a3b8}
+.vf-drw-title{font-size:13px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.vf-drw-body{flex:1;overflow-y:auto;padding:20px}
+.vf-drw-body::-webkit-scrollbar{width:3px}
+.vf-drw-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
+.vf-sec{margin-bottom:18px}
+.vf-sec-lbl{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
+.vf-sec-val{font-size:13px;color:#94a3b8;line-height:1.7}
+.vf-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding-top:6px}
+.vf-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#64748b;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;padding:7px 12px;transition:all .15s}
+.vf-btn:hover{border-color:rgba(255,255,255,.15);color:#94a3b8}
+.vf-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}
+.vf-btn.prim:hover{background:#3730a3}
+.vf-btn.ok{border-color:#065f46!important;color:#34d399!important}
+.vf-highlight{background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.18);border-radius:9px;padding:12px 14px;font-size:13px;color:#a5b4fc;line-height:1.6}
+.vf-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.vf-chip-grn{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15);font-weight:500}
+.vf-chip-blu{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(59,130,246,.08);color:#60a5fa;border:1px solid rgba(59,130,246,.15);font-weight:500}
+.vf-rev-big{font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em}
+.vf-score-row{display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+
+/* ── Section header ─────────────────────────────────────────────────────────*/
+.vf-sec-row{display:flex;align-items:center;gap:8px;margin:16px 0 10px}
+.vf-sec-row-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em}
+.vf-sec-row-line{flex:1;height:1px;background:rgba(255,255,255,.05)}
+.vf-ai-tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.14);color:#818cf8;flex-shrink:0}
+
+/* ── Regen ──────────────────────────────────────────────────────────────────*/
+.si-regen-row{display:flex;align-items:center;gap:10px;padding:14px 0 0;border-top:1px solid rgba(255,255,255,.05)}
+.si-regen-meta{font-size:11px;color:#1e293b}
+.si-regen-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#334155;cursor:pointer;font-family:inherit;font-size:11px;padding:5px 11px;transition:all .15s}
+.si-regen-btn:hover{border-color:rgba(255,255,255,.14);color:#64748b}
+
+/* ── Animations ─────────────────────────────────────────────────────────────*/
+@keyframes vf-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.si-tiles .si-tile:nth-child(1){animation-delay:.04s}
+.si-tiles .si-tile:nth-child(2){animation-delay:.08s}
+.si-tiles .si-tile:nth-child(3){animation-delay:.12s}
+.si-tiles .si-tile:nth-child(4){animation-delay:.16s}
+.si-pri-grid .si-pc2:nth-child(1),.si-pip-compact .si-pico:nth-child(1),.si-act-compact .si-aco:nth-child(1),.si-out-compact .si-oco:nth-child(1){animation-delay:.04s}
+.si-pri-grid .si-pc2:nth-child(2),.si-pip-compact .si-pico:nth-child(2),.si-act-compact .si-aco:nth-child(2),.si-out-compact .si-oco:nth-child(2){animation-delay:.08s}
+.si-pri-grid .si-pc2:nth-child(3),.si-pip-compact .si-pico:nth-child(3),.si-act-compact .si-aco:nth-child(3),.si-out-compact .si-oco:nth-child(3){animation-delay:.12s}
+.si-pri-grid .si-pc2:nth-child(4),.si-pip-compact .si-pico:nth-child(4),.si-act-compact .si-aco:nth-child(4),.si-out-compact .si-oco:nth-child(4){animation-delay:.16s}
+.si-pri-grid .si-pc2:nth-child(5),.si-pip-compact .si-pico:nth-child(5),.si-act-compact .si-aco:nth-child(5),.si-out-compact .si-oco:nth-child(5){animation-delay:.20s}
+.si-pri-grid .si-pc2:nth-child(6),.si-pip-compact .si-pico:nth-child(6),.si-act-compact .si-aco:nth-child(6),.si-out-compact .si-oco:nth-child(6){animation-delay:.24s}
+
+/* ── Dashboard body bg ──────────────────────────────────────────────────────*/
+#content{background:#020817!important}
+#section-insights{background:transparent}
 </style>
 
-<!-- Overlay + Drawer DOM -->
-<div class="si-ov2" id="si-ov2" onclick="siDrwClose()"></div>
-<div class="si-drw" id="si-drw">
-  <div class="si-drw-top">
-    <button class="si-drw-close" onclick="siDrwClose()">✕</button>
-    <div class="si-drw-label" id="si-drw-label"></div>
+<!-- Overlay + Drawer -->
+<div class="vf-overlay" id="vf-ov" onclick="vfClose()"></div>
+<div class="vf-drawer" id="vf-dr">
+  <div class="vf-drw-top">
+    <button class="vf-drw-close" onclick="vfClose()">✕</button>
+    <div class="vf-drw-title" id="vf-title"></div>
   </div>
-  <div class="si-drw-body" id="si-drw-body"></div>
+  <div class="vf-drw-body" id="vf-body"></div>
 </div>
 
 <script>
 (function(){
 'use strict';
 
-/* ── Stored data (populated after GPT response) ────────────────────────── */
-window._ID = {pip:[], acts:[], out:[]};
+/* ── Stored data ────────────────────────────────────────────────────────── */
+window._VD = {pip:[], acts:[], out:[], pri:[], ins:null};
+var _auto = false;
 
-/* ── Helpers ───────────────────────────────────────────────────────────── */
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
-var AVC=['#4338ca','#0e7490','#059669','#7c3aed','#b45309','#0284c7','#dc2626','#4338ca'];
-
-/* ── Drawer open/close ─────────────────────────────────────────────────── */
-window.siDrwClose = function(){
-  document.getElementById('si-drw').classList.remove('show');
-  document.getElementById('si-ov2').classList.remove('show');
-  document.querySelectorAll('.si-co-card.active,.si-email-card.active,.si-tl-item.active')
-    .forEach(function(el){el.classList.remove('active');});
+/* ── Drawer ─────────────────────────────────────────────────────────────── */
+window.vfClose = function(){
+  document.getElementById('vf-dr').classList.remove('on');
+  document.getElementById('vf-ov').classList.remove('on');
+  document.querySelectorAll('.si-pico.active,.si-aco.active,.si-oco.active').forEach(function(e){e.classList.remove('active');});
 };
-function siDrwOpen(title, html){
-  document.getElementById('si-drw-label').textContent = title;
-  document.getElementById('si-drw-body').innerHTML = html;
-  document.getElementById('si-drw').classList.add('show');
-  document.getElementById('si-ov2').classList.add('show');
-  document.getElementById('si-drw-body').scrollTop = 0;
-  /* Trigger score bar animation */
+window.vfOpen = function(title, html){
+  document.getElementById('vf-title').textContent = title;
+  document.getElementById('vf-body').innerHTML = html;
+  document.getElementById('vf-dr').classList.add('on');
+  document.getElementById('vf-ov').classList.add('on');
+  document.getElementById('vf-body').scrollTop = 0;
   setTimeout(function(){
-    document.querySelectorAll('.si-score-rfill[data-w]').forEach(function(el){
-      el.style.width = el.getAttribute('data-w') + '%';
+    document.querySelectorAll('[data-bar-w]').forEach(function(el){
+      el.style.width = el.getAttribute('data-bar-w') + '%';
     });
   }, 80);
-}
+};
+document.addEventListener('keydown',function(e){if(e.key==='Escape')vfClose();});
 
-/* ── SVG ring for drawer ───────────────────────────────────────────────── */
-function drwRing(sc, color){
-  var r=40, c2=2*Math.PI*r, off=c2*(1-sc/100);
-  return '<svg class="si-score-ring-lg" width="100" height="100" viewBox="0 0 100 100">'
-    +'<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="#1e293b" stroke-width="8"/>'
-    +'<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="8"'
-    +' stroke-linecap="round" stroke-dasharray="'+c2+'" stroke-dashoffset="'+c2+'"'
-    +' transform="rotate(-90 50 50)">'
-    +'<animate attributeName="stroke-dashoffset" from="'+c2+'" to="'+off+'" dur="1s" fill="freeze"/>'
-    +'</circle>'
-    +'<text x="50" y="54" text-anchor="middle" fill="'+color+'" font-size="20" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
-    +'<text x="50" y="68" text-anchor="middle" fill="#334155" font-size="9" font-family="Inter,sans-serif">/100</text>'
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
+var AVC=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46'];
+function svcC(s){return {SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'}[s]||'#64748b';}
+
+/* ── Ring SVG ────────────────────────────────────────────────────────────── */
+function ring(sc,color,size){
+  size=size||60;var r=(size/2)-7,c2=2*Math.PI*r,off=c2*(1-sc/100);var fs=Math.round(size*0.28);
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="6"/>'
+    +'<circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"'
+    +' stroke-dasharray="'+c2+'" stroke-dashoffset="'+c2+'" transform="rotate(-90 '+(size/2)+' '+(size/2)+')">'
+    +'<animate attributeName="stroke-dashoffset" from="'+c2+'" to="'+off+'" dur="1s" fill="freeze"/></circle>'
+    +'<text x="'+(size/2)+'" y="'+(size/2+fs*.38)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
     +'</svg>';
 }
 
-/* ── Pipeline drawer ───────────────────────────────────────────────────── */
-function showPipeline(d, avColor){
-  var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
-  var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-  var lbl=sc>=80?'<span style="color:#f87171">🔥 Critical Intent</span>':sc>=60?'<span style="color:#fbbf24">⚡ High Intent</span>':'<span style="color:#818cf8">👀 Watching</span>';
-
-  var sigs=(d.signals||[]).map(function(s,i){
-    var raw=d._rawSignals&&d._rawSignals[i];
-    var sev=(raw&&raw.severity)||'';
-    var cls='si-sev-pip-'+(sev||'L').charAt(0);
-    return '<div class="si-sig-pill"><span class="si-sig-ptype">'+esc(s)+'</span>'
-      +(sev?'<span class="'+cls+'">'+esc(sev)+'</span>':'')
-      +(raw&&raw.signal_date?'<span style="font-size:10px;color:#1e293b">'+esc(raw.signal_date)+'</span>':'')
-    +'</div>';
-  }).join('');
-
-  var svcs=(d.service_fit||[]).map(function(s){return '<span class="si-chip-grn">'+esc(s)+'</span>';}).join('');
-
-  var html=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-      +'<div style="width:48px;height:48px;border-radius:12px;background:'+avColor+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.name))+'</div>'
-      +'<div>'
-        +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(d.name)+'</div>'
-        +(d.domain?'<div style="font-size:11px;color:#334155;margin-top:2px">'+esc(d.domain)+'</div>':'')
-      +'</div>'
-    +'</div>'
-
-    +'<div class="si-score-blk">'
-      +drwRing(sc,rc)
-      +'<div class="si-score-rinfo">'
-        +'<div class="si-score-rlbl">'+lbl+'</div>'
-        +'<div class="si-score-rbar"><div class="si-score-rfill" style="width:0;background:'+rc+'" data-w="'+sc+'"></div></div>'
-        +'<div class="si-score-rwhy">'+esc(d.why_now||'')+'</div>'
-      +'</div>'
-    +'</div>'
-
-    +(sigs?'<div class="si-ds"><div class="si-ds-lbl">Detected Signals</div><div class="si-sig-pills">'+sigs+'</div></div>':'')
-    +(svcs?'<div class="si-ds"><div class="si-ds-lbl">Service Fit</div><div class="si-chip-row">'+svcs+'</div></div>':'')
-
-    +(d.opportunity?
-      '<div class="si-ds"><div class="si-ds-lbl">Revenue Opportunity</div>'
-        +'<div class="si-rev-big">'+esc(d.opportunity)+'</div>'
-      +'</div>':'')
-
-    +'<div class="si-ds"><div class="si-ds-lbl">Recommended Action</div>'
-      +'<div class="si-next-box">'+esc(d.next_step||'')+'</div>'
-    +'</div>'
-
-    +'<div class="si-drw-btns">'
-      +'<button class="si-btn prim" onclick="siGotoCo(\''+esc(d.name)+'\')">Find in Companies →</button>'
-      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.next_step||'')+'\')">Copy Action</button>'
-    +'</div>';
-
-  siDrwOpen(d.name, html);
+/* ── Gauge SVG (semi-circle) ─────────────────────────────────────────────── */
+function gauge(pct, label, value, color){
+  var r=50,cx=70,cy=70,sw=10;
+  var arc=Math.PI*r*pct;
+  var x2=cx+r*Math.cos(Math.PI*(1+pct)),y2=cy+r*Math.sin(Math.PI*(1+pct));
+  return '<svg width="140" height="80" viewBox="0 0 140 80">'
+    +'<path d="M20,70 A50,50 0 0,1 120,70" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="'+sw+'" stroke-linecap="round"/>'
+    +'<path d="M20,70 A50,50 0 0,'+(pct>.5?'1':'0')+' '+x2.toFixed(1)+','+y2.toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="'+sw+'" stroke-linecap="round">'
+    +'<animate attributeName="stroke-dasharray" from="0 157" to="'+(pct*157).toFixed(0)+' 157" dur=".9s" fill="freeze"/></path>'
+    +'<text x="70" y="62" text-anchor="middle" fill="'+color+'" font-size="18" font-weight="800" font-family="Inter,sans-serif">'+esc(value)+'</text>'
+    +'<text x="70" y="76" text-anchor="middle" fill="#334155" font-size="8" font-family="Inter,sans-serif">'+esc(label)+'</text>'
+    +'</svg>';
 }
 
-/* ── Actions drawer ────────────────────────────────────────────────────── */
-function showAction(d){
-  var hi=d.urgency==='HIGH';
-  var html=
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
-      +'<span class="si-urg-badge-'+(hi?'H':'M')+'">'+esc(d.urgency||'MEDIUM')+'</span>'
-      +(d.deadline?'<span style="font-size:11px;color:#334155">⏱ '+esc(d.deadline)+'</span>':'')
-      +(d.type?'<span style="font-size:11px;color:#475569">'+esc(d.type)+'</span>':'')
-    +'</div>'
-
-    +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:18px;letter-spacing:-.02em">'+esc(d.action||'')+'</div>'
-
-    +(d.company&&d.company!=='All'?
-      '<div class="si-ds"><div class="si-ds-lbl">Company</div>'
-        +'<div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(d.company)+'</div>'
-      +'</div>':'')
-
-    +'<div class="si-ds"><div class="si-ds-lbl">Why This Matters</div>'
-      +'<div class="si-ds-val">'+esc(d.reason||'')+'</div>'
-    +'</div>'
-
-    +(d.revenue_impact?
-      '<div class="si-ds"><div class="si-ds-lbl">Revenue Impact</div>'
-        +'<div class="si-rev-big">'+esc(d.revenue_impact)+'</div>'
-      +'</div>':'')
-
-    +'<div class="si-drw-btns">'
-      +(d.company&&d.company!=='All'?'<button class="si-btn prim" onclick="siGotoCo(\''+esc(d.company)+'\')">Find Company →</button>':'')
-      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.action||'')+'\')">Copy Action</button>'
-      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.reason||'')+'\')">Copy Reason</button>'
-    +'</div>';
-
-  siDrwOpen('Action #'+(d.rank||''), html);
+/* ── Donut SVG ───────────────────────────────────────────────────────────── */
+function donut(slices){
+  var total=slices.reduce(function(a,b){return a+b.v;},0)||1;
+  var r=30,cx=40,cy=40,sw=12,gap=2;
+  var offset=0,paths='';
+  slices.forEach(function(s){
+    var pct=s.v/total,arc=2*Math.PI*r*pct-gap/r;
+    var x1=cx+r*Math.cos(2*Math.PI*offset-Math.PI/2);
+    var y1=cy+r*Math.sin(2*Math.PI*offset-Math.PI/2);
+    var x2=cx+r*Math.cos(2*Math.PI*(offset+pct)-Math.PI/2);
+    var y2=cy+r*Math.sin(2*Math.PI*(offset+pct)-Math.PI/2);
+    var lg=pct>.5?1:0;
+    var da=2*Math.PI*r;
+    paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.c+'" stroke-width="'+sw+'"'
+      +' stroke-dasharray="'+(arc).toFixed(2)+' '+(da-arc).toFixed(2)+'"'
+      +' stroke-dashoffset="'+(-2*Math.PI*r*offset+Math.PI*r/2).toFixed(2)+'">'
+    +'<animate attributeName="stroke-dasharray" from="0 '+da.toFixed(2)+'" to="'+(arc).toFixed(2)+' '+(da-arc).toFixed(2)+'" dur=".8s" fill="freeze"/>'
+    +'</circle>';
+    offset+=pct;
+  });
+  return '<svg width="80" height="80" viewBox="0 0 80 80">'+paths+'</svg>';
 }
 
-/* ── Outreach drawer ───────────────────────────────────────────────────── */
-function showOutreach(d){
-  var tpsHtml=(d.talking_points||[]).map(function(tp){return '<li>'+esc(tp)+'</li>';}).join('');
-  var full='Subject: '+(d.subject||'')+'\n\n'+(d.opening||'')+'\n\n'+(d.talking_points||[]).join('\n')+(d.cta?'\n\n→ '+d.cta:'');
-  var fid='fe_'+Math.random().toString(36).substr(2,7);
-
-  var html=
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-      +'<div style="width:40px;height:40px;border-radius:10px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.company))+'</div>'
-      +'<div>'
-        +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em">'+esc(d.company||'')+'</div>'
-        +(d.domain?'<div style="font-size:11px;color:#334155">'+esc(d.domain)+'</div>':'')
-      +'</div>'
-      +((d.timing)?'<span style="margin-left:auto;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:'+(d.timing==='now'?'rgba(220,38,38,.1)':'rgba(217,119,6,.08)')+';color:'+(d.timing==='now'?'#f87171':'#fcd34d')+'">'+d.timing.toUpperCase()+'</span>':'')
-    +'</div>'
-
-    +(d.signal_hook?
-      '<div style="font-size:12px;color:#475569;padding:8px 12px;border-left:2px solid #312e81;background:rgba(49,46,129,.06);margin-bottom:16px;line-height:1.6;font-style:italic">'+esc(d.signal_hook)+'</div>'
-      :'')
-
-    +'<div class="si-ep" style="margin-bottom:16px">'
-      +'<div class="si-ep-chrome">'
-        +'<div class="si-ep-dot" style="background:#7f1d1d"></div>'
-        +'<div class="si-ep-dot" style="background:#78350f"></div>'
-        +'<div class="si-ep-dot" style="background:#14532d"></div>'
-        +'<span style="flex:1;text-align:center;font-size:11px;color:#334155">Email Preview</span>'
-      +'</div>'
-      +'<div class="si-ep-body">'
-        +(d.subject?'<div class="si-ep-subject">'+esc(d.subject)+'</div>':'')
-        +(d.opening?'<p class="si-ep-para">'+esc(d.opening)+'</p>':'')
-        +(tpsHtml?'<ul class="si-ep-ul">'+tpsHtml+'</ul>':'')
-        +(d.cta?'<p class="si-ep-cta">→ '+esc(d.cta)+'</p>':'')
-      +'</div>'
-    +'</div>'
-
-    +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
-
-    +'<div class="si-drw-btns">'
-      +'<button class="si-btn prim" onclick="siCpId(this,\''+fid+'\')">Copy Full Email</button>'
-      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.subject||'')+'\')">Copy Subject</button>'
-      +'<button class="si-btn" onclick="siCp(this,\''+esc(d.opening||'')+'\')">Copy Opening</button>'
-    +'</div>';
-
-  siDrwOpen('Outreach → '+d.company, html);
+/* ── Counter animation ───────────────────────────────────────────────────── */
+function countUp(el,to){
+  if(!el||!to)return;
+  var n=parseFloat(String(to).replace(/[^0-9.]/g,''))||0;
+  var dur=800,t0=null;
+  (function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);})(performance.now());
+  requestAnimationFrame(function(ts){t0=ts;});
 }
 
-/* ── Button helpers ────────────────────────────────────────────────────── */
-window.siCp = function(btn, text){
-  navigator.clipboard&&navigator.clipboard.writeText(text).then(function(){
-    var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
-    setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
-  });
-};
-window.siCpId = function(btn, id){
-  var el=document.getElementById(id);
-  if(el) window.siCp(btn, el.value||el.textContent);
-};
-window.siGotoCo = function(name){
-  siDrwClose();
-  var s=document.getElementById('nav-search');
-  if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
-  var cb=document.getElementById('nav-companies');if(cb)cb.click();
-};
-
-/* ── Attach click handlers to cards ────────────────────────────────────── */
-function attachCards(){
-  /* Pipeline */
-  var pipCards = document.querySelectorAll('#si-pip .si-co-card:not([data-si-idx])');
-  pipCards.forEach(function(card, i){
-    var d = window._ID.pip[i];
-    if(!d) return;
-    card.setAttribute('data-si-idx', i);
-    var hint = document.createElement('span');
-    hint.className = 'si-xhint'; hint.textContent = 'View details →';
-    card.appendChild(hint);
-    card.onclick = function(e){
-      if(e.target.closest('a,button,input')) return;
-      document.querySelectorAll('.si-co-card.active').forEach(function(el){el.classList.remove('active');});
-      card.classList.add('active');
-      showPipeline(d, AVC[i % AVC.length]);
-    };
-  });
-
-  /* Actions */
-  var actItems = document.querySelectorAll('#si-acts .si-tl-item:not([data-si-idx])');
-  actItems.forEach(function(item, i){
-    var d = window._ID.acts[i];
-    if(!d) return;
-    item.setAttribute('data-si-idx', i);
-    var hint = document.createElement('span');
-    hint.className = 'si-xhint'; hint.textContent = 'View context →';
-    item.appendChild(hint);
-    item.onclick = function(e){
-      if(e.target.closest('a,button,input')) return;
-      document.querySelectorAll('.si-tl-item.active').forEach(function(el){el.classList.remove('active');});
-      item.classList.add('active');
-      showAction(d);
-    };
-  });
-
-  /* Outreach */
-  var outCards = document.querySelectorAll('#si-out .si-email-card:not([data-si-idx])');
-  outCards.forEach(function(card, i){
-    var d = window._ID.out[i];
-    if(!d) return;
-    card.setAttribute('data-si-idx', i);
-    var hint = document.createElement('span');
-    hint.className = 'si-xhint'; hint.textContent = 'View full email →';
-    card.appendChild(hint);
-    card.onclick = function(e){
-      if(e.target.closest('a,button,input')) return;
-      document.querySelectorAll('.si-email-card.active').forEach(function(el){el.classList.remove('active');});
-      card.classList.add('active');
-      showOutreach(d);
-    };
-  });
-}
-
-/* ── Intercept siGenerate to capture response data ─────────────────────── */
-(function waitForGenerate(){
-  if(typeof window.siGenerate !== 'function'){
-    setTimeout(waitForGenerate, 100); return;
-  }
-  var _orig = window.siGenerate;
-  window.siGenerate = function(){
-    /* Wrap fetch to capture the response */
-    var _origFetch = window.fetch;
-    window.fetch = function(url, opts){
-      var p = _origFetch.apply(this, arguments);
-      if(typeof url === 'string' && url.indexOf('/api/insights/') > -1){
-        return p.then(function(resp){
-          resp.clone().json().then(function(data){
-            var ins = data && data.insights;
-            if(!ins) return;
-            window._ID.pip  = (ins.pipeline || []).slice(0, 9);
-            window._ID.acts = ins.actions  || [];
-            window._ID.out  = ins.outreach || [];
-            /* Attach handlers after DOM renders */
-            [400,700,1200].forEach(function(delay){
-              setTimeout(attachCards, delay);
-            });
-          }).catch(function(){});
-          return resp;
-        });
-      }
-      return p;
-    };
-    _orig();
-    setTimeout(function(){ window.fetch = _origFetch; }, 15000);
-  };
-
-  /* Also patch siTab to re-attach after switching tabs */
-  if(typeof window.siTab === 'function'){
-    var _origTab = window.siTab;
-    window.siTab = function(btn){
-      _origTab(btn);
-      setTimeout(attachCards, 150);
-    };
-  }
+/* ── Auto-generate hook ──────────────────────────────────────────────────── */
+(function hookOpen(){
+  if(typeof window.insOnTabOpen!=='function'){setTimeout(hookOpen,100);return;}
+  var _o=window.insOnTabOpen;
+  window.insOnTabOpen=function(){_o();if(!_auto){_auto=true;_showAuto();setTimeout(function(){if(typeof window.siGenerate==='function')window.siGenerate();},300);}};
 })();
 
-/* Escape key */
-document.addEventListener('keydown', function(e){
-  if(e.key === 'Escape') siDrwClose();
-});
-})();
-</script>
-
-<!-- ═══ LEADERSHIP INSIGHTS PATCH ════════════════════════════════════════════ -->
-<style>
-/* ── Auto-generate state ────────────────────────────────────────────────────*/
-.si-auto-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:420px;gap:18px;text-align:center}
-.si-auto-orb{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#4338ca,#7c3aed);
-  display:flex;align-items:center;justify-content:center;
-  animation:si-aorb 1.6s ease-in-out infinite}
-@keyframes si-aorb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5),0 0 24px rgba(67,56,202,.4)}
-  50%{box-shadow:0 0 0 10px rgba(67,56,202,0),0 0 48px rgba(67,56,202,.7)}}
-.si-auto-title{font-size:15px;font-weight:600;color:#e2e8f0;letter-spacing:-.02em}
-.si-auto-sub{font-size:12px;color:#334155;max-width:320px;line-height:1.65}
-.si-auto-dots{display:flex;gap:5px;align-items:center}
-.si-auto-dots span{width:5px;height:5px;border-radius:50%;background:#4338ca;
-  animation:si-dot 1.2s ease-in-out infinite}
-.si-auto-dots span:nth-child(2){animation-delay:.2s}
-.si-auto-dots span:nth-child(3){animation-delay:.4s}
-@keyframes si-dot{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
-
-/* ── AI badge ────────────────────────────────────────────────────────────────*/
-.si-ai-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;
-  padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.12);color:#818cf8;
-  border:1px solid rgba(67,56,202,.22);letter-spacing:.04em;flex-shrink:0}
-
-/* ── Executive brief card ────────────────────────────────────────────────────*/
-.si-exec-card{
-  position:relative;overflow:hidden;border-radius:14px;padding:22px 24px;
-  margin-bottom:18px;animation:si-up .35s ease both;
-  background:linear-gradient(135deg,rgba(67,56,202,.18) 0%,rgba(124,58,237,.12) 50%,rgba(29,78,216,.08) 100%);
-}
-.si-exec-card::before{
-  content:'';position:absolute;inset:0;border-radius:14px;padding:1px;
-  background:linear-gradient(135deg,rgba(99,102,241,.5),rgba(139,92,246,.25),rgba(59,130,246,.2));
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
-}
-.si-exec-card::after{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;
-  border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.14) 0%,transparent 65%);pointer-events:none}
-.si-exec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.si-exec-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
-.si-exec-text{font-size:15px;line-height:1.8;color:#e2e8f0;margin-bottom:14px;font-weight:400;letter-spacing:-.01em}
-.si-exec-chips{display:flex;gap:7px;flex-wrap:wrap}
-.si-exec-chip{font-size:11px;padding:4px 12px;border-radius:7px;font-weight:500;
-  background:#0f172a;border:1px solid #1e293b;color:#64748b;display:flex;align-items:center;gap:5px}
-.si-exec-chip.acc{border-color:rgba(99,102,241,.3);color:#818cf8;background:rgba(67,56,202,.08)}
-.si-exec-chip.gold{border-color:rgba(251,191,36,.25);color:#fbbf24;background:rgba(251,191,36,.06)}
-.si-exec-chip.grn{border-color:rgba(5,150,105,.2);color:#34d399;background:rgba(5,150,105,.06)}
-
-/* ── Section header with AI badge ───────────────────────────────────────────*/
-.si-sec-row{display:flex;align-items:center;gap:8px;margin:20px 0 10px}
-.si-sec-title{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em}
-.si-sec-line{flex:1;height:1px;background:#1e293b}
-
-/* ── Priority calls grid ─────────────────────────────────────────────────────*/
-.si-priority-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
-@media(max-width:1100px){.si-priority-grid{grid-template-columns:repeat(2,1fr)}}
-.si-pcard{
-  background:#0f172a;border:1px solid #1e293b;border-radius:12px;
-  padding:14px 15px;display:flex;flex-direction:column;gap:10px;
-  transition:border-color .2s,transform .2s,box-shadow .2s;
-  animation:si-up .35s ease both;cursor:pointer;position:relative;overflow:hidden
-}
-.si-pcard:hover{border-color:#334155;transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
-.si-pcard.rank-1{border-color:rgba(239,68,68,.25)}
-.si-pcard.rank-1:hover{border-color:rgba(239,68,68,.5);box-shadow:0 8px 28px rgba(239,68,68,.1)}
-.si-pcard.rank-2,.si-pcard.rank-3{border-color:rgba(245,158,11,.15)}
-.si-pcard-hdr{display:flex;align-items:center;gap:9px}
-.si-pcard-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
-.si-pcard-rank{position:absolute;top:10px;right:12px;font-size:9px;font-weight:800;
-  color:#1e293b;letter-spacing:.04em}
-.si-pcard-name{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.si-pcard-domain{font-size:10px;color:#334155}
-.si-pcard-signal{font-size:11px;color:#64748b;line-height:1.5;
-  padding:7px 9px;background:#0a0e1a;border-radius:7px;border-left:2px solid #312e81}
-.si-pcard-pitch{font-size:12px;font-weight:600;color:#a5b4fc;line-height:1.5}
-.si-pcard-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
-.si-pcard-svc{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;
-  background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.si-pcard-val{font-size:11px;font-weight:700;color:#fbbf24}
-.si-pcard-timing{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px}
-.si-pcard-timing.now{background:rgba(239,68,68,.1);color:#f87171}
-.si-pcard-timing.week{background:rgba(245,158,11,.08);color:#fcd34d}
-.si-pcard-timing.email{background:#1e293b;color:#475569}
-
-/* ── Market pulse + Strategic moves ─────────────────────────────────────────*/
-.si-pulse-list{display:flex;flex-direction:column;gap:7px}
-.si-pulse-item{display:flex;gap:10px;align-items:flex-start;
-  background:#0f172a;border:1px solid #1e293b;border-radius:9px;
-  padding:10px 12px;transition:border-color .2s;animation:si-up .35s ease both}
-.si-pulse-item:hover{border-color:#334155}
-.si-pulse-dot{width:6px;height:6px;border-radius:50%;background:#6366f1;flex-shrink:0;margin-top:5px}
-.si-pulse-text{font-size:12px;color:#94a3b8;line-height:1.6}
-
-.si-moves-list{display:flex;flex-direction:column;gap:7px}
-.si-move-card{background:#0f172a;border:1px solid #1e293b;border-radius:9px;
-  padding:11px 13px;transition:border-color .2s;animation:si-up .35s ease both}
-.si-move-card:hover{border-color:#334155}
-.si-move-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}
-.si-move-title{font-size:12px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;line-height:1.3}
-.si-move-owner{font-size:9px;font-weight:700;padding:2px 8px;border-radius:5px;
-  background:#1e293b;color:#475569;flex-shrink:0;white-space:nowrap}
-.si-move-rationale{font-size:11px;color:#475569;line-height:1.5;margin-bottom:6px}
-.si-move-impact{font-size:11px;font-weight:700;color:#34d399}
-
-/* ── Pipeline estimate banner ────────────────────────────────────────────────*/
-.si-pe-banner{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
-  background:#0f172a;border:1px solid #1e293b;border-radius:12px;
-  padding:16px 20px;margin-bottom:18px;animation:si-up .35s ease both
-}
-.si-pe-item{text-align:center}
-.si-pe-val{font-size:20px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:4px}
-.si-pe-lbl{font-size:10px;color:#334155;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
-
-/* ── Pipeline card improvements ──────────────────────────────────────────────*/
-.si-co-card{transition:border-color .2s,transform .2s,box-shadow .2s!important}
-.si-co-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;
-  box-shadow:0 10px 32px rgba(0,0,0,.4)!important}
-.si-co-card.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca,0 8px 24px rgba(67,56,202,.2)!important}
-
-/* ── Action item improvements ────────────────────────────────────────────────*/
-.si-tl-item{transition:transform .15s!important}
-.si-tl-item:hover{transform:translateX(2px)!important}
-.si-tl-item.active .si-tl-card{border-color:#4338ca!important}
-
-/* ── Outreach card improvements ──────────────────────────────────────────────*/
-.si-email-card{transition:border-color .2s,transform .2s,box-shadow .2s!important}
-.si-email-card:hover{border-color:#334155!important;transform:translateY(-2px)!important;
-  box-shadow:0 10px 32px rgba(0,0,0,.4)!important}
-.si-email-card.active{border-color:#4338ca!important}
-
-/* ── KPI card improvements ───────────────────────────────────────────────────*/
-.si-kpi{background:linear-gradient(135deg,#0f172a,#111827)!important;
-  border-color:#1e293b!important;transition:border-color .2s,transform .2s!important}
-.si-kpi:hover{border-color:#334155!important;transform:translateY(-1px)!important}
-.si-kpi-val{background:linear-gradient(135deg,#f1f5f9,#94a3b8);-webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;background-clip:text}
-
-/* Regenerate button (smaller, after first run) */
-.si-regen-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;
-  border:1px solid #1e293b;border-radius:7px;color:#475569;cursor:pointer;
-  font-family:inherit;font-size:11px;font-weight:500;padding:6px 12px;transition:all .15s}
-.si-regen-btn:hover{border-color:#334155;color:#94a3b8}
-</style>
-
-<script>
-(function(){
-'use strict';
-
-var _autoTriggered = false;
-
-/* ── Override insOnTabOpen to auto-generate ─────────────────────────────── */
-(function waitForInsOnTabOpen(){
-  if(typeof window.insOnTabOpen !== 'function'){
-    setTimeout(waitForInsOnTabOpen, 80); return;
-  }
-  var _origOpen = window.insOnTabOpen;
-  window.insOnTabOpen = function(){
-    _origOpen(); // load meta
-    if(!_autoTriggered){
-      _autoTriggered = true;
-      // Show immediate "analysing" state, then auto-generate
-      _showAutoLoader();
-      setTimeout(function(){
-        if(typeof window.siGenerate === 'function') window.siGenerate();
-      }, 400);
-    }
-  };
-})();
-
-function _showAutoLoader(){
-  var empty = document.getElementById('si-empty');
-  var load  = document.getElementById('si-loading');
-  if(empty) empty.style.display = 'none';
-  if(load)  load.style.display  = 'none';
-
-  var ov = document.getElementById('si-ov');
-  if(ov) ov.style.display = 'none';
-
-  // Create or reuse auto-loader
-  var existing = document.getElementById('si-auto-loader');
-  if(existing){ existing.style.display='flex'; return; }
-
-  var el = document.createElement('div');
-  el.id = 'si-auto-loader';
-  el.className = 'si-auto-loading';
-  el.innerHTML =
-    '<div class="si-auto-orb">'
-      +'<svg width="28" height="28" fill="none" viewBox="0 0 24 24">'
-        +'<ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">'
-          +'<animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/>'
-        +'</ellipse>'
-        +'<ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">'
-          +'<animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/>'
-        +'</ellipse>'
-        +'<circle cx="12" cy="12" r="2" fill="white"/>'
-      +'</svg>'
-    +'</div>'
-    +'<div class="si-auto-title">Analysing signals with GPT…</div>'
-    +'<div class="si-auto-sub">Reading '
-      +(window._ID&&window._ID._statText||'signals across all companies')
-      +' and generating leadership insights.</div>'
+function _showAuto(){
+  var empty=document.getElementById('si-empty'),load=document.getElementById('si-loading'),ov=document.getElementById('si-ov');
+  if(empty)empty.style.display='none';if(load)load.style.display='none';if(ov)ov.style.display='none';
+  var ex=document.getElementById('vf-auto-ld');if(ex){ex.style.display='flex';return;}
+  var d=document.createElement('div');d.id='vf-auto-ld';d.className='si-auto-loading';
+  d.innerHTML='<div class="si-auto-orb"><svg width="26" height="26" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>'
+    +'<div class="si-auto-label">Analysing signals with GPT…</div>'
+    +'<div class="si-auto-sub">Generating leadership insights, pipeline priorities, and outreach.</div>'
     +'<div class="si-auto-dots"><span></span><span></span><span></span></div>';
-
-  var panel = document.getElementById('si-p-overview');
-  if(panel) panel.insertBefore(el, panel.firstChild);
+  var p=document.getElementById('si-p-overview');if(p)p.insertBefore(d,p.firstChild);
 }
 
-/* ── Override _ov (overview renderer) to show leadership layout ─────────── */
-(function waitForSiGenerate(){
-  if(typeof window.siGenerate !== 'function'){
-    setTimeout(waitForSiGenerate, 100); return;
-  }
-
-  var _origGen = window.siGenerate;
-  window.siGenerate = function(){
-    // Hide auto-loader and show loading
-    var al = document.getElementById('si-auto-loader');
-    if(al) al.style.display = 'none';
-
-    // Intercept fetch to capture data
-    var _origFetch = window.fetch;
-    window.fetch = function(url, opts){
-      var p = _origFetch.apply(this, arguments);
-      if(typeof url === 'string' && url.indexOf('/api/insights/') > -1){
-        return p.then(function(resp){
-          resp.clone().json().then(function(data){
-            if(data && data.insights){
-              window._ID = window._ID || {};
-              window._ID.pip  = (data.insights.pipeline  || []).slice(0,9);
-              window._ID.acts =  data.insights.actions   || [];
-              window._ID.out  =  data.insights.outreach  || [];
+/* ── Hook siGenerate to capture data + render compact cards ─────────────── */
+(function hookGen(){
+  if(typeof window.siGenerate!=='function'){setTimeout(hookGen,120);return;}
+  var _og=window.siGenerate;
+  window.siGenerate=function(){
+    var d=document.getElementById('vf-auto-ld');if(d)d.style.display='none';
+    var _of=window.fetch;
+    window.fetch=function(url,opts){
+      var p=_of.apply(this,arguments);
+      if(typeof url==='string'&&url.indexOf('/api/insights/')>-1){
+        return p.then(function(r){
+          r.clone().json().then(function(data){
+            if(data&&data.insights){
+              var ins=data.insights;
+              window._VD.pip =(ins.pipeline||[]).slice(0,9);
+              window._VD.acts= ins.actions||[];
+              window._VD.out = ins.outreach||[];
+              window._VD.pri = ins.week_priority||[];
+              window._VD.ins = ins;
+              window._VD.meta= {sigs:data.signals_analyzed,cos:data.companies_analyzed};
               setTimeout(function(){
-                _renderLeadershipOv(data);
-                _attachCards();
-              }, 500);
+                _renderOv(data);
+                _renderPip(ins.pipeline||[]);
+                _renderActs(ins.actions||[]);
+                _renderOut(ins.outreach||[]);
+              },400);
             }
           }).catch(function(){});
-          return resp;
+          return r;
         });
       }
       return p;
     };
-
-    _origGen();
-    setTimeout(function(){ window.fetch = _origFetch; }, 20000);
+    _og();
+    setTimeout(function(){window.fetch=_of;},20000);
   };
+  /* Patch siTab */
+  if(typeof window.siTab==='function'){
+    var _ot=window.siTab;
+    window.siTab=function(btn){_ot(btn);};
+  }
 })();
 
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function ini(n){ return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase(); }
-var AVC=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46'];
+/* ── RENDER OVERVIEW (leadership compact) ────────────────────────────────── */
+function _renderOv(data){
+  var ins=data.insights||{},pe=ins.pipeline_estimate||{},wp=ins.week_priority||[];
+  var al=document.getElementById('vf-auto-ld');if(al)al.style.display='none';
+  var ld=document.getElementById('si-loading');if(ld)ld.style.display='none';
+  var ov=document.getElementById('si-ov');if(!ov)return;
+  var vel=(ins.meta&&ins.meta.signal_velocity_trend)||'stable';
+  var vc=vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
+  var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
+  var kp=ins.kpis||{};
 
-function svcColor(svc){
-  var map={SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'};
-  return map[svc]||'#64748b';
-}
-function timingClass(t){
-  if(!t)return 'email';
-  t=t.toLowerCase();
-  if(t.includes('today'))return 'now';
-  if(t.includes('week'))return 'week';
-  return 'email';
-}
-
-function _renderLeadershipOv(data){
-  var ins = data.insights || {};
-
-  /* Hide generic overview, render leadership view */
-  var ov = document.getElementById('si-ov');
-  var al = document.getElementById('si-auto-loader');
-  if(al) al.style.display = 'none';
-  if(!ov) return;
-
-  var pe = ins.pipeline_estimate || {};
-  var wp = ins.week_priority || [];
-  var mp = ins.market_pulse  || [];
-  var sm = ins.strategic_moves || [];
-  var vel = (ins.meta && ins.meta.signal_velocity_trend) || 'stable';
-  var velC = vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
-
-  ov.innerHTML =
-    /* ── Executive Brief ── */
-    '<div class="si-exec-card">'
-      +'<div class="si-exec-hdr">'
-        +'<div class="si-exec-lbl">Executive Brief</div>'
-        +'<span class="si-ai-pill">✦ GPT Analysis</span>'
-      +'</div>'
-      +'<div class="si-exec-text">'+esc(ins.brief||ins.summary||'')+'</div>'
-      +'<div class="si-exec-chips">'
-        +'<span class="si-exec-chip">📊 '+data.signals_analyzed.toLocaleString()+' signals</span>'
-        +'<span class="si-exec-chip">🏢 '+data.companies_analyzed.toLocaleString()+' companies</span>'
-        +'<span class="si-exec-chip acc" style="color:'+velC+'">'+{accelerating:'🚀 Accelerating',stable:'→ Stable',slowing:'⚠ Slowing'}[vel]+'</span>'
-        +(pe.total?'<span class="si-exec-chip gold">💰 '+esc(pe.total)+' opportunity</span>':'')
-        +(pe.win_window?'<span class="si-exec-chip grn">⏱ '+esc(pe.win_window)+'</span>':'')
-      +'</div>'
+  ov.innerHTML=
+    /* ── Metric tiles ── */
+    '<div class="si-tiles">'
+      +[
+        {ico:'💰',val:pe.total||kp.estimated_value||'—',raw:null,lbl:'Pipeline',trend:'up',g:'#fbbf24'},
+        {ico:'🔥',val:kp.high_priority||hot,raw:kp.high_priority||hot,lbl:'Hot Companies',trend:'up',g:'#ef4444'},
+        {ico:'🎯',val:kp.avg_intent?Math.round(kp.avg_intent):null,raw:kp.avg_intent?Math.round(kp.avg_intent):null,lbl:'Avg Intent',suffix:'/100',g:'#6366f1'},
+        {ico:'⚡',val:(ins.actions||[]).length,raw:(ins.actions||[]).length,lbl:'Actions',trend:'flat',g:'#f59e0b'},
+      ].map(function(k,i){
+        var v=k.raw!==null&&k.raw!==undefined?'<span id="vfkv'+i+'">0</span>'+(k.suffix||''):esc(String(k.val));
+        return '<div class="si-tile" style="animation-delay:'+(i*.06)+'s">'
+          +'<span class="si-tile-icon">'+k.ico+'</span>'
+          +'<div class="si-tile-val">'+v+'</div>'
+          +'<div class="si-tile-lbl">'+k.lbl+'</div>'
+          +'<div class="si-tile-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div>'
+        +'</div>';
+      }).join('')
     +'</div>'
 
-    /* ── Pipeline Estimate ── */
-    +(pe.total?
-      '<div class="si-pe-banner">'
-        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.total)+'</div><div class="si-pe-lbl">Total Pipeline</div></div>'
-        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.high_conviction||'—')+'</div><div class="si-pe-lbl">High Conviction</div></div>'
-        +'<div class="si-pe-item"><div class="si-pe-val">'+(pe.top_services||[]).slice(0,2).join(' · ')+'</div><div class="si-pe-lbl">Top Services</div></div>'
-        +'<div class="si-pe-item"><div class="si-pe-val">'+esc(pe.win_window||'—')+'</div><div class="si-pe-lbl">Win Window</div></div>'
-      +'</div>'
-      :'')
+    /* ── Executive brief (2-line clamp, click for full) ── */
+    +'<div class="si-brief-compact" id="vf-brief-card" onclick="vfShowBrief()">'
+      +'<div class="si-brief-hdr"><span class="si-brief-lbl">Executive Brief</span><span class="si-brief-ai">✦ GPT</span></div>'
+      +'<div class="si-brief-text">'+esc(ins.brief||ins.summary||'')+'</div>'
+      +'<span class="si-brief-expand">Read full →</span>'
+    +'</div>'
 
-    /* ── Priority Calls ── */
+    /* ── Priority calls (compact) ── */
     +(wp.length?
-      '<div class="si-sec-row"><span class="si-sec-title">Priority Calls This Week</span><span class="si-ai-pill">AI-ranked</span><span class="si-sec-line"></span></div>'
-      +'<div class="si-priority-grid">'
+      '<div class="vf-sec-row"><span class="vf-sec-row-title">Priority Calls This Week</span><span class="vf-ai-tag">AI-ranked</span><span class="vf-sec-row-line"></span></div>'
+      +'<div class="si-pri-grid">'
         +wp.slice(0,6).map(function(p,i){
           var av=AVC[i%AVC.length];
-          var tc=timingClass(p.call_timing);
-          var rankCls=i===0?'rank-1':i<=2?'rank-2 rank-3':'';
-          return '<div class="si-pcard '+rankCls+'" style="animation-delay:'+(i*.05)+'s" data-si-pw="'+i+'">'
-            +'<span class="si-pcard-rank">#'+(p.rank||i+1)+'</span>'
-            +'<div class="si-pcard-hdr">'
-              +'<div class="si-pcard-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
-              +'<div style="flex:1;min-width:0">'
-                +'<div class="si-pcard-name">'+esc(p.company||'')+'</div>'
-                +'<div class="si-pcard-domain">'+esc(p.domain||'')+'</div>'
-              +'</div>'
+          var t=(p.call_timing||'').toLowerCase();
+          var tc=t.includes('today')?'si-pc2-t-today':t.includes('week')?'si-pc2-t-week':'si-pc2-t-email';
+          var tl=t.includes('today')?'Today':t.includes('week')?'This Week':'Email First';
+          return '<div class="si-pc2'+(i===0?' r1':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="vfShowPriority('+i+')">'
+            +'<div class="si-pc2-top">'
+              +'<div class="si-pc2-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
+              +'<span class="si-pc2-name">'+esc(p.company||'')+'</span>'
+              +'<span class="si-pc2-timing '+tc+'">'+tl+'</span>'
             +'</div>'
-            +'<div class="si-pcard-signal">'+esc(p.signal||'')+'</div>'
-            +'<div class="si-pcard-pitch">'+esc(p.pitch||'')+'</div>'
-            +'<div class="si-pcard-foot">'
-              +(p.service?'<span class="si-pcard-svc" style="color:'+svcColor(p.service)+'">'+esc(p.service)+'</span>':'')
-              +(p.est_value?'<span class="si-pcard-val">'+esc(p.est_value)+'</span>':'')
-              +(p.call_timing?'<span class="si-pcard-timing '+tc+'">'+esc(p.call_timing)+'</span>':'')
+            +'<div class="si-pc2-signal">'+esc(p.signal||'')+'</div>'
+            +'<div class="si-pc2-foot">'
+              +(p.service?'<span class="si-pc2-svc" style="color:'+svcC(p.service)+'">'+esc(p.service)+'</span>':'')
+              +(p.est_value?'<span class="si-pc2-val">'+esc(p.est_value)+'</span>':'')
+              +'<span class="si-pc2-arr">→</span>'
             +'</div>'
           +'</div>';
         }).join('')
       +'</div>'
       :'')
 
-    /* ── Market Pulse + Strategic Moves ── */
-    +(mp.length||sm.length?
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">'
-        +(mp.length?
-          '<div>'
-            +'<div class="si-sec-row"><span class="si-sec-title">Market Pulse</span><span class="si-ai-pill">AI-observed</span><span class="si-sec-line"></span></div>'
-            +'<div class="si-pulse-list">'
-              +mp.slice(0,5).map(function(obs,i){
-                return '<div class="si-pulse-item" style="animation-delay:'+(i*.06)+'s">'
-                  +'<div class="si-pulse-dot"></div>'
-                  +'<div class="si-pulse-text">'+esc(obs)+'</div>'
-                +'</div>';
-              }).join('')
-            +'</div>'
-          +'</div>'
-          :'')
-        +(sm.length?
-          '<div>'
-            +'<div class="si-sec-row"><span class="si-sec-title">Strategic Moves</span><span class="si-ai-pill">AI-recommended</span><span class="si-sec-line"></span></div>'
-            +'<div class="si-moves-list">'
-              +sm.slice(0,4).map(function(m,i){
-                return '<div class="si-move-card" style="animation-delay:'+(i*.07)+'s">'
-                  +'<div class="si-move-top">'
-                    +'<div class="si-move-title">'+esc(m.move||'')+'</div>'
-                    +'<span class="si-move-owner">'+esc(m.owner||'')+'</span>'
-                  +'</div>'
-                  +'<div class="si-move-rationale">'+esc(m.rationale||'')+'</div>'
-                  +(m.impact?'<div class="si-move-impact">'+esc(m.impact)+'</div>':'')
-                +'</div>';
-              }).join('')
-            +'</div>'
-          +'</div>'
-          :'')
-      +'</div>'
-      :'')
+    /* ── Infographic row ── */
+    +'<div class="vf-sec-row" style="margin-top:18px"><span class="vf-sec-row-title">Signal Intelligence</span><span class="vf-ai-tag">Live data</span><span class="vf-sec-row-line"></span></div>'
+    +'<div class="si-infog-row" id="vf-infog-row"></div>'
 
-    /* ── Themes + Risks ── */
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px">'
-      +'<div id="si-themes-ldr"></div>'
-      +'<div id="si-risks-ldr"></div>'
-    +'</div>'
-
-    /* ── KPI row ── */
-    +'<div class="si-kpi-row" id="si-kpis" style="margin-top:20px"></div>'
-
-    /* ── Regenerate ── */
-    +'<div style="display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #1e293b">'
-      +'<span style="font-size:11px;color:#1e293b">Auto-generated from '+data.signals_analyzed+' signals</span>'
+    /* ── Regen ── */
+    +'<div class="si-regen-row"><span class="si-regen-meta">Auto-generated · '+data.signals_analyzed+' signals analysed</span>'
       +'<button class="si-regen-btn" onclick="siGenerate()">↺ Regenerate</button>'
     +'</div>';
 
-  ov.style.display = 'block';
+  ov.style.display='block';
 
-  /* Fill themes */
-  var tc = document.getElementById('si-themes-ldr');
-  if(tc && ins.themes){
-    tc.innerHTML='<div class="si-block"><div class="si-block-title">Signal Themes</div>'
-      +(ins.themes||[]).slice(0,4).map(function(t){
-        var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="si-co">'+esc(c)+'</span>';}).join('');
-        return '<div class="si-theme"><div class="si-theme-n">'+(t.count||'')+'x</div>'
-          +'<div><div class="si-theme-name">'+esc(t.theme||'')+'</div>'
-          +'<div class="si-theme-angle">'+esc(t.campaign_angle||'')+'</div>'
-          +(cos?'<div class="si-co-list">'+cos+'</div>':'')+'</div></div>';
-      }).join('')+'</div>';
-  }
+  /* Count up */
+  [{v:kp.high_priority||hot,i:1},{v:kp.avg_intent?Math.round(kp.avg_intent):null,i:2},{v:(ins.actions||[]).length,i:3}].forEach(function(k){
+    if(k.v!=null)setTimeout(function(){countUp(document.getElementById('vfkv'+k.i),k.v);},200+k.i*60);
+  });
 
-  /* Fill risks */
-  var rc = document.getElementById('si-risks-ldr');
-  if(rc){
-    var risks=ins.risks||[];
-    var h='<div class="si-block"><div class="si-block-title">Attention Flags</div>';
-    if(risks.length){
-      h+=risks.slice(0,4).map(function(r){
-        return '<div class="si-risk"><div class="si-risk-dot"></div><div>'
-          +'<div class="si-risk-co">'+esc(r.company||'')+'</div>'
-          +'<div class="si-risk-flag">'+esc(r.flag||'')+'</div>'
-          +'<div class="si-risk-impl">'+esc(r.implication||'')+'</div>'
-        +'</div></div>';
-      }).join('');
-    } else {
-      h+='<div style="font-size:12px;color:#1e293b;padding:14px 0;text-align:center">No critical flags</div>';
-    }
-    rc.innerHTML=h+'</div>';
-  }
+  /* Infographics */
+  _renderInfog(data,ins);
 
-  /* KPIs */
-  var kg = document.getElementById('si-kpis');
-  if(kg){
-    var kp=ins.kpis||{};
-    var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
-    var avg=kp.avg_intent?Math.round(kp.avg_intent):null;
-    var cards=[
-      {val:kp.high_priority||hot,raw:kp.high_priority||hot,lbl:'High-Priority',sub:'Intent ≥ 70'},
-      {val:avg?avg+' / 100':'—',raw:avg,lbl:'Avg Intent',sub:'Across pipeline'},
-      {val:(ins.actions||[]).length,raw:(ins.actions||[]).length,lbl:'Actions',sub:'This week'},
-      {val:pe.total||'—',raw:null,lbl:'Revenue',sub:'Est. opportunity'},
-    ];
-    kg.innerHTML=cards.map(function(k,i){
-      var v=k.raw!==null&&k.raw!==undefined?'<span id="si-kv'+i+'">0</span>'+(i===1?' / 100':''):esc(String(k.val));
-      return '<div class="si-kpi" style="animation-delay:'+(i*.06)+'s"><div class="si-kpi-val">'+v+'</div>'
-        +'<div class="si-kpi-label">'+esc(k.lbl)+'</div>'
-        +'<div class="si-kpi-sub">'+esc(k.sub)+'</div></div>';
-    }).join('');
-    cards.forEach(function(k,i){
-      if(k.raw!==null&&k.raw!==undefined){
-        setTimeout(function(){
-          var el=document.getElementById('si-kv'+i);
-          if(!el)return;
-          var n=k.raw,dur=900,t0=null;
-          (function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);
-            el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);})(performance.now());
-          requestAnimationFrame(function(ts){t0=ts;});
-        }, 200+i*60);
-      }
-    });
-  }
+  /* Store brief for drawer */
+  window._VD.brief = ins.brief||ins.summary||'';
+  window._VD.pe = pe;
+  window._VD.vel = vel;
+}
 
-  /* Priority cards — make clickable */
+function _renderInfog(data,ins){
+  var row=document.getElementById('vf-infog-row');if(!row)return;
+  var pe=ins.pipeline_estimate||{};
+  var kp=ins.kpis||{};
+  var pip=ins.pipeline||[];
+
+  /* Card 1: Pipeline gauge */
+  var gPct=pe.high_conviction?Math.min(.95,parseFloat(pe.high_conviction.replace(/[^0-9.]/g,''))/(parseFloat((pe.total||'1').replace(/[^0-9.]/g,''))||1)):0.6;
+  var gaugeHtml=gauge(Math.min(.95,gPct),'High Conviction',pe.high_conviction||'—','#34d399');
+
+  /* Card 2: Intent tier distribution */
+  var crit=pip.filter(function(c){return c.intent_score>=80;}).length;
+  var high=pip.filter(function(c){return c.intent_score>=60&&c.intent_score<80;}).length;
+  var watch=pip.filter(function(c){return c.intent_score<60;}).length;
+  var maxT=Math.max(crit,high,watch,1);
+  var tierHtml='<div class="si-tier-list">'
+    +[{lbl:'🔥 Critical (80+)',n:crit,c:'#ef4444'},{lbl:'⚡ High (60–79)',n:high,c:'#f59e0b'},{lbl:'👀 Watch (<60)',n:watch,c:'#6366f1'}].map(function(t){
+      return '<div class="si-tier-row">'
+        +'<div class="si-tier-dot" style="background:'+t.c+'"></div>'
+        +'<div class="si-tier-lbl">'+t.lbl+'</div>'
+        +'<div class="si-tier-bar-track"><div class="si-tier-bar-fill" style="width:0;background:'+t.c+'" data-bar-w="'+Math.round(t.n/maxT*100)+'"></div></div>'
+        +'<div class="si-tier-cnt" style="color:'+t.c+'">'+t.n+'</div>'
+      +'</div>';
+    }).join('')+'</div>';
+
+  /* Card 3: Top themes donut + labels */
+  var themes=ins.themes||[];
+  var tTotal=themes.reduce(function(a,t){return a+(t.count||0);},0)||1;
+  var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
+  var slices=themes.slice(0,4).map(function(t,i){return {v:t.count||1,c:tColors[i]};});
+  var donutHtml='<div style="display:flex;align-items:center;gap:12px">'
+    +donut(slices)
+    +'<div style="flex:1;display:flex;flex-direction:column;gap:5px">'
+    +themes.slice(0,4).map(function(t,i){
+      return '<div style="display:flex;align-items:center;gap:6px">'
+        +'<div style="width:7px;height:7px;border-radius:50%;background:'+tColors[i]+';flex-shrink:0"></div>'
+        +'<div style="font-size:10px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.theme||'')+'</div>'
+        +'<div style="font-size:10px;font-weight:700;color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div>'
+      +'</div>';
+    }).join('')
+    +'</div></div>';
+
+  row.innerHTML=[
+    {title:'Pipeline Value',body:'<div class="si-gauge-wrap">'+gaugeHtml+'<div class="si-gauge-sub">'+esc(pe.total||'—')+' total · '+esc(pe.win_window||'—')+'</div></div>'},
+    {title:'Intent Distribution',body:tierHtml},
+    {title:'Signal Themes',body:donutHtml},
+  ].map(function(c,i){
+    return '<div class="si-infog-card" style="animation-delay:'+(i*.08)+'s">'
+      +'<div class="si-infog-title">'+c.title+'</div>'+c.body+'</div>';
+  }).join('');
+
+  /* Animate tier bars */
   setTimeout(function(){
-    document.querySelectorAll('.si-pcard[data-si-pw]').forEach(function(card){
-      var idx=parseInt(card.getAttribute('data-si-pw'));
-      var pw=(ins.week_priority||[])[idx];
-      if(!pw)return;
-      card.onclick=function(){
-        if(typeof window.siDrwOpen==='function'){
-          document.querySelectorAll('.si-pcard').forEach(function(c){c.classList.remove('active');});
-          card.style.borderColor='#4338ca';
-          var html=
-            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-              +'<div style="width:40px;height:40px;border-radius:10px;background:'+AVC[idx%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff">'+esc(ini(pw.company))+'</div>'
-              +'<div><div style="font-size:15px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em">'+esc(pw.company)+'</div>'
-                +'<div style="font-size:11px;color:#334155">'+esc(pw.domain||'')+'</div></div>'
-              +(pw.call_timing?'<span style="margin-left:auto;font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(239,68,68,.1);color:#f87171">'+esc(pw.call_timing)+'</span>':'')
-            +'</div>'
-            +'<div class="si-ds"><div class="si-ds-lbl">Why This Week</div>'
-              +'<div style="font-size:13px;color:#94a3b8;line-height:1.7;background:#0f172a;border:1px solid #1e293b;border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:12px 14px">'+esc(pw.signal||'')+'</div>'
-            +'</div>'
-            +'<div class="si-ds"><div class="si-ds-lbl">What to Pitch</div>'
-              +'<div style="font-size:14px;font-weight:600;color:#a5b4fc;line-height:1.6;padding:10px 12px;background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);border-radius:8px">'+esc(pw.pitch||'')+'</div>'
-            +'</div>'
-            +(pw.est_value?'<div class="si-ds"><div class="si-ds-lbl">Est. Value</div><div style="font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em">'+esc(pw.est_value)+'</div></div>':'')
-            +'<div class="si-drw-btns">'
-              +'<button class="si-btn prim" onclick="siGotoCo(\''+esc(pw.company)+'\')">Find in Companies →</button>'
-              +'<button class="si-btn" onclick="siCp(this,\''+esc(pw.pitch||'')+'\')">Copy Pitch</button>'
-            +'</div>';
-          window.siDrwOpen('Priority #'+(pw.rank||idx+1)+' — '+pw.company, html);
-        }
-      };
-    });
-  }, 200);
+    row.querySelectorAll('[data-bar-w]').forEach(function(el){el.style.width=el.getAttribute('data-bar-w')+'%';});
+  },300);
 }
 
-/* ── Reattach interactive card handlers ─────────────────────────────────── */
-function _attachCards(){
-  /* Pipeline */
-  document.querySelectorAll('#si-pip .si-co-card:not([data-si-idx])').forEach(function(card,i){
-    var d=window._ID&&window._ID.pip&&window._ID.pip[i];
-    if(!d)return;
-    card.setAttribute('data-si-idx',i);
-    var h=document.createElement('span');h.className='si-xhint';h.textContent='View details →';
-    card.appendChild(h);
-    card.onclick=function(e){
-      if(e.target.closest('a,button,input'))return;
-      document.querySelectorAll('.si-co-card.active').forEach(function(c){c.classList.remove('active');});
-      card.classList.add('active');
-      if(typeof window.siPipClick==='function')window.siPipClick(card,d);
-      else if(typeof window.siDrwOpen==='function'){
-        var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
-        var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-        window.siDrwOpen(d.name,'<div style="font-size:13px;color:#94a3b8;margin-bottom:12px">Intent score: <strong style="color:'+rc+';font-size:18px">'+sc+'</strong>/100</div>'
-          +'<div style="font-size:13px;color:#64748b;line-height:1.7">'+esc(d.why_now||'')+'</div>'
-          +(d.next_step?'<div style="margin-top:14px;background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.2);border-radius:8px;padding:12px;font-size:13px;color:#a5b4fc">→ '+esc(d.next_step)+'</div>':''));
-      }
-    };
-  });
-  /* Actions */
-  document.querySelectorAll('#si-acts .si-tl-item:not([data-si-idx])').forEach(function(item,i){
-    var d=window._ID&&window._ID.acts&&window._ID.acts[i];
-    if(!d)return;
-    item.setAttribute('data-si-idx',i);
-    var h=document.createElement('span');h.className='si-xhint';h.textContent='View context →';
-    item.appendChild(h);
-    item.onclick=function(e){
-      if(e.target.closest('a,button,input'))return;
-      document.querySelectorAll('.si-tl-item.active').forEach(function(c){c.classList.remove('active');});
-      item.classList.add('active');
-      if(typeof window.siActClick==='function')window.siActClick(item,d);
-    };
-  });
-  /* Outreach */
-  document.querySelectorAll('#si-out .si-email-card:not([data-si-idx])').forEach(function(card,i){
-    var d=window._ID&&window._ID.out&&window._ID.out[i];
-    if(!d)return;
-    card.setAttribute('data-si-idx',i);
-    var h=document.createElement('span');h.className='si-xhint';h.textContent='View full email →';
-    card.appendChild(h);
-    card.onclick=function(e){
-      if(e.target.closest('a,button,input'))return;
-      document.querySelectorAll('.si-email-card.active').forEach(function(c){c.classList.remove('active');});
-      card.classList.add('active');
-      if(typeof window.siOutClick==='function')window.siOutClick(card,d);
-    };
-  });
+/* ── Brief drawer ────────────────────────────────────────────────────────── */
+window.vfShowBrief=function(){
+  var ins=window._VD.ins||{},pe=window._VD.pe||{};
+  var html='<div style="font-size:15px;line-height:1.8;color:#cbd5e1;margin-bottom:18px">'+esc(ins.brief||ins.summary||'')+'</div>'
+    +(pe.total?'<div class="vf-sec"><div class="vf-sec-lbl">Revenue Opportunity</div><div style="font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em">'+esc(pe.total)+'</div><div style="font-size:11px;color:#334155;margin-top:3px">'+esc(pe.win_window||'')+'</div></div>':'')
+    +(pe.top_services&&pe.top_services.length?'<div class="vf-sec"><div class="vf-sec-lbl">Top Services</div><div class="vf-chip-row">'+pe.top_services.map(function(s){return '<span class="vf-chip-grn">'+esc(s)+'</span>';}).join('')+'</div></div>':'')
+    +'<div class="vf-drw-btns"><button class="vf-btn" onclick="siGenerate()">↺ Regenerate</button></div>';
+  vfOpen('Executive Brief',html);
+};
+
+/* ── Priority call drawer ────────────────────────────────────────────────── */
+window.vfShowPriority=function(i){
+  var p=(window._VD.pri||[])[i];if(!p)return;
+  var html=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'
+      +'<div style="width:44px;height:44px;border-radius:12px;background:'+AVC[i%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(p.company))+'</div>'
+      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(p.company||'')+'</div>'
+        +'<div style="font-size:11px;color:#334155">'+esc(p.domain||'')+'</div></div>'
+    +'</div>'
+    +'<div class="vf-sec"><div class="vf-sec-lbl">Why This Week</div>'
+      +'<div style="font-size:13px;color:#94a3b8;line-height:1.7;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:12px 14px">'+esc(p.signal||'')+'</div>'
+    +'</div>'
+    +'<div class="vf-sec"><div class="vf-sec-lbl">What to Pitch</div><div class="vf-highlight">'+esc(p.pitch||'')+'</div></div>'
+    +(p.est_value?'<div class="vf-sec"><div class="vf-sec-lbl">Revenue Est.</div><div class="vf-rev-big">'+esc(p.est_value)+'</div></div>':'')
+    +'<div class="vf-drw-btns">'
+      +'<button class="vf-btn prim" onclick="vfGotoCo(\''+esc(p.company)+'\')">Find in Companies →</button>'
+      +'<button class="vf-btn" onclick="vfCopy(this,\''+esc(p.pitch||'')+'\')">Copy Pitch</button>'
+    +'</div>';
+  vfOpen('Priority #'+(p.rank||i+1)+' — '+p.company, html);
+};
+
+/* ── PIPELINE compact render ─────────────────────────────────────────────── */
+function _renderPip(pip){
+  var g=document.getElementById('si-pip');if(!g)return;
+  if(!pip.length){g.innerHTML='<p style="color:#1e293b;font-size:13px;padding:40px;text-align:center">No pipeline data.</p>';return;}
+  g.innerHTML='<div class="si-pip-compact">'+pip.slice(0,9).map(function(co,i){
+    var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
+    var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+    var lbl=sc>=80?'<span style="color:#f87171">Critical</span>':sc>=60?'<span style="color:#fbbf24">High</span>':'<span style="color:#818cf8">Watch</span>';
+    var av=AVC[i%AVC.length];
+    var sigs=(co.signals||[]).slice(0,2).map(function(s){return '<span class="si-pico-badge">'+esc(s)+'</span>';}).join('');
+    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){return '<span class="si-pico-svc">'+esc(s)+'</span>';}).join('');
+    return '<div class="si-pico'+(sc>=80?' hot':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="vfShowPip('+i+')">'
+      +'<div class="si-pico-top">'
+        +ring(sc,rc,50)
+        +'<div class="si-pico-info"><div class="si-pico-name">'+esc(co.name||'')+'</div><div class="si-pico-domain">'+esc(co.domain||'')+'</div>'
+          +'<div class="si-pico-score-lbl" style="font-size:10px;font-weight:600;color:'+rc+'">'+lbl+'</div>'
+        +'</div>'
+      +'</div>'
+      +(sigs?'<div class="si-pico-foot">'+sigs+svcs+'<span class="si-pico-arr">→</span></div>':'')
+    +'</div>';
+  }).join('')+'</div>';
 }
 
-/* Patch siTab to re-attach handlers on switch */
-(function waitForSiTab(){
-  if(typeof window.siTab!=='function'){setTimeout(waitForSiTab,100);return;}
-  var _ot=window.siTab;
-  window.siTab=function(btn){_ot(btn);setTimeout(_attachCards,150);};
-})();
+window.vfShowPip=function(i){
+  var d=(window._VD.pip||[])[i];if(!d)return;
+  document.querySelectorAll('.si-pico.active').forEach(function(e){e.classList.remove('active');});
+  var cards=document.querySelectorAll('.si-pico');if(cards[i])cards[i].classList.add('active');
+  var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
+  var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+  var lbl=sc>=80?'🔥 Critical Intent':sc>=60?'⚡ High Intent':'👀 Watching';
+  var sigs=(d.signals||[]).map(function(s){return '<span class="vf-chip-blu">'+esc(s)+'</span>';}).join('');
+  var svcs=(d.service_fit||[]).map(function(s){return '<span class="vf-chip-grn">'+esc(s)+'</span>';}).join('');
+  var html=
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">'
+      +'<div style="width:48px;height:48px;border-radius:13px;background:'+AVC[i%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.name))+'</div>'
+      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(d.name||'')+'</div><div style="font-size:11px;color:#334155">'+esc(d.domain||'')+'</div></div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 16px;margin-bottom:16px">'
+      +ring(sc,rc,90)
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:700;color:'+rc+';margin-bottom:6px">'+lbl+'</div>'
+        +'<div style="height:4px;background:rgba(255,255,255,.05);border-radius:999px;margin-bottom:10px;overflow:hidden"><div style="height:100%;width:0;background:'+rc+';border-radius:999px;transition:width 1s" data-bar-w="'+sc+'"></div></div>'
+        +'<div style="font-size:12px;color:#475569;line-height:1.6">'+esc(d.why_now||'')+'</div>'
+      +'</div>'
+    +'</div>'
+    +(sigs?'<div class="vf-sec"><div class="vf-sec-lbl">Detected Signals</div><div class="vf-chip-row">'+sigs+'</div></div>':'')
+    +(svcs?'<div class="vf-sec"><div class="vf-sec-lbl">Service Fit</div><div class="vf-chip-row">'+svcs+'</div></div>':'')
+    +(d.opportunity?'<div class="vf-sec"><div class="vf-sec-lbl">Revenue Opportunity</div><div class="vf-rev-big">'+esc(d.opportunity)+'</div></div>':'')
+    +'<div class="vf-sec"><div class="vf-sec-lbl">Recommended Action</div><div class="vf-highlight">'+esc(d.next_step||'')+'</div></div>'
+    +'<div class="vf-drw-btns"><button class="vf-btn prim" onclick="vfGotoCo(\''+esc(d.name)+'\')">Find in Companies →</button><button class="vf-btn" onclick="vfCopy(this,\''+esc(d.next_step||'')+'\')">Copy Action</button></div>';
+  vfOpen(d.name,html);
+};
+
+/* ── ACTIONS compact render ──────────────────────────────────────────────── */
+function _renderActs(acts){
+  var c=document.getElementById('si-acts');if(!c)return;
+  if(!acts.length){c.innerHTML='<p style="color:#1e293b;font-size:13px;padding:40px;text-align:center">No actions.</p>';return;}
+  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
+  c.innerHTML='<div class="si-act-compact">'+acts.map(function(a,i){
+    var hi=a.urgency==='HIGH';
+    return '<div class="si-aco '+(hi?'hi':'med')+'" style="animation-delay:'+(i*.04)+'s" onclick="vfShowAct('+i+')">'
+      +'<div class="si-aco-rank">'+(a.rank||i+1)+'</div>'
+      +'<div class="si-aco-ico">'+(ico[a.type]||'⚡')+'</div>'
+      +'<div class="si-aco-body">'
+        +'<div class="si-aco-action">'+esc(a.action||'')+'</div>'
+        +(a.company&&a.company!=='All'?'<div class="si-aco-co">'+esc(a.company)+'</div>':'')
+      +'</div>'
+      +'<div class="si-aco-right">'
+        +(a.deadline?'<span class="si-aco-dl">'+esc(a.deadline)+'</span>':'')
+        +'<div class="si-aco-urg '+(hi?'H':'M')+'"></div>'
+        +'<span class="si-aco-arr">→</span>'
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+window.vfShowAct=function(i){
+  var a=(window._VD.acts||[])[i];if(!a)return;
+  document.querySelectorAll('.si-aco.active').forEach(function(e){e.classList.remove('active');});
+  var items=document.querySelectorAll('.si-aco');if(items[i])items[i].classList.add('active');
+  var hi=a.urgency==='HIGH';
+  var html=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+      +'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+(hi?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)')+';color:'+(hi?'#f87171':'#fbbf24')+'">'+esc(a.urgency||'')+'</span>'
+      +(a.deadline?'<span style="font-size:11px;color:#334155">⏱ '+esc(a.deadline)+'</span>':'')
+    +'</div>'
+    +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:16px;letter-spacing:-.02em">'+esc(a.action||'')+'</div>'
+    +(a.company&&a.company!=='All'?'<div class="vf-sec"><div class="vf-sec-lbl">Company</div><div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(a.company)+'</div></div>':'')
+    +'<div class="vf-sec"><div class="vf-sec-lbl">Business Reason</div><div class="vf-sec-val">'+esc(a.reason||'')+'</div></div>'
+    +(a.revenue_impact?'<div class="vf-sec"><div class="vf-sec-lbl">Revenue Impact</div><div class="vf-rev-big">'+esc(a.revenue_impact)+'</div></div>':'')
+    +'<div class="vf-drw-btns">'
+      +(a.company&&a.company!=='All'?'<button class="vf-btn prim" onclick="vfGotoCo(\''+esc(a.company)+'\')">Find Company →</button>':'')
+      +'<button class="vf-btn" onclick="vfCopy(this,\''+esc(a.action||'')+'\')">Copy Action</button>'
+    +'</div>';
+  vfOpen('Action #'+(a.rank||i+1),html);
+};
+
+/* ── OUTREACH compact render ─────────────────────────────────────────────── */
+function _renderOut(out){
+  var g=document.getElementById('si-out');if(!g)return;
+  if(!out.length){g.innerHTML='<p style="color:#1e293b;font-size:13px;padding:40px;text-align:center">No outreach.</p>';return;}
+  g.innerHTML='<div class="si-out-compact">'+out.map(function(ot,i){
+    var t=(ot.timing||'watch').toLowerCase();
+    var sid='so'+i+'_'+Math.random().toString(36).substr(2,5);
+    return '<div class="si-oco" style="animation-delay:'+(i*.05)+'s" onclick="vfShowOut('+i+')">'
+      +'<div class="si-oco-chrome">'
+        +'<div class="si-oco-dot" style="background:#7f1d1d"></div>'
+        +'<div class="si-oco-dot" style="background:#78350f"></div>'
+        +'<div class="si-oco-dot" style="background:#14532d"></div>'
+        +'<div class="si-oco-to">'+esc(ot.company||'')+'</div>'
+        +'<span class="si-oco-t '+t+'">'+t.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div class="si-oco-body">'
+        +'<div class="si-oco-subj">'+esc(ot.subject||'')+'</div>'
+        +(ot.signal_hook?'<div class="si-oco-hook">📡 '+esc(ot.signal_hook)+'</div>':'')
+        +'<div class="si-oco-foot">'
+          +'<button class="si-oco-copy" id="'+sid+'" onclick="event.stopPropagation();vfCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
+          +'<span class="si-oco-arr">→</span>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+window.vfShowOut=function(i){
+  var ot=(window._VD.out||[])[i];if(!ot)return;
+  document.querySelectorAll('.si-oco.active').forEach(function(e){e.classList.remove('active');});
+  var cards=document.querySelectorAll('.si-oco');if(cards[i])cards[i].classList.add('active');
+  var t=(ot.timing||'watch').toLowerCase();
+  var tps=(ot.talking_points||[]).map(function(tp){return '<li style="display:flex;gap:8px;padding:3px 0;font-size:12px;color:#64748b"><span style="color:#059669;font-weight:700;flex-shrink:0">✓</span>'+esc(tp)+'</li>';}).join('');
+  var full='Subject: '+(ot.subject||'')+'\n\n'+(ot.opening||'')+'\n\n'+(ot.talking_points||[]).join('\n')+(ot.cta?'\n\n→ '+ot.cta:'');
+  var fid='fe'+i+'_'+Math.random().toString(36).substr(2,5);
+  var html=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+      +'<div style="width:38px;height:38px;border-radius:10px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(ot.company))+'</div>'
+      +'<div><div style="font-size:14px;font-weight:700;color:#f1f5f9">'+esc(ot.company||'')+'</div><div style="font-size:10px;color:#334155">'+esc(ot.domain||'')+'</div></div>'
+      +'<span class="si-oco-t '+t+'" style="margin-left:auto">'+t.toUpperCase()+'</span>'
+    +'</div>'
+    +(ot.signal_hook?'<div style="font-size:12px;color:#475569;padding:8px 12px;border-left:2px solid rgba(99,102,241,.4);background:rgba(67,56,202,.06);margin-bottom:14px;line-height:1.6;font-style:italic">'+esc(ot.signal_hook)+'</div>':'')
+    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:14px">'
+      +'<div style="background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 14px;display:flex;align-items:center;gap:5px">'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:#7f1d1d"></div>'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:#78350f"></div>'
+        +'<div style="width:8px;height:8px;border-radius:50%;background:#14532d"></div>'
+        +'<span style="flex:1;text-align:center;font-size:10px;color:#334155">Email Preview</span>'
+      +'</div>'
+      +'<div style="padding:16px;font-size:13px;color:#64748b;line-height:1.75">'
+        +(ot.subject?'<div style="font-size:14px;font-weight:700;color:#e2e8f0;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)">'+esc(ot.subject)+'</div>':'')
+        +(ot.opening?'<p>'+esc(ot.opening)+'</p>':'')
+        +(tps?'<ul style="list-style:none;padding:0;margin:8px 0 12px">'+tps+'</ul>':'')
+        +(ot.cta?'<p style="color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">→ '+esc(ot.cta)+'</p>':'')
+      +'</div>'
+    +'</div>'
+    +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
+    +'<div class="vf-drw-btns">'
+      +'<button class="vf-btn prim" onclick="vfCopyId(this,\''+fid+'\')">Copy Full Email</button>'
+      +'<button class="vf-btn" onclick="vfCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
+    +'</div>';
+  vfOpen('Outreach → '+ot.company, html);
+};
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+window.vfCopy=function(btn,text){
+  navigator.clipboard&&navigator.clipboard.writeText(text).then(function(){
+    var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
+    setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
+  });
+};
+window.vfCopyId=function(btn,id){var el=document.getElementById(id);if(el)vfCopy(btn,el.value||el.textContent);};
+window.vfGotoCo=function(name){
+  vfClose();
+  var s=document.getElementById('nav-search');if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
+  var cb=document.getElementById('nav-companies');if(cb)cb.click();
+};
 })();
 </script>
 
