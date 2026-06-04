@@ -16,7 +16,6 @@ from flask import (
 )
 import requests
 from collections import Counter
-from openai import OpenAI
 
 log = logging.getLogger(__name__)
 
@@ -1342,6 +1341,7 @@ def _build_ppc_context() -> str:
 @login_required
 def ppc_chat():
     """PPC AI assistant — context injection."""
+    from openai import OpenAI
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         return jsonify({"answer": "⚠️ Add `OPENAI_API_KEY` to Railway Variables."}), 200
@@ -1785,3 +1785,4 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+rt)
