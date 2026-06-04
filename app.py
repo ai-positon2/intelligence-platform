@@ -1762,8 +1762,6 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-)
-    ).most_common(10)]
 
     return {
         "status": "ok",
