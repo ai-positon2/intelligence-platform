@@ -1198,11 +1198,6 @@ h2::after,.section-title::after{
       <span style="margin-left:auto;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;letter-spacing:.04em;flex-shrink:0">AI</span>
     </button>
   </div>
-button class="nav-item" id="nav-insights" onclick="showSection('insights',this);insOnTabOpen()">
-      <span class="icon">✨</span> Insights
-      <span style="margin-left:auto;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;letter-spacing:.04em;flex-shrink:0">AI</span>
-    </button>
-  </div>
   <div class="sidebar-footer">
     <a href="/accounts" class="sidebar-switch-btn">
       <span style="font-size:14px">⇄</span> Switch Account
@@ -1420,149 +1415,94 @@ button class="nav-item" id="nav-insights" onclick="showSection('insights',this);
     </div>
 
 
-  <!-- ═══ INSIGHTS SECTION — inject inside #content ═══════════════════════ -->
+  <!-- ═══ INSIGHTS v5 — inside #content ═══════════════════════════════════ -->
   <div id="section-insights" class="section">
-
-    <!-- ── Controls bar (filters + tabs) ───────────────────────────────── -->
-    <div class="ig-bar">
-      <div class="ig-bar-row1">
-        <div class="ig-title">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" style="flex-shrink:0">
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.3">
-              <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/>
-            </ellipse>
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3">
-              <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/>
-            </ellipse>
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3">
-              <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/>
-            </ellipse>
-            <circle cx="12" cy="12" r="2" fill="#a5b4fc">
-              <animate attributeName="r" values="2;2.6;2" dur="3s" repeatCount="indefinite"/>
-            </circle>
-          </svg>
-          Signal Intelligence
-          <span class="ig-ai-badge">AI</span>
+    <div class="v5-bar" id="v5-bar">
+      <div class="v5-bar-top">
+        <div class="v5-brand">
+          <div class="v5-atom-wrap">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse>
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/></ellipse>
+              <circle cx="12" cy="12" r="2" fill="#a5b4fc"><animate attributeName="r" values="2;2.6;2" dur="3s" repeatCount="indefinite"/></circle>
+            </svg>
+          </div>
+          <span class="v5-brand-name">Signal Intelligence</span>
+          <span class="v5-ai-pill">AI</span>
         </div>
-        <div class="ig-filter-chips">
-          <div id="ig-type-chips" class="ig-chip-row"><span class="ig-loading-txt">Loading…</span></div>
-          <div class="ig-sep"></div>
-          <button class="ig-chip ig-sev-high on" data-sev="HIGH" onclick="igToggle(this)">HIGH</button>
-          <button class="ig-chip ig-sev-med on"  data-sev="MEDIUM" onclick="igToggle(this)">MED</button>
-          <button class="ig-chip ig-sev-low on"  data-sev="LOW" onclick="igToggle(this)">LOW</button>
-          <div class="ig-sep"></div>
-          <select class="ig-sel" id="ig-days">
-            <option value="7">7 days</option>
-            <option value="30">30 days</option>
-            <option value="90" selected>90 days</option>
-            <option value="365">12 months</option>
+        <div class="v5-filters" id="v5-filters">
+          <div id="v5-type-chips" class="v5-chip-row"><span class="v5-loading">Loading…</span></div>
+          <div class="v5-sep"></div>
+          <button class="v5-chip v5-ch v5-sev-h on" data-sev="HIGH" onclick="v5Toggle(this)">HIGH</button>
+          <button class="v5-chip v5-ch v5-sev-m on" data-sev="MEDIUM" onclick="v5Toggle(this)">MED</button>
+          <button class="v5-chip v5-ch v5-sev-l on" data-sev="LOW" onclick="v5Toggle(this)">LOW</button>
+          <div class="v5-sep"></div>
+          <select class="v5-sel" id="v5-days">
+            <option value="7">Last 7 days</option><option value="30">Last 30 days</option>
+            <option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option>
             <option value="0">All time</option>
           </select>
-          <select class="ig-sel" id="ig-industry"><option value="">All Industries</option></select>
-          <span class="ig-stats" id="ig-stats">—</span>
+          <select class="v5-sel" id="v5-industry"><option value="">All Industries</option></select>
+          <span class="v5-stats" id="v5-stats">—</span>
         </div>
-        <button class="ig-gen-btn" id="ig-gen-btn" onclick="igGenerate()">
-          <span class="ig-gen-ico">✨</span> Generate Insights <span class="ig-gen-tag">GPT</span>
+        <button class="v5-gen" id="v5-gen" onclick="v5Generate()">
+          <span class="v5-gen-ico">✨</span> Generate Insights <span class="v5-gen-tag">GPT</span>
         </button>
       </div>
-      <div class="ig-tabs" role="tablist">
-        <button class="ig-tab active" data-panel="overview" onclick="igTab(this)" role="tab">📊 Overview</button>
-        <button class="ig-tab" data-panel="pipeline" onclick="igTab(this)" role="tab">🔥 Pipeline <span class="ig-tc" id="ig-tc-pip"></span></button>
-        <button class="ig-tab" data-panel="actions"  onclick="igTab(this)" role="tab">⚡ Actions <span class="ig-tc" id="ig-tc-act"></span></button>
-        <button class="ig-tab" data-panel="outreach" onclick="igTab(this)" role="tab">🎯 Outreach <span class="ig-tc" id="ig-tc-out"></span></button>
-      </div>
+      <nav class="v5-tabs" id="v5-tabs">
+        <button class="v5-tab active" data-p="overview" onclick="v5Tab(this)">📊 Overview</button>
+        <button class="v5-tab" data-p="pipeline" onclick="v5Tab(this)">🔥 Pipeline <span class="v5-tc" id="v5-tc-pip"></span></button>
+        <button class="v5-tab" data-p="actions"  onclick="v5Tab(this)">⚡ Actions <span class="v5-tc" id="v5-tc-act"></span></button>
+        <button class="v5-tab" data-p="outreach" onclick="v5Tab(this)">🎯 Outreach <span class="v5-tc" id="v5-tc-out"></span></button>
+      </nav>
     </div>
-
-    <!-- ── Content panels ───────────────────────────────────────────────── -->
-    <div class="ig-body">
-
-      <!-- Overview -->
-      <div class="ig-panel active" id="ig-panel-overview">
-
-        <!-- Empty state -->
-        <div class="ig-empty" id="ig-empty">
-          <div class="ig-orb-wrap">
-            <div class="ig-orb">
-              <svg width="52" height="52" fill="none" viewBox="0 0 24 24">
-                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.3">
-                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/>
-                </ellipse>
-                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.3">
-                  <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/>
-                </ellipse>
-                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3">
-                  <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/>
-                </ellipse>
-                <circle cx="12" cy="12" r="2.7" fill="#c4b5fd">
-                  <animate attributeName="r" values="2.7;3.3;2.7" dur="3s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="1;.7;1" dur="3s" repeatCount="indefinite"/>
-                </circle>
+    <div class="v5-body">
+      <!-- Overview panel -->
+      <div class="v5-panel active" id="v5-p-overview">
+        <div class="v5-empty" id="v5-empty">
+          <div class="v5-orb-scene">
+            <div class="v5-big-orb">
+              <svg width="64" height="64" fill="none" viewBox="0 0 24 24">
+                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
+                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse>
+                <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/></ellipse>
+                <circle cx="12" cy="12" r="2.8" fill="#c4b5fd"><animate attributeName="r" values="2.8;3.4;2.8" dur="3s" repeatCount="indefinite"/></circle>
               </svg>
             </div>
-            <div class="ig-ring ig-r1"></div>
-            <div class="ig-ring ig-r2"></div>
-            <div class="ig-ring ig-r3"></div>
+            <div class="v5-ring v5-rg1"></div><div class="v5-ring v5-rg2"></div><div class="v5-ring v5-rg3"></div>
           </div>
-          <h2 class="ig-empty-h">Intelligence Command Centre</h2>
-          <p class="ig-empty-p">Apply filters, then click <strong>Generate Insights</strong> to get GPT-powered analysis — intent scores, pipeline opportunities, revenue estimates, and personalised outreach for every hot company.</p>
-          <button class="ig-start-btn" onclick="igGenerate()">✨ Generate Insights</button>
+          <h2 class="v5-empty-h">Intelligence Command Centre</h2>
+          <p class="v5-empty-p">Apply filters above, then click <strong>Generate Insights</strong> — get GPT-powered analysis covering intent scores, hot pipeline, priority actions, and personalised outreach for every signal-active company.</p>
+          <button class="v5-cta-btn" onclick="v5Generate()">✨ Generate Insights</button>
         </div>
-
-        <!-- Loading state -->
-        <div class="ig-load" id="ig-load" style="display:none">
-          <div class="ig-load-orb">
-            <svg width="36" height="36" fill="none" viewBox="0 0 24 24">
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="8s" repeatCount="indefinite"/>
-              </ellipse>
+        <div class="v5-load" id="v5-load" style="display:none">
+          <div class="v5-load-orb">
+            <svg width="38" height="38" fill="none" viewBox="0 0 24 24">
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse>
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/></ellipse>
+              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="8s" repeatCount="indefinite"/></ellipse>
               <circle cx="12" cy="12" r="2.2" fill="white"/>
             </svg>
           </div>
-          <div class="ig-load-steps">
-            <div class="ig-lstep on" id="ig-ls1">📡 Reading signals across all companies…</div>
-            <div class="ig-lstep"    id="ig-ls2">🧠 Scoring intent and identifying opportunities…</div>
-            <div class="ig-lstep"    id="ig-ls3">✨ Crafting insights, actions &amp; outreach…</div>
-          </div>
-          <div class="ig-prog-bg"><div class="ig-prog-bar" id="ig-prog"></div></div>
+          <div class="v5-steps"><div class="v5-step on" id="v5-s1">📡 Reading signals…</div><div class="v5-step" id="v5-s2">🧠 Scoring intent…</div><div class="v5-step" id="v5-s3">✨ Generating insights…</div></div>
+          <div class="v5-prog-bg"><div class="v5-prog-bar" id="v5-prog"></div></div>
+          <div class="v5-load-note">Analysing up to 200 signals with GPT — this may take 10–20 seconds</div>
         </div>
-
-        <!-- Overview results -->
-        <div id="ig-ov" style="display:none">
-          <!-- Summary -->
-          <div class="ig-summary" id="ig-summary"></div>
-          <!-- KPIs -->
-          <div class="ig-kpi-row" id="ig-kpis"></div>
-          <!-- Themes + Risks -->
-          <div class="ig-two">
-            <div class="ig-card" id="ig-themes-card"></div>
-            <div class="ig-card" id="ig-risks-card"></div>
-          </div>
+        <div id="v5-ov" style="display:none">
+          <div id="v5-summary"></div>
+          <div class="v5-kpi-grid" id="v5-kpis"></div>
+          <div class="v5-two-col"><div id="v5-themes"></div><div id="v5-risks"></div></div>
         </div>
-      </div><!-- /overview -->
-
-      <!-- Pipeline -->
-      <div class="ig-panel" id="ig-panel-pipeline">
-        <div class="ig-pip-grid" id="ig-pip"></div>
       </div>
-
-      <!-- Actions -->
-      <div class="ig-panel" id="ig-panel-actions">
-        <div id="ig-acts"></div>
-      </div>
-
-      <!-- Outreach -->
-      <div class="ig-panel" id="ig-panel-outreach">
-        <div class="ig-out-grid" id="ig-out"></div>
-      </div>
-
-    </div><!-- /ig-body -->
-  </div><!-- /section-insights -->
+      <!-- Pipeline panel -->
+      <div class="v5-panel" id="v5-p-pipeline"><div class="v5-pip-grid" id="v5-pip"></div></div>
+      <!-- Actions panel -->
+      <div class="v5-panel" id="v5-p-actions"><div class="v5-timeline" id="v5-acts"></div></div>
+      <!-- Outreach panel -->
+      <div class="v5-panel" id="v5-p-outreach"><div class="v5-email-grid" id="v5-out"></div></div>
+    </div>
+  </div>
 
   </div><!-- /content -->
 </div><!-- /main -->
@@ -3953,429 +3893,527 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-<!-- ═══ INSIGHTS CSS + JS ═════════════════════════════════════════════════ -->
+<!-- ═══ INSIGHTS v5 CSS ═══════════════════════════════════════════════════ -->
 <style>
-/* ── Section base ───────────────────────────────────────────────────────────*/
-#section-insights{display:none;flex-direction:column;gap:0;padding:0;margin:-20px -24px;min-height:calc(100vh - 56px)}
+/* ── Section & layout ───────────────────────────────────────────────────────*/
+#section-insights{padding:0;margin:-20px -24px;min-height:calc(100vh - 56px);display:none;flex-direction:column}
 #section-insights.active{display:flex!important}
 
 /* ── Controls bar ───────────────────────────────────────────────────────────*/
-.ig-bar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px 0;flex-shrink:0;position:sticky;top:56px;z-index:89}
-.ig-bar-row1{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.ig-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--text);flex-shrink:0}
-.ig-ai-badge{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.05em}
-.ig-filter-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1}
-.ig-chip-row{display:flex;gap:5px;flex-wrap:wrap}
-.ig-chip{font-size:11px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
-.ig-chip:hover{border-color:var(--blue);color:var(--blue)}
-.ig-chip.on{color:#fff;border-color:transparent}
-.ig-chip-type.on{background:rgba(59,130,246,.75)}
-.ig-sev-high.on{background:rgba(239,68,68,.75)}
-.ig-sev-med.on{background:rgba(245,158,11,.75)}
-.ig-sev-low.on{background:rgba(107,114,128,.6)}
-.ig-sep{width:1px;height:18px;background:var(--border);flex-shrink:0}
-.ig-sel{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:4px 24px 4px 9px;font-size:11px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .15s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center}
-.ig-sel:focus{border-color:var(--blue)}
-.ig-sel option{background:#1a2035}
-.ig-stats{font-size:11px;color:#a5b4fc;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);border-radius:999px;padding:3px 12px;white-space:nowrap;font-weight:500}
-.ig-loading-txt{font-size:11px;color:var(--text2)}
+.v5-bar{background:linear-gradient(180deg,#0c0f1d 0%,#111827 100%);border-bottom:1px solid rgba(99,102,241,.15);padding:14px 24px 0;flex-shrink:0;position:sticky;top:56px;z-index:89;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.v5-bar-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.v5-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.v5-atom-wrap{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(139,92,246,.15));border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(99,102,241,.2)}
+.v5-brand-name{font-size:14px;font-weight:700;color:#f1f5f9;letter-spacing:-.01em}
+.v5-ai-pill{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.05em}
+.v5-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+.v5-chip-row{display:flex;gap:4px;flex-wrap:wrap}
+.v5-chip{font-size:11px;font-weight:600;padding:4px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#94a3b8;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;line-height:1}
+.v5-chip:hover{border-color:rgba(99,102,241,.5);color:#a5b4fc}
+.v5-chip.on{color:#fff;border-color:transparent!important}
+.v5-ch.on{background:rgba(59,130,246,.7)}
+.v5-sev-h.on{background:rgba(239,68,68,.7)}
+.v5-sev-m.on{background:rgba(245,158,11,.7)}
+.v5-sev-l.on{background:rgba(107,114,128,.6)}
+.v5-sep{width:1px;height:16px;background:rgba(255,255,255,.08);flex-shrink:0}
+.v5-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;border-radius:8px;padding:4px 24px 4px 9px;font-size:11px;font-family:inherit;outline:none;cursor:pointer;transition:border-color .15s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center}
+.v5-sel:focus{border-color:rgba(99,102,241,.6)}
+.v5-sel option{background:#1e293b}
+.v5-stats{font-size:11px;color:#818cf8;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.18);border-radius:999px;padding:3px 12px;white-space:nowrap;font-weight:500;flex-shrink:0}
+.v5-loading{font-size:11px;color:#475569;font-style:italic}
 
 /* ── Generate button ─────────────────────────────────────────────────────────*/
-.ig-gen-btn{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#2563eb 100%);background-size:200% 200%;animation:ig-gbg 5s ease infinite;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;padding:9px 18px;box-shadow:0 3px 16px rgba(79,70,229,.4);transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden}
-.ig-gen-btn:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(79,70,229,.6)}
-.ig-gen-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
-.ig-gen-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);transform:translateX(-100%)}
-.ig-gen-btn:not(:disabled):hover::after{animation:ig-shine .5s ease forwards}
-@keyframes ig-shine{to{transform:translateX(100%)}}
-@keyframes ig-gbg{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-.ig-gen-ico{animation:ig-spark 2.5s ease-in-out infinite}
-@keyframes ig-spark{0%,100%{transform:scale(1)}50%{transform:scale(1.3) rotate(12deg)}}
-.ig-gen-tag{background:rgba(255,255,255,.2);border-radius:999px;padding:1px 7px;font-size:9px;font-weight:700;letter-spacing:.05em}
+.v5-gen{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;position:relative;overflow:hidden;background:linear-gradient(135deg,#4338ca 0%,#7c3aed 50%,#1d4ed8 100%);background-size:200% 200%;animation:v5gbg 5s ease infinite;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;padding:9px 18px;box-shadow:0 2px 12px rgba(79,70,229,.45),0 0 0 1px rgba(255,255,255,.08) inset;transition:transform .15s,box-shadow .15s}
+.v5-gen:hover{transform:translateY(-1px);box-shadow:0 5px 24px rgba(79,70,229,.65),0 0 0 1px rgba(255,255,255,.12) inset}
+.v5-gen:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.v5-gen::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);transform:translateX(-100%)}
+.v5-gen:not(:disabled):hover::after{animation:v5shine .55s ease forwards}
+@keyframes v5shine{to{transform:translateX(100%)}}
+@keyframes v5gbg{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.v5-gen-ico{animation:v5spark 2.5s ease-in-out infinite}
+@keyframes v5spark{0%,100%{transform:scale(1)}50%{transform:scale(1.3) rotate(12deg)}}
+.v5-gen-tag{background:rgba(255,255,255,.18);border-radius:999px;padding:1px 7px;font-size:9px;font-weight:700;letter-spacing:.05em}
 
-/* ── Tab nav ─────────────────────────────────────────────────────────────────*/
-.ig-tabs{display:flex;gap:0;overflow-x:auto;margin:0 -24px;padding:0 24px}
-.ig-tabs::-webkit-scrollbar{height:0}
-.ig-tab{display:flex;align-items:center;gap:6px;padding:8px 16px;border:none;background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap;flex-shrink:0}
-.ig-tab:hover{color:var(--text)}
-.ig-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
-.ig-tc{background:rgba(59,130,246,.15);color:var(--blue);border-radius:999px;padding:1px 6px;font-size:9px;font-weight:700;display:none}
-.ig-tc.show{display:inline}
+/* ── Tabs ───────────────────────────────────────────────────────────────────*/
+.v5-tabs{display:flex;gap:0;overflow-x:auto;margin:0 -24px;padding:0 24px}
+.v5-tabs::-webkit-scrollbar{height:0}
+.v5-tab{display:flex;align-items:center;gap:6px;padding:9px 16px;border:none;background:none;color:#64748b;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap;flex-shrink:0;letter-spacing:-.01em}
+.v5-tab:hover{color:#cbd5e1}
+.v5-tab.active{color:#818cf8;border-bottom-color:#6366f1}
+.v5-tc{background:rgba(99,102,241,.18);color:#818cf8;border-radius:999px;padding:1px 6px;font-size:9px;font-weight:700}
 
-/* ── Body ────────────────────────────────────────────────────────────────────*/
-.ig-body{flex:1;overflow-y:auto;padding:20px 24px}
-.ig-panel{display:none}.ig-panel.active{display:block;animation:ig-in .35s cubic-bezier(.22,1,.36,1) both}
-@keyframes ig-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+/* ── Body ───────────────────────────────────────────────────────────────────*/
+.v5-body{flex:1;overflow-y:auto;padding:22px 24px;background:linear-gradient(180deg,rgba(99,102,241,.03) 0%,transparent 300px)}
+.v5-panel{display:none}.v5-panel.active{display:block;animation:v5fade .3s ease both}
+@keyframes v5fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── Empty state ─────────────────────────────────────────────────────────────*/
-.ig-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;text-align:center;position:relative;padding:20px}
-.ig-orb-wrap{position:relative;margin-bottom:32px}
-.ig-orb{width:88px;height:88px;border-radius:26px;background:linear-gradient(135deg,#1e1b4b,#312e81);border:1px solid rgba(99,102,241,.4);display:flex;align-items:center;justify-content:center;box-shadow:0 0 50px rgba(99,102,241,.3),0 0 0 1px rgba(99,102,241,.15) inset;animation:ig-float 4s ease-in-out infinite;position:relative;z-index:2}
-@keyframes ig-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-.ig-ring{position:absolute;border-radius:50%;border:1px solid;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
-.ig-r1{width:148px;height:148px;border-color:rgba(99,102,241,.22);animation:ig-rp 3s ease-in-out infinite}
-.ig-r2{width:218px;height:218px;border-color:rgba(99,102,241,.11);animation:ig-rp 3s ease-in-out .5s infinite}
-.ig-r3{width:298px;height:298px;border-color:rgba(99,102,241,.05);animation:ig-rp 3s ease-in-out 1s infinite}
-@keyframes ig-rp{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.3;transform:translate(-50%,-50%) scale(1.04)}}
-.ig-empty-h{font-size:20px;font-weight:700;color:var(--text);margin-bottom:10px}
-.ig-empty-p{font-size:13px;color:var(--text2);max-width:400px;line-height:1.65;margin-bottom:24px}
-.ig-start-btn{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;border-radius:11px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;padding:11px 28px;box-shadow:0 5px 28px rgba(79,70,229,.5);transition:transform .15s,box-shadow .15s}
-.ig-start-btn:hover{transform:translateY(-2px);box-shadow:0 9px 36px rgba(79,70,229,.65)}
+.v5-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:460px;text-align:center;padding:20px;position:relative}
+.v5-orb-scene{position:relative;margin-bottom:32px}
+.v5-big-orb{width:92px;height:92px;border-radius:28px;background:linear-gradient(135deg,#1e1b4b,#312e81,#1e1b4b);border:1px solid rgba(99,102,241,.35);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(99,102,241,.3),0 0 0 1px rgba(99,102,241,.12) inset;animation:v5float 4s ease-in-out infinite;position:relative;z-index:2}
+@keyframes v5float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.v5-ring{position:absolute;border-radius:50%;border:1px solid;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.v5-rg1{width:152px;height:152px;border-color:rgba(99,102,241,.2);animation:v5rp 3s ease-in-out infinite}
+.v5-rg2{width:224px;height:224px;border-color:rgba(99,102,241,.1);animation:v5rp 3s ease-in-out .5s infinite}
+.v5-rg3{width:304px;height:304px;border-color:rgba(99,102,241,.05);animation:v5rp 3s ease-in-out 1s infinite}
+@keyframes v5rp{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.25;transform:translate(-50%,-50%) scale(1.04)}}
+.v5-empty-h{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:10px;letter-spacing:-.02em}
+.v5-empty-p{font-size:13px;color:#64748b;max-width:420px;line-height:1.7;margin-bottom:26px}
+.v5-cta-btn{display:inline-flex;align-items:center;gap:9px;background:linear-gradient(135deg,#4338ca,#7c3aed);border:none;border-radius:12px;color:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;padding:12px 30px;box-shadow:0 5px 28px rgba(67,56,202,.5);transition:transform .15s,box-shadow .15s;letter-spacing:-.01em}
+.v5-cta-btn:hover{transform:translateY(-2px);box-shadow:0 9px 36px rgba(67,56,202,.7)}
 
 /* ── Loading ─────────────────────────────────────────────────────────────────*/
-.ig-load{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;gap:22px}
-.ig-load-orb{width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;animation:ig-lpulse 1.5s ease-in-out infinite}
-@keyframes ig-lpulse{0%,100%{box-shadow:0 0 28px rgba(79,70,229,.5)}50%{box-shadow:0 0 64px rgba(79,70,229,.85),0 0 100px rgba(124,58,237,.4)}}
-.ig-load-steps{display:flex;flex-direction:column;gap:7px;align-items:center}
-.ig-lstep{font-size:12px;padding:5px 18px;border-radius:999px;border:1px solid var(--border);color:var(--text2);transition:all .4s}
-.ig-lstep.on{color:var(--text);background:rgba(79,70,229,.1);border-color:rgba(79,70,229,.4);box-shadow:0 0 14px rgba(79,70,229,.2);animation:ig-blink 1.3s ease-in-out infinite}
-@keyframes ig-blink{0%,100%{opacity:1}50%{opacity:.55}}
-.ig-prog-bg{width:260px;height:3px;background:var(--border);border-radius:999px;overflow:hidden}
-.ig-prog-bar{height:100%;width:0;background:linear-gradient(90deg,#4f46e5,#7c3aed,#2563eb);border-radius:999px;animation:ig-prog 10s ease-in-out forwards}
-@keyframes ig-prog{0%{width:0}20%{width:20%}45%{width:48%}70%{width:70%}88%{width:85%}100%{width:92%}}
+.v5-load{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:460px;gap:20px}
+.v5-load-orb{width:72px;height:72px;border-radius:22px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:v5lorb 1.5s ease-in-out infinite}
+@keyframes v5lorb{0%,100%{box-shadow:0 0 28px rgba(67,56,202,.5)}50%{box-shadow:0 0 64px rgba(67,56,202,.9),0 0 100px rgba(124,58,237,.4)}}
+.v5-steps{display:flex;flex-direction:column;gap:7px;align-items:center}
+.v5-step{font-size:12px;padding:5px 20px;border-radius:999px;border:1px solid rgba(255,255,255,.06);color:#475569;transition:all .4s}
+.v5-step.on{color:#e2e8f0;background:rgba(67,56,202,.12);border-color:rgba(99,102,241,.4);box-shadow:0 0 14px rgba(99,102,241,.18);animation:v5blink 1.3s ease-in-out infinite}
+@keyframes v5blink{0%,100%{opacity:1}50%{opacity:.55}}
+.v5-prog-bg{width:260px;height:3px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+.v5-prog-bar{height:100%;width:0;background:linear-gradient(90deg,#4338ca,#7c3aed,#2563eb);border-radius:999px;animation:v5prog 10s ease-in-out forwards}
+@keyframes v5prog{0%{width:0}20%{width:18%}45%{width:45%}70%{width:68%}88%{width:84%}100%{width:91%}}
+.v5-load-note{font-size:11px;color:#334155;text-align:center;max-width:280px;line-height:1.5}
 
 /* ── Summary card ─────────────────────────────────────────────────────────────*/
-.ig-summary{background:linear-gradient(135deg,rgba(79,70,229,.14),rgba(124,58,237,.09),rgba(37,99,235,.07));border:1px solid rgba(79,70,229,.3);border-radius:14px;padding:20px 22px;margin-bottom:18px;position:relative;overflow:hidden;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both}
-.ig-summary::after{content:'';position:absolute;top:-50px;right:-50px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(79,70,229,.18) 0%,transparent 70%);pointer-events:none}
-.ig-sum-lbl{font-size:10px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px;display:flex;align-items:center;gap:7px}
-.ig-sum-lbl::before{content:'';width:18px;height:2px;background:linear-gradient(90deg,#4f46e5,#7c3aed);border-radius:1px}
-.ig-sum-text{font-size:14px;line-height:1.75;color:var(--text);margin-bottom:13px}
-.ig-sum-chips{display:flex;gap:8px;flex-wrap:wrap}
-.ig-schip{font-size:11px;padding:3px 12px;border-radius:999px;background:rgba(79,70,229,.1);border:1px solid rgba(79,70,229,.2);color:#a5b4fc;font-weight:500}
+.v5-summary{position:relative;border-radius:16px;padding:22px 24px;margin-bottom:18px;overflow:hidden;animation:v5card .4s cubic-bezier(.22,1,.36,1) both;background:linear-gradient(135deg,rgba(67,56,202,.16),rgba(124,58,237,.1),rgba(29,78,216,.08))}
+.v5-summary::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;background:linear-gradient(135deg,rgba(99,102,241,.5),rgba(139,92,246,.3),rgba(59,130,246,.3));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.v5-summary::after{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.15) 0%,transparent 65%);pointer-events:none}
+.v5-sum-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.v5-sum-lbl::before{content:'';width:20px;height:2px;background:linear-gradient(90deg,#4338ca,#7c3aed);border-radius:1px}
+.v5-sum-text{font-size:14.5px;line-height:1.8;color:#e2e8f0;margin-bottom:14px;font-weight:400}
+.v5-sum-chips{display:flex;gap:7px;flex-wrap:wrap}
+.v5-schip{font-size:11px;padding:4px 12px;border-radius:999px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);color:#a5b4fc;font-weight:500;display:flex;align-items:center;gap:5px}
 
-/* ── KPI row ─────────────────────────────────────────────────────────────────*/
-.ig-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-@media(max-width:1100px){.ig-kpi-row{grid-template-columns:repeat(2,1fr)}}
-.ig-kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both;cursor:default}
-.ig-kpi:hover{border-color:rgba(79,70,229,.35);transform:translateY(-1px)}
-.ig-kpi-ico{font-size:20px;margin-bottom:8px}
-.ig-kpi-val{font-size:26px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px}
-.ig-kpi-lbl{font-size:11px;color:var(--text2);font-weight:500}
-.ig-kpi-sub{font-size:10px;color:var(--text2);margin-top:3px;line-height:1.4}
-.ig-kpi-glow{position:absolute;bottom:-20px;right:-20px;width:80px;height:80px;border-radius:50%}
+/* ── KPI grid ─────────────────────────────────────────────────────────────────*/
+.v5-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:1100px){.v5-kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.v5-kpicard{background:linear-gradient(135deg,#0f172a,#111827);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s;animation:v5card .4s cubic-bezier(.22,1,.36,1) both;cursor:default}
+.v5-kpicard:hover{border-color:rgba(99,102,241,.3);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.v5-kpicard-ico{font-size:22px;margin-bottom:10px;display:block}
+.v5-kpicard-val{font-size:28px;font-weight:800;color:#f1f5f9;line-height:1;margin-bottom:5px;letter-spacing:-.03em}
+.v5-kpicard-lbl{font-size:12px;color:#64748b;font-weight:500;margin-bottom:3px}
+.v5-kpicard-sub{font-size:10px;color:#334155;line-height:1.4}
+.v5-kpicard-glow{position:absolute;bottom:-30px;right:-30px;width:110px;height:110px;border-radius:50%;opacity:.1;pointer-events:none}
 
-/* ── Two-col ─────────────────────────────────────────────────────────────────*/
-.ig-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
-@media(max-width:950px){.ig-two{grid-template-columns:1fr}}
-.ig-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both}
-.ig-card-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+/* ── Two-col panels ──────────────────────────────────────────────────────────*/
+.v5-two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:960px){.v5-two-col{grid-template-columns:1fr}}
+.v5-panel-card{background:#0f172a;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;animation:v5card .4s cubic-bezier(.22,1,.36,1) both}
+.v5-pcard-title{font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:14px;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
 
-/* Theme items */
-.ig-theme{border-bottom:1px solid var(--border);padding:9px 0;display:flex;gap:10px;align-items:flex-start}
-.ig-theme:last-child{border-bottom:none;padding-bottom:0}
-.ig-theme-n{font-size:14px;font-weight:700;color:var(--blue);min-width:28px;line-height:1.2}
-.ig-theme-body{flex:1;min-width:0}
-.ig-theme-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
-.ig-theme-angle{font-size:11px;color:var(--text2);line-height:1.45;margin-bottom:4px}
-.ig-cos{display:flex;gap:4px;flex-wrap:wrap}
-.ig-co-tag{font-size:9px;padding:1px 7px;border-radius:4px;background:rgba(59,130,246,.09);color:var(--blue);border:1px solid rgba(59,130,246,.18)}
+/* Themes */
+.v5-theme{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;gap:12px;align-items:flex-start}
+.v5-theme:last-child{border-bottom:none;padding-bottom:0}
+.v5-th-n{font-size:15px;font-weight:800;color:#6366f1;min-width:32px;line-height:1.2;flex-shrink:0}
+.v5-th-body{flex:1;min-width:0}
+.v5-th-name{font-size:12px;font-weight:700;color:#cbd5e1;margin-bottom:2px}
+.v5-th-angle{font-size:11px;color:#475569;line-height:1.5;margin-bottom:5px}
+.v5-th-cos{display:flex;gap:4px;flex-wrap:wrap}
+.v5-th-co{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(59,130,246,.08);color:#60a5fa;border:1px solid rgba(59,130,246,.15)}
 
-/* Risk items */
-.ig-risk{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)}
-.ig-risk:last-child{border-bottom:none;padding-bottom:0}
-.ig-risk-co{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
-.ig-risk-flag{font-size:11px;color:var(--high);margin-bottom:1px}
-.ig-risk-impl{font-size:11px;color:var(--text2);line-height:1.4}
+/* Risks */
+.v5-risk{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;gap:10px;align-items:flex-start}
+.v5-risk:last-child{border-bottom:none;padding-bottom:0}
+.v5-risk-body{flex:1;min-width:0}
+.v5-risk-co{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:2px}
+.v5-risk-flag{font-size:11px;color:#f87171;font-weight:500;margin-bottom:2px}
+.v5-risk-impl{font-size:11px;color:#475569;line-height:1.45}
 
 /* ── Pipeline grid ───────────────────────────────────────────────────────────*/
-.ig-pip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
-@media(max-width:1100px){.ig-pip-grid{grid-template-columns:repeat(2,1fr)}}
-.ig-pc{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s,box-shadow .2s,transform .2s;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both;cursor:default}
-.ig-pc:hover{border-color:rgba(79,70,229,.4);box-shadow:0 0 22px rgba(79,70,229,.1);transform:translateY(-2px)}
-.ig-pc.crit{border-color:rgba(239,68,68,.3);background:linear-gradient(135deg,#111827,rgba(239,68,68,.06))}
-.ig-pc.crit:hover{border-color:rgba(239,68,68,.55);box-shadow:0 0 22px rgba(239,68,68,.15)}
-.ig-pc-hdr{display:flex;align-items:center;gap:9px}
-.ig-av{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;letter-spacing:.02em}
-.ig-pc-info{flex:1;min-width:0}
-.ig-pc-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ig-pc-domain{font-size:10px;color:var(--text2)}
-/* Intent gauge */
-.ig-intent-lbl{font-size:10px;color:var(--text2);font-weight:500;margin-bottom:3px;display:flex;justify-content:space-between}
-.ig-intent-lbl span{font-size:13px;font-weight:700}
-.ig-bar-bg{height:6px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
-.ig-bar-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
-/* Signal badges */
-.ig-sbadges{display:flex;gap:4px;flex-wrap:wrap}
-.ig-sbadge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.18)}
-.ig-why{font-size:11px;color:var(--text2);line-height:1.55}
-.ig-svc-tags{display:flex;gap:4px;flex-wrap:wrap}
-.ig-svc{font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,.08);color:var(--green);border:1px solid rgba(16,185,129,.18)}
-.ig-opp{font-size:11px;font-weight:600;color:#fbbf24}
-.ig-next{font-size:11px;background:rgba(79,70,229,.08);border:1px solid rgba(79,70,229,.2);border-radius:7px;padding:6px 9px;color:#a5b4fc;line-height:1.4;display:flex;align-items:flex-start;gap:5px}
-.ig-next::before{content:'→';flex-shrink:0;font-weight:700}
+.v5-pip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1100px){.v5-pip-grid{grid-template-columns:repeat(2,1fr)}}
+.v5-pc{background:#0f172a;border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .25s,box-shadow .25s,transform .25s;animation:v5card .4s cubic-bezier(.22,1,.36,1) both;cursor:default}
+.v5-pc:hover{border-color:rgba(99,102,241,.35);box-shadow:0 8px 40px rgba(0,0,0,.35),0 0 0 1px rgba(99,102,241,.15) inset;transform:translateY(-3px)}
+.v5-pc.crit{border-color:rgba(239,68,68,.25)!important;background:linear-gradient(135deg,#0f172a,rgba(127,29,29,.08))}
+.v5-pc.crit:hover{border-color:rgba(239,68,68,.5)!important;box-shadow:0 8px 40px rgba(0,0,0,.35),0 0 20px rgba(239,68,68,.12)!important}
 
-/* ── Actions list ────────────────────────────────────────────────────────────*/
-.ig-act{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:13px 15px;display:flex;align-items:flex-start;gap:12px;margin-bottom:9px;transition:border-color .2s;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both}
-.ig-act.urg-HIGH{border-left:3px solid var(--high);background:linear-gradient(90deg,rgba(239,68,68,.05),var(--card))}
-.ig-act.urg-MEDIUM{border-left:3px solid var(--medium);background:linear-gradient(90deg,rgba(245,158,11,.04),var(--card))}
-.ig-rank{width:26px;height:26px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.2));border:1px solid rgba(79,70,229,.3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#a5b4fc;margin-top:1px}
-.ig-act-body{flex:1;min-width:0}
-.ig-act-main{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
-.ig-act-co{font-size:11px;color:var(--blue);font-weight:500;margin-bottom:2px}
-.ig-act-why{font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:6px}
-.ig-act-foot{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.ig-rev{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.18)}
-.ig-dl{font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(245,158,11,.08);color:var(--medium);border:1px solid rgba(245,158,11,.18)}
-.ig-upill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.04em}
-.ig-upill-HIGH{background:rgba(239,68,68,.12);color:var(--high)}
-.ig-upill-MEDIUM{background:rgba(245,158,11,.12);color:var(--medium)}
+/* PC header */
+.v5-pc-top{display:flex;align-items:flex-start;gap:11px}
+.v5-av{width:40px;height:40px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;letter-spacing:-.01em}
+.v5-pc-meta{flex:1;min-width:0;padding-top:1px}
+.v5-pc-name{font-size:13px;font-weight:700;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;letter-spacing:-.01em}
+.v5-pc-domain{font-size:10px;color:#475569}
 
-/* ── Outreach grid ───────────────────────────────────────────────────────────*/
-.ig-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
-@media(max-width:950px){.ig-out-grid{grid-template-columns:1fr}}
-.ig-oc{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 16px;display:flex;flex-direction:column;gap:9px;transition:border-color .2s,transform .2s;animation:ig-card .45s cubic-bezier(.22,1,.36,1) both;cursor:default}
-.ig-oc:hover{border-color:rgba(79,70,229,.35);transform:translateY(-1px)}
-.ig-oc-hdr{display:flex;align-items:center;gap:9px}
-.ig-oc-info{flex:1;min-width:0}
-.ig-oc-name{font-size:13px;font-weight:700;color:var(--text)}
-.ig-oc-domain{font-size:10px;color:var(--text2)}
-.ig-t-pill{font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px}
-.ig-t-now{background:rgba(239,68,68,.12);color:var(--high)}
-.ig-t-soon{background:rgba(245,158,11,.12);color:var(--medium)}
-.ig-t-watch{background:rgba(107,114,128,.12);color:var(--low)}
-.ig-hook{font-size:11px;color:var(--blue);font-style:italic;line-height:1.45}
-.ig-subj-box{background:rgba(79,70,229,.07);border:1px solid rgba(79,70,229,.2);border-radius:8px;padding:8px 10px}
-.ig-subj-hdr{font-size:9px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
-.ig-subj-txt{font-size:12px;font-weight:600;color:var(--text);line-height:1.4}
-.ig-copy{background:none;border:1px solid rgba(99,102,241,.3);border-radius:4px;color:#a5b4fc;cursor:pointer;font-size:9px;font-weight:600;padding:2px 8px;font-family:inherit;transition:all .15s}
-.ig-copy:hover{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.5)}
-.ig-copy.ok{color:var(--green);border-color:rgba(16,185,129,.4)}
-.ig-opening{font-size:11px;color:var(--text2);line-height:1.55}
-.ig-tps{display:flex;flex-direction:column;gap:4px}
-.ig-tp{font-size:11px;color:var(--text2);display:flex;gap:6px;line-height:1.45;align-items:flex-start}
-.ig-tp::before{content:'✓';color:var(--green);flex-shrink:0;font-size:10px;font-weight:700;margin-top:1px}
-.ig-cta{font-size:11px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:6px;padding:5px 9px}
+/* Ring container */
+.v5-ring-wrap{display:flex;align-items:center;gap:14px}
+.v5-ring-svg{flex-shrink:0}
+.v5-ring-info{flex:1;min-width:0}
+.v5-ring-lbl{font-size:11px;font-weight:700;margin-bottom:4px}
+.v5-ring-why{font-size:11px;color:#475569;line-height:1.5}
 
-/* ── Animations ──────────────────────────────────────────────────────────────*/
-@keyframes ig-card{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-.ig-pc:nth-child(1),.ig-oc:nth-child(1),.ig-act:nth-child(1){animation-delay:.04s}
-.ig-pc:nth-child(2),.ig-oc:nth-child(2),.ig-act:nth-child(2){animation-delay:.08s}
-.ig-pc:nth-child(3),.ig-oc:nth-child(3),.ig-act:nth-child(3){animation-delay:.12s}
-.ig-pc:nth-child(4),.ig-oc:nth-child(4),.ig-act:nth-child(4){animation-delay:.16s}
-.ig-pc:nth-child(5),.ig-oc:nth-child(5),.ig-act:nth-child(5){animation-delay:.20s}
-.ig-pc:nth-child(6),.ig-oc:nth-child(6),.ig-act:nth-child(6){animation-delay:.24s}
+/* Badges */
+.v5-sbadges{display:flex;gap:4px;flex-wrap:wrap}
+.v5-sbadge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.18)}
+
+/* Service tags */
+.v5-svcs{display:flex;gap:4px;flex-wrap:wrap}
+.v5-svc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.18)}
+.v5-opp{font-size:11px;font-weight:700;color:#fbbf24}
+.v5-next{font-size:11px;background:rgba(67,56,202,.1);border:1px solid rgba(99,102,241,.18);border-radius:8px;padding:7px 10px;color:#a5b4fc;line-height:1.5;display:flex;align-items:flex-start;gap:6px}
+.v5-next::before{content:'→';flex-shrink:0;font-weight:800;color:#6366f1}
+
+/* ── Timeline (Actions) ──────────────────────────────────────────────────────*/
+.v5-timeline{position:relative;padding-left:20px}
+.v5-timeline::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:2px;background:linear-gradient(180deg,rgba(99,102,241,.5),rgba(99,102,241,.1))}
+.v5-titem{position:relative;margin-bottom:14px;animation:v5card .4s cubic-bezier(.22,1,.36,1) both}
+.v5-titem::before{content:'';position:absolute;left:-24px;top:15px;width:10px;height:10px;border-radius:50%;border:2px solid #4338ca;background:#0f172a;z-index:1}
+.v5-titem.urg-HIGH::before{background:#ef4444;border-color:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.5)}
+.v5-titem.urg-MEDIUM::before{background:#f59e0b;border-color:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.4)}
+.v5-tcard{background:#0f172a;border:1px solid rgba(255,255,255,.06);border-radius:13px;padding:14px 16px;transition:border-color .2s,transform .2s}
+.v5-tcard:hover{border-color:rgba(99,102,241,.3);transform:translateX(3px)}
+.v5-titem.urg-HIGH .v5-tcard{border-left:3px solid rgba(239,68,68,.6);background:linear-gradient(90deg,rgba(127,29,29,.08),#0f172a)}
+.v5-titem.urg-MEDIUM .v5-tcard{border-left:3px solid rgba(180,83,9,.6);background:linear-gradient(90deg,rgba(120,53,15,.06),#0f172a)}
+.v5-tcard-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.v5-t-rank{width:24px;height:24px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);color:#818cf8;margin-top:1px}
+.v5-t-body{flex:1;min-width:0}
+.v5-t-action{font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:3px;line-height:1.3;letter-spacing:-.01em}
+.v5-t-co{font-size:11px;color:#60a5fa;font-weight:600;margin-bottom:4px}
+.v5-t-reason{font-size:12px;color:#475569;line-height:1.55;margin-bottom:8px}
+.v5-t-foot{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.v5-t-rev{font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.2)}
+.v5-t-dl{font-size:10px;padding:3px 9px;border-radius:6px;background:rgba(245,158,11,.08);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.v5-upill{font-size:9px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.04em}
+.v5-upill-HIGH{background:rgba(239,68,68,.12);color:#f87171}
+.v5-upill-MEDIUM{background:rgba(245,158,11,.1);color:#fbbf24}
+
+/* ── Email cards (Outreach) ──────────────────────────────────────────────────*/
+.v5-email-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media(max-width:960px){.v5-email-grid{grid-template-columns:1fr}}
+.v5-email{background:#0b1120;border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;animation:v5card .4s cubic-bezier(.22,1,.36,1) both}
+.v5-email:hover{border-color:rgba(99,102,241,.3);transform:translateY(-2px);box-shadow:0 8px 40px rgba(0,0,0,.4)}
+/* macOS chrome */
+.v5-email-chrome{background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06);padding:10px 14px;display:flex;align-items:center;gap:8px}
+.v5-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.v5-dot-r{background:#ef4444;opacity:.7}
+.v5-dot-y{background:#f59e0b;opacity:.7}
+.v5-dot-g{background:#10b981;opacity:.7}
+.v5-email-co{font-size:11px;font-weight:600;color:#64748b;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:2px}
+.v5-t-now{background:rgba(239,68,68,.12);color:#f87171;font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.v5-t-soon{background:rgba(245,158,11,.1);color:#fbbf24;font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.v5-t-watch{background:rgba(100,116,139,.1);color:#64748b;font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0}
+/* Email body */
+.v5-email-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.v5-hook{font-size:11px;color:#818cf8;font-style:italic;line-height:1.5;background:rgba(99,102,241,.06);border-radius:6px;padding:6px 9px;border-left:2px solid rgba(99,102,241,.4)}
+/* Subject line */
+.v5-subj{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px}
+.v5-subj-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.v5-subj-lbl{font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em}
+.v5-copy{background:none;border:1px solid rgba(99,102,241,.3);border-radius:5px;color:#818cf8;cursor:pointer;font-size:9px;font-weight:700;padding:2px 9px;font-family:inherit;transition:all .15s}
+.v5-copy:hover{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.55)}
+.v5-copy.ok{color:#34d399;border-color:rgba(16,185,129,.4)}
+.v5-subj-txt{font-size:13px;font-weight:700;color:#e2e8f0;line-height:1.4;letter-spacing:-.01em}
+.v5-opening{font-size:12px;color:#64748b;line-height:1.65}
+.v5-tps{display:flex;flex-direction:column;gap:5px}
+.v5-tp{font-size:12px;color:#475569;display:flex;gap:7px;line-height:1.5;align-items:flex-start}
+.v5-tp::before{content:'✓';color:#34d399;flex-shrink:0;font-size:10px;font-weight:800;margin-top:2px}
+.v5-cta-line{font-size:12px;font-weight:600;color:#fbbf24;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.16);border-radius:7px;padding:7px 11px;display:flex;align-items:center;gap:6px}
+.v5-cta-line::before{content:'→';font-weight:800}
+
+/* ── Global card animation ───────────────────────────────────────────────────*/
+@keyframes v5card{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.v5-pc:nth-child(1),.v5-titem:nth-child(1),.v5-email:nth-child(1),.v5-kpicard:nth-child(1){animation-delay:.04s}
+.v5-pc:nth-child(2),.v5-titem:nth-child(2),.v5-email:nth-child(2),.v5-kpicard:nth-child(2){animation-delay:.09s}
+.v5-pc:nth-child(3),.v5-titem:nth-child(3),.v5-email:nth-child(3),.v5-kpicard:nth-child(3){animation-delay:.14s}
+.v5-pc:nth-child(4),.v5-titem:nth-child(4),.v5-email:nth-child(4),.v5-kpicard:nth-child(4){animation-delay:.18s}
+.v5-pc:nth-child(5),.v5-titem:nth-child(5),.v5-email:nth-child(5){animation-delay:.22s}
+.v5-pc:nth-child(6),.v5-titem:nth-child(6),.v5-email:nth-child(6){animation-delay:.26s}
+
+/* ── Global dashboard improvements ──────────────────────────────────────────*/
+/* Sidebar upgrade */
+#sidebar{background:linear-gradient(180deg,#090d1a 0%,#0c1120 100%);border-right:1px solid rgba(99,102,241,.12)!important}
+.sidebar-logo{border-bottom:1px solid rgba(99,102,241,.1);padding-bottom:16px;margin-bottom:8px}
+.sidebar-logo span{color:#818cf8!important}
+.nav-item{border-radius:9px!important;transition:all .15s!important}
+.nav-item.active,.nav-item:hover{background:rgba(99,102,241,.14)!important;color:#a5b4fc!important}
+.nav-item.active::before{background:linear-gradient(180deg,#6366f1,#8b5cf6)!important;box-shadow:0 0 12px rgba(99,102,241,.6)!important}
+.sidebar-footer{border-top-color:rgba(99,102,241,.1)!important}
+.sidebar-user-avatar{background:linear-gradient(135deg,#4338ca,#7c3aed)!important}
+/* Topnav upgrade */
+#topnav{background:linear-gradient(180deg,#090d1a,#0c1120)!important;border-bottom-color:rgba(99,102,241,.1)!important}
+.refresh-btn{background:#059669!important;box-shadow:0 2px 12px rgba(5,150,105,.4)!important}
+.refresh-btn:hover{background:#047857!important}
+/* KPI cards upgrade */
+.kpi-card{background:linear-gradient(135deg,#0c1120,#0f1728)!important;border-color:rgba(255,255,255,.06)!important}
+.kpi-card:hover{border-color:rgba(99,102,241,.3)!important;box-shadow:0 0 28px rgba(99,102,241,.1)!important}
+/* Table upgrade */
+.table-wrap{border-color:rgba(255,255,255,.06)!important}
+.data-table thead th{background:#080c18!important;border-bottom-color:rgba(99,102,241,.12)!important}
+/* Panel card upgrade */
+.panel,.chart-card{background:linear-gradient(135deg,#0c1120,#0f1728)!important;border-color:rgba(255,255,255,.06)!important}
+/* Content background */
+#content{background:linear-gradient(160deg,rgba(99,102,241,.02) 0%,transparent 400px)}
 </style>
-
+<!-- ═══ INSIGHTS v5 JS ════════════════════════════════════════════════════ -->
 <script>
 (function(){
 'use strict';
-var _meta=null,_metaLoaded=false,_stTimer=null;
+var _meta=null,_loaded=false,_stTimer=null;
+var GRAD=['#4338ca,#7c3aed','#0e7490,#0891b2','#065f46,#059669','#92400e,#b45309'];
 
-function _id(x){return document.getElementById(x);}
-function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function _ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();}
-function _acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
+function $id(x){return document.getElementById(x);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();}
+function acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
 
-window.insOnTabOpen=function(){if(!_metaLoaded)_loadMeta();};
+/* Score ring SVG */
+function ring(score,color){
+  var r=30,c=2*Math.PI*r,off=c*(1-score/100);
+  return '<svg class="v5-ring-svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="'+r+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/><circle cx="40" cy="40" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+c+'" transform="rotate(-90 40 40)" style="transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)" data-off="'+off+'"><animate attributeName="stroke-dashoffset" from="'+c+'" to="'+off+'" dur="1.2s" fill="freeze"/></circle><text x="40" y="44" text-anchor="middle" fill="white" font-size="17" font-weight="800" font-family="Inter,sans-serif">'+score+'</text><text x="40" y="56" text-anchor="middle" fill="rgba(255,255,255,.35)" font-size="8" font-family="Inter,sans-serif">/100</text></svg>';
+}
+
+/* Animated counter */
+function countUp(el,to,suffix){
+  if(!el)return;
+  var clean=String(to).replace(/[^0-9.]/g,'');
+  var num=parseFloat(clean)||0;
+  var dur=1200,start=null;
+  function step(ts){
+    if(!start)start=ts;
+    var p=Math.min((ts-start)/dur,1);
+    var ease=1-Math.pow(1-p,3);
+    var cur=Math.round(num*ease);
+    var disp=String(to).includes('/')?(cur+'/'+String(to).split('/')[1]):
+             (suffix?cur+suffix:cur.toLocaleString());
+    el.textContent=disp;
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+window.insOnTabOpen=function(){if(!_loaded)_loadMeta();};
 
 function _loadMeta(){
-  _metaLoaded=true;
-  fetch('/api/insights-meta/'+_acct()).then(function(r){return r.json();}).then(function(d){
+  _loaded=true;
+  fetch('/api/insights-meta/'+acct()).then(function(r){return r.json();}).then(function(d){
     _meta=d;
-    var wrap=_id('ig-type-chips');if(!wrap)return;
+    var wrap=$id('v5-type-chips');if(!wrap)return;
     wrap.innerHTML='';
     (d.signal_types||[]).forEach(function(t){
       var b=document.createElement('button');
-      b.className='ig-chip ig-chip-type on';b.setAttribute('data-type',t);b.onclick=function(){igToggle(this);};
+      b.className='v5-chip v5-ch on';b.setAttribute('data-type',t);b.onclick=function(){v5Toggle(this);};
       var lbl=t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-      var cnt=d.counts&&d.counts[t]?' <span style="opacity:.6;font-size:9px">('+d.counts[t]+')</span>':'';
-      b.innerHTML=_esc(lbl)+cnt;wrap.appendChild(b);
+      var cnt=d.counts&&d.counts[t]?' <span style="opacity:.5;font-size:9px">('+d.counts[t]+')</span>':'';
+      b.innerHTML=esc(lbl)+cnt;wrap.appendChild(b);
     });
-    var sel=_id('ig-industry');if(sel)(d.industries||[]).forEach(function(i){var o=document.createElement('option');o.value=i;o.textContent=i;sel.appendChild(o);});
-    var s=_id('ig-stats');if(s)s.textContent=(d.total_signals||0).toLocaleString()+' signals · '+(d.total_companies||0).toLocaleString()+' companies';
-  }).catch(function(){var s=_id('ig-stats');if(s)s.textContent='Unavailable';});
+    var sel=$id('v5-industry');
+    if(sel)(d.industries||[]).forEach(function(i){var o=document.createElement('option');o.value=i;o.textContent=i;sel.appendChild(o);});
+    var s=$id('v5-stats');
+    if(s)s.textContent=(d.total_signals||0).toLocaleString()+' signals · '+(d.total_companies||0).toLocaleString()+' companies';
+  }).catch(function(){var s=$id('v5-stats');if(s)s.textContent='Unavailable';});
 }
 
-window.igToggle=function(btn){btn.classList.toggle('on');};
+window.v5Toggle=function(btn){btn.classList.toggle('on');};
 
-window.igTab=function(btn){
-  document.querySelectorAll('.ig-tab').forEach(function(b){b.classList.remove('active');});
+window.v5Tab=function(btn){
+  document.querySelectorAll('.v5-tab').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
-  var p=btn.getAttribute('data-panel');
-  document.querySelectorAll('.ig-panel').forEach(function(el){el.classList.remove('active');});
-  var t=_id('ig-panel-'+p);if(t){t.classList.add('active');t.querySelectorAll('[class*="ig-pc"],[class*="ig-act"],[class*="ig-oc"]').forEach(function(el){el.style.animation='none';el.offsetHeight;el.style.animation='';});}
+  var p=btn.getAttribute('data-p');
+  document.querySelectorAll('.v5-panel').forEach(function(el){el.classList.remove('active');});
+  var t=$id('v5-p-'+p);
+  if(t){t.classList.add('active');t.querySelectorAll('.v5-pc,.v5-titem,.v5-email,.v5-kpicard').forEach(function(el){el.style.animation='none';el.offsetHeight;el.style.animation='';});}
 };
 
-window.igGenerate=function(){
-  if(!_metaLoaded)_loadMeta();
-  var btn=_id('ig-gen-btn');if(btn)btn.disabled=true;
+window.v5Generate=function(){
+  if(!_loaded)_loadMeta();
+  var btn=$id('v5-gen');if(btn)btn.disabled=true;
   var p=new URLSearchParams();
-  document.querySelectorAll('#ig-type-chips .ig-chip-type.on').forEach(function(c){p.append('signal_type',c.getAttribute('data-type'));});
-  document.querySelectorAll('.ig-sev-high.on,.ig-sev-med.on,.ig-sev-low.on').forEach(function(c){p.append('severity',c.getAttribute('data-sev'));});
-  var d=_id('ig-days');if(d)p.set('days',d.value);
-  var ind=_id('ig-industry');if(ind&&ind.value)p.set('industry',ind.value);
+  document.querySelectorAll('#v5-type-chips .v5-ch.on').forEach(function(c){p.append('signal_type',c.getAttribute('data-type'));});
+  document.querySelectorAll('.v5-sev-h.on,.v5-sev-m.on,.v5-sev-l.on').forEach(function(c){p.append('severity',c.getAttribute('data-sev'));});
+  var d=$id('v5-days');if(d)p.set('days',d.value);
+  var ind=$id('v5-industry');if(ind&&ind.value)p.set('industry',ind.value);
   _showLoad();
-  fetch('/api/insights/'+_acct()+'?'+p.toString())
+  fetch('/api/insights/'+acct()+'?'+p.toString())
     .then(function(r){return r.json();})
-    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stTimer);if(data.error){_showErr(data.error);}else{_render(data);}})
+    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stTimer);data.error?_showErr(data.error):_render(data);})
     .catch(function(e){if(btn)btn.disabled=false;clearInterval(_stTimer);_showErr('Network error: '+e.message);});
 };
 
 function _showLoad(){
-  _id('ig-empty').style.display='none';var ov=_id('ig-ov');if(ov)ov.style.display='none';
-  _id('ig-load').style.display='flex';
-  document.querySelectorAll('.ig-tab').forEach(function(b){b.classList.remove('active');});
-  var ot=document.querySelector('.ig-tab[data-panel="overview"]');if(ot)ot.classList.add('active');
-  document.querySelectorAll('.ig-panel').forEach(function(p){p.classList.remove('active');});
-  var op=_id('ig-panel-overview');if(op)op.classList.add('active');
-  var prog=_id('ig-prog');if(prog){var np=prog.cloneNode(true);prog.parentNode.replaceChild(np,prog);}
-  ['ig-ls1','ig-ls2','ig-ls3'].forEach(function(id){var e=_id(id);if(e)e.classList.remove('on');});
-  var e1=_id('ig-ls1');if(e1)e1.classList.add('on');
-  clearInterval(_stTimer);var cur=0;var steps=['ig-ls1','ig-ls2','ig-ls3'];
-  _stTimer=setInterval(function(){var ec=_id(steps[cur]);if(ec)ec.classList.remove('on');cur++;if(cur>=steps.length){clearInterval(_stTimer);return;}var en=_id(steps[cur]);if(en)en.classList.add('on');},3200);
+  $id('v5-empty').style.display='none';
+  var ov=$id('v5-ov');if(ov)ov.style.display='none';
+  $id('v5-load').style.display='flex';
+  document.querySelectorAll('.v5-tab').forEach(function(b){b.classList.remove('active');});
+  var ot=document.querySelector('.v5-tab[data-p="overview"]');if(ot)ot.classList.add('active');
+  document.querySelectorAll('.v5-panel').forEach(function(el){el.classList.remove('active');});
+  var op=$id('v5-p-overview');if(op)op.classList.add('active');
+  var prog=$id('v5-prog');if(prog){var np=prog.cloneNode(true);prog.parentNode.replaceChild(np,prog);}
+  ['v5-s1','v5-s2','v5-s3'].forEach(function(id){var e=$id(id);if(e)e.classList.remove('on');});
+  var e1=$id('v5-s1');if(e1)e1.classList.add('on');
+  clearInterval(_stTimer);var cur=0,steps=['v5-s1','v5-s2','v5-s3'];
+  _stTimer=setInterval(function(){var ec=$id(steps[cur]);if(ec)ec.classList.remove('on');cur++;if(cur>=3){clearInterval(_stTimer);return;}var en=$id(steps[cur]);if(en)en.classList.add('on');},3500);
 }
 
 function _showErr(msg){
-  _id('ig-load').style.display='none';_id('ig-empty').style.display='flex';
-  var old=_id('ig-empty').querySelector('.ig-err');if(old)old.remove();
-  var d=document.createElement('div');d.id='ig-err';d.className='ig-err';
-  d.style.cssText='margin-top:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--high);max-width:420px;line-height:1.5;text-align:center';
-  d.textContent='⚠ '+msg;_id('ig-empty').appendChild(d);
-  var btn=_id('ig-gen-btn');if(btn)btn.disabled=false;
+  $id('v5-load').style.display='none';$id('v5-empty').style.display='flex';
+  var old=$id('v5-empty').querySelector('.v5-err-box');if(old)old.remove();
+  var d=document.createElement('div');d.className='v5-err-box';
+  d.style.cssText='margin-top:14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:11px 18px;font-size:12px;color:#f87171;max-width:440px;line-height:1.55;text-align:left';
+  d.innerHTML='<strong>⚠ Error:</strong> '+esc(msg);
+  $id('v5-empty').appendChild(d);
+  var btn=$id('v5-gen');if(btn)btn.disabled=false;
 }
 
 function _render(data){
   var ins=data.insights||{};
-  _renderOv(data,ins);_renderPip(ins.pipeline||[]);_renderActs(ins.actions||[]);_renderOut(ins.outreach||[]);
+  _ov(data,ins);_pip(ins.pipeline||[]);_acts(ins.actions||[]);_out(ins.outreach||[]);
   var counts=[(ins.pipeline||[]).length,(ins.actions||[]).length,(ins.outreach||[]).length];
-  ['ig-tc-pip','ig-tc-act','ig-tc-out'].forEach(function(id,i){var e=_id(id);if(e){e.textContent=counts[i];e.className='ig-tc'+(counts[i]?'  show':'');}});
-  _id('ig-load').style.display='none';var ov=_id('ig-ov');if(ov){ov.style.display='block';ov.scrollIntoView({behavior:'smooth',block:'start'});}
+  ['v5-tc-pip','v5-tc-act','v5-tc-out'].forEach(function(id,i){var e=$id(id);if(e){e.textContent=counts[i];e.style.display=counts[i]?'':'none';}});
+  $id('v5-load').style.display='none';
+  var ov=$id('v5-ov');if(ov){ov.style.display='block';ov.scrollIntoView({behavior:'smooth',block:'start'});}
 }
 
-function _renderOv(data,ins){
-  var sc=_id('ig-summary');
+function _ov(data,ins){
+  /* Summary */
+  var sc=$id('v5-summary');
   if(sc&&ins.summary){
     var vel=(ins.meta&&ins.meta.signal_velocity_trend)||'stable';
-    var velC=vel==='accelerating'?'var(--green)':vel==='slowing'?'var(--high)':'var(--medium)';
-    sc.innerHTML='<div class="ig-sum-lbl">Executive Summary</div>'
-      +'<div class="ig-sum-text">'+_esc(ins.summary)+'</div>'
-      +'<div class="ig-sum-chips">'
-        +'<span class="ig-schip">📊 '+data.signals_analyzed+' signals</span>'
-        +'<span class="ig-schip">🏢 '+data.companies_analyzed+' companies</span>'
-        +'<span class="ig-schip" style="color:'+velC+'">'+{accelerating:'🚀 Accelerating',stable:'📊 Stable',slowing:'⚠️ Slowing'}[vel]+'</span>'
-        +((ins.meta&&ins.meta.top_theme)?'<span class="ig-schip">🎯 '+_esc(ins.meta.top_theme)+'</span>':'')
-        +((ins.meta&&ins.meta.total_opportunity)?'<span class="ig-schip" style="color:#fbbf24">💰 '+_esc(ins.meta.total_opportunity)+'</span>':'')
+    var vc=vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
+    var ve=vel==='accelerating'?'🚀':vel==='slowing'?'⚠️':'📊';
+    sc.innerHTML='<div class="v5-sum-lbl">Executive Summary</div>'
+      +'<div class="v5-sum-text">'+esc(ins.summary)+'</div>'
+      +'<div class="v5-sum-chips">'
+        +'<span class="v5-schip">📊 '+data.signals_analyzed.toLocaleString()+' signals</span>'
+        +'<span class="v5-schip">🏢 '+data.companies_analyzed.toLocaleString()+' companies</span>'
+        +'<span class="v5-schip" style="color:'+vc+'">'+ve+' '+vel+'</span>'
+        +((ins.meta&&ins.meta.top_theme)?'<span class="v5-schip">🎯 '+esc(ins.meta.top_theme)+'</span>':'')
+        +((ins.meta&&ins.meta.total_opportunity)?'<span class="v5-schip" style="color:#fbbf24;border-color:rgba(251,191,36,.25)">💰 '+esc(ins.meta.total_opportunity)+'</span>':'')
       +'</div>';
   }
-  var kg=_id('ig-kpis');
+  /* KPIs */
+  var kg=$id('v5-kpis');
   if(kg){
     var kp=ins.kpis||{};
     var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
-    var kpis=[
-      {ico:'🔥',val:kp.high_priority||hot,lbl:'High-Priority',sub:'Intent score ≥ 70',g:'#ef4444'},
-      {ico:'🎯',val:kp.avg_intent?Math.round(kp.avg_intent)+'/100':'—',lbl:'Avg Intent Score',sub:'Across all pipeline',g:'#6366f1'},
-      {ico:'⚡',val:(ins.actions||[]).length,lbl:'Priority Actions',sub:'GPT-ranked next steps',g:'#f59e0b'},
-      {ico:'💰',val:kp.estimated_value||'—',lbl:'Revenue Opportunity',sub:'Addressable pipeline',g:'#10b981'},
+    var cards=[
+      {ico:'🔥',val:kp.high_priority||hot,lbl:'High-Priority Companies',sub:'Intent score ≥ 70',g:'#ef4444',raw:kp.high_priority||hot},
+      {ico:'🎯',val:kp.avg_intent?Math.round(kp.avg_intent):null,lbl:'Avg Intent Score',sub:'Across pipeline',g:'#6366f1',raw:kp.avg_intent?Math.round(kp.avg_intent):null,suffix:'/100'},
+      {ico:'⚡',val:(ins.actions||[]).length,lbl:'Priority Actions',sub:'GPT-ranked next steps',g:'#f59e0b',raw:(ins.actions||[]).length},
+      {ico:'💰',val:kp.estimated_value||'—',lbl:'Revenue Opportunity',sub:'Addressable pipeline',g:'#10b981',raw:null},
     ];
-    kg.innerHTML=kpis.map(function(k,i){return '<div class="ig-kpi" style="animation-delay:'+(i*.06)+'s">'
-      +'<div class="ig-kpi-ico">'+k.ico+'</div>'
-      +'<div class="ig-kpi-val">'+_esc(String(k.val))+'</div>'
-      +'<div class="ig-kpi-lbl">'+_esc(k.lbl)+'</div>'
-      +'<div class="ig-kpi-sub">'+_esc(k.sub)+'</div>'
-      +'<div class="ig-kpi-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div>'
-      +'</div>';}).join('');
+    kg.innerHTML=cards.map(function(k,i){
+      var v=k.raw!==null&&k.raw!==undefined?'<span id="v5-kv'+i+'">0</span>'+(k.suffix||''):esc(String(k.val));
+      return '<div class="v5-kpicard" style="animation-delay:'+(i*.06)+'s">'
+        +'<span class="v5-kpicard-ico">'+k.ico+'</span>'
+        +'<div class="v5-kpicard-val">'+v+'</div>'
+        +'<div class="v5-kpicard-lbl">'+esc(k.lbl)+'</div>'
+        +'<div class="v5-kpicard-sub">'+esc(k.sub)+'</div>'
+        +'<div class="v5-kpicard-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div>'
+        +'</div>';
+    }).join('');
+    /* Animate counters */
+    cards.forEach(function(k,i){
+      if(k.raw!==null&&k.raw!==undefined){
+        setTimeout(function(){countUp($id('v5-kv'+i),k.raw,k.suffix||'');},200+i*80);
+      }
+    });
   }
-  var tc=_id('ig-themes-card');
+  /* Themes */
+  var tc=$id('v5-themes');
   if(tc){
-    tc.innerHTML='<div class="ig-card-title">🧩 Signal Themes</div>'
+    tc.innerHTML='<div class="v5-panel-card"><div class="v5-pcard-title">🧩 Signal Themes <span style="font-size:10px;color:#334155;font-weight:400">cross-company patterns</span></div>'
       +(ins.themes||[]).slice(0,4).map(function(t){
-        var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="ig-co-tag">'+_esc(c)+'</span>';}).join('');
-        return '<div class="ig-theme"><div class="ig-theme-n">'+(t.count||'')+'x</div>'
-          +'<div class="ig-theme-body"><div class="ig-theme-name">'+_esc(t.theme||'')+'</div>'
-          +'<div class="ig-theme-angle">'+_esc(t.campaign_angle||'')+'</div>'
-          +(cos?'<div class="ig-cos">'+cos+'</div>':'')+'</div></div>';
-      }).join('');
+        var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="v5-th-co">'+esc(c)+'</span>';}).join('');
+        return '<div class="v5-theme"><div class="v5-th-n">'+(t.count||'')+'x</div>'
+          +'<div class="v5-th-body"><div class="v5-th-name">'+esc(t.theme||'')+'</div>'
+          +'<div class="v5-th-angle">'+esc(t.campaign_angle||'')+'</div>'
+          +(cos?'<div class="v5-th-cos">'+cos+'</div>':'')+'</div></div>';
+      }).join('')+'</div>';
   }
-  var rc=_id('ig-risks-card');
+  /* Risks */
+  var rc=$id('v5-risks');
   if(rc){
     var risks=ins.risks||[];
-    rc.innerHTML='<div class="ig-card-title">⚠️ Attention Flags</div>';
+    var content='<div class="v5-panel-card"><div class="v5-pcard-title">⚠️ Attention Flags <span style="font-size:10px;color:#334155;font-weight:400">companies to watch</span></div>';
     if(risks.length){
-      rc.innerHTML+=risks.slice(0,3).map(function(r){
-        return '<div class="ig-risk"><div style="font-size:15px;flex-shrink:0;margin-top:1px">⚠️</div>'
-          +'<div><div class="ig-risk-co">'+_esc(r.company||'')+'</div>'
-          +'<div class="ig-risk-flag">'+_esc(r.flag||'')+'</div>'
-          +'<div class="ig-risk-impl">'+_esc(r.implication||'')+'</div></div></div>';
+      content+=risks.slice(0,4).map(function(r){
+        return '<div class="v5-risk"><div style="font-size:15px;flex-shrink:0;margin-top:2px">⚠️</div>'
+          +'<div class="v5-risk-body"><div class="v5-risk-co">'+esc(r.company||'')+'</div>'
+          +'<div class="v5-risk-flag">'+esc(r.flag||'')+'</div>'
+          +'<div class="v5-risk-impl">'+esc(r.implication||'')+'</div></div></div>';
       }).join('');
-    } else {
-      rc.innerHTML+='<div style="font-size:12px;color:var(--text2);padding:18px 0;text-align:center">✅ No critical flags detected</div>';
+    }else{
+      content+='<div style="font-size:12px;color:#334155;padding:18px 0;text-align:center">✅ No critical flags in this signal set</div>';
     }
+    rc.innerHTML=content+'</div>';
   }
 }
 
-function _renderPip(pip){
-  var g=_id('ig-pip');if(!g)return;
-  if(!pip.length){g.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);font-size:13px;grid-column:1/-1">No pipeline data. Try a broader filter.</div>';return;}
-  g.innerHTML=pip.slice(0,9).map(function(co){
+function _pip(pip){
+  var g=$id('v5-pip');if(!g)return;
+  if(!pip.length){g.innerHTML='<div style="text-align:center;padding:60px;color:#334155;font-size:13px;grid-column:1/-1">No pipeline data. Try a broader filter or re-generate.</div>';return;}
+  var colors=['#ef4444','#ef4444','#f59e0b','#f59e0b','#6366f1','#6366f1','#6366f1','#6366f1','#6366f1'];
+  g.innerHTML=pip.slice(0,9).map(function(co,idx){
     var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
     var bc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-    var lbl=sc>=80?'🔥 Critical Intent':sc>=60?'⚡ High Intent':'👀 Watching';
-    var cls=sc>=80?'ig-pc crit':'ig-pc';
-    var sigs=(co.signals||[]).map(function(s){return '<span class="ig-sbadge">'+_esc(s)+'</span>';}).join('');
-    var svcs=(co.service_fit||[]).map(function(s){return '<span class="ig-svc">'+_esc(s)+'</span>';}).join('');
-    return '<div class="'+cls+'">'
-      +'<div class="ig-pc-hdr"><div class="ig-av">'+_esc(_ini(co.name))+'</div>'
-        +'<div class="ig-pc-info"><div class="ig-pc-name">'+_esc(co.name||'')+'</div><div class="ig-pc-domain">'+_esc(co.domain||'')+'</div></div>'
+    var lbl=sc>=80?'<span style="color:#f87171">🔥 Critical</span>':sc>=60?'<span style="color:#fbbf24">⚡ High</span>':'<span style="color:#818cf8">👀 Watching</span>';
+    var g2=GRAD[idx%GRAD.length].split(',');
+    var sigs=(co.signals||[]).map(function(s){return '<span class="v5-sbadge">'+esc(s)+'</span>';}).join('');
+    var svcs=(co.service_fit||[]).map(function(s){return '<span class="v5-svc">'+esc(s)+'</span>';}).join('');
+    return '<div class="v5-pc'+(sc>=80?' crit':'')+'">'
+      +'<div class="v5-pc-top">'
+        +'<div class="v5-av" style="background:linear-gradient(135deg,'+g2[0]+','+g2[1]+')">'+esc(ini(co.name))+'</div>'
+        +'<div class="v5-pc-meta"><div class="v5-pc-name">'+esc(co.name||'')+'</div><div class="v5-pc-domain">'+esc(co.domain||'')+'</div></div>'
       +'</div>'
-      +'<div><div class="ig-intent-lbl">'+lbl+'<span style="color:'+bc+'">'+sc+'</span></div>'
-        +'<div class="ig-bar-bg"><div class="ig-bar-fill" style="width:0;background:'+bc+'" data-w="'+sc+'"></div></div>'
-      +'</div>'
-      +(sigs?'<div class="ig-sbadges">'+sigs+'</div>':'')
-      +'<div class="ig-why">'+_esc(co.why_now||'')+'</div>'
-      +(svcs?'<div class="ig-svc-tags">'+svcs+'</div>':'')
-      +(co.opportunity?'<div class="ig-opp">💰 '+_esc(co.opportunity)+'</div>':'')
-      +'<div class="ig-next">'+_esc(co.next_step||'')+'</div>'
+      +'<div class="v5-ring-wrap">'+ring(sc,bc)+'<div class="v5-ring-info"><div class="v5-ring-lbl">'+lbl+'</div><div class="v5-ring-why">'+esc(co.why_now||'')+'</div></div></div>'
+      +(sigs?'<div class="v5-sbadges">'+sigs+'</div>':'')
+      +(svcs?'<div class="v5-svcs">'+svcs+'</div>':'')
+      +(co.opportunity?'<div class="v5-opp">💰 '+esc(co.opportunity)+'</div>':'')
+      +'<div class="v5-next">'+esc(co.next_step||'')+'</div>'
     +'</div>';
   }).join('');
-  setTimeout(function(){g.querySelectorAll('.ig-bar-fill').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});},150);
 }
 
-function _renderActs(acts){
-  var c=_id('ig-acts');if(!c)return;
-  if(!acts.length){c.innerHTML='<div style="text-align:center;padding:48px;color:var(--text2);font-size:13px">No actions. Try re-generating.</div>';return;}
+function _acts(acts){
+  var c=$id('v5-acts');if(!c)return;
+  if(!acts.length){c.innerHTML='<div style="text-align:center;padding:60px;color:#334155;font-size:13px">No actions generated. Re-generate with broader filters.</div>';return;}
   c.innerHTML=acts.map(function(a){
     var uc='urg-'+(a.urgency||'MEDIUM');
-    var ico=a.type==='outreach'?'📧':a.type==='campaign'?'📣':a.type==='meeting'?'🤝':a.type==='proposal'?'📄':'⚡';
-    return '<div class="ig-act '+uc+'">'
-      +'<div class="ig-rank">'+(a.rank||'')+'</div>'
-      +'<div class="ig-act-body">'
-        +'<div class="ig-act-main">'+ico+' '+_esc(a.action||'')+'</div>'
-        +(a.company&&a.company!=='All'?'<div class="ig-act-co">🏢 '+_esc(a.company)+'</div>':'')
-        +'<div class="ig-act-why">'+_esc(a.reason||'')+'</div>'
-        +'<div class="ig-act-foot">'
-          +(a.revenue_impact?'<span class="ig-rev">💰 '+_esc(a.revenue_impact)+'</span>':'')
-          +(a.deadline?'<span class="ig-dl">⏱ '+_esc(a.deadline)+'</span>':'')
-          +'<span class="ig-upill ig-upill-'+(a.urgency||'MEDIUM')+'">'+_esc(a.urgency||'MEDIUM')+'</span>'
-        +'</div>'
-      +'</div>'
-    +'</div>';
+    var ico=({outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'})[a.type]||'⚡';
+    return '<div class="v5-titem '+uc+'">'
+      +'<div class="v5-tcard">'
+        +'<div class="v5-tcard-top"><div class="v5-t-rank">'+(a.rank||'')+'</div>'
+          +'<div class="v5-t-body"><div class="v5-t-action">'+ico+' '+esc(a.action||'')+'</div>'
+          +(a.company&&a.company!=='All'?'<div class="v5-t-co">🏢 '+esc(a.company)+'</div>':'')
+          +'<div class="v5-t-reason">'+esc(a.reason||'')+'</div>'
+          +'<div class="v5-t-foot">'
+            +(a.revenue_impact?'<span class="v5-t-rev">💰 '+esc(a.revenue_impact)+'</span>':'')
+            +(a.deadline?'<span class="v5-t-dl">⏱ '+esc(a.deadline)+'</span>':'')
+            +'<span class="v5-upill v5-upill-'+(a.urgency||'MEDIUM')+'">'+esc(a.urgency||'MEDIUM')+'</span>'
+          +'</div></div></div>'
+      +'</div></div>';
   }).join('');
 }
 
-function _renderOut(out){
-  var g=_id('ig-out');if(!g)return;
-  if(!out.length){g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--text2);font-size:13px">No outreach data.</div>';return;}
-  g.innerHTML=out.map(function(ot){
+function _out(out){
+  var g=$id('v5-out');if(!g)return;
+  if(!out.length){g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:#334155;font-size:13px">No outreach data.</div>';return;}
+  g.innerHTML=out.map(function(ot,idx){
     var t=(ot.timing||'watch').toLowerCase();
-    var tps=(ot.talking_points||[]).map(function(tp){return '<div class="ig-tp">'+_esc(tp)+'</div>';}).join('');
-    var sid='s'+Math.random().toString(36).substr(2,8);
-    return '<div class="ig-oc">'
-      +'<div class="ig-oc-hdr"><div class="ig-av">'+_esc(_ini(ot.company))+'</div>'
-        +'<div class="ig-oc-info"><div class="ig-oc-name">'+_esc(ot.company||'')+'</div><div class="ig-oc-domain">'+_esc(ot.domain||'')+'</div></div>'
-        +'<span class="ig-t-pill ig-t-'+t+'">'+t.toUpperCase()+'</span>'
+    var tps=(ot.talking_points||[]).map(function(tp){return '<div class="v5-tp">'+esc(tp)+'</div>';}).join('');
+    var sid='vs'+idx+'_'+Math.random().toString(36).substr(2,5);
+    var g2=GRAD[idx%GRAD.length].split(',');
+    return '<div class="v5-email">'
+      +'<div class="v5-email-chrome">'
+        +'<div class="v5-dot v5-dot-r"></div><div class="v5-dot v5-dot-y"></div><div class="v5-dot v5-dot-g"></div>'
+        +'<div class="v5-email-co">To: '+esc(ot.company||'')+' · '+esc(ot.domain||'')+'</div>'
+        +'<span class="v5-t-'+t+'">'+t.toUpperCase()+'</span>'
       +'</div>'
-      +(ot.signal_hook?'<div class="ig-hook">📡 '+_esc(ot.signal_hook)+'</div>':'')
-      +'<div class="ig-subj-box">'
-        +'<div class="ig-subj-hdr">Subject Line <button class="ig-copy" onclick="igCopy(this,\''+sid+'\')">Copy</button></div>'
-        +'<div class="ig-subj-txt" id="'+sid+'">'+_esc(ot.subject||'')+'</div>'
-      +'</div>'
-      +(ot.opening?'<div class="ig-opening">'+_esc(ot.opening)+'</div>':'')
-      +(tps?'<div class="ig-tps">'+tps+'</div>':'')
-      +(ot.cta?'<div class="ig-cta">CTA → '+_esc(ot.cta)+'</div>':'')
-    +'</div>';
+      +'<div class="v5-email-body">'
+        +(ot.signal_hook?'<div class="v5-hook">📡 '+esc(ot.signal_hook)+'</div>':'')
+        +'<div class="v5-subj">'
+          +'<div class="v5-subj-hdr"><span class="v5-subj-lbl">Subject</span>'
+            +'<button class="v5-copy" onclick="v5Copy(this,\''+sid+'\')">Copy</button></div>'
+          +'<div class="v5-subj-txt" id="'+sid+'">'+esc(ot.subject||'')+'</div>'
+        +'</div>'
+        +(ot.opening?'<div class="v5-opening">'+esc(ot.opening)+'</div>':'')
+        +(tps?'<div class="v5-tps">'+tps+'</div>':'')
+        +(ot.cta?'<div class="v5-cta-line">'+esc(ot.cta)+'</div>':'')
+      +'</div></div>';
   }).join('');
 }
 
-window.igCopy=function(btn,id){
+window.v5Copy=function(btn,id){
   var el=document.getElementById(id);if(!el)return;
   navigator.clipboard&&navigator.clipboard.writeText(el.textContent).then(function(){
     btn.textContent='✓ Copied';btn.classList.add('ok');
@@ -4384,5 +4422,6 @@ window.igCopy=function(btn,id){
 };
 })();
 </script>
+
 </body>
 </html>
