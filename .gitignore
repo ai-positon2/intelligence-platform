@@ -3,9 +3,7 @@ config.yaml
 service_account.json
 .env
 
-# Database
-data/tracker.db
-data/*.db
+# Database (committed so Railway chatbot can read them; re-commit after --dashboard-only refresh)
 
 # Python
 __pycache__/
