@@ -1350,7 +1350,8 @@ def ppc_chat():
 
     body         = request.json or {}
     user_message = body.get("message", "").strip()
-    history      = body.get("history", [])[-6:]
+    history      = body.get("history", [])[-12:]   # up to 12 turns of context
+    memories     = body.get("memories", [])         # persistent facts saved by user
 
     # ── Attached file (optional) ────────────────────────────────────────────
     file_name     = body.get("file_name", "")
@@ -1394,6 +1395,14 @@ HOW TO ANSWER:
 {ppc_context}
 ═══════════════════════════════════════════════════════════════
 """
+
+    # Append persistent memories to system prompt
+    if memories:
+        memory_block = "\n\n════ USER'S SAVED MEMORIES ════\n" + \
+                       "\n".join(f"• {m}" for m in memories[:30]) + \
+                       "\n(These are facts the user explicitly asked you to remember. " \
+                       "Always factor them into your answers.)"
+        system_prompt += memory_block
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history

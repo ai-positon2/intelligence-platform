@@ -405,6 +405,17 @@
           <div class="ppc-hdr-title">PPC Assistant</div>
           </div>
         <div class="ppc-hdr-btns">
+          <!-- Memory button -->
+          <button class="ppc-hbtn" id="ppc-mem-btn" onclick="ppcShowMemory()" aria-label="View memory" title="Saved memories" style="position:relative">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+            </svg>
+            <span id="ppc-mem-badge" style="display:none;position:absolute;top:-4px;right:-4px;
+              width:14px;height:14px;border-radius:50%;background:#6366f1;
+              font-size:8px;font-weight:700;color:#fff;align-items:center;justify-content:center;
+              border:1.5px solid #080a18;"></span>
+          </button>
           <!-- Expand toggle -->
           <button class="ppc-hbtn" id="ppc-expand-btn" onclick="ppcToggleExpand()" aria-label="Expand">
             <svg id="ppc-expand-ico" width="13" height="13" fill="none" viewBox="0 0 24 24">
@@ -488,8 +499,100 @@
   var _busy      = false;
   var _fresh     = true;
   var _expanded  = false;
-  var _file      = null;   // {name, is_image, mime, base64, content, chars, truncated}
+  var _file      = null;
   var _uploading = false;
+  var _memories  = [];     // persistent facts saved by user
+
+  /* ── Persistence helpers ── */
+  var _HIST_KEY = 'ppc_chat_hist_v1';
+  var _MEM_KEY  = 'ppc_chat_mem_v1';
+
+  function _loadPersisted() {
+    try {
+      var h = localStorage.getItem(_HIST_KEY);
+      if (h) _hist = JSON.parse(h).slice(-24);
+      var m = localStorage.getItem(_MEM_KEY);
+      if (m) _memories = JSON.parse(m);
+    } catch(e) {}
+  }
+
+  function _saveHist() {
+    try { localStorage.setItem(_HIST_KEY, JSON.stringify(_hist.slice(-24))); } catch(e) {}
+  }
+
+  function _saveMem() {
+    try { localStorage.setItem(_MEM_KEY, JSON.stringify(_memories)); } catch(e) {}
+    _updateMemBadge();
+  }
+
+  function _updateMemBadge() {
+    var badge = document.getElementById('ppc-mem-badge');
+    if (badge) {
+      badge.textContent = _memories.length || '';
+      badge.style.display = _memories.length ? 'flex' : 'none';
+    }
+  }
+
+  // Run on load
+  _loadPersisted();
+
+  /* ── Memory commands ── */
+  window.ppcShowMemory = function () {
+    if (_memories.length === 0) {
+      _addMsg('assistant', '🧠 No saved memories yet.\n\nSay **"remember that [fact]"** to save something permanently. Example:\n• "remember that our main focus is healthcare PPC"\n• "remember that our target CPA is $120"');
+    } else {
+      _addMsg('assistant', '🧠 **Saved memories** (' + _memories.length + '):\n\n' +
+        _memories.map(function(m, i){ return (i+1) + '. ' + m; }).join('\n') +
+        '\n\nSay **"forget [fact]"** to remove one, or **"clear all memories"** to wipe everything.');
+    }
+    if (!document.getElementById('ppc-border').classList.contains('open')) ppcOpen();
+    var wlc = document.getElementById('ppc-welcome');
+    if (wlc) wlc.remove();
+  };
+
+  function _handleMemoryCommand(msg) {
+    var lower = msg.toLowerCase().trim();
+
+    // "remember that X" or "remember X"
+    var remMatch = msg.match(/^remember\s+(that\s+)?(.+)/i);
+    if (remMatch) {
+      var fact = remMatch[2].trim();
+      _memories.push(fact);
+      _saveMem();
+      _addMsg('assistant', '🧠 Got it — I\'ll remember:\n**"' + fact + '"**\n\nThis will carry over to every future conversation.');
+      return true;
+    }
+
+    // "forget X"
+    var forgetMatch = msg.match(/^forget\s+(?!everything|all)(.+)/i);
+    if (forgetMatch) {
+      var target = forgetMatch[1].trim().toLowerCase();
+      var before = _memories.length;
+      _memories = _memories.filter(function(m){ return !m.toLowerCase().includes(target); });
+      _saveMem();
+      var removed = before - _memories.length;
+      _addMsg('assistant', removed > 0
+        ? '🗑️ Removed ' + removed + ' memor' + (removed === 1 ? 'y' : 'ies') + ' matching "' + target + '".'
+        : '❓ No memory found matching "' + target + '".');
+      return true;
+    }
+
+    // "clear all memories" / "forget everything"
+    if (/^(clear all memories|forget everything|clear memory|reset memory)$/i.test(lower)) {
+      _memories = [];
+      _saveMem();
+      _addMsg('assistant', '🗑️ All memories cleared.');
+      return true;
+    }
+
+    // "what do you remember" / "show memory"
+    if (/what do you remember|show memory|my memories|list memories/i.test(lower)) {
+      ppcShowMemory();
+      return true;
+    }
+
+    return false;
+  }
 
   /* ── Open / close ── */
   window.ppcOpen = function () {
@@ -499,10 +602,31 @@
     btn.classList.toggle('open', !isOpen);
     border.classList.toggle('open', !isOpen);
     if (!isOpen) {
-      if (_fresh) { _fresh = false; _welcome(); }
+      if (_fresh) {
+        _fresh = false;
+        _updateMemBadge();
+        if (_hist.length > 0) {
+          _restoreSession();
+        } else {
+          _welcome();
+        }
+      }
       setTimeout(function () { document.getElementById('ppc-input').focus(); }, 380);
     }
   };
+
+  function _restoreSession() {
+    var msgs = document.getElementById('ppc-msgs');
+    // Show last few exchanges from previous session
+    var recent = _hist.slice(-8);
+    var notice = document.createElement('div');
+    notice.style.cssText = 'text-align:center;padding:8px 12px;font-size:10.5px;color:#475569;font-family:\'Space Grotesk\',sans-serif;';
+    notice.innerHTML = '— Resuming previous session —';
+    msgs.appendChild(notice);
+    recent.forEach(function(turn) {
+      _addMsg(turn.role, turn.content);
+    });
+  }
 
   /* ── Expand / collapse ── */
   window.ppcToggleExpand = function () {
@@ -640,6 +764,16 @@
     inp.value = ''; inp.style.height = 'auto';
     _updateCharCount('');
 
+    // Intercept memory commands — handle locally, no API call needed
+    if (msg && !_file && _handleMemoryCommand(msg)) {
+      _addMsg('user', msg);     // show what user typed
+      var msgs = document.getElementById('ppc-msgs');
+      // Move the user msg before the assistant response (already appended by _handleMemoryCommand)
+      var rows = msgs.querySelectorAll('.ppc-row');
+      if (rows.length >= 2) msgs.insertBefore(rows[rows.length-2], rows[rows.length-1]);
+      return;
+    }
+
     // Build display message
     var displayMsg = msg;
     if (_file) displayMsg = (_file.is_image ? '🖼️ ' : _fileIco(_file.name) + ' ') + _file.name + (msg ? '\n' + msg : '');
@@ -647,9 +781,10 @@
 
     var histMsg = msg || 'Analyse this file.';
     _hist.push({ role: 'user', content: histMsg });
+    _saveHist();
 
-    // Build payload
-    var payload = { message: msg || '', history: _hist.slice(-6) };
+    // Build payload — include persistent memories
+    var payload = { message: msg || '', history: _hist.slice(-12), memories: _memories };
     if (_file) {
       payload.file_name      = _file.name;
       payload.file_is_image  = _file.is_image;
@@ -678,6 +813,7 @@
       var ans = d.answer || 'No response received.';
       _addMsg('assistant', ans);
       _hist.push({ role: 'assistant', content: ans });
+      _saveHist();
     })
     .catch(function () {
       loader.remove();
