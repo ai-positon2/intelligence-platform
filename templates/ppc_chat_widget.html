@@ -866,17 +866,22 @@
     .then(function (d) {
       loader.remove();
       var ans = d.answer || 'No response received.';
-      var row = _addMsg('assistant', d.is_export ? '✅ Here\'s your formatted data:' : ans);
-      if (d.is_export && d.answer) {
-        // Show the formatted data in a code-like block + download button
+      var fmt = d.detected_format || d.export_format || '';
+      var isCsv = d.is_csv || fmt === 'csv' || fmt === 'excel';
+      var isExport = d.is_export || (fmt && (isCsv || fmt === 'json' || fmt === 'table'));
+
+      var row = _addMsg('assistant', isExport ? '✅ Here\'s your data:' : ans);
+      if (isExport && d.answer) {
         var bubble = row.querySelector('.ppc-bubble');
         var pre = document.createElement('pre');
         pre.style.cssText = 'background:rgba(0,0,0,.3);border-radius:8px;padding:10px;' +
           'font-size:11px;color:#94a3b8;overflow-x:auto;margin-top:8px;white-space:pre-wrap;' +
-          'max-height:160px;overflow-y:auto;font-family:monospace;';
-        pre.textContent = d.answer.slice(0, 800) + (d.answer.length > 800 ? '\n...' : '');
+          'max-height:200px;overflow-y:auto;font-family:monospace;line-height:1.5;';
+        pre.textContent = d.answer.slice(0, 1200) + (d.answer.length > 1200 ? '\n...' : '');
         bubble.appendChild(pre);
-        _addDownloadBtn(bubble, d.answer, d.export_format || 'csv');
+        _addDownloadBtn(bubble, d.answer, fmt || 'csv');
+      } else if (!isExport) {
+        // normal response — nothing extra needed
       }
       _hist.push({ role: 'assistant', content: ans });
       _saveHist();

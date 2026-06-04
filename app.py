@@ -1370,8 +1370,22 @@ def ppc_chat():
     if not user_message and has_file:
         user_message = f"Please analyse the attached file '{file_name}' and summarise the key information."
 
+    # ── Detect format keyword in the user's message itself ───────────────────
+    import re as _re
+    _fmt_map = {
+        r'\bexcel\b|\bxlsx\b':       'excel',
+        r'\bcsv\b':                  'csv',
+        r'\bjson\b':                  'json',
+        r'\btable format\b|\bin a table\b|\bspreadsheet\b': 'table',
+    }
+    if not export_fmt:
+        for pattern, fmt in _fmt_map.items():
+            if _re.search(pattern, user_message, _re.I):
+                export_fmt = fmt
+                break
+
     # ── FORMAT / EXPORT REQUEST — handle separately, no PPC context needed ──
-    # Triggered when user asks to reformat the previous response as CSV/Excel/table/JSON
+    # Triggered when user asks to reformat a *previous* response
     if export_fmt and source_text:
         fmt_instructions = {
             "csv":   "Convert the data to clean CSV with a header row. Use comma separators. Output ONLY the CSV — no explanation, no markdown, no code block.",
@@ -1388,12 +1402,10 @@ def ppc_chat():
             {"role": "user", "content": f"{instruction}\n\nDATA TO REFORMAT:\n{source_text}"},
         ]
         try:
-            resp = oai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=reformat_messages,
-                max_tokens=2000,
-                temperature=0,
-            )
+            try:
+                resp = oai.chat.completions.create(model="gpt-4.1", messages=reformat_messages, max_tokens=2000, temperature=0)
+            except Exception:
+                resp = oai.chat.completions.create(model="gpt-4o-mini", messages=reformat_messages, max_tokens=2000, temperature=0)
             formatted = resp.choices[0].message.content.strip()
             is_csv = export_fmt in ("csv", "excel")
             return jsonify({"answer": formatted, "is_export": True,
@@ -1408,47 +1420,38 @@ def ppc_chat():
     today      = now_ist.strftime("%Y-%m-%d")
     week_start = (now_ist - timedelta(days=now_ist.weekday())).strftime("%Y-%m-%d")
 
-    system_prompt = f"""You are the PPC Intelligence Assistant for Position2 (a B2B marketing agency). \
-You are sharp, helpful, and always give accurate answers based on the live data below.
+    # Build format instruction if a format was requested in this message
+    fmt_instruction = ""
+    if export_fmt:
+        fmt_map = {
+            "excel": "Return the data as clean CSV (Excel-compatible) with a header row. Only output the CSV rows — no prose, no markdown fences.",
+            "csv":   "Return the data as clean CSV with a header row. Only output the CSV rows — no prose, no markdown fences.",
+            "json":  "Return the data as a valid JSON array of objects. Only output the JSON.",
+            "table": "Return the data formatted as a clean markdown table with headers.",
+        }
+        fmt_instruction = f"\n\nOUTPUT FORMAT REQUIRED: {fmt_map.get(export_fmt, f'Format the output as {export_fmt}.')}\nDo NOT include any explanation before or after the data."
 
-TODAY: {today}  |  WEEK STARTED: {week_start}
-"This week" = {week_start} to {today}. "Yesterday" = {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}.
-"Last N" = take the first N rows from the relevant list (data is newest-first).
+    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B marketing agency.
+You are highly intelligent, direct, and always give complete answers in one response — no follow-up questions.
 
-════ HOW TO ANSWER ════
+TODAY: {today} | THIS WEEK: {week_start} to {today} | YESTERDAY: {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}
+"Last N" = first N rows of the relevant list (data is newest-first).
 
-RULE 1 — READ FROM THE DATA
-Look at the correct section (VISITORS, SIGNALS, or ADS) and pull exact facts.
-Never make up numbers or say "I cannot access" when data is already provided below.
-
-RULE 2 — FORMAT REQUESTS ARE ABOUT OUTPUT, NOT DATA SOURCES
-If the user says "give me this in Excel", "CSV format", "as a table", "export this", "download" —
-they want the PREVIOUS ANSWER reformatted. Respond: "Sure! What data specifically would you like exported?"
-or summarise the relevant data in a tabular format.
-NEVER confuse "Excel format" with the Ad Intelligence Google Sheet or any data source error.
-
-RULE 3 — BE ANALYTICAL
-Don't just list. Highlight the most interesting finding. Bold **key numbers**.
-Bullet points for lists. Keep under 180 words unless asked for more detail.
-
-RULE 4 — IF DATA IS MISSING
-If a section has ⚠ Error, say that specific source is unavailable — but still answer from other sources.
-Never refuse to answer entirely just because one source has an error.
-
-RULE 5 — GENERAL QUESTIONS
-For general PPC/marketing questions not needing live data, answer directly from knowledge.
-Don't say "I only have access to..." — just answer helpfully.
+INSTRUCTIONS:
+- Answer every question fully using the live data below. Never say "I can't access" when data is provided.
+- If asked for "last 10 companies in excel" — pull the last 10 companies AND return them in the requested format. Never ask for clarification when the request is clear.
+- "Excel format", "CSV", "table", "JSON" = format the output that way. Not about any Google Sheet.
+- If a data section shows ⚠ Error, say that source is unavailable but answer from what's available.
+- Be analytical: bold **key numbers**, use bullets for lists, lead with the most useful insight.
+- For general PPC/marketing questions, answer from knowledge directly.{fmt_instruction}
 
 ══════════════════════════ LIVE DATA ══════════════════════════
 {ppc_context}
 ═══════════════════════════════════════════════════════════════
 """
-
-    # Persistent memories
     if memories:
-        system_prompt += "\n\n════ SAVED MEMORIES ════\n" + \
-                         "\n".join(f"• {m}" for m in memories[:30]) + \
-                         "\n(Always factor these into answers.)"
+        system_prompt += "\n\nSAVED MEMORIES (always apply these):\n" + \
+                         "\n".join(f"• {m}" for m in memories[:30])
 
     messages = [{"role": "system", "content": system_prompt}]
     messages += history
@@ -1480,14 +1483,27 @@ Don't say "I only have access to..." — just answer helpfully.
     else:
         messages.append({"role": "user", "content": user_message})
 
+    # Try best available model, fall back if not on this project's tier
+    def _chat(model):
+        return oai.chat.completions.create(
+            model=model, messages=messages, max_tokens=1200, temperature=0.1)
+
     try:
-        resp = oai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=800,
-            temperature=0.1,
-        )
-        return jsonify({"answer": resp.choices[0].message.content})
+        try:
+            resp = _chat("gpt-4.1")
+        except Exception:
+            try:
+                resp = _chat("gpt-4o")
+            except Exception:
+                resp = _chat("gpt-4o-mini")
+
+        answer = resp.choices[0].message.content
+        return jsonify({
+            "answer":          answer,
+            "detected_format": export_fmt or "",
+            "is_export":       bool(export_fmt and not source_text),
+            "is_csv":          export_fmt in ("csv", "excel"),
+        })
     except Exception as e:
         log.warning("PPC chat error: %s", e)
         return jsonify({"answer": f"Something went wrong: {str(e)}"}), 200
