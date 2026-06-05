@@ -1110,6 +1110,306 @@ h2::after,.section-title::after{
 }
 </style>
 <style>.sidebar-nav .badge-count{display:none!important}</style>
+<style>
+/* ── INSIGHTS STANDALONE v7 ─────────────────────────────────────────────── */
+#section-insights{margin:-20px -24px;padding:0;min-height:calc(100vh - 56px);display:none;flex-direction:column}
+#section-insights.active{display:flex!important}
+
+/* background */
+.ir-body{flex:1;overflow-y:auto;padding:20px 24px;
+  background:radial-gradient(ellipse 55% 40% at 12% 12%,rgba(67,56,202,.2) 0%,transparent 50%),
+             radial-gradient(ellipse 45% 35% at 88% 82%,rgba(124,58,237,.15) 0%,transparent 50%),
+             linear-gradient(160deg,#020817 0%,#060c18 100%)}
+#content{background:#020817!important}
+
+/* ── Control bar ─────────────────────────────────────────────────────────── */
+.ir-bar{background:#09101f;border-bottom:1px solid rgba(255,255,255,.07);padding:14px 24px 0;flex-shrink:0;position:sticky;top:56px;z-index:89}
+.ir-bar-top{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-bottom:12px;min-width:0}
+.ir-brand{display:flex;align-items:center;gap:8px;flex-shrink:0;color:#6366f1}
+.ir-atom-svg{flex-shrink:0}
+.ir-brand-name{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;white-space:nowrap}
+.ir-ai{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#1e1b4b;color:#a5b4fc;flex-shrink:0}
+.ir-filters{display:flex;align-items:center;gap:7px;flex:1;min-width:0;overflow:hidden;flex-wrap:nowrap}
+.ir-ddwrap{position:relative;flex-shrink:0}
+.ir-pill{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#64748b;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;padding:5px 9px;transition:all .15s;white-space:nowrap}
+.ir-pill:hover{border-color:rgba(255,255,255,.18);color:#94a3b8}
+.ir-pill-ct{background:rgba(255,255,255,.06);border-radius:4px;padding:0 5px;font-size:9px;font-weight:700;color:#475569}
+.ir-dropdown{position:absolute;top:calc(100% + 5px);left:0;background:#0c1428;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.7);z-index:300;min-width:190px;padding:6px;max-height:260px;overflow-y:auto}
+.ir-dd-item{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .1s}
+.ir-dd-item:hover{background:rgba(255,255,255,.05)}
+.ir-dd-item label{font-size:11px;color:#64748b;cursor:pointer;flex:1}
+.ir-dd-item input{accent-color:#4338ca;cursor:pointer}
+.ir-dd-item .ir-dd-cnt{font-size:9px;color:#1e293b}
+.ir-sev{display:flex;gap:2px;background:#060c18;border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:2px;flex-shrink:0}
+.ir-sv{background:none;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:3px 8px;color:#1e293b;transition:all .15s}
+.ir-sv.on[data-s="HIGH"]{background:#7f1d1d;color:#fca5a5}
+.ir-sv.on[data-s="MEDIUM"]{background:#78350f;color:#fcd34d}
+.ir-sv.on[data-s="LOW"]{background:#1e293b;color:#64748b}
+.ir-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#64748b;border-radius:7px;padding:4px 22px 4px 8px;font-size:11px;font-family:inherit;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;flex-shrink:0}
+.ir-sel option{background:#0c1428}
+.ir-stat{font-size:10px;color:#1e293b;white-space:nowrap;flex-shrink:0}
+.ir-gen{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;background:#4338ca;border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;transition:all .15s;white-space:nowrap}
+.ir-gen:hover{background:#3730a3;transform:translateY(-1px)}
+.ir-gen:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.ir-gen-lg{display:inline-flex;align-items:center;gap:8px;background:#4338ca;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:11px 26px;margin-top:20px;transition:all .15s}
+.ir-gen-lg:hover{background:#3730a3;transform:translateY(-1px)}
+.ir-tabs{display:flex;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.07);margin:0 -24px;padding:0 24px}
+.ir-tabs::-webkit-scrollbar{height:0}
+.ir-tab{background:none;border:none;border-bottom:2px solid transparent;color:#334155;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;margin-bottom:-1px;padding:8px 14px;transition:color .15s,border-color .15s;white-space:nowrap;flex-shrink:0}
+.ir-tab:hover{color:#64748b}
+.ir-tab.active{color:#e2e8f0;border-bottom-color:#4338ca}
+.ir-tc{background:rgba(67,56,202,.15);color:#818cf8;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:4px}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+.ir-panel{display:none}.ir-panel.active{display:block;animation:ir-in .25s ease both}
+@keyframes ir-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Empty / Loading ─────────────────────────────────────────────────────── */
+.ir-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;text-align:center;padding:24px}
+.ir-empty-orb{width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#1e1b4b,#312e81);border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:ir-float 4s ease-in-out infinite;box-shadow:0 0 50px rgba(99,102,241,.25)}
+@keyframes ir-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.ir-empty-title{font-size:18px;font-weight:700;color:#e2e8f0;margin-bottom:8px;letter-spacing:-.02em}
+.ir-empty-sub{font-size:13px;color:#334155;max-width:380px;line-height:1.65}
+.ir-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;gap:16px;text-align:center}
+.ir-load-orb{width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:ir-orb 1.6s ease-in-out infinite}
+@keyframes ir-orb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5)}50%{box-shadow:0 0 0 12px rgba(67,56,202,0),0 0 40px rgba(67,56,202,.7)}}
+.ir-load-lbl{font-size:13px;font-weight:500;color:#94a3b8}
+.ir-load-track{width:240px;height:2px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+.ir-load-fill{height:100%;width:0;background:linear-gradient(90deg,#4338ca,#7c3aed);border-radius:999px;animation:ir-prog 10s ease-in-out forwards}
+@keyframes ir-prog{0%{width:0}20%{width:18%}45%{width:45%}70%{width:68%}88%{width:83%}100%{width:91%}}
+.ir-load-note{font-size:11px;color:#1e293b}
+
+/* ── Section header ──────────────────────────────────────────────────────── */
+.ir-sh{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
+.ir-sh-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;white-space:nowrap}
+.ir-sh-ai{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.14);color:#818cf8;flex-shrink:0}
+.ir-sh-line{flex:1;height:1px;background:rgba(255,255,255,.05)}
+
+/* ── Metric tiles ────────────────────────────────────────────────────────── */
+.ir-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1000px){.ir-tiles{grid-template-columns:repeat(2,1fr)}}
+.ir-tile{border-radius:13px;padding:16px 18px;cursor:default;position:relative;overflow:hidden;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(16px);animation:ir-up .35s ease both}
+.ir-tile:hover{border-color:rgba(255,255,255,.14);transform:translateY(-1px);transition:all .2s}
+.ir-tile-ico{font-size:22px;margin-bottom:10px;display:block}
+.ir-tile-val{font-size:26px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:5px}
+.ir-tile-lbl{font-size:11px;color:#475569;font-weight:500}
+.ir-tile-glow{position:absolute;bottom:-25px;right:-25px;width:100px;height:100px;border-radius:50%;opacity:.1;pointer-events:none}
+
+/* ── Brief card ──────────────────────────────────────────────────────────── */
+.ir-brief{position:relative;overflow:hidden;border-radius:13px;padding:16px 20px 38px;margin-bottom:14px;cursor:pointer;
+  background:linear-gradient(135deg,rgba(67,56,202,.16),rgba(124,58,237,.09));
+  border:1px solid rgba(99,102,241,.2);transition:all .2s;animation:ir-up .35s .05s ease both}
+.ir-brief:hover{border-color:rgba(99,102,241,.4);box-shadow:0 8px 30px rgba(67,56,202,.15)}
+.ir-brief-hdr{display:flex;gap:7px;align-items:center;margin-bottom:9px}
+.ir-brief-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
+.ir-brief-text{font-size:13px;line-height:1.7;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ir-brief-more{position:absolute;bottom:12px;right:16px;font-size:11px;color:#4338ca;font-weight:600}
+
+/* ── Priority call cards ─────────────────────────────────────────────────── */
+.ir-pri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
+@media(max-width:1100px){.ir-pri-grid{grid-template-columns:repeat(2,1fr)}}
+.ir-pc{border-radius:12px;padding:13px 14px;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both;
+  display:flex;flex-direction:column;gap:7px}
+.ir-pc:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
+.ir-pc.r1{border-color:rgba(239,68,68,.22)}
+.ir-pc-top{display:flex;align-items:center;gap:8px}
+.ir-pc-av{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.ir-pc-name{font-size:12px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.ir-pc-t{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;flex-shrink:0}
+.ir-pc-t-now{background:rgba(239,68,68,.15);color:#f87171}
+.ir-pc-t-week{background:rgba(245,158,11,.1);color:#fbbf24}
+.ir-pc-t-email{background:#1e293b;color:#475569}
+.ir-pc-sig{font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-pc-foot{display:flex;align-items:center;gap:6px}
+.ir-pc-svc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.ir-pc-val{font-size:11px;font-weight:700;color:#fbbf24;margin-left:auto}
+
+/* ── Infographic panels ──────────────────────────────────────────────────── */
+.ir-infog{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1000px){.ir-infog{grid-template-columns:1fr 1fr}}
+.ir-ic{border-radius:13px;padding:15px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(10px);animation:ir-up .35s ease both}
+.ir-ic-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:11px}
+.ir-gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:5px}
+.ir-gauge-sub{font-size:10px;color:#334155;text-align:center;line-height:1.4}
+.ir-bars{display:flex;flex-direction:column;gap:7px}
+.ir-bar-row{display:flex;align-items:center;gap:7px}
+.ir-bar-lbl{font-size:10px;color:#334155;width:82px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-bar-track{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
+.ir-bar-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
+.ir-bar-cnt{font-size:10px;min-width:24px;text-align:right;flex-shrink:0}
+.ir-tier-list{display:flex;flex-direction:column;gap:7px}
+.ir-tier-row{display:flex;align-items:center;gap:7px}
+.ir-tier-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ir-tier-lbl{font-size:11px;color:#334155;flex:1}
+.ir-tier-track{width:75px;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden;flex-shrink:0}
+.ir-tier-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
+.ir-tier-cnt{font-size:11px;font-weight:700;min-width:18px;text-align:right}
+.ir-donut-wrap{display:flex;align-items:center;gap:10px}
+.ir-donut-leg{flex:1;display:flex;flex-direction:column;gap:5px}
+.ir-dleg-row{display:flex;align-items:center;gap:5px}
+.ir-dleg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ir-dleg-lbl{font-size:10px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-dleg-cnt{font-size:10px;font-weight:700}
+
+/* ── Themes / Risks panels ───────────────────────────────────────────────── */
+.ir-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:900px){.ir-grid2{grid-template-columns:1fr}}
+.ir-panel-card{border-radius:13px;padding:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);animation:ir-up .35s ease both}
+.ir-pc-hdr{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+.ir-theme-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ir-theme-row:last-child{border-bottom:none;padding-bottom:0}
+.ir-theme-n{font-size:16px;font-weight:800;color:#4338ca;min-width:30px;flex-shrink:0;line-height:1.2}
+.ir-theme-body{}
+.ir-theme-name{font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:2px;letter-spacing:-.01em}
+.ir-theme-angle{font-size:11px;color:#334155;line-height:1.5;margin-bottom:4px}
+.ir-cos{display:flex;gap:4px;flex-wrap:wrap}
+.ir-co-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:#0a0e1a;border:1px solid rgba(255,255,255,.07);color:#334155}
+.ir-risk-row{display:flex;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
+.ir-risk-row:last-child{border-bottom:none;padding-bottom:0}
+.ir-risk-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:4px}
+.ir-risk-co{font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:2px}
+.ir-risk-flag{font-size:10px;color:#f87171;margin-bottom:2px}
+.ir-risk-impl{font-size:10px;color:#334155;line-height:1.45}
+
+/* ── Pipeline compact cards ──────────────────────────────────────────────── */
+.ir-pip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:1100px){.ir-pip-grid{grid-template-columns:repeat(2,1fr)}}
+.ir-pcard{border-radius:13px;padding:14px;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both;
+  display:flex;flex-direction:column;gap:10px}
+.ir-pcard:hover{border-color:rgba(255,255,255,.15);transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.ir-pcard.hot{border-color:rgba(239,68,68,.18)}.ir-pcard.hot:hover{border-color:rgba(239,68,68,.4)}
+.ir-pcard.sel{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca!important}
+.ir-pcard-top{display:flex;align-items:center;gap:9px}
+.ir-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+.ir-pcard-info{flex:1;min-width:0}
+.ir-pcard-name{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;margin-bottom:1px}
+.ir-pcard-domain{font-size:10px;color:#1e293b}
+.ir-score-row{display:flex;align-items:center;gap:9px}
+.ir-score-lbl{font-size:10px;font-weight:600;margin-bottom:3px}
+.ir-score-track{height:4px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-bottom:5px}
+.ir-score-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
+.ir-score-why{font-size:10px;color:#1e293b;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ir-badges{display:flex;gap:4px;flex-wrap:wrap}
+.ir-badge{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.15)}
+.ir-svc-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
+.ir-card-btns{display:flex;gap:5px;flex-wrap:wrap;padding-top:2px;border-top:1px solid rgba(255,255,255,.05)}
+.ir-cbtn{background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:3px 8px;transition:all .15s;white-space:nowrap}
+.ir-cbtn:hover{border-color:rgba(255,255,255,.18);color:#64748b}
+.ir-cbtn.em:hover{border-color:rgba(99,102,241,.5);color:#818cf8;background:rgba(67,56,202,.08)}
+.ir-cbtn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.05)}
+
+/* ── Action rows ─────────────────────────────────────────────────────────── */
+.ir-act-list{display:flex;flex-direction:column;gap:7px}
+.ir-arow{border-radius:10px;padding:11px 13px;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(10px);transition:all .2s;animation:ir-up .35s ease both;
+  display:flex;align-items:center;gap:11px}
+.ir-arow:hover{border-color:rgba(255,255,255,.14);transform:translateX(2px)}
+.ir-arow.sel{border-color:#4338ca!important}
+.ir-arow.hi{border-left:2px solid rgba(239,68,68,.6)}
+.ir-arow.med{border-left:2px solid rgba(245,158,11,.5)}
+.ir-arow-rank{width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#1e293b;flex-shrink:0}
+.ir-arow-ico{font-size:14px;flex-shrink:0}
+.ir-arow-body{flex:1;min-width:0}
+.ir-arow-action{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.ir-arow-co{font-size:10px;color:#1e293b}
+.ir-arow-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ir-arow-dl{font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.04);color:#1e293b;border:1px solid rgba(255,255,255,.07);white-space:nowrap}
+.ir-urgdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ir-urgdot.H{background:#ef4444;box-shadow:0 0 7px rgba(239,68,68,.7)}
+.ir-urgdot.M{background:#f59e0b;box-shadow:0 0 7px rgba(245,158,11,.6)}
+
+/* ── Outreach compact ────────────────────────────────────────────────────── */
+.ir-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(max-width:900px){.ir-out-grid{grid-template-columns:1fr}}
+.ir-ocard{border-radius:12px;overflow:hidden;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both}
+.ir-ocard:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px);box-shadow:0 10px 26px rgba(0,0,0,.5)}
+.ir-ocard.sel{border-color:#4338ca!important}
+.ir-ocard-chrome{background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.07);padding:8px 12px;display:flex;align-items:center;gap:5px}
+.ir-ocard-dot{width:8px;height:8px;border-radius:50%}
+.ir-ocard-to{font-size:10px;color:#1e293b;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:3px}
+.ir-ot{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.ir-ot-now{background:rgba(239,68,68,.15);color:#f87171}
+.ir-ot-soon{background:rgba(245,158,11,.1);color:#fbbf24}
+.ir-ot-watch{background:#1e293b;color:#334155}
+.ir-ocard-body{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.ir-ocard-subj{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.ir-ocard-hook{font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-ocard-btns{display:flex;gap:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.05)}
+
+/* ── Drawer ──────────────────────────────────────────────────────────────── */
+.ir-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
+.ir-ov.on{opacity:1;pointer-events:all}
+.ir-drw{position:fixed;top:0;right:-540px;width:520px;max-width:96vw;height:100vh;z-index:399;
+  background:linear-gradient(180deg,#07101f 0%,#0a1223 100%);
+  border-left:1px solid rgba(255,255,255,.08);
+  transition:right .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;
+  box-shadow:-30px 0 100px rgba(0,0,0,.8)}
+.ir-drw.on{right:0}
+.ir-drw-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;background:rgba(0,0,0,.4)}
+.ir-drw-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#334155;cursor:pointer;font-size:13px;padding:5px 9px;transition:all .15s}
+.ir-drw-close:hover{border-color:rgba(255,255,255,.16);color:#94a3b8}
+.ir-drw-title{font-size:13px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.ir-drw-body{flex:1;overflow-y:auto;padding:20px}
+.ir-drw-body::-webkit-scrollbar{width:3px}.ir-drw-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
+.ir-ds{margin-bottom:17px}
+.ir-ds-lbl{font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
+.ir-ds-val{font-size:13px;color:#64748b;line-height:1.7}
+.ir-hl{background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.18);border-radius:8px;padding:11px 13px;font-size:13px;color:#a5b4fc;line-height:1.65}
+.ir-rev{font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em;margin-top:2px}
+.ir-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ir-chip-g{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15);font-weight:500}
+.ir-chip-b{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(59,130,246,.08);color:#60a5fa;border:1px solid rgba(59,130,246,.15);font-weight:500}
+.ir-tp-list{display:flex;flex-direction:column;gap:5px}
+.ir-tp{display:flex;gap:8px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:8px 10px}
+.ir-tp-n{width:16px;height:16px;border-radius:4px;background:rgba(67,56,202,.15);border:1px solid rgba(67,56,202,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#818cf8;flex-shrink:0;margin-top:1px}
+.ir-tp-t{font-size:12px;color:#64748b;line-height:1.5;flex:1}
+.ir-obj{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12);border-radius:7px;padding:9px 11px;margin-bottom:5px}
+.ir-obj-q{font-size:11px;color:#f87171;font-weight:600;margin-bottom:3px}
+.ir-obj-a{font-size:11px;color:#334155;line-height:1.5}
+.ir-subj-alt{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:8px 10px;margin-bottom:4px}
+.ir-subj-alt-txt{font-size:12px;font-weight:600;color:#e2e8f0;flex:1;letter-spacing:-.01em}
+.ir-sc{background:none;border:1px solid rgba(255,255,255,.08);border-radius:4px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:2px 8px;transition:all .15s}
+.ir-sc:hover{border-color:#4338ca;color:#818cf8}
+.ir-sc.ok{border-color:#065f46!important;color:#34d399!important}
+.ir-ai-load{display:flex;align-items:center;gap:8px;padding:11px 13px;background:rgba(67,56,202,.06);border:1px solid rgba(67,56,202,.14);border-radius:8px;font-size:12px;color:#818cf8;margin-bottom:13px}
+.ir-spin{animation:ir-spin .8s linear infinite;display:inline-block}
+@keyframes ir-spin{to{transform:rotate(360deg)}}
+.ir-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding:13px 0 0;border-top:1px solid rgba(255,255,255,.06)}
+.ir-btn{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#334155;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:7px 12px;transition:all .15s;white-space:nowrap;text-decoration:none}
+.ir-btn:hover{border-color:rgba(255,255,255,.18);color:#64748b}
+.ir-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}.ir-btn.prim:hover{background:#3730a3}
+.ir-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.05)}
+.ir-btn.ok{border-color:#065f46!important;color:#34d399!important}
+
+/* Regen */
+.ir-regen-row{display:flex;align-items:center;gap:10px;padding:13px 0 0;border-top:1px solid rgba(255,255,255,.05);margin-top:4px}
+.ir-regen-meta{font-size:11px;color:#0f172a;flex:1}
+.ir-regen-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:11px;padding:5px 11px;transition:all .15s}
+.ir-regen-btn:hover{border-color:rgba(255,255,255,.15);color:#334155}
+
+/* Animations */
+@keyframes ir-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.ir-tiles .ir-tile:nth-child(1){animation-delay:.03s}.ir-tiles .ir-tile:nth-child(2){animation-delay:.07s}
+.ir-tiles .ir-tile:nth-child(3){animation-delay:.11s}.ir-tiles .ir-tile:nth-child(4){animation-delay:.15s}
+
+/* Global sidebar skin */
+#sidebar{background:#060a14!important;border-right-color:rgba(255,255,255,.06)!important}
+.sidebar-logo span{color:#6366f1!important}
+.nav-item:hover,.nav-item.active{background:rgba(99,102,241,.1)!important;color:#a5b4fc!important}
+.nav-item.active::before{background:#6366f1!important;box-shadow:0 0 10px rgba(99,102,241,.5)!important}
+#topnav{background:#060a14!important;border-bottom-color:rgba(255,255,255,.07)!important}
+#content{background:#020817!important}
+</style>
+
 </head>
 <body>
 <div id="app">
@@ -1194,7 +1494,7 @@ h2::after,.section-title::after{
     <button class="nav-item" id="nav-trends" onclick="showSection('trends',this)">
       <span class="icon">📈</span> Trends <span class="badge-count" id="snav-trends"></span>
     </button>
-    <button class="nav-item" id="nav-insights" onclick="showSection('insights',this);insOnTabOpen()">
+    <button class="nav-item" id="nav-insights" onclick="showSection('insights',this);iTab();">
       <span class="icon">✨</span> Insights
     </button>
   </div>
@@ -1415,149 +1715,54 @@ h2::after,.section-title::after{
     </div>
 
 
+  <!-- INSIGHTS SECTION -->
   <div id="section-insights" class="section">
-
-    <!-- ── Control bar ─────────────────────────────────────────────────── -->
-    <div class="si-bar" id="si-bar">
-      <div class="si-bar-row">
-        <!-- Brand -->
-        <div class="si-brand">
-          <div class="si-atom">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="currentColor" stroke-width="1.4" opacity=".85">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="currentColor" stroke-width="1.4" opacity=".6">
-                <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/>
-              </ellipse>
-              <circle cx="12" cy="12" r="2" fill="currentColor" opacity=".9">
-                <animate attributeName="r" values="2;2.5;2" dur="3s" repeatCount="indefinite"/>
-              </circle>
-            </svg>
-          </div>
-          <span class="si-brand-name">Signal Intelligence</span>
-          <span class="si-ai">AI</span>
+    <div class="ir-bar" id="ir-bar">
+      <div class="ir-bar-top">
+        <div class="ir-brand">
+          <svg class="ir-atom-svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse>
+            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse>
+            <circle cx="12" cy="12" r="2" fill="#818cf8"><animate attributeName="r" values="2;2.6;2" dur="3s" repeatCount="indefinite"/></circle>
+          </svg>
+          <span class="ir-brand-name">Signal Intelligence</span>
+          <span class="ir-ai">AI</span>
         </div>
-
-        <!-- Filters inline -->
-        <div class="si-controls">
-          <!-- Signal types dropdown -->
-          <div class="si-dropdown-wrap" id="si-types-wrap">
-            <button class="si-pill" id="si-types-btn" onclick="siTypesToggle()">
-              Signal Types <span class="si-pill-count" id="si-types-count">All</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-            <div class="si-dropdown" id="si-types-menu" style="display:none">
-              <div class="si-dd-inner" id="si-types-list"></div>
-            </div>
-          </div>
-          <!-- Severity -->
-          <div class="si-sev-group">
-            <button class="si-sev on" data-sev="HIGH" onclick="siToggleSev(this)">HIGH</button>
-            <button class="si-sev on" data-sev="MEDIUM" onclick="siToggleSev(this)">MED</button>
-            <button class="si-sev on" data-sev="LOW" onclick="siToggleSev(this)">LOW</button>
-          </div>
-          <!-- Date -->
-          <select class="si-sel" id="si-days">
-            <option value="7">7 days</option>
-            <option value="30">30 days</option>
-            <option value="90" selected>90 days</option>
-            <option value="365">12 months</option>
-            <option value="0">All time</option>
-          </select>
-          <!-- Industry -->
-          <select class="si-sel" id="si-industry"><option value="">All Industries</option></select>
-          <!-- Stats -->
-          <span class="si-stat" id="si-stat"></span>
+        <div class="ir-filters">
+          <div class="ir-ddwrap" id="ir-ddwrap"><button class="ir-pill" id="ir-types-btn" onclick="irTypesToggle()">Signal Types <span class="ir-pill-ct" id="ir-types-ct">All</span><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="ir-dropdown" id="ir-types-menu" style="display:none"><div id="ir-types-list"></div></div></div>
+          <div class="ir-sev"><button class="ir-sv on" data-s="HIGH" onclick="irSv(this)">HIGH</button><button class="ir-sv on" data-s="MEDIUM" onclick="irSv(this)">MED</button><button class="ir-sv on" data-s="LOW" onclick="irSv(this)">LOW</button></div>
+          <select class="ir-sel" id="ir-days"><option value="7">7 days</option><option value="30">30 days</option><option value="90" selected>90 days</option><option value="365">12 months</option><option value="0">All time</option></select>
+          <select class="ir-sel" id="ir-industry"><option value="">All Industries</option></select>
+          <span class="ir-stat" id="ir-stat"></span>
         </div>
-
-        <!-- Generate -->
-        <button class="si-gen" id="si-gen" onclick="siGenerate()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="si-gen-ico"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          Generate Insights
-        </button>
+        <button class="ir-gen" id="ir-gen" onclick="irGenerate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Generate Insights</button>
       </div>
-
-      <!-- Tabs -->
-      <div class="si-tabs">
-        <button class="si-tab active" data-p="overview" onclick="siTab(this)">Overview</button>
-        <button class="si-tab" data-p="pipeline" onclick="siTab(this)">Pipeline <span class="si-tc" id="si-tc-pip"></span></button>
-        <button class="si-tab" data-p="actions"  onclick="siTab(this)">Actions <span class="si-tc" id="si-tc-act"></span></button>
-        <button class="si-tab" data-p="outreach" onclick="siTab(this)">Outreach <span class="si-tc" id="si-tc-out"></span></button>
+      <div class="ir-tabs" id="ir-tabs">
+        <button class="ir-tab active" data-p="ov" onclick="irTab(this)">Overview</button>
+        <button class="ir-tab" data-p="pip" onclick="irTab(this)">Pipeline <span class="ir-tc" id="ir-tc-pip"></span></button>
+        <button class="ir-tab" data-p="act" onclick="irTab(this)">Actions <span class="ir-tc" id="ir-tc-act"></span></button>
+        <button class="ir-tab" data-p="out" onclick="irTab(this)">Outreach <span class="ir-tc" id="ir-tc-out"></span></button>
       </div>
     </div>
-
-    <!-- ── Body ─────────────────────────────────────────────────────────── -->
-    <div class="si-body">
-
-      <!-- Overview panel -->
-      <div class="si-panel active" id="si-p-overview">
-        <!-- Empty -->
-        <div class="si-empty" id="si-empty">
-          <div class="si-empty-icon">
-            <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#4f46e5" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#7c3aed" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/>
-              </ellipse>
-              <circle cx="12" cy="12" r="2.2" fill="#818cf8">
-                <animate attributeName="r" values="2.2;2.8;2.2" dur="3s" repeatCount="indefinite"/>
-              </circle>
-            </svg>
-          </div>
-          <div class="si-empty-title">Ready to generate insights</div>
-          <div class="si-empty-sub">Set your filters and click <strong>Generate Insights</strong> to get GPT analysis — intent scores, pipeline opportunities, and personalised outreach.</div>
-          <button class="si-gen-lg" onclick="siGenerate()">Generate Insights</button>
+    <div class="ir-body">
+      <div class="ir-panel active" id="ir-p-ov">
+        <div class="ir-empty" id="ir-empty">
+          <div class="ir-empty-orb"><svg width="44" height="44" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#c4b5fd"><animate attributeName="r" values="2.5;3.2;2.5" dur="3s" repeatCount="indefinite"/></circle></svg></div>
+          <div class="ir-empty-title">Intelligence Command Centre</div>
+          <div class="ir-empty-sub">Click <strong>Generate Insights</strong> to get GPT-powered analysis — intent scores, priority calls, personalised outreach, and LinkedIn contacts.</div>
+          <button class="ir-gen-lg" onclick="irGenerate()">Generate Insights</button>
         </div>
-        <!-- Loading -->
-        <div class="si-loading" id="si-loading" style="display:none">
-          <div class="si-load-icon">
-            <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/>
-              </ellipse>
-              <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.3">
-                <animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="8s" repeatCount="indefinite"/>
-              </ellipse>
-              <circle cx="12" cy="12" r="2" fill="white"/>
-            </svg>
-          </div>
-          <div class="si-load-label" id="si-load-label">Reading signals…</div>
-          <div class="si-load-track"><div class="si-load-fill" id="si-load-fill"></div></div>
-          <div class="si-load-note">Analysing with GPT — usually 10–20 seconds</div>
+        <div class="ir-loading" id="ir-loading" style="display:none">
+          <div class="ir-load-orb"><svg width="30" height="30" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>
+          <div class="ir-load-lbl" id="ir-load-lbl">Reading signals…</div>
+          <div class="ir-load-track"><div class="ir-load-fill" id="ir-load-fill"></div></div>
+          <div class="ir-load-note">Analysing with GPT · 10–20 seconds</div>
         </div>
-        <!-- Results -->
-        <div id="si-ov" style="display:none">
-          <div class="si-summary" id="si-summary"></div>
-          <div class="si-kpi-row" id="si-kpis"></div>
-          <div class="si-grid-2">
-            <div id="si-themes"></div>
-            <div id="si-risks"></div>
-          </div>
-        </div>
+        <div id="ir-ov" style="display:none"></div>
       </div>
-
-      <!-- Pipeline -->
-      <div class="si-panel" id="si-p-pipeline">
-        <div class="si-card-grid" id="si-pip"></div>
-      </div>
-      <!-- Actions -->
-      <div class="si-panel" id="si-p-actions">
-        <div id="si-acts"></div>
-      </div>
-      <!-- Outreach -->
-      <div class="si-panel" id="si-p-outreach">
-        <div class="si-email-grid" id="si-out"></div>
-      </div>
-
+      <div class="ir-panel" id="ir-p-pip"><div id="ir-pip"></div></div>
+      <div class="ir-panel" id="ir-p-act"><div id="ir-act"></div></div>
+      <div class="ir-panel" id="ir-p-out"><div id="ir-out"></div></div>
     </div>
   </div>
 
@@ -3950,1382 +4155,527 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-<style>
-/* ─── INSIGHTS CLEAN v6 ───────────────────────────────────────────────────── */
-#section-insights{margin:-20px -24px;padding:0;min-height:calc(100vh - 56px);display:none;flex-direction:column}
-#section-insights.active{display:flex!important}
-
-/* ─── Control bar ─────────────────────────────────────────────────────────── */
-.si-bar{background:#0a0e1a;border-bottom:1px solid #1e293b;padding:16px 28px 0;flex-shrink:0;position:sticky;top:56px;z-index:89}
-.si-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:nowrap}
-
-/* Brand */
-.si-brand{display:flex;align-items:center;gap:8px;flex-shrink:0;color:#6366f1}
-.si-atom{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.si-brand-name{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;white-space:nowrap}
-.si-ai{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#312e81;color:#a5b4fc;letter-spacing:.05em;flex-shrink:0}
-
-/* Filter controls */
-.si-controls{display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap}
-
-/* Signal types dropdown */
-.si-dropdown-wrap{position:relative}
-.si-pill{display:flex;align-items:center;gap:5px;background:transparent;border:1px solid #1e293b;border-radius:7px;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;padding:5px 10px;transition:all .15s;white-space:nowrap}
-.si-pill:hover{border-color:#4338ca;color:#a5b4fc}
-.si-pill-count{background:#1e293b;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700;color:#64748b}
-.si-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:#0f1729;border:1px solid #1e293b;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:200;min-width:200px;padding:8px}
-.si-dd-inner{display:flex;flex-direction:column;gap:2px}
-.si-dd-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .1s;font-size:12px;color:#94a3b8}
-.si-dd-item:hover{background:rgba(99,102,241,.08);color:#e2e8f0}
-.si-dd-item input[type=checkbox]{accent-color:#6366f1;width:13px;height:13px;cursor:pointer;flex-shrink:0}
-.si-dd-item.checked{color:#e2e8f0}
-.si-dd-count{font-size:10px;color:#334155;margin-left:auto}
-
-/* Severity */
-.si-sev-group{display:flex;gap:2px;background:#0f172a;border:1px solid #1e293b;border-radius:7px;padding:2px}
-.si-sev{background:none;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:4px 9px;color:#334155;transition:all .15s;letter-spacing:.03em}
-.si-sev.on[data-sev="HIGH"]{background:#7f1d1d;color:#fca5a5}
-.si-sev.on[data-sev="MEDIUM"]{background:#78350f;color:#fcd34d}
-.si-sev.on[data-sev="LOW"]{background:#1e293b;color:#94a3b8}
-
-/* Selects */
-.si-sel{background:#0f172a;border:1px solid #1e293b;color:#94a3b8;border-radius:7px;padding:5px 24px 5px 10px;font-size:11px;font-family:inherit;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;transition:border-color .15s}
-.si-sel:focus{border-color:#4338ca;color:#e2e8f0}
-.si-sel option{background:#0f1729}
-.si-stat{font-size:11px;color:#334155;white-space:nowrap;flex-shrink:0}
-
-/* Generate button */
-.si-gen{display:flex;align-items:center;gap:7px;flex-shrink:0;background:#4338ca;border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;transition:background .15s,transform .1s;letter-spacing:-.01em;margin-left:auto}
-.si-gen:hover{background:#3730a3;transform:translateY(-1px)}
-.si-gen:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.si-gen-ico{animation:si-star 2.5s ease-in-out infinite}
-@keyframes si-star{0%,100%{transform:rotate(0)}50%{transform:rotate(20deg) scale(1.1)}}
-.si-gen-lg{display:inline-flex;align-items:center;gap:8px;background:#4338ca;border:none;border-radius:9px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:10px 22px;margin-top:20px;transition:background .15s,transform .1s}
-.si-gen-lg:hover{background:#3730a3;transform:translateY(-1px)}
-
-/* Tabs */
-.si-tabs{display:flex;gap:0;border-bottom:1px solid #1e293b;margin:0 -28px;padding:0 28px;overflow-x:auto}
-.si-tabs::-webkit-scrollbar{height:0}
-.si-tab{padding:8px 16px;border:none;background:none;color:#475569;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;white-space:nowrap;letter-spacing:-.01em}
-.si-tab:hover{color:#94a3b8}
-.si-tab.active{color:#e2e8f0;border-bottom-color:#4338ca}
-.si-tc{background:#1e293b;color:#475569;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:4px}
-
-/* Body */
-.si-body{flex:1;overflow-y:auto;padding:28px}
-.si-panel{display:none}.si-panel.active{display:block;animation:si-in .25s ease both}
-@keyframes si-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
-/* ─── Empty state ─────────────────────────────────────────────────────────── */
-.si-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;text-align:center;padding:20px}
-.si-empty-icon{width:80px;height:80px;border-radius:20px;background:#0f172a;border:1px solid #1e293b;display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:si-float 4s ease-in-out infinite}
-@keyframes si-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.si-empty-title{font-size:18px;font-weight:600;color:#e2e8f0;margin-bottom:8px;letter-spacing:-.02em}
-.si-empty-sub{font-size:13px;color:#475569;max-width:380px;line-height:1.65}
-
-/* ─── Loading ─────────────────────────────────────────────────────────────── */
-.si-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:16px;text-align:center}
-.si-load-icon{width:56px;height:56px;border-radius:16px;background:#4338ca;display:flex;align-items:center;justify-content:center;animation:si-pulse 1.5s ease-in-out infinite}
-@keyframes si-pulse{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.4)}50%{box-shadow:0 0 0 12px rgba(67,56,202,0)}}
-.si-load-label{font-size:13px;font-weight:500;color:#94a3b8;min-height:20px}
-.si-load-track{width:240px;height:2px;background:#1e293b;border-radius:999px;overflow:hidden}
-.si-load-fill{height:100%;width:0;background:#4338ca;border-radius:999px;animation:si-prog 10s ease-in-out forwards}
-@keyframes si-prog{0%{width:0}20%{width:18%}45%{width:44%}70%{width:67%}90%{width:83%}100%{width:90%}}
-.si-load-note{font-size:11px;color:#1e293b}
-
-/* ─── Summary ─────────────────────────────────────────────────────────────── */
-.si-summary{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:20px 24px;margin-bottom:16px;animation:si-up .3s ease both}
-@keyframes si-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.si-sum-eyebrow{font-size:10px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
-.si-sum-text{font-size:14px;line-height:1.75;color:#cbd5e1;margin-bottom:14px}
-.si-sum-row{display:flex;gap:8px;flex-wrap:wrap}
-.si-tag{font-size:11px;padding:3px 10px;border-radius:6px;background:#0f172a;border:1px solid #1e293b;color:#64748b;font-weight:500}
-.si-tag-acc{border-color:#312e81;color:#818cf8;background:rgba(49,46,129,.15)}
-.si-tag-gold{border-color:#713f12;color:#fbbf24;background:rgba(113,63,18,.1)}
-
-/* ─── KPI row ─────────────────────────────────────────────────────────────── */
-.si-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-@media(max-width:1000px){.si-kpi-row{grid-template-columns:repeat(2,1fr)}}
-.si-kpi{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:20px;cursor:default;transition:border-color .2s;animation:si-up .3s ease both}
-.si-kpi:hover{border-color:#334155}
-.si-kpi-val{font-size:30px;font-weight:800;color:#f1f5f9;line-height:1;margin-bottom:6px;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
-.si-kpi-label{font-size:12px;color:#475569;font-weight:500}
-.si-kpi-sub{font-size:11px;color:#1e293b;margin-top:3px}
-
-/* ─── 2-col grid ──────────────────────────────────────────────────────────── */
-.si-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:900px){.si-grid-2{grid-template-columns:1fr}}
-.si-block{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:20px;animation:si-up .3s ease both}
-.si-block-title{font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
-.si-theme{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #0f1729}
-.si-theme:last-child{border-bottom:none;padding-bottom:0}
-.si-theme-n{font-size:20px;font-weight:800;color:#4338ca;min-width:36px;line-height:1.1;flex-shrink:0}
-.si-theme-name{font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:3px;letter-spacing:-.01em}
-.si-theme-angle{font-size:11px;color:#475569;line-height:1.5;margin-bottom:5px}
-.si-co-list{display:flex;gap:4px;flex-wrap:wrap}
-.si-co{font-size:10px;padding:2px 7px;border-radius:5px;background:#0a0e1a;border:1px solid #1e293b;color:#475569}
-.si-risk{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #0f1729;align-items:flex-start}
-.si-risk:last-child{border-bottom:none;padding-bottom:0}
-.si-risk-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:4px}
-.si-risk-co{font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:2px;letter-spacing:-.01em}
-.si-risk-flag{font-size:11px;color:#f87171;margin-bottom:2px}
-.si-risk-impl{font-size:11px;color:#475569;line-height:1.45}
-
-/* ─── Pipeline cards ──────────────────────────────────────────────────────── */
-.si-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:1100px){.si-card-grid{grid-template-columns:repeat(2,1fr)}}
-.si-co-card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s,transform .2s;animation:si-up .3s ease both;cursor:default}
-.si-co-card:hover{border-color:#334155;transform:translateY(-1px)}
-.si-co-card.hot{border-color:#7f1d1d}
-.si-co-card.hot:hover{border-color:#991b1b}
-.si-co-hdr{display:flex;align-items:center;gap:10px}
-.si-co-av{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:-.01em}
-.si-co-name{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:1px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.si-co-domain{font-size:10px;color:#334155}
-.si-score-row{display:flex;align-items:center;gap:12px}
-.si-score-ring{flex-shrink:0}
-.si-score-info{flex:1}
-.si-score-label{font-size:11px;font-weight:600;margin-bottom:4px}
-.si-score-why{font-size:11px;color:#475569;line-height:1.5}
-.si-badges{display:flex;gap:4px;flex-wrap:wrap}
-.si-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#1e293b;color:#64748b;border:1px solid #1e293b}
-.si-svc-row{display:flex;gap:4px;flex-wrap:wrap}
-.si-svc-tag{font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.si-opp{font-size:11px;font-weight:600;color:#fbbf24}
-.si-nextstep{font-size:11px;color:#6366f1;line-height:1.5;border-top:1px solid #1e293b;padding-top:10px}
-
-/* ─── Actions timeline ────────────────────────────────────────────────────── */
-.si-tl{display:flex;flex-direction:column;gap:8px}
-.si-tl-item{background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;transition:border-color .2s;animation:si-up .3s ease both}
-.si-tl-item:hover{border-color:#334155}
-.si-tl-item.hi{border-left:2px solid #dc2626}
-.si-tl-item.med{border-left:2px solid #d97706}
-.si-tl-rank{width:22px;height:22px;border-radius:6px;background:#0a0e1a;border:1px solid #1e293b;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#475569;flex-shrink:0;margin-top:1px}
-.si-tl-body{flex:1;min-width:0}
-.si-tl-action{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:3px;letter-spacing:-.01em;line-height:1.35}
-.si-tl-co{font-size:11px;color:#6366f1;font-weight:500;margin-bottom:4px}
-.si-tl-reason{font-size:12px;color:#475569;line-height:1.55;margin-bottom:8px}
-.si-tl-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.si-rev{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.si-dl{font-size:10px;padding:3px 8px;border-radius:5px;background:#0a0e1a;color:#475569;border:1px solid #1e293b}
-.si-urg{font-size:9px;font-weight:700;padding:3px 7px;border-radius:5px;letter-spacing:.04em}
-.si-urg-H{background:rgba(220,38,38,.1);color:#f87171}
-.si-urg-M{background:rgba(217,119,6,.08);color:#fcd34d}
-
-/* ─── Email cards ─────────────────────────────────────────────────────────── */
-.si-email-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-@media(max-width:900px){.si-email-grid{grid-template-columns:1fr}}
-.si-email-card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;overflow:hidden;transition:border-color .2s,transform .2s;animation:si-up .3s ease both}
-.si-email-card:hover{border-color:#334155;transform:translateY(-1px)}
-.si-email-hdr{background:#0a0e1a;border-bottom:1px solid #1e293b;padding:10px 14px;display:flex;align-items:center;gap:6px}
-.si-dot-r{width:9px;height:9px;border-radius:50%;background:#7f1d1d;flex-shrink:0}
-.si-dot-y{width:9px;height:9px;border-radius:50%;background:#78350f;flex-shrink:0}
-.si-dot-g{width:9px;height:9px;border-radius:50%;background:#14532d;flex-shrink:0}
-.si-email-to{font-size:11px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px}
-.si-timing{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0}
-.si-t-now{background:#7f1d1d;color:#fca5a5}
-.si-t-soon{background:#78350f;color:#fcd34d}
-.si-t-watch{background:#1e293b;color:#475569}
-.si-email-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-.si-signal-hook{font-size:11px;color:#475569;font-style:italic;line-height:1.5;padding:6px 10px;border-left:2px solid #312e81;background:rgba(49,46,129,.06)}
-.si-subj-block{background:#0a0e1a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px}
-.si-subj-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
-.si-subj-eyebrow{font-size:9px;font-weight:600;color:#1e293b;text-transform:uppercase;letter-spacing:.1em}
-.si-copy-btn{background:none;border:1px solid #1e293b;border-radius:4px;color:#334155;cursor:pointer;font-size:9px;font-weight:600;padding:2px 8px;font-family:inherit;transition:all .15s}
-.si-copy-btn:hover{border-color:#4338ca;color:#818cf8}
-.si-copy-btn.ok{border-color:#065f46;color:#34d399}
-.si-subj-line{font-size:13px;font-weight:600;color:#e2e8f0;line-height:1.4;letter-spacing:-.01em}
-.si-opening-text{font-size:12px;color:#475569;line-height:1.65}
-.si-tps-list{display:flex;flex-direction:column;gap:5px}
-.si-tp{font-size:12px;color:#475569;display:flex;gap:8px;line-height:1.5;align-items:flex-start}
-.si-tp::before{content:'✓';color:#059669;flex-shrink:0;font-weight:700;font-size:10px;margin-top:2px}
-.si-cta{font-size:12px;font-weight:500;color:#818cf8;border-top:1px solid #1e293b;padding-top:10px}
-
-/* ─── Global dashboard skin ───────────────────────────────────────────────── */
-#sidebar{background:#060a14!important;border-right-color:#1a2035!important}
-.sidebar-logo span{color:#6366f1!important}
-.nav-item:hover,.nav-item.active{background:rgba(99,102,241,.1)!important;color:#a5b4fc!important}
-.nav-item.active::before{background:#6366f1!important;box-shadow:0 0 10px rgba(99,102,241,.5)!important}
-#topnav{background:#060a14!important;border-bottom-color:#1a2035!important}
-.kpi-card{background:#0c1018!important;border-color:#1a2035!important}
-.kpi-card:hover{border-color:#334155!important;box-shadow:none!important}
-.panel,.chart-card{background:#0c1018!important;border-color:#1a2035!important}
-.table-wrap{border-color:#1a2035!important}
-.data-table thead th{background:#060a14!important;border-bottom-color:#1a2035!important}
-#content{background:#080c18}
-</style>
-
-<script>
-(function(){
-'use strict';
-var _meta=null,_loaded=false,_stTimer=null;
-
-function $id(x){return document.getElementById(x);}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').substring(0,2).toUpperCase();}
-function acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
-
-/* Animated counter */
-function countUp(el,to){
-  if(!el||!to)return;
-  var n=parseFloat(String(to).replace(/[^0-9.]/g,''))||0;
-  var dur=900,t0=null;
-  (function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);})(performance.now());
-  requestAnimationFrame(function(ts){t0=ts;});
-}
-
-/* SVG ring */
-function ring(score,color){
-  var r=28,c=2*Math.PI*r,off=c*(1-score/100);
-  return '<svg class="si-score-ring" width="70" height="70" viewBox="0 0 70 70">'
-    +'<circle cx="35" cy="35" r="'+r+'" fill="none" stroke="#1e293b" stroke-width="6"/>'
-    +'<circle cx="35" cy="35" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"'
-    +' stroke-dasharray="'+c+'" stroke-dashoffset="'+c+'" transform="rotate(-90 35 35)">'
-    +'<animate attributeName="stroke-dashoffset" from="'+c+'" to="'+off+'" dur="1s" fill="freeze"/>'
-    +'</circle>'
-    +'<text x="35" y="38" text-anchor="middle" fill="'+color+'" font-size="15" font-weight="800" font-family="Inter,sans-serif">'+score+'</text>'
-    +'</svg>';
-}
-
-/* Avatar colors */
-var AVCOLORS=['#4338ca','#0e7490','#059669','#7c3aed','#b45309','#0284c7','#dc2626','#4338ca'];
-
-window.insOnTabOpen=function(){if(!_loaded)_loadMeta();};
-
-function _loadMeta(){
-  _loaded=true;
-  fetch('/api/insights-meta/'+acct()).then(function(r){return r.json();}).then(function(d){
-    _meta=d;
-    _buildTypesList(d.signal_types||[],d.counts||{});
-    var sel=$id('si-industry');
-    if(sel)(d.industries||[]).forEach(function(i){var o=document.createElement('option');o.value=i;o.textContent=i;sel.appendChild(o);});
-    var s=$id('si-stat');
-    if(s)s.textContent=(d.total_signals||0).toLocaleString()+' signals';
-    _updateTypesCount();
-  }).catch(function(){});
-}
-
-function _buildTypesList(types,counts){
-  var wrap=$id('si-types-list');if(!wrap)return;
-  wrap.innerHTML='';
-  types.forEach(function(t){
-    var lbl=t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-    var cnt=counts[t]||0;
-    var div=document.createElement('div');div.className='si-dd-item checked';div.setAttribute('data-type',t);
-    div.innerHTML='<input type="checkbox" checked id="sitype_'+t+'"><label for="sitype_'+t+'" style="cursor:pointer;flex:1">'+esc(lbl)+'</label><span class="si-dd-count">'+cnt+'</span>';
-    div.querySelector('input').addEventListener('change',function(){
-      div.classList.toggle('checked',this.checked);_updateTypesCount();
-    });
-    wrap.appendChild(div);
-  });
-}
-
-function _updateTypesCount(){
-  var all=document.querySelectorAll('#si-types-list .si-dd-item');
-  var on=document.querySelectorAll('#si-types-list .si-dd-item.checked');
-  var el=$id('si-types-count');
-  if(el)el.textContent=on.length===all.length?'All':on.length+'/'+all.length;
-}
-
-window.siTypesToggle=function(){
-  var m=$id('si-types-menu');if(!m)return;
-  if(m.style.display==='none'){m.style.display='block';setTimeout(function(){document.addEventListener('click',_closeTypes,{once:true});},10);}
-  else m.style.display='none';
-};
-function _closeTypes(e){var w=$id('si-types-wrap');if(w&&!w.contains(e.target)){var m=$id('si-types-menu');if(m)m.style.display='none';}}
-
-window.siToggleSev=function(btn){btn.classList.toggle('on');};
-
-window.siTab=function(btn){
-  document.querySelectorAll('.si-tab').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');
-  var p=btn.getAttribute('data-p');
-  document.querySelectorAll('.si-panel').forEach(function(el){el.classList.remove('active');});
-  var t=$id('si-p-'+p);if(t){t.classList.add('active');}
-};
-
-window.siGenerate=function(){
-  if(!_loaded)_loadMeta();
-  var btn=$id('si-gen');if(btn)btn.disabled=true;
-  var p=new URLSearchParams();
-  document.querySelectorAll('#si-types-list .si-dd-item.checked').forEach(function(c){p.append('signal_type',c.getAttribute('data-type'));});
-  document.querySelectorAll('.si-sev.on').forEach(function(c){p.append('severity',c.getAttribute('data-sev'));});
-  var d=$id('si-days');if(d)p.set('days',d.value);
-  var ind=$id('si-industry');if(ind&&ind.value)p.set('industry',ind.value);
-  _showLoad();
-  fetch('/api/insights/'+acct()+'?'+p.toString())
-    .then(function(r){return r.json();})
-    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stTimer);data.error?_showErr(data.error):_render(data);})
-    .catch(function(e){if(btn)btn.disabled=false;clearInterval(_stTimer);_showErr('Network error: '+e.message);});
-};
-
-var _STEPS=['Reading signals…','Scoring intent and identifying patterns…','Generating insights, actions and outreach…'];
-function _showLoad(){
-  $id('si-empty').style.display='none';var ov=$id('si-ov');if(ov)ov.style.display='none';
-  $id('si-loading').style.display='flex';
-  // switch to overview
-  document.querySelectorAll('.si-tab').forEach(function(b){b.classList.remove('active');});
-  document.querySelector('.si-tab[data-p="overview"]').classList.add('active');
-  document.querySelectorAll('.si-panel').forEach(function(el){el.classList.remove('active');});
-  $id('si-p-overview').classList.add('active');
-  // reset progress bar
-  var f=$id('si-load-fill');if(f){var nf=f.cloneNode(true);f.parentNode.replaceChild(nf,f);}
-  // step labels
-  var lbl=$id('si-load-label');if(lbl)lbl.textContent=_STEPS[0];
-  clearInterval(_stTimer);var cur=0;
-  _stTimer=setInterval(function(){cur++;if(cur>=_STEPS.length){clearInterval(_stTimer);return;}var l=$id('si-load-label');if(l)l.textContent=_STEPS[cur];},3500);
-}
-
-function _showErr(msg){
-  $id('si-loading').style.display='none';$id('si-empty').style.display='flex';
-  var btn=$id('si-gen');if(btn)btn.disabled=false;
-  var old=$id('si-empty').querySelector('.si-err');if(old)old.remove();
-  var d=document.createElement('div');d.className='si-err';
-  d.style.cssText='margin-top:16px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:8px;padding:12px 16px;font-size:12px;color:#f87171;max-width:400px;line-height:1.55';
-  d.innerHTML='<strong>Error:</strong> '+esc(msg);$id('si-empty').appendChild(d);
-}
-
-function _render(data){
-  var ins=data.insights||{};
-  _ov(data,ins);_pip(ins.pipeline||[]);_acts(ins.actions||[]);_out(ins.outreach||[]);
-  [['si-tc-pip',(ins.pipeline||[]).length],['si-tc-act',(ins.actions||[]).length],['si-tc-out',(ins.outreach||[]).length]].forEach(function(pair){
-    var e=$id(pair[0]);if(e){e.textContent=pair[1];e.style.display=pair[1]?'':'none';}
-  });
-  $id('si-loading').style.display='none';var ov=$id('si-ov');if(ov){ov.style.display='block';}
-}
-
-function _ov(data,ins){
-  var sc=$id('si-summary');
-  if(sc){
-    var vel=(ins.meta&&ins.meta.signal_velocity_trend)||'stable';
-    var opp=(ins.meta&&ins.meta.total_opportunity)||'';
-    var theme=(ins.meta&&ins.meta.top_theme)||'';
-    sc.innerHTML='<div class="si-sum-eyebrow">Executive Summary</div>'
-      +'<div class="si-sum-text">'+esc(ins.summary||'')+'</div>'
-      +'<div class="si-sum-row">'
-        +'<span class="si-tag">'+data.signals_analyzed.toLocaleString()+' signals</span>'
-        +'<span class="si-tag">'+data.companies_analyzed.toLocaleString()+' companies</span>'
-        +(vel?'<span class="si-tag si-tag-acc">'+esc(vel)+'</span>':'')
-        +(theme?'<span class="si-tag">'+esc(theme)+'</span>':'')
-        +(opp?'<span class="si-tag si-tag-gold">'+esc(opp)+'</span>':'')
-      +'</div>';
-  }
-  var kg=$id('si-kpis');
-  if(kg){
-    var kp=ins.kpis||{};
-    var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
-    var avg=kp.avg_intent?Math.round(kp.avg_intent):null;
-    var cards=[
-      {val:kp.high_priority||hot,raw:kp.high_priority||hot,lbl:'High-Priority',sub:'Intent ≥ 70'},
-      {val:avg?avg+' / 100':'—',raw:avg,lbl:'Avg Intent',sub:'Across pipeline'},
-      {val:(ins.actions||[]).length,raw:(ins.actions||[]).length,lbl:'Actions',sub:'Prioritised'},
-      {val:kp.estimated_value||'—',raw:null,lbl:'Revenue',sub:'Est. opportunity'},
-    ];
-    kg.innerHTML=cards.map(function(k,i){
-      var v=k.raw!==null&&k.raw!==undefined?'<span id="si-kv'+i+'">0</span>'+(i===1?' / 100':''):esc(String(k.val));
-      return '<div class="si-kpi" style="animation-delay:'+(i*.06)+'s">'
-        +'<div class="si-kpi-val">'+v+'</div>'
-        +'<div class="si-kpi-label">'+esc(k.lbl)+'</div>'
-        +'<div class="si-kpi-sub">'+esc(k.sub)+'</div>'
-        +'</div>';
-    }).join('');
-    cards.forEach(function(k,i){if(k.raw!==null&&k.raw!==undefined)setTimeout(function(){countUp($id('si-kv'+i),k.raw);},200+i*60);});
-  }
-  var tc=$id('si-themes');
-  if(tc){
-    tc.innerHTML='<div class="si-block"><div class="si-block-title">Signal Themes</div>'
-      +(ins.themes||[]).slice(0,4).map(function(t){
-        var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="si-co">'+esc(c)+'</span>';}).join('');
-        return '<div class="si-theme"><div class="si-theme-n">'+(t.count||'')+'x</div>'
-          +'<div><div class="si-theme-name">'+esc(t.theme||'')+'</div>'
-          +'<div class="si-theme-angle">'+esc(t.campaign_angle||'')+'</div>'
-          +(cos?'<div class="si-co-list">'+cos+'</div>':'')+'</div></div>';
-      }).join('')+'</div>';
-  }
-  var rc=$id('si-risks');
-  if(rc){
-    var risks=ins.risks||[];
-    var h='<div class="si-block"><div class="si-block-title">Attention Flags</div>';
-    if(risks.length){h+=risks.slice(0,4).map(function(r){return '<div class="si-risk"><div class="si-risk-dot"></div><div><div class="si-risk-co">'+esc(r.company||'')+'</div><div class="si-risk-flag">'+esc(r.flag||'')+'</div><div class="si-risk-impl">'+esc(r.implication||'')+'</div></div></div>';}).join('');}
-    else{h+='<div style="font-size:12px;color:#1e293b;padding:16px 0;text-align:center">No flags detected</div>';}
-    rc.innerHTML=h+'</div>';
-  }
-}
-
-function _pip(pip){
-  var g=$id('si-pip');if(!g)return;
-  if(!pip.length){g.innerHTML='<p style="color:#334155;font-size:13px">No pipeline data.</p>';return;}
-  g.innerHTML=pip.slice(0,9).map(function(co,i){
-    var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
-    var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-    var lbl=sc>=80?'<span style="color:#f87171">Critical</span>':sc>=60?'<span style="color:#fbbf24">High Intent</span>':'<span style="color:#6366f1">Watching</span>';
-    var av=AVCOLORS[i%AVCOLORS.length];
-    var sigs=(co.signals||[]).map(function(s){return '<span class="si-badge">'+esc(s)+'</span>';}).join('');
-    var svcs=(co.service_fit||[]).map(function(s){return '<span class="si-svc-tag">'+esc(s)+'</span>';}).join('');
-    return '<div class="si-co-card'+(sc>=80?' hot':'')+'">'
-      +'<div class="si-co-hdr"><div class="si-co-av" style="background:'+av+'">'+esc(ini(co.name))+'</div>'
-        +'<div style="flex:1;min-width:0"><div class="si-co-name">'+esc(co.name||'')+'</div><div class="si-co-domain">'+esc(co.domain||'')+'</div></div>'
-      +'</div>'
-      +'<div class="si-score-row">'+ring(sc,rc)
-        +'<div class="si-score-info"><div class="si-score-label">'+lbl+'</div><div class="si-score-why">'+esc(co.why_now||'')+'</div></div>'
-      +'</div>'
-      +(sigs?'<div class="si-badges">'+sigs+'</div>':'')
-      +(svcs?'<div class="si-svc-row">'+svcs+'</div>':'')
-      +(co.opportunity?'<div class="si-opp">'+esc(co.opportunity)+'</div>':'')
-      +'<div class="si-nextstep">→ '+esc(co.next_step||'')+'</div>'
-    +'</div>';
-  }).join('');
-}
-
-function _acts(acts){
-  var c=$id('si-acts');if(!c)return;
-  if(!acts.length){c.innerHTML='<p style="color:#334155;font-size:13px">No actions generated.</p>';return;}
-  c.innerHTML='<div class="si-tl">'+acts.map(function(a){
-    var hi=a.urgency==='HIGH',ico=({outreach:'→ Email',campaign:'→ Campaign',meeting:'→ Meet',proposal:'→ Proposal',alert:'→ Alert'})[a.type]||'→';
-    return '<div class="si-tl-item '+(hi?'hi':'med')+'">'
-      +'<div class="si-tl-rank">'+(a.rank||'')+'</div>'
-      +'<div class="si-tl-body">'
-        +'<div class="si-tl-action">'+esc(a.action||'')+'</div>'
-        +(a.company&&a.company!=='All'?'<div class="si-tl-co">'+esc(a.company)+'</div>':'')
-        +'<div class="si-tl-reason">'+esc(a.reason||'')+'</div>'
-        +'<div class="si-tl-meta">'
-          +(a.revenue_impact?'<span class="si-rev">'+esc(a.revenue_impact)+'</span>':'')
-          +(a.deadline?'<span class="si-dl">'+esc(a.deadline)+'</span>':'')
-          +'<span class="si-urg si-urg-'+(hi?'H':'M')+'">'+esc(a.urgency||'')+'</span>'
-        +'</div>'
-      +'</div></div>';
-  }).join('')+'</div>';
-}
-
-function _out(out){
-  var g=$id('si-out');if(!g)return;
-  if(!out.length){g.innerHTML='<p style="color:#334155;font-size:13px">No outreach data.</p>';return;}
-  g.innerHTML=out.map(function(ot,i){
-    var t=(ot.timing||'watch').toLowerCase();
-    var tps=(ot.talking_points||[]).map(function(tp){return '<div class="si-tp">'+esc(tp)+'</div>';}).join('');
-    var sid='se'+i+'_'+Math.random().toString(36).substr(2,5);
-    return '<div class="si-email-card">'
-      +'<div class="si-email-hdr"><div class="si-dot-r"></div><div class="si-dot-y"></div><div class="si-dot-g"></div>'
-        +'<div class="si-email-to">'+esc(ot.company||'')+'</div>'
-        +'<span class="si-timing si-t-'+t+'">'+t.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div class="si-email-body">'
-        +(ot.signal_hook?'<div class="si-signal-hook">'+esc(ot.signal_hook)+'</div>':'')
-        +'<div class="si-subj-block"><div class="si-subj-top"><span class="si-subj-eyebrow">Subject</span>'
-          +'<button class="si-copy-btn" onclick="siCopy(this,\''+sid+'\')">Copy</button></div>'
-          +'<div class="si-subj-line" id="'+sid+'">'+esc(ot.subject||'')+'</div></div>'
-        +(ot.opening?'<div class="si-opening-text">'+esc(ot.opening)+'</div>':'')
-        +(tps?'<div class="si-tps-list">'+tps+'</div>':'')
-        +(ot.cta?'<div class="si-cta">'+esc(ot.cta)+'</div>':'')
-      +'</div></div>';
-  }).join('');
-}
-
-window.siCopy=function(btn,id){
-  var el=document.getElementById(id);if(!el)return;
-  navigator.clipboard&&navigator.clipboard.writeText(el.textContent).then(function(){
-    btn.textContent='Copied';btn.classList.add('ok');
-    setTimeout(function(){btn.textContent='Copy';btn.classList.remove('ok');},2000);
-  });
-};
-})();
-</script>
-
-
-
-
-
-
-
-
-
-<!-- ═══ INSIGHTS FINAL OVERHAUL ═════════════════════════════════════════════ -->
-<style>
-/* ── Section base ────────────────────────────────────────────────────────── */
-#section-insights{margin:-20px -24px;padding:0;min-height:calc(100vh - 56px);display:none;flex-direction:column}
-#section-insights.active{display:flex!important}
-#section-insights .si-body{
-  flex:1;overflow-y:auto;padding:20px 24px;
-  background:
-    radial-gradient(ellipse 55% 45% at 10% 10%,rgba(67,56,202,.2) 0%,transparent 50%),
-    radial-gradient(ellipse 45% 35% at 90% 85%,rgba(124,58,237,.15) 0%,transparent 50%),
-    radial-gradient(ellipse 30% 25% at 60% 40%,rgba(29,78,216,.08) 0%,transparent 60%),
-    linear-gradient(160deg,#020817 0%,#060c18 100%)
-}
-#content{background:#020817!important}
-
-/* ── Metric tiles ────────────────────────────────────────────────────────── */
-.si-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;width:100%}
-@media(max-width:1000px){.si-tiles{grid-template-columns:repeat(2,1fr)}}
-.si-tile{border-radius:14px;padding:16px 18px;cursor:pointer;position:relative;overflow:hidden;
-  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
-  backdrop-filter:blur(16px);transition:all .25s;animation:fp-up .35s ease both}
-.si-tile:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.55)}
-.si-tile-icon{font-size:22px;margin-bottom:10px;display:block}
-.si-tile-val{font-size:26px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:5px;font-variant-numeric:tabular-nums}
-.si-tile-lbl{font-size:11px;color:#475569;font-weight:500}
-.si-tile-glow{position:absolute;bottom:-25px;right:-25px;width:100px;height:100px;border-radius:50%;opacity:.1;pointer-events:none}
-
-/* ── Brief ───────────────────────────────────────────────────────────────── */
-.si-brief-compact{position:relative;overflow:hidden;border-radius:14px;padding:16px 20px 40px;
-  margin-bottom:14px;cursor:pointer;
-  background:linear-gradient(135deg,rgba(67,56,202,.18) 0%,rgba(124,58,237,.1) 60%,rgba(29,78,216,.08) 100%);
-  border:1px solid rgba(99,102,241,.22);transition:all .2s;animation:fp-up .35s .06s ease both}
-.si-brief-compact:hover{border-color:rgba(99,102,241,.45);box-shadow:0 10px 36px rgba(67,56,202,.18)}
-.si-brief-compact::after{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;
-  border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.14) 0%,transparent 70%);pointer-events:none}
-.si-brief-hdr{display:flex;align-items:center;gap:7px;margin-bottom:9px}
-.si-brief-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
-.si-ai-tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.2);color:#a5b4fc}
-.si-brief-text{font-size:13px;line-height:1.7;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.si-brief-expand{position:absolute;bottom:12px;right:16px;font-size:11px;color:#6366f1;font-weight:600;display:flex;align-items:center;gap:4px}
-
-/* ── Section rows ────────────────────────────────────────────────────────── */
-.fp-sec{display:flex;align-items:center;gap:8px;margin:16px 0 10px}
-.fp-sec-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;white-space:nowrap}
-.fp-sec-line{flex:1;height:1px;background:rgba(255,255,255,.05)}
-.fp-ai{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.14);color:#818cf8;flex-shrink:0}
-
-/* ── Priority grid ───────────────────────────────────────────────────────── */
-.si-pri-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;width:100%}
-@media(max-width:1100px){.si-pri-grid{grid-template-columns:repeat(2,1fr)}}
-.si-pc2{border-radius:13px;padding:13px 14px;cursor:pointer;position:relative;overflow:hidden;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .22s;animation:fp-up .35s ease both;
-  display:flex;flex-direction:column;gap:8px}
-.si-pc2:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.55)}
-.si-pc2.r1{border-color:rgba(239,68,68,.25);background:rgba(127,29,29,.07)}
-.si-pc2.r1:hover{border-color:rgba(239,68,68,.45)}
-.si-pc2-top{display:flex;align-items:center;gap:9px}
-.si-pc2-av{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
-.si-pc2-name{font-size:12px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.si-pc2-timing{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;flex-shrink:0}
-.t-today{background:rgba(239,68,68,.15);color:#f87171}.t-week{background:rgba(245,158,11,.1);color:#fbbf24}.t-email{background:#1e293b;color:#475569}
-.si-pc2-signal{font-size:10px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:2px}
-.si-pc2-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.si-pc2-svc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.si-pc2-val{font-size:11px;font-weight:700;color:#fbbf24;margin-left:auto}
-
-/* ── Infographic row ─────────────────────────────────────────────────────── */
-.fp-infog{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;width:100%}
-@media(max-width:1000px){.fp-infog{grid-template-columns:1fr 1fr}}
-.fp-ic{border-radius:14px;padding:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(10px);animation:fp-up .35s ease both}
-.fp-ic-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
-
-/* Gauge */
-.fp-gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
-.fp-gauge-sub{font-size:11px;color:#334155;text-align:center;line-height:1.4}
-
-/* Bar rows */
-.fp-bars{display:flex;flex-direction:column;gap:7px}
-.fp-bar-row{display:flex;align-items:center;gap:8px}
-.fp-bar-lbl{font-size:10px;color:#475569;width:88px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp-bar-track{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
-.fp-bar-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.fp-bar-cnt{font-size:10px;color:#475569;min-width:26px;text-align:right;flex-shrink:0}
-
-/* Tier list */
-.fp-tier-list{display:flex;flex-direction:column;gap:7px}
-.fp-tier-row{display:flex;align-items:center;gap:8px}
-.fp-tier-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.fp-tier-lbl{font-size:11px;color:#475569;flex:1}
-.fp-tier-track{width:80px;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
-.fp-tier-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.fp-tier-cnt{font-size:11px;font-weight:700;min-width:20px;text-align:right}
-
-/* Donut */
-.fp-donut-wrap{display:flex;align-items:center;gap:12px}
-.fp-donut-legend{flex:1;display:flex;flex-direction:column;gap:5px}
-.fp-legend-row{display:flex;align-items:center;gap:6px}
-.fp-legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.fp-legend-lbl{font-size:10px;color:#475569;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp-legend-cnt{font-size:10px;font-weight:700}
-
-/* ── Pipeline cards ──────────────────────────────────────────────────────── */
-.fp-pip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
-@media(max-width:1100px){.fp-pip-grid{grid-template-columns:repeat(2,1fr)}}
-.fp-pcard{border-radius:14px;padding:14px;cursor:pointer;position:relative;overflow:hidden;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .22s;animation:fp-up .35s ease both;
-  display:flex;flex-direction:column;gap:10px}
-.fp-pcard:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.55)}
-.fp-pcard.hot{border-color:rgba(239,68,68,.2)}.fp-pcard.hot:hover{border-color:rgba(239,68,68,.45);box-shadow:0 12px 30px rgba(239,68,68,.12)}
-.fp-pcard.active{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca!important}
-.fp-pcard-top{display:flex;align-items:center;gap:10px}
-.fp-av{width:36px;height:36px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;letter-spacing:-.02em}
-.fp-pcard-info{flex:1;min-width:0}
-.fp-pcard-name{font-size:13px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;margin-bottom:1px}
-.fp-pcard-domain{font-size:10px;color:#334155}
-.fp-score-row{display:flex;align-items:center;gap:10px}
-.fp-score-lbl{font-size:10px;font-weight:700;margin-bottom:3px}
-.fp-score-track{height:4px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-bottom:5px}
-.fp-score-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.fp-score-why{font-size:10px;color:#334155;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.fp-badges{display:flex;gap:4px;flex-wrap:wrap}
-.fp-badge{font-size:9px;padding:2px 7px;border-radius:5px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.15)}
-.fp-svc-tag{font-size:9px;padding:2px 7px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-/* Inline action buttons on card */
-.fp-card-actions{display:flex;gap:5px;padding-top:2px;border-top:1px solid rgba(255,255,255,.05);flex-wrap:wrap}
-.fp-ca-btn{background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#334155;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:3px 8px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:3px}
-.fp-ca-btn:hover{border-color:rgba(255,255,255,.18);color:#64748b}
-.fp-ca-btn.email:hover{border-color:rgba(99,102,241,.5);color:#818cf8}
-.fp-ca-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8}
-.fp-ca-btn.ok{border-color:#065f46!important;color:#34d399!important}
-
-/* ── Actions ─────────────────────────────────────────────────────────────── */
-.fp-act-list{display:flex;flex-direction:column;gap:8px;width:100%}
-.fp-acard{border-radius:11px;padding:12px 14px;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-  backdrop-filter:blur(10px);transition:all .2s;animation:fp-up .35s ease both;
-  display:flex;align-items:center;gap:12px}
-.fp-acard:hover{border-color:rgba(255,255,255,.14);transform:translateX(2px)}
-.fp-acard.active{border-color:#4338ca!important}
-.fp-acard.hi{border-left:2px solid rgba(239,68,68,.6)}.fp-acard.med{border-left:2px solid rgba(245,158,11,.5)}
-.fp-acard-rank{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#334155;flex-shrink:0}
-.fp-acard-ico{font-size:15px;flex-shrink:0}
-.fp-acard-body{flex:1;min-width:0}
-.fp-acard-action{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.fp-acard-co{font-size:10px;color:#334155}
-.fp-acard-right{display:flex;align-items:center;gap:7px;flex-shrink:0}
-.fp-acard-dl{font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.04);color:#334155;border:1px solid rgba(255,255,255,.07)}
-.fp-urgdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.fp-urgdot.H{background:#ef4444;box-shadow:0 0 7px rgba(239,68,68,.7)}.fp-urgdot.M{background:#f59e0b;box-shadow:0 0 7px rgba(245,158,11,.6)}
-
-/* ── Outreach cards ──────────────────────────────────────────────────────── */
-.fp-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%}
-@media(max-width:950px){.fp-out-grid{grid-template-columns:1fr}}
-.fp-ocard{border-radius:13px;overflow:hidden;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .22s;animation:fp-up .35s ease both}
-.fp-ocard:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
-.fp-ocard.active{border-color:#4338ca!important}
-.fp-ocard-chrome{background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 12px;display:flex;align-items:center;gap:5px}
-.fp-ocard-dot{width:9px;height:9px;border-radius:50%}
-.fp-ocard-to{font-size:10px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px}
-.fp-ocard-t{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0}
-.fp-ot-now{background:rgba(239,68,68,.15);color:#f87171}.fp-ot-soon{background:rgba(245,158,11,.1);color:#fbbf24}.fp-ot-watch{background:#1e293b;color:#475569}
-.fp-ocard-body{padding:11px 13px;display:flex;flex-direction:column;gap:8px}
-.fp-ocard-subj{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.fp-ocard-hook{font-size:10px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp-ocard-actions{display:flex;gap:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.05)}
-
-/* ── Drawer ──────────────────────────────────────────────────────────────── */
-.fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
-.fp-overlay.on{opacity:1;pointer-events:all}
-.fp-drawer{position:fixed;top:0;right:-560px;width:540px;max-width:96vw;height:100vh;z-index:399;
-  background:linear-gradient(180deg,#070b17 0%,#0a0f1c 100%);
-  border-left:1px solid rgba(255,255,255,.08);
-  transition:right .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;overflow:hidden;
-  box-shadow:-30px 0 100px rgba(0,0,0,.8)}
-.fp-drawer.on{right:0}
-.fp-drw-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;background:rgba(0,0,0,.4)}
-.fp-drw-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:#475569;cursor:pointer;font-size:13px;padding:5px 10px;transition:all .15s}
-.fp-drw-close:hover{border-color:rgba(255,255,255,.16);color:#94a3b8}
-.fp-drw-title{font-size:13px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.fp-drw-body{flex:1;overflow-y:auto;padding:20px}
-.fp-drw-body::-webkit-scrollbar{width:3px}.fp-drw-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:2px}
-
-/* Drawer sections */
-.fp-ds{margin-bottom:18px}
-.fp-ds-lbl{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
-.fp-ds-val{font-size:13px;color:#94a3b8;line-height:1.7}
-.fp-highlight{background:rgba(67,56,202,.09);border:1px solid rgba(67,56,202,.2);border-radius:9px;padding:12px 14px;font-size:13px;color:#a5b4fc;line-height:1.65}
-.fp-rev-big{font-size:26px;font-weight:800;color:#fbbf24;letter-spacing:-.04em}
-.fp-chip-row{display:flex;gap:6px;flex-wrap:wrap}
-.fp-chip-grn{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15);font-weight:500}
-.fp-chip-blu{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(59,130,246,.08);color:#60a5fa;border:1px solid rgba(59,130,246,.15);font-weight:500}
-.fp-chip-pur{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(139,92,246,.08);color:#c4b5fd;border:1px solid rgba(139,92,246,.15);font-weight:500}
-
-/* Talking points */
-.fp-tp-list{display:flex;flex-direction:column;gap:6px}
-.fp-tp-item{display:flex;gap:8px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px}
-.fp-tp-num{width:18px;height:18px;border-radius:5px;background:rgba(67,56,202,.15);border:1px solid rgba(67,56,202,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#818cf8;flex-shrink:0;margin-top:1px}
-.fp-tp-text{font-size:12px;color:#94a3b8;line-height:1.55;flex:1}
-
-/* Objections */
-.fp-obj{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12);border-radius:8px;padding:10px 12px;margin-bottom:6px}
-.fp-obj-q{font-size:11px;color:#f87171;font-weight:600;margin-bottom:4px}
-.fp-obj-a{font-size:11px;color:#64748b;line-height:1.5}
-
-/* Subject line alternatives */
-.fp-subj-alt{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px;margin-bottom:5px}
-.fp-subj-alt-text{font-size:12px;font-weight:600;color:#e2e8f0;flex:1;letter-spacing:-.01em}
-.fp-subj-copy{background:none;border:1px solid rgba(255,255,255,.08);border-radius:5px;color:#334155;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:2px 8px;transition:all .15s;flex-shrink:0}
-.fp-subj-copy:hover{border-color:#4338ca;color:#818cf8}
-.fp-subj-copy.ok{border-color:#065f46!important;color:#34d399!important}
-
-/* Score badge */
-.fp-score-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 16px;margin-bottom:14px;width:100%}
-.fp-score-badge-val{font-size:28px;font-weight:800;letter-spacing:-.04em;line-height:1}
-.fp-score-badge-bar-wrap{flex:1}
-.fp-score-badge-lbl{font-size:11px;font-weight:700;margin-bottom:4px}
-.fp-score-badge-track{height:5px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
-.fp-score-badge-fill{height:100%;border-radius:999px;transition:width 1s cubic-bezier(.22,1,.36,1)}
-
-/* Action buttons block */
-.fp-action-btns{display:flex;gap:7px;flex-wrap:wrap;padding:14px 0 0;border-top:1px solid rgba(255,255,255,.06)}
-.fp-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;color:#475569;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:8px 13px;transition:all .18s;white-space:nowrap}
-.fp-btn:hover{border-color:rgba(255,255,255,.18);color:#94a3b8}
-.fp-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}.fp-btn.prim:hover{background:#3730a3}
-.fp-btn.email{}.fp-btn.email:hover{border-color:rgba(99,102,241,.5);color:#818cf8;background:rgba(67,56,202,.1)}
-.fp-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.06)}
-.fp-btn.ok{border-color:#065f46!important;color:#34d399!important}
-
-/* Urgency badge */
-.fp-urg-H{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;background:rgba(239,68,68,.1);color:#f87171}
-.fp-urg-M{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;background:rgba(245,158,11,.08);color:#fcd34d}
-
-/* AI analysis loading */
-.fp-ai-loading{display:flex;align-items:center;gap:8px;padding:12px 14px;background:rgba(67,56,202,.06);border:1px solid rgba(67,56,202,.15);border-radius:9px;font-size:12px;color:#818cf8;margin-bottom:14px}
-.fp-ai-spin{animation:fp-spin .8s linear infinite;display:inline-block}
-@keyframes fp-spin{to{transform:rotate(360deg)}}
-
-/* Auto-load state */
-.fp-auto-load{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;gap:16px;text-align:center}
-.fp-auto-orb{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:fp-orb 1.6s ease-in-out infinite}
-@keyframes fp-orb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5),0 0 24px rgba(67,56,202,.4)}50%{box-shadow:0 0 0 10px rgba(67,56,202,0),0 0 48px rgba(67,56,202,.7)}}
-.fp-auto-dots{display:flex;gap:5px}.fp-auto-dots span{width:5px;height:5px;border-radius:50%;background:#4338ca;animation:fp-dot 1.2s ease-in-out infinite}
-.fp-auto-dots span:nth-child(2){animation-delay:.2s}.fp-auto-dots span:nth-child(3){animation-delay:.4s}
-@keyframes fp-dot{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
-.fp-auto-lbl{font-size:14px;font-weight:600;color:#e2e8f0;letter-spacing:-.01em}
-.fp-auto-sub{font-size:12px;color:#334155;max-width:300px;line-height:1.6}
-
-/* Regen */
-.fp-regen-row{display:flex;align-items:center;gap:10px;padding:14px 0 0;border-top:1px solid rgba(255,255,255,.05);margin-top:4px}
-.fp-regen-meta{font-size:11px;color:#1e293b;flex:1}
-.fp-regen-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#334155;cursor:pointer;font-family:inherit;font-size:11px;padding:5px 12px;transition:all .15s}
-.fp-regen-btn:hover{border-color:rgba(255,255,255,.15);color:#64748b}
-
-/* Global panel animation */
-@keyframes fp-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.si-tiles .si-tile:nth-child(1){animation-delay:.03s}.si-tiles .si-tile:nth-child(2){animation-delay:.07s}
-.si-tiles .si-tile:nth-child(3){animation-delay:.11s}.si-tiles .si-tile:nth-child(4){animation-delay:.15s}
-</style>
-
-<!-- Overlay + Drawer DOM -->
-<div class="fp-overlay" id="fp-ov" onclick="fpClose()"></div>
-<div class="fp-drawer" id="fp-dr">
-  <div class="fp-drw-top">
-    <button class="fp-drw-close" onclick="fpClose()">✕</button>
-    <div class="fp-drw-title" id="fp-title"></div>
-  </div>
-  <div class="fp-drw-body" id="fp-body"></div>
+<!-- INSIGHTS STANDALONE JS v7 -->
+<div class="ir-ov" id="ir-ov" onclick="irClose()"></div>
+<div class="ir-drw" id="ir-drw">
+  <div class="ir-drw-top"><button class="ir-drw-close" onclick="irClose()">✕</button><div class="ir-drw-title" id="ir-drw-title"></div></div>
+  <div class="ir-drw-body" id="ir-drw-body"></div>
 </div>
-
 <script>
 (function(){
 'use strict';
-window._FD = {pip:[], acts:[], out:[], pri:[], ins:null, meta:{sigs:0,cos:0}};
-var _auto = false;
-
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function ini(n){return(n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
+/* ── State ─────────────────────────────────────────────────────────────── */
+var D={pip:[],acts:[],out:[],pri:[],ins:null,meta:{sigs:0,cos:0}};
+var _metaLoaded=false,_autoTriggered=false,_stepTimer=null;
 var AVC=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46'];
-function svcC(s){return{SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'}[s]||'#64748b';}
+var STEPS=['Reading signals…','Scoring intent and identifying patterns…','Generating insights, actions and outreach…'];
+
+/* ── Helpers ───────────────────────────────────────────────────────────── */
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
 function acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
-function tClass(t){t=(t||'').toLowerCase();return t.includes('today')?'fp-ot-now':t.includes('week')?'fp-ot-soon':'fp-ot-watch';}
+function svcC(s){return{SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'}[s]||'#64748b';}
+function liCo(co){return 'https://www.linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co);}
+function liPpl(co){return 'https://www.linkedin.com/search/results/people/?company='+encodeURIComponent(co)+'&keywords=CMO+CEO+VP+Marketing+CTO';}
+function tClass(t){t=(t||'').toLowerCase();return t.includes('today')?'ir-ot-now':t.includes('week')?'ir-ot-soon':'ir-ot-watch';}
 function tLabel(t){t=(t||'').toLowerCase();return t.includes('today')?'Today':t.includes('week')?'This Week':'Email';}
 
-/* ─── Ring SVG ───────────────────────────────────────────────────────────── */
-function ring(sc,color,size){
-  size=size||56;var cx=size/2,r=cx-7,c2=2*Math.PI*r,off=c2*(1-sc/100),fs=Math.round(size*.28);
-  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+/* ── SVG ring ──────────────────────────────────────────────────────────── */
+function ring(sc,color,sz){
+  sz=sz||54;var cx=sz/2,r=cx-7,c2=2*Math.PI*r,off=c2*(1-sc/100),fs=Math.round(sz*.27);
+  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'
     +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="6"/>'
     +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"'
     +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx)'">'
     +'<animate attributeName="stroke-dashoffset" from="'+c2.toFixed(1)+'" to="'+off.toFixed(1)+'" dur="1s" fill="freeze"/></circle>'
-    +'<text x="'+cx+'" y="'+(cx+fs*.35)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
+    +'<text x="'+cx+'" y="'+(cx+fs*.37)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
     +'</svg>';
 }
-
-/* ─── Gauge ──────────────────────────────────────────────────────────────── */
-function gauge(pct,value,label,color){
-  var r=48,cx=70,cy=68,sw=10,c2=Math.PI*r;
+function gauge(pct,val,lbl,color){
+  var r=46,cx=68,cy=64,c2=Math.PI*r;
   var ex=cx+r*Math.cos(Math.PI*pct),ey=cy+r*Math.sin(Math.PI*pct);
-  var la=pct>.5?1:0;
-  return '<svg width="140" height="80" viewBox="0 0 140 80">'
-    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,1 '+(cx+r)+','+cy+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="'+sw+'" stroke-linecap="round"/>'
-    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,'+(pct>.5?'1':'0')+' '+ex.toFixed(1)+','+ey.toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="'+sw+'" stroke-linecap="round">'
-    +'<animate attributeName="stroke-dasharray" from="0 '+(Math.PI*r).toFixed(0)+'" to="'+(pct*Math.PI*r).toFixed(0)+' '+(Math.PI*r).toFixed(0)+'" dur=".9s" fill="freeze"/>'
-    +'</path>'
-    +'<text x="'+cx+'" y="60" text-anchor="middle" fill="'+color+'" font-size="16" font-weight="800" font-family="Inter,sans-serif">'+esc(value)+'</text>'
-    +'<text x="'+cx+'" y="74" text-anchor="middle" fill="#334155" font-size="9" font-family="Inter,sans-serif">'+esc(label)+'</text>'
+  return '<svg width="136" height="76" viewBox="0 0 136 76">'
+    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,1 '+(cx+r)+','+cy+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="9" stroke-linecap="round"/>'
+    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,'+(pct>.5?'1':'0')+' '+ex.toFixed(1)+','+ey.toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="9" stroke-linecap="round">'
+    +'<animate attributeName="stroke-dasharray" from="0 '+c2.toFixed(0)+'" to="'+(pct*c2).toFixed(0)+' '+c2.toFixed(0)+'" dur=".9s" fill="freeze"/></path>'
+    +'<text x="'+cx+'" y="58" text-anchor="middle" fill="'+color+'" font-size="15" font-weight="800" font-family="Inter,sans-serif">'+esc(val)+'</text>'
+    +'<text x="'+cx+'" y="71" text-anchor="middle" fill="#334155" font-size="8" font-family="Inter,sans-serif">'+esc(lbl)+'</text>'
     +'</svg>';
 }
-
-/* ─── Donut ──────────────────────────────────────────────────────────────── */
 function donut(slices){
-  if(!slices||!slices.length)return '';
   var total=slices.reduce(function(a,b){return a+(b.v||0);},0)||1;
-  var r=28,cx=36,cy=36,sw=10,c2=2*Math.PI*r,gap=.04;
-  var off=0,paths='';
+  var r=26,cx=34,cy=34,c2=2*Math.PI*r,off=0,paths='';
   slices.forEach(function(s){
-    var pct=Math.max((s.v||0)/total,0.01),arc=c2*pct-gap;
-    paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.c+'" stroke-width="'+sw+'"'
+    var pct=Math.max((s.v||0)/total,.01),arc=c2*pct-.05;
+    paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.c+'" stroke-width="9"'
       +' stroke-dasharray="'+arc.toFixed(2)+' '+(c2-arc).toFixed(2)+'"'
       +' stroke-dashoffset="'+(-(c2*off-c2/4)).toFixed(2)+'">'
-      +'<animate attributeName="stroke-dasharray" from="0 '+c2.toFixed(2)+'" to="'+arc.toFixed(2)+' '+(c2-arc).toFixed(2)+'" dur=".8s" fill="freeze"/>'
-      +'</circle>';
+      +'<animate attributeName="stroke-dasharray" from="0 '+c2.toFixed(2)+'" to="'+arc.toFixed(2)+' '+(c2-arc).toFixed(2)+'" dur=".8s" fill="freeze"/></circle>';
     off+=pct;
   });
-  return '<svg width="72" height="72" viewBox="0 0 72 72">'+paths+'</svg>';
+  return '<svg width="68" height="68" viewBox="0 0 68 68">'+paths+'</svg>';
 }
-
-/* ─── Counter ────────────────────────────────────────────────────────────── */
 function countUp(el,to){
   if(!el||to==null)return;
   var n=parseFloat(String(to).replace(/[^0-9.]/g,''))||0,dur=800,t0=null;
-  (function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);})(performance.now());
-  requestAnimationFrame(function(ts){t0=ts;});
+  requestAnimationFrame(function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);});
 }
 
-/* ─── Drawer open/close ──────────────────────────────────────────────────── */
-window.fpClose = function(){
-  document.getElementById('fp-dr').classList.remove('on');
-  document.getElementById('fp-ov').classList.remove('on');
-  document.querySelectorAll('.fp-pcard.active,.fp-acard.active,.fp-ocard.active').forEach(function(e){e.classList.remove('active');});
+/* ── Drawer ────────────────────────────────────────────────────────────── */
+window.irClose=function(){
+  $('ir-drw').classList.remove('on');$('ir-ov').classList.remove('on');
+  document.querySelectorAll('.ir-pcard.sel,.ir-arow.sel,.ir-ocard.sel').forEach(function(e){e.classList.remove('sel');});
 };
-function fpOpen(title, html){
-  document.getElementById('fp-title').textContent = title;
-  document.getElementById('fp-body').innerHTML = html;
-  document.getElementById('fp-dr').classList.add('on');
-  document.getElementById('fp-ov').classList.add('on');
-  document.getElementById('fp-body').scrollTop = 0;
+function irOpen(title,html){
+  $('ir-drw-title').textContent=title;$('ir-drw-body').innerHTML=html;
+  $('ir-drw').classList.add('on');$('ir-ov').classList.add('on');
+  $('ir-drw-body').scrollTop=0;
   setTimeout(function(){document.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},100);
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')fpClose();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')irClose();});
 
-/* ─── LinkedIn URL ───────────────────────────────────────────────────────── */
-function liURL(company){return 'https://www.linkedin.com/search/results/companies/?keywords='+encodeURIComponent(company);}
-function liPeopleURL(company){return 'https://www.linkedin.com/search/results/people/?company='+encodeURIComponent(company)+'&keywords=CMO+CEO+VP+Marketing+CTO';}
+/* ── Tab open → auto-generate ──────────────────────────────────────────── */
+window.iTab=function(){
+  if(!_metaLoaded)irLoadMeta();
+  if(!_autoTriggered){_autoTriggered=true;irGenerate();}
+};
+window.irTab=function(btn){
+  document.querySelectorAll('.ir-tab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  var p=btn.getAttribute('data-p');
+  document.querySelectorAll('.ir-panel').forEach(function(el){el.classList.remove('active');});
+  var t=$('ir-p-'+p);if(t)t.classList.add('active');
+};
 
-/* ─── Auto-generate on tab open ──────────────────────────────────────────── */
-(function hookOpen(){
-  if(typeof window.insOnTabOpen!=='function'){setTimeout(hookOpen,100);return;}
-  var _o=window.insOnTabOpen;
-  window.insOnTabOpen=function(){
-    _o();
-    if(!_auto){
-      _auto=true;
-      _showAutoLoad();
-      setTimeout(function(){if(typeof window.siGenerate==='function')window.siGenerate();},300);
-    }
-  };
-})();
+/* ── Meta ──────────────────────────────────────────────────────────────── */
+function irLoadMeta(){
+  _metaLoaded=true;
+  fetch('/api/insights-meta/'+acct()).then(function(r){return r.json();}).then(function(d){
+    _buildTypesList(d.signal_types||[],d.counts||{});
+    var sel=$('ir-industry');
+    if(sel)(d.industries||[]).forEach(function(ind){var o=document.createElement('option');o.value=ind;o.textContent=ind;sel.appendChild(o);});
+    var st=$('ir-stat');if(st)st.textContent=(d.total_signals||0).toLocaleString()+' signals';
+  }).catch(function(){});
+}
+function _buildTypesList(types,counts){
+  var wrap=$('ir-types-list');if(!wrap)return;
+  wrap.innerHTML='';
+  types.forEach(function(t){
+    var lbl=t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+    var d=document.createElement('div');d.className='ir-dd-item';d.setAttribute('data-type',t);
+    d.innerHTML='<input type="checkbox" checked id="irt_'+t+'"><label for="irt_'+t+'">'+esc(lbl)+'</label><span class="ir-dd-cnt">'+(counts[t]||0)+'</span>';
+    d.querySelector('input').addEventListener('change',function(){_updateTypesCount();});
+    wrap.appendChild(d);
+  });
+  _updateTypesCount();
+}
+function _updateTypesCount(){
+  var all=document.querySelectorAll('#ir-types-list .ir-dd-item'),on=document.querySelectorAll('#ir-types-list .ir-dd-item input:checked');
+  var el=$('ir-types-ct');if(el)el.textContent=on.length===all.length?'All':on.length+'/'+all.length;
+}
+window.irTypesToggle=function(){
+  var m=$('ir-types-menu');if(!m)return;
+  if(m.style.display==='none'){m.style.display='block';setTimeout(function(){document.addEventListener('click',_closeTypes,{once:true});},10);}else{m.style.display='none';}
+};
+function _closeTypes(e){var w=$('ir-ddwrap');if(w&&!w.contains(e.target)){var m=$('ir-types-menu');if(m)m.style.display='none';}}
+window.irSv=function(btn){btn.classList.toggle('on');};
 
-function _showAutoLoad(){
-  var empty=document.getElementById('si-empty'),load=document.getElementById('si-loading'),ov=document.getElementById('si-ov');
-  if(empty)empty.style.display='none';if(load)load.style.display='none';if(ov)ov.style.display='none';
-  var ex=document.getElementById('fp-auto-el');if(ex){ex.style.display='flex';return;}
-  var d=document.createElement('div');d.id='fp-auto-el';d.className='fp-auto-load';
-  d.innerHTML='<div class="fp-auto-orb"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>'
-    +'<div class="fp-auto-lbl">Analysing signals with GPT…</div>'
-    +'<div class="fp-auto-sub">Generating leadership insights, pipeline priorities, and personalised outreach.</div>'
-    +'<div class="fp-auto-dots"><span></span><span></span><span></span></div>';
-  var p=document.getElementById('si-p-overview');if(p)p.insertBefore(d,p.firstChild);
+/* ── Generate ──────────────────────────────────────────────────────────── */
+window.irGenerate=function(){
+  if(!_metaLoaded)irLoadMeta();
+  var btn=$('ir-gen');if(btn)btn.disabled=true;
+  var p=new URLSearchParams();
+  document.querySelectorAll('#ir-types-list .ir-dd-item input:checked').forEach(function(cb){p.append('signal_type',cb.closest('.ir-dd-item').getAttribute('data-type'));});
+  document.querySelectorAll('.ir-sv.on').forEach(function(sv){p.append('severity',sv.getAttribute('data-s'));});
+  var d=$('ir-days');if(d)p.set('days',d.value);
+  var ind=$('ir-industry');if(ind&&ind.value)p.set('industry',ind.value);
+  _showLoad();
+  fetch('/api/insights/'+acct()+'?'+p.toString())
+    .then(function(r){return r.json();})
+    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stepTimer);data.error?_showErr(data.error):_renderAll(data);})
+    .catch(function(e){if(btn)btn.disabled=false;clearInterval(_stepTimer);_showErr('Network error: '+e.message);});
+};
+function _showLoad(){
+  $('ir-empty').style.display='none';$('ir-ov').style.display='none';$('ir-loading').style.display='flex';
+  document.querySelectorAll('.ir-tab').forEach(function(b){b.classList.remove('active');});
+  document.querySelector('.ir-tab[data-p="ov"]').classList.add('active');
+  document.querySelectorAll('.ir-panel').forEach(function(p){p.classList.remove('active');});
+  $('ir-p-ov').classList.add('active');
+  var f=$('ir-load-fill');if(f){var nf=f.cloneNode(true);f.parentNode.replaceChild(nf,f);}
+  var lbl=$('ir-load-lbl');if(lbl)lbl.textContent=STEPS[0];
+  clearInterval(_stepTimer);var cur=0;
+  _stepTimer=setInterval(function(){cur++;if(cur>=STEPS.length){clearInterval(_stepTimer);return;}var l=$('ir-load-lbl');if(l)l.textContent=STEPS[cur];},3500);
+}
+function _showErr(msg){
+  $('ir-loading').style.display='none';$('ir-empty').style.display='flex';
+  var btn=$('ir-gen');if(btn)btn.disabled=false;
+  var old=$('ir-empty').querySelector('.ir-err-box');if(old)old.remove();
+  var d=document.createElement('div');d.className='ir-err-box';
+  d.style.cssText='margin-top:14px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#f87171;max-width:400px;line-height:1.55';
+  d.innerHTML='<strong>Error:</strong> '+esc(msg);$('ir-empty').appendChild(d);
 }
 
-/* ─── Hook siGenerate to capture response ────────────────────────────────── */
-(function hookGen(){
-  if(typeof window.siGenerate!=='function'){setTimeout(hookGen,120);return;}
-  var _og=window.siGenerate;
-  window.siGenerate=function(){
-    var al=document.getElementById('fp-auto-el');if(al)al.style.display='none';
-    var _of=window.fetch;
-    window.fetch=function(url,opts){
-      var p=_of.apply(this,arguments);
-      if(typeof url==='string'&&url.indexOf('/api/insights/')>-1){
-        return p.then(function(r){
-          r.clone().json().then(function(data){
-            if(data&&data.insights){
-              var ins=data.insights;
-              window._FD={pip:(ins.pipeline||[]).slice(0,9),acts:ins.actions||[],out:ins.outreach||[],pri:ins.week_priority||[],ins:ins,meta:{sigs:data.signals_analyzed,cos:data.companies_analyzed}};
-              setTimeout(function(){_renderAll(data);},400);
-            }
-          }).catch(function(){});
-          return r;
-        });
-      }
-      return p;
-    };
-    _og();
-    setTimeout(function(){window.fetch=_of;},20000);
-  };
-  if(typeof window.siTab==='function'){var _ot=window.siTab;window.siTab=function(b){_ot(b);};}
-})();
-
-/* ─── RENDER ALL ─────────────────────────────────────────────────────────── */
+/* ── Render all tabs ───────────────────────────────────────────────────── */
 function _renderAll(data){
   var ins=data.insights||{};
-  _renderOv(data,ins);
-  _renderPip(ins.pipeline||[]);
-  _renderActs(ins.actions||[]);
-  _renderOut(ins.outreach||[]);
-  var al=document.getElementById('fp-auto-el');if(al)al.style.display='none';
-  var ld=document.getElementById('si-loading');if(ld)ld.style.display='none';
+  D={pip:(ins.pipeline||[]).slice(0,9),acts:ins.actions||[],out:ins.outreach||[],pri:ins.week_priority||[],ins:ins,meta:{sigs:data.signals_analyzed,cos:data.companies_analyzed}};
+  _renderOv(data,ins);_renderPip(D.pip);_renderActs(D.acts);_renderOut(D.out);
+  [['ir-tc-pip',D.pip.length],['ir-tc-act',D.acts.length],['ir-tc-out',D.out.length]].forEach(function(pair){
+    var e=$(pair[0]);if(e){e.textContent=pair[1];e.style.display=pair[1]?'':'none';}
+  });
+  $('ir-loading').style.display='none';$('ir-ov').style.display='block';
 }
 
-/* ─── OVERVIEW ───────────────────────────────────────────────────────────── */
+/* ── OVERVIEW ──────────────────────────────────────────────────────────── */
 function _renderOv(data,ins){
-  var ov=document.getElementById('si-ov');if(!ov)return;
+  var ov=$('ir-ov');if(!ov)return;
   var pe=ins.pipeline_estimate||{},wp=ins.week_priority||[],kp=ins.kpis||{};
+  var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
   var vel=(ins.meta&&ins.meta.signal_velocity_trend)||'stable';
   var vc=vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
-  var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
-
   ov.innerHTML=
-    /* Tiles */
-    '<div class="si-tiles">'
-    +[{i:'💰',v:pe.total||kp.estimated_value||'—',r:null,l:'Pipeline',g:'#fbbf24'},
+    '<div class="ir-tiles">'
+    +[{i:'💰',v:pe.total||kp.estimated_value||'—',r:null,l:'Pipeline Value',g:'#fbbf24'},
       {i:'🔥',v:kp.high_priority||hot,r:kp.high_priority||hot,l:'Hot Targets',g:'#ef4444'},
-      {i:'🎯',v:kp.avg_intent?Math.round(kp.avg_intent):null,r:kp.avg_intent?Math.round(kp.avg_intent):null,l:'Avg Intent',s:'/100',g:'#6366f1'},
-      {i:'⚡',v:(ins.actions||[]).length,r:(ins.actions||[]).length,l:'Actions',g:'#f59e0b'}]
+      {i:'🎯',v:kp.avg_intent?Math.round(kp.avg_intent):null,r:kp.avg_intent?Math.round(kp.avg_intent):null,l:'Avg Intent',sx:'/100',g:'#6366f1'},
+      {i:'⚡',v:D.acts.length,r:D.acts.length,l:'Actions',g:'#f59e0b'}]
     .map(function(k,i){
-      var v=k.r!=null?'<span id="fpkv'+i+'">0</span>'+(k.s||''):esc(String(k.v));
-      return '<div class="si-tile" style="animation-delay:'+(i*.06)+'s"><span class="si-tile-icon">'+k.i+'</span>'
-        +'<div class="si-tile-val">'+v+'</div><div class="si-tile-lbl">'+k.l+'</div>'
-        +'<div class="si-tile-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div>'
-      +'</div>';
+      var v=k.r!=null?'<span id="irkv'+i+'">0</span>'+(k.sx||''):esc(String(k.v));
+      return '<div class="ir-tile" style="animation-delay:'+(i*.06)+'s"><span class="ir-tile-ico">'+k.i+'</span><div class="ir-tile-val">'+v+'</div><div class="ir-tile-lbl">'+k.l+'</div><div class="ir-tile-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div></div>';
     }).join('')+'</div>'
 
-    /* Brief */
-    +'<div class="si-brief-compact" onclick="fpShowBrief()"><div class="si-brief-hdr"><span class="si-brief-lbl">Executive Brief</span><span class="si-ai-tag">✦ GPT</span></div><div class="si-brief-text">'+esc(ins.brief||ins.summary||'')+'</div><span class="si-brief-expand">Read full →</span></div>'
+    +'<div class="ir-brief" onclick="irShowBrief()">'
+      +'<div class="ir-brief-hdr"><span class="ir-brief-lbl">Executive Brief</span><span class="ir-sh-ai">✦ GPT</span></div>'
+      +'<div class="ir-brief-text">'+esc(ins.brief||ins.summary||'')+'</div>'
+      +'<span class="ir-brief-more">Read full →</span>'
+    +'</div>'
 
-    /* Priority calls */
     +(wp.length?
-      '<div class="fp-sec"><span class="fp-sec-title">Priority Calls This Week</span><span class="fp-ai">AI-ranked</span><span class="fp-sec-line"></span></div>'
-      +'<div class="si-pri-grid">'+wp.slice(0,6).map(function(p,i){
+      '<div class="ir-sh"><span class="ir-sh-title">Priority Calls This Week</span><span class="ir-sh-ai">AI-ranked</span><span class="ir-sh-line"></span></div>'
+      +'<div class="ir-pri-grid">'+wp.slice(0,6).map(function(p,i){
         var av=AVC[i%AVC.length],tc=tClass(p.call_timing),tl=tLabel(p.call_timing);
-        return '<div class="si-pc2'+(i===0?' r1':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="fpShowPri('+i+')">'
-          +'<div class="si-pc2-top"><div class="si-pc2-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
-            +'<span class="si-pc2-name">'+esc(p.company||'')+'</span>'
-            +'<span class="si-pc2-timing '+tc+'">'+tl+'</span>'
+        return '<div class="ir-pc'+(i===0?' r1':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="irShowPri('+i+')">'
+          +'<div class="ir-pc-top"><div class="ir-pc-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
+            +'<span class="ir-pc-name">'+esc(p.company||'')+'</span>'
+            +'<span class="ir-pc-t '+tc+'">'+tl+'</span>'
           +'</div>'
-          +'<div class="si-pc2-signal">📡 '+esc(p.signal||'')+'</div>'
-          +'<div class="si-pc2-foot">'+(p.service?'<span class="si-pc2-svc" style="color:'+svcC(p.service)+'">'+esc(p.service)+'</span>':'')+(p.est_value?'<span class="si-pc2-val">'+esc(p.est_value)+'</span>':'')+'</div>'
+          +'<div class="ir-pc-sig">📡 '+esc(p.signal||'')+'</div>'
+          +'<div class="ir-pc-foot">'+(p.service?'<span class="ir-pc-svc" style="color:'+svcC(p.service)+'">'+esc(p.service)+'</span>':'')+' <span class="ir-pc-val">'+esc(p.est_value||'')+'</span></div>'
         +'</div>';}).join('')+'</div>'
       :'')
 
-    /* Infographics */
-    +'<div class="fp-sec" style="margin-top:18px"><span class="fp-sec-title">Signal Intelligence</span><span class="fp-ai">Live data</span><span class="fp-sec-line"></span></div>'
-    +'<div class="fp-infog" id="fp-infog"></div>'
-
-    /* Themes + Risks */
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0">'
-      +'<div id="fp-themes"></div><div id="fp-risks"></div>'
-    +'</div>'
-
-    /* Regen */
-    +'<div class="fp-regen-row"><span class="fp-regen-meta">✦ GPT-generated · '+data.signals_analyzed+' signals · '+data.companies_analyzed+' companies</span><button class="fp-regen-btn" onclick="siGenerate()">↺ Regenerate</button></div>';
-
-  ov.style.display='block';
+    +'<div class="ir-sh" style="margin-top:18px"><span class="ir-sh-title">Signal Intelligence</span><span class="ir-sh-ai">Live data</span><span class="ir-sh-line"></span></div>'
+    +'<div class="ir-infog" id="ir-infog"></div>'
+    +'<div class="ir-grid2"><div id="ir-themes"></div><div id="ir-risks"></div></div>'
+    +'<div class="ir-regen-row"><span class="ir-regen-meta">✦ GPT · '+data.signals_analyzed+' signals · '+data.companies_analyzed+' companies</span><button class="ir-regen-btn" onclick="irGenerate()">↺ Regenerate</button></div>';
 
   /* Count up */
-  [{v:kp.high_priority||hot,i:1},{v:kp.avg_intent?Math.round(kp.avg_intent):null,i:2},{v:(ins.actions||[]).length,i:3}].forEach(function(k){
-    if(k.v!=null)setTimeout(function(){countUp(document.getElementById('fpkv'+k.i),k.v);},200+k.i*60);
+  [{r:kp.high_priority||hot,i:1},{r:kp.avg_intent?Math.round(kp.avg_intent):null,i:2},{r:D.acts.length,i:3}].forEach(function(k){
+    if(k.r!=null)setTimeout(function(){countUp($('irkv'+k.i),k.r);},200+k.i*60);
   });
 
-  window._FD.brief=ins.brief||ins.summary||'';window._FD.pe=pe;window._FD.vel=vel;
-
-  /* Infographics */
   _buildInfog(ins);
-
-  /* Themes */
-  var tc=document.getElementById('fp-themes');
-  if(tc){
-    var th=ins.themes||[];var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
-    tc.innerHTML='<div class="fp-ic" style="padding:16px"><div class="fp-ic-title">Signal Themes</div>'
-      +'<div class="fp-donut-wrap">'+donut(th.slice(0,4).map(function(t,i){return{v:t.count||1,c:tColors[i]};}))
-      +'<div class="fp-donut-legend">'+th.slice(0,4).map(function(t,i){
-        return '<div class="fp-legend-row"><div class="fp-legend-dot" style="background:'+tColors[i]+'"></div>'
-          +'<div class="fp-legend-lbl">'+esc(t.theme||'')+'</div>'
-          +'<div class="fp-legend-cnt" style="color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div></div>';
-      }).join('')+'</div></div></div>';
-  }
-  var rc=document.getElementById('fp-risks');
-  if(rc){
-    var risks=ins.risks||[];
-    rc.innerHTML='<div class="fp-ic" style="padding:16px"><div class="fp-ic-title">Attention Flags</div>'
-      +(risks.length?risks.slice(0,3).map(function(r){
-        return '<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
-          +'<div style="font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:2px">⚠ '+esc(r.company||'')+'</div>'
-          +'<div style="font-size:10px;color:#f87171;margin-bottom:2px">'+esc(r.flag||'')+'</div>'
-          +'<div style="font-size:10px;color:#334155;line-height:1.45">'+esc(r.implication||'')+'</div>'
-        +'</div>';
-      }).join(''):'<div style="font-size:11px;color:#1e293b;padding:14px 0;text-align:center">✅ No critical flags</div>')
-    +'</div>';
-  }
+  _buildThemes(ins.themes||[]);
+  _buildRisks(ins.risks||[]);
 }
 
 function _buildInfog(ins){
-  var row=document.getElementById('fp-infog');if(!row)return;
-  var pe=ins.pipeline_estimate||{},pip=ins.pipeline||[],kp=ins.kpis||{};
+  var row=$('ir-infog');if(!row)return;
+  var pe=ins.pipeline_estimate||{},pip=ins.pipeline||[];
   var crit=pip.filter(function(c){return c.intent_score>=80;}).length;
   var hi=pip.filter(function(c){return c.intent_score>=60&&c.intent_score<80;}).length;
   var watch=pip.filter(function(c){return c.intent_score<60;}).length;
   var maxT=Math.max(crit,hi,watch,1);
-  var gPct=.65;
-  try{gPct=Math.min(.98,parseFloat((pe.high_conviction||'0').replace(/[^0-9.]/g,''))/(parseFloat((pe.total||'1').replace(/[^0-9.]/g,''))||1));}catch(e){}
+  var gPct=.65;try{gPct=Math.min(.97,parseFloat((pe.high_conviction||'0').replace(/[^0-9.]/g,''))/(parseFloat((pe.total||'1').replace(/[^0-9.]/g,''))||1));}catch(e){}
+  var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
+  var themes=ins.themes||[];
   row.innerHTML=[
-    {t:'Pipeline Confidence',b:'<div class="fp-gauge-wrap">'+gauge(gPct,pe.high_conviction||'—','High Conviction','#34d399')+'<div class="fp-gauge-sub">'+esc(pe.total||'—')+' total · '+esc(pe.win_window||'—')+'</div></div>'},
-    {t:'Intent Distribution',b:'<div class="fp-tier-list">'
+    {t:'Pipeline Confidence',b:'<div class="ir-gauge-wrap">'+gauge(Math.min(.97,gPct),pe.high_conviction||'—','High Conviction','#34d399')+'<div class="ir-gauge-sub">'+esc(pe.total||'—')+' total · '+esc(pe.win_window||'—')+'</div></div>'},
+    {t:'Intent Tiers',b:'<div class="ir-tier-list">'
       +[{l:'🔥 Critical (80+)',n:crit,c:'#ef4444'},{l:'⚡ High (60–79)',n:hi,c:'#f59e0b'},{l:'👀 Watch (<60)',n:watch,c:'#6366f1'}].map(function(t){
-        return '<div class="fp-tier-row"><div class="fp-tier-dot" style="background:'+t.c+'"></div>'
-          +'<div class="fp-tier-lbl">'+t.l+'</div>'
-          +'<div class="fp-tier-track"><div class="fp-tier-fill" style="background:'+t.c+'" data-fw="'+Math.round(t.n/maxT*100)+'"></div></div>'
-          +'<div class="fp-tier-cnt" style="color:'+t.c+'">'+t.n+'</div></div>';
+        return '<div class="ir-tier-row"><div class="ir-tier-dot" style="background:'+t.c+'"></div><div class="ir-tier-lbl">'+t.l+'</div><div class="ir-tier-track"><div class="ir-tier-fill" style="background:'+t.c+'" data-fw="'+Math.round(t.n/maxT*100)+'"></div></div><div class="ir-tier-cnt" style="color:'+t.c+'">'+t.n+'</div></div>';
       }).join('')+'</div>'},
-    {t:'Top Services Match',b:'<div class="fp-bars">'
-      +(ins.themes||[]).slice(0,4).map(function(t,i){
-        var colors=['#6366f1','#f59e0b','#34d399','#f472b6'];
-        var max=(ins.themes||[]).reduce(function(a,b){return Math.max(a,b.count||0);},1);
-        return '<div class="fp-bar-row"><div class="fp-bar-lbl">'+esc((t.theme||'').slice(0,14))+'</div>'
-          +'<div class="fp-bar-track"><div class="fp-bar-fill" style="background:'+colors[i]+'" data-fw="'+Math.round((t.count||0)/max*100)+'"></div></div>'
-          +'<div class="fp-bar-cnt" style="color:'+colors[i]+'">'+esc(String(t.count||0))+'</div></div>';
-      }).join('')+'</div>'}
-  ].map(function(c,i){return '<div class="fp-ic" style="animation-delay:'+(i*.08)+'s"><div class="fp-ic-title">'+c.t+'</div>'+c.b+'</div>';}).join('');
+    {t:'Signal Themes',b:'<div class="ir-donut-wrap">'+donut(themes.slice(0,4).map(function(t,i){return{v:t.count||1,c:tColors[i]};}))+'<div class="ir-donut-leg">'+themes.slice(0,4).map(function(t,i){return '<div class="ir-dleg-row"><div class="ir-dleg-dot" style="background:'+tColors[i]+'"></div><div class="ir-dleg-lbl">'+esc(t.theme||'')+'</div><div class="ir-dleg-cnt" style="color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div></div>';}).join('')+'</div></div>'},
+  ].map(function(c,i){return '<div class="ir-ic" style="animation-delay:'+(i*.07)+'s"><div class="ir-ic-title">'+c.t+'</div>'+c.b+'</div>';}).join('');
   setTimeout(function(){row.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},200);
 }
 
-/* ─── PIPELINE CARDS ─────────────────────────────────────────────────────── */
+function _buildThemes(themes){
+  var tc=$('ir-themes');if(!tc)return;
+  var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
+  tc.innerHTML='<div class="ir-panel-card"><div class="ir-pc-hdr">Signal Themes</div>'
+    +themes.slice(0,4).map(function(t,i){
+      var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="ir-co-tag">'+esc(c)+'</span>';}).join('');
+      return '<div class="ir-theme-row"><div class="ir-theme-n" style="color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div>'
+        +'<div class="ir-theme-body"><div class="ir-theme-name">'+esc(t.theme||'')+'</div>'
+        +'<div class="ir-theme-angle">'+esc(t.campaign_angle||'')+'</div>'
+        +(cos?'<div class="ir-cos">'+cos+'</div>':'')+'</div></div>';
+    }).join('')+'</div>';
+}
+
+function _buildRisks(risks){
+  var rc=$('ir-risks');if(!rc)return;
+  var h='<div class="ir-panel-card"><div class="ir-pc-hdr">Attention Flags</div>';
+  if(risks.length){h+=risks.slice(0,3).map(function(r){return '<div class="ir-risk-row"><div class="ir-risk-dot"></div><div><div class="ir-risk-co">'+esc(r.company||'')+'</div><div class="ir-risk-flag">'+esc(r.flag||'')+'</div><div class="ir-risk-impl">'+esc(r.implication||'')+'</div></div></div>';}).join('');}
+  else{h+='<div style="font-size:11px;color:#0f172a;padding:14px 0;text-align:center">✅ No critical flags</div>';}
+  rc.innerHTML=h+'</div>';
+}
+
+/* ── PIPELINE ──────────────────────────────────────────────────────────── */
 function _renderPip(pip){
-  var g=document.getElementById('si-pip');if(!g)return;
-  if(!pip.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center">No pipeline data.</p>';return;}
-  g.innerHTML='<div class="fp-pip-grid">'+pip.slice(0,9).map(function(co,i){
+  var g=$('ir-pip');if(!g)return;
+  if(!pip.length){g.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No pipeline data.</p>';return;}
+  g.innerHTML='<div class="ir-pip-grid">'+pip.map(function(co,i){
     var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
     var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
     var lbl=sc>=80?'<span style="color:#f87171">🔥 Critical</span>':sc>=60?'<span style="color:#fbbf24">⚡ High</span>':'<span style="color:#818cf8">👀 Watch</span>';
-    var av=AVC[i%AVC.length];
-    var sigs=(co.signals||[]).slice(0,2).map(function(s){return '<span class="fp-badge">'+esc(s)+'</span>';}).join('');
-    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){return '<span class="fp-svc-tag">'+esc(s)+'</span>';}).join('');
-    return '<div class="fp-pcard'+(sc>=80?' hot':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="fpShowPip('+i+')">'
-      +'<div class="fp-pcard-top">'+ring(sc,rc,52)
-        +'<div class="fp-pcard-info"><div class="fp-pcard-name">'+esc(co.name||'')+'</div>'
-          +'<div class="fp-pcard-domain">'+esc(co.domain||'')+'</div>'
-          +'<div class="fp-score-lbl" style="font-size:10px;font-weight:700;color:'+rc+'">'+lbl+'</div>'
-        +'</div>'
+    var sigs=(co.signals||[]).slice(0,2).map(function(s){return '<span class="ir-badge">'+esc(s)+'</span>';}).join('');
+    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){return '<span class="ir-svc-tag">'+esc(s)+'</span>';}).join('');
+    return '<div class="ir-pcard'+(sc>=80?' hot':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="irShowPip('+i+')">'
+      +'<div class="ir-pcard-top">'+ring(sc,rc,50)
+        +'<div class="ir-pcard-info"><div class="ir-pcard-name">'+esc(co.name||'')+'</div><div class="ir-pcard-domain">'+esc(co.domain||'')+'</div><div class="ir-score-lbl" style="color:'+rc+'">'+lbl+'</div></div>'
       +'</div>'
-      +'<div class="fp-score-track"><div class="fp-score-fill" style="background:'+rc+'" data-fw="'+sc+'"></div></div>'
-      +(sigs||svcs?'<div class="fp-badges">'+sigs+svcs+'</div>':'')
-      +'<div class="fp-card-actions" onclick="event.stopPropagation()">'
-        +'<button class="fp-ca-btn email" onclick="fpCreateEmail('+i+',event)">✉ Email</button>'
-        +'<button class="fp-ca-btn li" onclick="window.open(\''+liURL(co.name||'')+'\',\'_blank\')">💼 LinkedIn</button>'
-        +'<button class="fp-ca-btn li" onclick="window.open(\''+liPeopleURL(co.name||'')+'\',\'_blank\')">👤 Decision Makers</button>'
-        +'<button class="fp-ca-btn" onclick="fpAIAnalysis(\''+esc(co.name||'')+'\',event)">✦ AI Analysis</button>'
+      +'<div class="ir-score-track"><div class="ir-score-fill" style="background:'+rc+'" data-fw="'+sc+'"></div></div>'
+      +(sigs||svcs?'<div class="ir-badges">'+sigs+svcs+'</div>':'')
+      +'<div class="ir-card-btns" onclick="event.stopPropagation()">'
+        +'<button class="ir-cbtn em" onclick="irMakeEmail('+i+',event)">✉ Email</button>'
+        +'<a class="ir-cbtn li" href="'+liCo(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
+        +'<a class="ir-cbtn li" href="'+liPpl(co.name||'')+'" target="_blank">👤 Contacts</a>'
+        +'<button class="ir-cbtn" onclick="irDeepAI(\''+esc(co.name||'')+'\',event)">✦ Analyse</button>'
       +'</div>'
     +'</div>';
   }).join('')+'</div>';
-  setTimeout(function(){document.querySelectorAll('#si-pip [data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},200);
+  setTimeout(function(){g.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},200);
 }
 
-/* ─── PIPELINE DRAWER ────────────────────────────────────────────────────── */
-window.fpShowPip=function(i){
-  var d=(window._FD.pip||[])[i];if(!d)return;
-  document.querySelectorAll('.fp-pcard.active').forEach(function(e){e.classList.remove('active');});
-  var cards=document.querySelectorAll('.fp-pcard');if(cards[i])cards[i].classList.add('active');
-  var sc=Math.min(100,Math.max(0,parseInt(d.intent_score)||0));
+/* ── ACTIONS ───────────────────────────────────────────────────────────── */
+function _renderActs(acts){
+  var c=$('ir-act');if(!c)return;
+  if(!acts.length){c.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No actions.</p>';return;}
+  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
+  c.innerHTML='<div class="ir-act-list">'+acts.map(function(a,i){
+    var hi=a.urgency==='HIGH';
+    return '<div class="ir-arow '+(hi?'hi':'med')+'" style="animation-delay:'+(i*.04)+'s" onclick="irShowAct('+i+')">'
+      +'<div class="ir-arow-rank">'+(a.rank||i+1)+'</div>'
+      +'<div class="ir-arow-ico">'+(ico[a.type]||'⚡')+'</div>'
+      +'<div class="ir-arow-body"><div class="ir-arow-action">'+esc(a.action||'')+'</div>'
+        +(a.company&&a.company!=='All'?'<div class="ir-arow-co">'+esc(a.company)+'</div>':'')+'</div>'
+      +'<div class="ir-arow-right">'+(a.deadline?'<span class="ir-arow-dl">'+esc(a.deadline)+'</span>':'')+'<div class="ir-urgdot '+(hi?'H':'M')+'"></div></div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+/* ── OUTREACH ──────────────────────────────────────────────────────────── */
+function _renderOut(out){
+  var g=$('ir-out');if(!g)return;
+  if(!out.length){g.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No outreach.</p>';return;}
+  g.innerHTML='<div class="ir-out-grid">'+out.map(function(ot,i){
+    var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'ir-ot-now':t==='soon'?'ir-ot-soon':'ir-ot-watch';
+    var sid='ios'+i+'_'+Math.random().toString(36).substr(2,4);
+    return '<div class="ir-ocard" style="animation-delay:'+(i*.05)+'s" onclick="irShowOut('+i+')">'
+      +'<div class="ir-ocard-chrome">'
+        +'<div class="ir-ocard-dot" style="background:#7f1d1d"></div><div class="ir-ocard-dot" style="background:#78350f"></div><div class="ir-ocard-dot" style="background:#14532d"></div>'
+        +'<div class="ir-ocard-to">'+esc(ot.company||'')+'</div>'
+        +'<span class="ir-ot '+tc+'">'+t.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div class="ir-ocard-body"><div class="ir-ocard-subj">'+esc(ot.subject||'')+'</div>'
+        +(ot.signal_hook?'<div class="ir-ocard-hook">📡 '+esc(ot.signal_hook)+'</div>':'')
+        +'<div class="ir-ocard-btns" onclick="event.stopPropagation()">'
+          +'<button class="ir-cbtn em ok" id="'+sid+'" onclick="irCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
+          +'<a class="ir-cbtn li" href="'+liCo(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
+          +'<a class="ir-cbtn li" href="'+liPpl(ot.company||'')+'" target="_blank">👤 Contact</a>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+/* ── Drawer: Brief ─────────────────────────────────────────────────────── */
+window.irShowBrief=function(){
+  var ins=D.ins||{},pe=D.ins&&D.ins.pipeline_estimate||{};
+  var sm=ins.strategic_moves||[],mp=ins.market_pulse||[];
+  var html='<div style="font-size:14px;line-height:1.8;color:#cbd5e1;margin-bottom:18px">'+esc(ins.brief||ins.summary||'')+'</div>'
+    +(pe.total?'<div class="ir-ds"><div class="ir-ds-lbl">Total Opportunity</div><div class="ir-rev">'+esc(pe.total)+'</div></div>':'')
+    +(pe.top_services&&pe.top_services.length?'<div class="ir-ds"><div class="ir-ds-lbl">Top Services</div><div class="ir-chips">'+pe.top_services.map(function(s){return '<span class="ir-chip-g">'+esc(s)+'</span>';}).join('')+'</div></div>':'')
+    +(mp.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Market Pulse</div>'+mp.map(function(m){return '<div style="font-size:12px;color:#64748b;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6">• '+esc(m)+'</div>';}).join('')+'</div>':'')
+    +(sm.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Strategic Moves</div>'+sm.map(function(m){return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:3px">'+esc(m.move||'')+'</div><div style="font-size:11px;color:#334155;margin-bottom:4px">'+esc(m.rationale||'')+'</div><div style="font-size:11px;font-weight:600;color:#34d399">'+esc(m.impact||'')+'</div></div>';}).join('')+'</div>':'')
+    +'<div class="ir-drw-btns"><button class="ir-btn" onclick="irGenerate()">↺ Regenerate</button></div>';
+  irOpen('Executive Brief',html);
+};
+
+/* ── Drawer: Priority ──────────────────────────────────────────────────── */
+window.irShowPri=function(i){
+  var p=(D.pri||[])[i];if(!p)return;
+  var html=_coHeader(p.company,p.domain,AVC[i%AVC.length])
+    +'<div class="ir-ds"><div class="ir-ds-lbl">Why This Week</div><div style="font-size:13px;color:#94a3b8;line-height:1.7;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:11px 13px">'+esc(p.signal||'')+'</div></div>'
+    +'<div class="ir-ds"><div class="ir-ds-lbl">What to Pitch</div><div class="ir-hl">'+esc(p.pitch||'')+'</div></div>'
+    +(p.est_value?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Estimate</div><div class="ir-rev">'+esc(p.est_value)+'</div></div>':'')
+    +'<div class="ir-drw-btns">'
+      +'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(p.company||'')+'\')">✉ Create Email</button>'
+      +'<a class="ir-btn li" href="'+liCo(p.company||'')+'" target="_blank">💼 LinkedIn</a>'
+      +'<a class="ir-btn li" href="'+liPpl(p.company||'')+'" target="_blank">👤 Decision Makers</a>'
+      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(p.pitch||'')+'\')">📋 Copy Pitch</button>'
+      +'<button class="ir-btn" onclick="irGoto(\''+esc(p.company||'')+'\')">🔍 Find Company</button>'
+    +'</div>';
+  irOpen('Priority #'+(p.rank||i+1)+' — '+p.company,html);
+};
+
+/* ── Drawer: Pipeline ──────────────────────────────────────────────────── */
+window.irShowPip=function(i){
+  var co=(D.pip||[])[i];if(!co)return;
+  document.querySelectorAll('.ir-pcard.sel').forEach(function(e){e.classList.remove('sel');});
+  var cards=document.querySelectorAll('.ir-pcard');if(cards[i])cards[i].classList.add('sel');
+  var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
   var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
   var lbl=sc>=80?'🔥 Critical Intent':sc>=60?'⚡ High Intent':'👀 Watching';
-  /* Match outreach data for talking points */
-  var out=window._FD.out||[];
-  var matched=out.filter(function(o){return (o.company||'').toLowerCase()===((d.name||'').toLowerCase());})[0];
-  var tps=matched&&matched.talking_points?matched.talking_points:(d._talking_points||[]);
-  var sigs=(d.signals||[]).map(function(s){return '<span class="fp-chip-blu">'+esc(s)+'</span>';}).join('');
-  var svcs=(d.service_fit||[]).map(function(s){return '<span class="fp-chip-grn">'+esc(s)+'</span>';}).join('');
-
-  var html=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'
-      +'<div style="width:46px;height:46px;border-radius:12px;background:'+AVC[i%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(d.name))+'</div>'
-      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(d.name||'')+'</div>'
-        +'<div style="font-size:11px;color:#334155;margin-top:1px">'+esc(d.domain||'')+'</div></div>'
-    +'</div>'
-    +'<div class="fp-score-badge">'
+  var matched=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===(co.name||'').toLowerCase();})[0];
+  var tps=matched&&matched.talking_points?matched.talking_points:[];
+  var sigs=(co.signals||[]).map(function(s){return '<span class="ir-chip-b">'+esc(s)+'</span>';}).join('');
+  var svcs=(co.service_fit||[]).map(function(s){return '<span class="ir-chip-g">'+esc(s)+'</span>';}).join('');
+  var html=_coHeader(co.name,co.domain,AVC[i%AVC.length])
+    +'<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:13px 15px;margin-bottom:16px">'
       +ring(sc,rc,80)
-      +'<div class="fp-score-badge-bar-wrap">'
-        +'<div class="fp-score-badge-lbl" style="color:'+rc+'">'+lbl+'</div>'
-        +'<div class="fp-score-badge-track"><div class="fp-score-badge-fill" style="background:'+rc+'" data-fw="'+sc+'"></div></div>'
-        +'<div style="font-size:11px;color:#334155;line-height:1.5;margin-top:5px">'+esc(d.why_now||'')+'</div>'
-      +'</div>'
-    +'</div>'
-    +(sigs?'<div class="fp-ds"><div class="fp-ds-lbl">Signals</div><div class="fp-chip-row">'+sigs+'</div></div>':'')
-    +(svcs?'<div class="fp-ds"><div class="fp-ds-lbl">Service Fit</div><div class="fp-chip-row">'+svcs+'</div></div>':'')
-    +(tps.length?'<div class="fp-ds"><div class="fp-ds-lbl">✦ AI Talking Points</div><div class="fp-tp-list">'+tps.map(function(tp,j){return '<div class="fp-tp-item"><div class="fp-tp-num">'+(j+1)+'</div><div class="fp-tp-text">'+esc(tp)+'</div></div>';}).join('')+'</div></div>':'')
-    +(d.opportunity?'<div class="fp-ds"><div class="fp-ds-lbl">Revenue Opportunity</div><div class="fp-rev-big">'+esc(d.opportunity)+'</div></div>':'')
-    +'<div class="fp-ds"><div class="fp-ds-lbl">Recommended Action</div><div class="fp-highlight">'+esc(d.next_step||'')+'</div></div>'
-    +'<div id="fp-ai-analysis-section"></div>'
-    +'<div class="fp-action-btns">'
-      +'<button class="fp-btn prim" onclick="fpCreateEmail('+i+')">✉ Create Email</button>'
-      +'<a class="fp-btn li" href="'+liURL(d.name||'')+'" target="_blank">💼 Company on LinkedIn</a>'
-      +'<a class="fp-btn li" href="'+liPeopleURL(d.name||'')+'" target="_blank">👤 Find Decision Makers</a>'
-      +'<button class="fp-btn email" onclick="fpAIAnalysis(\''+esc(d.name||'')+'\')">✦ Full AI Analysis</button>'
-      +(tps.length?'<button class="fp-btn" onclick="fpCopy(this,\''+esc(tps.join(\'\\n\'))+'\')">📋 Copy Talking Points</button>':'')
-      +'<button class="fp-btn" onclick="fpGoto(\''+esc(d.name||'')+'\')">🔍 Find in Companies</button>'
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:700;color:'+rc+';margin-bottom:5px">'+lbl+'</div>'
+        +'<div style="height:4px;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:0;background:'+rc+';border-radius:999px;transition:width 1s" data-fw="'+sc+'"></div></div>'
+        +'<div style="font-size:12px;color:#334155;line-height:1.6">'+esc(co.why_now||'')+'</div>'
+      +'</div></div>'
+    +(sigs?'<div class="ir-ds"><div class="ir-ds-lbl">Signals</div><div class="ir-chips">'+sigs+'</div></div>':'')
+    +(svcs?'<div class="ir-ds"><div class="ir-ds-lbl">Service Fit</div><div class="ir-chips">'+svcs+'</div></div>':'')
+    +(tps.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ AI Talking Points</div><div class="ir-tp-list">'+tps.map(function(tp,j){return '<div class="ir-tp"><div class="ir-tp-n">'+(j+1)+'</div><div class="ir-tp-t">'+esc(tp)+'</div></div>';}).join('')+'</div></div>':'')
+    +(co.opportunity?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Opportunity</div><div class="ir-rev">'+esc(co.opportunity)+'</div></div>':'')
+    +'<div class="ir-ds"><div class="ir-ds-lbl">Recommended Action</div><div class="ir-hl">'+esc(co.next_step||'')+'</div></div>'
+    +'<div id="ir-ai-sect"></div>'
+    +'<div class="ir-drw-btns">'
+      +'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(co.name||'')+'\')">✉ Create Email</button>'
+      +'<a class="ir-btn li" href="'+liCo(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
+      +'<a class="ir-btn li" href="'+liPpl(co.name||'')+'" target="_blank">👤 Decision Makers</a>'
+      +(tps.length?'<button class="ir-btn" onclick="irCopy(this,\''+esc(tps.join('\\n'))+'\')">📋 Copy Talking Points</button>':'')
+      +'<button class="ir-btn" onclick="irDeepAI(\''+esc(co.name||'')+'\')">✦ Full AI Analysis</button>'
+      +'<button class="ir-btn" onclick="irGoto(\''+esc(co.name||'')+'\')">🔍 Find Company</button>'
     +'</div>';
-
-  fpOpen(d.name, html);
+  irOpen(co.name,html);
 };
 
-/* ─── Create Email from pipeline/priority ────────────────────────────────── */
-window.fpCreateEmail=function(idx, e){
-  if(e)e.stopPropagation();
-  var pip=(window._FD.pip||[])[idx];if(!pip)return;
-  /* Find matching outreach */
-  var out=window._FD.out||[];
-  var matched=out.filter(function(o){return (o.company||'').toLowerCase()===((pip.name||'').toLowerCase());})[0];
-  var subj=matched?matched.subject:'Following up on recent developments at '+pip.name;
-  var opening=matched?matched.opening:'I noticed some significant activity at '+pip.name+' recently and wanted to reach out.';
-  var tps=matched?matched.talking_points:(pip.service_fit||[]).map(function(s){return 'Our '+s+' capabilities align directly with where '+pip.name+' is heading.';});
-  var cta=matched?matched.cta:'Would love 15 minutes to explore how Position2 can support your growth goals.';
-  var full='Subject: '+subj+'\n\n'+opening+'\n\n'+tps.join('\n')+'\n\n'+cta;
-  var fid='fem_'+Math.random().toString(36).substr(2,6);
-  var emailHtml=
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-      +'<div style="width:38px;height:38px;border-radius:10px;background:'+AVC[idx%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff">'+esc(ini(pip.name))+'</div>'
-      +'<div><div style="font-size:14px;font-weight:700;color:#f1f5f9">'+esc(pip.name)+'</div><div style="font-size:10px;color:#334155">'+esc(pip.domain||'')+'</div></div>'
-    +'</div>'
-    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:14px">'
-      +'<div style="background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 14px;display:flex;gap:5px;align-items:center">'
-        +'<div style="width:9px;height:9px;border-radius:50%;background:#7f1d1d"></div>'
-        +'<div style="width:9px;height:9px;border-radius:50%;background:#78350f"></div>'
-        +'<div style="width:9px;height:9px;border-radius:50%;background:#14532d"></div>'
-        +'<span style="flex:1;text-align:center;font-size:10px;color:#334155">New Email</span>'
-      +'</div>'
-      +'<div style="padding:16px;font-size:13px;color:#64748b;line-height:1.75">'
-        +'<div style="font-size:14px;font-weight:700;color:#e2e8f0;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)">'+esc(subj)+'</div>'
-        +'<p>'+esc(opening)+'</p>'
-        +'<ul style="list-style:none;padding:0;margin:8px 0 12px">'+tps.map(function(tp){return '<li style="display:flex;gap:8px;padding:3px 0"><span style="color:#059669;font-weight:700">✓</span>'+esc(tp)+'</li>';}).join('')+'</ul>'
-        +'<p style="color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">→ '+esc(cta)+'</p>'
-      +'</div>'
-    +'</div>'
-    +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
-    +'<div class="fp-action-btns">'
-      +'<button class="fp-btn prim" onclick="fpCopyId(this,\''+fid+'\')">Copy Full Email</button>'
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(subj)+'\')">Copy Subject</button>'
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(opening)+'\')">Copy Opening</button>'
-    +'</div>';
-  fpOpen('✉ Email — '+pip.name, emailHtml);
-};
-
-/* ─── AI Company Analysis ────────────────────────────────────────────────── */
-window.fpAIAnalysis=function(company, e){
-  if(e)e.stopPropagation();
-  var section=document.getElementById('fp-ai-analysis-section');
-  if(!section)return;
-  section.innerHTML='<div class="fp-ai-loading"><span class="fp-ai-spin">⟳</span> GPT is analysing '+esc(company)+'…</div>';
-  fetch('/api/company-analysis/'+acct()+'?company='+encodeURIComponent(company))
-    .then(function(r){return r.json();})
-    .then(function(data){
-      if(data.error){section.innerHTML='<div style="font-size:11px;color:#f87171;padding:8px">'+esc(data.error)+'</div>';return;}
-      var a=data.analysis||{};
-      var sc=a.score||0,rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-      var objs=(a.objections||[]).map(function(o){
-        return '<div class="fp-obj"><div class="fp-obj-q">⚠ '+esc(o.objection||'')+'</div><div class="fp-obj-a">→ '+esc(o.response||'')+'</div></div>';
-      }).join('');
-      var subjs=(a.subject_lines||[]).map(function(sl){
-        var sid='sl_'+Math.random().toString(36).substr(2,5);
-        return '<div class="fp-subj-alt"><div class="fp-subj-alt-text" id="'+sid+'">'+esc(sl)+'</div>'
-          +'<button class="fp-subj-copy" onclick="fpCopy(this,document.getElementById(\''+sid+'\').textContent)">Copy</button></div>';
-      }).join('');
-      section.innerHTML=
-        '<div style="border-top:1px solid rgba(255,255,255,.06);margin:14px 0;padding-top:14px">'
-          +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:12px"><span class="fp-ai">✦ AI Deep Analysis</span><span style="font-size:9px;color:#334155">powered by GPT</span></div>'
-          +(a.company_context?'<div class="fp-ds"><div class="fp-ds-lbl">Company Context</div><div class="fp-ds-val">'+esc(a.company_context)+'</div></div>':'')
-          +(a.why_now?'<div class="fp-ds"><div class="fp-ds-lbl">Why Now</div><div class="fp-highlight">'+esc(a.why_now)+'</div></div>':'')
-          +(objs?'<div class="fp-ds"><div class="fp-ds-lbl">Anticipated Objections</div>'+objs+'</div>':'')
-          +(subjs?'<div class="fp-ds"><div class="fp-ds-lbl">✦ AI Subject Line Alternatives</div>'+subjs+'</div>':'')
-          +(a.email_opening?'<div class="fp-ds"><div class="fp-ds-lbl">AI Opening Line</div><div class="fp-highlight" style="font-size:13px;font-style:italic">'+esc(a.email_opening)+'</div></div>':'')
-        +'</div>';
-    })
-    .catch(function(){section.innerHTML='<div style="font-size:11px;color:#f87171;padding:8px">Analysis failed. Try again.</div>';});
-};
-
-/* ─── Priority drawer ────────────────────────────────────────────────────── */
-window.fpShowPri=function(i){
-  var p=(window._FD.pri||[])[i];if(!p)return;
-  var html=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'
-      +'<div style="width:44px;height:44px;border-radius:12px;background:'+AVC[i%AVC.length]+';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(p.company))+'</div>'
-      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(p.company)+'</div>'
-        +'<div style="font-size:11px;color:#334155">'+esc(p.domain||'')+'</div></div>'
-    +'</div>'
-    +'<div class="fp-ds"><div class="fp-ds-lbl">Why This Week</div>'
-      +'<div style="font-size:13px;color:#94a3b8;line-height:1.7;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:12px 14px">'+esc(p.signal||'')+'</div>'
-    +'</div>'
-    +'<div class="fp-ds"><div class="fp-ds-lbl">What to Pitch</div><div class="fp-highlight">'+esc(p.pitch||'')+'</div></div>'
-    +(p.est_value?'<div class="fp-ds"><div class="fp-ds-lbl">Revenue Estimate</div><div class="fp-rev-big">'+esc(p.est_value)+'</div></div>':'')
-    +'<div class="fp-action-btns">'
-      +'<button class="fp-btn prim" onclick="fpShowPriEmail('+i+')">✉ Create Email</button>'
-      +'<a class="fp-btn li" href="'+liURL(p.company||'')+'" target="_blank">💼 LinkedIn Company</a>'
-      +'<a class="fp-btn li" href="'+liPeopleURL(p.company||'')+'" target="_blank">👤 Find Decision Makers</a>'
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(p.pitch||'')+'\')">📋 Copy Pitch</button>'
-      +'<button class="fp-btn" onclick="fpGoto(\''+esc(p.company||'')+'\')">🔍 Find in Companies</button>'
-    +'</div>';
-  fpOpen('Priority #'+(p.rank||i+1)+' — '+p.company, html);
-};
-
-window.fpShowPriEmail=function(i){
-  var pip_idx=(window._FD.pip||[]).findIndex(function(p){return p.name===(window._FD.pri[i]||{}).company;});
-  if(pip_idx>=0)fpCreateEmail(pip_idx);
-  else{
-    var p=(window._FD.pri||[])[i];if(!p)return;
-    var subj='Reaching out re: '+p.company+' — '+esc(p.service||'digital marketing');
-    var full='Subject: '+subj+'\n\n'+p.pitch;
-    var fid='fpe_'+Math.random().toString(36).substr(2,5);
-    fpOpen('✉ Email — '+p.company,'<div class="fp-highlight" style="margin-bottom:14px;font-style:normal">'+esc(p.pitch||'')+'</div>'
-      +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
-      +'<div class="fp-action-btns"><button class="fp-btn prim" onclick="fpCopyId(this,\''+fid+'\')">Copy Email</button><button class="fp-btn" onclick="fpCopy(this,\''+esc(subj)+'\')">Copy Subject</button></div>');
-  }
-};
-
-/* ─── ACTIONS ────────────────────────────────────────────────────────────── */
-function _renderActs(acts){
-  var c=document.getElementById('si-acts');if(!c)return;
-  if(!acts.length){c.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center">No actions.</p>';return;}
-  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
-  c.innerHTML='<div class="fp-act-list">'+acts.map(function(a,i){
-    var hi=a.urgency==='HIGH';
-    return '<div class="fp-acard '+(hi?'hi':'med')+'" style="animation-delay:'+(i*.04)+'s" onclick="fpShowAct('+i+')">'
-      +'<div class="fp-acard-rank">'+(a.rank||i+1)+'</div>'
-      +'<div class="fp-acard-ico">'+(ico[a.type]||'⚡')+'</div>'
-      +'<div class="fp-acard-body">'
-        +'<div class="fp-acard-action">'+esc(a.action||'')+'</div>'
-        +(a.company&&a.company!=='All'?'<div class="fp-acard-co">'+esc(a.company)+'</div>':'')
-      +'</div>'
-      +'<div class="fp-acard-right">'
-        +(a.deadline?'<span class="fp-acard-dl">'+esc(a.deadline)+'</span>':'')
-        +'<div class="fp-urgdot '+(hi?'H':'M')+'"></div>'
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-window.fpShowAct=function(i){
-  var a=(window._FD.acts||[])[i];if(!a)return;
-  document.querySelectorAll('.fp-acard.active').forEach(function(e){e.classList.remove('active');});
-  var items=document.querySelectorAll('.fp-acard');if(items[i])items[i].classList.add('active');
+/* ── Drawer: Action ────────────────────────────────────────────────────── */
+window.irShowAct=function(i){
+  var a=(D.acts||[])[i];if(!a)return;
+  document.querySelectorAll('.ir-arow.sel').forEach(function(e){e.classList.remove('sel');});
+  var rows=document.querySelectorAll('.ir-arow');if(rows[i])rows[i].classList.add('sel');
   var hi=a.urgency==='HIGH';
-  var html=
-    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">'
-      +'<span class="fp-urg-'+(hi?'H':'M')+'">'+esc(a.urgency||'')+'</span>'
-      +(a.deadline?'<span style="font-size:11px;color:#334155">⏱ '+esc(a.deadline)+'</span>':'')
+  var html='<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">'
+      +'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+(hi?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)')+';color:'+(hi?'#f87171':'#fcd34d')+'">'+esc(a.urgency||'')+'</span>'
+      +(a.deadline?'<span style="font-size:11px;color:#1e293b">⏱ '+esc(a.deadline)+'</span>':'')
     +'</div>'
-    +'<div style="font-size:16px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:16px;letter-spacing:-.02em">'+esc(a.action||'')+'</div>'
-    +(a.company&&a.company!=='All'?'<div class="fp-ds"><div class="fp-ds-lbl">Company</div><div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(a.company)+'</div></div>':'')
-    +'<div class="fp-ds"><div class="fp-ds-lbl">Business Reason</div><div class="fp-ds-val">'+esc(a.reason||'')+'</div></div>'
-    +(a.revenue_impact?'<div class="fp-ds"><div class="fp-ds-lbl">Revenue Impact</div><div class="fp-rev-big">'+esc(a.revenue_impact)+'</div></div>':'')
-    +'<div class="fp-action-btns">'
-      +(a.company&&a.company!=='All'?'<button class="fp-btn prim" onclick="fpShowActEmail('+i+')">✉ Create Email</button>':'')
-      +(a.company&&a.company!=='All'?'<a class="fp-btn li" href="'+liURL(a.company)+'" target="_blank">💼 LinkedIn</a>':'')
-      +(a.company&&a.company!=='All'?'<a class="fp-btn li" href="'+liPeopleURL(a.company)+'" target="_blank">👤 Decision Makers</a>':'')
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(a.action||'')+'\')">📋 Copy Action</button>'
-      +(a.company&&a.company!=='All'?'<button class="fp-btn" onclick="fpGoto(\''+esc(a.company)+'\')">🔍 Find Company</button>':'')
+    +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:16px;letter-spacing:-.02em">'+esc(a.action||'')+'</div>'
+    +(a.company&&a.company!=='All'?'<div class="ir-ds"><div class="ir-ds-lbl">Company</div><div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(a.company)+'</div></div>':'')
+    +'<div class="ir-ds"><div class="ir-ds-lbl">Business Reason</div><div class="ir-ds-val">'+esc(a.reason||'')+'</div></div>'
+    +(a.revenue_impact?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Impact</div><div class="ir-rev">'+esc(a.revenue_impact)+'</div></div>':'')
+    +'<div class="ir-drw-btns">'
+      +(a.company&&a.company!=='All'?'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(a.company)+'\')">✉ Create Email</button>':'')
+      +(a.company&&a.company!=='All'?'<a class="ir-btn li" href="'+liCo(a.company)+'" target="_blank">💼 LinkedIn</a>':'')
+      +(a.company&&a.company!=='All'?'<a class="ir-btn li" href="'+liPpl(a.company)+'" target="_blank">👤 Contacts</a>':'')
+      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(a.action||'')+'\')">📋 Copy Action</button>'
+      +(a.company&&a.company!=='All'?'<button class="ir-btn" onclick="irGoto(\''+esc(a.company)+'\')">🔍 Find Company</button>':'')
     +'</div>';
-  fpOpen('Action #'+(a.rank||i+1), html);
+  irOpen('Action #'+(a.rank||i+1),html);
 };
 
-window.fpShowActEmail=function(i){
-  var a=(window._FD.acts||[])[i];if(!a||!a.company)return;
-  var pip_idx=(window._FD.pip||[]).findIndex(function(p){return p.name===a.company;});
-  if(pip_idx>=0)fpCreateEmail(pip_idx);
-  else{
-    var subj='Re: '+a.company+' — let\'s connect';
-    var body=a.action+'\n\n'+a.reason;
-    var fid='fae_'+Math.random().toString(36).substr(2,5);
-    fpOpen('✉ Email — '+a.company,'<div class="fp-highlight" style="margin-bottom:14px">'+esc(a.reason||'')+'</div>'
-      +'<textarea id="'+fid+'" style="display:none">'+esc('Subject: '+subj+'\n\n'+body)+'</textarea>'
-      +'<div class="fp-action-btns"><button class="fp-btn prim" onclick="fpCopyId(this,\''+fid+'\')">Copy Email</button><button class="fp-btn" onclick="fpCopy(this,\''+esc(subj)+'\')">Copy Subject</button></div>');
-  }
-};
-
-/* ─── OUTREACH CARDS ─────────────────────────────────────────────────────── */
-function _renderOut(out){
-  var g=document.getElementById('si-out');if(!g)return;
-  if(!out.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center">No outreach.</p>';return;}
-  g.innerHTML='<div class="fp-out-grid">'+out.map(function(ot,i){
-    var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'fp-ot-now':t==='soon'?'fp-ot-soon':'fp-ot-watch';
-    var sid='fos_'+i+'_'+Math.random().toString(36).substr(2,4);
-    return '<div class="fp-ocard" style="animation-delay:'+(i*.05)+'s" onclick="fpShowOut('+i+')">'
-      +'<div class="fp-ocard-chrome">'
-        +'<div class="fp-ocard-dot" style="background:#7f1d1d"></div><div class="fp-ocard-dot" style="background:#78350f"></div><div class="fp-ocard-dot" style="background:#14532d"></div>'
-        +'<div class="fp-ocard-to">'+esc(ot.company||'')+'</div>'
-        +'<span class="fp-ocard-t '+tc+'">'+t.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div class="fp-ocard-body">'
-        +'<div class="fp-ocard-subj">'+esc(ot.subject||'')+'</div>'
-        +(ot.signal_hook?'<div class="fp-ocard-hook">📡 '+esc(ot.signal_hook)+'</div>':'')
-        +'<div class="fp-ocard-actions" onclick="event.stopPropagation()">'
-          +'<button class="fp-ca-btn email ok" id="'+sid+'" onclick="fpCopy(document.getElementById(\''+sid+'\'),\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
-          +'<a class="fp-ca-btn li" href="'+liURL(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
-          +'<a class="fp-ca-btn li" href="'+liPeopleURL(ot.company||'')+'" target="_blank">👤 Contact</a>'
-        +'</div>'
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-window.fpShowOut=function(i){
-  var ot=(window._FD.out||[])[i];if(!ot)return;
-  document.querySelectorAll('.fp-ocard.active').forEach(function(e){e.classList.remove('active');});
-  var cards=document.querySelectorAll('.fp-ocard');if(cards[i])cards[i].classList.add('active');
-  var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'fp-ot-now':t==='soon'?'fp-ot-soon':'fp-ot-watch';
-  var tps=(ot.talking_points||[]).map(function(tp){return '<div class="fp-tp-item"><div class="fp-tp-num">✓</div><div class="fp-tp-text">'+esc(tp)+'</div></div>';}).join('');
+/* ── Drawer: Outreach ──────────────────────────────────────────────────── */
+window.irShowOut=function(i){
+  var ot=(D.out||[])[i];if(!ot)return;
+  document.querySelectorAll('.ir-ocard.sel').forEach(function(e){e.classList.remove('sel');});
+  var cards=document.querySelectorAll('.ir-ocard');if(cards[i])cards[i].classList.add('sel');
+  var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'ir-ot-now':t==='soon'?'ir-ot-soon':'ir-ot-watch';
+  var tps=(ot.talking_points||[]).map(function(tp){return '<div class="ir-tp"><div class="ir-tp-n">✓</div><div class="ir-tp-t">'+esc(tp)+'</div></div>';}).join('');
   var full='Subject: '+(ot.subject||'')+'\n\n'+(ot.opening||'')+'\n\n'+(ot.talking_points||[]).join('\n')+(ot.cta?'\n\n→ '+ot.cta:'');
-  var fid='fo_'+i+'_'+Math.random().toString(36).substr(2,5);
-  var html=
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
-      +'<div style="width:40px;height:40px;border-radius:11px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(ot.company))+'</div>'
-      +'<div><div style="font-size:15px;font-weight:700;color:#f1f5f9">'+esc(ot.company||'')+'</div><div style="font-size:10px;color:#334155">'+esc(ot.domain||'')+'</div></div>'
-      +'<span class="fp-ocard-t '+tc+'" style="margin-left:auto">'+t.toUpperCase()+'</span>'
-    +'</div>'
-    +(ot.signal_hook?'<div style="font-size:12px;color:#475569;padding:8px 12px;border-left:2px solid rgba(99,102,241,.4);background:rgba(67,56,202,.06);margin-bottom:14px;line-height:1.6;font-style:italic">📡 '+esc(ot.signal_hook)+'</div>':'')
-    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;overflow:hidden;margin-bottom:14px">'
-      +'<div style="background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 14px;display:flex;gap:5px;align-items:center">'
-        +'<div style="width:9px;height:9px;border-radius:50%;background:#7f1d1d"></div><div style="width:9px;height:9px;border-radius:50%;background:#78350f"></div><div style="width:9px;height:9px;border-radius:50%;background:#14532d"></div>'
-        +'<span style="flex:1;text-align:center;font-size:10px;color:#334155">Email Preview</span>'
-      +'</div>'
-      +'<div style="padding:16px;font-size:13px;color:#64748b;line-height:1.75">'
-        +(ot.subject?'<div style="font-size:14px;font-weight:700;color:#e2e8f0;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)">'+esc(ot.subject)+'</div>':'')
+  var fid='ief_'+i+'_'+Math.random().toString(36).substr(2,5);
+  var html=_coHeader(ot.company,ot.domain,'#4338ca')
+    +(ot.signal_hook?'<div style="font-size:12px;color:#334155;padding:8px 11px;border-left:2px solid rgba(99,102,241,.4);background:rgba(67,56,202,.05);margin-bottom:14px;line-height:1.6;font-style:italic">📡 '+esc(ot.signal_hook)+'</div>':'')
+    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:14px">'
+      +'<div style="background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 13px;display:flex;gap:5px;align-items:center"><div style="width:8px;height:8px;border-radius:50%;background:#7f1d1d"></div><div style="width:8px;height:8px;border-radius:50%;background:#78350f"></div><div style="width:8px;height:8px;border-radius:50%;background:#14532d"></div><span style="flex:1;text-align:center;font-size:10px;color:#1e293b">Email Preview</span></div>'
+      +'<div style="padding:15px;font-size:13px;color:#64748b;line-height:1.75">'
+        +(ot.subject?'<div style="font-size:13px;font-weight:700;color:#e2e8f0;padding-bottom:11px;margin-bottom:11px;border-bottom:1px solid rgba(255,255,255,.06)">'+esc(ot.subject)+'</div>':'')
         +(ot.opening?'<p>'+esc(ot.opening)+'</p>':'')
-        +(tps?'<div class="fp-tp-list" style="margin:10px 0">'+tps+'</div>':'')
+        +(tps?'<div class="ir-tp-list" style="margin:9px 0">'+tps+'</div>':'')
         +(ot.cta?'<p style="color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">→ '+esc(ot.cta)+'</p>':'')
       +'</div>'
     +'</div>'
     +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
-    +'<div class="fp-action-btns">'
-      +'<button class="fp-btn prim" onclick="fpCopyId(this,\''+fid+'\')">Copy Full Email</button>'
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
-      +'<button class="fp-btn" onclick="fpCopy(this,\''+esc(ot.opening||'')+'\')">Copy Opening</button>'
-      +'<a class="fp-btn li" href="'+liURL(ot.company||'')+'" target="_blank">💼 LinkedIn Company</a>'
-      +'<a class="fp-btn li" href="'+liPeopleURL(ot.company||'')+'" target="_blank">👤 Find Contact</a>'
-      +'<button class="fp-btn" onclick="fpAIAnalysis(\''+esc(ot.company||'')+'\')">✦ AI Analysis</button>'
+    +'<div class="ir-drw-btns">'
+      +'<button class="ir-btn prim" onclick="irCopyId(this,\''+fid+'\')">Copy Full Email</button>'
+      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
+      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(ot.opening||'')+'\')">Copy Opening</button>'
+      +'<a class="ir-btn li" href="'+liCo(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
+      +'<a class="ir-btn li" href="'+liPpl(ot.company||'')+'" target="_blank">👤 Find Contact</a>'
+      +'<button class="ir-btn" onclick="irDeepAI(\''+esc(ot.company||'')+'\')">✦ AI Analysis</button>'
     +'</div>';
-  fpOpen('Outreach → '+ot.company, html);
+  irOpen('Outreach → '+ot.company,html);
 };
 
-/* ─── Brief drawer ───────────────────────────────────────────────────────── */
-window.fpShowBrief=function(){
-  var ins=window._FD.ins||{},pe=window._FD.pe||{};
-  var sm=ins.strategic_moves||[],mp=ins.market_pulse||[];
-  var html='<div style="font-size:15px;line-height:1.8;color:#cbd5e1;margin-bottom:18px">'+esc(ins.brief||ins.summary||'')+'</div>'
-    +(pe.total?'<div class="fp-ds"><div class="fp-ds-lbl">Total Opportunity</div><div class="fp-rev-big">'+esc(pe.total)+'</div></div>':'')
-    +(pe.top_services&&pe.top_services.length?'<div class="fp-ds"><div class="fp-ds-lbl">Top Services</div><div class="fp-chip-row">'+pe.top_services.map(function(s){return '<span class="fp-chip-grn">'+esc(s)+'</span>';}).join('')+'</div></div>':'')
-    +(mp.length?'<div class="fp-ds"><div class="fp-ds-lbl">✦ Market Pulse</div>'+mp.map(function(m){return '<div style="font-size:12px;color:#94a3b8;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6">• '+esc(m)+'</div>';}).join('')+'</div>':'')
-    +(sm.length?'<div class="fp-ds"><div class="fp-ds-lbl">✦ Strategic Moves</div>'+sm.map(function(m){return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:3px">'+esc(m.move||'')+'</div><div style="font-size:11px;color:#475569;margin-bottom:5px">'+esc(m.rationale||'')+'</div><div style="font-size:11px;font-weight:600;color:#34d399">'+esc(m.impact||'')+'</div></div>';}).join('')+'</div>':'')
-    +'<div class="fp-action-btns"><button class="fp-btn" onclick="siGenerate()">↺ Regenerate</button></div>';
-  fpOpen('Executive Brief', html);
+/* ── Create Email ──────────────────────────────────────────────────────── */
+window.irMakeEmail=function(i,e){if(e)e.stopPropagation();irMakeEmailFor((D.pip[i]||{}).name||'');};
+window.irMakeEmailFor=function(name){
+  var ot=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===(name||'').toLowerCase();})[0];
+  if(ot){irShowOut(D.out.indexOf(ot));}
+  else{
+    var pip=(D.pip||[]).filter(function(p){return (p.name||'').toLowerCase()===(name||'').toLowerCase();})[0];
+    if(!pip){irOpen('✉ Create Email','<div class="ir-ds-val">No email data available for this company. Try regenerating insights.</div>');return;}
+    var subj='Following up on recent activity at '+pip.name;
+    var body=subj+'\n\nI noticed some significant developments at '+pip.name+' recently. '+(pip.why_now||'')+'\n\nWe specialize in '+(pip.service_fit||[]).join(', ')+' and believe we could help significantly.\n\nWould you be open to a 15-minute call?';
+    var fid='imef_'+Math.random().toString(36).substr(2,5);
+    irOpen('✉ Email — '+pip.name,'<div class="ir-hl" style="margin-bottom:14px">'+esc(pip.why_now||'')+'</div>'
+      +'<textarea id="'+fid+'" style="display:none">'+esc(body)+'</textarea>'
+      +'<div class="ir-drw-btns"><button class="ir-btn prim" onclick="irCopyId(this,\''+fid+'\')">Copy Email</button><button class="ir-btn" onclick="irCopy(this,\''+esc(subj)+'\')">Copy Subject</button></div>');
+  }
 };
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-window.fpCopy=function(btn,text){
+/* ── AI Deep Analysis ──────────────────────────────────────────────────── */
+window.irDeepAI=function(company,e){
+  if(e)e.stopPropagation();
+  var sect=$('ir-ai-sect');
+  if(sect){sect.innerHTML='<div class="ir-ai-load"><span class="ir-spin">⟳</span> Analysing '+esc(company)+' with GPT…</div>';}
+  else{irOpen('✦ AI Analysis — '+company,'<div class="ir-ai-load"><span class="ir-spin">⟳</span> Analysing '+esc(company)+' with GPT…</div>');}
+  fetch('/api/company-analysis/'+acct()+'?company='+encodeURIComponent(company))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var target=$('ir-ai-sect')||$('ir-drw-body');if(!target)return;
+      if(data.error){target.innerHTML='<div style="font-size:11px;color:#f87171">'+esc(data.error)+'</div>';return;}
+      var a=data.analysis||{};
+      var sc=a.score||0,rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+      var objs=(a.objections||[]).map(function(o){return '<div class="ir-obj"><div class="ir-obj-q">⚠ '+esc(o.objection||'')+'</div><div class="ir-obj-a">→ '+esc(o.response||'')+'</div></div>';}).join('');
+      var subjs=(a.subject_lines||[]).map(function(sl){var sid='isl_'+Math.random().toString(36).substr(2,5);return '<div class="ir-subj-alt"><div class="ir-subj-alt-txt" id="'+sid+'">'+esc(sl)+'</div><button class="ir-sc" onclick="irCopy(this,document.getElementById(\''+sid+'\').textContent)">Copy</button></div>';}).join('');
+      var html='<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:14px;padding-top:14px">'
+        +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:12px"><span class="ir-sh-ai">✦ AI Deep Analysis</span></div>'
+        +(a.company_context?'<div class="ir-ds"><div class="ir-ds-lbl">Company Context</div><div class="ir-ds-val">'+esc(a.company_context)+'</div></div>':'')
+        +(a.why_now?'<div class="ir-ds"><div class="ir-ds-lbl">Why Now</div><div class="ir-hl">'+esc(a.why_now)+'</div></div>':'')
+        +(objs?'<div class="ir-ds"><div class="ir-ds-lbl">Anticipated Objections</div>'+objs+'</div>':'')
+        +(subjs?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Alternative Subject Lines</div>'+subjs+'</div>':'')
+        +(a.email_opening?'<div class="ir-ds"><div class="ir-ds-lbl">AI Opening Line</div><div class="ir-hl" style="font-style:italic">'+esc(a.email_opening)+'</div></div>':'')
+        +'<div class="ir-drw-btns"><button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(company)+'\')">✉ Create Email</button><a class="ir-btn li" href="'+liPpl(company)+'" target="_blank">👤 Find Decision Makers</a></div>'
+        +'</div>';
+      target.innerHTML=html;
+    }).catch(function(){var t=$('ir-ai-sect');if(t)t.innerHTML='<div style="font-size:11px;color:#f87171">Analysis failed.</div>';});
+};
+
+/* ── Helpers ───────────────────────────────────────────────────────────── */
+function _coHeader(name,domain,color){
+  return '<div style="display:flex;align-items:center;gap:11px;margin-bottom:18px">'
+    +'<div style="width:44px;height:44px;border-radius:12px;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(name))+'</div>'
+    +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(name||'')+'</div>'
+      +(domain?'<div style="font-size:11px;color:#1e293b;margin-top:1px">'+esc(domain)+'</div>':'')+'</div>'
+  +'</div>';
+}
+window.irCopy=function(btn,text){
   navigator.clipboard&&navigator.clipboard.writeText(text).then(function(){
     var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
     setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
   });
 };
-window.fpCopyId=function(btn,id){var el=document.getElementById(id);if(el)fpCopy(btn,el.value||el.textContent);};
-window.fpGoto=function(name){
-  fpClose();
-  var s=document.getElementById('nav-search');if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
+window.irCopyId=function(btn,id){var el=document.getElementById(id);if(el)irCopy(btn,el.value||el.textContent);};
+window.irGoto=function(name){
+  irClose();var s=document.getElementById('nav-search');
+  if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
   var cb=document.getElementById('nav-companies');if(cb)cb.click();
 };
 })();
