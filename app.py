@@ -1773,7 +1773,7 @@ def insights_generate(account_id):
             "(shared investors, sector waves, leadership migrations, timing clusters). "
             "NEVER include revenue estimates, pipeline values, or dollar figures of any kind. No fluff. "
             "Return ONLY valid JSON (no markdown): "+schema+" "
-            "RULES: week_priority=top 6 by urgency; pipeline=top 8 scored 0-100 with honest momentum; "
+            "RULES: week_priority=top 6 by urgency; pipeline=top 14 scored 0-100 with honest momentum — include mid and lower-score watchlist companies too, not only the hot ones; "
             "actions=6 ranked; outreach=8 personalised with <55-char subjects; "
             "themes=4; risks=2-3 only if real. "
             "Every field must cite actual signal data. Generic = failure."
@@ -1787,7 +1787,7 @@ def insights_generate(account_id):
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
             ],
-            max_completion_tokens=5200,
+            max_completion_tokens=6000,
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:

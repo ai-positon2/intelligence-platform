@@ -1265,12 +1265,12 @@ h2::after,.section-title::after{
 .ir9-act.sm{font-size:10px;padding:4px 9px}
 
 /* ── Pipeline cards ── */
-.ir9-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ir9-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;row-gap:18px}
 @media(max-width:860px){.ir9-grid{grid-template-columns:1fr}}
 .ir9-card{border-radius:15px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08);transition:all .18s;animation:ir9-up .4s ease both;overflow:hidden;backdrop-filter:blur(10px)}
 .ir9-card:hover{border-color:rgba(129,140,248,.35);transform:translateY(-2px);box-shadow:0 14px 40px rgba(0,0,0,.45)}
 .ir9-card.hot{box-shadow:inset 3px 0 0 #f43f5e}
-.ir9-card-main{display:flex;gap:13px;padding:16px 17px 12px;cursor:pointer;align-items:flex-start}
+.ir9-card-main{display:flex;gap:15px;padding:19px 20px 13px;cursor:pointer;align-items:flex-start}
 .ir9-ring{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;background:conic-gradient(var(--c) calc(var(--p)*1%),rgba(255,255,255,.07) 0)}
 .ir9-ring::before{content:'';position:absolute;inset:5px;border-radius:50%;background:#0b1024}
 .ir9-ring span{position:relative;font-size:14px;font-weight:800;color:var(--c)}
@@ -1282,13 +1282,13 @@ h2::after,.section-title::after{
 .ir9-mom.up{background:rgba(16,185,129,.12);color:#34d399}
 .ir9-mom.st{background:rgba(245,158,11,.1);color:#fbbf24}
 .ir9-mom.dn{background:rgba(100,116,139,.14);color:#94a3b8}
-.ir9-why{font-size:12px;color:#8b98ab;line-height:1.6;margin:5px 0 7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ir9-why{font-size:12.5px;color:#8b98ab;line-height:1.65;margin:8px 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ir9-chips{display:flex;gap:5px;flex-wrap:wrap}
-.ir9-chip{font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,.09);color:#7cb3f5;border:1px solid rgba(59,130,246,.16)}
+.ir9-chip{font-size:10px;padding:3px 9px;border-radius:5px;background:rgba(59,130,246,.09);color:#7cb3f5;border:1px solid rgba(59,130,246,.16);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ir9-chip.svc{background:rgba(16,185,129,.08);color:#34d399;border-color:rgba(16,185,129,.18)}
 .ir9-contact{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#55617a;margin-top:7px}
 .ir9-contact b{color:#9fabbe;font-weight:600}
-.ir9-card-btns{display:flex;gap:6px;flex-wrap:wrap;padding:10px 17px 14px;border-top:1px solid rgba(255,255,255,.05)}
+.ir9-card-btns{display:flex;gap:6px;flex-wrap:wrap;padding:12px 20px 16px;border-top:1px solid rgba(255,255,255,.05);align-items:center}
 
 /* ── Actions kanban ── */
 .ir9-kan{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
@@ -1388,6 +1388,28 @@ h2::after,.section-title::after{
 .ir9-src{display:block;font-size:12px;color:#7cb3f5;text-decoration:none;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ir9-src:hover{color:#a5cdf9}
 .ir9-note{font-size:11px;color:#55617a;font-style:italic;margin-top:9px}
+
+/* ── v10.1 Pipeline polish ── */
+.ir9-tierhead{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:10px 0 -4px;padding:0 2px}
+.ir9-tier-t{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.ir9-tier-line{flex:1;height:1px;background:rgba(255,255,255,.06)}
+.ir9-tier-n{font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border-radius:5px;padding:1px 7px}
+.ir9-chip.more{background:rgba(255,255,255,.04);color:#8b98ab;border-color:rgba(255,255,255,.12);cursor:pointer}
+.ir9-chip.more:hover{color:#cbd5e1;border-color:rgba(129,140,248,.4)}
+.ir9-name-wrap{min-width:0;flex:1}
+.ir9-card .ir9-dom{display:block;margin-top:2px}
+.ir9-card-tags{display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.ir9-sinfo{border-radius:16px;padding:19px 21px;background:linear-gradient(140deg,rgba(79,70,229,.08),rgba(124,58,237,.04));border:1px solid rgba(129,140,248,.18);margin-top:24px;animation:ir9-up .4s ease both}
+.ir9-sinfo-t{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#a5b4fc;margin-bottom:12px}
+.ir9-sinfo-g{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:860px){.ir9-sinfo-g{grid-template-columns:repeat(2,1fr)}}
+.ir9-sinfo-i{font-size:11.5px;color:#7e8aa3;line-height:1.62}
+.ir9-sinfo-i b{display:block;color:#cbd5e1;font-size:11px;margin-bottom:3px;font-weight:700}
+.ir9-shlink{font-size:11px;font-weight:600;color:#818cf8;cursor:pointer;margin-left:auto;white-space:nowrap}
+.ir9-shlink:hover{color:#a5b4fc}
+.ir9-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.ir9-leg{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#7e8aa3}
+.ir9-leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 </style>
 
 </head>
@@ -1746,8 +1768,9 @@ h2::after,.section-title::after{
             <div class="ir9-foot" id="ir9-foot"></div>
           </div>
           <div class="ir9-panel" id="ir9-p-pip">
-            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Intent pipeline</span><span class="ir9-sh-s">scored 0&ndash;100 by Kairo &middot; every card opens a full dossier</span></div>
+            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Intent pipeline</span><span class="ir9-sh-s">scored 0&ndash;100 by Kairo &middot; every card opens a full dossier</span><span class="ir9-shlink" data-iract="scoreinfo">&#9432; How scores work</span></div>
             <div class="ir9-grid" id="ir9-pipgrid"></div>
+            <div id="ir9-sinfo"></div>
           </div>
           <div class="ir9-panel" id="ir9-p-act">
             <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Action board</span><span class="ir9-sh-s">Kairo&rsquo;s ranked to-do list &middot; tick items off as you go</span></div>
@@ -4358,7 +4381,7 @@ function buildFeed(ins){
     f._rank=(f.score==null?45:f.score)+(t.indexOf('today')>-1?1000:t.indexOf('week')>-1?400:0);
   });
   feed.sort(function(a,b){return b._rank-a._rank;});
-  return feed.slice(0,10);
+  return feed.slice(0,16);
 }
 
 /* ── Render all ── */
@@ -4422,31 +4445,62 @@ function _renderCC(ins,cachedTs){
     +'<button class="ir9-regen" onclick="irGenerate()">&#8635; Ask Kairo again</button>';
 }
 
-/* ── Pipeline ── */
+/* ── Pipeline (tier-grouped) ── */
+function _tierOf(f){var s=f.score==null?-1:f.score;return s>=80?0:s>=60?1:2;}
 function _renderPip(){
-  $('ir9-pipgrid').innerHTML=D.feed.length?D.feed.map(function(f,i){
-    var sc=f.score==null?0:f.score,c=f.score==null?'#a5b4fc':scC(sc);
-    var chips=f.signals.slice(0,3).map(function(s){return chip(s);}).join('')+f.svc.slice(0,2).map(function(s){return chip(s,true);}).join('');
-    return '<div class="ir9-card'+(sc>=80?' hot':'')+'" style="animation-delay:'+(i*.05)+'s">'
-      +'<div class="ir9-card-main" data-iract="co" data-i="'+i+'">'
-        +'<div class="ir9-ring" style="--p:'+sc+';--c:'+c+'"><span>'+(f.score==null?'&mdash;':sc)+'</span></div>'
-        +'<div class="ir9-card-mid">'
-          +'<div class="ir9-card-l1"><span class="ir9-card-name">'+esc(f.name)+'</span>'
-            +(f.domain?'<span class="ir9-dom">'+esc(f.domain)+'</span>':'')+momB(f.momentum)
-            +(f.timing?'<span class="ir9-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')+'</div>'
-          +(f.why?'<div class="ir9-why">'+esc(f.why)+'</div>':'')
-          +(chips?'<div class="ir9-chips">'+chips+'</div>':'')
-          +(f.contact?'<div class="ir9-contact">&#127919; Approach: <b>'+esc(f.contact)+'</b></div>':'')
+  var g=$('ir9-pipgrid');
+  if(!D.feed.length){g.innerHTML='<p style="color:#55617a;padding:30px">No pipeline data.</p>';if($('ir9-sinfo'))$('ir9-sinfo').innerHTML='';return;}
+  var tiers=[{t:'🔥 Critical — act today',c:'#fb7185'},{t:'⚡ High intent — engage this week',c:'#fbbf24'},{t:'👀 Watchlist — nurture',c:'#a5b4fc'}];
+  var groups=[[],[],[]];
+  D.feed.forEach(function(f,i){groups[_tierOf(f)].push(i);});
+  var h='';
+  groups.forEach(function(idxs,ti){
+    if(!idxs.length)return;
+    h+='<div class="ir9-tierhead"><span class="ir9-tier-t" style="color:'+tiers[ti].c+'">'+tiers[ti].t+'</span><span class="ir9-tier-line"></span><span class="ir9-tier-n">'+idxs.length+'</span></div>';
+    idxs.forEach(function(i,j){
+      var f=D.feed[i];
+      var sc=f.score==null?0:f.score,c=f.score==null?'#a5b4fc':scC(sc);
+      var sigs=f.signals.slice(0,2).map(function(s){return chip(s);}).join('');
+      var moreN=Math.max(0,f.signals.length-2);
+      var svcs=f.svc.slice(0,1).map(function(s){return chip(s,true);}).join('');
+      var dom=(f.domain||'').replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'');
+      h+='<div class="ir9-card'+(sc>=80?' hot':'')+'" style="animation-delay:'+(j*.05)+'s">'
+        +'<div class="ir9-card-main" data-iract="co" data-i="'+i+'">'
+          +'<div class="ir9-ring" style="--p:'+sc+';--c:'+c+'"><span>'+(f.score==null?'&mdash;':sc)+'</span></div>'
+          +'<div class="ir9-card-mid">'
+            +'<div class="ir9-card-l1"><div class="ir9-name-wrap"><span class="ir9-card-name">'+esc(f.name)+'</span>'
+              +(dom?'<span class="ir9-dom">'+esc(dom)+'</span>':'')+'</div>'
+              +'<div class="ir9-card-tags">'+momB(f.momentum)+(f.timing?'<span class="ir9-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')+'</div></div>'
+            +(f.why?'<div class="ir9-why">'+esc(f.why)+'</div>':'')
+            +'<div class="ir9-chips">'+sigs+(moreN?'<span class="ir9-chip more" data-iract="co" data-i="'+i+'">+'+moreN+' more</span>':'')+svcs+'</div>'
+            +(f.contact?'<div class="ir9-contact">&#127919; Approach: <b>'+esc(f.contact)+'</b></div>':'')
+          +'</div>'
         +'</div>'
-      +'</div>'
-      +'<div class="ir9-card-btns">'
-        +'<button class="ir9-act em" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
-        +'<button class="ir9-act rs" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain)+'">&#10022; Research with Kairo</button>'
-        +'<a class="ir9-act" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">&#128100; Contacts</a>'
-        +'<a class="ir9-act" href="'+liCo(f.name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
-      +'</div>'
-    +'</div>';
-  }).join(''):'<p style="color:#55617a;padding:30px">No pipeline data.</p>';
+        +'<div class="ir9-card-btns">'
+          +'<button class="ir9-act em" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
+          +'<button class="ir9-act rs" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain)+'">&#10022; Research</button>'
+          +'<a class="ir9-act" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">&#128100; Contacts</a>'
+          +'<a class="ir9-act" href="'+liCo(f.name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
+          +'<button class="ir9-act" data-iract="co" data-i="'+i+'" style="margin-left:auto">Dossier &#8594;</button>'
+        +'</div>'
+      +'</div>';
+    });
+  });
+  g.innerHTML=h;
+  var si=$('ir9-sinfo');
+  if(si)si.innerHTML='<div class="ir9-sinfo"><div class="ir9-sinfo-t">&#10022; How Kairo calculates intent scores <span class="ir9-shlink" data-iract="scoreinfo">Full methodology &#8594;</span></div>'
+    +'<div class="ir9-sinfo-g">'
+    +'<div class="ir9-sinfo-i"><b>Signal severity</b>HIGH-severity events &mdash; funding, C-suite resets, M&amp;A &mdash; weigh far more than routine news mentions.</div>'
+    +'<div class="ir9-sinfo-i"><b>Recency &amp; clustering</b>Several signals landing close together (a CEO and CFO change on one day) multiply the score.</div>'
+    +'<div class="ir9-sinfo-i"><b>Buying-window fit</b>How clearly the events map to a marketing need Position2 can serve right now.</div>'
+    +'<div class="ir9-sinfo-i"><b>Momentum</b>Whether activity is accelerating, steady, or cooling against the company&rsquo;s own baseline.</div>'
+    +'</div>'
+    +'<div class="ir9-legend">'
+    +'<span class="ir9-leg"><span class="ir9-leg-dot" style="background:#fb7185"></span>80&ndash;100 Critical &middot; act today</span>'
+    +'<span class="ir9-leg"><span class="ir9-leg-dot" style="background:#fbbf24"></span>60&ndash;79 High &middot; engage this week</span>'
+    +'<span class="ir9-leg"><span class="ir9-leg-dot" style="background:#a5b4fc"></span>Below 60 Watchlist &middot; nurture</span>'
+    +'<span class="ir9-leg" style="margin-left:auto;font-style:italic">AI-assessed from live signals &middot; refreshed on every run</span>'
+    +'</div></div>';
 }
 
 /* ── Actions kanban (with done-tracking) ── */
@@ -4519,6 +4573,7 @@ document.addEventListener('click',function(e){
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
   else if(a==='brief'){irShowBrief();}
+  else if(a==='scoreinfo'){irScoreInfo();}
   else if(a==='kpi'){irShowKpi(b.getAttribute('data-k'));}
   else if(a==='theme'){irShowTheme(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='pulse'){irShowPulse(parseInt(b.getAttribute('data-i'),10));}
@@ -4527,6 +4582,27 @@ document.addEventListener('click',function(e){
   else if(a==='copy'){irCopy(b,b.getAttribute('data-copy')||'');}
   else if(a==='copyid'){var el=document.getElementById(b.getAttribute('data-id'));if(el)irCopy(b,el.value||el.textContent);}
 });
+
+/* ── Scoring methodology drawer ── */
+function irScoreInfo(){
+  var html='<div style="font-size:16px;font-weight:800;color:#eef2ff;letter-spacing:-.02em;margin-bottom:14px">How Kairo calculates intent scores</div>'
+    +'<div class="ir9-ds-v" style="margin-bottom:18px">Every time you ask Kairo, it re-reads the live signals that match your filters and scores each company 0&ndash;100 for <b style="color:#e6edf6">buying intent</b> &mdash; how likely they are to need an agency like Position2 right now. It is an AI judgement over observed events, not a financial metric, and it refreshes with every run.</div>'
+    +'<div class="ir9-ds"><div class="ir9-ds-l">What moves the score</div>'
+    +[['Severity-weighted signals','Funding rounds, C-suite joins/exits, M&A and IPO signals carry the most weight; routine news mentions the least.'],
+      ['Clustering','Multiple significant events in a short window — e.g. a CEO and CFO change on the same date — compound, because they indicate an organisational reset.'],
+      ['Recency','Fresh signals score higher; older ones decay toward the watchlist.'],
+      ['Need fit','Events that map directly to marketing needs — rebrands, new growth leadership, market expansion — lift the score further.']].map(function(x,i){
+        return '<div class="ir9-tp"><div class="ir9-tp-n">'+(i+1)+'</div><div class="ir9-tp-t"><b style="color:#dee5ef">'+x[0]+':</b> '+esc(x[1])+'</div></div>';}).join('')+'</div>'
+    +'<div class="ir9-ds"><div class="ir9-ds-l">Reading the tiers</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+    +'<span class="ir9-leg" style="font-size:12.5px"><span class="ir9-leg-dot" style="background:#fb7185"></span><b style="color:#fb7185">80&ndash;100 Critical</b>&nbsp;&mdash; a clear buying window is open. Call today.</span>'
+    +'<span class="ir9-leg" style="font-size:12.5px"><span class="ir9-leg-dot" style="background:#fbbf24"></span><b style="color:#fbbf24">60&ndash;79 High</b>&nbsp;&mdash; strong signals, window forming. Engage this week.</span>'
+    +'<span class="ir9-leg" style="font-size:12.5px"><span class="ir9-leg-dot" style="background:#a5b4fc"></span><b style="color:#a5b4fc">Below 60 Watchlist</b>&nbsp;&mdash; early signals worth nurturing with warm touches.</span>'
+    +'</div></div>'
+    +'<div class="ir9-ds"><div class="ir9-ds-l">Momentum</div><div class="ir9-ds-v">&#9650; <b style="color:#34d399">Rising</b> — activity accelerating vs their baseline &nbsp;&middot;&nbsp; &#9658; <b style="color:#fbbf24">Steady</b> — consistent drumbeat &nbsp;&middot;&nbsp; &#9660; <b style="color:#94a3b8">Cooling</b> — signals tapering off.</div></div>'
+    +'<div class="ir9-note">Scores are directional AI assessments based on tracked signals — use them to prioritise attention, then open a dossier for the evidence behind the number.</div>';
+  irOpen('✦ Kairo scoring methodology',html);
+}
 
 /* ── KPI drill-downs ── */
 function irShowKpi(k){
