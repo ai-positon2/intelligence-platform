@@ -1111,7 +1111,7 @@ h2::after,.section-title::after{
 </style>
 <style>.sidebar-nav .badge-count{display:none!important}</style>
 <style>
-/* ── KAIRO v9 — premium intelligence platform ───────────────────────────── */
+/* ── KAIRO v10 — fully interactive intelligence platform ────────────────── */
 #section-insights{margin:0;padding:0;min-height:calc(100vh - 56px);display:none;flex-direction:column}
 #section-insights.active{display:flex!important}
 
@@ -1202,8 +1202,15 @@ h2::after,.section-title::after{
 .ir9-sh-s{font-size:11px;color:#55617a}
 .ir9-kbadge{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;padding:2.5px 8px;border-radius:5px;background:linear-gradient(95deg,rgba(79,70,229,.22),rgba(124,58,237,.16));color:#a5b4fc;border:1px solid rgba(129,140,248,.3);letter-spacing:.06em}
 
-/* ── Hero (Command Center) ── */
-.ir9-hero{position:relative;border-radius:19px;padding:1px;background:linear-gradient(140deg,rgba(129,140,248,.5),rgba(167,139,250,.22) 45%,rgba(255,255,255,.05));animation:ir9-up .4s ease both;box-shadow:0 16px 60px rgba(8,6,40,.6)}
+/* clickable affordance */
+.ir9-click{cursor:pointer;transition:all .16s;position:relative}
+.ir9-click:hover{border-color:rgba(129,140,248,.4)!important;background:rgba(99,102,241,.05)}
+.ir9-chev{position:absolute;top:50%;right:11px;transform:translateY(-50%);font-size:13px;color:#3b4763;opacity:0;transition:opacity .15s;pointer-events:none}
+.ir9-click:hover .ir9-chev{opacity:1}
+
+/* ── Hero ── */
+.ir9-hero{position:relative;border-radius:19px;padding:1px;background:linear-gradient(140deg,rgba(129,140,248,.5),rgba(167,139,250,.22) 45%,rgba(255,255,255,.05));animation:ir9-up .4s ease both;box-shadow:0 16px 60px rgba(8,6,40,.6);cursor:pointer;transition:transform .2s}
+.ir9-hero:hover{transform:translateY(-2px)}
 .ir9-hero-in{border-radius:18px;background:linear-gradient(160deg,#0b1130 0%,#0a0e22 55%,#0c0a26 100%);padding:24px 28px}
 .ir9-hero-lbl{display:flex;align-items:center;gap:9px;margin-bottom:13px}
 .ir9-hl-title{font-size:10px;font-weight:800;color:#818cf8;text-transform:uppercase;letter-spacing:.16em}
@@ -1219,13 +1226,16 @@ h2::after,.section-title::after{
 /* ── KPIs ── */
 .ir9-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:14px}
 @media(max-width:820px){.ir9-kpis{grid-template-columns:repeat(2,1fr)}}
-.ir9-kpi{position:relative;overflow:hidden;border-radius:14px;padding:16px 17px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08);animation:ir9-up .4s ease both;backdrop-filter:blur(10px)}
+.ir9-kpi{position:relative;overflow:hidden;border-radius:14px;padding:16px 17px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08);animation:ir9-up .4s ease both;backdrop-filter:blur(10px);cursor:pointer;transition:all .18s}
+.ir9-kpi:hover{border-color:rgba(129,140,248,.45);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.ir9-kpi::after{content:'\203A';position:absolute;top:13px;right:14px;font-size:15px;color:#3b4763;opacity:0;transition:opacity .15s}
+.ir9-kpi:hover::after{opacity:1}
 .ir9-kpi-glow{position:absolute;bottom:-30px;right:-30px;width:110px;height:110px;border-radius:50%;opacity:.14;pointer-events:none}
 .ir9-kpi-i{font-size:17px;margin-bottom:9px;display:block}
 .ir9-kpi-v{font-size:25px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1}
 .ir9-kpi-l{font-size:10.5px;color:#55617a;margin-top:5px;font-weight:500}
 
-/* ── Spotlight (top priorities) ── */
+/* ── Spotlight ── */
 .ir9-spots{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
 @media(max-width:900px){.ir9-spots{grid-template-columns:1fr}}
 .ir9-spot{position:relative;border-radius:15px;padding:1px;background:linear-gradient(150deg,rgba(129,140,248,.34),rgba(255,255,255,.05) 55%);transition:transform .18s;animation:ir9-up .4s ease both;cursor:pointer}
@@ -1245,7 +1255,7 @@ h2::after,.section-title::after{
 .ir9-spot-foot{display:flex;gap:6px;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)}
 .ir9-svc{font-size:9px;font-weight:700;padding:2px 8px;border-radius:5px;background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.2)}
 
-/* ── Buttons (shared) ── */
+/* ── Buttons ── */
 .ir9-act{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#8b98ab;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:6px 11px;transition:all .15s;text-decoration:none;white-space:nowrap}
 .ir9-act:hover{border-color:rgba(255,255,255,.22);color:#cbd5e1}
 .ir9-act.em{border-color:rgba(99,102,241,.4);color:#a5b4fc;background:rgba(79,70,229,.1)}
@@ -1290,7 +1300,13 @@ h2::after,.section-title::after{
 .ir9-kcol-n{font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border-radius:5px;padding:1px 7px}
 .ir9-kcard{border-radius:11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:all .15s;animation:ir9-up .35s ease both}
 .ir9-kcard:hover{border-color:rgba(129,140,248,.35);transform:translateX(2px)}
-.ir9-kcard-t{font-size:12px;font-weight:600;color:#dee5ef;line-height:1.45;margin-bottom:5px}
+.ir9-kcard.done{opacity:.45}
+.ir9-kcard.done .ir9-kcard-t{text-decoration:line-through}
+.ir9-kcard-row{display:flex;gap:9px;align-items:flex-start}
+.ir9-kcard-t{font-size:12px;font-weight:600;color:#dee5ef;line-height:1.45;margin-bottom:5px;flex:1}
+.ir9-kchk{width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:none;color:transparent;cursor:pointer;flex-shrink:0;font-size:11px;line-height:1;padding:0;transition:all .15s}
+.ir9-kchk:hover{border-color:#34d399;color:rgba(52,211,153,.5)}
+.ir9-kchk.on{background:#059669;border-color:#059669;color:#fff}
 .ir9-kcard-m{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .ir9-kco{font-size:10px;color:#7cb3f5;font-weight:600}
 .ir9-kdl{font-size:9px;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.05);color:#55617a;border:1px solid rgba(255,255,255,.07)}
@@ -1301,25 +1317,37 @@ h2::after,.section-title::after{
 .ir9-rcard{border-radius:15px;padding:18px 19px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08);animation:ir9-up .4s ease both;backdrop-filter:blur(10px)}
 .ir9-rcard.wide{grid-column:1/-1}
 .ir9-rcard-t{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#9fabbe;margin-bottom:13px;letter-spacing:.02em}
-.ir9-pulse-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:flex-start}
-.ir9-pulse-row:last-child{border-bottom:none;padding-bottom:0}
+.ir9-pulse-row{display:flex;gap:10px;padding:10px 11px;border:1px solid transparent;border-radius:10px;align-items:flex-start;margin-bottom:4px}
 .ir9-pulse-n{width:20px;height:20px;border-radius:6px;background:rgba(99,102,241,.14);border:1px solid rgba(129,140,248,.26);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#a5b4fc;flex-shrink:0;margin-top:1px}
-.ir9-pulse-tx{font-size:12.5px;color:#9fabbe;line-height:1.65;flex:1}
-.ir9-bar-row{margin-bottom:12px}
+.ir9-pulse-tx{font-size:12.5px;color:#9fabbe;line-height:1.65;flex:1;padding-right:16px}
+.ir9-bar-row{margin-bottom:7px;padding:9px 11px;border:1px solid transparent;border-radius:10px}
 .ir9-bar-l1{display:flex;justify-content:space-between;margin-bottom:5px}
 .ir9-bar-name{font-size:12px;font-weight:600;color:#d7dee9}
 .ir9-bar-ct{font-size:11px;font-weight:700}
 .ir9-bar-track{height:6px;background:rgba(255,255,255,.05);border-radius:99px;overflow:hidden}
 .ir9-bar-fill{height:100%;border-radius:99px;width:0;transition:width 1.1s cubic-bezier(.22,1,.36,1)}
-.ir9-bar-angle{font-size:10.5px;color:#55617a;margin-top:4px;line-height:1.5}
+.ir9-bar-angle{font-size:10.5px;color:#55617a;margin-top:4px;line-height:1.5;padding-right:16px}
 .ir9-move{border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);padding:13px 15px;margin-bottom:9px}
-.ir9-move-t{font-size:13px;font-weight:700;color:#e6edf6;margin-bottom:4px}
+.ir9-move-t{font-size:13px;font-weight:700;color:#e6edf6;margin-bottom:4px;padding-right:16px}
 .ir9-move-r{font-size:11.5px;color:#55617a;line-height:1.6}
 .ir9-move-i{font-size:11.5px;color:#34d399;margin-top:6px;line-height:1.55}
 .ir9-own{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:5px;background:rgba(99,102,241,.12);color:#a5b4fc;margin-top:7px}
-.ir9-risk{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:flex-start}
-.ir9-risk:last-child{border-bottom:none;padding-bottom:0}
+.ir9-risk{display:flex;gap:10px;padding:10px 11px;border:1px solid transparent;border-radius:10px;align-items:flex-start;margin-bottom:4px}
 .ir9-rdot{width:7px;height:7px;border-radius:50%;background:#f43f5e;flex-shrink:0;margin-top:5px;box-shadow:0 0 8px rgba(244,63,94,.6)}
+
+/* ── Mini company rows (drill-down drawers) ── */
+.ir9-mini{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid rgba(255,255,255,.07);border-radius:10px;background:rgba(255,255,255,.03);margin-bottom:7px}
+.ir9-mini-mid{flex:1;min-width:0}
+.ir9-mini-n{font-size:12.5px;font-weight:700;color:#eef2f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir9-mini-d{font-size:10px;color:#3b4763}
+.ir9-mini-sc{font-size:14px;font-weight:800;flex-shrink:0}
+
+/* ── Deep dossier ── */
+.ir9-obj{background:rgba(244,63,94,.05);border:1px solid rgba(244,63,94,.15);border-radius:9px;padding:10px 13px;margin-bottom:6px}
+.ir9-obj-q{font-size:12px;color:#fb7185;font-weight:600;margin-bottom:3px}
+.ir9-obj-a{font-size:12px;color:#9fabbe;line-height:1.6}
+.ir9-subj{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 11px;margin-bottom:5px}
+.ir9-subj-t{font-size:12.5px;font-weight:600;color:#e6edf6;flex:1;letter-spacing:-.01em}
 
 /* ── Foot ── */
 .ir9-foot{display:flex;align-items:center;gap:10px;margin-top:32px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)}
@@ -1667,7 +1695,7 @@ h2::after,.section-title::after{
     </div>
 
 
-  <!-- INSIGHTS SECTION v9 (Kairo) -->
+  <!-- INSIGHTS SECTION v10 (Kairo) -->
   <div id="section-insights" class="section">
     <div class="ir9-top">
       <div class="ir9-brand"><svg class="ir9-orbit" width="26" height="26" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.1"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.1" fill="#c7d2fe"><animate attributeName="r" values="2.1;2.7;2.1" dur="3s" repeatCount="indefinite"/></circle></svg><div class="ir9-brand-tx"><span class="ir9-kairo">Kairo</span><span class="ir9-sub">Signal Intelligence</span></div><span class="ir9-stat" id="ir9-stat"></span></div>
@@ -1692,7 +1720,7 @@ h2::after,.section-title::after{
       <button class="ir9-tab active" data-p="cc" onclick="ir9Tab(this)">&#8962; Command Center</button>
       <button class="ir9-tab" data-p="pip" onclick="ir9Tab(this)">&#127919; Pipeline <span class="ir9-tc" id="ir9-tc-pip"></span></button>
       <button class="ir9-tab" data-p="act" onclick="ir9Tab(this)">&#9889; Actions <span class="ir9-tc" id="ir9-tc-act"></span></button>
-      <button class="ir9-tab" data-p="rad" onclick="ir9Tab(this)">&#128225; Radar</button>
+      <button class="ir9-tab" data-p="rad" onclick="ir9Tab(this)">&#128225; Radar <span class="ir9-tc" id="ir9-tc-rad"></span></button>
     </div>
     <div class="ir9-body">
       <div class="ir9-blob a"></div><div class="ir9-blob b"></div>
@@ -1700,7 +1728,7 @@ h2::after,.section-title::after{
         <div class="ir9-empty" id="ir9-empty">
           <div class="ir9-eorb"><svg width="46" height="46" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c7d2fe" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#e0e7ff"><animate attributeName="r" values="2.5;3.2;2.5" dur="3s" repeatCount="indefinite"/></circle></svg></div>
           <div class="ir9-etitle">Meet Kairo</div>
-          <div class="ir9-esub">Your AI revenue analyst. Kairo reads every signal in this account, ranks the companies worth calling this week, writes personalised outreach, and researches any prospect across the web &mdash; in one click.</div>
+          <div class="ir9-esub">Your AI revenue analyst. Kairo reads every signal in this account, ranks the companies worth calling this week, writes personalised outreach, and researches any prospect across the web &mdash; in one click. Every card opens into deeper intelligence.</div>
           <button class="ir9-gen-lg" onclick="irGenerate()">&#10022; Ask Kairo</button>
         </div>
         <div class="ir9-loading" id="ir9-loading" style="display:none">
@@ -1718,15 +1746,15 @@ h2::after,.section-title::after{
             <div class="ir9-foot" id="ir9-foot"></div>
           </div>
           <div class="ir9-panel" id="ir9-p-pip">
-            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Intent pipeline</span><span class="ir9-sh-s">scored 0&ndash;100 by Kairo &middot; click a card for the full dossier</span></div>
+            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Intent pipeline</span><span class="ir9-sh-s">scored 0&ndash;100 by Kairo &middot; every card opens a full dossier</span></div>
             <div class="ir9-grid" id="ir9-pipgrid"></div>
           </div>
           <div class="ir9-panel" id="ir9-p-act">
-            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Action board</span><span class="ir9-sh-s">Kairo&rsquo;s ranked to-do list, by urgency</span></div>
+            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Action board</span><span class="ir9-sh-s">Kairo&rsquo;s ranked to-do list &middot; tick items off as you go</span></div>
             <div class="ir9-kan" id="ir9-kan"></div>
           </div>
           <div class="ir9-panel" id="ir9-p-rad">
-            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Market radar</span><span class="ir9-sh-s">patterns Kairo sees across the whole account</span></div>
+            <div class="ir9-sh" style="margin-top:4px"><span class="ir9-sh-t">Market radar</span><span class="ir9-sh-s">patterns Kairo sees across the whole account &middot; click anything to go deeper</span></div>
             <div class="ir9-rgrid" id="ir9-rgrid"></div>
           </div>
         </div>
@@ -4123,7 +4151,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-<!-- INSIGHTS v9 JS (Kairo) -->
+<!-- INSIGHTS v10 JS (Kairo) -->
 <div class="ir9-scrim" id="ir9-scrim" onclick="irClose()"></div>
 <div class="ir9-drw" id="ir9-drw">
   <div class="ir9-drw-top"><button class="ir9-x" onclick="irClose()">&#10005;</button><div class="ir9-drw-title" id="ir9-drw-title"></div><span class="ir9-kbadge">&#10022; KAIRO</span></div>
@@ -4134,7 +4162,7 @@ document.addEventListener('DOMContentLoaded', function() {
 'use strict';
 /* ── State ── */
 var D={ins:null,feed:[],acts:[],out:[],meta:{sigs:0,cos:0}};
-var _metaLoaded=false,_stepTimer=null;
+var META=null,DEEP={},_metaLoaded=false,_stepTimer=null;
 var AVC=['#4f46e5','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46','#92400e','#1d4ed8'];
 var STEPS=['Kairo is reading the signals…','Cross-referencing companies and patterns…','Scoring intent and momentum…','Composing your command brief…'];
 
@@ -4157,6 +4185,24 @@ function countUp(el,to){
   if(!el)return;var n=parseInt(to,10)||0,t0=null;
   function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/750,1),e=1-Math.pow(1-p,3);el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);}
   requestAnimationFrame(step);}
+function feedIdx(name){var n=(name||'').toLowerCase();for(var i=0;i<D.feed.length;i++)if(D.feed[i].name.toLowerCase()===n)return i;return null;}
+function miniRow(name,domain,score,timing,idx){
+  var c=score!=null?scC(score):'#a5b4fc';
+  return '<div class="ir9-mini">'
+    +'<div class="ir9-av" style="width:30px;height:30px;border-radius:8px;font-size:11px;background:'+AVC[(idx==null?3:idx)%AVC.length]+'">'+esc(ini(name))+'</div>'
+    +'<div class="ir9-mini-mid"><div class="ir9-mini-n">'+esc(name)+'</div>'+(domain?'<div class="ir9-mini-d">'+esc(domain)+'</div>':'')+'</div>'
+    +(timing?'<span class="ir9-tchip '+tCls(timing)+'">'+tLbl(timing)+'</span>':'')
+    +(score!=null?'<span class="ir9-mini-sc" style="color:'+c+'">'+score+'</span>':'')
+    +'<button class="ir9-act em sm" title="Kairo Email" data-iract="email" data-co="'+esc(name)+'">&#9993;</button>'
+    +'<button class="ir9-act rs sm" title="Research with Kairo" data-iract="research" data-co="'+esc(name)+'" data-dom="'+esc(domain||'')+'">&#10022;</button>'
+    +(idx!=null?'<button class="ir9-act sm" title="Open dossier" data-iract="co" data-i="'+idx+'">&#8594;</button>':'')
+  +'</div>';
+}
+function doneKey(){return 'kairo_done_'+acct();}
+function getDone(){try{return JSON.parse(localStorage.getItem(doneKey())||'{}');}catch(e){return {};}}
+function setDone(d){try{localStorage.setItem(doneKey(),JSON.stringify(d));}catch(e){}}
+function actId(a){return (a.rank||'')+'|'+String(a.action||'').slice(0,60);}
+function cacheKey(){return 'kairo_cache_'+acct();}
 
 /* ── Drawer ── */
 window.irClose=function(){$('ir9-drw').classList.remove('on');$('ir9-scrim').classList.remove('on');};
@@ -4169,8 +4215,15 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){irClose();var p=$('ir9-fpanel');if(p)p.style.display='none';}
 });
 
-/* ── Nav hook ── */
-window.iTab=function(){if(!_metaLoaded)irLoadMeta();};
+/* ── Nav hook: restore last Kairo run instantly ── */
+window.iTab=function(){
+  if(_metaLoaded)return;
+  irLoadMeta();
+  try{
+    var c=JSON.parse(localStorage.getItem(cacheKey())||'null');
+    if(c&&c.d&&c.d.insights&&Date.now()-(c.ts||0)<86400000)_renderAll(c.d,c.ts);
+  }catch(e){}
+};
 
 /* ── Tabs ── */
 window.ir9Tab=function(btn){
@@ -4187,6 +4240,7 @@ function _growBars(){document.querySelectorAll('.ir9-bar-fill[data-fw]').forEach
 function irLoadMeta(){
   _metaLoaded=true;
   fetch('/api/insights-meta/'+acct()).then(function(r){return r.json();}).then(function(d){
+    META=d;
     var wrap=$('ir9-types');
     if(wrap){wrap.innerHTML='';(d.signal_types||[]).forEach(function(t,i){
       var div=document.createElement('div');div.className='ir9-chk';div.setAttribute('data-type',t);
@@ -4250,7 +4304,11 @@ window.irGenerate=function(){
     .then(function(data){
       if(btn)btn.disabled=false;
       clearInterval(_stepTimer);
-      if(data.error){_showErr(data.error);}else{_renderAll(data);}
+      if(data.error){_showErr(data.error);}
+      else{
+        try{localStorage.setItem(cacheKey(),JSON.stringify({d:data,ts:Date.now()}));}catch(e){}
+        _renderAll(data,0);
+      }
     })
     .catch(function(e){
       if(btn)btn.disabled=false;
@@ -4272,7 +4330,7 @@ function _showErr(msg){
   d.innerHTML='<strong>Kairo hit a snag:</strong> '+esc(msg);$('ir9-empty').appendChild(d);
 }
 
-/* ── Feed (pipeline + week_priority merged) ── */
+/* ── Feed ── */
 function buildFeed(ins){
   var feed=(ins.pipeline||[]).map(function(c){return{
     name:c.name||'',domain:c.domain||'',
@@ -4304,38 +4362,39 @@ function buildFeed(ins){
 }
 
 /* ── Render all ── */
-function _renderAll(data){
+function _renderAll(data,cachedTs){
   var ins=data.insights||{};
   D.ins=ins;D.acts=(ins.actions||[]).map(function(a,i){a._i=i;return a;});
   D.out=ins.outreach||[];D.feed=buildFeed(ins);
   D.meta={sigs:data.signals_analyzed||0,cos:data.companies_analyzed||0};
-  _renderCC(ins);_renderPip();_renderActs();_renderRad(ins);
+  _renderCC(ins,cachedTs);_renderPip();_renderActs();_renderRad(ins);
   var tp=$('ir9-tc-pip');if(tp)tp.textContent=D.feed.length;
   var ta=$('ir9-tc-act');if(ta)ta.textContent=D.acts.length;
+  var tr=$('ir9-tc-rad');if(tr)tr.textContent=(ins.market_pulse||[]).length+(ins.themes||[]).length+(ins.strategic_moves||[]).length+(ins.risks||[]).length;
   $('ir9-loading').style.display='none';$('ir9-empty').style.display='none';
   $('ir9-results').style.display='block';$('ir9-tabs').style.display='flex';
   var cc=document.querySelector('.ir9-tab[data-p="cc"]');if(cc)ir9Tab(cc);
 }
 
 /* ── Command Center ── */
-function _renderCC(ins){
-  $('ir9-hero').innerHTML='<div class="ir9-hero"><div class="ir9-hero-in">'
+function _renderCC(ins,cachedTs){
+  $('ir9-hero').innerHTML='<div class="ir9-hero" data-iract="brief"><div class="ir9-hero-in">'
     +'<div class="ir9-hero-lbl"><span class="ir9-kbadge">&#10022; KAIRO</span><span class="ir9-hl-title">Executive Brief</span></div>'
     +(ins.headline?'<div class="ir9-headline">'+esc(ins.headline)+'</div>':'')
     +'<div class="ir9-brief-tx">'+esc(ins.brief||ins.summary||'')+'</div>'
     +(ins.kairo_take?'<div class="ir9-take"><span class="ir9-take-ico">&#10022;</span><div class="ir9-take-tx"><span class="ir9-take-lbl">Kairo&rsquo;s take</span>'+esc(ins.kairo_take)+'</div></div>':'')
-    +'<span class="ir9-hero-more" data-iract="brief">Full brief, market pulse &amp; strategic moves &rarr;</span>'
+    +'<span class="ir9-hero-more">Full brief, market pulse &amp; strategic moves &rarr;</span>'
   +'</div></div>';
 
   var hot=D.feed.filter(function(f){return (f.score||0)>=80;}).length;
   var due=D.feed.filter(function(f){var t=(f.timing||'').toLowerCase();return t.indexOf('today')>-1||t.indexOf('week')>-1;}).length;
   var rising=D.feed.filter(function(f){return (f.momentum||'').toLowerCase().indexOf('ris')>-1;}).length;
-  var K=[{i:'🔥',v:hot,l:'Hot targets (80+)',g:'#fb7185'},
-         {i:'📞',v:due,l:'Calls due this week',g:'#fbbf24'},
-         {i:'📈',v:rising,l:'Rising momentum',g:'#34d399'},
-         {i:'📡',v:D.meta.sigs,l:'Signals analysed',g:'#818cf8'}];
+  var K=[{i:'🔥',v:hot,l:'Hot targets (80+)',g:'#fb7185',k:'hot'},
+         {i:'📞',v:due,l:'Calls due this week',g:'#fbbf24',k:'due'},
+         {i:'📈',v:rising,l:'Rising momentum',g:'#34d399',k:'rise'},
+         {i:'📡',v:D.meta.sigs,l:'Signals analysed',g:'#818cf8',k:'sig'}];
   $('ir9-kpis').innerHTML=K.map(function(k,i){
-    return '<div class="ir9-kpi" style="animation-delay:'+(i*.06)+'s"><span class="ir9-kpi-i">'+k.i+'</span>'
+    return '<div class="ir9-kpi" style="animation-delay:'+(i*.06)+'s" data-iract="kpi" data-k="'+k.k+'"><span class="ir9-kpi-i">'+k.i+'</span>'
       +'<div class="ir9-kpi-v" id="ir9kv'+i+'">0</div><div class="ir9-kpi-l">'+k.l+'</div>'
       +'<div class="ir9-kpi-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div></div>';
   }).join('');
@@ -4357,7 +4416,9 @@ function _renderCC(ins){
       +'</div></div>';
   }).join('')||'<p style="color:#55617a;padding:20px">No priorities found.</p>';
 
-  $('ir9-foot').innerHTML='<span class="ir9-foot-m">&#10022; Generated by Kairo · '+D.meta.sigs+' signals · '+D.meta.cos+' companies · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>'
+  var when=cachedTs?new Date(cachedTs):new Date();
+  var note=cachedTs?'Restored from Kairo&rsquo;s last run ('+when.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+') — Ask Kairo for fresh analysis':'Generated just now · '+when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  $('ir9-foot').innerHTML='<span class="ir9-foot-m">&#10022; '+note+' · '+D.meta.sigs+' signals · '+D.meta.cos+' companies</span>'
     +'<button class="ir9-regen" onclick="irGenerate()">&#8635; Ask Kairo again</button>';
 }
 
@@ -4388,8 +4449,9 @@ function _renderPip(){
   }).join(''):'<p style="color:#55617a;padding:30px">No pipeline data.</p>';
 }
 
-/* ── Actions kanban ── */
+/* ── Actions kanban (with done-tracking) ── */
 function _renderActs(){
+  var done=getDone();
   var g={t:[],w:[],m:[]};
   D.acts.forEach(function(a){
     var dl=(a.deadline||'').toLowerCase();
@@ -4403,8 +4465,10 @@ function _renderActs(){
     return '<div class="ir9-kcol"><div class="ir9-kcol-h"><span class="ir9-kdot" style="background:'+col.c+';box-shadow:0 0 8px '+col.c+'"></span>'
       +'<span class="ir9-kcol-t" style="color:'+col.c+'">'+col.t+'</span><span class="ir9-kcol-n">'+items.length+'</span></div>'
       +(items.length?items.map(function(a,j){
-        return '<div class="ir9-kcard" style="animation-delay:'+(j*.05)+'s" data-iract="act" data-i="'+a._i+'">'
-          +'<div class="ir9-kcard-t">'+esc(a.action||'')+'</div>'
+        var dn=!!done[actId(a)];
+        return '<div class="ir9-kcard'+(dn?' done':'')+'" style="animation-delay:'+(j*.05)+'s" data-iract="act" data-i="'+a._i+'">'
+          +'<div class="ir9-kcard-row"><div class="ir9-kcard-t">'+esc(a.action||'')+'</div>'
+          +'<button class="ir9-kchk'+(dn?' on':'')+'" title="Mark done" data-iract="ado" data-i="'+a._i+'">&#10003;</button></div>'
           +'<div class="ir9-kcard-m">'+(a.company&&a.company!=='All'?'<span class="ir9-kco">'+esc(a.company)+'</span>':'')
           +(a.deadline?'<span class="ir9-kdl">'+esc(a.deadline)+'</span>':'')+'</div></div>';
       }).join(''):'<div style="font-size:11px;color:#3b4763;text-align:center;padding:14px 0">Nothing here</div>')
@@ -4412,35 +4476,35 @@ function _renderActs(){
   }).join('');
 }
 
-/* ── Radar ── */
+/* ── Radar (everything clickable) ── */
 function _renderRad(ins){
   var mp=ins.market_pulse||[],themes=ins.themes||[],sm=ins.strategic_moves||[],risks=ins.risks||[];
   var maxT=Math.max.apply(null,themes.map(function(t){return t.count||1;}).concat([1]));
   var tCol=['#818cf8','#fbbf24','#34d399','#f472b6'];
   var h='';
   h+='<div class="ir9-rcard wide"><div class="ir9-rcard-t">&#128225; Market pulse <span class="ir9-kbadge">&#10022; KAIRO</span></div>'
-    +(mp.length?mp.map(function(m,i){return '<div class="ir9-pulse-row"><div class="ir9-pulse-n">'+(i+1)+'</div><div class="ir9-pulse-tx">'+esc(m)+'</div></div>';}).join(''):'<div style="font-size:12px;color:#3b4763">No observations.</div>')+'</div>';
+    +(mp.length?mp.map(function(m,i){return '<div class="ir9-pulse-row ir9-click" data-iract="pulse" data-i="'+i+'"><div class="ir9-pulse-n">'+(i+1)+'</div><div class="ir9-pulse-tx">'+esc(m)+'</div><span class="ir9-chev">&#8250;</span></div>';}).join(''):'<div style="font-size:12px;color:#3b4763">No observations.</div>')+'</div>';
   h+='<div class="ir9-rcard"><div class="ir9-rcard-t">&#127912; Signal themes</div>'
     +(themes.length?themes.slice(0,4).map(function(t,i){
       var pct=Math.round((t.count||1)/maxT*100);
-      return '<div class="ir9-bar-row"><div class="ir9-bar-l1"><span class="ir9-bar-name">'+esc(t.theme||'')+'</span><span class="ir9-bar-ct" style="color:'+tCol[i%4]+'">'+esc(String(t.count||0))+'</span></div>'
+      return '<div class="ir9-bar-row ir9-click" data-iract="theme" data-i="'+i+'"><div class="ir9-bar-l1"><span class="ir9-bar-name">'+esc(t.theme||'')+'</span><span class="ir9-bar-ct" style="color:'+tCol[i%4]+'">'+esc(String(t.count||0))+'</span></div>'
         +'<div class="ir9-bar-track"><div class="ir9-bar-fill" style="background:'+tCol[i%4]+'" data-fw="'+pct+'"></div></div>'
-        +(t.campaign_angle?'<div class="ir9-bar-angle">'+esc(t.campaign_angle)+'</div>':'')+'</div>';
+        +(t.campaign_angle?'<div class="ir9-bar-angle">'+esc(t.campaign_angle)+'</div>':'')+'<span class="ir9-chev">&#8250;</span></div>';
     }).join(''):'<div style="font-size:12px;color:#3b4763">No themes.</div>')+'</div>';
   h+='<div class="ir9-rcard"><div class="ir9-rcard-t">&#9888;&#65039; Attention flags</div>'
-    +(risks.length?risks.slice(0,3).map(function(r){
-      return '<div class="ir9-risk"><div class="ir9-rdot"></div><div>'
+    +(risks.length?risks.slice(0,3).map(function(r,i){
+      return '<div class="ir9-risk ir9-click" data-iract="risk" data-i="'+i+'"><div class="ir9-rdot"></div><div style="flex:1;padding-right:14px">'
         +'<div style="font-size:12.5px;font-weight:700;color:#dee5ef">'+esc(r.company||'')+'</div>'
         +(r.flag?'<div style="font-size:11.5px;color:#fb7185;margin-top:1px">'+esc(r.flag)+'</div>':'')
         +(r.implication?'<div style="font-size:11px;color:#55617a;line-height:1.55;margin-top:2px">'+esc(r.implication)+'</div>':'')
-      +'</div></div>';
+      +'</div><span class="ir9-chev">&#8250;</span></div>';
     }).join(''):'<div style="font-size:12px;color:#3b4763">&#9989; Nothing concerning this week.</div>')+'</div>';
   h+='<div class="ir9-rcard wide"><div class="ir9-rcard-t">&#9876;&#65039; Strategic moves <span class="ir9-kbadge">&#10022; KAIRO</span></div>'
-    +(sm.length?sm.map(function(m){
-      return '<div class="ir9-move"><div class="ir9-move-t">'+esc(m.move||'')+'</div>'
+    +(sm.length?sm.map(function(m,i){
+      return '<div class="ir9-move ir9-click" data-iract="move" data-i="'+i+'"><div class="ir9-move-t">'+esc(m.move||'')+'</div>'
         +(m.rationale?'<div class="ir9-move-r">'+esc(m.rationale)+'</div>':'')
         +(m.impact?'<div class="ir9-move-i">&#8599; '+esc(m.impact)+'</div>':'')
-        +(m.owner?'<span class="ir9-own">'+esc(m.owner)+'</span>':'')+'</div>';
+        +(m.owner?'<span class="ir9-own">'+esc(m.owner)+'</span>':'')+'<span class="ir9-chev">&#8250;</span></div>';
     }).join(''):'<div style="font-size:12px;color:#3b4763">No moves suggested.</div>')+'</div>';
   $('ir9-rgrid').innerHTML=h;
 }
@@ -4453,12 +4517,86 @@ document.addEventListener('click',function(e){
   else if(a==='email'){e.stopPropagation();irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'');}
   else if(a==='research'){e.stopPropagation();irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
   else if(a==='brief'){irShowBrief();}
+  else if(a==='kpi'){irShowKpi(b.getAttribute('data-k'));}
+  else if(a==='theme'){irShowTheme(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='pulse'){irShowPulse(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='risk'){irShowRisk(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='move'){irShowMove(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='copy'){irCopy(b,b.getAttribute('data-copy')||'');}
   else if(a==='copyid'){var el=document.getElementById(b.getAttribute('data-id'));if(el)irCopy(b,el.value||el.textContent);}
 });
 
-/* ── Drawers ── */
+/* ── KPI drill-downs ── */
+function irShowKpi(k){
+  if(k==='sig'){
+    var m=META||{},counts=m.counts||{},keys=Object.keys(counts);
+    var max=1;keys.forEach(function(x){if(counts[x]>max)max=counts[x];});
+    var cols=['#818cf8','#fbbf24','#34d399','#f472b6','#7cb3f5','#fb7185'];
+    var html='<div class="ir9-ds"><div class="ir9-ds-l">Signal mix across this account</div>'
+      +(keys.length?keys.map(function(t,i){var pct=Math.round(counts[t]/max*100);
+        return '<div class="ir9-bar-row"><div class="ir9-bar-l1"><span class="ir9-bar-name">'+esc(t)+'</span><span class="ir9-bar-ct" style="color:'+cols[i%6]+'">'+counts[t]+'</span></div><div class="ir9-bar-track"><div class="ir9-bar-fill" style="background:'+cols[i%6]+';width:'+pct+'%"></div></div></div>';}).join(''):'<div class="ir9-note">Signal mix loads after the filters panel has been opened once.</div>')
+      +'</div>'
+      +'<div class="ir9-ds"><div class="ir9-ds-l">In this Kairo analysis</div><div class="ir9-ds-v">Kairo read <b style="color:#e6edf6">'+D.meta.sigs+'</b> signals across <b style="color:#e6edf6">'+D.meta.cos+'</b> companies that matched your current filters, then ranked the pipeline you see now.</div></div>';
+    irOpen('Signals — full breakdown',html);return;
+  }
+  var defs={
+    hot:{t:'Hot targets — intent 80+',f:function(x){return (x.score||0)>=80;},e:'No companies above 80 right now. Kairo flags them the moment they heat up.'},
+    due:{t:'Calls due this week',f:function(x){var t=(x.timing||'').toLowerCase();return t.indexOf('today')>-1||t.indexOf('week')>-1;},e:'Nothing time-critical this week.'},
+    rise:{t:'Rising momentum',f:function(x){return (x.momentum||'').toLowerCase().indexOf('ris')>-1;},e:'No accelerating accounts in this batch.'}};
+  var d=defs[k];if(!d)return;
+  var items=[];D.feed.forEach(function(f,i){if(d.f(f))items.push({f:f,i:i});});
+  var html=(items.length?items.map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join(''):'<div class="ir9-note">'+d.e+'</div>');
+  irOpen(d.t,html);
+}
+
+/* ── Radar drawers ── */
+function irShowTheme(i){
+  var t=(D.ins&&D.ins.themes||[])[i];if(!t)return;
+  var html='<div style="font-size:17px;font-weight:800;color:#eef2ff;margin-bottom:5px;letter-spacing:-.02em">'+esc(t.theme||'')+'</div>'
+    +'<div style="font-size:11px;color:#55617a;margin-bottom:17px">'+esc(String(t.count||0))+' signals share this pattern</div>'
+    +(t.campaign_angle?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Campaign angle</div><div class="ir9-hl">'+esc(t.campaign_angle)+'</div></div>':'')
+    +((t.companies||[]).length?'<div class="ir9-ds"><div class="ir9-ds-l">Companies riding this wave</div>'+t.companies.map(function(c){
+        var ix=feedIdx(c);
+        return miniRow(c,ix!=null?D.feed[ix].domain:'',ix!=null?D.feed[ix].score:null,ix!=null?D.feed[ix].timing:'',ix);
+      }).join('')+'</div>':'')
+    +'<div class="ir9-drw-btns"><button class="ir9-btn prim" data-iract="copy" data-copy="'+esc((t.theme||'')+' — '+(t.campaign_angle||''))+'">&#128203; Copy campaign angle</button></div>';
+  irOpen('Theme — '+(t.theme||''),html);
+}
+function irShowPulse(i){
+  var m=(D.ins&&D.ins.market_pulse||[])[i];if(m==null)return;
+  var ml=String(m).toLowerCase(),rel=[];
+  D.feed.forEach(function(f,ix){if(f.name&&ml.indexOf(f.name.toLowerCase())>-1)rel.push({f:f,i:ix});});
+  var html='<div class="ir9-hl" style="font-size:13.5px;line-height:1.8;margin-bottom:18px">'+esc(m)+'</div>'
+    +(rel.length?'<div class="ir9-ds"><div class="ir9-ds-l">Companies in this observation</div>'+rel.map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join('')+'</div>':'<div class="ir9-note">No tracked pipeline companies named directly — this is an account-wide pattern.</div>')
+    +'<div class="ir9-drw-btns"><button class="ir9-btn prim" data-iract="copy" data-copy="'+esc(m)+'">&#128203; Copy observation</button></div>';
+  irOpen('Market pulse #'+(i+1),html);
+}
+function irShowRisk(i){
+  var r=(D.ins&&D.ins.risks||[])[i];if(!r)return;
+  var ix=feedIdx(r.company);
+  var html=coHeader(r.company||'',ix!=null?D.feed[ix].domain:'','#9f1239')
+    +(r.flag?'<div class="ir9-ds"><div class="ir9-ds-l">&#9888;&#65039; Flag</div><div style="font-size:13.5px;font-weight:600;color:#fb7185;line-height:1.6">'+esc(r.flag)+'</div></div>':'')
+    +(r.implication?'<div class="ir9-ds"><div class="ir9-ds-l">What it means for us</div><div class="ir9-ds-v">'+esc(r.implication)+'</div></div>':'')
+    +(ix!=null?'<div class="ir9-ds"><div class="ir9-ds-l">In the pipeline</div>'+miniRow(r.company,D.feed[ix].domain,D.feed[ix].score,D.feed[ix].timing,ix)+'</div>':'')
+    +aiBtns(r.company||'',ix!=null?D.feed[ix].domain:'','');
+  irOpen('Attention flag — '+(r.company||''),html);
+}
+function irShowMove(i){
+  var m=(D.ins&&D.ins.strategic_moves||[])[i];if(!m)return;
+  var rel=[];var txt=((m.move||'')+' '+(m.rationale||'')).toLowerCase();
+  D.feed.forEach(function(f,ix){if(f.name&&txt.indexOf(f.name.toLowerCase())>-1)rel.push({f:f,i:ix});});
+  var html='<div style="font-size:16px;font-weight:800;color:#eef2ff;line-height:1.45;margin-bottom:15px;letter-spacing:-.02em">'+esc(m.move||'')+'</div>'
+    +(m.owner?'<div class="ir9-ds"><div class="ir9-ds-l">Owner</div><span class="ir9-own" style="font-size:11px;padding:4px 12px">'+esc(m.owner)+'</span></div>':'')
+    +(m.rationale?'<div class="ir9-ds"><div class="ir9-ds-l">Why Kairo suggests this</div><div class="ir9-ds-v">'+esc(m.rationale)+'</div></div>':'')
+    +(m.impact?'<div class="ir9-ds"><div class="ir9-ds-l">Expected impact</div><div class="ir9-hl" style="border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.07);color:#6ee7b7">'+esc(m.impact)+'</div></div>':'')
+    +(rel.length?'<div class="ir9-ds"><div class="ir9-ds-l">Companies involved</div>'+rel.map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join('')+'</div>':'')
+    +'<div class="ir9-drw-btns"><button class="ir9-btn prim" data-iract="copy" data-copy="'+esc((m.move||'')+'\n\nWhy: '+(m.rationale||'')+'\n\nImpact: '+(m.impact||'')+'\n\nOwner: '+(m.owner||''))+'">&#128203; Copy move</button></div>';
+  irOpen('Strategic move #'+(i+1),html);
+}
+
+/* ── Company / action / brief drawers ── */
 function coHeader(name,domain,color){
   return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'
     +'<div style="width:46px;height:46px;border-radius:13px;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(name))+'</div>'
@@ -4491,38 +4629,74 @@ function irShowCo(i){
     +(f.svc.length?'<div class="ir9-ds"><div class="ir9-ds-l">Service fit</div><div class="ir9-chips">'+f.svc.map(function(s){return chip(s,true);}).join('')+'</div></div>':'')
     +(tps.length?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Talking points</div>'+tps.map(function(t,j){return '<div class="ir9-tp"><div class="ir9-tp-n">'+(j+1)+'</div><div class="ir9-tp-t">'+esc(t)+'</div></div>';}).join('')+'</div>':'')
     +(f.next?'<div class="ir9-ds"><div class="ir9-ds-l">Next step</div><div class="ir9-ds-v">'+esc(f.next)+'</div></div>':'')
+    +'<div id="ir9-deep"></div>'
     +aiBtns(f.name,f.domain,f.svc[0]||'');
   irOpen(f.name,html);
+  irDeep(f.name);
+}
+function irDeep(name){
+  var box=$('ir9-deep');if(!box)return;
+  if(DEEP[name]){box.innerHTML=DEEP[name];return;}
+  box.innerHTML='<div class="ir9-load"><span class="ir9-spin">&#10227;</span> Kairo is preparing the deep dossier &mdash; objections, angles and subject lines&hellip;</div>';
+  fetch('/api/company-analysis/'+acct()+'?company='+encodeURIComponent(name))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var box=$('ir9-deep');if(!box)return;
+      if(d.error){box.innerHTML='<div class="ir9-note">Deep dossier unavailable: '+esc(d.error)+'</div>';return;}
+      var a=d.analysis||{};
+      var html='<div style="border-top:1px solid rgba(255,255,255,.07);margin:6px 0 16px;padding-top:16px"><span class="ir9-kbadge">&#10022; KAIRO DEEP DOSSIER</span></div>';
+      if(a.company_context)html+='<div class="ir9-ds"><div class="ir9-ds-l">Company context</div><div class="ir9-ds-v">'+esc(a.company_context)+'</div></div>';
+      if(a.score&&a.score_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Score rationale ('+esc(String(a.score))+'/100)</div><div class="ir9-ds-v">'+esc(a.score_reason)+'</div></div>';
+      if(a.why_now)html+='<div class="ir9-ds"><div class="ir9-ds-l">Why now</div><div class="ir9-hl">'+esc(a.why_now)+'</div></div>';
+      var objs=a.objections||[];
+      if(objs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Objections &amp; counters</div>'+objs.map(function(o){
+        return '<div class="ir9-obj"><div class="ir9-obj-q">&#9888; '+esc(o.objection||'')+'</div><div class="ir9-obj-a">&#8594; '+esc(o.response||'')+'</div></div>';}).join('')+'</div>';
+      var subs=a.subject_lines||[];
+      if(subs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Subject lines that will land</div>'+subs.map(function(sl){
+        return '<div class="ir9-subj"><div class="ir9-subj-t">'+esc(sl)+'</div><button class="ir9-btn" style="padding:3px 9px;font-size:10px" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button></div>';}).join('')+'</div>';
+      if(a.recommended_service&&a.service_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Best-fit service: '+esc(a.recommended_service)+'</div><div class="ir9-ds-v">'+esc(a.service_reason)+'</div></div>';
+      if(a.urgency)html+='<div class="ir9-ds"><div class="ir9-ds-l">Urgency</div><div class="ir9-ds-v"><span class="ir9-tchip '+(a.urgency==='HIGH'?'ir9-t-now':a.urgency==='MEDIUM'?'ir9-t-week':'ir9-t-email')+'" style="font-size:10px;padding:4px 10px">'+esc(a.urgency)+'</span>'+(a.urgency_reason?' &nbsp;'+esc(a.urgency_reason):'')+'</div></div>';
+      DEEP[name]=html;
+      box.innerHTML=html;
+    })
+    .catch(function(){var box=$('ir9-deep');if(box)box.innerHTML='<div class="ir9-note">Deep dossier failed to load.</div>';});
 }
 function irShowAct(i){
-  var a=D.acts.filter(function(x){return x._i===i;})[0]||D.acts[i];if(!a)return;
-  var hi=a.urgency==='HIGH';
+  var a=D.acts.filter(function(x){return x._i===i;})[0];if(!a)return;
+  var hi=a.urgency==='HIGH',dn=!!getDone()[actId(a)];
   var html='<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">'
     +'<span style="font-size:10px;font-weight:800;padding:4px 11px;border-radius:6px;background:'+(hi?'rgba(244,63,94,.12)':'rgba(245,158,11,.09)')+';color:'+(hi?'#fb7185':'#fcd34d')+'">'+esc(a.urgency||'')+'</span>'
-    +(a.deadline?'<span style="font-size:11px;color:#55617a">&#9201; '+esc(a.deadline)+'</span>':'')+'</div>'
-    +'<div style="font-size:15.5px;font-weight:700;color:#f1f5f9;line-height:1.5;margin-bottom:16px">'+esc(a.action||'')+'</div>'
+    +(a.deadline?'<span style="font-size:11px;color:#55617a">&#9201; '+esc(a.deadline)+'</span>':'')
+    +(dn?'<span style="font-size:10px;font-weight:700;color:#34d399">&#10003; DONE</span>':'')+'</div>'
+    +'<div style="font-size:15.5px;font-weight:700;color:#f1f5f9;line-height:1.5;margin-bottom:16px;'+(dn?'text-decoration:line-through;opacity:.6':'')+'">'+esc(a.action||'')+'</div>'
     +(a.company&&a.company!=='All'?'<div class="ir9-ds"><div class="ir9-ds-l">Company</div><div class="ir9-ds-v" style="color:#7cb3f5;font-weight:600">'+esc(a.company)+'</div></div>':'')
     +(a.reason?'<div class="ir9-ds"><div class="ir9-ds-l">Why it matters</div><div class="ir9-ds-v">'+esc(a.reason)+'</div></div>':'')
-    +(a.company&&a.company!=='All'?aiBtns(a.company,'',''):'');
+    +'<div class="ir9-drw-btns">'
+      +'<button class="ir9-btn'+(dn?'':' prim')+'" data-iract="ado" data-i="'+a._i+'" data-redrw="1">'+(dn?'&#8634; Mark as not done':'&#10003; Mark done')+'</button>'
+      +(a.company&&a.company!=='All'?'<button class="ir9-btn" data-iract="email" data-co="'+esc(a.company)+'">&#9993; Kairo Email</button><button class="ir9-btn" data-iract="research" data-co="'+esc(a.company)+'">&#10022; Research</button>':'')
+    +'</div>';
   irOpen('Action #'+(a.rank||i+1),html);
 }
 function irShowBrief(){
   var ins=D.ins||{};
   var mp=ins.market_pulse||[],sm=ins.strategic_moves||[];
+  var txt=(ins.headline?ins.headline+'\n\n':'')+(ins.brief||'')+(ins.kairo_take?'\n\nKairo’s take: '+ins.kairo_take:'')+(mp.length?'\n\nMarket pulse:\n'+mp.map(function(m){return '• '+m;}).join('\n'):'');
   var html=(ins.headline?'<div style="font-size:18px;font-weight:800;color:#eef2ff;letter-spacing:-.02em;line-height:1.4;margin-bottom:13px">'+esc(ins.headline)+'</div>':'')
     +'<div style="font-size:13.5px;line-height:1.85;color:#cbd5e1;margin-bottom:18px">'+esc(ins.brief||ins.summary||'')+'</div>'
     +(ins.kairo_take?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Kairo&rsquo;s take</div><div class="ir9-hl">'+esc(ins.kairo_take)+'</div></div>':'')
-    +(mp.length?'<div class="ir9-ds"><div class="ir9-ds-l">Market pulse</div>'+mp.map(function(m){return '<div style="font-size:12.5px;color:#9fabbe;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.7">&bull; '+esc(m)+'</div>';}).join('')+'</div>':'')
+    +(mp.length?'<div class="ir9-ds"><div class="ir9-ds-l">Market pulse — click any line on the Radar tab for detail</div>'+mp.map(function(m){return '<div style="font-size:12.5px;color:#9fabbe;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.7">&bull; '+esc(m)+'</div>';}).join('')+'</div>':'')
     +(sm.length?'<div class="ir9-ds"><div class="ir9-ds-l">Strategic moves</div>'+sm.map(function(m){
       return '<div class="ir9-move"><div class="ir9-move-t">'+esc(m.move||'')+'</div>'
         +(m.rationale?'<div class="ir9-move-r">'+esc(m.rationale)+'</div>':'')
         +(m.impact?'<div class="ir9-move-i">&#8599; '+esc(m.impact)+'</div>':'')
         +(m.owner?'<span class="ir9-own">'+esc(m.owner)+'</span>':'')+'</div>';
-    }).join('')+'</div>':'');
+    }).join('')+'</div>':'')
+    +'<textarea id="ir9-brieftxt" style="display:none">'+esc(txt)+'</textarea>'
+    +'<div class="ir9-drw-btns"><button class="ir9-btn prim" data-iract="copyid" data-id="ir9-brieftxt">&#128203; Copy full brief</button></div>';
   irOpen('Kairo — Executive brief',html);
 }
 
-/* ── Kairo Email (always generated live) ── */
+/* ── Kairo Email ── */
 window.irAIEmail=function(co,svc){
   if(!co)return;
   var f=D.feed.filter(function(x){return x.name.toLowerCase()===co.toLowerCase();})[0];
@@ -4560,7 +4734,7 @@ window.irAIEmail=function(co,svc){
     .catch(function(){var L=$('ir9-mload');if(L)L.remove();var out=$('ir9-mout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo could not finish the email. Try again.</div>';});
 };
 
-/* ── Research with Kairo (live web search) ── */
+/* ── Research with Kairo ── */
 window.irResearch=function(co,dom){
   if(!co)return;
   irOpen('✦ Kairo Research — '+co,coHeader(co,dom||'','#7c3aed')
