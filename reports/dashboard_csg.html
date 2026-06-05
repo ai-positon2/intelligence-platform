@@ -1425,6 +1425,70 @@ h2::after,.section-title::after{
 .ir-infog{grid-template-columns:repeat(2,1fr)!important}
 </style>
 
+
+<style>
+/* Readability + dark gradient restoration */
+.ir-body{
+  background:
+    radial-gradient(ellipse 55% 45% at 10% 10%,rgba(67,56,202,.18) 0%,transparent 50%),
+    radial-gradient(ellipse 45% 35% at 90% 85%,rgba(124,58,237,.14) 0%,transparent 50%),
+    linear-gradient(160deg,#020817 0%,#060c18 100%) !important
+}
+/* Card text contrast */
+.ir-tile-val{font-size:24px!important;color:#f1f5f9!important;letter-spacing:-.03em}
+.ir-tile-lbl{font-size:12px!important;color:#94a3b8!important;margin-top:4px}
+.ir-tile{padding:18px!important}
+/* Brief card text */
+.ir-brief-text{font-size:13px!important;color:#cbd5e1!important;line-height:1.7!important}
+.ir-brief-lbl,.ir-sh-title{color:#64748b!important}
+/* Priority card text */
+.ir-pc-name{font-size:13px!important;font-weight:700!important;color:#f1f5f9!important}
+.ir-pc-sig{font-size:11px!important;color:#64748b!important;line-height:1.5}
+.ir-pc-val{font-size:12px!important;font-weight:700!important;color:#fbbf24!important}
+.ir-pc-svc{font-size:10px!important;font-weight:600!important}
+.ir-pc{padding:14px!important}
+/* Infog cards */
+.ir-infog{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
+.ir-ic{padding:18px!important}
+.ir-ic-title{font-size:11px!important;font-weight:700!important;color:#94a3b8!important;letter-spacing:.06em!important;margin-bottom:14px!important}
+.ir-tier-lbl{font-size:12px!important;color:#94a3b8!important}
+.ir-tier-cnt{font-size:13px!important;font-weight:700!important}
+.ir-dleg-lbl{font-size:11px!important;color:#94a3b8!important}
+.ir-dleg-cnt{font-size:11px!important;font-weight:700!important}
+/* Action rows */
+.ir-arow-action{font-size:13px!important;color:#e2e8f0!important;font-weight:600!important}
+.ir-arow-co{font-size:11px!important;color:#6366f1!important}
+.ir-arow-dl{font-size:10px!important;color:#94a3b8!important;border-color:rgba(255,255,255,.1)!important}
+/* Pipeline cards */
+.ir-pcard-name{font-size:13px!important;font-weight:700!important;color:#f1f5f9!important}
+.ir-pcard-domain{font-size:10px!important;color:#475569!important}
+.ir-score-lbl{font-size:11px!important;font-weight:600!important}
+/* Outreach */
+.ir-ocard-subj{font-size:13px!important;font-weight:700!important;color:#e2e8f0!important}
+.ir-ocard-hook{font-size:11px!important;color:#64748b!important}
+/* Theme/risk cards */
+.ir-theme-name,.ir-risk-co{font-size:13px!important;font-weight:700!important;color:#e2e8f0!important}
+.ir-theme-angle,.ir-risk-impl{font-size:12px!important;color:#64748b!important;line-height:1.55!important}
+.ir-theme-n{font-size:18px!important;font-weight:800!important}
+.ir-risk-flag{font-size:12px!important}
+/* Panel cards */
+.ir-panel-card{padding:18px!important}
+.ir-pc-hdr{font-size:11px!important;color:#94a3b8!important;letter-spacing:.07em!important;margin-bottom:14px!important}
+/* Drawer readability */
+.ir-ds-lbl{font-size:11px!important;color:#64748b!important;letter-spacing:.07em!important;margin-bottom:8px!important}
+.ir-ds-val{font-size:13px!important;color:#94a3b8!important;line-height:1.7!important}
+.ir-hl{font-size:13px!important;color:#a5b4fc!important;line-height:1.65!important}
+.ir-rev{font-size:26px!important;letter-spacing:-.03em!important}
+.ir-tp-t{font-size:12px!important;color:#94a3b8!important;line-height:1.55!important}
+.ir-obj-q{font-size:12px!important}.ir-obj-a{font-size:12px!important}
+/* Bar text */
+.ir-brand-name{font-size:14px!important;color:#e2e8f0!important;font-weight:700!important}
+.ir-stat{font-size:11px!important;color:#64748b!important}
+/* Tab text */
+.ir-tab{font-size:13px!important;font-weight:500!important}
+.ir-tab.active{color:#e2e8f0!important;font-weight:600!important}
+</style>
+
 </head>
 <body>
 <div id="app">
@@ -4405,7 +4469,6 @@ function _buildInfog(ins){
   var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
   var themes=ins.themes||[];
   row.innerHTML=[
-    {t:'Pipeline Confidence',b:'<div class="ir-gauge-wrap">'+gauge(Math.min(.97,gPct),pe.high_conviction||'—','High Conviction','#34d399')+'<div class="ir-gauge-sub">'+esc(pe.total||'—')+' total · '+esc(pe.win_window||'—')+'</div></div>'},
     {t:'Intent Tiers',b:'<div class="ir-tier-list">'
       +[{l:'🔥 Critical (80+)',n:crit,c:'#ef4444'},{l:'⚡ High (60–79)',n:hi,c:'#f59e0b'},{l:'👀 Watch (<60)',n:watch,c:'#6366f1'}].map(function(t){
         return '<div class="ir-tier-row"><div class="ir-tier-dot" style="background:'+t.c+'"></div><div class="ir-tier-lbl">'+t.l+'</div><div class="ir-tier-track"><div class="ir-tier-fill" style="background:'+t.c+'" data-fw="'+Math.round(t.n/maxT*100)+'"></div></div><div class="ir-tier-cnt" style="color:'+t.c+'">'+t.n+'</div></div>';
