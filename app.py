@@ -30,6 +30,10 @@ app.permanent_session_lifetime = timedelta(days=7)
 def forbidden(e):
     return render_template("403.html"), 403
 
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify({"error": "Server error: " + str(e)}), 500
+
 # ── Google OAuth ────────────────────────────────────────────────────────────────
 # Set GOOGLE_CLIENT_ID in Railway → Variables.
 # Setup: console.cloud.google.com → APIs & Services → Credentials
@@ -1691,8 +1695,11 @@ def insights_generate(account_id):
 
     signal_types = request.args.getlist("signal_type")
     severities   = request.args.getlist("severity")
-    days         = int(request.args.get("days", 90))
-    industry     = request.args.get("industry","")
+    try:
+        days = int(request.args.get("days", 90))
+    except (ValueError, TypeError):
+        days = 90
+    industry = request.args.get("industry","")
 
     try:
         conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
@@ -1783,6 +1790,8 @@ def insights_generate(account_id):
         insights = json.loads(raw)
         return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
     except Exception as e:
+        import traceback
+        log.error("insights_generate %s: %s", account_id, traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
