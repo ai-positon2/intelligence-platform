@@ -30,10 +30,6 @@ app.permanent_session_lifetime = timedelta(days=7)
 def forbidden(e):
     return render_template("403.html"), 403
 
-@app.errorhandler(500)
-def internal_error(e):
-    return jsonify({"error": "Server error: " + str(e)}), 500
-
 # ── Google OAuth ────────────────────────────────────────────────────────────────
 # Set GOOGLE_CLIENT_ID in Railway → Variables.
 # Setup: console.cloud.google.com → APIs & Services → Credentials
@@ -1676,7 +1672,7 @@ def insights_meta(account_id):
         return jsonify({"industries": industries, "signal_types": signal_types,
                         "counts": counts, "total_signals": total, "total_companies": companies})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)})
 
 
 @app.route("/api/insights/<account_id>")
@@ -1695,11 +1691,8 @@ def insights_generate(account_id):
 
     signal_types = request.args.getlist("signal_type")
     severities   = request.args.getlist("severity")
-    try:
-        days = int(request.args.get("days", 90))
-    except (ValueError, TypeError):
-        days = 90
-    industry = request.args.get("industry","")
+    days         = int(request.args.get("days", 90))
+    industry     = request.args.get("industry","")
 
     try:
         conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
@@ -1779,7 +1772,7 @@ def insights_generate(account_id):
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
             ],
-            max_completion_tokens=5500,
+            max_completion_tokens=3000,
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
@@ -1790,9 +1783,8 @@ def insights_generate(account_id):
         insights = json.loads(raw)
         return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
     except Exception as e:
-        import traceback
-        log.error("insights_generate %s: %s", account_id, traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        import traceback; log.error("insights_generate: %s", traceback.format_exc())
+        return jsonify({"error": str(e)})
 
 
 @app.route("/api/ppc-chat-debug")
@@ -1979,7 +1971,7 @@ def company_analysis(account_id):
         if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
         return jsonify({"ok": True, "company": company_name, "analysis": json.loads(raw)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)})
 
 
 if __name__ == "__main__":
