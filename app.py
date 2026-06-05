@@ -1772,7 +1772,7 @@ def insights_generate(account_id):
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
             ],
-            max_completion_tokens=3000,
+            max_completion_tokens=4500,
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
@@ -1780,7 +1780,25 @@ def insights_generate(account_id):
             raw = m.group(1).strip() if m else raw
         s2=raw.find("{"); e2=raw.rfind("}")
         if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
-        insights = json.loads(raw)
+        # Handle truncated JSON by trying progressively shorter strings
+        insights = None
+        for attempt in [raw, raw[:raw.rfind("},")+1]+"}" if "}," in raw else raw]:
+            try:
+                insights = json.loads(attempt)
+                break
+            except json.JSONDecodeError:
+                pass
+        if insights is None:
+            # Last resort: parse up to last valid closing brace
+            for i in range(len(raw)-1, 0, -1):
+                if raw[i]=="}":
+                    try:
+                        insights = json.loads(raw[:i+1])
+                        break
+                    except Exception:
+                        continue
+        if insights is None:
+            return jsonify({"error": "GPT returned invalid JSON. Try again."})
         return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
     except Exception as e:
         import traceback; log.error("insights_generate: %s", traceback.format_exc())
