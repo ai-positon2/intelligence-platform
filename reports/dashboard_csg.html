@@ -4775,5 +4775,494 @@ window.irGoto=function(name){
 })();
 </script>
 
+<!-- TABS OVERHAUL -->
+<style>
+/* ═══ PIPELINE / ACTIONS / OUTREACH OVERHAUL ═══════════════════════════════ */
+
+/* Dark gradient background */
+.ir-body{
+  background:
+    radial-gradient(ellipse 60% 50% at 8% 8%, rgba(79,70,229,.22) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 40% at 92% 88%,rgba(124,58,237,.18) 0%,transparent 55%),
+    radial-gradient(ellipse 35% 30% at 55% 45%,rgba(15,23,42,.5) 0%,transparent 65%),
+    linear-gradient(170deg,#020817 0%,#070d1c 60%,#020817 100%) !important;
+  min-height:100%
+}
+
+/* ── Pipeline cards ──────────────────────────────────────────────────────── */
+.ir-pip-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:100%}
+.ir-pcard{
+  border-radius:16px;padding:0;cursor:pointer;overflow:hidden;
+  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
+  border:1px solid rgba(99,102,241,.15);
+  box-shadow:0 4px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:all .25s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
+  display:flex;flex-direction:column
+}
+.ir-pcard:hover{
+  border-color:rgba(99,102,241,.4);
+  transform:translateY(-3px);
+  box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(99,102,241,.2) inset
+}
+.ir-pcard.hot{border-color:rgba(239,68,68,.25)!important}
+.ir-pcard.hot:hover{border-color:rgba(239,68,68,.55)!important;box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 30px rgba(239,68,68,.1)!important}
+.ir-pcard.sel{border-color:#4338ca!important;box-shadow:0 0 0 2px rgba(67,56,202,.3)!important}
+
+/* Card header strip */
+.ir-pc-strip{
+  background:linear-gradient(90deg,rgba(99,102,241,.12),rgba(124,58,237,.08),transparent);
+  border-bottom:1px solid rgba(255,255,255,.05);
+  padding:14px 16px;display:flex;align-items:center;gap:12px
+}
+.ir-pc-av2{
+  width:40px;height:40px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:#fff;letter-spacing:-.02em;
+  box-shadow:0 4px 12px rgba(0,0,0,.3)
+}
+.ir-pc-meta2{flex:1;min-width:0}
+.ir-pc-name2{font-size:14px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.ir-pc-domain2{font-size:10px;color:#475569;font-weight:400}
+
+/* Intent badge */
+.ir-intent-badge{
+  display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0
+}
+.ir-intent-num{font-size:22px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.ir-intent-lbl{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+
+/* Card body */
+.ir-pc-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.ir-pc-why-lbl{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.ir-pc-why2{font-size:12px;color:#94a3b8;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ir-pc-tags{display:flex;gap:5px;flex-wrap:wrap}
+.ir-pc-svc2{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:rgba(5,150,105,.1);color:#34d399;border:1px solid rgba(5,150,105,.2)}
+.ir-pc-sig2{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+.ir-pc-opp2{font-size:13px;font-weight:700;color:#fbbf24;letter-spacing:-.01em}
+
+/* Card footer actions */
+.ir-pc-actions{
+  border-top:1px solid rgba(255,255,255,.05);padding:10px 16px;
+  display:flex;gap:6px;background:rgba(0,0,0,.2)
+}
+.ir-pc-btn{
+  display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#64748b;
+  cursor:pointer;font-family:inherit;font-size:10px;font-weight:600;
+  padding:5px 10px;transition:all .15s;white-space:nowrap
+}
+.ir-pc-btn:hover{border-color:rgba(99,102,241,.4);color:#a5b4fc;background:rgba(99,102,241,.08)}
+.ir-pc-btn.ai{background:linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.15));border-color:rgba(99,102,241,.3);color:#a5b4fc}
+.ir-pc-btn.ai:hover{background:linear-gradient(135deg,rgba(79,70,229,.35),rgba(124,58,237,.25));box-shadow:0 0 16px rgba(99,102,241,.2)}
+.ir-pc-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.08)}
+
+/* ── Actions timeline ─────────────────────────────────────────────────────── */
+.ir-act-list{display:flex;flex-direction:column;gap:10px}
+.ir-arow{
+  border-radius:14px;padding:0;cursor:pointer;overflow:hidden;
+  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:0 4px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:all .2s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
+  display:flex;overflow:hidden
+}
+.ir-arow:hover{border-color:rgba(255,255,255,.14);transform:translateX(3px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
+.ir-arow.sel{border-color:#4338ca!important}
+/* Urgency stripe */
+.ir-arow-stripe{width:4px;flex-shrink:0}
+.ir-arow-stripe.H{background:linear-gradient(180deg,#ef4444,#b91c1c);box-shadow:4px 0 12px rgba(239,68,68,.3)}
+.ir-arow-stripe.M{background:linear-gradient(180deg,#f59e0b,#b45309);box-shadow:4px 0 10px rgba(245,158,11,.25)}
+.ir-arow-stripe.L{background:rgba(107,114,128,.4)}
+.ir-arow-content{flex:1;padding:14px 16px;min-width:0}
+.ir-arow-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.ir-arow-rank2{
+  width:26px;height:26px;border-radius:8px;flex-shrink:0;
+  background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#818cf8;margin-top:1px
+}
+.ir-arow-main{flex:1;min-width:0}
+.ir-arow-action2{font-size:14px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;margin-bottom:3px;line-height:1.3}
+.ir-arow-co2{font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px}
+.ir-arow-reason2{font-size:12px;color:#64748b;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ir-arow-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04)}
+.ir-arow-rev2{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(5,150,105,.1);color:#34d399;border:1px solid rgba(5,150,105,.2)}
+.ir-arow-dl2{font-size:10px;padding:3px 9px;border-radius:6px;background:rgba(245,158,11,.08);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.ir-arow-urg2{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;letter-spacing:.04em}
+.ir-urg2-H{background:rgba(239,68,68,.12);color:#f87171}
+.ir-urg2-M{background:rgba(245,158,11,.1);color:#fbbf24}
+.ir-arow-btns{display:flex;gap:6px;margin-top:8px}
+
+/* ── Outreach email cards ─────────────────────────────────────────────────── */
+.ir-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.ir-ocard{
+  border-radius:16px;overflow:hidden;cursor:pointer;
+  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 4px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
+  transition:all .25s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
+  display:flex;flex-direction:column
+}
+.ir-ocard:hover{border-color:rgba(99,102,241,.3);transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.5)}
+.ir-ocard.sel{border-color:#4338ca!important}
+/* macOS chrome */
+.ir-ocard-chrome2{
+  background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);
+  padding:10px 14px;display:flex;align-items:center;gap:6px
+}
+.ir-od{width:10px;height:10px;border-radius:50%}
+.ir-od-r{background:#ff5f57}.ir-od-y{background:#febc2e}.ir-od-g{background:#28c840}
+.ir-ocard-co2{font-size:11px;color:#475569;flex:1;font-weight:500;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-ocard-t2{font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.ir-ot2-now{background:rgba(239,68,68,.18);color:#f87171}
+.ir-ot2-soon{background:rgba(245,158,11,.12);color:#fbbf24}
+.ir-ot2-watch{background:rgba(107,114,128,.12);color:#64748b}
+/* Card body */
+.ir-ocard-body2{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:10px}
+.ir-ocard-hook2{
+  font-size:11px;color:#818cf8;font-style:italic;line-height:1.55;
+  background:rgba(99,102,241,.07);border-left:2px solid rgba(99,102,241,.4);
+  padding:6px 10px;border-radius:0 6px 6px 0
+}
+.ir-ocard-subj2{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;line-height:1.35}
+.ir-subj-box2{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:10px 12px}
+.ir-subj-hdr2{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.ir-subj-lbl2{font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em}
+.ir-copy2{background:none;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#334155;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:2px 9px;transition:all .15s}
+.ir-copy2:hover{border-color:#4338ca;color:#818cf8}
+.ir-copy2.ok{border-color:#065f46!important;color:#34d399!important}
+/* Opening preview */
+.ir-ocard-opening{font-size:11px;color:#475569;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* Footer */
+.ir-ocard-footer{border-top:1px solid rgba(255,255,255,.05);padding:10px 16px;background:rgba(0,0,0,.2);display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── Generate Email AI Drawer ─────────────────────────────────────────────── */
+.ir-email-gen-section{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
+.ir-email-gen-lbl{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.ir-email-gen-lbl::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+.ir-email-preview{
+  background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;overflow:hidden;margin-bottom:12px
+}
+.ir-email-preview-chrome{
+  background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);
+  padding:9px 14px;display:flex;align-items:center;gap:5px
+}
+.ir-email-preview-body{padding:16px;font-size:13px;line-height:1.8;color:#64748b}
+.ir-email-preview-body .subj{font-size:14px;font-weight:700;color:#e2e8f0;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ir-email-preview-body .body-txt{color:#94a3b8;white-space:pre-wrap}
+.ir-email-preview-body .cta-txt{color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);margin-top:10px;font-weight:500}
+.ir-gen-ai-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#4338ca,#7c3aed);
+  border:none;border-radius:9px;color:#fff;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;padding:9px 18px;
+  transition:all .15s;box-shadow:0 4px 16px rgba(67,56,202,.4)
+}
+.ir-gen-ai-btn:hover{background:linear-gradient(135deg,#3730a3,#6d28d9);box-shadow:0 6px 24px rgba(67,56,202,.6);transform:translateY(-1px)}
+.ir-gen-ai-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.ir-spin2{animation:ir-spin .7s linear infinite;display:inline-block}
+@keyframes ir-spin{to{transform:rotate(360deg)}}
+
+/* Shared refinements */
+.ir-drw-body{background:transparent}
+.ir-hl{background:rgba(67,56,202,.1)!important;border-color:rgba(67,56,202,.25)!important}
+.ir-tp-t{color:#94a3b8!important}
+.ir-chips{gap:7px}
+.ir-chip-g,.ir-chip-b{font-size:11px!important;padding:4px 11px!important}
+
+@keyframes ir-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.ir-pip-grid .ir-pcard:nth-child(1){animation-delay:.04s}
+.ir-pip-grid .ir-pcard:nth-child(2){animation-delay:.08s}
+.ir-pip-grid .ir-pcard:nth-child(3){animation-delay:.12s}
+.ir-pip-grid .ir-pcard:nth-child(4){animation-delay:.16s}
+.ir-act-list .ir-arow:nth-child(1){animation-delay:.04s}
+.ir-act-list .ir-arow:nth-child(2){animation-delay:.08s}
+.ir-act-list .ir-arow:nth-child(3){animation-delay:.12s}
+.ir-out-grid .ir-ocard:nth-child(1){animation-delay:.04s}
+.ir-out-grid .ir-ocard:nth-child(2){animation-delay:.08s}
+.ir-out-grid .ir-ocard:nth-child(3){animation-delay:.12s}
+</style>
+
+<script>
+/* ═══ PIPELINE / ACTIONS / OUTREACH RENDER OVERHAUL ════════════════════════ */
+(function(){
+'use strict';
+
+var AVC2=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46','#b45309'];
+function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ini2(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
+function acct2(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
+function svcBg(s){var m={SEO:'rgba(5,150,105,.1)',PPC:'rgba(59,130,246,.1)',Content:'rgba(139,92,246,.1)',Brand:'rgba(244,114,182,.1)',RevOps:'rgba(251,191,36,.1)'};return m[s]||'rgba(99,102,241,.1)';}
+function svcFg(s){var m={SEO:'#34d399',PPC:'#60a5fa',Content:'#c4b5fd',Brand:'#f9a8d4',RevOps:'#fbbf24'};return m[s]||'#a5b4fc';}
+function svcBorder(s){var m={SEO:'rgba(5,150,105,.25)',PPC:'rgba(59,130,246,.25)',Content:'rgba(139,92,246,.25)',Brand:'rgba(244,114,182,.25)',RevOps:'rgba(251,191,36,.25)'};return m[s]||'rgba(99,102,241,.25)';}
+
+/* ── Ring SVG ────────────────────────────────────────────────────────────── */
+function ring2(sc,color,sz){
+  sz=sz||64;var cx=sz/2,r=cx-8,c2=2*Math.PI*r,off=c2*(1-sc/100),fs=Math.round(sz*.3);
+  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" style="flex-shrink:0">'
+    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>'
+    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round"'
+    +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx+')">'
+    +'<animate attributeName="stroke-dashoffset" from="'+c2.toFixed(1)+'" to="'+off.toFixed(1)+'" dur="1s" fill="freeze"/>'
+    +'</circle>'
+    +'<text x="'+cx+'" y="'+(cx+fs*.36)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
+    +'</svg>';
+}
+
+/* ── PIPELINE render ─────────────────────────────────────────────────────── */
+function renderPip2(pip){
+  var g=document.getElementById('ir-pip');if(!g)return;
+  if(!pip.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No pipeline data yet.</p>';return;}
+  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
+  g.innerHTML='<div class="ir-pip-grid">'+pip.map(function(co,i){
+    var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
+    var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
+    var rlbl=sc>=80?'Critical':'High Intent';
+    var ricoTxt=sc>=80?'🔥':sc>=60?'⚡':'👀';
+    var av=AVC2[i%AVC2.length];
+    var sigs=(co.signals||[]).slice(0,3).map(function(s){return '<span class="ir-pc-sig2">'+esc2(s)+'</span>';}).join('');
+    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){
+      return '<span class="ir-pc-svc2" style="background:'+svcBg(s)+';color:'+svcFg(s)+';border-color:'+svcBorder(s)+'">'+esc2(s)+'</span>';
+    }).join('');
+    return '<div class="ir-pcard'+(sc>=80?' hot':'')+'" onclick="irShowPip('+i+')" style="animation-delay:'+(i*.06)+'s">'
+      /* Header strip */
+      +'<div class="ir-pc-strip">'
+        +'<div class="ir-pc-av2" style="background:linear-gradient(135deg,'+av+','+av+'cc)">'+esc2(ini2(co.name))+'</div>'
+        +'<div class="ir-pc-meta2">'
+          +'<div class="ir-pc-name2">'+esc2(co.name||'')+'</div>'
+          +'<div class="ir-pc-domain2">'+esc2(co.domain||'')+'</div>'
+        +'</div>'
+        +'<div class="ir-intent-badge">'
+          +'<div class="ir-intent-num" style="color:'+rc+'">'+sc+'</div>'
+          +'<div class="ir-intent-lbl" style="color:'+rc+'">'+ricoTxt+' '+rlbl+'</div>'
+        +'</div>'
+      +'</div>'
+      /* Body */
+      +'<div class="ir-pc-body">'
+        +(co.why_now?'<div><div class="ir-pc-why-lbl">Why now</div><div class="ir-pc-why2">'+esc2(co.why_now)+'</div></div>':'')
+        +(sigs||svcs?'<div class="ir-pc-tags">'+sigs+svcs+'</div>':'')
+        +(co.opportunity?'<div class="ir-pc-opp2">💰 '+esc2(co.opportunity)+'</div>':'')
+      +'</div>'
+      /* Footer actions */
+      +'<div class="ir-pc-actions" onclick="event.stopPropagation()">'
+        +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(co.name)+'\',\''+esc2((co.service_fit||[])[0]||'')+'\',event)">✦ AI Email</button>'
+        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
+        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/people/?company='+encodeURIComponent(co.name||'')+'&keywords=CMO+CEO+VP+Marketing" target="_blank">👤 Contacts</a>'
+        +'<button class="ir-pc-btn" onclick="irShowPip('+i+',event)" style="margin-left:auto">View Details →</button>'
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+/* ── ACTIONS render ──────────────────────────────────────────────────────── */
+function renderActs2(acts){
+  var c=document.getElementById('ir-act');if(!c)return;
+  if(!acts.length){c.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No actions generated.</p>';return;}
+  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
+  c.innerHTML='<div class="ir-act-list">'+acts.map(function(a,i){
+    var hi=a.urgency==='HIGH',stripe=hi?'H':a.urgency==='MEDIUM'?'M':'L';
+    var icotxt=(ico[a.type]||'⚡')+' ';
+    return '<div class="ir-arow '+(hi?'hi':'med')+'" onclick="irShowAct('+i+')" style="animation-delay:'+(i*.05)+'s">'
+      +'<div class="ir-arow-stripe '+stripe+'"></div>'
+      +'<div class="ir-arow-content">'
+        +'<div class="ir-arow-top">'
+          +'<div class="ir-arow-rank2">'+(a.rank||i+1)+'</div>'
+          +'<div class="ir-arow-main">'
+            +'<div class="ir-arow-action2">'+icotxt+esc2(a.action||'')+'</div>'
+            +(a.company&&a.company!=='All'?'<div class="ir-arow-co2">🏢 '+esc2(a.company)+'</div>':'')
+            +'<div class="ir-arow-reason2">'+esc2(a.reason||'')+'</div>'
+          +'</div>'
+        +'</div>'
+        +'<div class="ir-arow-meta">'
+          +(a.revenue_impact?'<span class="ir-arow-rev2">💰 '+esc2(a.revenue_impact)+'</span>':'')
+          +(a.deadline?'<span class="ir-arow-dl2">⏱ '+esc2(a.deadline)+'</span>':'')
+          +'<span class="ir-arow-urg2 ir-urg2-'+(hi?'H':'M')+'">'+esc2(a.urgency||'MEDIUM')+'</span>'
+        +'</div>'
+        +(a.company&&a.company!=='All'?
+          '<div class="ir-arow-btns" onclick="event.stopPropagation()">'
+            +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(a.company)+'\',\'\',event)">✦ AI Email</button>'
+            +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(a.company||'')+'" target="_blank" onclick="event.stopPropagation()">💼 LinkedIn</a>'
+          +'</div>':'')
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+/* ── OUTREACH render ─────────────────────────────────────────────────────── */
+function renderOut2(out){
+  var g=document.getElementById('ir-out');if(!g)return;
+  if(!out.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No outreach data.</p>';return;}
+  g.innerHTML='<div class="ir-out-grid">'+out.map(function(ot,i){
+    var t=(ot.timing||'watch').toLowerCase();
+    var tc=t==='now'?'ir-ot2-now':t==='soon'?'ir-ot2-soon':'ir-ot2-watch';
+    var sid='os2_'+i+'_'+Math.random().toString(36).substr(2,5);
+    return '<div class="ir-ocard" onclick="irShowOut('+i+')" style="animation-delay:'+(i*.06)+'s">'
+      +'<div class="ir-ocard-chrome2">'
+        +'<div class="ir-od ir-od-r"></div><div class="ir-od ir-od-y"></div><div class="ir-od ir-od-g"></div>'
+        +'<div class="ir-ocard-co2">'+esc2(ot.company||'')+(ot.domain?' · '+esc2(ot.domain):'')+'</div>'
+        +'<span class="ir-ocard-t2 '+tc+'">'+t.toUpperCase()+'</span>'
+      +'</div>'
+      +'<div class="ir-ocard-body2">'
+        +(ot.signal_hook?'<div class="ir-ocard-hook2">📡 '+esc2(ot.signal_hook)+'</div>':'')
+        +'<div class="ir-subj-box2">'
+          +'<div class="ir-subj-hdr2"><span class="ir-subj-lbl2">Subject</span>'
+            +'<button class="ir-copy2" id="'+sid+'" onclick="event.stopPropagation();irCopy2(this,\''+esc2(ot.subject||'')+'\')">Copy</button>'
+          +'</div>'
+          +'<div class="ir-ocard-subj2">'+esc2(ot.subject||'')+'</div>'
+        +'</div>'
+        +(ot.opening?'<div class="ir-ocard-opening">'+esc2(ot.opening)+'</div>':'')
+      +'</div>'
+      +'<div class="ir-ocard-footer" onclick="event.stopPropagation()">'
+        +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(ot.company)+'\',\'\',event)">✦ AI Email</button>'
+        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
+        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/people/?company='+encodeURIComponent(ot.company||'')+'&keywords=CMO+CEO+CTO+VP" target="_blank">👤 Contacts</a>'
+        +'<button class="ir-pc-btn" onclick="irShowOut('+i+',event)" style="margin-left:auto">Full Email →</button>'
+      +'</div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+/* ── AI Email Generation ─────────────────────────────────────────────────── */
+window.irAIEmail=function(company, service, e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  var html=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+      +'<div style="width:44px;height:44px;border-radius:12px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc2(ini2(company))+'</div>'
+      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc2(company)+'</div>'
+        +'<div style="font-size:11px;color:#334155">GPT-researched personalised email</div></div>'
+    +'</div>'
+    +'<div id="ir-email-gen-out">'
+      +'<div class="ir-ai-load" style="background:rgba(67,56,202,.07);border:1px solid rgba(67,56,202,.18);border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:10px;font-size:13px;color:#818cf8">'
+        +'<span class="ir-spin2">⟳</span> Researching '+esc2(company)+' signals with GPT…'
+      +'</div>'
+    +'</div>';
+  if(typeof irOpen==='function') irOpen('✦ AI Email — '+company, html);
+  else if(typeof vfOpen==='function') vfOpen('✦ AI Email — '+company, html);
+  else if(typeof fpOpen==='function') fpOpen('✦ AI Email — '+company, html);
+
+  fetch('/api/generate-email/'+acct2()+'?company='+encodeURIComponent(company)+'&service='+encodeURIComponent(service||''))
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var out=document.getElementById('ir-email-gen-out');if(!out)return;
+      if(data.error){out.innerHTML='<div style="color:#f87171;padding:12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px"><strong>Error:</strong> '+esc2(data.error)+'</div>';return;}
+      var em=data.email||{};
+      var fid='aief_'+Math.random().toString(36).substr(2,6);
+      var fullEmail='Subject: '+(em.subject||'')+'\n\n'+(em.greeting||'Hi,')+'\n\n'+(em.opening||'')+'\n\n'+(em.body||'')+(em.cta?'\n\n'+em.cta:'')+(em.ps?'\n\nP.S. '+em.ps:'');
+      out.innerHTML=
+        '<div class="ir-email-gen-lbl">✦ GPT-Personalised Email ('+data.signals_used+' signals used)</div>'
+        +'<div class="ir-email-preview">'
+          +'<div class="ir-email-preview-chrome">'
+            +'<div class="ir-od ir-od-r"></div><div class="ir-od ir-od-y"></div><div class="ir-od ir-od-g"></div>'
+            +'<span style="flex:1;text-align:center;font-size:10px;color:#334155">'+esc2(company)+'</span>'
+          +'</div>'
+          +'<div class="ir-email-preview-body">'
+            +(em.subject?'<div class="subj">'+esc2(em.subject)+'</div>':'')
+            +'<div class="body-txt">'
+              +(em.greeting?esc2(em.greeting)+'\n\n':'')
+              +(em.opening?esc2(em.opening)+'\n\n':'')
+              +(em.body?esc2(em.body):'')
+            +'</div>'
+            +(em.cta?'<div class="cta-txt">'+esc2(em.cta)+'</div>':'')
+            +(em.ps?'<div style="margin-top:10px;font-size:12px;color:#475569;font-style:italic">P.S. '+esc2(em.ps)+'</div>':'')
+          +'</div>'
+        +'</div>'
+        +(em.recommended_service||em.why_now?
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
+            +(em.recommended_service?'<div style="background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.18);border-radius:8px;padding:9px 12px"><div style="font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Pitch Service</div><div style="font-size:13px;font-weight:700;color:#34d399">'+esc2(em.recommended_service)+'</div></div>':'')
+            +(em.why_now?'<div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.16);border-radius:8px;padding:9px 12px"><div style="font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Timing Reason</div><div style="font-size:12px;color:#fbbf24;line-height:1.4">'+esc2(em.why_now)+'</div></div>':'')
+          +'</div>':'')
+        +'<textarea id="'+fid+'" style="display:none">'+esc2(fullEmail)+'</textarea>'
+        +'<div style="display:flex;gap:7px;flex-wrap:wrap">'
+          +'<button class="ir-gen-ai-btn" onclick="irCopyId2(this,\''+fid+'\')">📋 Copy Full Email</button>'
+          +'<button class="ir-pc-btn" onclick="irCopy2(this,\''+esc2(em.subject||'')+'\')">Copy Subject</button>'
+          +(em.opening?'<button class="ir-pc-btn" onclick="irCopy2(this,\''+esc2(em.opening||'')+'\')">Copy Opening</button>':'')
+          +'<button class="ir-gen-ai-btn" onclick="irAIEmail(\''+esc2(company)+'\',\''+esc2(service||'')+'\')">↺ Regenerate</button>'
+        +'</div>';
+    })
+    .catch(function(e){
+      var out=document.getElementById('ir-email-gen-out');
+      if(out)out.innerHTML='<div style="color:#f87171;padding:12px">Request failed: '+esc2(e.message)+'</div>';
+    });
+};
+
+window.irCopy2=function(btn,text){
+  if(!navigator.clipboard)return;
+  navigator.clipboard.writeText(text).then(function(){
+    var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
+    setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
+  });
+};
+window.irCopyId2=function(btn,id){var el=document.getElementById(id);if(el)irCopy2(btn,el.value||el.textContent);};
+
+/* ── Hook into existing render cycle ─────────────────────────────────────── */
+(function hookRender(){
+  if(typeof window._renderAll2==='undefined'){
+    var _orig=window._renderAll||null;
+    window._patchedRenderTabs=function(data){
+      var ins=data&&data.insights||{};
+      if(ins.pipeline)  {window._FD&&(window._FD.pip=(ins.pipeline||[]).slice(0,9));renderPip2(ins.pipeline||[]);}
+      if(ins.actions)   {window._FD&&(window._FD.acts=ins.actions||[]);renderActs2(ins.actions||[]);}
+      if(ins.outreach)  {window._FD&&(window._FD.out=ins.outreach||[]);renderOut2(ins.outreach||[]);}
+    };
+    window._renderAll2=true;
+    /* Watch for DOM changes to patch cards after render */
+    var mo=new MutationObserver(function(){
+      if(window._FD&&window._FD.pip&&window._FD.pip.length){
+        var g=document.getElementById('ir-pip');
+        if(g&&g.innerHTML&&!g.querySelector('.ir-pcard')) {renderPip2(window._FD.pip);}
+      }
+      if(window._FD&&window._FD.acts&&window._FD.acts.length){
+        var a=document.getElementById('ir-act');
+        if(a&&a.innerHTML&&!a.querySelector('.ir-arow')) {renderActs2(window._FD.acts);}
+      }
+      if(window._FD&&window._FD.out&&window._FD.out.length){
+        var o=document.getElementById('ir-out');
+        if(o&&o.innerHTML&&!o.querySelector('.ir-ocard')) {renderOut2(window._FD.out);}
+      }
+    });
+    ['ir-pip','ir-act','ir-out'].forEach(function(id){
+      var el=document.getElementById(id);if(el)mo.observe(el,{childList:true,subtree:false});
+    });
+  }
+})();
+
+/* Override the existing tab render functions so our new designs take effect */
+(function waitAndOverride(){
+  setTimeout(function(){
+    /* After irGenerate completes, re-render with new designs if data exists */
+    var _origFetch=window.fetch;
+    if(!_origFetch||window._tabsPatched)return;
+    window._tabsPatched=true;
+    var _patchedFetch=function(url,opts){
+      var p=_origFetch.apply(this,arguments);
+      if(typeof url==='string'&&url.indexOf('/api/insights/')>-1){
+        return p.then(function(r){
+          r.clone().json().then(function(data){
+            if(data&&data.insights){
+              var ins=data.insights;
+              window._FD=window._FD||{};
+              window._FD.pip=(ins.pipeline||[]).slice(0,9);
+              window._FD.acts=ins.actions||[];
+              window._FD.out=ins.outreach||[];
+              setTimeout(function(){
+                renderPip2(window._FD.pip);
+                renderActs2(window._FD.acts);
+                renderOut2(window._FD.out);
+              },600);
+            }
+          }).catch(function(){});
+          return r;
+        });
+      }
+      return p;
+    };
+    window.fetch=_patchedFetch;
+  },800);
+})();
+})();
+</script>
+
 </body>
 </html>
