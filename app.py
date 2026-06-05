@@ -1645,6 +1645,18 @@ def ppc_upload():
 
 
 # ── Signal Tracker Insights API ──────────────────────────────────────────────
+
+_REVENUE_KEYS = {"est_value", "opportunity", "revenue_impact", "pipeline_estimate",
+                 "estimated_value", "pipeline_value", "deal_size", "contract_value"}
+
+def _strip_revenue_fields(obj):
+    """Recursively remove all revenue / pipeline-value fields from GPT output."""
+    if isinstance(obj, dict):
+        return {k: _strip_revenue_fields(v) for k, v in obj.items() if k not in _REVENUE_KEYS}
+    if isinstance(obj, list):
+        return [_strip_revenue_fields(x) for x in obj]
+    return obj
+
 @app.route("/api/insights-meta/<account_id>")
 @login_required
 def insights_meta(account_id):
@@ -1739,13 +1751,12 @@ def insights_generate(account_id):
                 co, info["domain"], info["industry"], len(info["sigs"]), sig_str))
 
         schema = (
-            '{"brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, total revenue opp, ONE sales action.",'
-            +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","est_value":"$X-Y","call_timing":"Call today|Call this week|Warm email first"}],'
+            '{"brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, ONE sales action.",'
+            +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","call_timing":"Call today|Call this week|Warm email first"}],'
             +'  "market_pulse":["specific data-backed observation citing companies"],'
-            +'  "strategic_moves":[{"move":"title","rationale":"signal-backed reason","impact":"$X-Y pipeline","owner":"BDR|Account Exec|Marketing|Leadership"}],'
-            +'  "pipeline_estimate":{"total":"$X-Y","high_conviction":"$X-Y","top_services":["SEO"],"win_window":"Next 30|60|90 days"},'
-            +'  "pipeline":[{"name":"","domain":"","intent_score":85,"signals":["type"],"why_now":"","service_fit":["SEO"],"opportunity":"$X-Y","next_step":""}],'
-            +'  "actions":[{"rank":1,"type":"outreach","company":"","action":"","reason":"","revenue_impact":"$X","deadline":"Today","urgency":"HIGH"}],'
+            +'  "strategic_moves":[{"move":"title","rationale":"signal-backed reason","impact":"qualitative business impact, no dollar figures","owner":"BDR|Account Exec|Marketing|Leadership"}],'
+            +'  "pipeline":[{"name":"","domain":"","intent_score":85,"signals":["type"],"why_now":"","service_fit":["SEO"],"next_step":""}],'
+            +'  "actions":[{"rank":1,"type":"outreach","company":"","action":"","reason":"","deadline":"Today","urgency":"HIGH"}],'
             +'  "outreach":[{"company":"","domain":"","timing":"now","signal_hook":"","subject":"","opening":"","talking_points":[""],"cta":""}],'
             +'  "themes":[{"theme":"","count":0,"companies":[""],"campaign_angle":""}],'
             +'  "risks":[{"company":"","flag":"","implication":""}]}'
@@ -1756,7 +1767,8 @@ def insights_generate(account_id):
             "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
             "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
             "Brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
-            "Be specific: name companies, cite signals, give $ numbers. No fluff. "
+            "Be specific: name companies, cite signals. NEVER include revenue estimates, "
+            "pipeline values, or dollar figures of any kind. No fluff. "
             "Return ONLY valid JSON (no markdown): "+schema+" "
             "RULES: week_priority=top 6 by urgency; pipeline=top 8 scored 0-100; "
             "actions=6 ranked; outreach=8 personalised with <55-char subjects; "
@@ -1799,6 +1811,7 @@ def insights_generate(account_id):
                         continue
         if insights is None:
             return jsonify({"error": "GPT returned invalid JSON. Try again."})
+        insights = _strip_revenue_fields(insights)
         return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
     except Exception as e:
         import traceback; log.error("insights_generate: %s", traceback.format_exc())
@@ -2068,6 +2081,105 @@ Return ONLY valid JSON:
         return jsonify({"ok":True,"company":company,"email":email_data,"signals_used":len(signals)})
     except Exception as e:
         import traceback; log.error("generate_email: %s", traceback.format_exc())
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/research-company/<account_id>")
+@login_required
+def research_company(account_id):
+    """AI research on a company: GPT + web search -> key facts, insights, Position2 angle."""
+    import sqlite3, re as _re
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"})
+    api_key = os.environ.get("OPENAI_API_KEY","")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"})
+    company = request.args.get("company","").strip()
+    domain  = request.args.get("domain","").strip()
+    if not company:
+        return jsonify({"error": "company parameter required"})
+    try:
+        # Pull known signals for grounding context
+        sig_lines = ""
+        try:
+            conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT a.signal_type,a.signal_detail,a.severity,a.signal_date,c.industry,c.domain "
+                "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+                "WHERE c.name LIKE ? AND a.dry_run=0 ORDER BY a.signal_date DESC LIMIT 10",
+                ["%"+company+"%"]).fetchall()
+            conn.close()
+            sigs = [dict(r) for r in rows]
+            if sigs and not domain:
+                domain = sigs[0].get("domain","") or ""
+            sig_lines = "\n".join(
+                "- %s (%s) on %s%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                    ": "+s["signal_detail"][:120] if s.get("signal_detail") else "")
+                for s in sigs)
+        except Exception:
+            pass
+
+        system = (
+            "You are a B2B sales-intelligence researcher at Position2, a digital marketing agency. "
+            "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
+            "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
+            "Research the given company using web search. Find what they do, recent news, "
+            "leadership, market position, and their likely digital-marketing gaps. "
+            "NEVER include revenue estimates or dollar figures. "
+            "Return ONLY valid JSON (no markdown):\n"
+            '{"overview":"2-3 sentences on what the company does and their market position",'
+            '"recent_developments":[{"date":"YYYY-MM or recent","headline":"","detail":"1 sentence"}],'
+            '"key_people":[{"name":"","role":""}],'
+            '"digital_presence":"1-2 sentences on their website/SEO/ads/social footprint and visible gaps",'
+            '"opportunities":["specific marketing gap or opportunity Position2 could address"],'
+            '"position2_angle":"2 sentences: which Position2 services fit and why, tied to findings",'
+            '"recommended_services":["SEO|PPC|Content|Brand|RevOps"],'
+            '"conversation_starters":["specific opener referencing a real finding"],'
+            '"sources":[{"title":"","url":""}]}'
+        )
+        user_msg = "Research this company NOW:\nCompany: %s\nDomain: %s\n%s" % (
+            company, domain or "unknown",
+            "Known signals from our tracker:\n"+sig_lines if sig_lines else "")
+
+        from openai import OpenAI
+        oai   = OpenAI(api_key=api_key)
+        model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
+        raw = None; web_used = False
+        # Preferred: Responses API with web search tool
+        try:
+            resp = oai.responses.create(
+                model=model,
+                tools=[{"type": "web_search"}],
+                input=[{"role":"system","content":system},{"role":"user","content":user_msg}],
+                max_output_tokens=2500,
+            )
+            raw = (resp.output_text or "").strip()
+            web_used = True
+        except Exception as we:
+            log.warning("research_company web search unavailable (%s); falling back", we)
+        # Fallback: plain completion using only tracker signals
+        if not raw:
+            resp = oai.chat.completions.create(
+                model=model,
+                messages=[{"role":"system","content":system.replace("using web search","using your knowledge (web search unavailable)")},
+                          {"role":"user","content":user_msg}],
+                max_completion_tokens=2000,
+            )
+            raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else raw
+        s2=raw.find("{"); e2=raw.rfind("}")
+        if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
+        research = _strip_revenue_fields(json.loads(raw))
+        return jsonify({"ok": True, "company": company, "domain": domain,
+                        "web_search_used": web_used, "research": research})
+    except Exception as e:
+        import traceback; log.error("research_company: %s", traceback.format_exc())
         return jsonify({"error": str(e)})
 
 

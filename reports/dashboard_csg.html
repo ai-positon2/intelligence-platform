@@ -1111,382 +1111,183 @@ h2::after,.section-title::after{
 </style>
 <style>.sidebar-nav .badge-count{display:none!important}</style>
 <style>
-/* ── INSIGHTS STANDALONE v7 ─────────────────────────────────────────────── */
+/* ── INSIGHTS v8 — clean single-feed redesign ───────────────────────────── */
 #section-insights{margin:0;padding:0;min-height:calc(100vh - 56px);display:none;flex-direction:column}
 #section-insights.active{display:flex!important}
 
-/* background */
-.ir-body{flex:1;overflow-y:auto;padding:16px 0}
-
-
-/* ── Control bar ─────────────────────────────────────────────────────────── */
-.ir-bar{background:#09101f;border-bottom:1px solid rgba(255,255,255,.07);padding:12px 0 0;flex-shrink:0}
-.ir-bar-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;min-width:0}
-.ir-brand{display:flex;align-items:center;gap:8px;flex-shrink:0;color:#6366f1}
-.ir-atom-svg{flex-shrink:0}
-.ir-brand-name{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;white-space:nowrap}
-.ir-ai{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#1e1b4b;color:#a5b4fc;flex-shrink:0}
-.ir-filters{display:flex;align-items:center;gap:7px;flex:1;min-width:0;overflow:hidden;flex-wrap:nowrap}
-.ir-ddwrap{position:relative;flex-shrink:0}
-.ir-pill{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#64748b;cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;padding:5px 9px;transition:all .15s;white-space:nowrap}
-.ir-pill:hover{border-color:rgba(255,255,255,.18);color:#94a3b8}
-.ir-pill-ct{background:rgba(255,255,255,.06);border-radius:4px;padding:0 5px;font-size:9px;font-weight:700;color:#475569}
-.ir-dropdown{position:absolute;top:calc(100% + 5px);left:0;background:#0c1428;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.7);z-index:300;min-width:190px;padding:6px;max-height:260px;overflow-y:auto}
-.ir-dd-item{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .1s}
-.ir-dd-item:hover{background:rgba(255,255,255,.05)}
-.ir-dd-item label{font-size:11px;color:#64748b;cursor:pointer;flex:1}
-.ir-dd-item input{accent-color:#4338ca;cursor:pointer}
-.ir-dd-item .ir-dd-cnt{font-size:9px;color:#1e293b}
-.ir-sev{display:flex;gap:2px;background:#060c18;border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:2px;flex-shrink:0}
-.ir-sv{background:none;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:3px 8px;color:#1e293b;transition:all .15s}
-.ir-sv.on[data-s="HIGH"]{background:#7f1d1d;color:#fca5a5}
-.ir-sv.on[data-s="MEDIUM"]{background:#78350f;color:#fcd34d}
-.ir-sv.on[data-s="LOW"]{background:#1e293b;color:#64748b}
-.ir-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#64748b;border-radius:7px;padding:4px 22px 4px 8px;font-size:11px;font-family:inherit;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;flex-shrink:0}
-.ir-sel option{background:#0c1428}
-.ir-stat{font-size:10px;color:#1e293b;white-space:nowrap;flex-shrink:0}
-.ir-gen{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;background:#4338ca;border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;transition:all .15s;white-space:nowrap}
-.ir-gen:hover{background:#3730a3;transform:translateY(-1px)}
-.ir-gen:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.ir-gen-lg{display:inline-flex;align-items:center;gap:8px;background:#4338ca;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:11px 26px;margin-top:20px;transition:all .15s}
-.ir-gen-lg:hover{background:#3730a3;transform:translateY(-1px)}
-.ir-tabs{display:flex;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.07);margin:0;padding:0}
-.ir-tabs::-webkit-scrollbar{height:0}
-.ir-tab{background:none;border:none;border-bottom:2px solid transparent;color:#334155;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;margin-bottom:-1px;padding:8px 14px;transition:color .15s,border-color .15s;white-space:nowrap;flex-shrink:0}
-.ir-tab:hover{color:#64748b}
-.ir-tab.active{color:#e2e8f0;border-bottom-color:#4338ca}
-.ir-tc{background:rgba(67,56,202,.15);color:#818cf8;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:4px}
-
-/* ── Panels ──────────────────────────────────────────────────────────────── */
-.ir-panel{display:none}.ir-panel.active{display:block;animation:ir-in .25s ease both}
-@keyframes ir-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-
-/* ── Empty / Loading ─────────────────────────────────────────────────────── */
-.ir-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;text-align:center;padding:24px}
-.ir-empty-orb{width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#1e1b4b,#312e81);border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:ir-float 4s ease-in-out infinite;box-shadow:0 0 50px rgba(99,102,241,.25)}
-@keyframes ir-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.ir-empty-title{font-size:18px;font-weight:700;color:#e2e8f0;margin-bottom:8px;letter-spacing:-.02em}
-.ir-empty-sub{font-size:13px;color:#334155;max-width:380px;line-height:1.65}
-.ir-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;gap:16px;text-align:center}
-.ir-load-orb{width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:ir-orb 1.6s ease-in-out infinite}
-@keyframes ir-orb{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5)}50%{box-shadow:0 0 0 12px rgba(67,56,202,0),0 0 40px rgba(67,56,202,.7)}}
-.ir-load-lbl{font-size:13px;font-weight:500;color:#94a3b8}
-.ir-load-track{width:240px;height:2px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
-.ir-load-fill{height:100%;width:0;background:linear-gradient(90deg,#4338ca,#7c3aed);border-radius:999px;animation:ir-prog 10s ease-in-out forwards}
-@keyframes ir-prog{0%{width:0}20%{width:18%}45%{width:45%}70%{width:68%}88%{width:83%}100%{width:91%}}
-.ir-load-note{font-size:11px;color:#1e293b}
-
-/* ── Section header ──────────────────────────────────────────────────────── */
-.ir-sh{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
-.ir-sh-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;white-space:nowrap}
-.ir-sh-ai{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(67,56,202,.14);color:#818cf8;flex-shrink:0}
-.ir-sh-line{flex:1;height:1px;background:rgba(255,255,255,.05)}
-
-/* ── Metric tiles ────────────────────────────────────────────────────────── */
-.ir-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-@media(max-width:1000px){.ir-tiles{grid-template-columns:repeat(2,1fr)}}
-.ir-tile{border-radius:13px;padding:16px 18px;cursor:default;position:relative;overflow:hidden;
-  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
-  backdrop-filter:blur(16px);animation:ir-up .35s ease both}
-.ir-tile:hover{border-color:rgba(255,255,255,.14);transform:translateY(-1px);transition:all .2s}
-.ir-tile-ico{font-size:22px;margin-bottom:10px;display:block}
-.ir-tile-val{font-size:26px;font-weight:800;color:#f1f5f9;letter-spacing:-.04em;line-height:1;margin-bottom:5px}
-.ir-tile-lbl{font-size:11px;color:#475569;font-weight:500}
-.ir-tile-glow{position:absolute;bottom:-25px;right:-25px;width:100px;height:100px;border-radius:50%;opacity:.1;pointer-events:none}
-
-/* ── Brief card ──────────────────────────────────────────────────────────── */
-.ir-brief{position:relative;overflow:hidden;border-radius:13px;padding:16px 20px 38px;margin-bottom:14px;cursor:pointer;
-  background:linear-gradient(135deg,rgba(67,56,202,.16),rgba(124,58,237,.09));
-  border:1px solid rgba(99,102,241,.2);transition:all .2s;animation:ir-up .35s .05s ease both}
-.ir-brief:hover{border-color:rgba(99,102,241,.4);box-shadow:0 8px 30px rgba(67,56,202,.15)}
-.ir-brief-hdr{display:flex;gap:7px;align-items:center;margin-bottom:9px}
-.ir-brief-lbl{font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em}
-.ir-brief-text{font-size:13px;line-height:1.7;color:#cbd5e1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ir-brief-more{position:absolute;bottom:12px;right:16px;font-size:11px;color:#4338ca;font-weight:600}
-
-/* ── Priority call cards ─────────────────────────────────────────────────── */
-.ir-pri-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px}
-@media(max-width:1100px){.ir-pri-grid{grid-template-columns:repeat(2,1fr)}}
-.ir-pc{border-radius:12px;padding:13px 14px;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both;
-  display:flex;flex-direction:column;gap:7px}
-.ir-pc:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
-.ir-pc.r1{border-color:rgba(239,68,68,.22)}
-.ir-pc-top{display:flex;align-items:center;gap:8px}
-.ir-pc-av{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
-.ir-pc-name{font-size:12px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.ir-pc-t{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;flex-shrink:0}
-.ir-pc-t-now{background:rgba(239,68,68,.15);color:#f87171}
-.ir-pc-t-week{background:rgba(245,158,11,.1);color:#fbbf24}
-.ir-pc-t-email{background:#1e293b;color:#475569}
-.ir-pc-sig{font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-pc-foot{display:flex;align-items:center;gap:6px}
-.ir-pc-svc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.ir-pc-val{font-size:11px;font-weight:700;color:#fbbf24;margin-left:auto}
-
-/* ── Infographic panels ──────────────────────────────────────────────────── */
-.ir-infog{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;min-width:0}
-@media(max-width:1000px){.ir-infog{grid-template-columns:1fr 1fr}}
-.ir-ic{border-radius:13px;padding:15px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(10px);animation:ir-up .35s ease both}
-.ir-ic-title{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:11px}
-.ir-gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:5px}
-.ir-gauge-sub{font-size:10px;color:#334155;text-align:center;line-height:1.4}
-.ir-bars{display:flex;flex-direction:column;gap:7px}
-.ir-bar-row{display:flex;align-items:center;gap:7px}
-.ir-bar-lbl{font-size:10px;color:#334155;width:82px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-bar-track{flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden}
-.ir-bar-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.ir-bar-cnt{font-size:10px;min-width:24px;text-align:right;flex-shrink:0}
-.ir-tier-list{display:flex;flex-direction:column;gap:7px}
-.ir-tier-row{display:flex;align-items:center;gap:7px}
-.ir-tier-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.ir-tier-lbl{font-size:11px;color:#334155;flex:1}
-.ir-tier-track{width:75px;height:5px;background:rgba(255,255,255,.05);border-radius:999px;overflow:hidden;flex-shrink:0}
-.ir-tier-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.ir-tier-cnt{font-size:11px;font-weight:700;min-width:18px;text-align:right}
-.ir-donut-wrap{display:flex;align-items:center;gap:10px}
-.ir-donut-leg{flex:1;display:flex;flex-direction:column;gap:5px}
-.ir-dleg-row{display:flex;align-items:center;gap:5px}
-.ir-dleg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.ir-dleg-lbl{font-size:10px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-dleg-cnt{font-size:10px;font-weight:700}
-
-/* ── Themes / Risks panels ───────────────────────────────────────────────── */
-.ir-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-@media(max-width:900px){.ir-grid2{grid-template-columns:1fr}}
-.ir-panel-card{border-radius:13px;padding:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);animation:ir-up .35s ease both}
-.ir-pc-hdr{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
-.ir-theme-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.ir-theme-row:last-child{border-bottom:none;padding-bottom:0}
-.ir-theme-n{font-size:16px;font-weight:800;color:#4338ca;min-width:30px;flex-shrink:0;line-height:1.2}
-.ir-theme-body{}
-.ir-theme-name{font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:2px;letter-spacing:-.01em}
-.ir-theme-angle{font-size:11px;color:#334155;line-height:1.5;margin-bottom:4px}
-.ir-cos{display:flex;gap:4px;flex-wrap:wrap}
-.ir-co-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:#0a0e1a;border:1px solid rgba(255,255,255,.07);color:#334155}
-.ir-risk-row{display:flex;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
-.ir-risk-row:last-child{border-bottom:none;padding-bottom:0}
-.ir-risk-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:4px}
-.ir-risk-co{font-size:11px;font-weight:700;color:#e2e8f0;margin-bottom:2px}
-.ir-risk-flag{font-size:10px;color:#f87171;margin-bottom:2px}
-.ir-risk-impl{font-size:10px;color:#334155;line-height:1.45}
-
-/* ── Pipeline compact cards ──────────────────────────────────────────────── */
-.ir-pip-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(max-width:1100px){.ir-pip-grid{grid-template-columns:repeat(2,1fr)}}
-.ir-pcard{border-radius:13px;padding:14px;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both;
-  display:flex;flex-direction:column;gap:10px}
-.ir-pcard:hover{border-color:rgba(255,255,255,.15);transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.5)}
-.ir-pcard.hot{border-color:rgba(239,68,68,.18)}.ir-pcard.hot:hover{border-color:rgba(239,68,68,.4)}
-.ir-pcard.sel{border-color:#4338ca!important;box-shadow:0 0 0 1px #4338ca!important}
-.ir-pcard-top{display:flex;align-items:center;gap:9px}
-.ir-av{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
-.ir-pcard-info{flex:1;min-width:0}
-.ir-pcard-name{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;margin-bottom:1px}
-.ir-pcard-domain{font-size:10px;color:#1e293b}
-.ir-score-row{display:flex;align-items:center;gap:9px}
-.ir-score-lbl{font-size:10px;font-weight:600;margin-bottom:3px}
-.ir-score-track{height:4px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-bottom:5px}
-.ir-score-fill{height:100%;border-radius:999px;transition:width 1.1s cubic-bezier(.22,1,.36,1);width:0}
-.ir-score-why{font-size:10px;color:#1e293b;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ir-badges{display:flex;gap:4px;flex-wrap:wrap}
-.ir-badge{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.15)}
-.ir-svc-tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15)}
-.ir-card-btns{display:flex;gap:5px;flex-wrap:wrap;padding-top:2px;border-top:1px solid rgba(255,255,255,.05)}
-.ir-cbtn{background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:3px 8px;transition:all .15s;white-space:nowrap}
-.ir-cbtn:hover{border-color:rgba(255,255,255,.18);color:#64748b}
-.ir-cbtn.em:hover{border-color:rgba(99,102,241,.5);color:#818cf8;background:rgba(67,56,202,.08)}
-.ir-cbtn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.05)}
-
-/* ── Action rows ─────────────────────────────────────────────────────────── */
-.ir-act-list{display:flex;flex-direction:column;gap:7px}
-.ir-arow{border-radius:10px;padding:11px 13px;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-  backdrop-filter:blur(10px);transition:all .2s;animation:ir-up .35s ease both;
-  display:flex;align-items:center;gap:11px}
-.ir-arow:hover{border-color:rgba(255,255,255,.14);transform:translateX(2px)}
-.ir-arow.sel{border-color:#4338ca!important}
-.ir-arow.hi{border-left:2px solid rgba(239,68,68,.6)}
-.ir-arow.med{border-left:2px solid rgba(245,158,11,.5)}
-.ir-arow-rank{width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#1e293b;flex-shrink:0}
-.ir-arow-ico{font-size:14px;flex-shrink:0}
-.ir-arow-body{flex:1;min-width:0}
-.ir-arow-action{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.ir-arow-co{font-size:10px;color:#1e293b}
-.ir-arow-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.ir-arow-dl{font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.04);color:#1e293b;border:1px solid rgba(255,255,255,.07);white-space:nowrap}
-.ir-urgdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.ir-urgdot.H{background:#ef4444;box-shadow:0 0 7px rgba(239,68,68,.7)}
-.ir-urgdot.M{background:#f59e0b;box-shadow:0 0 7px rgba(245,158,11,.6)}
-
-/* ── Outreach compact ────────────────────────────────────────────────────── */
-.ir-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(max-width:900px){.ir-out-grid{grid-template-columns:1fr}}
-.ir-ocard{border-radius:12px;overflow:hidden;cursor:pointer;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  backdrop-filter:blur(12px);transition:all .2s;animation:ir-up .35s ease both}
-.ir-ocard:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px);box-shadow:0 10px 26px rgba(0,0,0,.5)}
-.ir-ocard.sel{border-color:#4338ca!important}
-.ir-ocard-chrome{background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.07);padding:8px 12px;display:flex;align-items:center;gap:5px}
-.ir-ocard-dot{width:8px;height:8px;border-radius:50%}
-.ir-ocard-to{font-size:10px;color:#1e293b;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:3px}
-.ir-ot{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0}
-.ir-ot-now{background:rgba(239,68,68,.15);color:#f87171}
-.ir-ot-soon{background:rgba(245,158,11,.1);color:#fbbf24}
-.ir-ot-watch{background:#1e293b;color:#334155}
-.ir-ocard-body{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
-.ir-ocard-subj{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.ir-ocard-hook{font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-ocard-btns{display:flex;gap:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.05)}
-
-/* ── Drawer ──────────────────────────────────────────────────────────────── */
-.ir-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
-.ir-ov.on{opacity:1;pointer-events:all}
-.ir-drw{position:fixed;top:0;right:-540px;width:520px;max-width:96vw;height:100vh;z-index:399;
-  background:linear-gradient(180deg,#07101f 0%,#0a1223 100%);
-  border-left:1px solid rgba(255,255,255,.08);
-  transition:right .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;
-  box-shadow:-30px 0 100px rgba(0,0,0,.8)}
-.ir-drw.on{right:0}
-.ir-drw-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;background:rgba(0,0,0,.4)}
-.ir-drw-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:7px;color:#334155;cursor:pointer;font-size:13px;padding:5px 9px;transition:all .15s}
-.ir-drw-close:hover{border-color:rgba(255,255,255,.16);color:#94a3b8}
-.ir-drw-title{font-size:13px;font-weight:700;color:#e2e8f0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-.ir-drw-body{flex:1;overflow-y:auto;padding:20px}
-.ir-drw-body::-webkit-scrollbar{width:3px}.ir-drw-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07)}
-.ir-ds{margin-bottom:17px}
-.ir-ds-lbl{font-size:10px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
-.ir-ds-val{font-size:13px;color:#64748b;line-height:1.7}
-.ir-hl{background:rgba(67,56,202,.08);border:1px solid rgba(67,56,202,.18);border-radius:8px;padding:11px 13px;font-size:13px;color:#a5b4fc;line-height:1.65}
-.ir-rev{font-size:24px;font-weight:800;color:#fbbf24;letter-spacing:-.04em;margin-top:2px}
-.ir-chips{display:flex;gap:6px;flex-wrap:wrap}
-.ir-chip-g{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(5,150,105,.08);color:#34d399;border:1px solid rgba(5,150,105,.15);font-weight:500}
-.ir-chip-b{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(59,130,246,.08);color:#60a5fa;border:1px solid rgba(59,130,246,.15);font-weight:500}
-.ir-tp-list{display:flex;flex-direction:column;gap:5px}
-.ir-tp{display:flex;gap:8px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:8px 10px}
-.ir-tp-n{width:16px;height:16px;border-radius:4px;background:rgba(67,56,202,.15);border:1px solid rgba(67,56,202,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#818cf8;flex-shrink:0;margin-top:1px}
-.ir-tp-t{font-size:12px;color:#64748b;line-height:1.5;flex:1}
-.ir-obj{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.12);border-radius:7px;padding:9px 11px;margin-bottom:5px}
-.ir-obj-q{font-size:11px;color:#f87171;font-weight:600;margin-bottom:3px}
-.ir-obj-a{font-size:11px;color:#334155;line-height:1.5}
-.ir-subj-alt{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:8px 10px;margin-bottom:4px}
-.ir-subj-alt-txt{font-size:12px;font-weight:600;color:#e2e8f0;flex:1;letter-spacing:-.01em}
-.ir-sc{background:none;border:1px solid rgba(255,255,255,.08);border-radius:4px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:2px 8px;transition:all .15s}
-.ir-sc:hover{border-color:#4338ca;color:#818cf8}
-.ir-sc.ok{border-color:#065f46!important;color:#34d399!important}
-.ir-ai-load{display:flex;align-items:center;gap:8px;padding:11px 13px;background:rgba(67,56,202,.06);border:1px solid rgba(67,56,202,.14);border-radius:8px;font-size:12px;color:#818cf8;margin-bottom:13px}
-.ir-spin{animation:ir-spin .8s linear infinite;display:inline-block}
-@keyframes ir-spin{to{transform:rotate(360deg)}}
-.ir-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding:13px 0 0;border-top:1px solid rgba(255,255,255,.06)}
-.ir-btn{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#334155;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:7px 12px;transition:all .15s;white-space:nowrap;text-decoration:none}
-.ir-btn:hover{border-color:rgba(255,255,255,.18);color:#64748b}
-.ir-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}.ir-btn.prim:hover{background:#3730a3}
-.ir-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.05)}
-.ir-btn.ok{border-color:#065f46!important;color:#34d399!important}
-
-/* Regen */
-.ir-regen-row{display:flex;align-items:center;gap:10px;padding:13px 0 0;border-top:1px solid rgba(255,255,255,.05);margin-top:4px}
-.ir-regen-meta{font-size:11px;color:#0f172a;flex:1}
-.ir-regen-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:#1e293b;cursor:pointer;font-family:inherit;font-size:11px;padding:5px 11px;transition:all .15s}
-.ir-regen-btn:hover{border-color:rgba(255,255,255,.15);color:#334155}
-
-/* Animations */
-@keyframes ir-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.ir-tiles .ir-tile:nth-child(1){animation-delay:.03s}.ir-tiles .ir-tile:nth-child(2){animation-delay:.07s}
-.ir-tiles .ir-tile:nth-child(3){animation-delay:.11s}.ir-tiles .ir-tile:nth-child(4){animation-delay:.15s}
-
-/* Global sidebar skin */
+/* Global dark skin (kept from v7) */
 #sidebar{background:#060a14!important;border-right-color:rgba(255,255,255,.06)!important}
 .sidebar-logo span{color:#6366f1!important}
 .nav-item:hover,.nav-item.active{background:rgba(99,102,241,.1)!important;color:#a5b4fc!important}
 .nav-item.active::before{background:#6366f1!important;box-shadow:0 0 10px rgba(99,102,241,.5)!important}
 #topnav{background:#060a14!important;border-bottom-color:rgba(255,255,255,.07)!important}
 #content{background:#020817!important}
-</style>
 
+/* Top bar */
+.ir8-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px;background:#070d1a;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+.ir8-brand{display:flex;align-items:center;gap:9px;min-width:0}
+.ir8-brand-name{font-size:14px;font-weight:700;color:#e6edf6;letter-spacing:-.01em;white-space:nowrap}
+.ir8-ai{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;background:#1e1b4b;color:#a5b4fc}
+.ir8-stat{font-size:11px;color:#55617a;white-space:nowrap;margin-left:4px}
+.ir8-top-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.ir8-fwrap{position:relative}
+.ir8-fbtn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#8b98ab;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;padding:7px 13px;transition:all .15s}
+.ir8-fbtn:hover{border-color:rgba(255,255,255,.2);color:#cbd5e1}
+.ir8-fct{background:#4338ca;color:#fff;border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;display:none}
+.ir8-fpanel{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:#0b1326;border:1px solid rgba(255,255,255,.12);border-radius:13px;box-shadow:0 24px 70px rgba(0,0,0,.75);z-index:320;padding:15px;max-height:70vh;overflow-y:auto}
+.ir8-fgrp{margin-bottom:14px}
+.ir8-fgrp:last-child{margin-bottom:0}
+.ir8-flbl{font-size:10px;font-weight:700;color:#55617a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;display:block}
+.ir8-sel{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#cbd5e1;border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none;cursor:pointer}
+.ir8-sel option{background:#0b1326}
+.ir8-sev{display:flex;gap:5px}
+.ir8-sv{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:7px;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:6px 0;color:#55617a;transition:all .15s}
+.ir8-sv.on[data-s="HIGH"]{background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.3)}
+.ir8-sv.on[data-s="MEDIUM"]{background:rgba(245,158,11,.1);color:#fbbf24;border-color:rgba(245,158,11,.3)}
+.ir8-sv.on[data-s="LOW"]{background:rgba(99,102,241,.1);color:#a5b4fc;border-color:rgba(99,102,241,.3)}
+.ir8-chk{display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer}
+.ir8-chk input{accent-color:#4338ca;cursor:pointer}
+.ir8-chk label{font-size:12px;color:#8b98ab;cursor:pointer;flex:1}
+.ir8-chk .ct{font-size:10px;color:#3b4763}
+.ir8-fapply{display:flex;gap:7px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.07)}
+.ir8-fapply .ap{flex:1;background:#4338ca;border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 0}
+.ir8-fapply .ap:hover{background:#3730a3}
+.ir8-fapply .rs{background:none;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#55617a;cursor:pointer;font-family:inherit;font-size:12px;padding:8px 13px}
+.ir8-gen{display:inline-flex;align-items:center;gap:7px;background:#4338ca;border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;transition:all .15s;white-space:nowrap}
+.ir8-gen:hover{background:#3730a3;transform:translateY(-1px)}
+.ir8-gen:disabled{opacity:.5;cursor:not-allowed;transform:none}
 
-<style>
-/* Layout containment fix */
-#section-insights{overflow:hidden;width:100%;box-sizing:border-box}
-.ir-bar,.ir-body{width:100%;box-sizing:border-box}
-.ir-bar-top{flex-wrap:wrap;row-gap:6px}
-.ir-filters{flex-wrap:wrap;row-gap:4px;min-width:0}
-.ir-gen{flex-shrink:0}
-.ir-tiles,.ir-pri-grid,.ir-pip-grid,.ir-out-grid,.ir-infog,.ir-grid2{width:100%;box-sizing:border-box;min-width:0}
-.ir-tile,.ir-pc,.ir-pcard,.ir-ocard,.ir-panel-card,.ir-ic,.ir-arow{min-width:0;overflow:hidden;box-sizing:border-box}
-.ir-pc-name,.ir-pcard-name,.ir-ocard-subj,.ir-ocard-to,.ir-arow-action{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%}
-.ir-pc-sig{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}
-.ir-pc-top,.ir-pcard-top,.ir-ocard-chrome{min-width:0;overflow:hidden}
-.ir-pc-foot,.ir-pcard-top,.ir-pc-top{min-width:0}
-.ir-tile-val{font-size:22px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-infog{grid-template-columns:repeat(2,1fr)!important}
-</style>
+/* Body */
+.ir8-body{flex:1;overflow-y:auto;background:radial-gradient(ellipse 50% 40% at 15% 0%,rgba(67,56,202,.12) 0%,transparent 55%),linear-gradient(170deg,#030a16 0%,#060c18 100%)}
+.ir8-wrap{max-width:880px;margin:0 auto;padding:26px 24px 60px}
 
+/* Empty / loading */
+.ir8-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;text-align:center}
+.ir8-orb{width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,#1e1b4b,#312e81);border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 0 50px rgba(99,102,241,.25)}
+.ir8-empty-title{font-size:19px;font-weight:700;color:#e6edf6;margin-bottom:9px;letter-spacing:-.02em}
+.ir8-empty-sub{font-size:13px;color:#55617a;max-width:420px;line-height:1.7;margin-bottom:22px}
+.ir8-gen-lg{display:inline-flex;align-items:center;gap:8px;background:#4338ca;border:none;border-radius:10px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:12px 28px;transition:all .15s}
+.ir8-gen-lg:hover{background:#3730a3;transform:translateY(-1px)}
+.ir8-err{margin-top:16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:9px;padding:11px 15px;font-size:12px;color:#f87171;max-width:420px;line-height:1.6}
+.ir8-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;gap:16px;text-align:center}
+.ir8-lorb{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#4338ca,#7c3aed);display:flex;align-items:center;justify-content:center;animation:ir8-pulse 1.6s ease-in-out infinite}
+@keyframes ir8-pulse{0%,100%{box-shadow:0 0 0 0 rgba(67,56,202,.5)}50%{box-shadow:0 0 0 12px rgba(67,56,202,0),0 0 40px rgba(67,56,202,.7)}}
+.ir8-llbl{font-size:13px;color:#8b98ab}
+.ir8-lnote{font-size:11px;color:#3b4763}
 
-<style>
-/* Readability + dark gradient restoration */
-.ir-body{
-  background:
-    radial-gradient(ellipse 55% 45% at 10% 10%,rgba(67,56,202,.18) 0%,transparent 50%),
-    radial-gradient(ellipse 45% 35% at 90% 85%,rgba(124,58,237,.14) 0%,transparent 50%),
-    linear-gradient(160deg,#020817 0%,#060c18 100%) !important
-}
-/* Card text contrast */
-.ir-tile-val{font-size:24px!important;color:#f1f5f9!important;letter-spacing:-.03em}
-.ir-tile-lbl{font-size:12px!important;color:#94a3b8!important;margin-top:4px}
-.ir-tile{padding:18px!important}
-/* Brief card text */
-.ir-brief-text{font-size:13px!important;color:#cbd5e1!important;line-height:1.7!important}
-.ir-brief-lbl,.ir-sh-title{color:#64748b!important}
-/* Priority card text */
-.ir-pc-name{font-size:13px!important;font-weight:700!important;color:#f1f5f9!important}
-.ir-pc-sig{font-size:11px!important;color:#64748b!important;line-height:1.5}
-.ir-pc-val{font-size:12px!important;font-weight:700!important;color:#fbbf24!important}
-.ir-pc-svc{font-size:10px!important;font-weight:600!important}
-.ir-pc{padding:14px!important}
-/* Infog cards */
-.ir-infog{grid-template-columns:repeat(2,1fr)!important;gap:12px!important}
-.ir-ic{padding:18px!important}
-.ir-ic-title{font-size:11px!important;font-weight:700!important;color:#94a3b8!important;letter-spacing:.06em!important;margin-bottom:14px!important}
-.ir-tier-lbl{font-size:12px!important;color:#94a3b8!important}
-.ir-tier-cnt{font-size:13px!important;font-weight:700!important}
-.ir-dleg-lbl{font-size:11px!important;color:#94a3b8!important}
-.ir-dleg-cnt{font-size:11px!important;font-weight:700!important}
-/* Action rows */
-.ir-arow-action{font-size:13px!important;color:#e2e8f0!important;font-weight:600!important}
-.ir-arow-co{font-size:11px!important;color:#6366f1!important}
-.ir-arow-dl{font-size:10px!important;color:#94a3b8!important;border-color:rgba(255,255,255,.1)!important}
-/* Pipeline cards */
-.ir-pcard-name{font-size:13px!important;font-weight:700!important;color:#f1f5f9!important}
-.ir-pcard-domain{font-size:10px!important;color:#475569!important}
-.ir-score-lbl{font-size:11px!important;font-weight:600!important}
-/* Outreach */
-.ir-ocard-subj{font-size:13px!important;font-weight:700!important;color:#e2e8f0!important}
-.ir-ocard-hook{font-size:11px!important;color:#64748b!important}
-/* Theme/risk cards */
-.ir-theme-name,.ir-risk-co{font-size:13px!important;font-weight:700!important;color:#e2e8f0!important}
-.ir-theme-angle,.ir-risk-impl{font-size:12px!important;color:#64748b!important;line-height:1.55!important}
-.ir-theme-n{font-size:18px!important;font-weight:800!important}
-.ir-risk-flag{font-size:12px!important}
-/* Panel cards */
-.ir-panel-card{padding:18px!important}
-.ir-pc-hdr{font-size:11px!important;color:#94a3b8!important;letter-spacing:.07em!important;margin-bottom:14px!important}
-/* Drawer readability */
-.ir-ds-lbl{font-size:11px!important;color:#64748b!important;letter-spacing:.07em!important;margin-bottom:8px!important}
-.ir-ds-val{font-size:13px!important;color:#94a3b8!important;line-height:1.7!important}
-.ir-hl{font-size:13px!important;color:#a5b4fc!important;line-height:1.65!important}
-.ir-rev{font-size:26px!important;letter-spacing:-.03em!important}
-.ir-tp-t{font-size:12px!important;color:#94a3b8!important;line-height:1.55!important}
-.ir-obj-q{font-size:12px!important}.ir-obj-a{font-size:12px!important}
-/* Bar text */
-.ir-brand-name{font-size:14px!important;color:#e2e8f0!important;font-weight:700!important}
-.ir-stat{font-size:11px!important;color:#64748b!important}
-/* Tab text */
-.ir-tab{font-size:13px!important;font-weight:500!important}
-.ir-tab.active{color:#e2e8f0!important;font-weight:600!important}
+/* Section heads */
+.ir8-sh{display:flex;align-items:baseline;gap:9px;margin:30px 0 13px}
+.ir8-sh-t{font-size:15px;font-weight:700;color:#e6edf6;letter-spacing:-.01em}
+.ir8-sh-s{font-size:11px;color:#55617a}
+
+/* Brief */
+.ir8-brief{border-radius:14px;padding:20px 22px;background:linear-gradient(135deg,rgba(67,56,202,.14),rgba(124,58,237,.07));border:1px solid rgba(99,102,241,.22);animation:ir8-up .35s ease both}
+.ir8-brief-lbl{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.ir8-brief-tx{font-size:14px;line-height:1.75;color:#d7dee9}
+.ir8-brief-more{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;color:#818cf8;cursor:pointer}
+.ir8-brief-more:hover{color:#a5b4fc}
+
+/* KPIs */
+.ir8-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+@media(max-width:760px){.ir8-kpis{grid-template-columns:repeat(2,1fr)}}
+.ir8-kpi{border-radius:12px;padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);animation:ir8-up .35s ease both}
+.ir8-kpi-v{font-size:22px;font-weight:800;color:#f1f5f9;letter-spacing:-.03em}
+.ir8-kpi-l{font-size:11px;color:#55617a;margin-top:3px}
+
+/* Feed */
+.ir8-feed{display:flex;flex-direction:column;gap:10px}
+.ir8-row{border-radius:13px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07);transition:border-color .15s;animation:ir8-up .35s ease both;overflow:hidden}
+.ir8-row:hover{border-color:rgba(255,255,255,.15)}
+.ir8-row.hot{border-left:3px solid #ef4444}
+.ir8-row-main{display:flex;align-items:flex-start;gap:13px;padding:15px 17px 11px;cursor:pointer}
+.ir8-av{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.ir8-mid{flex:1;min-width:0}
+.ir8-l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.ir8-name{font-size:14px;font-weight:700;color:#eef2f8;letter-spacing:-.01em}
+.ir8-dom{font-size:11px;color:#3b4763}
+.ir8-tchip{font-size:9px;font-weight:700;padding:2px 8px;border-radius:5px}
+.ir8-t-now{background:rgba(239,68,68,.14);color:#f87171}
+.ir8-t-week{background:rgba(245,158,11,.12);color:#fbbf24}
+.ir8-t-email{background:rgba(99,102,241,.12);color:#a5b4fc}
+.ir8-why{font-size:12.5px;color:#8b98ab;line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ir8-chips{display:flex;gap:5px;flex-wrap:wrap}
+.ir8-chip{font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,.09);color:#7cb3f5;border:1px solid rgba(59,130,246,.14)}
+.ir8-chip.svc{background:rgba(5,150,105,.08);color:#34d399;border-color:rgba(5,150,105,.16)}
+.ir8-scorebox{flex-shrink:0;text-align:right;min-width:64px}
+.ir8-score-n{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.ir8-score-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.ir8-rowbtns{display:flex;gap:6px;flex-wrap:wrap;padding:10px 17px 13px;border-top:1px solid rgba(255,255,255,.05)}
+.ir8-act{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#8b98ab;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:6px 11px;transition:all .15s;text-decoration:none;white-space:nowrap}
+.ir8-act:hover{border-color:rgba(255,255,255,.2);color:#cbd5e1}
+.ir8-act.em{border-color:rgba(99,102,241,.35);color:#a5b4fc;background:rgba(67,56,202,.08)}
+.ir8-act.em:hover{background:rgba(67,56,202,.18)}
+.ir8-act.rs{border-color:rgba(124,58,237,.35);color:#c4b5fd;background:rgba(124,58,237,.07)}
+.ir8-act.rs:hover{background:rgba(124,58,237,.16)}
+
+/* Actions list */
+.ir8-alist{display:flex;flex-direction:column;gap:8px}
+.ir8-arow{display:flex;align-items:center;gap:12px;border-radius:11px;padding:12px 15px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:border-color .15s;animation:ir8-up .35s ease both}
+.ir8-arow:hover{border-color:rgba(255,255,255,.14)}
+.ir8-arank{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#55617a;flex-shrink:0}
+.ir8-abody{flex:1;min-width:0}
+.ir8-atx{font-size:13px;font-weight:600;color:#dee5ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir8-aco{font-size:11px;color:#55617a;margin-top:1px}
+.ir8-adl{font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.04);color:#55617a;border:1px solid rgba(255,255,255,.07);white-space:nowrap;flex-shrink:0}
+.ir8-udot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ir8-udot.H{background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,.7)}
+.ir8-udot.M{background:#f59e0b}
+.ir8-udot.L{background:#475569}
+
+/* Themes / risks */
+.ir8-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px}
+@media(max-width:760px){.ir8-cols{grid-template-columns:1fr}}
+.ir8-card{border-radius:13px;padding:17px 18px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07)}
+.ir8-card-t{font-size:12px;font-weight:700;color:#8b98ab;margin-bottom:12px}
+.ir8-thm{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.ir8-thm:last-child{border-bottom:none;padding-bottom:0}
+.ir8-thm-n{font-size:13px;font-weight:600;color:#d7dee9}
+.ir8-thm-a{font-size:11.5px;color:#55617a;line-height:1.55;margin-top:2px}
+.ir8-risk{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:flex-start}
+.ir8-risk:last-child{border-bottom:none;padding-bottom:0}
+.ir8-rdot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:5px}
+.ir8-foot{display:flex;align-items:center;gap:10px;margin-top:30px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)}
+.ir8-foot-m{font-size:11px;color:#3b4763;flex:1}
+.ir8-regen{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#8b98ab;cursor:pointer;font-family:inherit;font-size:11px;padding:6px 13px}
+.ir8-regen:hover{color:#cbd5e1;border-color:rgba(255,255,255,.18)}
+
+/* Drawer */
+.ir8-scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
+.ir8-scrim.on{opacity:1;pointer-events:all}
+.ir8-drw{position:fixed;top:0;right:-560px;width:540px;max-width:96vw;height:100vh;z-index:399;background:linear-gradient(180deg,#081021 0%,#0a1223 100%);border-left:1px solid rgba(255,255,255,.09);transition:right .3s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;box-shadow:-30px 0 100px rgba(0,0,0,.8)}
+.ir8-drw.on{right:0}
+.ir8-drw-top{display:flex;align-items:center;gap:10px;padding:15px 19px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;background:rgba(0,0,0,.35)}
+.ir8-x{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#55617a;cursor:pointer;font-size:13px;padding:5px 10px;transition:all .15s}
+.ir8-x:hover{color:#cbd5e1;border-color:rgba(255,255,255,.2)}
+.ir8-drw-title{font-size:13px;font-weight:700;color:#e6edf6;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir8-drw-body{flex:1;overflow-y:auto;padding:22px}
+.ir8-drw-body::-webkit-scrollbar{width:4px}.ir8-drw-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
+.ir8-ds{margin-bottom:18px}
+.ir8-ds-l{font-size:10px;font-weight:700;color:#55617a;text-transform:uppercase;letter-spacing:.09em;margin-bottom:7px}
+.ir8-ds-v{font-size:13px;color:#9fabbe;line-height:1.7}
+.ir8-hl{background:rgba(67,56,202,.09);border:1px solid rgba(67,56,202,.2);border-radius:9px;padding:12px 14px;font-size:13px;color:#b6c0f7;line-height:1.65}
+.ir8-tp{display:flex;gap:9px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px;margin-bottom:6px}
+.ir8-tp-n{width:17px;height:17px;border-radius:5px;background:rgba(67,56,202,.16);border:1px solid rgba(67,56,202,.26);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#818cf8;flex-shrink:0;margin-top:1px}
+.ir8-tp-t{font-size:12.5px;color:#9fabbe;line-height:1.55;flex:1}
+.ir8-load{display:flex;align-items:center;gap:10px;padding:13px 15px;background:rgba(67,56,202,.07);border:1px solid rgba(67,56,202,.16);border-radius:9px;font-size:12.5px;color:#a5b4fc;margin-bottom:14px}
+.ir8-spin{animation:ir8-spin .8s linear infinite;display:inline-block}
+@keyframes ir8-spin{to{transform:rotate(360deg)}}
+.ir8-drw-btns{display:flex;gap:7px;flex-wrap:wrap;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px}
+.ir8-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#8b98ab;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:8px 13px;transition:all .15s;white-space:nowrap;text-decoration:none}
+.ir8-btn:hover{color:#cbd5e1;border-color:rgba(255,255,255,.2)}
+.ir8-btn.prim{background:#4338ca;border-color:#4338ca;color:#fff}.ir8-btn.prim:hover{background:#3730a3}
+.ir8-btn.ok{border-color:#065f46!important;color:#34d399!important}
+.ir8-mail{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:17px;font-size:13px;color:#9fabbe;line-height:1.8}
+.ir8-mail p{margin:0 0 10px}
+.ir8-mail-sub{font-size:14px;font-weight:700;color:#eef2f8;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.ir8-src{display:block;font-size:12px;color:#7cb3f5;text-decoration:none;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir8-src:hover{color:#a5cdf9}
+.ir8-note{font-size:11px;color:#55617a;font-style:italic;margin-top:8px}
+@keyframes ir8-up{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
 </style>
 
 </head>
@@ -1794,54 +1595,51 @@ h2::after,.section-title::after{
     </div>
 
 
-  <!-- INSIGHTS SECTION -->
+  <!-- INSIGHTS SECTION v8 -->
   <div id="section-insights" class="section">
-    <div class="ir-bar" id="ir-bar">
-      <div class="ir-bar-top">
-        <div class="ir-brand">
-          <svg class="ir-atom-svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse>
-            <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse>
-            <circle cx="12" cy="12" r="2" fill="#818cf8"><animate attributeName="r" values="2;2.6;2" dur="3s" repeatCount="indefinite"/></circle>
-          </svg>
-          <span class="ir-brand-name">Signal Intelligence</span>
-          <span class="ir-ai">AI</span>
+    <div class="ir8-top">
+      <div class="ir8-brand"><svg width="18" height="18" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#6366f1" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="#818cf8"><animate attributeName="r" values="2;2.6;2" dur="3s" repeatCount="indefinite"/></circle></svg><span class="ir8-brand-name">Signal Intelligence</span><span class="ir8-ai">AI</span><span class="ir8-stat" id="ir8-stat"></span></div>
+      <div class="ir8-top-right">
+        <div class="ir8-fwrap" id="ir8-fwrap">
+          <button class="ir8-fbtn" id="ir8-fbtn" onclick="irFilters(event)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg> Filters <span class="ir8-fct" id="ir8-fct"></span></button>
+          <div class="ir8-fpanel" id="ir8-fpanel" style="display:none">
+            <div class="ir8-fgrp"><span class="ir8-flbl">Time range</span>
+              <select class="ir8-sel" id="ir8-days"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option><option value="0">All time</option></select></div>
+            <div class="ir8-fgrp"><span class="ir8-flbl">Industry</span>
+              <select class="ir8-sel" id="ir8-industry"><option value="">All industries</option></select></div>
+            <div class="ir8-fgrp"><span class="ir8-flbl">Severity</span>
+              <div class="ir8-sev"><button class="ir8-sv on" data-s="HIGH" onclick="irSv(this)">HIGH</button><button class="ir8-sv on" data-s="MEDIUM" onclick="irSv(this)">MED</button><button class="ir8-sv on" data-s="LOW" onclick="irSv(this)">LOW</button></div></div>
+            <div class="ir8-fgrp"><span class="ir8-flbl">Signal types</span><div id="ir8-types"></div></div>
+            <div class="ir8-fapply"><button class="ap" onclick="irApplyFilters()">Apply &amp; Generate</button><button class="rs" onclick="irResetFilters()">Reset</button></div>
+          </div>
         </div>
-        <div class="ir-filters">
-          <div class="ir-ddwrap" id="ir-ddwrap"><button class="ir-pill" id="ir-types-btn" onclick="irTypesToggle()">Signal Types <span class="ir-pill-ct" id="ir-types-ct">All</span><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="ir-dropdown" id="ir-types-menu" style="display:none"><div id="ir-types-list"></div></div></div>
-          <div class="ir-sev"><button class="ir-sv on" data-s="HIGH" onclick="irSv(this)">HIGH</button><button class="ir-sv on" data-s="MEDIUM" onclick="irSv(this)">MED</button><button class="ir-sv on" data-s="LOW" onclick="irSv(this)">LOW</button></div>
-          <select class="ir-sel" id="ir-days"><option value="7">7 days</option><option value="30">30 days</option><option value="90" selected>90 days</option><option value="365">12 months</option><option value="0">All time</option></select>
-          <select class="ir-sel" id="ir-industry"><option value="">All Industries</option></select>
-          <span class="ir-stat" id="ir-stat"></span>
-        </div>
-        <button class="ir-gen" id="ir-gen" onclick="irGenerate()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Generate Insights</button>
-      </div>
-      <div class="ir-tabs" id="ir-tabs">
-        <button class="ir-tab active" data-p="ov" onclick="irTab(this)">Overview</button>
-        <button class="ir-tab" data-p="pip" onclick="irTab(this)">Pipeline <span class="ir-tc" id="ir-tc-pip"></span></button>
-        <button class="ir-tab" data-p="act" onclick="irTab(this)">Actions <span class="ir-tc" id="ir-tc-act"></span></button>
-        <button class="ir-tab" data-p="out" onclick="irTab(this)">Outreach <span class="ir-tc" id="ir-tc-out"></span></button>
+        <button class="ir8-gen" id="ir8-gen" onclick="irGenerate()">&#10022; Generate Insights</button>
       </div>
     </div>
-    <div class="ir-body">
-      <div class="ir-panel active" id="ir-p-ov">
-        <div class="ir-empty" id="ir-empty">
-          <div class="ir-empty-orb"><svg width="44" height="44" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#c4b5fd"><animate attributeName="r" values="2.5;3.2;2.5" dur="3s" repeatCount="indefinite"/></circle></svg></div>
-          <div class="ir-empty-title">Intelligence Command Centre</div>
-          <div class="ir-empty-sub">Click <strong>Generate Insights</strong> to get GPT-powered analysis — intent scores, priority calls, personalised outreach, and LinkedIn contacts.</div>
-          <button class="ir-gen-lg" onclick="irGenerate()">Generate Insights</button>
+    <div class="ir8-body">
+      <div class="ir8-wrap">
+        <div class="ir8-empty" id="ir8-empty">
+          <div class="ir8-orb"><svg width="40" height="40" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#818cf8" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#c4b5fd"/></svg></div>
+          <div class="ir8-empty-title">Signal Intelligence</div>
+          <div class="ir8-empty-sub">One click gives you an AI-ranked list of companies to call this week &mdash; with the reason to call, AI-written emails, and live company research.</div>
+          <button class="ir8-gen-lg" onclick="irGenerate()">&#10022; Generate Insights</button>
         </div>
-        <div class="ir-loading" id="ir-loading" style="display:none">
-          <div class="ir-load-orb"><svg width="30" height="30" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="6s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>
-          <div class="ir-load-lbl" id="ir-load-lbl">Reading signals…</div>
-          <div class="ir-load-track"><div class="ir-load-fill" id="ir-load-fill"></div></div>
-          <div class="ir-load-note">Analysing with GPT · 10–20 seconds</div>
+        <div class="ir8-loading" id="ir8-loading" style="display:none">
+          <div class="ir8-lorb"><svg width="26" height="26" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.85)" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="4s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>
+          <div class="ir8-llbl" id="ir8-llbl">Reading signals&hellip;</div>
+          <div class="ir8-lnote">Analysing with AI &middot; 10&ndash;20 seconds</div>
         </div>
-        <div id="ir-ov" style="display:none"></div>
+        <div id="ir8-results" style="display:none">
+          <div id="ir8-brief"></div>
+          <div class="ir8-kpis" id="ir8-kpis"></div>
+          <div class="ir8-sh"><span class="ir8-sh-t">Priority companies</span><span class="ir8-sh-s">ranked by intent &middot; click a row for detail</span></div>
+          <div class="ir8-feed" id="ir8-feed"></div>
+          <div class="ir8-sh"><span class="ir8-sh-t">This week&rsquo;s actions</span><span class="ir8-sh-s">AI-ranked to-do list</span></div>
+          <div class="ir8-alist" id="ir8-acts"></div>
+          <div class="ir8-cols"><div id="ir8-themes"></div><div id="ir8-risks"></div></div>
+          <div class="ir8-foot" id="ir8-foot"></div>
+        </div>
       </div>
-      <div class="ir-panel" id="ir-p-pip"><div id="ir-pip"></div></div>
-      <div class="ir-panel" id="ir-p-act"><div id="ir-act"></div></div>
-      <div class="ir-panel" id="ir-p-out"><div id="ir-out"></div></div>
     </div>
   </div>
 
@@ -4234,1033 +4032,425 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-<!-- INSIGHTS STANDALONE JS v7 -->
-<div class="ir-ov" id="ir-ov" onclick="irClose()"></div>
-<div class="ir-drw" id="ir-drw">
-  <div class="ir-drw-top"><button class="ir-drw-close" onclick="irClose()">✕</button><div class="ir-drw-title" id="ir-drw-title"></div></div>
-  <div class="ir-drw-body" id="ir-drw-body"></div>
+<!-- INSIGHTS v8 JS -->
+<div class="ir8-scrim" id="ir8-scrim" onclick="irClose()"></div>
+<div class="ir8-drw" id="ir8-drw">
+  <div class="ir8-drw-top"><button class="ir8-x" onclick="irClose()">&#10005;</button><div class="ir8-drw-title" id="ir8-drw-title"></div></div>
+  <div class="ir8-drw-body" id="ir8-drw-body"></div>
 </div>
 <script>
 (function(){
 'use strict';
-/* ── State ─────────────────────────────────────────────────────────────── */
-var D={pip:[],acts:[],out:[],pri:[],ins:null,meta:{sigs:0,cos:0}};
-var _metaLoaded=false,_autoTriggered=false,_stepTimer=null;
+/* ── State ── */
+var D={ins:null,feed:[],acts:[],out:[],meta:{sigs:0,cos:0}};
+var _metaLoaded=false,_stepTimer=null;
 var AVC=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46'];
-var STEPS=['Reading signals…','Scoring intent and identifying patterns…','Generating insights, actions and outreach…'];
+var STEPS=['Reading signals…','Scoring intent and spotting patterns…','Writing the brief and ranking companies…'];
 
-/* ── Helpers ───────────────────────────────────────────────────────────── */
+/* ── Helpers ── */
 function $(id){return document.getElementById(id);}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
 function acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
-function svcC(s){return{SEO:'#34d399',PPC:'#60a5fa',Content:'#a78bfa',Brand:'#f472b6',RevOps:'#fbbf24'}[s]||'#64748b';}
 function liCo(co){return 'https://www.linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co);}
 function liPpl(co){return 'https://www.linkedin.com/search/results/people/?company='+encodeURIComponent(co)+'&keywords=CMO+CEO+VP+Marketing+CTO';}
-function tClass(t){t=(t||'').toLowerCase();return t.includes('today')?'ir-ot-now':t.includes('week')?'ir-ot-soon':'ir-ot-watch';}
-function tLabel(t){t=(t||'').toLowerCase();return t.includes('today')?'Today':t.includes('week')?'This Week':'Email';}
+function tCls(t){t=(t||'').toLowerCase();return t.indexOf('today')>-1?'ir8-t-now':t.indexOf('week')>-1?'ir8-t-week':'ir8-t-email';}
+function tLbl(t){t=(t||'').toLowerCase();return t.indexOf('today')>-1?'CALL TODAY':t.indexOf('week')>-1?'THIS WEEK':'WARM EMAIL';}
+function scC(sc){return sc>=80?'#f87171':sc>=60?'#fbbf24':'#a5b4fc';}
+function scL(sc){return sc>=80?'Critical':sc>=60?'High':'Watch';}
+function chip(s,svc){return '<span class="ir8-chip'+(svc?' svc':'')+'">'+esc(s)+'</span>';}
 
-/* ── SVG ring ──────────────────────────────────────────────────────────── */
-function ring(sc,color,sz){
-  sz=sz||54;var cx=sz/2,r=cx-7,c2=2*Math.PI*r,off=c2*(1-sc/100),fs=Math.round(sz*.27);
-  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'
-    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="6"/>'
-    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"'
-    +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx+')">'
-    +'<animate attributeName="stroke-dashoffset" from="'+c2.toFixed(1)+'" to="'+off.toFixed(1)+'" dur="1s" fill="freeze"/></circle>'
-    +'<text x="'+cx+'" y="'+(cx+fs*.37)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
-    +'</svg>';
-}
-function gauge(pct,val,lbl,color){
-  var r=46,cx=68,cy=64,c2=Math.PI*r;
-  var ex=cx+r*Math.cos(Math.PI*pct),ey=cy+r*Math.sin(Math.PI*pct);
-  return '<svg width="136" height="76" viewBox="0 0 136 76">'
-    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,1 '+(cx+r)+','+cy+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="9" stroke-linecap="round"/>'
-    +'<path d="M'+(cx-r)+','+cy+' A'+r+','+r+' 0 0,'+(pct>.5?'1':'0')+' '+ex.toFixed(1)+','+ey.toFixed(1)+'" fill="none" stroke="'+color+'" stroke-width="9" stroke-linecap="round">'
-    +'<animate attributeName="stroke-dasharray" from="0 '+c2.toFixed(0)+'" to="'+(pct*c2).toFixed(0)+' '+c2.toFixed(0)+'" dur=".9s" fill="freeze"/></path>'
-    +'<text x="'+cx+'" y="58" text-anchor="middle" fill="'+color+'" font-size="15" font-weight="800" font-family="Inter,sans-serif">'+esc(val)+'</text>'
-    +'<text x="'+cx+'" y="71" text-anchor="middle" fill="#334155" font-size="8" font-family="Inter,sans-serif">'+esc(lbl)+'</text>'
-    +'</svg>';
-}
-function donut(slices){
-  var total=slices.reduce(function(a,b){return a+(b.v||0);},0)||1;
-  var r=26,cx=34,cy=34,c2=2*Math.PI*r,off=0,paths='';
-  slices.forEach(function(s){
-    var pct=Math.max((s.v||0)/total,.01),arc=c2*pct-.05;
-    paths+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.c+'" stroke-width="9"'
-      +' stroke-dasharray="'+arc.toFixed(2)+' '+(c2-arc).toFixed(2)+'"'
-      +' stroke-dashoffset="'+(-(c2*off-c2/4)).toFixed(2)+'">'
-      +'<animate attributeName="stroke-dasharray" from="0 '+c2.toFixed(2)+'" to="'+arc.toFixed(2)+' '+(c2-arc).toFixed(2)+'" dur=".8s" fill="freeze"/></circle>';
-    off+=pct;
-  });
-  return '<svg width="68" height="68" viewBox="0 0 68 68">'+paths+'</svg>';
-}
-function countUp(el,to){
-  if(!el||to==null)return;
-  var n=parseFloat(String(to).replace(/[^0-9.]/g,''))||0,dur=800,t0=null;
-  requestAnimationFrame(function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1),e=1-Math.pow(1-p,3);el.textContent=Math.round(n*e);if(p<1)requestAnimationFrame(step);});
-}
-
-/* ── Drawer ────────────────────────────────────────────────────────────── */
+/* ── Drawer ── */
 window.irClose=function(){
-  $('ir-drw').classList.remove('on');$('ir-ov').classList.remove('on');
-  document.querySelectorAll('.ir-pcard.sel,.ir-arow.sel,.ir-ocard.sel').forEach(function(e){e.classList.remove('sel');});
+  $('ir8-drw').classList.remove('on');$('ir8-scrim').classList.remove('on');
 };
 function irOpen(title,html){
-  $('ir-drw-title').textContent=title;$('ir-drw-body').innerHTML=html;
-  $('ir-drw').classList.add('on');$('ir-ov').classList.add('on');
-  $('ir-drw-body').scrollTop=0;
-  setTimeout(function(){document.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},100);
+  $('ir8-drw-title').textContent=title;$('ir8-drw-body').innerHTML=html;
+  $('ir8-drw').classList.add('on');$('ir8-scrim').classList.add('on');
+  $('ir8-drw-body').scrollTop=0;
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')irClose();});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){irClose();var p=$('ir8-fpanel');if(p)p.style.display='none';}
+});
 
-/* ── Tab open → auto-generate ──────────────────────────────────────────── */
-window.iTab=function(){
-  if(!_metaLoaded)irLoadMeta();
-};
-window.irTab=function(btn){
-  document.querySelectorAll('.ir-tab').forEach(function(b){b.classList.remove('active');});
-  btn.classList.add('active');
-  var p=btn.getAttribute('data-p');
-  document.querySelectorAll('.ir-panel').forEach(function(el){el.classList.remove('active');});
-  var t=$('ir-p-'+p);if(t)t.classList.add('active');
-};
+/* ── Nav hook ── */
+window.iTab=function(){if(!_metaLoaded)irLoadMeta();};
 
-/* ── Meta ──────────────────────────────────────────────────────────────── */
+/* ── Meta + filters ── */
 function irLoadMeta(){
   _metaLoaded=true;
   fetch('/api/insights-meta/'+acct()).then(function(r){return r.json();}).then(function(d){
-    _buildTypesList(d.signal_types||[],d.counts||{});
-    var sel=$('ir-industry');
+    var wrap=$('ir8-types');
+    if(wrap){wrap.innerHTML='';(d.signal_types||[]).forEach(function(t,i){
+      var lbl=t.replace(/_/g,' ');
+      var div=document.createElement('div');div.className='ir8-chk';div.setAttribute('data-type',t);
+      div.innerHTML='<input type="checkbox" checked id="ir8t'+i+'"><label for="ir8t'+i+'">'+esc(lbl)+'</label><span class="ct">'+((d.counts||{})[t]||0)+'</span>';
+      div.querySelector('input').addEventListener('change',irFCount);
+      wrap.appendChild(div);
+    });}
+    var sel=$('ir8-industry');
     if(sel)(d.industries||[]).forEach(function(ind){var o=document.createElement('option');o.value=ind;o.textContent=ind;sel.appendChild(o);});
-    var st=$('ir-stat');if(st)st.textContent=(d.total_signals||0).toLocaleString()+' signals';
+    var st=$('ir8-stat');if(st)st.textContent=(d.total_signals||0).toLocaleString()+' signals · '+(d.total_companies||0).toLocaleString()+' companies';
+    var ds=$('ir8-days');if(ds)ds.addEventListener('change',irFCount);
+    if(sel)sel.addEventListener('change',irFCount);
   }).catch(function(){});
 }
-function _buildTypesList(types,counts){
-  var wrap=$('ir-types-list');if(!wrap)return;
-  wrap.innerHTML='';
-  types.forEach(function(t){
-    var lbl=t.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
-    var d=document.createElement('div');d.className='ir-dd-item';d.setAttribute('data-type',t);
-    d.innerHTML='<input type="checkbox" checked id="irt_'+t+'"><label for="irt_'+t+'">'+esc(lbl)+'</label><span class="ir-dd-cnt">'+(counts[t]||0)+'</span>';
-    d.querySelector('input').addEventListener('change',function(){_updateTypesCount();});
-    wrap.appendChild(d);
-  });
-  _updateTypesCount();
+function irFCount(){
+  var n=0;
+  var ds=$('ir8-days');if(ds&&ds.value!=='90')n++;
+  var ind=$('ir8-industry');if(ind&&ind.value)n++;
+  if(document.querySelectorAll('.ir8-sv.on').length<3)n++;
+  var all=document.querySelectorAll('#ir8-types input'),on=document.querySelectorAll('#ir8-types input:checked');
+  if(all.length&&on.length<all.length)n++;
+  var b=$('ir8-fct');if(b){b.textContent=n;b.style.display=n?'inline-block':'none';}
 }
-function _updateTypesCount(){
-  var all=document.querySelectorAll('#ir-types-list .ir-dd-item'),on=document.querySelectorAll('#ir-types-list .ir-dd-item input:checked');
-  var el=$('ir-types-ct');if(el)el.textContent=on.length===all.length?'All':on.length+'/'+all.length;
-}
-window.irTypesToggle=function(){
-  var m=$('ir-types-menu');if(!m)return;
-  if(m.style.display==='none'){m.style.display='block';setTimeout(function(){document.addEventListener('click',_closeTypes,{once:true});},10);}else{m.style.display='none';}
+window.irFilters=function(e){
+  if(e)e.stopPropagation();
+  if(!_metaLoaded)irLoadMeta();
+  var p=$('ir8-fpanel');if(p)p.style.display=p.style.display==='none'?'block':'none';
 };
-function _closeTypes(e){var w=$('ir-ddwrap');if(w&&!w.contains(e.target)){var m=$('ir-types-menu');if(m)m.style.display='none';}}
-window.irSv=function(btn){btn.classList.toggle('on');};
+document.addEventListener('click',function(e){
+  var p=$('ir8-fpanel'),w=$('ir8-fwrap');
+  if(p&&p.style.display!=='none'&&w&&!w.contains(e.target))p.style.display='none';
+});
+window.irSv=function(btn){btn.classList.toggle('on');irFCount();};
+window.irApplyFilters=function(){var p=$('ir8-fpanel');if(p)p.style.display='none';irGenerate();};
+window.irResetFilters=function(){
+  var ds=$('ir8-days');if(ds)ds.value='90';
+  var ind=$('ir8-industry');if(ind)ind.value='';
+  document.querySelectorAll('.ir8-sv').forEach(function(b){b.classList.add('on');});
+  document.querySelectorAll('#ir8-types input').forEach(function(c){c.checked=true;});
+  irFCount();
+};
 
-/* ── Generate ──────────────────────────────────────────────────────────── */
+/* ── Generate ── */
 window.irGenerate=function(){
   if(!_metaLoaded)irLoadMeta();
-  var btn=$('ir-gen');if(btn)btn.disabled=true;
+  var btn=$('ir8-gen');if(btn)btn.disabled=true;
   var p=new URLSearchParams();
-  document.querySelectorAll('#ir-types-list .ir-dd-item input:checked').forEach(function(cb){p.append('signal_type',cb.closest('.ir-dd-item').getAttribute('data-type'));});
-  document.querySelectorAll('.ir-sv.on').forEach(function(sv){p.append('severity',sv.getAttribute('data-s'));});
-  var d=$('ir-days');if(d)p.set('days',d.value);
-  var ind=$('ir-industry');if(ind&&ind.value)p.set('industry',ind.value);
+  var all=document.querySelectorAll('#ir8-types .ir8-chk'),on=document.querySelectorAll('#ir8-types .ir8-chk input:checked');
+  if(all.length&&on.length<all.length){
+    on.forEach(function(cb){p.append('signal_type',cb.closest('.ir8-chk').getAttribute('data-type'));});
+  }
+  var sv=document.querySelectorAll('.ir8-sv.on');
+  if(sv.length<3)sv.forEach(function(b){p.append('severity',b.getAttribute('data-s'));});
+  var ds=$('ir8-days');if(ds)p.set('days',ds.value);
+  var ind=$('ir8-industry');if(ind&&ind.value)p.set('industry',ind.value);
   _showLoad();
   fetch('/api/insights/'+acct()+'?'+p.toString())
     .then(function(r){
       var ct=r.headers.get('content-type')||'';
-      if(!ct.includes('json')){
-        return r.text().then(function(t){
-          var hint=r.status===500?'Server error (500). Check Railway logs.':'HTTP '+r.status;
-          throw new Error(hint);
-        });
-      }
+      if(ct.indexOf('json')<0)throw new Error(r.status===500?'Server error (500). Check Railway logs.':'HTTP '+r.status);
       return r.json();
     })
     .then(function(data){
-      if(btn){btn.disabled=false;btn.textContent='Generate Insights';}
+      if(btn)btn.disabled=false;
       clearInterval(_stepTimer);
-      data.error?_showErr(data.error):_renderAll(data);
+      if(data.error){_showErr(data.error);}else{_renderAll(data);}
     })
     .catch(function(e){
-      if(btn){btn.disabled=false;btn.textContent='Generate Insights';}
+      if(btn)btn.disabled=false;
       clearInterval(_stepTimer);
       _showErr(e.message||'Request failed. Try again.');
     });
 };
 function _showLoad(){
-  $('ir-empty').style.display='none';$('ir-ov').style.display='none';$('ir-loading').style.display='flex';
-  document.querySelectorAll('.ir-tab').forEach(function(b){b.classList.remove('active');});
-  var _ovTab=document.querySelector('.ir-tab[data-p="ov"]');if(_ovTab)_ovTab.classList.add('active');
-  document.querySelectorAll('.ir-panel').forEach(function(p){p.classList.remove('active');});
-  $('ir-p-ov').classList.add('active');
-  var f=$('ir-load-fill');if(f){var nf=f.cloneNode(true);f.parentNode.replaceChild(nf,f);}
-  var lbl=$('ir-load-lbl');if(lbl)lbl.textContent=STEPS[0];
+  $('ir8-empty').style.display='none';$('ir8-results').style.display='none';$('ir8-loading').style.display='flex';
+  var lbl=$('ir8-llbl');if(lbl)lbl.textContent=STEPS[0];
   clearInterval(_stepTimer);var cur=0;
-  _stepTimer=setInterval(function(){cur++;if(cur>=STEPS.length){clearInterval(_stepTimer);return;}var l=$('ir-load-lbl');if(l)l.textContent=STEPS[cur];},3500);
+  _stepTimer=setInterval(function(){cur++;if(cur>=STEPS.length){clearInterval(_stepTimer);return;}var l=$('ir8-llbl');if(l)l.textContent=STEPS[cur];},4000);
 }
 function _showErr(msg){
-  $('ir-loading').style.display='none';$('ir-empty').style.display='flex';
-  var btn=$('ir-gen');if(btn)btn.disabled=false;
-  var old=$('ir-empty').querySelector('.ir-err-box');if(old)old.remove();
-  var d=document.createElement('div');d.className='ir-err-box';
-  d.style.cssText='margin-top:14px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#f87171;max-width:400px;line-height:1.55';
-  d.innerHTML='<strong>Error:</strong> '+esc(msg);$('ir-empty').appendChild(d);
+  $('ir8-loading').style.display='none';$('ir8-empty').style.display='flex';
+  var old=$('ir8-empty').querySelector('.ir8-err');if(old)old.remove();
+  var d=document.createElement('div');d.className='ir8-err';
+  d.innerHTML='<strong>Error:</strong> '+esc(msg);$('ir8-empty').appendChild(d);
 }
 
-/* ── Render all tabs ───────────────────────────────────────────────────── */
+/* ── Build merged feed (pipeline + week_priority) ── */
+function buildFeed(ins){
+  var feed=(ins.pipeline||[]).map(function(c){return{
+    name:c.name||'',domain:c.domain||'',
+    score:(c.intent_score==null?null:Math.min(100,Math.max(0,parseInt(c.intent_score)||0))),
+    signals:(c.signals||[]).slice(),why:c.why_now||'',svc:(c.service_fit||[]).slice(),
+    next:c.next_step||'',timing:'',pitch:''};});
+  (ins.week_priority||[]).forEach(function(w){
+    var nm=(w.company||'').toLowerCase();
+    var f=feed.filter(function(x){return x.name.toLowerCase()===nm;})[0];
+    if(f){
+      f.timing=w.call_timing||'';f.pitch=w.pitch||'';
+      if(!f.why)f.why=w.pitch||'';
+      if(w.signal&&f.signals.indexOf(w.signal)<0&&f.signals.length<3)f.signals.push(w.signal);
+      if(w.service&&f.svc.indexOf(w.service)<0&&!f.svc.length)f.svc.push(w.service);
+    }else if(w.company){
+      feed.push({name:w.company,domain:w.domain||'',score:null,
+        signals:w.signal?[w.signal]:[],why:w.pitch||'',svc:w.service?[w.service]:[],
+        next:'',timing:w.call_timing||'',pitch:w.pitch||''});
+    }
+  });
+  feed.forEach(function(f){
+    var t=(f.timing||'').toLowerCase();
+    f._rank=(f.score==null?45:f.score)+(t.indexOf('today')>-1?1000:t.indexOf('week')>-1?400:0);
+  });
+  feed.sort(function(a,b){return b._rank-a._rank;});
+  return feed.slice(0,10);
+}
+
+/* ── Render ── */
 function _renderAll(data){
   var ins=data.insights||{};
-  D={pip:(ins.pipeline||[]).slice(0,9),acts:ins.actions||[],out:ins.outreach||[],pri:ins.week_priority||[],ins:ins,meta:{sigs:data.signals_analyzed,cos:data.companies_analyzed}};
-  _renderOv(data,ins);_renderPip(D.pip);_renderActs(D.acts);_renderOut(D.out);
-  [['ir-tc-pip',D.pip.length],['ir-tc-act',D.acts.length],['ir-tc-out',D.out.length]].forEach(function(pair){
-    var e=$(pair[0]);if(e){e.textContent=pair[1];e.style.display=pair[1]?'':'none';}
-  });
-  $('ir-loading').style.display='none';$('ir-ov').style.display='block';
-}
+  D.ins=ins;D.acts=ins.actions||[];D.out=ins.outreach||[];D.feed=buildFeed(ins);
+  D.meta={sigs:data.signals_analyzed||0,cos:data.companies_analyzed||0};
 
-/* ── OVERVIEW ──────────────────────────────────────────────────────────── */
-function _renderOv(data,ins){
-  var ov=$('ir-ov');if(!ov)return;
-  var pe=ins.pipeline_estimate||{},wp=ins.week_priority||[],kp=ins.kpis||{};
-  var hot=(ins.pipeline||[]).filter(function(c){return c.intent_score>=70;}).length;
-  var vel=(ins.meta&&ins.meta.signal_velocity_trend)||'stable';
-  var vc=vel==='accelerating'?'#34d399':vel==='slowing'?'#f87171':'#fbbf24';
-  ov.innerHTML=
-    '<div class="ir-tiles">'
-    +[{i:'💰',v:pe.total||kp.estimated_value||'—',r:null,l:'Pipeline Value',g:'#fbbf24'},
-      {i:'🔥',v:kp.high_priority||hot,r:kp.high_priority||hot,l:'Hot Targets',g:'#ef4444'},
-      {i:'🎯',v:kp.avg_intent?Math.round(kp.avg_intent)+'/ 100':'—',r:kp.avg_intent?Math.round(kp.avg_intent):null,l:'Avg Intent',sx:'/ 100',g:'#6366f1'},
-      {i:'⚡',v:D.acts.length,r:D.acts.length,l:'Actions',g:'#f59e0b'}]
-    .map(function(k,i){
-      var kval=(k.v!=null&&String(k.v)!=='null')?esc(String(k.v)):'—';var v=k.r!=null?'<span id="irkv'+i+'">0</span>'+(k.sx?' <span style="font-size:13px;color:#475569">'+k.sx+'</span>':''):kval;
-      return '<div class="ir-tile" style="animation-delay:'+(i*.06)+'s"><span class="ir-tile-ico">'+k.i+'</span><div class="ir-tile-val">'+v+'</div><div class="ir-tile-lbl">'+k.l+'</div><div class="ir-tile-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div></div>';
-    }).join('')+'</div>'
+  $('ir8-brief').innerHTML='<div class="ir8-brief"><div class="ir8-brief-lbl">Executive brief <span class="ir8-ai">&#10022; AI</span></div>'
+    +'<div class="ir8-brief-tx">'+esc(ins.brief||ins.summary||'')+'</div>'
+    +'<span class="ir8-brief-more" data-iract="brief">Full brief &amp; market pulse &rarr;</span></div>';
 
-    +'<div class="ir-brief" onclick="irShowBrief()">'
-      +'<div class="ir-brief-hdr"><span class="ir-brief-lbl">Executive Brief</span><span class="ir-sh-ai">✦ GPT</span></div>'
-      +'<div class="ir-brief-text">'+esc(ins.brief||ins.summary||'')+'</div>'
-      +'<span class="ir-brief-more">Read full →</span>'
-    +'</div>'
+  var hot=D.feed.filter(function(f){return (f.score||0)>=80;}).length;
+  var due=D.feed.filter(function(f){var t=(f.timing||'').toLowerCase();return t.indexOf('today')>-1||t.indexOf('week')>-1;}).length;
+  $('ir8-kpis').innerHTML=[
+    {v:hot,l:'Hot targets (80+)'},
+    {v:due,l:'Calls due this week'},
+    {v:D.meta.cos,l:'Companies analysed'},
+    {v:D.meta.sigs,l:'Signals analysed'}
+  ].map(function(k,i){return '<div class="ir8-kpi" style="animation-delay:'+(i*.05)+'s"><div class="ir8-kpi-v">'+k.v+'</div><div class="ir8-kpi-l">'+k.l+'</div></div>';}).join('');
 
-    +(wp.length?
-      '<div class="ir-sh"><span class="ir-sh-title">Priority Calls This Week</span><span class="ir-sh-ai">AI-ranked</span><span class="ir-sh-line"></span></div>'
-      +'<div class="ir-pri-grid">'+wp.slice(0,6).map(function(p,i){
-        var av=AVC[i%AVC.length],tc=tClass(p.call_timing),tl=tLabel(p.call_timing);
-        return '<div class="ir-pc'+(i===0?' r1':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="irShowPri('+i+')">'
-          +'<div class="ir-pc-top"><div class="ir-pc-av" style="background:'+av+'">'+esc(ini(p.company))+'</div>'
-            +'<span class="ir-pc-name">'+esc(p.company||'')+'</span>'
-            +'<span class="ir-pc-t '+tc+'">'+tl+'</span>'
-          +'</div>'
-          +'<div class="ir-pc-sig">📡 '+esc(p.signal||'')+'</div>'
-          +'<div class="ir-pc-foot">'+(p.service?'<span class="ir-pc-svc" style="color:'+svcC(p.service)+'">'+esc(p.service)+'</span>':'')+' <span class="ir-pc-val">'+esc(p.est_value||'')+'</span></div>'
-        +'</div>';}).join('')+'</div>'
-      :'')
-
-    +'<div class="ir-sh" style="margin-top:18px"><span class="ir-sh-title">Signal Intelligence</span><span class="ir-sh-ai">Live data</span><span class="ir-sh-line"></span></div>'
-    +'<div class="ir-infog" id="ir-infog"></div>'
-    +'<div class="ir-grid2"><div id="ir-themes"></div><div id="ir-risks"></div></div>'
-    +'<div class="ir-regen-row"><span class="ir-regen-meta">✦ GPT · '+data.signals_analyzed+' signals · '+data.companies_analyzed+' companies</span><button class="ir-regen-btn" onclick="irGenerate()">↺ Regenerate</button></div>';
-
-  /* Count up */
-  [{r:kp.high_priority||hot,i:1},{r:kp.avg_intent?Math.round(kp.avg_intent):null,i:2},{r:D.acts.length,i:3}].forEach(function(k){
-    if(k.r!=null)setTimeout(function(){countUp($('irkv'+k.i),k.r);},200+k.i*60);
-  });
-
-  _buildInfog(ins);
-  _buildThemes(ins.themes||[]);
-  _buildRisks(ins.risks||[]);
-}
-
-function _buildInfog(ins){
-  var row=$('ir-infog');if(!row)return;
-  var pe=ins.pipeline_estimate||{},pip=ins.pipeline||[];
-  var crit=pip.filter(function(c){return c.intent_score>=80;}).length;
-  var hi=pip.filter(function(c){return c.intent_score>=60&&c.intent_score<80;}).length;
-  var watch=pip.filter(function(c){return c.intent_score<60;}).length;
-  var maxT=Math.max(crit,hi,watch,1);
-  var gPct=.65;try{gPct=Math.min(.97,parseFloat((pe.high_conviction||'0').replace(/[^0-9.]/g,''))/(parseFloat((pe.total||'1').replace(/[^0-9.]/g,''))||1));}catch(e){}
-  var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
-  var themes=ins.themes||[];
-  row.innerHTML=[
-    {t:'Intent Tiers',b:'<div class="ir-tier-list">'
-      +[{l:'🔥 Critical (80+)',n:crit,c:'#ef4444'},{l:'⚡ High (60–79)',n:hi,c:'#f59e0b'},{l:'👀 Watch (<60)',n:watch,c:'#6366f1'}].map(function(t){
-        return '<div class="ir-tier-row"><div class="ir-tier-dot" style="background:'+t.c+'"></div><div class="ir-tier-lbl">'+t.l+'</div><div class="ir-tier-track"><div class="ir-tier-fill" style="background:'+t.c+'" data-fw="'+Math.round(t.n/maxT*100)+'"></div></div><div class="ir-tier-cnt" style="color:'+t.c+'">'+t.n+'</div></div>';
-      }).join('')+'</div>'},
-    {t:'Signal Themes',b:'<div class="ir-donut-wrap">'+donut(themes.slice(0,4).map(function(t,i){return{v:t.count||1,c:tColors[i]};}))+'<div class="ir-donut-leg">'+themes.slice(0,4).map(function(t,i){return '<div class="ir-dleg-row"><div class="ir-dleg-dot" style="background:'+tColors[i]+'"></div><div class="ir-dleg-lbl">'+esc(t.theme||'')+'</div><div class="ir-dleg-cnt" style="color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div></div>';}).join('')+'</div></div>'},
-  ].map(function(c,i){return '<div class="ir-ic" style="animation-delay:'+(i*.07)+'s"><div class="ir-ic-title">'+c.t+'</div>'+c.b+'</div>';}).join('');
-  setTimeout(function(){row.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},200);
-}
-
-function _buildThemes(themes){
-  var tc=$('ir-themes');if(!tc)return;
-  var tColors=['#6366f1','#f59e0b','#34d399','#f472b6'];
-  tc.innerHTML='<div class="ir-panel-card"><div class="ir-pc-hdr">Signal Themes</div>'
-    +themes.slice(0,4).map(function(t,i){
-      var cos=(t.companies||[]).slice(0,3).map(function(c){return '<span class="ir-co-tag">'+esc(c)+'</span>';}).join('');
-      return '<div class="ir-theme-row"><div class="ir-theme-n" style="color:'+tColors[i]+'">'+esc(String(t.count||0))+'x</div>'
-        +'<div class="ir-theme-body"><div class="ir-theme-name">'+esc(t.theme||'')+'</div>'
-        +'<div class="ir-theme-angle">'+esc(t.campaign_angle||'')+'</div>'
-        +(cos?'<div class="ir-cos">'+cos+'</div>':'')+'</div></div>';
-    }).join('')+'</div>';
-}
-
-function _buildRisks(risks){
-  var rc=$('ir-risks');if(!rc)return;
-  var h='<div class="ir-panel-card"><div class="ir-pc-hdr">Attention Flags</div>';
-  if(risks.length){h+=risks.slice(0,3).map(function(r){return '<div class="ir-risk-row"><div class="ir-risk-dot"></div><div><div class="ir-risk-co">'+esc(r.company||'')+'</div><div class="ir-risk-flag">'+esc(r.flag||'')+'</div><div class="ir-risk-impl">'+esc(r.implication||'')+'</div></div></div>';}).join('');}
-  else{h+='<div style="font-size:11px;color:#0f172a;padding:14px 0;text-align:center">✅ No critical flags</div>';}
-  rc.innerHTML=h+'</div>';
-}
-
-/* ── PIPELINE ──────────────────────────────────────────────────────────── */
-function _renderPip(pip){
-  var g=$('ir-pip');if(!g)return;
-  if(!pip.length){g.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No pipeline data.</p>';return;}
-  g.innerHTML='<div class="ir-pip-grid">'+pip.map(function(co,i){
-    var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
-    var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-    var lbl=sc>=80?'<span style="color:#f87171">🔥 Critical</span>':sc>=60?'<span style="color:#fbbf24">⚡ High</span>':'<span style="color:#818cf8">👀 Watch</span>';
-    var sigs=(co.signals||[]).slice(0,2).map(function(s){return '<span class="ir-badge">'+esc(s)+'</span>';}).join('');
-    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){return '<span class="ir-svc-tag">'+esc(s)+'</span>';}).join('');
-    return '<div class="ir-pcard'+(sc>=80?' hot':'')+'" style="animation-delay:'+(i*.05)+'s" onclick="irShowPip('+i+')">'
-      +'<div class="ir-pcard-top">'+ring(sc,rc,50)
-        +'<div class="ir-pcard-info"><div class="ir-pcard-name">'+esc(co.name||'')+'</div><div class="ir-pcard-domain">'+esc(co.domain||'')+'</div><div class="ir-score-lbl" style="color:'+rc+'">'+lbl+'</div></div>'
-      +'</div>'
-      +'<div class="ir-score-track"><div class="ir-score-fill" style="background:'+rc+'" data-fw="'+sc+'"></div></div>'
-      +(sigs||svcs?'<div class="ir-badges">'+sigs+svcs+'</div>':'')
-      +'<div class="ir-card-btns" onclick="event.stopPropagation()">'
-        +'<button class="ir-cbtn em" onclick="irMakeEmail('+i+',event)">✉ Email</button>'
-        +'<a class="ir-cbtn li" href="'+liCo(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
-        +'<a class="ir-cbtn li" href="'+liPpl(co.name||'')+'" target="_blank">👤 Contacts</a>'
-        +'<button class="ir-cbtn" onclick="irDeepAI(\''+esc(co.name||'')+'\',event)">✦ Analyse</button>'
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-  setTimeout(function(){g.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},200);
-}
-
-/* ── ACTIONS ───────────────────────────────────────────────────────────── */
-function _renderActs(acts){
-  var c=$('ir-act');if(!c)return;
-  if(!acts.length){c.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No actions.</p>';return;}
-  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
-  c.innerHTML='<div class="ir-act-list">'+acts.map(function(a,i){
-    var hi=a.urgency==='HIGH';
-    return '<div class="ir-arow '+(hi?'hi':'med')+'" style="animation-delay:'+(i*.04)+'s" onclick="irShowAct('+i+')">'
-      +'<div class="ir-arow-rank">'+(a.rank||i+1)+'</div>'
-      +'<div class="ir-arow-ico">'+(ico[a.type]||'⚡')+'</div>'
-      +'<div class="ir-arow-body"><div class="ir-arow-action">'+esc(a.action||'')+'</div>'
-        +(a.company&&a.company!=='All'?'<div class="ir-arow-co">'+esc(a.company)+'</div>':'')+'</div>'
-      +'<div class="ir-arow-right">'+(a.deadline?'<span class="ir-arow-dl">'+esc(a.deadline)+'</span>':'')+'<div class="ir-urgdot '+(hi?'H':'M')+'"></div></div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-/* ── OUTREACH ──────────────────────────────────────────────────────────── */
-function _renderOut(out){
-  var g=$('ir-out');if(!g)return;
-  if(!out.length){g.innerHTML='<p style="color:#0f172a;padding:40px;text-align:center">No outreach.</p>';return;}
-  g.innerHTML='<div class="ir-out-grid">'+out.map(function(ot,i){
-    var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'ir-ot-now':t==='soon'?'ir-ot-soon':'ir-ot-watch';
-    var sid='ios'+i+'_'+Math.random().toString(36).substr(2,4);
-    return '<div class="ir-ocard" style="animation-delay:'+(i*.05)+'s" onclick="irShowOut('+i+')">'
-      +'<div class="ir-ocard-chrome">'
-        +'<div class="ir-ocard-dot" style="background:#7f1d1d"></div><div class="ir-ocard-dot" style="background:#78350f"></div><div class="ir-ocard-dot" style="background:#14532d"></div>'
-        +'<div class="ir-ocard-to">'+esc(ot.company||'')+'</div>'
-        +'<span class="ir-ot '+tc+'">'+t.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div class="ir-ocard-body"><div class="ir-ocard-subj">'+esc(ot.subject||'')+'</div>'
-        +(ot.signal_hook?'<div class="ir-ocard-hook">📡 '+esc(ot.signal_hook)+'</div>':'')
-        +'<div class="ir-ocard-btns" onclick="event.stopPropagation()">'
-          +'<button class="ir-cbtn em ok" id="'+sid+'" onclick="irCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
-          +'<a class="ir-cbtn li" href="'+liCo(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
-          +'<a class="ir-cbtn li" href="'+liPpl(ot.company||'')+'" target="_blank">👤 Contact</a>'
+  $('ir8-feed').innerHTML=D.feed.length?D.feed.map(function(f,i){
+    var c=f.score!=null?scC(f.score):'#a5b4fc';
+    var chips=f.signals.slice(0,3).map(function(s){return chip(s);}).join('')
+      +f.svc.slice(0,2).map(function(s){return chip(s,true);}).join('');
+    return '<div class="ir8-row'+((f.score||0)>=80?' hot':'')+'" style="animation-delay:'+(i*.04)+'s">'
+      +'<div class="ir8-row-main" data-iract="co" data-i="'+i+'">'
+        +'<div class="ir8-av" style="background:'+AVC[i%AVC.length]+'">'+esc(ini(f.name))+'</div>'
+        +'<div class="ir8-mid">'
+          +'<div class="ir8-l1"><span class="ir8-name">'+esc(f.name)+'</span>'
+            +(f.domain?'<span class="ir8-dom">'+esc(f.domain)+'</span>':'')
+            +(f.timing?'<span class="ir8-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')+'</div>'
+          +(f.why?'<div class="ir8-why">'+esc(f.why)+'</div>':'')
+          +(chips?'<div class="ir8-chips">'+chips+'</div>':'')
         +'</div>'
+        +(f.score!=null?'<div class="ir8-scorebox"><div class="ir8-score-n" style="color:'+c+'">'+f.score+'</div><div class="ir8-score-l" style="color:'+c+'">'+scL(f.score)+'</div></div>':'')
+      +'</div>'
+      +'<div class="ir8-rowbtns">'
+        +'<button class="ir8-act em" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; AI Email</button>'
+        +'<button class="ir8-act rs" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain)+'">&#10022; Research with AI</button>'
+        +'<a class="ir8-act" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">&#128100; Contacts</a>'
+        +'<a class="ir8-act" href="'+liCo(f.name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
+        +'<button class="ir8-act" data-iract="co" data-i="'+i+'">Details</button>'
       +'</div>'
     +'</div>';
-  }).join('')+'</div>';
+  }).join(''):'<p style="color:#55617a;padding:30px;text-align:center">No companies matched these filters.</p>';
+
+  $('ir8-acts').innerHTML=D.acts.length?D.acts.map(function(a,i){
+    var u=(a.urgency||'M')[0];
+    return '<div class="ir8-arow" style="animation-delay:'+(i*.03)+'s" data-iract="act" data-i="'+i+'">'
+      +'<div class="ir8-arank">'+(a.rank||i+1)+'</div>'
+      +'<div class="ir8-abody"><div class="ir8-atx">'+esc(a.action||'')+'</div>'
+        +(a.company&&a.company!=='All'?'<div class="ir8-aco">'+esc(a.company)+'</div>':'')+'</div>'
+      +(a.deadline?'<span class="ir8-adl">'+esc(a.deadline)+'</span>':'')
+      +'<div class="ir8-udot '+(u==='H'?'H':u==='L'?'L':'M')+'"></div>'
+    +'</div>';
+  }).join(''):'<p style="color:#55617a;padding:20px;text-align:center">No actions.</p>';
+
+  var themes=ins.themes||[];
+  $('ir8-themes').innerHTML='<div class="ir8-card"><div class="ir8-card-t">Market themes</div>'
+    +(themes.length?themes.slice(0,4).map(function(t){
+      return '<div class="ir8-thm"><div class="ir8-thm-n">'+esc(t.theme||'')+(t.count?' <span style="color:#55617a;font-weight:400">· '+esc(String(t.count))+' signals</span>':'')+'</div>'
+        +(t.campaign_angle?'<div class="ir8-thm-a">'+esc(t.campaign_angle)+'</div>':'')+'</div>';
+    }).join(''):'<div class="ir8-thm-a">No themes identified.</div>')+'</div>';
+
+  var risks=ins.risks||[];
+  $('ir8-risks').innerHTML='<div class="ir8-card"><div class="ir8-card-t">Attention flags</div>'
+    +(risks.length?risks.slice(0,3).map(function(r){
+      return '<div class="ir8-risk"><div class="ir8-rdot"></div><div>'
+        +'<div style="font-size:12px;font-weight:700;color:#dee5ef">'+esc(r.company||'')+'</div>'
+        +(r.flag?'<div style="font-size:11px;color:#f87171;margin-top:1px">'+esc(r.flag)+'</div>':'')
+        +(r.implication?'<div style="font-size:11px;color:#55617a;line-height:1.5;margin-top:2px">'+esc(r.implication)+'</div>':'')
+      +'</div></div>';
+    }).join(''):'<div class="ir8-thm-a">&#9989; No critical flags.</div>')+'</div>';
+
+  $('ir8-foot').innerHTML='<span class="ir8-foot-m">&#10022; AI analysis · '+D.meta.sigs+' signals · '+D.meta.cos+' companies</span>'
+    +'<button class="ir8-regen" onclick="irGenerate()">&#8635; Regenerate</button>';
+
+  $('ir8-loading').style.display='none';$('ir8-empty').style.display='none';
+  $('ir8-results').style.display='block';
 }
 
-/* ── Drawer: Brief ─────────────────────────────────────────────────────── */
-window.irShowBrief=function(){
-  var ins=D.ins||{},pe=D.ins&&D.ins.pipeline_estimate||{};
-  var sm=ins.strategic_moves||[],mp=ins.market_pulse||[];
-  var html='<div style="font-size:14px;line-height:1.8;color:#cbd5e1;margin-bottom:18px">'+esc(ins.brief||ins.summary||'')+'</div>'
-    +(pe.total?'<div class="ir-ds"><div class="ir-ds-lbl">Total Opportunity</div><div class="ir-rev">'+esc(pe.total)+'</div></div>':'')
-    +(pe.top_services&&pe.top_services.length?'<div class="ir-ds"><div class="ir-ds-lbl">Top Services</div><div class="ir-chips">'+pe.top_services.map(function(s){return '<span class="ir-chip-g">'+esc(s)+'</span>';}).join('')+'</div></div>':'')
-    +(mp.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Market Pulse</div>'+mp.map(function(m){return '<div style="font-size:12px;color:#64748b;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.6">• '+esc(m)+'</div>';}).join('')+'</div>':'')
-    +(sm.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Strategic Moves</div>'+sm.map(function(m){return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:3px">'+esc(m.move||'')+'</div><div style="font-size:11px;color:#334155;margin-bottom:4px">'+esc(m.rationale||'')+'</div><div style="font-size:11px;font-weight:600;color:#34d399">'+esc(m.impact||'')+'</div></div>';}).join('')+'</div>':'')
-    +'<div class="ir-drw-btns"><button class="ir-btn" onclick="irGenerate()">↺ Regenerate</button></div>';
-  irOpen('Executive Brief',html);
-};
+/* ── Click delegation ── */
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-iract]');if(!b)return;
+  var a=b.getAttribute('data-iract');
+  if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='email'){irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'');}
+  else if(a==='research'){irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
+  else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
+  else if(a==='brief'){irShowBrief();}
+  else if(a==='copy'){irCopy(b,b.getAttribute('data-copy')||'');}
+  else if(a==='copyid'){var el=document.getElementById(b.getAttribute('data-id'));if(el)irCopy(b,el.value||el.textContent);}
+});
 
-/* ── Drawer: Priority ──────────────────────────────────────────────────── */
-window.irShowPri=function(i){
-  var p=(D.pri||[])[i];if(!p)return;
-  var html=_coHeader(p.company,p.domain,AVC[i%AVC.length])
-    +'<div class="ir-ds"><div class="ir-ds-lbl">Why This Week</div><div style="font-size:13px;color:#94a3b8;line-height:1.7;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:2px solid #4338ca;border-radius:0 8px 8px 0;padding:11px 13px">'+esc(p.signal||'')+'</div></div>'
-    +'<div class="ir-ds"><div class="ir-ds-lbl">What to Pitch</div><div class="ir-hl">'+esc(p.pitch||'')+'</div></div>'
-    +(p.est_value?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Estimate</div><div class="ir-rev">'+esc(p.est_value)+'</div></div>':'')
-    +'<div class="ir-drw-btns">'
-      +'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(p.company||'')+'\')">✉ Create Email</button>'
-      +'<a class="ir-btn li" href="'+liCo(p.company||'')+'" target="_blank">💼 LinkedIn</a>'
-      +'<a class="ir-btn li" href="'+liPpl(p.company||'')+'" target="_blank">👤 Decision Makers</a>'
-      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(p.pitch||'')+'\')">📋 Copy Pitch</button>'
-      +'<button class="ir-btn" onclick="irGoto(\''+esc(p.company||'')+'\')">🔍 Find Company</button>'
-    +'</div>';
-  irOpen('Priority #'+(p.rank||i+1)+' — '+p.company,html);
-};
-
-/* ── Drawer: Pipeline ──────────────────────────────────────────────────── */
-window.irShowPip=function(i){
-  var co=(D.pip||[])[i];if(!co)return;
-  document.querySelectorAll('.ir-pcard.sel').forEach(function(e){e.classList.remove('sel');});
-  var cards=document.querySelectorAll('.ir-pcard');if(cards[i])cards[i].classList.add('sel');
-  var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
-  var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-  var lbl=sc>=80?'🔥 Critical Intent':sc>=60?'⚡ High Intent':'👀 Watching';
-  var matched=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===(co.name||'').toLowerCase();})[0];
-  var tps=matched&&matched.talking_points?matched.talking_points:[];
-  var sigs=(co.signals||[]).map(function(s){return '<span class="ir-chip-b">'+esc(s)+'</span>';}).join('');
-  var svcs=(co.service_fit||[]).map(function(s){return '<span class="ir-chip-g">'+esc(s)+'</span>';}).join('');
-  var html=_coHeader(co.name,co.domain,AVC[i%AVC.length])
-    +'<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:13px 15px;margin-bottom:16px">'
-      +ring(sc,rc,80)
-      +'<div style="flex:1"><div style="font-size:12px;font-weight:700;color:'+rc+';margin-bottom:5px">'+lbl+'</div>'
-        +'<div style="height:4px;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:0;background:'+rc+';border-radius:999px;transition:width 1s" data-fw="'+sc+'"></div></div>'
-        +'<div style="font-size:12px;color:#334155;line-height:1.6">'+esc(co.why_now||'')+'</div>'
-      +'</div></div>'
-    +(sigs?'<div class="ir-ds"><div class="ir-ds-lbl">Signals</div><div class="ir-chips">'+sigs+'</div></div>':'')
-    +(svcs?'<div class="ir-ds"><div class="ir-ds-lbl">Service Fit</div><div class="ir-chips">'+svcs+'</div></div>':'')
-    +(tps.length?'<div class="ir-ds"><div class="ir-ds-lbl">✦ AI Talking Points</div><div class="ir-tp-list">'+tps.map(function(tp,j){return '<div class="ir-tp"><div class="ir-tp-n">'+(j+1)+'</div><div class="ir-tp-t">'+esc(tp)+'</div></div>';}).join('')+'</div></div>':'')
-    +(co.opportunity?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Opportunity</div><div class="ir-rev">'+esc(co.opportunity)+'</div></div>':'')
-    +'<div class="ir-ds"><div class="ir-ds-lbl">Recommended Action</div><div class="ir-hl">'+esc(co.next_step||'')+'</div></div>'
-    +'<div id="ir-ai-sect"></div>'
-    +'<div class="ir-drw-btns">'
-      +'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(co.name||'')+'\')">✉ Create Email</button>'
-      +'<a class="ir-btn li" href="'+liCo(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
-      +'<a class="ir-btn li" href="'+liPpl(co.name||'')+'" target="_blank">👤 Decision Makers</a>'
-      +(tps.length?'<button class="ir-btn" onclick="irCopy(this,\''+esc(tps.join('\\n'))+'\')">📋 Copy Talking Points</button>':'')
-      +'<button class="ir-btn" onclick="irDeepAI(\''+esc(co.name||'')+'\')">✦ Full AI Analysis</button>'
-      +'<button class="ir-btn" onclick="irGoto(\''+esc(co.name||'')+'\')">🔍 Find Company</button>'
-    +'</div>';
-  irOpen(co.name,html);
-};
-
-/* ── Drawer: Action ────────────────────────────────────────────────────── */
-window.irShowAct=function(i){
-  var a=(D.acts||[])[i];if(!a)return;
-  document.querySelectorAll('.ir-arow.sel').forEach(function(e){e.classList.remove('sel');});
-  var rows=document.querySelectorAll('.ir-arow');if(rows[i])rows[i].classList.add('sel');
-  var hi=a.urgency==='HIGH';
-  var html='<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">'
-      +'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+(hi?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)')+';color:'+(hi?'#f87171':'#fcd34d')+'">'+esc(a.urgency||'')+'</span>'
-      +(a.deadline?'<span style="font-size:11px;color:#1e293b">⏱ '+esc(a.deadline)+'</span>':'')
-    +'</div>'
-    +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;line-height:1.4;margin-bottom:16px;letter-spacing:-.02em">'+esc(a.action||'')+'</div>'
-    +(a.company&&a.company!=='All'?'<div class="ir-ds"><div class="ir-ds-lbl">Company</div><div style="font-size:14px;font-weight:600;color:#60a5fa">'+esc(a.company)+'</div></div>':'')
-    +'<div class="ir-ds"><div class="ir-ds-lbl">Business Reason</div><div class="ir-ds-val">'+esc(a.reason||'')+'</div></div>'
-    +(a.revenue_impact?'<div class="ir-ds"><div class="ir-ds-lbl">Revenue Impact</div><div class="ir-rev">'+esc(a.revenue_impact)+'</div></div>':'')
-    +'<div class="ir-drw-btns">'
-      +(a.company&&a.company!=='All'?'<button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(a.company)+'\')">✉ Create Email</button>':'')
-      +(a.company&&a.company!=='All'?'<a class="ir-btn li" href="'+liCo(a.company)+'" target="_blank">💼 LinkedIn</a>':'')
-      +(a.company&&a.company!=='All'?'<a class="ir-btn li" href="'+liPpl(a.company)+'" target="_blank">👤 Contacts</a>':'')
-      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(a.action||'')+'\')">📋 Copy Action</button>'
-      +(a.company&&a.company!=='All'?'<button class="ir-btn" onclick="irGoto(\''+esc(a.company)+'\')">🔍 Find Company</button>':'')
-    +'</div>';
-  irOpen('Action #'+(a.rank||i+1),html);
-};
-
-/* ── Drawer: Outreach ──────────────────────────────────────────────────── */
-window.irShowOut=function(i){
-  var ot=(D.out||[])[i];if(!ot)return;
-  document.querySelectorAll('.ir-ocard.sel').forEach(function(e){e.classList.remove('sel');});
-  var cards=document.querySelectorAll('.ir-ocard');if(cards[i])cards[i].classList.add('sel');
-  var t=(ot.timing||'watch').toLowerCase(),tc=t==='now'?'ir-ot-now':t==='soon'?'ir-ot-soon':'ir-ot-watch';
-  var tps=(ot.talking_points||[]).map(function(tp){return '<div class="ir-tp"><div class="ir-tp-n">✓</div><div class="ir-tp-t">'+esc(tp)+'</div></div>';}).join('');
-  var full='Subject: '+(ot.subject||'')+'\n\n'+(ot.opening||'')+'\n\n'+(ot.talking_points||[]).join('\n')+(ot.cta?'\n\n→ '+ot.cta:'');
-  var fid='ief_'+i+'_'+Math.random().toString(36).substr(2,5);
-  var html=_coHeader(ot.company,ot.domain,'#4338ca')
-    +(ot.signal_hook?'<div style="font-size:12px;color:#334155;padding:8px 11px;border-left:2px solid rgba(99,102,241,.4);background:rgba(67,56,202,.05);margin-bottom:14px;line-height:1.6;font-style:italic">📡 '+esc(ot.signal_hook)+'</div>':'')
-    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:14px">'
-      +'<div style="background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);padding:8px 13px;display:flex;gap:5px;align-items:center"><div style="width:8px;height:8px;border-radius:50%;background:#7f1d1d"></div><div style="width:8px;height:8px;border-radius:50%;background:#78350f"></div><div style="width:8px;height:8px;border-radius:50%;background:#14532d"></div><span style="flex:1;text-align:center;font-size:10px;color:#1e293b">Email Preview</span></div>'
-      +'<div style="padding:15px;font-size:13px;color:#64748b;line-height:1.75">'
-        +(ot.subject?'<div style="font-size:13px;font-weight:700;color:#e2e8f0;padding-bottom:11px;margin-bottom:11px;border-bottom:1px solid rgba(255,255,255,.06)">'+esc(ot.subject)+'</div>':'')
-        +(ot.opening?'<p>'+esc(ot.opening)+'</p>':'')
-        +(tps?'<div class="ir-tp-list" style="margin:9px 0">'+tps+'</div>':'')
-        +(ot.cta?'<p style="color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">→ '+esc(ot.cta)+'</p>':'')
-      +'</div>'
-    +'</div>'
-    +'<textarea id="'+fid+'" style="display:none">'+esc(full)+'</textarea>'
-    +'<div class="ir-drw-btns">'
-      +'<button class="ir-btn prim" onclick="irCopyId(this,\''+fid+'\')">Copy Full Email</button>'
-      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(ot.subject||'')+'\')">Copy Subject</button>'
-      +'<button class="ir-btn" onclick="irCopy(this,\''+esc(ot.opening||'')+'\')">Copy Opening</button>'
-      +'<a class="ir-btn li" href="'+liCo(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
-      +'<a class="ir-btn li" href="'+liPpl(ot.company||'')+'" target="_blank">👤 Find Contact</a>'
-      +'<button class="ir-btn" onclick="irDeepAI(\''+esc(ot.company||'')+'\')">✦ AI Analysis</button>'
-    +'</div>';
-  irOpen('Outreach → '+ot.company,html);
-};
-
-/* ── Create Email ──────────────────────────────────────────────────────── */
-window.irMakeEmail=function(i,e){if(e)e.stopPropagation();irMakeEmailFor((D.pip[i]||{}).name||'');};
-window.irMakeEmailFor=function(name){
-  var ot=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===(name||'').toLowerCase();})[0];
-  if(ot){irShowOut(D.out.indexOf(ot));}
-  else{
-    var pip=(D.pip||[]).filter(function(p){return (p.name||'').toLowerCase()===(name||'').toLowerCase();})[0];
-    if(!pip){irOpen('✉ Create Email','<div class="ir-ds-val">No email data available for this company. Try regenerating insights.</div>');return;}
-    var subj='Following up on recent activity at '+pip.name;
-    var body=subj+'\n\nI noticed some significant developments at '+pip.name+' recently. '+(pip.why_now||'')+'\n\nWe specialize in '+(pip.service_fit||[]).join(', ')+' and believe we could help significantly.\n\nWould you be open to a 15-minute call?';
-    var fid='imef_'+Math.random().toString(36).substr(2,5);
-    irOpen('✉ Email — '+pip.name,'<div class="ir-hl" style="margin-bottom:14px">'+esc(pip.why_now||'')+'</div>'
-      +'<textarea id="'+fid+'" style="display:none">'+esc(body)+'</textarea>'
-      +'<div class="ir-drw-btns"><button class="ir-btn prim" onclick="irCopyId(this,\''+fid+'\')">Copy Email</button><button class="ir-btn" onclick="irCopy(this,\''+esc(subj)+'\')">Copy Subject</button></div>');
-  }
-};
-
-/* ── AI Deep Analysis ──────────────────────────────────────────────────── */
-window.irDeepAI=function(company,e){
-  if(e)e.stopPropagation();
-  var sect=$('ir-ai-sect');
-  if(sect){sect.innerHTML='<div class="ir-ai-load"><span class="ir-spin">⟳</span> Analysing '+esc(company)+' with GPT…</div>';}
-  else{irOpen('✦ AI Analysis — '+company,'<div class="ir-ai-load"><span class="ir-spin">⟳</span> Analysing '+esc(company)+' with GPT…</div>');}
-  fetch('/api/company-analysis/'+acct()+'?company='+encodeURIComponent(company))
-    .then(function(r){return r.json();})
-    .then(function(data){
-      var target=$('ir-ai-sect')||$('ir-drw-body');if(!target)return;
-      if(data.error){target.innerHTML='<div style="font-size:11px;color:#f87171">'+esc(data.error)+'</div>';return;}
-      var a=data.analysis||{};
-      var sc=a.score||0,rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-      var objs=(a.objections||[]).map(function(o){return '<div class="ir-obj"><div class="ir-obj-q">⚠ '+esc(o.objection||'')+'</div><div class="ir-obj-a">→ '+esc(o.response||'')+'</div></div>';}).join('');
-      var subjs=(a.subject_lines||[]).map(function(sl){var sid='isl_'+Math.random().toString(36).substr(2,5);return '<div class="ir-subj-alt"><div class="ir-subj-alt-txt" id="'+sid+'">'+esc(sl)+'</div><button class="ir-sc" onclick="irCopy(this,document.getElementById(\''+sid+'\').textContent)">Copy</button></div>';}).join('');
-      var html='<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:14px;padding-top:14px">'
-        +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:12px"><span class="ir-sh-ai">✦ AI Deep Analysis</span></div>'
-        +(a.company_context?'<div class="ir-ds"><div class="ir-ds-lbl">Company Context</div><div class="ir-ds-val">'+esc(a.company_context)+'</div></div>':'')
-        +(a.why_now?'<div class="ir-ds"><div class="ir-ds-lbl">Why Now</div><div class="ir-hl">'+esc(a.why_now)+'</div></div>':'')
-        +(objs?'<div class="ir-ds"><div class="ir-ds-lbl">Anticipated Objections</div>'+objs+'</div>':'')
-        +(subjs?'<div class="ir-ds"><div class="ir-ds-lbl">✦ Alternative Subject Lines</div>'+subjs+'</div>':'')
-        +(a.email_opening?'<div class="ir-ds"><div class="ir-ds-lbl">AI Opening Line</div><div class="ir-hl" style="font-style:italic">'+esc(a.email_opening)+'</div></div>':'')
-        +'<div class="ir-drw-btns"><button class="ir-btn prim" onclick="irMakeEmailFor(\''+esc(company)+'\')">✉ Create Email</button><a class="ir-btn li" href="'+liPpl(company)+'" target="_blank">👤 Find Decision Makers</a></div>'
-        +'</div>';
-      target.innerHTML=html;
-    }).catch(function(){var t=$('ir-ai-sect');if(t)t.innerHTML='<div style="font-size:11px;color:#f87171">Analysis failed.</div>';});
-};
-
-/* ── Helpers ───────────────────────────────────────────────────────────── */
-function _coHeader(name,domain,color){
+/* ── Company drawer ── */
+function coHeader(name,domain,color){
   return '<div style="display:flex;align-items:center;gap:11px;margin-bottom:18px">'
     +'<div style="width:44px;height:44px;border-radius:12px;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0">'+esc(ini(name))+'</div>'
-    +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc(name||'')+'</div>'
-      +(domain?'<div style="font-size:11px;color:#1e293b;margin-top:1px">'+esc(domain)+'</div>':'')+'</div>'
+    +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9">'+esc(name||'')+'</div>'
+    +(domain?'<div style="font-size:11px;color:#55617a;margin-top:1px">'+esc(domain)+'</div>':'')+'</div></div>';
+}
+function aiBtns(name,domain,svc){
+  return '<div class="ir8-drw-btns">'
+    +'<button class="ir8-btn prim" data-iract="email" data-co="'+esc(name)+'" data-svc="'+esc(svc||'')+'">&#9993; AI Email</button>'
+    +'<button class="ir8-btn" data-iract="research" data-co="'+esc(name)+'" data-dom="'+esc(domain||'')+'">&#10022; Research with AI</button>'
+    +'<a class="ir8-btn" href="'+liPpl(name)+'" target="_blank" rel="noopener">&#128100; Decision makers</a>'
+    +'<a class="ir8-btn" href="'+liCo(name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
   +'</div>';
 }
-window.irCopy=function(btn,text){
-  navigator.clipboard&&navigator.clipboard.writeText(text).then(function(){
-    var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
-    setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
-  });
-};
-window.irCopyId=function(btn,id){var el=document.getElementById(id);if(el)irCopy(btn,el.value||el.textContent);};
-window.irGoto=function(name){
-  irClose();var s=document.getElementById('nav-search');
-  if(s){s.value=name;s.dispatchEvent(new Event('input',{bubbles:true}));}
-  var cb=document.getElementById('nav-companies');if(cb)cb.click();
-};
-})();
-</script>
-
-<!-- TABS OVERHAUL -->
-<style>
-/* ═══ PIPELINE / ACTIONS / OUTREACH OVERHAUL ═══════════════════════════════ */
-
-/* Dark gradient background */
-.ir-body{
-  background:
-    radial-gradient(ellipse 60% 50% at 8% 8%, rgba(79,70,229,.22) 0%,transparent 55%),
-    radial-gradient(ellipse 50% 40% at 92% 88%,rgba(124,58,237,.18) 0%,transparent 55%),
-    radial-gradient(ellipse 35% 30% at 55% 45%,rgba(15,23,42,.5) 0%,transparent 65%),
-    linear-gradient(170deg,#020817 0%,#070d1c 60%,#020817 100%) !important;
-  min-height:100%
-}
-
-/* ── Pipeline cards ──────────────────────────────────────────────────────── */
-.ir-pip-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:100%}
-.ir-pcard{
-  border-radius:16px;padding:0;cursor:pointer;overflow:hidden;
-  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
-  border:1px solid rgba(99,102,241,.15);
-  box-shadow:0 4px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
-  transition:all .25s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
-  display:flex;flex-direction:column
-}
-.ir-pcard:hover{
-  border-color:rgba(99,102,241,.4);
-  transform:translateY(-3px);
-  box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(99,102,241,.2) inset
-}
-.ir-pcard.hot{border-color:rgba(239,68,68,.25)!important}
-.ir-pcard.hot:hover{border-color:rgba(239,68,68,.55)!important;box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 30px rgba(239,68,68,.1)!important}
-.ir-pcard.sel{border-color:#4338ca!important;box-shadow:0 0 0 2px rgba(67,56,202,.3)!important}
-
-/* Card header strip */
-.ir-pc-strip{
-  background:linear-gradient(90deg,rgba(99,102,241,.12),rgba(124,58,237,.08),transparent);
-  border-bottom:1px solid rgba(255,255,255,.05);
-  padding:14px 16px;display:flex;align-items:center;gap:12px
-}
-.ir-pc-av2{
-  width:40px;height:40px;border-radius:12px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;font-weight:800;color:#fff;letter-spacing:-.02em;
-  box-shadow:0 4px 12px rgba(0,0,0,.3)
-}
-.ir-pc-meta2{flex:1;min-width:0}
-.ir-pc-name2{font-size:14px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.ir-pc-domain2{font-size:10px;color:#475569;font-weight:400}
-
-/* Intent badge */
-.ir-intent-badge{
-  display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0
-}
-.ir-intent-num{font-size:22px;font-weight:800;letter-spacing:-.04em;line-height:1}
-.ir-intent-lbl{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
-
-/* Card body */
-.ir-pc-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
-.ir-pc-why-lbl{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
-.ir-pc-why2{font-size:12px;color:#94a3b8;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.ir-pc-tags{display:flex;gap:5px;flex-wrap:wrap}
-.ir-pc-svc2{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:rgba(5,150,105,.1);color:#34d399;border:1px solid rgba(5,150,105,.2)}
-.ir-pc-sig2{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
-.ir-pc-opp2{font-size:13px;font-weight:700;color:#fbbf24;letter-spacing:-.01em}
-
-/* Card footer actions */
-.ir-pc-actions{
-  border-top:1px solid rgba(255,255,255,.05);padding:10px 16px;
-  display:flex;gap:6px;background:rgba(0,0,0,.2)
-}
-.ir-pc-btn{
-  display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#64748b;
-  cursor:pointer;font-family:inherit;font-size:10px;font-weight:600;
-  padding:5px 10px;transition:all .15s;white-space:nowrap
-}
-.ir-pc-btn:hover{border-color:rgba(99,102,241,.4);color:#a5b4fc;background:rgba(99,102,241,.08)}
-.ir-pc-btn.ai{background:linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.15));border-color:rgba(99,102,241,.3);color:#a5b4fc}
-.ir-pc-btn.ai:hover{background:linear-gradient(135deg,rgba(79,70,229,.35),rgba(124,58,237,.25));box-shadow:0 0 16px rgba(99,102,241,.2)}
-.ir-pc-btn.li:hover{border-color:rgba(14,165,233,.4);color:#38bdf8;background:rgba(14,165,233,.08)}
-
-/* ── Actions timeline ─────────────────────────────────────────────────────── */
-.ir-act-list{display:flex;flex-direction:column;gap:10px}
-.ir-arow{
-  border-radius:14px;padding:0;cursor:pointer;overflow:hidden;
-  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
-  border:1px solid rgba(255,255,255,.07);
-  box-shadow:0 4px 20px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.04);
-  transition:all .2s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
-  display:flex;overflow:hidden
-}
-.ir-arow:hover{border-color:rgba(255,255,255,.14);transform:translateX(3px);box-shadow:0 6px 28px rgba(0,0,0,.4)}
-.ir-arow.sel{border-color:#4338ca!important}
-/* Urgency stripe */
-.ir-arow-stripe{width:4px;flex-shrink:0}
-.ir-arow-stripe.H{background:linear-gradient(180deg,#ef4444,#b91c1c);box-shadow:4px 0 12px rgba(239,68,68,.3)}
-.ir-arow-stripe.M{background:linear-gradient(180deg,#f59e0b,#b45309);box-shadow:4px 0 10px rgba(245,158,11,.25)}
-.ir-arow-stripe.L{background:rgba(107,114,128,.4)}
-.ir-arow-content{flex:1;padding:14px 16px;min-width:0}
-.ir-arow-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
-.ir-arow-rank2{
-  width:26px;height:26px;border-radius:8px;flex-shrink:0;
-  background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#818cf8;margin-top:1px
-}
-.ir-arow-main{flex:1;min-width:0}
-.ir-arow-action2{font-size:14px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;margin-bottom:3px;line-height:1.3}
-.ir-arow-co2{font-size:11px;color:#6366f1;font-weight:600;margin-bottom:4px}
-.ir-arow-reason2{font-size:12px;color:#64748b;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.ir-arow-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04)}
-.ir-arow-rev2{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(5,150,105,.1);color:#34d399;border:1px solid rgba(5,150,105,.2)}
-.ir-arow-dl2{font-size:10px;padding:3px 9px;border-radius:6px;background:rgba(245,158,11,.08);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
-.ir-arow-urg2{font-size:9px;font-weight:700;padding:3px 8px;border-radius:5px;letter-spacing:.04em}
-.ir-urg2-H{background:rgba(239,68,68,.12);color:#f87171}
-.ir-urg2-M{background:rgba(245,158,11,.1);color:#fbbf24}
-.ir-arow-btns{display:flex;gap:6px;margin-top:8px}
-
-/* ── Outreach email cards ─────────────────────────────────────────────────── */
-.ir-out-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-.ir-ocard{
-  border-radius:16px;overflow:hidden;cursor:pointer;
-  background:linear-gradient(145deg,rgba(15,23,42,.9),rgba(10,14,26,.95));
-  border:1px solid rgba(255,255,255,.08);
-  box-shadow:0 4px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04);
-  transition:all .25s cubic-bezier(.22,1,.36,1);animation:ir-in .4s ease both;
-  display:flex;flex-direction:column
-}
-.ir-ocard:hover{border-color:rgba(99,102,241,.3);transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.5)}
-.ir-ocard.sel{border-color:#4338ca!important}
-/* macOS chrome */
-.ir-ocard-chrome2{
-  background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.06);
-  padding:10px 14px;display:flex;align-items:center;gap:6px
-}
-.ir-od{width:10px;height:10px;border-radius:50%}
-.ir-od-r{background:#ff5f57}.ir-od-y{background:#febc2e}.ir-od-g{background:#28c840}
-.ir-ocard-co2{font-size:11px;color:#475569;flex:1;font-weight:500;margin-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ir-ocard-t2{font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;flex-shrink:0}
-.ir-ot2-now{background:rgba(239,68,68,.18);color:#f87171}
-.ir-ot2-soon{background:rgba(245,158,11,.12);color:#fbbf24}
-.ir-ot2-watch{background:rgba(107,114,128,.12);color:#64748b}
-/* Card body */
-.ir-ocard-body2{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:10px}
-.ir-ocard-hook2{
-  font-size:11px;color:#818cf8;font-style:italic;line-height:1.55;
-  background:rgba(99,102,241,.07);border-left:2px solid rgba(99,102,241,.4);
-  padding:6px 10px;border-radius:0 6px 6px 0
-}
-.ir-ocard-subj2{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em;line-height:1.35}
-.ir-subj-box2{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:10px 12px}
-.ir-subj-hdr2{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
-.ir-subj-lbl2{font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em}
-.ir-copy2{background:none;border:1px solid rgba(255,255,255,.1);border-radius:5px;color:#334155;cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;padding:2px 9px;transition:all .15s}
-.ir-copy2:hover{border-color:#4338ca;color:#818cf8}
-.ir-copy2.ok{border-color:#065f46!important;color:#34d399!important}
-/* Opening preview */
-.ir-ocard-opening{font-size:11px;color:#475569;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-/* Footer */
-.ir-ocard-footer{border-top:1px solid rgba(255,255,255,.05);padding:10px 16px;background:rgba(0,0,0,.2);display:flex;gap:6px;flex-wrap:wrap}
-
-/* ── Generate Email AI Drawer ─────────────────────────────────────────────── */
-.ir-email-gen-section{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
-.ir-email-gen-lbl{font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;display:flex;align-items:center;gap:7px}
-.ir-email-gen-lbl::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
-.ir-email-preview{
-  background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;overflow:hidden;margin-bottom:12px
-}
-.ir-email-preview-chrome{
-  background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);
-  padding:9px 14px;display:flex;align-items:center;gap:5px
-}
-.ir-email-preview-body{padding:16px;font-size:13px;line-height:1.8;color:#64748b}
-.ir-email-preview-body .subj{font-size:14px;font-weight:700;color:#e2e8f0;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)}
-.ir-email-preview-body .body-txt{color:#94a3b8;white-space:pre-wrap}
-.ir-email-preview-body .cta-txt{color:#818cf8;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);margin-top:10px;font-weight:500}
-.ir-gen-ai-btn{
-  display:inline-flex;align-items:center;gap:8px;
-  background:linear-gradient(135deg,#4338ca,#7c3aed);
-  border:none;border-radius:9px;color:#fff;cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:600;padding:9px 18px;
-  transition:all .15s;box-shadow:0 4px 16px rgba(67,56,202,.4)
-}
-.ir-gen-ai-btn:hover{background:linear-gradient(135deg,#3730a3,#6d28d9);box-shadow:0 6px 24px rgba(67,56,202,.6);transform:translateY(-1px)}
-.ir-gen-ai-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
-.ir-spin2{animation:ir-spin .7s linear infinite;display:inline-block}
-@keyframes ir-spin{to{transform:rotate(360deg)}}
-
-/* Shared refinements */
-.ir-drw-body{background:transparent}
-.ir-hl{background:rgba(67,56,202,.1)!important;border-color:rgba(67,56,202,.25)!important}
-.ir-tp-t{color:#94a3b8!important}
-.ir-chips{gap:7px}
-.ir-chip-g,.ir-chip-b{font-size:11px!important;padding:4px 11px!important}
-
-@keyframes ir-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.ir-pip-grid .ir-pcard:nth-child(1){animation-delay:.04s}
-.ir-pip-grid .ir-pcard:nth-child(2){animation-delay:.08s}
-.ir-pip-grid .ir-pcard:nth-child(3){animation-delay:.12s}
-.ir-pip-grid .ir-pcard:nth-child(4){animation-delay:.16s}
-.ir-act-list .ir-arow:nth-child(1){animation-delay:.04s}
-.ir-act-list .ir-arow:nth-child(2){animation-delay:.08s}
-.ir-act-list .ir-arow:nth-child(3){animation-delay:.12s}
-.ir-out-grid .ir-ocard:nth-child(1){animation-delay:.04s}
-.ir-out-grid .ir-ocard:nth-child(2){animation-delay:.08s}
-.ir-out-grid .ir-ocard:nth-child(3){animation-delay:.12s}
-</style>
-
-<script>
-/* ═══ PIPELINE / ACTIONS / OUTREACH RENDER OVERHAUL ════════════════════════ */
-(function(){
-'use strict';
-
-var AVC2=['#4338ca','#dc2626','#d97706','#059669','#7c3aed','#0e7490','#be185d','#065f46','#b45309'];
-function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function ini2(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||''}).join('').slice(0,2).toUpperCase();}
-function acct2(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
-function svcBg(s){var m={SEO:'rgba(5,150,105,.1)',PPC:'rgba(59,130,246,.1)',Content:'rgba(139,92,246,.1)',Brand:'rgba(244,114,182,.1)',RevOps:'rgba(251,191,36,.1)'};return m[s]||'rgba(99,102,241,.1)';}
-function svcFg(s){var m={SEO:'#34d399',PPC:'#60a5fa',Content:'#c4b5fd',Brand:'#f9a8d4',RevOps:'#fbbf24'};return m[s]||'#a5b4fc';}
-function svcBorder(s){var m={SEO:'rgba(5,150,105,.25)',PPC:'rgba(59,130,246,.25)',Content:'rgba(139,92,246,.25)',Brand:'rgba(244,114,182,.25)',RevOps:'rgba(251,191,36,.25)'};return m[s]||'rgba(99,102,241,.25)';}
-
-/* ── Ring SVG ────────────────────────────────────────────────────────────── */
-function ring2(sc,color,sz){
-  sz=sz||64;var cx=sz/2,r=cx-8,c2=2*Math.PI*r,off=c2*(1-sc/100),fs=Math.round(sz*.3);
-  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'" style="flex-shrink:0">'
-    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>'
-    +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round"'
-    +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx+')">'
-    +'<animate attributeName="stroke-dashoffset" from="'+c2.toFixed(1)+'" to="'+off.toFixed(1)+'" dur="1s" fill="freeze"/>'
-    +'</circle>'
-    +'<text x="'+cx+'" y="'+(cx+fs*.36)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
-    +'</svg>';
-}
-
-/* ── PIPELINE render ─────────────────────────────────────────────────────── */
-function renderPip2(pip){
-  var g=document.getElementById('ir-pip');if(!g)return;
-  if(!pip.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No pipeline data yet.</p>';return;}
-  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
-  g.innerHTML='<div class="ir-pip-grid">'+pip.map(function(co,i){
-    var sc=Math.min(100,Math.max(0,parseInt(co.intent_score)||0));
-    var rc=sc>=80?'#ef4444':sc>=60?'#f59e0b':'#6366f1';
-    var rlbl=sc>=80?'Critical':'High Intent';
-    var ricoTxt=sc>=80?'🔥':sc>=60?'⚡':'👀';
-    var av=AVC2[i%AVC2.length];
-    var sigs=(co.signals||[]).slice(0,3).map(function(s){return '<span class="ir-pc-sig2">'+esc2(s)+'</span>';}).join('');
-    var svcs=(co.service_fit||[]).slice(0,2).map(function(s){
-      return '<span class="ir-pc-svc2" style="background:'+svcBg(s)+';color:'+svcFg(s)+';border-color:'+svcBorder(s)+'">'+esc2(s)+'</span>';
-    }).join('');
-    return '<div class="ir-pcard'+(sc>=80?' hot':'')+'" onclick="irShowPip('+i+')" style="animation-delay:'+(i*.06)+'s">'
-      /* Header strip */
-      +'<div class="ir-pc-strip">'
-        +'<div class="ir-pc-av2" style="background:linear-gradient(135deg,'+av+','+av+'cc)">'+esc2(ini2(co.name))+'</div>'
-        +'<div class="ir-pc-meta2">'
-          +'<div class="ir-pc-name2">'+esc2(co.name||'')+'</div>'
-          +'<div class="ir-pc-domain2">'+esc2(co.domain||'')+'</div>'
-        +'</div>'
-        +'<div class="ir-intent-badge">'
-          +'<div class="ir-intent-num" style="color:'+rc+'">'+sc+'</div>'
-          +'<div class="ir-intent-lbl" style="color:'+rc+'">'+ricoTxt+' '+rlbl+'</div>'
-        +'</div>'
-      +'</div>'
-      /* Body */
-      +'<div class="ir-pc-body">'
-        +(co.why_now?'<div><div class="ir-pc-why-lbl">Why now</div><div class="ir-pc-why2">'+esc2(co.why_now)+'</div></div>':'')
-        +(sigs||svcs?'<div class="ir-pc-tags">'+sigs+svcs+'</div>':'')
-        +(co.opportunity?'<div class="ir-pc-opp2">💰 '+esc2(co.opportunity)+'</div>':'')
-      +'</div>'
-      /* Footer actions */
-      +'<div class="ir-pc-actions" onclick="event.stopPropagation()">'
-        +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(co.name)+'\',\''+esc2((co.service_fit||[])[0]||'')+'\',event)">✦ AI Email</button>'
-        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co.name||'')+'" target="_blank">💼 LinkedIn</a>'
-        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/people/?company='+encodeURIComponent(co.name||'')+'&keywords=CMO+CEO+VP+Marketing" target="_blank">👤 Contacts</a>'
-        +'<button class="ir-pc-btn" onclick="irShowPip('+i+',event)" style="margin-left:auto">View Details →</button>'
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-/* ── ACTIONS render ──────────────────────────────────────────────────────── */
-function renderActs2(acts){
-  var c=document.getElementById('ir-act');if(!c)return;
-  if(!acts.length){c.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No actions generated.</p>';return;}
-  var ico={outreach:'📧',campaign:'📣',meeting:'🤝',proposal:'📄',alert:'🔔'};
-  c.innerHTML='<div class="ir-act-list">'+acts.map(function(a,i){
-    var hi=a.urgency==='HIGH',stripe=hi?'H':a.urgency==='MEDIUM'?'M':'L';
-    var icotxt=(ico[a.type]||'⚡')+' ';
-    return '<div class="ir-arow '+(hi?'hi':'med')+'" onclick="irShowAct('+i+')" style="animation-delay:'+(i*.05)+'s">'
-      +'<div class="ir-arow-stripe '+stripe+'"></div>'
-      +'<div class="ir-arow-content">'
-        +'<div class="ir-arow-top">'
-          +'<div class="ir-arow-rank2">'+(a.rank||i+1)+'</div>'
-          +'<div class="ir-arow-main">'
-            +'<div class="ir-arow-action2">'+icotxt+esc2(a.action||'')+'</div>'
-            +(a.company&&a.company!=='All'?'<div class="ir-arow-co2">🏢 '+esc2(a.company)+'</div>':'')
-            +'<div class="ir-arow-reason2">'+esc2(a.reason||'')+'</div>'
-          +'</div>'
-        +'</div>'
-        +'<div class="ir-arow-meta">'
-          +(a.revenue_impact?'<span class="ir-arow-rev2">💰 '+esc2(a.revenue_impact)+'</span>':'')
-          +(a.deadline?'<span class="ir-arow-dl2">⏱ '+esc2(a.deadline)+'</span>':'')
-          +'<span class="ir-arow-urg2 ir-urg2-'+(hi?'H':'M')+'">'+esc2(a.urgency||'MEDIUM')+'</span>'
-        +'</div>'
-        +(a.company&&a.company!=='All'?
-          '<div class="ir-arow-btns" onclick="event.stopPropagation()">'
-            +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(a.company)+'\',\'\',event)">✦ AI Email</button>'
-            +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(a.company||'')+'" target="_blank" onclick="event.stopPropagation()">💼 LinkedIn</a>'
-          +'</div>':'')
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-/* ── OUTREACH render ─────────────────────────────────────────────────────── */
-function renderOut2(out){
-  var g=document.getElementById('ir-out');if(!g)return;
-  if(!out.length){g.innerHTML='<p style="color:#1e293b;padding:40px;text-align:center;font-size:13px">No outreach data.</p>';return;}
-  g.innerHTML='<div class="ir-out-grid">'+out.map(function(ot,i){
-    var t=(ot.timing||'watch').toLowerCase();
-    var tc=t==='now'?'ir-ot2-now':t==='soon'?'ir-ot2-soon':'ir-ot2-watch';
-    var sid='os2_'+i+'_'+Math.random().toString(36).substr(2,5);
-    return '<div class="ir-ocard" onclick="irShowOut('+i+')" style="animation-delay:'+(i*.06)+'s">'
-      +'<div class="ir-ocard-chrome2">'
-        +'<div class="ir-od ir-od-r"></div><div class="ir-od ir-od-y"></div><div class="ir-od ir-od-g"></div>'
-        +'<div class="ir-ocard-co2">'+esc2(ot.company||'')+(ot.domain?' · '+esc2(ot.domain):'')+'</div>'
-        +'<span class="ir-ocard-t2 '+tc+'">'+t.toUpperCase()+'</span>'
-      +'</div>'
-      +'<div class="ir-ocard-body2">'
-        +(ot.signal_hook?'<div class="ir-ocard-hook2">📡 '+esc2(ot.signal_hook)+'</div>':'')
-        +'<div class="ir-subj-box2">'
-          +'<div class="ir-subj-hdr2"><span class="ir-subj-lbl2">Subject</span>'
-            +'<button class="ir-copy2" id="'+sid+'" onclick="event.stopPropagation();irCopy2(this,\''+esc2(ot.subject||'')+'\')">Copy</button>'
-          +'</div>'
-          +'<div class="ir-ocard-subj2">'+esc2(ot.subject||'')+'</div>'
-        +'</div>'
-        +(ot.opening?'<div class="ir-ocard-opening">'+esc2(ot.opening)+'</div>':'')
-      +'</div>'
-      +'<div class="ir-ocard-footer" onclick="event.stopPropagation()">'
-        +'<button class="ir-pc-btn ai" onclick="irAIEmail(\''+esc2(ot.company)+'\',\'\',event)">✦ AI Email</button>'
-        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/companies/?keywords='+encodeURIComponent(ot.company||'')+'" target="_blank">💼 LinkedIn</a>'
-        +'<a class="ir-pc-btn li" href="https://linkedin.com/search/results/people/?company='+encodeURIComponent(ot.company||'')+'&keywords=CMO+CEO+CTO+VP" target="_blank">👤 Contacts</a>'
-        +'<button class="ir-pc-btn" onclick="irShowOut('+i+',event)" style="margin-left:auto">Full Email →</button>'
-      +'</div>'
-    +'</div>';
-  }).join('')+'</div>';
-}
-
-/* ── AI Email Generation ─────────────────────────────────────────────────── */
-window.irAIEmail=function(company, service, e){
-  if(e){e.stopPropagation();e.preventDefault();}
-  var html=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-      +'<div style="width:44px;height:44px;border-radius:12px;background:#4338ca;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0">'+esc2(ini2(company))+'</div>'
-      +'<div><div style="font-size:16px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em">'+esc2(company)+'</div>'
-        +'<div style="font-size:11px;color:#334155">GPT-researched personalised email</div></div>'
+function irShowCo(i){
+  var f=D.feed[i];if(!f)return;
+  var c=f.score!=null?scC(f.score):'#a5b4fc';
+  var m=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===f.name.toLowerCase();})[0];
+  var tps=(m&&m.talking_points)||[];
+  var html=coHeader(f.name,f.domain,AVC[i%AVC.length])
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'
+      +(f.score!=null?'<div style="font-size:30px;font-weight:800;color:'+c+'">'+f.score+'<span style="font-size:13px;color:#55617a;font-weight:600"> /100 intent</span></div>':'')
+      +(f.timing?'<span class="ir8-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')
     +'</div>'
-    +'<div id="ir-email-gen-out">'
-      +'<div class="ir-ai-load" style="background:rgba(67,56,202,.07);border:1px solid rgba(67,56,202,.18);border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:10px;font-size:13px;color:#818cf8">'
-        +'<span class="ir-spin2">⟳</span> Researching '+esc2(company)+' signals with GPT…'
-      +'</div>'
-    +'</div>';
-  if(typeof irOpen==='function') irOpen('✦ AI Email — '+company, html);
-  else if(typeof vfOpen==='function') vfOpen('✦ AI Email — '+company, html);
-  else if(typeof fpOpen==='function') fpOpen('✦ AI Email — '+company, html);
+    +(f.why?'<div class="ir8-ds"><div class="ir8-ds-l">Why now</div><div class="ir8-hl">'+esc(f.why)+'</div></div>':'')
+    +(f.pitch&&f.pitch!==f.why?'<div class="ir8-ds"><div class="ir8-ds-l">What to pitch</div><div class="ir8-ds-v">'+esc(f.pitch)+'</div></div>':'')
+    +(f.signals.length?'<div class="ir8-ds"><div class="ir8-ds-l">Signals</div><div class="ir8-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'')
+    +(f.svc.length?'<div class="ir8-ds"><div class="ir8-ds-l">Service fit</div><div class="ir8-chips">'+f.svc.map(function(s){return chip(s,true);}).join('')+'</div></div>':'')
+    +(tps.length?'<div class="ir8-ds"><div class="ir8-ds-l">&#10022; Talking points</div>'+tps.map(function(t,j){return '<div class="ir8-tp"><div class="ir8-tp-n">'+(j+1)+'</div><div class="ir8-tp-t">'+esc(t)+'</div></div>';}).join('')+'</div>':'')
+    +(f.next?'<div class="ir8-ds"><div class="ir8-ds-l">Next step</div><div class="ir8-ds-v">'+esc(f.next)+'</div></div>':'')
+    +aiBtns(f.name,f.domain,f.svc[0]||'');
+  irOpen(f.name,html);
+}
 
-  fetch('/api/generate-email/'+acct2()+'?company='+encodeURIComponent(company)+'&service='+encodeURIComponent(service||''))
+/* ── Action drawer ── */
+function irShowAct(i){
+  var a=D.acts[i];if(!a)return;
+  var hi=a.urgency==='HIGH';
+  var html='<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">'
+    +'<span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+(hi?'rgba(239,68,68,.1)':'rgba(245,158,11,.08)')+';color:'+(hi?'#f87171':'#fcd34d')+'">'+esc(a.urgency||'')+'</span>'
+    +(a.deadline?'<span style="font-size:11px;color:#55617a">&#9201; '+esc(a.deadline)+'</span>':'')+'</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;line-height:1.45;margin-bottom:16px">'+esc(a.action||'')+'</div>'
+    +(a.company&&a.company!=='All'?'<div class="ir8-ds"><div class="ir8-ds-l">Company</div><div class="ir8-ds-v" style="color:#7cb3f5;font-weight:600">'+esc(a.company)+'</div></div>':'')
+    +(a.reason?'<div class="ir8-ds"><div class="ir8-ds-l">Why it matters</div><div class="ir8-ds-v">'+esc(a.reason)+'</div></div>':'')
+    +(a.company&&a.company!=='All'?aiBtns(a.company,'',''):'');
+  irOpen('Action #'+(a.rank||i+1),html);
+}
+
+/* ── Brief drawer ── */
+function irShowBrief(){
+  var ins=D.ins||{};
+  var mp=ins.market_pulse||[],sm=ins.strategic_moves||[];
+  var html='<div style="font-size:14px;line-height:1.85;color:#cbd5e1;margin-bottom:20px">'+esc(ins.brief||ins.summary||'')+'</div>'
+    +(mp.length?'<div class="ir8-ds"><div class="ir8-ds-l">Market pulse</div>'+mp.map(function(m){return '<div style="font-size:12.5px;color:#9fabbe;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.65">&bull; '+esc(m)+'</div>';}).join('')+'</div>':'')
+    +(sm.length?'<div class="ir8-ds"><div class="ir8-ds-l">Strategic moves</div>'+sm.map(function(m){
+      return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 13px;margin-bottom:6px">'
+        +'<div style="font-size:12.5px;font-weight:700;color:#e6edf6;margin-bottom:3px">'+esc(m.move||'')+'</div>'
+        +(m.rationale?'<div style="font-size:11.5px;color:#55617a;line-height:1.55">'+esc(m.rationale)+'</div>':'')
+        +(m.impact?'<div style="font-size:11.5px;color:#34d399;margin-top:4px">'+esc(m.impact)+'</div>':'')
+        +(m.owner?'<div style="font-size:10px;color:#3b4763;margin-top:4px">Owner: '+esc(m.owner)+'</div>':'')+'</div>';
+    }).join('')+'</div>':'');
+  irOpen('Executive brief',html);
+}
+
+/* ── AI Email (always generated live via ChatGPT) ── */
+window.irAIEmail=function(co,svc){
+  if(!co)return;
+  var f=D.feed.filter(function(x){return x.name.toLowerCase()===co.toLowerCase();})[0];
+  var ctx=coHeader(co,(f&&f.domain)||'','#4338ca')
+    +((f&&f.signals.length)?'<div class="ir8-ds"><div class="ir8-ds-l">Signals sent to the AI</div><div class="ir8-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'')
+    +((f&&f.why)?'<div class="ir8-ds"><div class="ir8-ds-l">Context</div><div class="ir8-ds-v">'+esc(f.why)+'</div></div>':'');
+  irOpen('✉ AI Email — '+co,ctx
+    +'<div class="ir8-load" id="ir8-mload"><span class="ir8-spin">&#10227;</span> ChatGPT is writing a personalised email from this company’s live signals and Position2’s services…</div>'
+    +'<div id="ir8-mout"></div>');
+  fetch('/api/generate-email/'+acct()+'?company='+encodeURIComponent(co)+(svc?'&service='+encodeURIComponent(svc):''))
     .then(function(r){return r.json();})
-    .then(function(data){
-      var out=document.getElementById('ir-email-gen-out');if(!out)return;
-      if(data.error){out.innerHTML='<div style="color:#f87171;padding:12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px"><strong>Error:</strong> '+esc2(data.error)+'</div>';return;}
-      var em=data.email||{};
-      var fid='aief_'+Math.random().toString(36).substr(2,6);
-      var fullEmail='Subject: '+(em.subject||'')+'\n\n'+(em.greeting||'Hi,')+'\n\n'+(em.opening||'')+'\n\n'+(em.body||'')+(em.cta?'\n\n'+em.cta:'')+(em.ps?'\n\nP.S. '+em.ps:'');
-      out.innerHTML=
-        '<div class="ir-email-gen-lbl">✦ GPT-Personalised Email ('+data.signals_used+' signals used)</div>'
-        +'<div class="ir-email-preview">'
-          +'<div class="ir-email-preview-chrome">'
-            +'<div class="ir-od ir-od-r"></div><div class="ir-od ir-od-y"></div><div class="ir-od ir-od-g"></div>'
-            +'<span style="flex:1;text-align:center;font-size:10px;color:#334155">'+esc2(company)+'</span>'
-          +'</div>'
-          +'<div class="ir-email-preview-body">'
-            +(em.subject?'<div class="subj">'+esc2(em.subject)+'</div>':'')
-            +'<div class="body-txt">'
-              +(em.greeting?esc2(em.greeting)+'\n\n':'')
-              +(em.opening?esc2(em.opening)+'\n\n':'')
-              +(em.body?esc2(em.body):'')
-            +'</div>'
-            +(em.cta?'<div class="cta-txt">'+esc2(em.cta)+'</div>':'')
-            +(em.ps?'<div style="margin-top:10px;font-size:12px;color:#475569;font-style:italic">P.S. '+esc2(em.ps)+'</div>':'')
-          +'</div>'
+    .then(function(d){
+      var L=$('ir8-mload');if(L)L.remove();
+      var out=$('ir8-mout');if(!out)return;
+      if(d.error){out.innerHTML='<div class="ir8-err" style="margin:0;max-width:none">'+esc(d.error)+'</div>';return;}
+      var em=d.email||{};
+      var full='Subject: '+(em.subject||'')+'\n\n'+(em.greeting||'')+'\n\n'+(em.opening||'')+'\n\n'+(em.body||'')+'\n\n'+(em.cta||'')+(em.ps?'\n\nP.S. '+em.ps:'');
+      out.innerHTML=(em.why_now?'<div class="ir8-hl" style="margin-bottom:13px">&#9201; '+esc(em.why_now)+'</div>':'')
+        +'<div class="ir8-mail">'
+          +(em.subject?'<div class="ir8-mail-sub">'+esc(em.subject)+'</div>':'')
+          +(em.greeting?'<p>'+esc(em.greeting)+'</p>':'')
+          +(em.opening?'<p>'+esc(em.opening)+'</p>':'')
+          +(em.body?'<p>'+esc(em.body)+'</p>':'')
+          +(em.cta?'<p style="color:#a5b4fc">'+esc(em.cta)+'</p>':'')
+          +(em.ps?'<p style="color:#55617a;font-size:12px;margin-bottom:0">P.S. '+esc(em.ps)+'</p>':'')
         +'</div>'
-        +(em.recommended_service||em.why_now?
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
-            +(em.recommended_service?'<div style="background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.18);border-radius:8px;padding:9px 12px"><div style="font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Pitch Service</div><div style="font-size:13px;font-weight:700;color:#34d399">'+esc2(em.recommended_service)+'</div></div>':'')
-            +(em.why_now?'<div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.16);border-radius:8px;padding:9px 12px"><div style="font-size:9px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Timing Reason</div><div style="font-size:12px;color:#fbbf24;line-height:1.4">'+esc2(em.why_now)+'</div></div>':'')
-          +'</div>':'')
-        +'<textarea id="'+fid+'" style="display:none">'+esc2(fullEmail)+'</textarea>'
-        +'<div style="display:flex;gap:7px;flex-wrap:wrap">'
-          +'<button class="ir-gen-ai-btn" onclick="irCopyId2(this,\''+fid+'\')">📋 Copy Full Email</button>'
-          +'<button class="ir-pc-btn" onclick="irCopy2(this,\''+esc2(em.subject||'')+'\')">Copy Subject</button>'
-          +(em.opening?'<button class="ir-pc-btn" onclick="irCopy2(this,\''+esc2(em.opening||'')+'\')">Copy Opening</button>':'')
-          +'<button class="ir-gen-ai-btn" onclick="irAIEmail(\''+esc2(company)+'\',\''+esc2(service||'')+'\')">↺ Regenerate</button>'
+        +'<div class="ir8-note">'+(em.recommended_service?'Recommended service: '+esc(em.recommended_service)+' · ':'')+(d.signals_used||0)+' signals used</div>'
+        +'<textarea id="ir8-fullmail" style="display:none">'+esc(full)+'</textarea>'
+        +'<div class="ir8-drw-btns">'
+          +'<button class="ir8-btn prim" data-iract="copyid" data-id="ir8-fullmail">&#128203; Copy email</button>'
+          +'<button class="ir8-btn" data-iract="copy" data-copy="'+esc(em.subject||'')+'">Copy subject</button>'
+          +'<button class="ir8-btn" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(svc||'')+'">&#8635; Regenerate</button>'
         +'</div>';
     })
-    .catch(function(e){
-      var out=document.getElementById('ir-email-gen-out');
-      if(out)out.innerHTML='<div style="color:#f87171;padding:12px">Request failed: '+esc2(e.message)+'</div>';
-    });
+    .catch(function(){var L=$('ir8-mload');if(L)L.remove();var out=$('ir8-mout');if(out)out.innerHTML='<div class="ir8-err" style="margin:0;max-width:none">Email generation failed. Try again.</div>';});
 };
 
-window.irCopy2=function(btn,text){
+/* ── Research with AI (ChatGPT + web search) ── */
+window.irResearch=function(co,dom){
+  if(!co)return;
+  irOpen('✦ Research with AI — '+co,coHeader(co,dom||'','#7c3aed')
+    +'<div class="ir8-load" id="ir8-rload"><span class="ir8-spin">&#10227;</span> ChatGPT is researching '+esc(co)+' across the web — news, leadership, market position, marketing gaps…</div>'
+    +'<div id="ir8-rout"></div>');
+  fetch('/api/research-company/'+acct()+'?company='+encodeURIComponent(co)+(dom?'&domain='+encodeURIComponent(dom):''))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var L=$('ir8-rload');if(L)L.remove();
+      var out=$('ir8-rout');if(!out)return;
+      if(d.error){out.innerHTML='<div class="ir8-err" style="margin:0;max-width:none">'+esc(d.error)+'</div>';return;}
+      var R=d.research||{};
+      var html='';
+      if(R.overview)html+='<div class="ir8-ds"><div class="ir8-ds-l">Overview</div><div class="ir8-ds-v">'+esc(R.overview)+'</div></div>';
+      var rd=R.recent_developments||[];
+      if(rd.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Recent developments</div>'+rd.map(function(x){
+        return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">'
+          +'<div style="font-size:12.5px;font-weight:600;color:#dee5ef">'+esc(x.headline||'')+(x.date?' <span style="color:#3b4763;font-weight:400;font-size:10px">· '+esc(x.date)+'</span>':'')+'</div>'
+          +(x.detail?'<div style="font-size:11.5px;color:#55617a;line-height:1.55;margin-top:2px">'+esc(x.detail)+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+      var kp=R.key_people||[];
+      if(kp.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Key people</div><div class="ir8-chips">'+kp.map(function(p){return '<span class="ir8-chip">'+esc(p.name||'')+(p.role?' · '+esc(p.role):'')+'</span>';}).join('')+'</div></div>';
+      if(R.digital_presence)html+='<div class="ir8-ds"><div class="ir8-ds-l">Digital presence</div><div class="ir8-ds-v">'+esc(R.digital_presence)+'</div></div>';
+      var op=R.opportunities||[];
+      if(op.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Opportunities for Position2</div>'+op.map(function(o,j){return '<div class="ir8-tp"><div class="ir8-tp-n">'+(j+1)+'</div><div class="ir8-tp-t">'+esc(o)+'</div></div>';}).join('')+'</div>';
+      if(R.position2_angle)html+='<div class="ir8-ds"><div class="ir8-ds-l">&#10022; Position2 angle</div><div class="ir8-hl">'+esc(R.position2_angle)+'</div></div>';
+      var rs=R.recommended_services||[];
+      if(rs.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Recommended services</div><div class="ir8-chips">'+rs.map(function(s){return chip(s,true);}).join('')+'</div></div>';
+      var cs=R.conversation_starters||[];
+      if(cs.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Conversation starters</div>'+cs.map(function(c){
+        return '<div style="display:flex;gap:8px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 11px;margin-bottom:6px">'
+          +'<div style="font-size:12.5px;color:#9fabbe;line-height:1.55;flex:1">'+esc(c)+'</div>'
+          +'<button class="ir8-btn" style="padding:3px 9px;font-size:10px" data-iract="copy" data-copy="'+esc(c)+'">Copy</button></div>';
+      }).join('')+'</div>';
+      var src=R.sources||[];
+      if(src.length)html+='<div class="ir8-ds"><div class="ir8-ds-l">Sources</div>'+src.map(function(s){
+        var u=String(s.url||'');if(!/^https?:\/\//i.test(u))u='';
+        return u?'<a class="ir8-src" href="'+esc(u)+'" target="_blank" rel="noopener">&#128279; '+esc(s.title||u)+'</a>':'';
+      }).join('')+'</div>';
+      if(!d.web_search_used)html+='<div class="ir8-note">Generated without live web access — based on tracked signals and AI knowledge.</div>';
+      html+='<div class="ir8-drw-btns">'
+        +'<button class="ir8-btn prim" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(rs[0]||'')+'">&#9993; AI Email</button>'
+        +'<button class="ir8-btn" data-iract="research" data-co="'+esc(co)+'" data-dom="'+esc(dom||'')+'">&#8635; Refresh research</button>'
+        +'<a class="ir8-btn" href="'+liCo(co)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
+      +'</div>';
+      out.innerHTML=html||'<div class="ir8-note">No research returned. Try again.</div>';
+    })
+    .catch(function(){var L=$('ir8-rload');if(L)L.remove();var out=$('ir8-rout');if(out)out.innerHTML='<div class="ir8-err" style="margin:0;max-width:none">Research failed. Try again.</div>';});
+};
+
+/* ── Copy ── */
+window.irCopy=function(btn,text){
   if(!navigator.clipboard)return;
   navigator.clipboard.writeText(text).then(function(){
     var o=btn.textContent;btn.textContent='Copied ✓';btn.classList.add('ok');
     setTimeout(function(){btn.textContent=o;btn.classList.remove('ok');},2000);
   });
 };
-window.irCopyId2=function(btn,id){var el=document.getElementById(id);if(el)irCopy2(btn,el.value||el.textContent);};
-
-/* ── Hook into existing render cycle ─────────────────────────────────────── */
-(function hookRender(){
-  if(typeof window._renderAll2==='undefined'){
-    var _orig=window._renderAll||null;
-    window._patchedRenderTabs=function(data){
-      var ins=data&&data.insights||{};
-      if(ins.pipeline)  {window._FD&&(window._FD.pip=(ins.pipeline||[]).slice(0,9));renderPip2(ins.pipeline||[]);}
-      if(ins.actions)   {window._FD&&(window._FD.acts=ins.actions||[]);renderActs2(ins.actions||[]);}
-      if(ins.outreach)  {window._FD&&(window._FD.out=ins.outreach||[]);renderOut2(ins.outreach||[]);}
-    };
-    window._renderAll2=true;
-    /* Watch for DOM changes to patch cards after render */
-    var mo=new MutationObserver(function(){
-      if(window._FD&&window._FD.pip&&window._FD.pip.length){
-        var g=document.getElementById('ir-pip');
-        if(g&&g.innerHTML&&!g.querySelector('.ir-pcard')) {renderPip2(window._FD.pip);}
-      }
-      if(window._FD&&window._FD.acts&&window._FD.acts.length){
-        var a=document.getElementById('ir-act');
-        if(a&&a.innerHTML&&!a.querySelector('.ir-arow')) {renderActs2(window._FD.acts);}
-      }
-      if(window._FD&&window._FD.out&&window._FD.out.length){
-        var o=document.getElementById('ir-out');
-        if(o&&o.innerHTML&&!o.querySelector('.ir-ocard')) {renderOut2(window._FD.out);}
-      }
-    });
-    ['ir-pip','ir-act','ir-out'].forEach(function(id){
-      var el=document.getElementById(id);if(el)mo.observe(el,{childList:true,subtree:false});
-    });
-  }
-})();
-
-/* Override the existing tab render functions so our new designs take effect */
-(function waitAndOverride(){
-  setTimeout(function(){
-    /* After irGenerate completes, re-render with new designs if data exists */
-    var _origFetch=window.fetch;
-    if(!_origFetch||window._tabsPatched)return;
-    window._tabsPatched=true;
-    var _patchedFetch=function(url,opts){
-      var p=_origFetch.apply(this,arguments);
-      if(typeof url==='string'&&url.indexOf('/api/insights/')>-1){
-        return p.then(function(r){
-          r.clone().json().then(function(data){
-            if(data&&data.insights){
-              var ins=data.insights;
-              window._FD=window._FD||{};
-              window._FD.pip=(ins.pipeline||[]).slice(0,9);
-              window._FD.acts=ins.actions||[];
-              window._FD.out=ins.outreach||[];
-              setTimeout(function(){
-                renderPip2(window._FD.pip);
-                renderActs2(window._FD.acts);
-                renderOut2(window._FD.out);
-              },600);
-            }
-          }).catch(function(){});
-          return r;
-        });
-      }
-      return p;
-    };
-    window.fetch=_patchedFetch;
-  },800);
-})();
 })();
 </script>
 
