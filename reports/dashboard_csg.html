@@ -1407,6 +1407,24 @@ h2::after,.section-title::after{
 #content{background:#020817!important}
 </style>
 
+
+<style>
+/* Layout containment fix */
+#section-insights{overflow:hidden;width:100%;box-sizing:border-box}
+.ir-bar,.ir-body{width:100%;box-sizing:border-box}
+.ir-bar-top{flex-wrap:wrap;row-gap:6px}
+.ir-filters{flex-wrap:wrap;row-gap:4px;min-width:0}
+.ir-gen{flex-shrink:0}
+.ir-tiles,.ir-pri-grid,.ir-pip-grid,.ir-out-grid,.ir-infog,.ir-grid2{width:100%;box-sizing:border-box;min-width:0}
+.ir-tile,.ir-pc,.ir-pcard,.ir-ocard,.ir-panel-card,.ir-ic,.ir-arow{min-width:0;overflow:hidden;box-sizing:border-box}
+.ir-pc-name,.ir-pcard-name,.ir-ocard-subj,.ir-ocard-to,.ir-arow-action{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%}
+.ir-pc-sig{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}
+.ir-pc-top,.ir-pcard-top,.ir-ocard-chrome{min-width:0;overflow:hidden}
+.ir-pc-foot,.ir-pcard-top,.ir-pc-top{min-width:0}
+.ir-tile-val{font-size:22px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-infog{grid-template-columns:repeat(2,1fr)!important}
+</style>
+
 </head>
 <body>
 <div id="app">
@@ -4334,10 +4352,10 @@ function _renderOv(data,ins){
     '<div class="ir-tiles">'
     +[{i:'💰',v:pe.total||kp.estimated_value||'—',r:null,l:'Pipeline Value',g:'#fbbf24'},
       {i:'🔥',v:kp.high_priority||hot,r:kp.high_priority||hot,l:'Hot Targets',g:'#ef4444'},
-      {i:'🎯',v:kp.avg_intent?Math.round(kp.avg_intent):null,r:kp.avg_intent?Math.round(kp.avg_intent):null,l:'Avg Intent',sx:'/100',g:'#6366f1'},
+      {i:'🎯',v:kp.avg_intent?Math.round(kp.avg_intent)+'/ 100':'—',r:kp.avg_intent?Math.round(kp.avg_intent):null,l:'Avg Intent',sx:'/ 100',g:'#6366f1'},
       {i:'⚡',v:D.acts.length,r:D.acts.length,l:'Actions',g:'#f59e0b'}]
     .map(function(k,i){
-      var v=k.r!=null?'<span id="irkv'+i+'">0</span>'+(k.sx||''):esc(String(k.v));
+      var kval=(k.v!=null&&String(k.v)!=='null')?esc(String(k.v)):'—';var v=k.r!=null?'<span id="irkv'+i+'">0</span>'+(k.sx?' <span style="font-size:13px;color:#475569">'+k.sx+'</span>':''):kval;
       return '<div class="ir-tile" style="animation-delay:'+(i*.06)+'s"><span class="ir-tile-ico">'+k.i+'</span><div class="ir-tile-val">'+v+'</div><div class="ir-tile-lbl">'+k.l+'</div><div class="ir-tile-glow" style="background:radial-gradient(circle,'+k.g+' 0%,transparent 70%)"></div></div>';
     }).join('')+'</div>'
 
