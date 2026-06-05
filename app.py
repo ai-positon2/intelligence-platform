@@ -1902,6 +1902,77 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
     }
 
 
+
+@app.route("/api/company-analysis/<account_id>")
+@login_required
+def company_analysis(account_id):
+    """Deep AI analysis of a single company for the insights drawer."""
+    import sqlite3, re as _re
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"}), 404
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"}), 500
+    company_name = request.args.get("company", "")
+    if not company_name:
+        return jsonify({"error": "company parameter required"}), 400
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT a.signal_type, a.signal_detail, a.severity, a.signal_date, "
+            "c.industry, c.domain, c.city, c.state "
+            "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+            "WHERE c.name LIKE ? AND a.dry_run=0 ORDER BY a.signal_date DESC LIMIT 20",
+            ["%" + company_name + "%"]
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return jsonify({"error": "No signals found for this company"}), 200
+        signals = [dict(r) for r in rows]
+        sig_str = "; ".join(
+            "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                ": "+s["signal_detail"][:100] if s.get("signal_detail") else "")
+            for s in signals[:10])
+        industry = signals[0].get("industry","") if signals else ""
+        system = (
+            "You are a senior B2B sales strategist at Position2 (SEO, PPC, Content, Brand, RevOps). "
+            "Generate a deep analysis of this prospect company in ONLY valid JSON: "
+            '{"score":85,"score_reason":"one sentence why",'
+            '"company_context":"2 sentences about what this company does and why they matter",'
+            '"why_now":"2 sentences on why right now is the perfect time to reach out",'
+            '"talking_points":["specific point 1 tied to signal","specific point 2","specific point 3"],'
+            '"objections":[{"objection":"likely pushback","response":"how to handle it"}],'
+            '"subject_lines":["option 1 <55 chars","option 2","option 3"],'
+            '"email_opening":"2 sentence personalized opening referencing their specific situation",'
+            '"recommended_service":"SEO|PPC|Content|Brand|RevOps",'
+            '"service_reason":"why this specific service fits their situation",'
+            '"urgency":"HIGH|MEDIUM|LOW","urgency_reason":"why"}'
+        )
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key)
+        resp = oai.chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": "Company: %s | Industry: %s | Signals: %s" % (company_name, industry, sig_str)}
+            ],
+            max_completion_tokens=1200,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else raw
+        s2=raw.find("{"); e2=raw.rfind("}")
+        if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
+        return jsonify({"ok": True, "company": company_name, "analysis": json.loads(raw)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
