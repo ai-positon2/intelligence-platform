@@ -4370,9 +4370,26 @@ window.irGenerate=function(){
   var ind=$('ir-industry');if(ind&&ind.value)p.set('industry',ind.value);
   _showLoad();
   fetch('/api/insights/'+acct()+'?'+p.toString())
-    .then(function(r){return r.json();})
-    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stepTimer);data.error?_showErr(data.error):_renderAll(data);})
-    .catch(function(e){if(btn)btn.disabled=false;clearInterval(_stepTimer);_showErr('Network error: '+e.message);});
+    .then(function(r){
+      var ct=r.headers.get('content-type')||'';
+      if(!ct.includes('json')){
+        return r.text().then(function(t){
+          var hint=r.status===500?'Server error (500). Check Railway logs.':'HTTP '+r.status;
+          throw new Error(hint);
+        });
+      }
+      return r.json();
+    })
+    .then(function(data){
+      if(btn){btn.disabled=false;btn.textContent='Generate Insights';}
+      clearInterval(_stepTimer);
+      data.error?_showErr(data.error):_renderAll(data);
+    })
+    .catch(function(e){
+      if(btn){btn.disabled=false;btn.textContent='Generate Insights';}
+      clearInterval(_stepTimer);
+      _showErr(e.message||'Request failed. Try again.');
+    });
 };
 function _showLoad(){
   $('ir-empty').style.display='none';$('ir-ov').style.display='none';$('ir-loading').style.display='flex';
