@@ -4187,7 +4187,7 @@ function ring(sc,color,sz){
   return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'
     +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="6"/>'
     +'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round"'
-    +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx)'">'
+    +' stroke-dasharray="'+c2.toFixed(1)+'" stroke-dashoffset="'+c2.toFixed(1)+'" transform="rotate(-90 '+cx+' '+cx+')">'
     +'<animate attributeName="stroke-dashoffset" from="'+c2.toFixed(1)+'" to="'+off.toFixed(1)+'" dur="1s" fill="freeze"/></circle>'
     +'<text x="'+cx+'" y="'+(cx+fs*.37)+'" text-anchor="middle" fill="'+color+'" font-size="'+fs+'" font-weight="800" font-family="Inter,sans-serif">'+sc+'</text>'
     +'</svg>';
