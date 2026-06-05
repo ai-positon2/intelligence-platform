@@ -1751,11 +1751,13 @@ def insights_generate(account_id):
                 co, info["domain"], info["industry"], len(info["sigs"]), sig_str))
 
         schema = (
-            '{"brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, ONE sales action.",'
-            +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","call_timing":"Call today|Call this week|Warm email first"}],'
+            '{"headline":"one punchy 8-12 word headline capturing this week in the market",'
+            +'  "brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, ONE sales action.",'
+            +'  "kairo_take":"one bold, non-obvious strategic observation from the data that a human analyst would likely miss",'
+            +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","call_timing":"Call today|Call this week|Warm email first","hook":"one-line conversation opener citing the signal"}],'
             +'  "market_pulse":["specific data-backed observation citing companies"],'
             +'  "strategic_moves":[{"move":"title","rationale":"signal-backed reason","impact":"qualitative business impact, no dollar figures","owner":"BDR|Account Exec|Marketing|Leadership"}],'
-            +'  "pipeline":[{"name":"","domain":"","intent_score":85,"signals":["type"],"why_now":"","service_fit":["SEO"],"next_step":""}],'
+            +'  "pipeline":[{"name":"","domain":"","intent_score":85,"momentum":"rising|steady|cooling","signals":["type"],"why_now":"","service_fit":["SEO"],"contact_title":"best job title to approach","hook":"one-line opener citing their signal","next_step":""}],'
             +'  "actions":[{"rank":1,"type":"outreach","company":"","action":"","reason":"","deadline":"Today","urgency":"HIGH"}],'
             +'  "outreach":[{"company":"","domain":"","timing":"now","signal_hook":"","subject":"","opening":"","talking_points":[""],"cta":""}],'
             +'  "themes":[{"theme":"","count":0,"companies":[""],"campaign_angle":""}],'
@@ -1763,14 +1765,15 @@ def insights_generate(account_id):
         )
 
         system_prompt = (
-            "You are the Chief Revenue Officer of Position2, a B2B digital marketing agency. "
-            "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
-            "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
-            "Brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
-            "Be specific: name companies, cite signals. NEVER include revenue estimates, "
-            "pipeline values, or dollar figures of any kind. No fluff. "
+            "You are Kairo, Position2's revenue-intelligence AI. Position2 is a B2B digital "
+            "marketing agency. Services: SEO & Organic Growth | Performance Marketing "
+            "(Google/Meta/LinkedIn Ads) | Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
+            "Brief the CEO and Head of Sales on THIS WEEK's pipeline priorities like an elite analyst: "
+            "sharp, specific, pattern-driven. Name companies, cite signals, connect dots ACROSS companies "
+            "(shared investors, sector waves, leadership migrations, timing clusters). "
+            "NEVER include revenue estimates, pipeline values, or dollar figures of any kind. No fluff. "
             "Return ONLY valid JSON (no markdown): "+schema+" "
-            "RULES: week_priority=top 6 by urgency; pipeline=top 8 scored 0-100; "
+            "RULES: week_priority=top 6 by urgency; pipeline=top 8 scored 0-100 with honest momentum; "
             "actions=6 ranked; outreach=8 personalised with <55-char subjects; "
             "themes=4; risks=2-3 only if real. "
             "Every field must cite actual signal data. Generic = failure."
@@ -1784,7 +1787,7 @@ def insights_generate(account_id):
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
             ],
-            max_completion_tokens=4500,
+            max_completion_tokens=5200,
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
@@ -2047,7 +2050,7 @@ def generate_email(account_id):
             ) for s in signals[:10]
         )
 
-        system = """You are a senior B2B sales rep at Position2 (digital marketing agency).
+        system = """You are Kairo, Position2’s sales-intelligence AI, writing as a senior B2B sales rep at Position2 (digital marketing agency).
 Services: SEO | Performance Marketing (PPC) | Content Strategy | Brand & Website | Revenue Operations.
 Write a highly personalised cold outreach email using the company signals provided.
 
@@ -2124,7 +2127,7 @@ def research_company(account_id):
             pass
 
         system = (
-            "You are a B2B sales-intelligence researcher at Position2, a digital marketing agency. "
+            "You are Kairo, Position2’s sales-intelligence research AI. Position2 is a digital marketing agency. "
             "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
             "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
             "Research the given company using web search. Find what they do, recent news, "
