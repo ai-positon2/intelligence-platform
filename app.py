@@ -1992,6 +1992,85 @@ def company_analysis(account_id):
         return jsonify({"error": str(e)})
 
 
+
+@app.route("/api/generate-email/<account_id>")
+@login_required
+def generate_email(account_id):
+    """GPT-powered personalised email using company signals."""
+    import sqlite3, re as _re
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"})
+    api_key = os.environ.get("OPENAI_API_KEY","")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"})
+    company = request.args.get("company","").strip()
+    service = request.args.get("service","")
+    if not company:
+        return jsonify({"error": "company parameter required"})
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT a.signal_type,a.signal_detail,a.severity,a.signal_date,"
+            "c.industry,c.domain FROM alerts_sent a "
+            "JOIN companies c ON a.apollo_id=c.apollo_id "
+            "WHERE c.name LIKE ? AND a.dry_run=0 ORDER BY a.signal_date DESC LIMIT 15",
+            ["%"+company+"%"]
+        ).fetchall()
+        conn.close()
+        signals = [dict(r) for r in rows]
+        if not signals:
+            return jsonify({"error": "No signals found for " + company})
+
+        industry = signals[0].get("industry","") if signals else ""
+        domain   = signals[0].get("domain","")   if signals else ""
+        sig_lines = "\n".join(
+            "- %s (%s) on %s%s" % (
+                s["signal_type"], s["severity"], s["signal_date"],
+                ": "+s["signal_detail"][:120] if s.get("signal_detail") else ""
+            ) for s in signals[:10]
+        )
+
+        system = """You are a senior B2B sales rep at Position2 (digital marketing agency).
+Services: SEO | Performance Marketing (PPC) | Content Strategy | Brand & Website | Revenue Operations.
+Write a highly personalised cold outreach email using the company signals provided.
+
+Rules:
+- Reference specific signals by name and date (e.g. "I noticed [Name] joined as CMO on [date]")
+- Connect signals to a clear business pain that Position2 solves
+- Keep under 180 words
+- Conversational, not salesy
+- End with ONE specific, low-friction CTA (15-minute call, quick audit offer)
+
+Return ONLY valid JSON:
+{"subject":"<compelling subject under 55 chars>","greeting":"Hi [Name/Team],","opening":"<1 sentence referencing their specific signal>","body":"<2-3 sentences connecting signal to business need and Position2 value>","cta":"<specific ask>","ps":"<optional P.S. referencing another signal>","recommended_service":"<one of: SEO|PPC|Content|Brand|RevOps>","why_now":"<one sentence on timing urgency>"}"""
+
+        user_msg = "Company: %s\nIndustry: %s\nDomain: %s\nPreferred service: %s\n\nSignals:\n%s\n\nWrite the email." % (
+            company, industry, domain, service or "best fit", sig_lines)
+
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key)
+        resp = oai.chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
+            messages=[{"role":"system","content":system},{"role":"user","content":user_msg}],
+            max_completion_tokens=800,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if "```" in raw:
+            m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m.group(1).strip() if m else raw
+        s2=raw.find("{"); e2=raw.rfind("}")
+        if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
+        email_data = json.loads(raw)
+        return jsonify({"ok":True,"company":company,"email":email_data,"signals_used":len(signals)})
+    except Exception as e:
+        import traceback; log.error("generate_email: %s", traceback.format_exc())
+        return jsonify({"error": str(e)})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
