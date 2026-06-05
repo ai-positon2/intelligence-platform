@@ -1346,8 +1346,8 @@ h2::after,.section-title::after{
 .ir-ocard-btns{display:flex;gap:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.05)}
 
 /* ── Drawer ──────────────────────────────────────────────────────────────── */
-.ir-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
-.ir-ov.on{opacity:1;pointer-events:all}
+.ir-ov,.ir-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:398;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(4px)}
+.ir-ov.on,.ir-overlay.on{opacity:1;pointer-events:all}
 .ir-drw{position:fixed;top:0;right:-540px;width:520px;max-width:96vw;height:100vh;z-index:399;
   background:linear-gradient(180deg,#07101f 0%,#0a1223 100%);
   border-left:1px solid rgba(255,255,255,.08);
@@ -4156,7 +4156,7 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 <!-- INSIGHTS STANDALONE JS v7 -->
-<div class="ir-ov" id="ir-ov" onclick="irClose()"></div>
+<div class="ir-overlay" id="ir-overlay" onclick="irClose()"></div>
 <div class="ir-drw" id="ir-drw">
   <div class="ir-drw-top"><button class="ir-drw-close" onclick="irClose()">✕</button><div class="ir-drw-title" id="ir-drw-title"></div></div>
   <div class="ir-drw-body" id="ir-drw-body"></div>
@@ -4224,12 +4224,12 @@ function countUp(el,to){
 
 /* ── Drawer ────────────────────────────────────────────────────────────── */
 window.irClose=function(){
-  $('ir-drw').classList.remove('on');$('ir-ov').classList.remove('on');
+  $('ir-drw').classList.remove('on');$('ir-overlay').classList.remove('on');
   document.querySelectorAll('.ir-pcard.sel,.ir-arow.sel,.ir-ocard.sel').forEach(function(e){e.classList.remove('sel');});
 };
 function irOpen(title,html){
   $('ir-drw-title').textContent=title;$('ir-drw-body').innerHTML=html;
-  $('ir-drw').classList.add('on');$('ir-ov').classList.add('on');
+  $('ir-drw').classList.add('on');$('ir-overlay').classList.add('on');
   $('ir-drw-body').scrollTop=0;
   setTimeout(function(){document.querySelectorAll('[data-fw]').forEach(function(el){el.style.width=el.getAttribute('data-fw')+'%';});},100);
 }
@@ -4238,7 +4238,6 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')irClose();})
 /* ── Tab open → auto-generate ──────────────────────────────────────────── */
 window.iTab=function(){
   if(!_metaLoaded)irLoadMeta();
-  if(!_autoTriggered){_autoTriggered=true;irGenerate();}
 };
 window.irTab=function(btn){
   document.querySelectorAll('.ir-tab').forEach(function(b){b.classList.remove('active');});
@@ -4284,7 +4283,7 @@ window.irSv=function(btn){btn.classList.toggle('on');};
 /* ── Generate ──────────────────────────────────────────────────────────── */
 window.irGenerate=function(){
   if(!_metaLoaded)irLoadMeta();
-  var btn=$('ir-gen');if(btn)btn.disabled=true;
+  var btn=$('ir-gen');if(btn){btn.disabled=true;btn.textContent='Generating…';}
   var p=new URLSearchParams();
   document.querySelectorAll('#ir-types-list .ir-dd-item input:checked').forEach(function(cb){p.append('signal_type',cb.closest('.ir-dd-item').getAttribute('data-type'));});
   document.querySelectorAll('.ir-sv.on').forEach(function(sv){p.append('severity',sv.getAttribute('data-s'));});
@@ -4293,8 +4292,8 @@ window.irGenerate=function(){
   _showLoad();
   fetch('/api/insights/'+acct()+'?'+p.toString())
     .then(function(r){return r.json();})
-    .then(function(data){if(btn)btn.disabled=false;clearInterval(_stepTimer);data.error?_showErr(data.error):_renderAll(data);})
-    .catch(function(e){if(btn)btn.disabled=false;clearInterval(_stepTimer);_showErr('Network error: '+e.message);});
+    .then(function(data){if(btn){btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Generate Insights';}clearInterval(_stepTimer);data.error?_showErr(data.error):_renderAll(data);})
+    .catch(function(e){if(btn){btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Generate Insights';}clearInterval(_stepTimer);_showErr('Network error: '+e.message);});
 };
 function _showLoad(){
   $('ir-empty').style.display='none';$('ir-ov').style.display='none';$('ir-loading').style.display='flex';
@@ -4312,7 +4311,7 @@ function _showErr(msg){
   var btn=$('ir-gen');if(btn)btn.disabled=false;
   var old=$('ir-empty').querySelector('.ir-err-box');if(old)old.remove();
   var d=document.createElement('div');d.className='ir-err-box';
-  d.style.cssText='margin-top:14px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#f87171;max-width:400px;line-height:1.55';
+  d.style.cssText='margin-top:20px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:14px 18px;font-size:13px;color:#f87171;max-width:460px;line-height:1.6;text-align:left';
   d.innerHTML='<strong>Error:</strong> '+esc(msg);$('ir-empty').appendChild(d);
 }
 
