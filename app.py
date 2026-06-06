@@ -30,6 +30,13 @@ app.permanent_session_lifetime = timedelta(days=7)
 def forbidden(e):
     return render_template("403.html"), 403
 
+@app.errorhandler(500)
+def server_error(e):
+    """Always answer API routes with JSON so the frontend never chokes on an HTML error page."""
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Kairo is taking longer than usual - please try again."}), 500
+    return ("Internal Server Error", 500)
+
 # ── Google OAuth ────────────────────────────────────────────────────────────────
 # Set GOOGLE_CLIENT_ID in Railway → Variables.
 # Setup: console.cloud.google.com → APIs & Services → Credentials
@@ -1780,14 +1787,14 @@ def insights_generate(account_id):
         )
 
         from openai import OpenAI
-        oai  = OpenAI(api_key=api_key)
+        oai  = OpenAI(api_key=api_key, timeout=95.0, max_retries=1)
         resp = oai.chat.completions.create(
             model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
             messages=[
                 {"role":"system","content":system_prompt},
                 {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
             ],
-            max_completion_tokens=6000,
+            max_completion_tokens=5000,
         )
         raw = resp.choices[0].message.content.strip()
         if "```" in raw:
