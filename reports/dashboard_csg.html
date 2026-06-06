@@ -1575,6 +1575,15 @@ h2::after,.section-title::after{
 @keyframes kairo-fab-p{0%{box-shadow:0 0 0 0 rgba(124,58,237,.5)}70%,100%{box-shadow:0 0 0 16px rgba(124,58,237,0)}}
 @media(max-width:600px){.kairo-fab .kairo-fab-tx{display:none}.kairo-fab{padding:14px}}
 </style>
+<style>
+/* ── Performance (v10.5): no backdrop blur on repeated cards, virtualize long lists ── */
+.signal-item,.ir9-card,.ir9-kcard,.ir9-pcard,.sgx-card,.ir9-viz,.ir9-kpi,.ir9-rcard,
+.ir9-arow,.ir9-mini,.ir9-tile,.ir9-spot-in,.ir9-ocard,.ir9-pc,.ir9-pcard,.ir9-hero-in{
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#all-signals-list .signal-item{content-visibility:auto;contain-intrinsic-size:auto 96px}
+.ir9-blob{will-change:transform}
+.kairo-fab{will-change:transform}
+</style>
 </head>
 <body>
 <div id="app">
@@ -3939,16 +3948,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var mainEl = document.getElementById('main') || document.documentElement;
   var topBtn = document.getElementById('scroll-top-btn');
-  var onScroll = function() {
+  var _ticking = false, _scrollMax = 0;
+  function _measure(){ _scrollMax = (mainEl.scrollHeight || document.body.scrollHeight) - (mainEl.clientHeight || window.innerHeight); }
+  function _update(){
+    _ticking = false;
     var scrollTop = mainEl.scrollTop || window.scrollY || 0;
-    var scrollMax = (mainEl.scrollHeight || document.body.scrollHeight) - (mainEl.clientHeight || window.innerHeight);
-    var pct = scrollMax > 0 ? (scrollTop / scrollMax) * 100 : 0;
+    if (_scrollMax <= 0) _measure();
+    var pct = _scrollMax > 0 ? (scrollTop / _scrollMax) * 100 : 0;
     prog.style.width = pct + '%';
-    if (topBtn) {
-      if (scrollTop > 350) topBtn.classList.add('visible');
-      else topBtn.classList.remove('visible');
-    }
-  };
+    if (topBtn) topBtn.classList.toggle('visible', scrollTop > 350);
+  }
+  var onScroll = function(){ if(!_ticking){ _ticking = true; requestAnimationFrame(_update); } };
+  _measure();
+  window.addEventListener('resize', _measure, { passive: true });
   mainEl.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('scroll', onScroll, { passive: true });
 })();
