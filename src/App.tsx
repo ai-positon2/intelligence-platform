@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import {
   LayoutDashboard, Image, Users, Sparkles, Brain,
   RefreshCw, ExternalLink, CheckCircle2,
@@ -131,7 +132,61 @@ function GradientCard({
   );
 }
 
-/* ── Main App ─────────────────────────────────────────── */
+/* ── Global Platform header (consistent across the platform) ── */
+const kpDdItem: CSSProperties = { display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, color: '#9fabbe', textDecoration: 'none', fontSize: 12.5 };
+function PlatformBar() {
+  const [u, setU] = useState<{ name?: string; given_name?: string; email?: string; picture?: string } | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { fetch('/api/whoami').then(r => r.json()).then(setU).catch(() => {}); }, []);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest || !t.closest('#kp-right')) setOpen(false);
+    };
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, []);
+  const nm = u?.given_name || u?.name || 'Account';
+  const full = u?.name || nm;
+  const isAdmin = u?.email === 'krishna.ladha@position2.com' || u?.email === 'sudheer.d@position2.com';
+  return (
+    <div style={{ height: 46, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px', background: 'rgba(6,9,20,.96)', borderBottom: '1px solid rgba(129,140,248,.16)', position: 'relative', zIndex: 60 }}>
+      <a href="/hub" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(99,102,241,.45)' }}><Zap size={16} className="text-white" /></span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#eef2ff', letterSpacing: '-.01em' }}>Platform</span>
+      </a>
+      <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, fontSize: 12.5, minWidth: 0 }}>
+        <a href="/hub" style={{ color: '#64748b', textDecoration: 'none' }}>Hub</a>
+        <span style={{ color: '#334155' }}>›</span>
+        <a href="/ppc" style={{ color: '#64748b', textDecoration: 'none' }}>PPC</a>
+        <span style={{ color: '#334155' }}>›</span>
+        <span style={{ color: '#c7d2fe', fontWeight: 600 }}>Ad Intelligence</span>
+      </div>
+      <div id="kp-right" style={{ marginLeft: 'auto', position: 'relative', flexShrink: 0 }}>
+        <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 999, padding: '4px 13px 4px 4px', cursor: 'pointer' }}>
+          <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#f97316,#ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', overflow: 'hidden' }}>
+            {u?.picture ? <img src={u.picture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (nm || 'U').slice(0, 1).toUpperCase()}
+          </span>
+          <span className="hidden sm:inline" style={{ fontSize: 13, color: '#cbd5e1', fontWeight: 500 }}>{nm}</span>
+          <span style={{ fontSize: 9, color: '#64748b' }}>▼</span>
+        </div>
+        {open && (
+          <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: 224, background: '#0b1326', border: '1px solid rgba(129,140,248,.25)', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.7)', padding: 6, zIndex: 80 }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,.06)', marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#e6edf6' }}>{full}</div>
+              <div style={{ fontSize: 11, color: '#55617a', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u?.email || ''}</div>
+            </div>
+            <a href="/hub" style={kpDdItem}>⌂&nbsp; Hub</a>
+            {isAdmin && <a href="/admin/usage" style={kpDdItem}>⚙&nbsp; Usage Dashboard</a>}
+            <a href="/logout" style={{ ...kpDdItem, color: '#fb7185' }}>→&nbsp; Sign out</a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ─────────────────────────────── */
 export default function App() {
   const [ads, setAds]             = useState<Ad[]>(embeddedAds as Ad[]);
   const [tab, setTab]             = useState<TabId>('insights');
@@ -189,7 +244,9 @@ export default function App() {
   const tabLabel    = NAV.find(n => n.id === tab)?.label ?? '';
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#0c1120]">
+    <div className="flex flex-col h-screen w-full overflow-hidden">
+      <PlatformBar />
+      <div className="flex flex-1 min-w-0 overflow-hidden bg-[#0c1120]">
 
       {/* Mobile overlay */}
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 lg:hidden" onClick={() => setSidebar(false)} />}
@@ -377,6 +434,7 @@ export default function App() {
           </div>
         </main>
       </div>
+    </div>
     </div>
   );
 }
