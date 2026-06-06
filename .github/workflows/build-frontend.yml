@@ -1,0 +1,40 @@
+name: Build Ad Intelligence frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ad-intelligence/**'
+      - 'scripts/build-frontend.sh'
+      - 'scripts/inject_widget.py'
+      - 'scripts/ad_intelligence_widget.html'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-frontend
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build frontend into ad_intelligence/
+        run: bash scripts/build-frontend.sh
+      - name: Commit rebuilt app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ad_intelligence
+          if git diff --cached --quiet; then
+            echo "No frontend changes to commit."
+          else
+            git commit -m "build: rebuild Ad Intelligence app [skip ci]"
+            git push
+          fi

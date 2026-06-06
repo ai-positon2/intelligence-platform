@@ -76,9 +76,13 @@ scripts/build-frontend.sh   Builds apps/ad-intelligence -> ad_intelligence/ (+ r
 ```
 
 ### Deploy (single Railway service)
-On deploy, `nixpacks.toml` runs `scripts/build-frontend.sh` (Node) then serves Flask via gunicorn
-(`railway.toml`). If the frontend build is unavailable, the committed `ad_intelligence/` build is
-served as-is, so the deploy never breaks.
+Railway runs this as a clean **Python** service (gunicorn, see `railway.toml`) and serves the
+committed `ad_intelligence/` build directly — fast and reliable, no Node build on Railway.
+
+### Frontend auto-build (GitHub Actions)
+When `apps/ad-intelligence/**` changes on `main`, `.github/workflows/build-frontend.yml` builds the
+React app on a clean Node 22 runner, copies it into `ad_intelligence/`, re-injects the Kairo chat
+widget, and commits the result back — which Railway then deploys. No manual build-and-copy.
 
 ### Rebuild the Ad Intelligence app locally
 ```

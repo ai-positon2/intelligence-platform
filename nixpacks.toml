@@ -1,7 +1,0 @@
-# Single Railway service: build the React front-end (Node) then serve Flask (Python/gunicorn).
-providers = ["node", "python"]
-
-[phases.build]
-# Builds apps/ad-intelligence into ad_intelligence/. Falls back to the committed
-# build (kept in git) if anything goes wrong, so the deploy never breaks.
-cmds = ["bash scripts/build-frontend.sh || true"]
