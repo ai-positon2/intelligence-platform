@@ -1451,6 +1451,66 @@ h2::after,.section-title::after{
 .ir9-sl b{color:#e6edf6;font-weight:800}
 .ir9-sl-dot{width:9px;height:9px;border-radius:3px}
 </style>
+<style>
+/* ── KAIRO header + tabs polish + chat (v10.3) ── */
+.ir9-top{padding:16px 26px;gap:16px;background:linear-gradient(180deg,rgba(9,12,28,.97),rgba(5,8,18,.92));border-bottom:1px solid rgba(129,140,248,.16)}
+.ir9-brand{gap:12px}
+.ir9-orbit{filter:drop-shadow(0 0 11px rgba(129,140,248,.85))}
+.ir9-kairo{font-size:19px;letter-spacing:-.03em}
+.ir9-sub{font-size:8.5px;letter-spacing:.2em;color:#5b6585;margin-top:1px}
+.ir9-stat{display:flex;gap:8px;margin-left:14px}
+.ir9-statchip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#aeb8cf;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:5px 11px;white-space:nowrap}
+.ir9-statchip b{color:#f1f5f9;font-weight:800}
+.ir9-statchip .i{opacity:.8;font-size:12px}
+@media(max-width:760px){.ir9-stat{display:none}}
+.ir9-fbtn{border-radius:10px;padding:9px 15px;font-weight:600}
+.ir9-gen{padding:10px 20px;border-radius:11px;font-size:13px;box-shadow:0 6px 24px rgba(99,102,241,.42)}
+.ir9-tabs{gap:7px;padding:12px 26px 14px;background:rgba(5,8,18,.72)}
+.ir9-tab{border-radius:10px;padding:9px 16px;font-size:12.5px;color:#6b7793;border:1px solid transparent;background:rgba(255,255,255,.025)}
+.ir9-tab:hover{background:rgba(99,102,241,.1);color:#c7d2fe;border-color:rgba(129,140,248,.2)}
+.ir9-tab.active{color:#fff;background:linear-gradient(95deg,rgba(79,70,229,.92),rgba(124,58,237,.85));border-color:rgba(167,139,250,.5);box-shadow:0 5px 20px rgba(99,102,241,.38)}
+.ir9-tc{background:rgba(129,140,248,.18);color:#a5b4fc;border-radius:6px;padding:1px 7px;font-size:9.5px;font-weight:800}
+.ir9-tab.active .ir9-tc{background:rgba(0,0,0,.28);color:#eef2ff}
+.ir9-chatlink{background:none;border:none;color:#818cf8;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:6px}
+.ir9-chatlink:hover{color:#a5b4fc;text-decoration:underline}
+/* chat panel */
+.ir9-chat{position:fixed;top:0;right:-470px;width:448px;max-width:96vw;height:100vh;z-index:400;display:flex;flex-direction:column;background:linear-gradient(180deg,#0a1029,#080b1c);border-left:1px solid rgba(129,140,248,.22);box-shadow:-40px 0 120px rgba(0,0,0,.85);transition:right .32s cubic-bezier(.22,1,.36,1)}
+.ir9-chat.on{right:0}
+.ir9-chat-top{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid rgba(129,140,248,.16);background:linear-gradient(95deg,rgba(79,70,229,.18),rgba(124,58,237,.08));flex-shrink:0}
+.ir9-chat-id{display:flex;flex-direction:column;line-height:1.25;flex:1;min-width:0}
+.ir9-chat-id b{font-size:14px;font-weight:800;color:#eef2ff}
+.ir9-chat-id span{font-size:9px;color:#7e8aa3;text-transform:uppercase;letter-spacing:.1em}
+.ir9-chat-clear{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:7px;color:#55617a;cursor:pointer;font-size:10px;font-family:inherit;padding:5px 9px;transition:all .15s}
+.ir9-chat-clear:hover{color:#cbd5e1;border-color:rgba(255,255,255,.2)}
+.ir9-chat-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+.ir9-chat-body::-webkit-scrollbar{width:4px}.ir9-chat-body::-webkit-scrollbar-thumb{background:rgba(129,140,248,.25)}
+.ir9-msg{display:flex;gap:9px;max-width:92%}
+.ir9-msg.u{align-self:flex-end;flex-direction:row-reverse}
+.ir9-msg-av{width:27px;height:27px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px}
+.ir9-msg.k .ir9-msg-av{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
+.ir9-msg.u .ir9-msg-av{background:rgba(255,255,255,.08);color:#a5b4fc}
+.ir9-bub{border-radius:13px;padding:11px 14px;font-size:13px;line-height:1.68}
+.ir9-msg.k .ir9-bub{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cdd6e6;border-top-left-radius:4px}
+.ir9-msg.u .ir9-bub{background:linear-gradient(95deg,#4338ca,#6d28d9);color:#fff;border-top-right-radius:4px}
+.ir9-bub a{color:#a5cdf9}.ir9-bub b{color:#eef2ff}
+.ir9-chat-empty{margin:auto 0;text-align:center;color:#55617a;padding:10px 4px}
+.ir9-sugg{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.ir9-sugg-b{text-align:left;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:11px;color:#9fabbe;font-family:inherit;font-size:12px;padding:11px 13px;cursor:pointer;transition:all .15s}
+.ir9-sugg-b:hover{border-color:rgba(129,140,248,.45);color:#cbd5e1;background:rgba(99,102,241,.08)}
+.ir9-chat-foot{flex-shrink:0;padding:13px 15px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.25)}
+.ir9-chat-inwrap{display:flex;gap:8px;align-items:flex-end;background:rgba(255,255,255,.04);border:1px solid rgba(129,140,248,.28);border-radius:13px;padding:8px 8px 8px 14px}
+.ir9-chat-inwrap:focus-within{border-color:rgba(129,140,248,.5)}
+.ir9-chat-in{flex:1;background:none;border:none;outline:none;color:#e6edf6;font-family:inherit;font-size:13px;resize:none;max-height:120px;line-height:1.5;padding:5px 0}
+.ir9-chat-in::placeholder{color:#55617a}
+.ir9-send{width:34px;height:34px;border-radius:9px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ir9-send:hover{box-shadow:0 4px 16px rgba(99,102,241,.5)}
+.ir9-send:disabled{opacity:.5;cursor:not-allowed}
+.ir9-chat-note{font-size:9.5px;color:#3b4763;text-align:center;margin-top:8px}
+.ir9-typing{display:flex;gap:4px;padding:3px 2px}
+.ir9-typing span{width:6px;height:6px;border-radius:50%;background:#6b7793;animation:ir9-blink 1.2s infinite}
+.ir9-typing span:nth-child(2){animation-delay:.2s}.ir9-typing span:nth-child(3){animation-delay:.4s}
+@keyframes ir9-blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+</style>
 </head>
 <body>
 <div id="app">
@@ -1771,10 +1831,10 @@ h2::after,.section-title::after{
             <div class="ir9-fgrp"><span class="ir9-flbl">Severity</span>
               <div class="ir9-sev"><button class="ir9-sv on" data-s="HIGH" onclick="irSv(this)">HIGH</button><button class="ir9-sv on" data-s="MEDIUM" onclick="irSv(this)">MED</button><button class="ir9-sv on" data-s="LOW" onclick="irSv(this)">LOW</button></div></div>
             <div class="ir9-fgrp"><span class="ir9-flbl">Signal types</span><div id="ir9-types"></div></div>
-            <div class="ir9-fapply"><button class="ap" onclick="irApplyFilters()">Apply &amp; Ask Kairo</button><button class="rs" onclick="irResetFilters()">Reset</button></div>
+            <div class="ir9-fapply"><button class="ap" onclick="irApplyFilters()">Apply &amp; Generate</button><button class="rs" onclick="irResetFilters()">Reset</button></div>
           </div>
         </div>
-        <button class="ir9-gen" id="ir9-gen" onclick="irGenerate()">&#10022; Ask Kairo</button>
+        <button class="ir9-gen" id="ir9-gen" onclick="irChat()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg> Ask Kairo</button>
       </div>
     </div>
     <div class="ir9-tabs" id="ir9-tabs" style="display:none">
@@ -1790,7 +1850,7 @@ h2::after,.section-title::after{
           <div class="ir9-eorb"><svg width="46" height="46" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c7d2fe" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#e0e7ff"><animate attributeName="r" values="2.5;3.2;2.5" dur="3s" repeatCount="indefinite"/></circle></svg></div>
           <div class="ir9-etitle">Meet Kairo</div>
           <div class="ir9-esub">Your AI revenue analyst. Kairo reads every signal in this account, ranks the companies worth calling this week, writes personalised outreach, and researches any prospect across the web &mdash; in one click. Every card opens into deeper intelligence.</div>
-          <button class="ir9-gen-lg" onclick="irGenerate()">&#10022; Ask Kairo</button>
+          <button class="ir9-gen-lg" onclick="irGenerate()">&#10022; Generate briefing</button><div style="margin-top:14px"><button class="ir9-chatlink" onclick="irChat()">&#128172; &hellip;or ask Kairo anything</button></div>
         </div>
         <div class="ir9-loading" id="ir9-loading" style="display:none">
           <div class="ir9-lorb"><svg width="30" height="30" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.9)" stroke-width="1.3"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="3.5s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.7)" stroke-width="1.1"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="5s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2" fill="white"/></svg></div>
@@ -4223,6 +4283,23 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="ir9-drw-top"><button class="ir9-x" onclick="irClose()">&#10005;</button><div class="ir9-drw-title" id="ir9-drw-title"></div><span class="ir9-kbadge">&#10022; KAIRO</span></div>
   <div class="ir9-drw-body" id="ir9-drw-body"></div>
 </div>
+<div class="ir9-scrim" id="ir9-cscrim" onclick="irChatClose()"></div>
+<div class="ir9-chat" id="ir9-chat">
+  <div class="ir9-chat-top">
+    <div class="ir9-msg-av" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;width:30px;height:30px;border-radius:9px">&#10022;</div>
+    <div class="ir9-chat-id"><b>Ask Kairo</b><span>Signal &amp; market assistant</span></div>
+    <button class="ir9-chat-clear" onclick="irChatClear()">Clear</button>
+    <button class="ir9-x" onclick="irChatClose()">&#10005;</button>
+  </div>
+  <div class="ir9-chat-body" id="ir9-chat-body"></div>
+  <div class="ir9-chat-foot">
+    <div class="ir9-chat-inwrap">
+      <textarea class="ir9-chat-in" id="ir9-chat-in" rows="1" placeholder="Ask about any company, signal, news, or contact..."></textarea>
+      <button class="ir9-send" id="ir9-chat-send" onclick="irChatSend()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+    </div>
+    <div class="ir9-chat-note">Kairo can search your signals and the web &middot; answers may need verifying</div>
+  </div>
+</div>
 <script>
 (function(){
 'use strict';
@@ -4354,7 +4431,7 @@ function irLoadMeta(){
     });}
     var sel=$('ir9-industry');
     if(sel)(d.industries||[]).forEach(function(ind){var o=document.createElement('option');o.value=ind;o.textContent=ind;sel.appendChild(o);});
-    var st=$('ir9-stat');if(st)st.textContent=(d.total_signals||0).toLocaleString()+' signals · '+(d.total_companies||0).toLocaleString()+' companies tracked';
+    var st=$('ir9-stat');if(st)st.innerHTML='<span class="ir9-statchip"><span class="i">\uD83D\uDCE1</span><b>'+(d.total_signals||0).toLocaleString()+'</b> signals</span><span class="ir9-statchip"><span class="i">\uD83C\uDFE2</span><b>'+(d.total_companies||0).toLocaleString()+'</b> companies</span>';
     var ds=$('ir9-days');if(ds)ds.addEventListener('change',irFCount);
     if(sel)sel.addEventListener('change',irFCount);
   }).catch(function(){});
@@ -4527,7 +4604,7 @@ function _renderCC(ins,cachedTs){
   var when=cachedTs?new Date(cachedTs):new Date();
   var note=cachedTs?'Restored from Kairo&rsquo;s last run ('+when.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+') — Ask Kairo for fresh analysis':'Generated just now · '+when.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   $('ir9-foot').innerHTML='<span class="ir9-foot-m">&#10022; '+note+' · '+D.meta.sigs+' signals · '+D.meta.cos+' companies</span>'
-    +'<button class="ir9-regen" onclick="irGenerate()">&#8635; Ask Kairo again</button>';
+    +'<button class="ir9-regen" onclick="irGenerate()">&#8635; Refresh briefing</button>';
 }
 
 /* ── Pipeline (tier-grouped) ── */
@@ -4959,6 +5036,73 @@ window.irResearch=function(co,dom){
     .catch(function(){var L=$('ir9-rload');if(L)L.remove();var out=$('ir9-rout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo research failed. Try again.</div>';});
 };
 
+/* ── Kairo Chat ── */
+var CHATK='kairo_chat_'+acct();
+function chatHist(){try{return JSON.parse(localStorage.getItem(CHATK)||'[]');}catch(e){return[];}}
+function chatSave(h){try{localStorage.setItem(CHATK,JSON.stringify(h.slice(-20)));}catch(e){}}
+function mdLite(t){
+  t=esc(t);
+  t=t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t=t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  t=t.replace(/\n/g,'<br>');
+  return t;
+}
+window.irChat=function(){
+  var c=$('ir9-chat');if(!c)return;
+  c.classList.add('on');$('ir9-cscrim').classList.add('on');
+  _chatRender();
+  setTimeout(function(){var i=$('ir9-chat-in');if(i)i.focus();},260);
+};
+window.irChatClose=function(){var c=$('ir9-chat');if(c)c.classList.remove('on');var s=$('ir9-cscrim');if(s)s.classList.remove('on');};
+window.irChatClear=function(){try{localStorage.removeItem(CHATK);}catch(e){}_chatRender();};
+function _chatRender(){
+  var body=$('ir9-chat-body');if(!body)return;
+  var h=chatHist();
+  if(!h.length){
+    body.innerHTML='<div class="ir9-chat-empty"><div style="font-size:13px;color:#9fabbe;line-height:1.65">Ask Kairo anything about your signals, companies, market news, research, outreach, or contacts.</div>'
+      +'<div class="ir9-sugg">'
+      +['What changed across my pipeline this week?','Who are my hottest targets and why?','Research the #1 company and its marketing gaps','Draft a cold email to my top priority','Which companies just changed leadership?'].map(function(q){return '<button class="ir9-sugg-b" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')
+      +'</div></div>';
+    return;
+  }
+  body.innerHTML=h.map(function(m){
+    var k=m.role!=='user';
+    return '<div class="ir9-msg '+(k?'k':'u')+'"><div class="ir9-msg-av">'+(k?'&#10022;':'&#128100;')+'</div><div class="ir9-bub">'+(k?mdLite(m.content):esc(m.content))+'</div></div>';
+  }).join('');
+  body.scrollTop=body.scrollHeight;
+}
+window.irChatSend=function(q){
+  var inp=$('ir9-chat-in');
+  var text=(typeof q==='string')?q:(inp?inp.value.trim():'');
+  if(!text)return;
+  if(inp){inp.value='';inp.style.height='auto';}
+  var h=chatHist();h.push({role:'user',content:text});chatSave(h);_chatRender();
+  var body=$('ir9-chat-body');
+  var tip=document.createElement('div');tip.className='ir9-msg k';tip.id='ir9-chat-tip';
+  tip.innerHTML='<div class="ir9-msg-av">&#10022;</div><div class="ir9-bub"><div class="ir9-typing"><span></span><span></span><span></span></div></div>';
+  body.appendChild(tip);body.scrollTop=body.scrollHeight;
+  var send=$('ir9-chat-send');if(send)send.disabled=true;
+  fetch('/api/kairo-chat/'+acct(),{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:text,history:h.slice(0,-1).slice(-8)})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var t=$('ir9-chat-tip');if(t)t.remove();
+      if(send)send.disabled=false;
+      var ans=d.error?('Sorry - '+d.error):(d.answer||'No answer returned.');
+      var h2=chatHist();h2.push({role:'assistant',content:ans});chatSave(h2);_chatRender();
+    })
+    .catch(function(){
+      var t=$('ir9-chat-tip');if(t)t.remove();if(send)send.disabled=false;
+      var h2=chatHist();h2.push({role:'assistant',content:'Sorry - I could not reach the server. Please try again.'});chatSave(h2);_chatRender();
+    });
+};
+document.addEventListener('click',function(e){var b=e.target.closest('.ir9-sugg-b');if(b)irChatSend(b.getAttribute('data-q'));});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')irChatClose();});
+(function(){var i=document.getElementById('ir9-chat-in');if(!i)return;
+  i.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();irChatSend();}});
+  i.addEventListener('input',function(){i.style.height='auto';i.style.height=Math.min(i.scrollHeight,120)+'px';});
+})();
 /* ── Copy ── */
 window.irCopy=function(btn,text){
   if(!navigator.clipboard)return;

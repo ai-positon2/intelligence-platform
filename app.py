@@ -2193,6 +2193,95 @@ def research_company(account_id):
         return jsonify({"error": str(e)})
 
 
+@app.route("/api/kairo-chat/<account_id>", methods=["POST"])
+@login_required
+def kairo_chat(account_id):
+    """Conversational Kairo: grounded on the account signal DB, web-search for the rest."""
+    import sqlite3, re as _re
+    from pathlib import Path
+    db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
+              "csg":        Path(__file__).parent/"data"/"tracker_csg_v2.db"}
+    db_path = db_map.get(account_id)
+    if not db_path or not db_path.exists():
+        return jsonify({"error": "Unknown account"})
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"})
+    body = request.get_json(silent=True) or {}
+    question = (body.get("question") or "").strip()
+    history = body.get("history") or []
+    if not question:
+        return jsonify({"error": "empty question"})
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        counts = {r[0]: r[1] for r in conn.execute(
+            "SELECT signal_type, COUNT(*) FROM alerts_sent WHERE dry_run=0 GROUP BY signal_type")}
+        total_sig = sum(counts.values())
+        total_co = conn.execute("SELECT COUNT(DISTINCT apollo_id) FROM alerts_sent WHERE dry_run=0").fetchone()[0]
+        acct_label = "Healthcare" if account_id == "healthcare" else "CSG"
+        ql = question.lower()
+        names = [r[0] for r in conn.execute("SELECT DISTINCT name FROM companies WHERE name IS NOT NULL")]
+        matched = [n for n in names if n and len(n) > 2 and n.lower() in ql][:6]
+        ctx = []
+        if matched:
+            for nm in matched:
+                rows = conn.execute(
+                    "SELECT a.signal_type,a.severity,a.signal_date,a.signal_detail,c.domain,c.industry "
+                    "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+                    "WHERE c.name=? AND a.dry_run=0 ORDER BY a.signal_date DESC LIMIT 12", [nm]).fetchall()
+                if rows:
+                    sl = " | ".join("%s(%s,%s)%s" % (
+                        r["signal_type"], r["severity"], r["signal_date"],
+                        (": " + r["signal_detail"][:80]) if r["signal_detail"] else "") for r in rows[:8])
+                    ctx.append("[%s | %s | %s] %s" % (nm, rows[0]["domain"], rows[0]["industry"], sl))
+        else:
+            rows = conn.execute(
+                "SELECT c.name,c.domain,COUNT(*) n,SUM(CASE WHEN a.severity='HIGH' THEN 1 ELSE 0 END) hi "
+                "FROM alerts_sent a JOIN companies c ON a.apollo_id=c.apollo_id "
+                "WHERE a.dry_run=0 GROUP BY c.apollo_id ORDER BY hi DESC,n DESC LIMIT 12").fetchall()
+            for r in rows:
+                ctx.append("%s (%s) - %d signals, %d HIGH" % (r["name"], r["domain"], r["n"], r["hi"]))
+        conn.close()
+
+        overview = "Account: %s market. %d tracked signals across %d companies. Signal mix: %s." % (
+            acct_label, total_sig, total_co,
+            ", ".join("%s %d" % (k, v) for k, v in sorted(counts.items(), key=lambda x: -x[1])))
+        ctx_str = "\n".join(ctx) or "(no specific company matched - use the overview and web search)"
+        system = (
+            "You are Kairo, Position2's signal-intelligence assistant. Position2 is a B2B digital marketing "
+            "agency (SEO, PPC, Content, Brand & Website, RevOps). Answer the user accurately and concisely. "
+            "Use the ACCOUNT SIGNAL DATA below for questions about tracked companies and signals; use web search "
+            "for company research, recent news, people, contacts, or anything not in the data. If asked to draft an "
+            "email or message, make it tight and personalised. Never invent revenue or dollar figures. Cite specific "
+            "companies and signals. Format with short, clean markdown (bold, links, short lists).\n\n"
+            "ACCOUNT OVERVIEW: %s\n\nRELEVANT SIGNAL DATA:\n%s" % (overview, ctx_str))
+
+        msgs = [{"role": "system", "content": system}]
+        for m in history[-8:]:
+            role = m.get("role")
+            if role in ("user", "assistant") and m.get("content"):
+                msgs.append({"role": role, "content": str(m["content"])[:2000]})
+        msgs.append({"role": "user", "content": question})
+
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key, timeout=80.0, max_retries=1)
+        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        answer = None; web = False
+        try:
+            resp = oai.responses.create(
+                model=model, tools=[{"type": "web_search"}], input=msgs, max_output_tokens=1100)
+            answer = (resp.output_text or "").strip(); web = True
+        except Exception as we:
+            log.warning("kairo_chat web search unavailable (%s); falling back", we)
+        if not answer:
+            resp = oai.chat.completions.create(model=model, messages=msgs, max_completion_tokens=1000)
+            answer = resp.choices[0].message.content.strip()
+        return jsonify({"ok": True, "answer": answer, "web_search_used": web})
+    except Exception as e:
+        import traceback; log.error("kairo_chat: %s", traceback.format_exc())
+        return jsonify({"error": str(e)})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
