@@ -2331,6 +2331,69 @@ def refresh_dashboard():
         return jsonify({"error": str(e)}), 200
 
 
+def _refresh_stage(name):
+    n = (name or "").lower()
+    if "fetch healthcare" in n: return "Fetching Healthcare signals (Sheets + News)…"
+    if "fetch csg" in n:        return "Fetching CSG news…"
+    if "rebuild" in n:          return "Rebuilding & scoring both accounts…"
+    if "commit" in n or "publish" in n: return "Publishing…"
+    if "restore" in n:          return "Rebuilding…"
+    return "Preparing…"
+
+@app.route("/api/refresh-status")
+@login_required
+def refresh_status():
+    """Live status of the most recent refresh Action run (for the progress bar)."""
+    import datetime as _dt, time as _t
+    token    = os.environ.get("GH_DISPATCH_TOKEN", "")
+    repo     = os.environ.get("GH_REPO", "ai-positon2/intelligence-platform")
+    workflow = os.environ.get("GH_WORKFLOW", "refresh-dashboards.yml")
+    if not token:
+        return jsonify({"error": "Refresh isn't configured (missing GH_DISPATCH_TOKEN)."})
+    def _epoch(iso):
+        try:
+            return _dt.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc).timestamp()
+        except Exception:
+            return 0.0
+    try:
+        since = float(request.args.get("since", 0) or 0)
+        hdr = {"Authorization": "Bearer " + token, "Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28"}
+        rr = requests.get("https://api.github.com/repos/%s/actions/workflows/%s/runs?per_page=5" % (repo, workflow),
+                          headers=hdr, timeout=15)
+        if rr.status_code != 200:
+            return jsonify({"error": "GitHub runs %d" % rr.status_code})
+        run = None
+        for w in rr.json().get("workflow_runs", []):
+            if since <= 0 or _epoch(w.get("created_at", "")) >= since - 90:
+                run = w; break
+        if not run:
+            return jsonify({"pending": True})
+        status = run.get("status"); concl = run.get("conclusion")
+        started = _epoch(run.get("run_started_at") or run.get("created_at") or "")
+        elapsed = max(0, int(_t.time() - started)) if started else 0
+        percent, stage = 8, "Queued…"
+        if status == "completed":
+            percent, stage = 100, ("Done" if concl == "success" else "Failed")
+        else:
+            steps = []
+            jurl = run.get("jobs_url")
+            if jurl:
+                jr = requests.get(jurl, headers=hdr, timeout=15)
+                if jr.status_code == 200:
+                    jobs = jr.json().get("jobs", [])
+                    if jobs: steps = jobs[0].get("steps", []) or []
+            if steps:
+                tot = len(steps); done = sum(1 for s in steps if s.get("status") == "completed")
+                cur = next((s for s in steps if s.get("status") == "in_progress"), None)
+                percent = min(95, int(round(100.0 * done / max(tot, 1))))
+                stage = _refresh_stage(cur.get("name")) if cur else "Working…"
+        return jsonify({"status": status, "conclusion": concl, "percent": percent,
+                        "stage": stage, "elapsed": elapsed, "html_url": run.get("html_url", "")})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
