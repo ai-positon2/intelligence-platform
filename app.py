@@ -2298,6 +2298,39 @@ def kairo_chat(account_id):
         return jsonify({"error": str(e)})
 
 
+@app.route("/api/refresh-dashboard", methods=["POST"])
+@login_required
+def refresh_dashboard():
+    """Trigger the GitHub Action that fetches the latest signals (HIGH from
+    Sheets, LOW from Google News with filters) for both accounts, rebuilds the
+    dashboards (preserving Kairo), prunes news, and publishes."""
+    token    = os.environ.get("GH_DISPATCH_TOKEN", "")
+    repo     = os.environ.get("GH_REPO", "ai-positon2/intelligence-platform")
+    workflow = os.environ.get("GH_WORKFLOW", "refresh-dashboards.yml")
+    if not token:
+        return jsonify({"error": "Refresh isn't wired up yet — add a GH_DISPATCH_TOKEN "
+                                 "environment variable in Railway (a GitHub token with the "
+                                 "'workflow' scope). Until then, use the manual commands below."}), 200
+    try:
+        url = "https://api.github.com/repos/%s/actions/workflows/%s/dispatches" % (repo, workflow)
+        r = requests.post(url, json={"ref": "main"}, timeout=20, headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        })
+        if r.status_code in (201, 204):
+            return jsonify({"ok": True,
+                "message": "Refresh started. Kairo is fetching the latest HIGH signals (Sheets) and "
+                           "LOW signals (Google News, filtered) for both accounts, rebuilding, and "
+                           "publishing. Your dashboard updates automatically in a few minutes — reload then.",
+                "actions_url": "https://github.com/%s/actions/workflows/%s" % (repo, workflow)})
+        return jsonify({"error": "GitHub returned %d. Check the GH_DISPATCH_TOKEN scope/repo. %s"
+                                 % (r.status_code, (r.text or "")[:160])}), 200
+    except Exception as e:
+        import traceback; log.error("refresh_dashboard: %s", traceback.format_exc())
+        return jsonify({"error": str(e)}), 200
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)

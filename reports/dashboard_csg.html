@@ -1783,7 +1783,7 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
   <div id="refresh-modal">
     <button id="refresh-modal-close" onclick="hideRefreshModal()" title="Close">✕</button>
     <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">⟳ Refresh Dashboard</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:18px">Choose what to refresh, then run the command in your terminal</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Fetch the latest signals and rebuild &mdash; automatically.</div><button id="live-refresh-btn" onclick="runLiveRefresh()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:11px 16px;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.35)">&#9654; Run full refresh now</button><div style="font-size:11px;color:var(--text2);margin-top:9px;line-height:1.55">Fetches <b>HIGH</b> signals from the connected Google Sheets and <b>LOW</b> signals from Google News (filtered), for <b>both accounts</b>, then rebuilds &amp; publishes. Updates appear in a few minutes &mdash; reload then.</div><div id="live-refresh-status" style="font-size:12px;margin-top:10px;line-height:1.5"></div><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;border-top:1px solid var(--border);padding-top:14px">Or run manually</div>
 
     
     <div class="refresh-opt" onclick="highlightOpt('opt-seed')">
@@ -5330,6 +5330,21 @@ window.irCopy=function(btn,text){
   function init(){renderSig();openFromPath();sgxSync();}
   if(document.readyState!=='loading')init();else document.addEventListener('DOMContentLoaded',init);
 })();
+</script>
+<script>
+window.runLiveRefresh=function(){
+  var btn=document.getElementById("live-refresh-btn"),st=document.getElementById("live-refresh-status");
+  if(btn){btn.disabled=true;btn.style.opacity=".6";btn.textContent="Starting\u2026";}
+  if(st)st.innerHTML="<span style=\"color:#a5b4fc\">\u27f3 Triggering refresh\u2026</span>";
+  fetch("/api/refresh-dashboard",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){ if(st)st.innerHTML="<span style=\"color:#fb7185\">"+d.error+"</span>"; if(btn){btn.disabled=false;btn.style.opacity="1";btn.textContent="\u25b6 Run full refresh now";} return; }
+      if(st)st.innerHTML="<span style=\"color:#34d399\">\u2713 "+(d.message||"Refresh started.")+"</span>"+(d.actions_url?" <a href=\""+d.actions_url+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#7cb3f5\">View progress \u2192</a>":"");
+      if(btn){btn.textContent="Refresh started \u2713";}
+    })
+    .catch(function(){ if(st)st.innerHTML="<span style=\"color:#fb7185\">Could not start refresh. Try again.</span>"; if(btn){btn.disabled=false;btn.style.opacity="1";btn.textContent="\u25b6 Run full refresh now";} });
+};
 </script>
 </body>
 </html>
