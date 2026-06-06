@@ -10,6 +10,7 @@ echo "[build-frontend] starting"
 [ -d "$FE" ] || { echo "[build-frontend] no frontend source; serving committed build"; exit 0; }
 command -v npm >/dev/null 2>&1 || { echo "[build-frontend] npm unavailable; serving committed build"; exit 0; }
 cd "$FE" || exit 0
+echo "[build-frontend] node $(node -v 2>/dev/null) / npm $(npm -v 2>/dev/null)"
 ( npm ci --no-audit --no-fund || npm install --no-audit --no-fund ) || { echo "[build-frontend] deps failed; serving committed build"; exit 0; }
 npm run build || { echo "[build-frontend] vite build failed; serving committed build"; exit 0; }
 mkdir -p "$DEST/assets"
