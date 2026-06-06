@@ -384,8 +384,10 @@ def _process_company_sheets(
         _ai_filter = bool(_sig_cfg.get("news_ai_filter", False))
         _ai_key    = os.environ.get("OPENAI_API_KEY", "") if _ai_filter else ""
         _ai_model  = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        _min_score = int(_sig_cfg.get("news_relevance_min_score", 2))
         new_data["news_articles"] = news_client.get_news_articles(
             name, serpapi_key, ai_key=_ai_key, ai_filter=_ai_filter, ai_model=_ai_model,
+            min_score=_min_score,
         )
         news_events = change_detector.detect_news_signals(
             old_snapshot, new_data, config,

@@ -116,6 +116,7 @@ def get_news_articles(
     ai_key: str = "",
     ai_filter: bool = False,
     ai_model: str = "gpt-4o-mini",
+    min_score: int = 2,
 ) -> list[dict]:
     """Return business-relevant article dicts for a company.
 
@@ -135,7 +136,7 @@ def get_news_articles(
         from .news_relevance import filter_relevant_articles
         articles = filter_relevant_articles(
             company_name, articles,
-            ai_key=ai_key if ai_filter else "", model=ai_model,
+            ai_key=ai_key if ai_filter else "", model=ai_model, min_score=min_score,
         )
     except Exception as exc:  # fail-open: never lose news because the filter broke
         logger.warning("[NEWS] relevance filter unavailable for %s: %s", company_name, exc)
