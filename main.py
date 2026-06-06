@@ -12,6 +12,7 @@ still used as the company master list and for baseline metadata only.
 
 from __future__ import annotations
 
+import os
 import re
 import logging
 import time
@@ -379,7 +380,13 @@ def _process_company_sheets(
     # ── LOW signals from Google News RSS ──────────────────────────────────────
     if not skip_news and behaviour.get("enrich_news", True):
         serpapi_key = creds.get("serpapi_key", "")
-        new_data["news_articles"] = news_client.get_news_articles(name, serpapi_key)
+        _sig_cfg   = config.get("signals", {})
+        _ai_filter = bool(_sig_cfg.get("news_ai_filter", False))
+        _ai_key    = os.environ.get("OPENAI_API_KEY", "") if _ai_filter else ""
+        _ai_model  = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        new_data["news_articles"] = news_client.get_news_articles(
+            name, serpapi_key, ai_key=_ai_key, ai_filter=_ai_filter, ai_model=_ai_model,
+        )
         news_events = change_detector.detect_news_signals(
             old_snapshot, new_data, config,
             company_name=name, company_domain=domain,

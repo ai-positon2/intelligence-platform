@@ -113,14 +113,34 @@ def get_news_articles(
     serpapi_key: str = "",
     max_articles: int = 5,
     max_age_days: int = MAX_NEWS_AGE_DAYS,
+    ai_key: str = "",
+    ai_filter: bool = False,
+    ai_model: str = "gpt-4o-mini",
 ) -> list[dict]:
-    """Return a list of raw article dicts for a company. Used by main.py to inject into snapshots."""
-    if serpapi_key:
-        articles = _serpapi_articles(company_name, serpapi_key, max_articles, max_age_days)
-        if articles:
-            return articles
+    """Return business-relevant article dicts for a company.
 
-    return _rss_articles(company_name, max_articles, max_age_days)
+    A larger candidate pool is fetched, then passed through the relevance filter
+    (heuristic always; AI gate when ai_filter and ai_key are set) so only news
+    about real business events is stored. Returns at most ``max_articles``.
+    """
+    pool = max(max_articles * 3, 12)
+    if serpapi_key:
+        articles = _serpapi_articles(company_name, serpapi_key, pool, max_age_days)
+        if not articles:
+            articles = _rss_articles(company_name, pool, max_age_days)
+    else:
+        articles = _rss_articles(company_name, pool, max_age_days)
+
+    try:
+        from .news_relevance import filter_relevant_articles
+        articles = filter_relevant_articles(
+            company_name, articles,
+            ai_key=ai_key if ai_filter else "", model=ai_model,
+        )
+    except Exception as exc:  # fail-open: never lose news because the filter broke
+        logger.warning("[NEWS] relevance filter unavailable for %s: %s", company_name, exc)
+
+    return articles[:max_articles]
 
 
 def _rss_articles(

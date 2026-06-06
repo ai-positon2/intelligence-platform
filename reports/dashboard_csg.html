@@ -4614,7 +4614,7 @@ function irShowKpi(k){
       +(keys.length?keys.map(function(t,i){var pct=Math.round(counts[t]/max*100);
         return '<div class="ir9-bar-row"><div class="ir9-bar-l1"><span class="ir9-bar-name">'+esc(t)+'</span><span class="ir9-bar-ct" style="color:'+cols[i%6]+'">'+counts[t]+'</span></div><div class="ir9-bar-track"><div class="ir9-bar-fill" style="background:'+cols[i%6]+';width:'+pct+'%"></div></div></div>';}).join(''):'<div class="ir9-note">Signal mix loads after the filters panel has been opened once.</div>')
       +'</div>'
-      +'<div class="ir9-ds"><div class="ir9-ds-l">In this Kairo analysis</div><div class="ir9-ds-v">Kairo read <b style="color:#e6edf6">'+D.meta.sigs+'</b> signals across <b style="color:#e6edf6">'+D.meta.cos+'</b> companies that matched your current filters, then ranked the pipeline you see now.</div></div>';
+      +'<div class="ir9-ds"><div class="ir9-ds-l">How Kairo prioritised</div><div class="ir9-ds-v">Kairo continuously tracks <b style="color:#e6edf6">'+(((META&&META.total_companies)||D.meta.cos)||0).toLocaleString()+'</b> companies and <b style="color:#e6edf6">'+(((META&&META.total_signals)||D.meta.sigs)||0).toLocaleString()+'</b> signals in this account. For this run it focused on the <b style="color:#e6edf6">'+D.meta.sigs+'</b> highest-priority signals &mdash; ranked by severity (HIGH&rarr;LOW) and recency &mdash; which surfaced from the <b style="color:#e6edf6">'+D.meta.cos+'</b> companies showing the most significant activity right now. The rest are still tracked &mdash; they simply didn&rsquo;t rise into this week&rsquo;s priority cut.</div></div>';
     irOpen('Signals — full breakdown',html);return;
   }
   var defs={
