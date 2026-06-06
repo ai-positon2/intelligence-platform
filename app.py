@@ -359,8 +359,8 @@ def accounts():
     cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
     return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
-@app.route("/dashboard/<account_id>")
-@app.route("/dashboard/<account_id>/<section>")
+@app.route("/signal-tracker/<account_id>")
+@app.route("/signal-tracker/<account_id>/<section>")
 @login_required
 def dashboard(account_id: str, section: str = None):
     cfg = ACCOUNTS.get(account_id)
@@ -373,6 +373,21 @@ def dashboard(account_id: str, section: str = None):
     resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
                          "Pragma": "no-cache", "Expires": "0"})
     return resp
+
+@app.route("/dashboard/<account_id>")
+@app.route("/dashboard/<account_id>/<section>")
+@login_required
+def dashboard_legacy(account_id: str, section: str = None):
+    """Back-compat: old /dashboard/* URLs redirect to canonical /signal-tracker/*."""
+    target = "/signal-tracker/" + account_id + (("/" + section) if section else "")
+    return redirect(target, code=301)
+
+@app.route("/api/whoami")
+@login_required
+def whoami():
+    u = _get_user() or {}
+    return jsonify({"name": u.get("name", ""), "given_name": u.get("given_name", ""),
+                    "email": u.get("email", ""), "picture": u.get("picture", "")})
 
 # ── Health + API ─────────────────────────────────────────────────────────────────
 @app.route("/api/track", methods=["POST"])
@@ -828,7 +843,7 @@ def _build_account_card(account_id, cfg):
         count = _read_company_count(path)
         refreshed = _read_last_refreshed(path)
         return (
-            f'<a class="card" href="/dashboard/{account_id}" '
+            f'<a class="card" href="/signal-tracker/{account_id}" '
             f'style="--accent:{accent};--glow:rgba(99,102,241,.25);'
             f'--thumb:{thumb};--accent-text:{accent}">'
             f'<div class="card-band"></div>'
