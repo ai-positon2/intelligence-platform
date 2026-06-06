@@ -1584,8 +1584,70 @@ h2::after,.section-title::after{
 .ir9-blob{will-change:transform}
 .kairo-fab{will-change:transform}
 </style>
+<style>
+/* ── Platform global header + clickable signals infographics (v10.6) ── */
+body{padding-top:46px;box-sizing:border-box}
+#kairo-plat{position:fixed;top:0;left:0;right:0;height:46px;z-index:150;display:flex;align-items:center;gap:14px;padding:0 18px;background:rgba(6,9,20,.96);border-bottom:1px solid rgba(129,140,248,.16);backdrop-filter:blur(8px)}
+#sidebar{top:46px!important;height:calc(100vh - 46px)!important}
+#topnav{top:46px!important}
+.kp-brand{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0}
+.kp-logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(99,102,241,.45)}
+.kp-name{font-size:15px;font-weight:800;color:#eef2ff;letter-spacing:-.01em}
+.kp-bc{display:flex;align-items:center;gap:8px;font-size:12.5px;min-width:0}
+.kp-bc a{color:#64748b;text-decoration:none;white-space:nowrap}.kp-bc a:hover{color:#a5b4fc}
+.kp-sep{color:#334155}
+.kp-cur{color:#c7d2fe;font-weight:600;white-space:nowrap}
+.kp-right{margin-left:auto;position:relative;flex-shrink:0}
+.kp-pill{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px 13px 4px 4px;cursor:pointer;transition:all .15s}
+.kp-pill:hover{border-color:rgba(129,140,248,.4);background:rgba(255,255,255,.07)}
+.kp-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#f97316,#ea580c);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;overflow:hidden;flex-shrink:0}
+.kp-av img{width:100%;height:100%;object-fit:cover}
+.kp-uname{font-size:13px;color:#cbd5e1;font-weight:500}
+.kp-cv{font-size:9px;color:#64748b;transition:transform .15s}
+.kp-pill.open .kp-cv{transform:rotate(180deg)}
+.kp-dd{position:absolute;top:calc(100% + 8px);right:0;min-width:224px;background:#0b1326;border:1px solid rgba(129,140,248,.25);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.7);padding:6px;display:none;z-index:200}
+.kp-dd.open{display:block}
+.kp-dd-h{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:6px}
+.kp-dd-n{font-size:13px;font-weight:700;color:#e6edf6}
+.kp-dd-e{font-size:11px;color:#55617a;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kp-dd-i{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;color:#9fabbe;text-decoration:none;font-size:12.5px;cursor:pointer}
+.kp-dd-i:hover{background:rgba(255,255,255,.05);color:#cbd5e1}
+.kp-dd-i.danger:hover{background:rgba(244,63,94,.1);color:#fb7185}
+@media(max-width:640px){.kp-bc{display:none}.kp-uname{display:none}}
+/* clickable infographic cards */
+.sgx-click{cursor:pointer;border-radius:8px;transition:background .12s,box-shadow .12s}
+.sgx-leg-row.sgx-click,.sgx-stat.sgx-click{padding:4px 7px;margin:0 -7px}
+.sgx-bar-row.sgx-click{padding:5px 7px;margin:0 -7px}
+.sgx-leg-row.sgx-click:hover,.sgx-bar-row.sgx-click:hover,.sgx-stat.sgx-click:hover{background:rgba(129,140,248,.1)}
+.sgx-active{background:rgba(129,140,248,.16)!important;box-shadow:inset 0 0 0 1px rgba(129,140,248,.45)}
+</style>
 </head>
 <body>
+<div id="kairo-plat">
+  <a class="kp-brand" href="/hub"><span class="kp-logo"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg></span><span class="kp-name">Platform</span></a>
+  <div class="kp-bc"><a href="/hub">Hub</a><span class="kp-sep">&rsaquo;</span><a href="/ppc">PPC</a><span class="kp-sep">&rsaquo;</span><span class="kp-cur">Signal Tracker</span></div>
+  <div class="kp-right">
+    <div class="kp-pill" id="kp-pill" onclick="kpToggle()"><span class="kp-av" id="kp-av">&middot;</span><span class="kp-uname" id="kp-uname">Account</span><span class="kp-cv">&#9660;</span></div>
+    <div class="kp-dd" id="kp-dd">
+      <div class="kp-dd-h"><div class="kp-dd-n" id="kp-dd-n">Signed in</div><div class="kp-dd-e" id="kp-dd-e"></div></div>
+      <a class="kp-dd-i" href="/hub"><span>&#8962;</span> Hub</a>
+      <a class="kp-dd-i" id="kp-usage" href="/admin/usage" style="display:none"><span>&#9881;</span> Usage Dashboard</a>
+      <a class="kp-dd-i danger" href="/logout"><span>&#8594;</span> Sign out</a>
+    </div>
+  </div>
+</div>
+<script>
+function kpToggle(){var d=document.getElementById("kp-dd"),p=document.getElementById("kp-pill");if(d){var o=d.classList.toggle("open");if(p)p.classList.toggle("open",o);}}
+document.addEventListener("click",function(e){if(!e.target.closest||!e.target.closest(".kp-right")){var d=document.getElementById("kp-dd"),p=document.getElementById("kp-pill");if(d){d.classList.remove("open");if(p)p.classList.remove("open");}}});
+(function(){try{fetch("/api/whoami").then(function(r){return r.json();}).then(function(u){
+  if(!u)return;var nm=u.given_name||u.name||"Account",full=u.name||nm;
+  var un=document.getElementById("kp-uname");if(un)un.textContent=nm;
+  var dn=document.getElementById("kp-dd-n");if(dn)dn.textContent=full;
+  var de=document.getElementById("kp-dd-e");if(de)de.textContent=u.email||"";
+  var av=document.getElementById("kp-av");if(av){if(u.picture){av.innerHTML="<img src=\""+u.picture+"\" alt=\"\">";}else{av.textContent=(nm||"U").slice(0,1).toUpperCase();}}
+  if(u.email&&(u.email==="krishna.ladha@position2.com"||u.email==="sudheer.d@position2.com")){var us=document.getElementById("kp-usage");if(us)us.style.display="";}
+}).catch(function(){});}catch(e){}})();
+</script>
 <div id="app">
 
 <!-- Filter Panel Overlay -->
@@ -4390,7 +4452,7 @@ var STEPS=['Kairo is reading the signals…','Cross-referencing companies and pa
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
-function acct(){var m=window.location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'healthcare';}
+function acct(){var m=window.location.pathname.match(/\/(?:dashboard|signal-tracker)\/([^\/]+)/);return m?m[1]:'healthcare';}
 function liCo(co){return 'https://www.linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co);}
 function liPpl(co){return 'https://www.linkedin.com/search/results/people/?company='+encodeURIComponent(co)+'&keywords=CMO+CEO+VP+Marketing+CTO';}
 function tCls(t){t=(t||'').toLowerCase();return t.indexOf('today')>-1?'ir9-t-now':t.indexOf('week')>-1?'ir9-t-week':'ir9-t-email';}
@@ -5218,35 +5280,54 @@ window.irCopy=function(btn,text){
       var d=new Date(s.signal_date||s.sent_at).getTime();if(d&&now-d<7*864e5)week++;
       if(s.apollo_id)cos[s.apollo_id]=1;
     });
-    var sevP=[{l:'High',v:sev.HIGH||0,c:'#fb7185'},{l:'Medium',v:sev.MEDIUM||0,c:'#fbbf24'},{l:'Low',v:sev.LOW||0,c:'#818cf8'}];
+    var sevP=[{l:'High',v:sev.HIGH||0,c:'#fb7185',s:'HIGH'},{l:'Medium',v:sev.MEDIUM||0,c:'#fbbf24',s:'MEDIUM'},{l:'Low',v:sev.LOW||0,c:'#818cf8',s:'LOW'}];
     var tk=Object.keys(types).sort(function(a,b){return types[b]-types[a];}).slice(0,6);
     var mx=Math.max.apply(null,tk.map(function(t){return types[t];}).concat([1]));
     var tcol=['#818cf8','#34d399','#fbbf24','#f472b6','#7cb3f5','#fb7185'];
     el.innerHTML=
       '<div class="sgx-card"><div class="sgx-t">&#9889; Severity mix</div><div class="sgx-donutwrap">'+donut(sevP,sigs.length,'signals')
-        +'<div class="sgx-leg">'+sevP.map(function(p){return '<div class="sgx-leg-row"><span class="sgx-leg-dot" style="background:'+p.c+'"></span>'+p.l+'<span class="sgx-leg-v">'+p.v+'</span></div>';}).join('')+'</div></div></div>'
-      +'<div class="sgx-card"><div class="sgx-t">&#128202; Signal types</div><div class="sgx-bars">'+tk.map(function(t,i){return '<div class="sgx-bar-row"><span class="sgx-bar-l" title="'+esc2(t)+'">'+esc2(t)+'</span><div class="sgx-bar-track"><div class="sgx-bar-fill" style="background:'+tcol[i%6]+'" data-w="'+Math.round(types[t]/mx*100)+'"></div></div><span class="sgx-bar-v">'+types[t]+'</span></div>';}).join('')+'</div></div>'
+        +'<div class="sgx-leg">'+sevP.map(function(p){return '<div class="sgx-leg-row sgx-click" data-sgx-sev="'+p.s+'"><span class="sgx-leg-dot" style="background:'+p.c+'"></span>'+p.l+'<span class="sgx-leg-v">'+p.v+'</span></div>';}).join('')+'</div></div></div>'
+      +'<div class="sgx-card"><div class="sgx-t">&#128202; Signal types</div><div class="sgx-bars">'+tk.map(function(t,i){return '<div class="sgx-bar-row sgx-click" data-sgx-type="'+esc2(t)+'"><span class="sgx-bar-l" title="'+esc2(t)+'">'+esc2(t)+'</span><div class="sgx-bar-track"><div class="sgx-bar-fill" style="background:'+tcol[i%6]+'" data-w="'+Math.round(types[t]/mx*100)+'"></div></div><span class="sgx-bar-v">'+types[t]+'</span></div>';}).join('')+'</div></div>'
       +'<div class="sgx-card"><div class="sgx-t">&#128225; At a glance</div><div class="sgx-stats">'
-        +'<div class="sgx-stat"><b>'+sigs.length+'</b><span>total signals</span></div>'
+        +'<div class="sgx-stat sgx-click" data-sgx-clear="1"><b>'+sigs.length+'</b><span>total signals</span></div>'
         +'<div class="sgx-stat"><b style="color:#34d399">'+week+'</b><span>in the last 7 days</span></div>'
         +'<div class="sgx-stat"><b style="color:#a5b4fc">'+Object.keys(cos).length+'</b><span>companies with signals</span></div>'
       +'</div></div>';
     setTimeout(function(){el.querySelectorAll('.sgx-bar-fill[data-w]').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});},90);
   }
   /* URL routing */
-  function curAcct(){var m=location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'';}
-  function sectionFromPath(){var m=location.pathname.match(/\/dashboard\/[^\/]+\/([^\/?#]+)/);return m?m[1]:'';}
+  function curAcct(){var m=location.pathname.match(/\/(?:dashboard|signal-tracker)\/([^\/]+)/);return m?m[1]:'';}
+  function sectionFromPath(){var m=location.pathname.match(/\/(?:dashboard|signal-tracker)\/[^\/]+\/([^\/?#]+)/);return m?m[1]:'';}
   var _origSS=window.showSection;
   if(typeof _origSS==='function'){
     window.showSection=function(name,btn){
       _origSS(name,btn);
-      if(VALID[name]){var base='/dashboard/'+curAcct();var url=(name==='overview')?base:base+'/'+name;try{history.replaceState(null,'',url);}catch(e){}}
+      if(VALID[name]){var base='/signal-tracker/'+curAcct();var url=(name==='overview')?base:base+'/'+name;try{history.replaceState(null,'',url);}catch(e){}}
       if(name==='signals')renderSig();
     };
   }
   function openFromPath(){var sec=sectionFromPath();if(VALID[sec]){var b=$id('nav-'+sec);if(b)b.click();}}
   window.addEventListener('popstate',openFromPath);
-  function init(){renderSig();openFromPath();}
+  function sgxSync(){
+    var sevSel=document.getElementById('sig-sev-filter'),typSel=document.getElementById('sig-type-filter');
+    var sv=sevSel?sevSel.value:'',ty=typSel?typSel.value:'';
+    document.querySelectorAll('[data-sgx-sev]').forEach(function(e){e.classList.toggle('sgx-active',!!sv&&e.getAttribute('data-sgx-sev')===sv);});
+    document.querySelectorAll('[data-sgx-type]').forEach(function(e){e.classList.toggle('sgx-active',!!ty&&e.getAttribute('data-sgx-type')===ty);});
+  }
+  document.addEventListener('click',function(e){
+    var el=e.target.closest&&e.target.closest('[data-sgx-sev],[data-sgx-type],[data-sgx-clear]');if(!el)return;
+    var sevSel=document.getElementById('sig-sev-filter'),typSel=document.getElementById('sig-type-filter');
+    if(el.hasAttribute('data-sgx-clear')){if(sevSel)sevSel.value='';if(typSel)typSel.value='';}
+    else if(el.hasAttribute('data-sgx-sev')){var v=el.getAttribute('data-sgx-sev');if(sevSel)sevSel.value=(sevSel.value===v?'':v);}
+    else if(el.hasAttribute('data-sgx-type')){var v2=el.getAttribute('data-sgx-type');if(typSel)typSel.value=(typSel.value===v2?'':v2);}
+    if(typeof window.renderAllSignals==='function')window.renderAllSignals();
+    sgxSync();
+    var b=document.getElementById('nav-signals');if(b&&!b.classList.contains('active'))b.click();
+    var list=document.getElementById('all-signals-list');if(list)list.scrollTop=0;
+  });
+  var _origRAS=window.renderAllSignals;
+  if(typeof _origRAS==='function'){window.renderAllSignals=function(){var r=_origRAS.apply(this,arguments);sgxSync();return r;};}
+  function init(){renderSig();openFromPath();sgxSync();}
   if(document.readyState!=='loading')init();else document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
