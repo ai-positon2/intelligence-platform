@@ -360,8 +360,9 @@ def accounts():
     return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
 @app.route("/dashboard/<account_id>")
+@app.route("/dashboard/<account_id>/<section>")
 @login_required
-def dashboard(account_id: str):
+def dashboard(account_id: str, section: str = None):
     cfg = ACCOUNTS.get(account_id)
     if not cfg:
         abort(404, f"Unknown account '{account_id}'")

@@ -1511,6 +1511,70 @@ h2::after,.section-title::after{
 .ir9-typing span:nth-child(2){animation-delay:.2s}.ir9-typing span:nth-child(3){animation-delay:.4s}
 @keyframes ir9-blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
 </style>
+<style>
+/* ── Legacy dashboard premium polish + Signals infographics + Kairo FAB (v10.4) ── */
+#content{background:
+  radial-gradient(ellipse 60% 50% at 12% 0%,rgba(67,56,202,.13),transparent 55%),
+  radial-gradient(ellipse 52% 42% at 96% 100%,rgba(124,58,237,.11),transparent 55%),
+  linear-gradient(170deg,#020412 0%,#070b1c 52%,#04060f 100%)!important}
+.section-header h2{font-size:20px;font-weight:800;letter-spacing:-.02em;color:#eef2ff}
+.badge-count{background:rgba(129,140,248,.18);color:#a5b4fc;border-radius:7px;padding:2px 9px;font-size:12px;font-weight:800}
+.signals-toolbar{gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.sig-filter-select{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#cbd5e1;border-radius:10px;padding:8px 12px;font-size:12px;outline:none;cursor:pointer}
+.sig-filter-select option{background:#0a0f24}
+.export-btn{background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;color:#fff;border-radius:10px;padding:9px 16px;font-weight:600;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.35);transition:all .15s}
+.export-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(99,102,241,.5)}
+#section-signals .panel{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}
+#all-signals-list{display:flex;flex-direction:column;gap:10px;padding-right:4px}
+.signal-item{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:14px!important;padding:15px 17px!important;display:flex;gap:13px;align-items:flex-start;transition:all .18s;backdrop-filter:blur(10px)}
+.signal-item:hover{border-color:rgba(129,140,248,.4)!important;transform:translateY(-2px);box-shadow:0 12px 34px rgba(0,0,0,.45)}
+.signal-item.sev-high{box-shadow:inset 3px 0 0 #fb7185}
+.signal-item.sev-medium{box-shadow:inset 3px 0 0 #fbbf24}
+.signal-item.sev-low{box-shadow:inset 3px 0 0 #818cf8}
+.sev-badge{font-size:9px;font-weight:800;padding:3px 9px;border-radius:6px;letter-spacing:.05em;align-self:center;flex-shrink:0}
+.sev-badge.sev-HIGH{background:rgba(244,63,94,.16)!important;color:#fb7185!important}
+.sev-badge.sev-MEDIUM{background:rgba(245,158,11,.14)!important;color:#fbbf24!important}
+.sev-badge.sev-LOW{background:rgba(99,102,241,.14)!important;color:#a5b4fc!important}
+.signal-company{font-size:14px;font-weight:700;color:#eef2f8;letter-spacing:-.01em}
+.signal-type{font-size:11px;font-weight:600;color:#818cf8;margin-top:1px}
+.signal-detail{font-size:12.5px;color:#9fabbe;line-height:1.6;margin-top:4px}
+.signal-meta{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.signal-time{font-size:10.5px;color:#55617a}
+.signal-link{font-size:10.5px;color:#7cb3f5!important;border:1px solid rgba(59,130,246,.22);border-radius:6px;padding:2px 9px;text-decoration:none;background:rgba(59,130,246,.07);transition:all .15s}
+.signal-link:hover{border-color:rgba(59,130,246,.5);color:#a5cdf9!important}
+/* infographic strip */
+.sgx-info{display:grid;grid-template-columns:1.05fr 1.35fr .95fr;gap:12px;margin-bottom:18px}
+@media(max-width:900px){.sgx-info{grid-template-columns:1fr}}
+.sgx-card{border-radius:15px;padding:16px 18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(10px)}
+.sgx-t{font-size:11px;font-weight:800;color:#8b98ab;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.sgx-donutwrap{display:flex;align-items:center;gap:15px}
+.sgx-donut{width:100px;height:100px;border-radius:50%;flex-shrink:0;position:relative}
+.sgx-donut::after{content:'';position:absolute;inset:13px;border-radius:50%;background:#0a0f22}
+.sgx-donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.sgx-donut-c b{font-size:22px;font-weight:800;color:#f1f5f9;line-height:1}
+.sgx-donut-c span{font-size:9px;color:#55617a;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.sgx-leg{display:flex;flex-direction:column;gap:8px;flex:1}
+.sgx-leg-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#9fabbe}
+.sgx-leg-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.sgx-leg-v{margin-left:auto;font-weight:800;color:#dee5ef}
+.sgx-bars{display:flex;flex-direction:column;gap:10px}
+.sgx-bar-row{display:flex;align-items:center;gap:9px}
+.sgx-bar-l{font-size:11px;color:#9fabbe;width:112px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sgx-bar-track{flex:1;height:7px;background:rgba(255,255,255,.05);border-radius:99px;overflow:hidden}
+.sgx-bar-fill{height:100%;border-radius:99px;width:0;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.sgx-bar-v{font-size:11px;font-weight:700;color:#cbd5e1;width:28px;text-align:right;flex-shrink:0}
+.sgx-stats{display:flex;flex-direction:column;gap:12px;justify-content:center;height:100%}
+.sgx-stat{display:flex;align-items:baseline;gap:8px}
+.sgx-stat b{font-size:25px;font-weight:800;color:#f1f5f9;letter-spacing:-.03em;line-height:1}
+.sgx-stat span{font-size:11.5px;color:#7e8aa3}
+/* Kairo floating launcher */
+.kairo-fab{position:fixed;right:24px;bottom:24px;z-index:390;display:flex;align-items:center;gap:9px;background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;border-radius:999px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;padding:13px 19px 13px 15px;box-shadow:0 10px 34px rgba(99,102,241,.5);transition:transform .18s,box-shadow .18s}
+.kairo-fab:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 14px 46px rgba(99,102,241,.66)}
+.kairo-fab svg{filter:drop-shadow(0 0 6px rgba(199,210,254,.7))}
+.kairo-fab-pulse{position:absolute;inset:0;border-radius:999px;animation:kairo-fab-p 2.6s ease-out infinite;pointer-events:none}
+@keyframes kairo-fab-p{0%{box-shadow:0 0 0 0 rgba(124,58,237,.5)}70%,100%{box-shadow:0 0 0 16px rgba(124,58,237,0)}}
+@media(max-width:600px){.kairo-fab .kairo-fab-tx{display:none}.kairo-fab{padding:14px}}
+</style>
 </head>
 <body>
 <div id="app">
@@ -1779,6 +1843,7 @@ h2::after,.section-title::after{
         </select>
         <button class="export-btn" onclick="exportSignalsCSV()">⬇ Export CSV</button>
       </div>
+      <div class="sgx-info" id="sgx-info"></div>
       <div class="panel">
         <div id="all-signals-list" style="max-height:72vh;overflow-y:auto"></div>
       </div>
@@ -5114,5 +5179,64 @@ window.irCopy=function(btn,text){
 })();
 </script>
 
+<button class="kairo-fab" onclick="window.irChat&&irChat()" title="Ask Kairo">
+  <span class="kairo-fab-pulse"></span>
+  <svg width="22" height="22" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.4"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#e0e7ff" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.1" fill="#fff"/></svg>
+  <span class="kairo-fab-tx">Ask Kairo</span>
+</button>
+<script>
+/* ── Signals infographics + URL routing (v10.4) ── */
+(function(){
+  var VALID={overview:1,companies:1,signals:1,trends:1,insights:1};
+  function $id(i){return document.getElementById(i);}
+  function esc2(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function donut(parts,cTop,cBot){
+    var tot=parts.reduce(function(a,p){return a+(p.v||0);},0)||1,acc=0,st=[];
+    parts.forEach(function(p){var a=acc/tot*360,b=(acc+(p.v||0))/tot*360;acc+=(p.v||0);if((p.v||0)>0)st.push(p.c+' '+a.toFixed(1)+'deg '+b.toFixed(1)+'deg');});
+    var bg=st.length?'conic-gradient('+st.join(',')+')':'rgba(255,255,255,.06)';
+    return '<div class="sgx-donut" style="background:'+bg+'"><div class="sgx-donut-c"><b>'+cTop+'</b><span>'+esc2(cBot)+'</span></div></div>';
+  }
+  function renderSig(){
+    if(typeof DATA==='undefined'||!DATA||!DATA.signals)return;
+    var el=$id('sgx-info');if(!el||el._done)return;el._done=true;
+    var sigs=DATA.signals,sev={HIGH:0,MEDIUM:0,LOW:0},types={},now=Date.now(),week=0,cos={};
+    sigs.forEach(function(s){
+      var sv=(s.severity||'LOW').toUpperCase();sev[sv]=(sev[sv]||0)+1;
+      var t=s.signal_type||'Other';types[t]=(types[t]||0)+1;
+      var d=new Date(s.signal_date||s.sent_at).getTime();if(d&&now-d<7*864e5)week++;
+      if(s.apollo_id)cos[s.apollo_id]=1;
+    });
+    var sevP=[{l:'High',v:sev.HIGH||0,c:'#fb7185'},{l:'Medium',v:sev.MEDIUM||0,c:'#fbbf24'},{l:'Low',v:sev.LOW||0,c:'#818cf8'}];
+    var tk=Object.keys(types).sort(function(a,b){return types[b]-types[a];}).slice(0,6);
+    var mx=Math.max.apply(null,tk.map(function(t){return types[t];}).concat([1]));
+    var tcol=['#818cf8','#34d399','#fbbf24','#f472b6','#7cb3f5','#fb7185'];
+    el.innerHTML=
+      '<div class="sgx-card"><div class="sgx-t">&#9889; Severity mix</div><div class="sgx-donutwrap">'+donut(sevP,sigs.length,'signals')
+        +'<div class="sgx-leg">'+sevP.map(function(p){return '<div class="sgx-leg-row"><span class="sgx-leg-dot" style="background:'+p.c+'"></span>'+p.l+'<span class="sgx-leg-v">'+p.v+'</span></div>';}).join('')+'</div></div></div>'
+      +'<div class="sgx-card"><div class="sgx-t">&#128202; Signal types</div><div class="sgx-bars">'+tk.map(function(t,i){return '<div class="sgx-bar-row"><span class="sgx-bar-l" title="'+esc2(t)+'">'+esc2(t)+'</span><div class="sgx-bar-track"><div class="sgx-bar-fill" style="background:'+tcol[i%6]+'" data-w="'+Math.round(types[t]/mx*100)+'"></div></div><span class="sgx-bar-v">'+types[t]+'</span></div>';}).join('')+'</div></div>'
+      +'<div class="sgx-card"><div class="sgx-t">&#128225; At a glance</div><div class="sgx-stats">'
+        +'<div class="sgx-stat"><b>'+sigs.length+'</b><span>total signals</span></div>'
+        +'<div class="sgx-stat"><b style="color:#34d399">'+week+'</b><span>in the last 7 days</span></div>'
+        +'<div class="sgx-stat"><b style="color:#a5b4fc">'+Object.keys(cos).length+'</b><span>companies with signals</span></div>'
+      +'</div></div>';
+    setTimeout(function(){el.querySelectorAll('.sgx-bar-fill[data-w]').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});},90);
+  }
+  /* URL routing */
+  function curAcct(){var m=location.pathname.match(/\/dashboard\/([^\/]+)/);return m?m[1]:'';}
+  function sectionFromPath(){var m=location.pathname.match(/\/dashboard\/[^\/]+\/([^\/?#]+)/);return m?m[1]:'';}
+  var _origSS=window.showSection;
+  if(typeof _origSS==='function'){
+    window.showSection=function(name,btn){
+      _origSS(name,btn);
+      if(VALID[name]){var base='/dashboard/'+curAcct();var url=(name==='overview')?base:base+'/'+name;try{history.replaceState(null,'',url);}catch(e){}}
+      if(name==='signals')renderSig();
+    };
+  }
+  function openFromPath(){var sec=sectionFromPath();if(VALID[sec]){var b=$id('nav-'+sec);if(b)b.click();}}
+  window.addEventListener('popstate',openFromPath);
+  function init(){renderSig();openFromPath();}
+  if(document.readyState!=='loading')init();else document.addEventListener('DOMContentLoaded',init);
+})();
+</script>
 </body>
 </html>
