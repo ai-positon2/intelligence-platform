@@ -1621,6 +1621,40 @@ body{padding-top:46px;box-sizing:border-box}
 .sgx-leg-row.sgx-click:hover,.sgx-bar-row.sgx-click:hover,.sgx-stat.sgx-click:hover{background:rgba(129,140,248,.1)}
 .sgx-active{background:rgba(129,140,248,.16)!important;box-shadow:inset 0 0 0 1px rgba(129,140,248,.45)}
 </style>
+<style>
+/* ── Refresh modal redesign + progress (rfx) ── */
+#refresh-modal{background:linear-gradient(180deg,#0b1226,#0a0f20)!important;border:1px solid rgba(129,140,248,.22)!important;border-radius:16px!important;width:430px!important;padding:22px!important;box-shadow:0 24px 80px rgba(0,0,0,.72),0 0 50px rgba(99,102,241,.08)!important}
+#refresh-overlay{background:rgba(2,4,16,.62)!important;backdrop-filter:blur(4px)}
+#refresh-modal-close{color:#55617a!important}
+#refresh-modal-close:hover{color:#cbd5e1!important}
+.rfx-head{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+.rfx-orbit{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px rgba(99,102,241,.4)}
+.rfx-title{font-size:16px;font-weight:800;color:#eef2ff;letter-spacing:-.02em}
+.rfx-sub{font-size:11.5px;color:#7e8aa3;margin-top:1px}
+.rfx-steps{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+.rfx-step{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:10px 11px}
+.rfx-ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.rfx-step-tx{display:flex;flex-direction:column;min-width:0}
+.rfx-step-tx b{font-size:12px;font-weight:700;color:#dee5ef;line-height:1.2}
+.rfx-step-tx span{font-size:10px;color:#55617a;margin-top:2px}
+.rfx-go{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;border-radius:11px;color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;padding:12px 16px;cursor:pointer;box-shadow:0 6px 22px rgba(99,102,241,.4);transition:transform .15s,box-shadow .15s}
+.rfx-go:hover{transform:translateY(-1px);box-shadow:0 9px 30px rgba(99,102,241,.55)}
+.rfx-go:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.rfx-progress{margin-top:16px}
+.rfx-bar-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.rfx-stage{font-size:12px;font-weight:600;color:#a5b4fc}
+.rfx-pct{font-size:12px;font-weight:800;color:#e6edf6}
+.rfx-bar-track{height:8px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+.rfx-bar-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#4f46e5,#a78bfa);transition:width .6s cubic-bezier(.22,1,.36,1);box-shadow:0 0 12px rgba(124,58,237,.5)}
+.rfx-bar-fill.ok{background:linear-gradient(90deg,#10b981,#34d399)}
+.rfx-bar-fill.err{background:linear-gradient(90deg,#e11d48,#fb7185)}
+.rfx-meta{font-size:10.5px;color:#55617a;margin-top:7px}
+.rfx-meta a{color:#7cb3f5}
+.rfx-status{font-size:12px;line-height:1.55;margin-top:12px}
+.rfx-status a{color:#7cb3f5}
+.rfx-reload{margin-left:8px;display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#34d399;border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:700;padding:6px 12px;cursor:pointer}
+.rfx-note{font-size:10.5px;color:#3b4763;margin-top:14px;line-height:1.5}
+</style>
 </head>
 <body>
 <div id="kairo-plat">
@@ -1782,58 +1816,21 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
   <!-- Refresh modal -->
   <div id="refresh-modal">
     <button id="refresh-modal-close" onclick="hideRefreshModal()" title="Close">✕</button>
-    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">⟳ Refresh Dashboard</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Fetch the latest signals and rebuild &mdash; automatically.</div><button id="live-refresh-btn" onclick="runLiveRefresh()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:13px;font-weight:700;padding:11px 16px;cursor:pointer;box-shadow:0 4px 18px rgba(99,102,241,.35)">&#9654; Run full refresh now</button><div style="font-size:11px;color:var(--text2);margin-top:9px;line-height:1.55">Fetches <b>HIGH</b> signals from the connected Google Sheets and <b>LOW</b> signals from Google News (filtered), for <b>both accounts</b>, then rebuilds &amp; publishes. Updates appear in a few minutes &mdash; reload then.</div><div id="live-refresh-status" style="font-size:12px;margin-top:10px;line-height:1.5"></div><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;border-top:1px solid var(--border);padding-top:14px">Or run manually</div>
-
-    
-    <div class="refresh-opt" onclick="highlightOpt('opt-seed')">
-      <div class="refresh-opt-title" id="opt-seed">
-        <span style="font-size:18px">🌱</span>
-        <span>Re-seed Signals</span>
-      </div>
-      <div class="refresh-opt-desc">
-        Re-inserts all manually-researched signals from KNOWN_SIGNALS into the database.<br>Safe to re-run — duplicates are automatically skipped.
-      </div>
-      <code id="cmd-seed">python seed_csg_signals.py</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-seed', event)">Copy command</button>
+    <div class="rfx-head"><span class="rfx-orbit"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.4"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg></span><div><div class="rfx-title">Refresh signals</div><div class="rfx-sub">Pull the latest intelligence &amp; rebuild</div></div></div>
+    <div class="rfx-steps">
+      <div class="rfx-step"><span class="rfx-ic" style="background:rgba(59,130,246,.14)">📊</span><div class="rfx-step-tx"><b>HIGH signals</b><span>Google Sheets</span></div></div>
+      <div class="rfx-step"><span class="rfx-ic" style="background:rgba(129,140,248,.14)">📰</span><div class="rfx-step-tx"><b>LOW signals</b><span>Google News · filtered</span></div></div>
+      <div class="rfx-step"><span class="rfx-ic" style="background:rgba(167,139,250,.14)">🧠</span><div class="rfx-step-tx"><b>Rebuild &amp; score</b><span>both accounts</span></div></div>
+      <div class="rfx-step"><span class="rfx-ic" style="background:rgba(16,185,129,.14)">🚀</span><div class="rfx-step-tx"><b>Publish</b><span>auto-deploys live</span></div></div>
     </div>
-
-    <div class="refresh-opt" onclick="highlightOpt('opt-news')">
-      <div class="refresh-opt-title" id="opt-news">
-        <span style="font-size:18px">📰</span>
-        <span>Fetch Google News</span>
-      </div>
-      <div class="refresh-opt-desc">
-        Fetches the latest Google News for all 292 CSG companies (last 90 days).<br>Takes ~6 minutes. Re-running is safe — duplicates are skipped.
-      </div>
-      <code id="cmd-news">python fetch_csg_news.py</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-news', event)">Copy command</button>
+    <button id="live-refresh-btn" class="rfx-go" onclick="runLiveRefresh()"><span>▶</span> Run full refresh</button>
+    <div id="rfx-progress" class="rfx-progress" style="display:none">
+      <div class="rfx-bar-top"><span id="rfx-stage" class="rfx-stage">Starting…</span><span id="rfx-pct" class="rfx-pct">0%</span></div>
+      <div class="rfx-bar-track"><div id="rfx-bar" class="rfx-bar-fill"></div></div>
+      <div class="rfx-meta" id="rfx-meta"></div>
     </div>
-
-    <div class="refresh-opt" onclick="highlightOpt('opt-rebuild')">
-      <div class="refresh-opt-title" id="opt-rebuild">
-        <span style="font-size:18px">⚙️</span>
-        <span>Rebuild Dashboard</span>
-      </div>
-      <div class="refresh-opt-desc">
-        Regenerates the dashboard HTML from the database.<br>Run this after re-seeding or fetching news.
-      </div>
-      <code id="cmd-rebuild">python build_csg_dashboard.py</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-rebuild', event)">Copy command</button>
-    </div>
-
-    <div class="refresh-opt" onclick="highlightOpt('opt-publish')" style="margin-bottom:0">
-      <div class="refresh-opt-title" id="opt-publish">
-        <span style="font-size:18px">🚀</span>
-        <span>Publish to Live Site</span>
-      </div>
-      <div class="refresh-opt-desc">
-        After rebuilding the dashboard, push to Railway to go live.<br>Run this from <strong>C:\Users\krishna.l\company-signal-tracker\</strong>
-      </div>
-      <code id="cmd-publish">git add -A ; git commit -m "Update CSG dashboard" ; git push</code>
-      <button class="copy-cmd-btn" onclick="copyCmd('cmd-publish', event)">Copy command</button>
-    </div>
-
+    <div id="live-refresh-status" class="rfx-status"></div>
+    <div class="rfx-note">Usually a few minutes — the news fetch can take longer. You can close this; it keeps running.</div>
   </div>
 
   <div id="content">
@@ -3438,7 +3435,7 @@ function renderNewsTab(c) {
     return `<div class="placeholder-tab">
       <p style="font-size:28px;margin-bottom:8px">📰</p>
       <p style="color:var(--text2)">No news signals yet.</p>
-      <p style="font-size:11px;color:var(--text3);margin-top:4px">Run <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">--news-only</code> to fetch the latest news.</p>
+      <p style="font-size:11px;color:var(--text3);margin-top:4px">Use the <strong style="color:var(--text2)">Refresh Dashboard</strong> button to fetch the latest news.</p>
     </div>`;
   }
   const cards = newsAlerts.map(a => {
@@ -5332,19 +5329,45 @@ window.irCopy=function(btn,text){
 })();
 </script>
 <script>
+(function(){
+var RFX_KEY='rfx_since',_poll=null;
+function $r(id){return document.getElementById(id);}
+function _fmt(s){s=s|0;var m=(s/60)|0,x=s%60;return m?(m+'m '+x+'s'):(x+'s');}
+function _render(d){
+  var bar=$r('rfx-bar'),pct=$r('rfx-pct'),stg=$r('rfx-stage'),meta=$r('rfx-meta'),stt=$r('live-refresh-status');
+  if(!bar)return;
+  if(d.pending){stg.textContent='Queued…';pct.textContent='';bar.style.width='6%';meta.textContent='Waiting for the run to start…';return;}
+  if(d.error){stg.textContent='Status unavailable';meta.textContent=d.error;return;}
+  var p=Math.max(0,Math.min(100,d.percent||0));
+  bar.classList.remove('ok','err');bar.style.width=p+'%';pct.textContent=p+'%';stg.textContent=d.stage||'Working…';
+  meta.innerHTML=(d.elapsed?('Elapsed '+_fmt(d.elapsed)):'')+(d.html_url?(d.elapsed?'  ·  ':'')+'<a href="'+d.html_url+'" target="_blank" rel="noopener">View logs ↗</a>':'');
+  if(d.status==='completed'){
+    _stop();
+    if(d.conclusion==='success'){bar.style.width='100%';bar.classList.add('ok');pct.textContent='100%';stg.textContent='Done';
+      stt.innerHTML='<span style="color:#34d399">✓ Latest signals fetched. Publishing & deploying — reload in ~1–2 min.</span><button class="rfx-reload" onclick="location.reload()">↻ Reload</button>';}
+    else{bar.style.width='100%';bar.classList.add('err');stg.textContent='Failed';
+      stt.innerHTML='<span style="color:#fb7185">The refresh run failed.'+(d.html_url?' <a href="'+d.html_url+'" target="_blank" rel="noopener">See logs ↗</a>':'')+'</span>';}
+    try{localStorage.removeItem(RFX_KEY);}catch(e){}
+  }
+}
+function _tick(){var since=0;try{since=parseFloat(localStorage.getItem(RFX_KEY)||'0');}catch(e){}
+  fetch('/api/refresh-status?since='+Math.floor(since)).then(function(r){return r.json();}).then(_render).catch(function(){});}
+function _start(){var p=$r('rfx-progress');if(p)p.style.display='block';var b=$r('live-refresh-btn');if(b)b.style.display='none';_stop();_tick();_poll=setInterval(_tick,5000);}
+function _stop(){if(_poll){clearInterval(_poll);_poll=null;}}
 window.runLiveRefresh=function(){
-  var btn=document.getElementById("live-refresh-btn"),st=document.getElementById("live-refresh-status");
-  if(btn){btn.disabled=true;btn.style.opacity=".6";btn.textContent="Starting\u2026";}
-  if(st)st.innerHTML="<span style=\"color:#a5b4fc\">\u27f3 Triggering refresh\u2026</span>";
-  fetch("/api/refresh-dashboard",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.error){ if(st)st.innerHTML="<span style=\"color:#fb7185\">"+d.error+"</span>"; if(btn){btn.disabled=false;btn.style.opacity="1";btn.textContent="\u25b6 Run full refresh now";} return; }
-      if(st)st.innerHTML="<span style=\"color:#34d399\">\u2713 "+(d.message||"Refresh started.")+"</span>"+(d.actions_url?" <a href=\""+d.actions_url+"\" target=\"_blank\" rel=\"noopener\" style=\"color:#7cb3f5\">View progress \u2192</a>":"");
-      if(btn){btn.textContent="Refresh started \u2713";}
-    })
-    .catch(function(){ if(st)st.innerHTML="<span style=\"color:#fb7185\">Could not start refresh. Try again.</span>"; if(btn){btn.disabled=false;btn.style.opacity="1";btn.textContent="\u25b6 Run full refresh now";} });
+  var btn=$r('live-refresh-btn'),stt=$r('live-refresh-status');
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(stt)stt.innerHTML='<span style="color:#a5b4fc">⟳ Triggering…</span>';
+  fetch('/api/refresh-dashboard',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.error){if(stt)stt.innerHTML='<span style="color:#fb7185">'+d.error+'</span>';if(btn){btn.disabled=false;btn.style.opacity='1';}return;}
+      try{localStorage.setItem(RFX_KEY,String(Math.floor(Date.now()/1000)));}catch(e){}
+      if(stt)stt.innerHTML='';_start();
+    }).catch(function(){if(stt)stt.innerHTML='<span style="color:#fb7185">Could not start refresh. Try again.</span>';if(btn){btn.disabled=false;btn.style.opacity='1';}});
 };
+window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getItem(RFX_KEY)||'0');}catch(e){}if(since>0&&(Date.now()/1000-since)<3600)_start();};
+})();
+(function(){var _o=window.showRefreshModal;window.showRefreshModal=function(){if(typeof _o==='function')_o.apply(this,arguments);if(window.rfxResume)window.rfxResume();};})();
 </script>
 </body>
 </html>
