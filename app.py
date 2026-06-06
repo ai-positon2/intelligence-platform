@@ -1656,6 +1656,22 @@ def ppc_upload():
 _REVENUE_KEYS = {"est_value", "opportunity", "revenue_impact", "pipeline_estimate",
                  "estimated_value", "pipeline_value", "deal_size", "contract_value"}
 
+def _responses_web_search(oai, model, input_msgs, max_tokens):
+    """Call the Responses API with web search, trying both known tool-type names
+    ('web_search' and the older 'web_search_preview'). Returns (text, True) on
+    success or (None, False) if web search is unavailable on this SDK/model."""
+    for _tt in ("web_search", "web_search_preview"):
+        try:
+            resp = oai.responses.create(
+                model=model, tools=[{"type": _tt}], input=input_msgs, max_output_tokens=max_tokens)
+            txt = (getattr(resp, "output_text", "") or "").strip()
+            if txt:
+                return txt, True
+        except Exception as we:
+            log.warning("web search via '%s' unavailable: %s", _tt, we)
+    return None, False
+
+
 def _strip_revenue_fields(obj):
     """Recursively remove all revenue / pipeline-value fields from GPT output."""
     if isinstance(obj, dict):
@@ -2158,19 +2174,9 @@ def research_company(account_id):
         from openai import OpenAI
         oai   = OpenAI(api_key=api_key)
         model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
-        raw = None; web_used = False
-        # Preferred: Responses API with web search tool
-        try:
-            resp = oai.responses.create(
-                model=model,
-                tools=[{"type": "web_search"}],
-                input=[{"role":"system","content":system},{"role":"user","content":user_msg}],
-                max_output_tokens=2500,
-            )
-            raw = (resp.output_text or "").strip()
-            web_used = True
-        except Exception as we:
-            log.warning("research_company web search unavailable (%s); falling back", we)
+        raw, web_used = _responses_web_search(
+            oai, model,
+            [{"role":"system","content":system},{"role":"user","content":user_msg}], 2500)
         # Fallback: plain completion using only tracker signals
         if not raw:
             resp = oai.chat.completions.create(
@@ -2266,13 +2272,7 @@ def kairo_chat(account_id):
         from openai import OpenAI
         oai = OpenAI(api_key=api_key, timeout=80.0, max_retries=1)
         model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-        answer = None; web = False
-        try:
-            resp = oai.responses.create(
-                model=model, tools=[{"type": "web_search"}], input=msgs, max_output_tokens=1100)
-            answer = (resp.output_text or "").strip(); web = True
-        except Exception as we:
-            log.warning("kairo_chat web search unavailable (%s); falling back", we)
+        answer, web = _responses_web_search(oai, model, msgs, 1100)
         if not answer:
             resp = oai.chat.completions.create(model=model, messages=msgs, max_completion_tokens=1000)
             answer = resp.choices[0].message.content.strip()
