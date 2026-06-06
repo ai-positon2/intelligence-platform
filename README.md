@@ -58,3 +58,29 @@ Store `config.yaml` contents as a repository secret named `CONFIG_YAML` and the 
 - **Google Sheets**: "Change Log" tab (one row per signal) + "Company List" tab
 - **HTML dashboard**: `reports/latest.html` regenerated after each run
 - **SQLite**: `data/tracker.db` — full snapshot history and alert dedup log
+
+---
+
+## Monorepo layout (unified platform)
+
+This repo is the single source for the Position² Intelligence Platform.
+
+```
+.                      Flask backend (app.py), serves everything
+ad_intelligence/       Built Ad Intelligence app (served at /ppc/ad-intelligence) — committed
+apps/ad-intelligence/  Ad Intelligence React/Vite SOURCE (build target of the above)
+reports/               Prebuilt Signal Tracker dashboards
+data/                  SQLite signal databases
+tracker/               Signal ingestion pipeline
+scripts/build-frontend.sh   Builds apps/ad-intelligence -> ad_intelligence/ (+ re-injects Kairo chat widget)
+```
+
+### Deploy (single Railway service)
+On deploy, `nixpacks.toml` runs `scripts/build-frontend.sh` (Node) then serves Flask via gunicorn
+(`railway.toml`). If the frontend build is unavailable, the committed `ad_intelligence/` build is
+served as-is, so the deploy never breaks.
+
+### Rebuild the Ad Intelligence app locally
+```
+bash scripts/build-frontend.sh        # builds apps/ad-intelligence -> ad_intelligence/
+```
