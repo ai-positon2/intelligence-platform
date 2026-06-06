@@ -1,0 +1,70 @@
+name: Refresh Signal Tracker dashboards
+
+# One-click refresh of BOTH accounts: fetch latest signals, rebuild the
+# dashboards while preserving every Kairo customization, prune irrelevant news,
+# and publish. Run manually (Actions tab -> Run workflow) or weekly.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 8 * * 1'   # Mondays 08:30 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-dashboards
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write config + credentials (from repo secrets)
+        run: |
+          cat > config.yaml << 'CONFIGEOF'
+          ${{ secrets.CONFIG_YAML }}
+          CONFIGEOF
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > service_account.json
+
+      - name: Snapshot Kairo dashboards (fetch step rewrites them; we restore after)
+        run: |
+          cp reports/dashboard.html /tmp/kairo_health.html
+          cp reports/dashboard_csg.html /tmp/kairo_csg.html
+
+      - name: Fetch Healthcare signals (Sheets HIGH + News LOW)
+        run: python main.py
+        continue-on-error: true
+
+      - name: Fetch CSG news
+        run: python fetch_csg_news.py
+        continue-on-error: true
+
+      - name: Restore Kairo dashboards
+        run: |
+          cp /tmp/kairo_health.html reports/dashboard.html
+          cp /tmp/kairo_csg.html reports/dashboard_csg.html
+
+      - name: Rebuild dashboards from fresh data (preserve Kairo) + prune news
+        run: python scripts/refresh-dashboards.py
+
+      - name: Commit & publish
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data reports
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "data: refresh Signal Tracker dashboards [skip ci]"
+            git push
+          fi
