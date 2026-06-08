@@ -463,6 +463,7 @@
   function empSize(e){var n=parseInt(e)||0;return n>=1000?'enterprise':n>=200?'mid':'smb';}
   function empSizeLabel(e){return{enterprise:'Enterprise (1000+)',mid:'Mid-Market (200–999)',smb:'SMB (<200)'}[empSize(e)]||'—';}
   function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function normDomain(u){return(u||'').toLowerCase().replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./,'');}
   function liUrl(n){return'https://www.linkedin.com/search/results/people/?keywords='+encodeURIComponent(n||'');}
 
   /* DRAWER */
@@ -479,7 +480,7 @@
     var pct=engPct(p.pages);
     var pages=parseInt(p.pages)||0;
     var colleagues=[];
-    if(p.website){_allPeople.forEach(function(q,qi){if(q.website===p.website&&q.name!==p.name)colleagues.push({person:q,idx:qi});});}
+    if(p.website){_allPeople.forEach(function(q,qi){if(normDomain(q.website)===normDomain(p.website)&&q.name!==p.name)colleagues.push({person:q,idx:qi});});}
     document.getElementById('drwHead').innerHTML=
       '<div class="drw-avatar-wrap">'+
         '<div class="drw-av-lg drw-av-person">'+esc(initials(p.name))+'</div>'+
@@ -540,7 +541,7 @@
     var src=fromAll?_allCompanies:_filteredCompanies;
     var c=src[idx]; if(!c)return;
     var visitors=[];
-    _allPeople.forEach(function(p,pi){if(p.website&&c.website&&p.website===c.website)visitors.push({person:p,idx:pi});});
+    _allPeople.forEach(function(p,pi){if(p.website&&c.website&&normDomain(p.website)===normDomain(c.website))visitors.push({person:p,idx:pi});});
     var loc=[c.city,c.state].filter(Boolean).join(', ')||c.country||'—';
     document.getElementById('drwHead').innerHTML=
       '<div class="drw-avatar-wrap">'+
