@@ -696,6 +696,14 @@ def anonymous_visitors_data():
     return jsonify(_fetch_anon_visitors_data())
 
 
+
+
+@app.route("/ppc/linkedin-scraper")
+@login_required
+def linkedin_scraper():
+    """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""
+    return render_template("linkedin_scraper.html", user=_get_user())
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "accounts": {
