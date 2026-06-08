@@ -565,16 +565,7 @@
     if(c.country&&c.country!==c.state)h+='<div class="drw-info-box"><div class="drw-info-label">Country</div><div class="drw-info-value">'+esc(c.country)+'</div></div>';
     if(c.website)h+='<div class="drw-info-box"><div class="drw-info-label">Website</div><div class="drw-info-value"><a href="https://'+esc(c.website)+'" target="_blank" style="color:#a5b4fc;text-decoration:none">'+esc(c.website)+' ↗</a></div></div>';
     h+='</div></div>';
-    if(visitors.length){
-      var totalPg=visitors.reduce(function(s,v){return s+(parseInt(v.person.pages)||0);},0);
-      var hiEng=visitors.filter(function(v){return(parseInt(v.person.pages)||0)>=30;}).length;
-      h+='<div class="drw-section"><div class="drw-section-label">Visit Summary</div><div class="drw-grid">';
-      h+='<div class="drw-info-box"><div class="drw-info-label">People Identified</div><div class="drw-info-value" style="color:#6ee7b7">'+visitors.length+'</div></div>';
-      h+='<div class="drw-info-box"><div class="drw-info-label">Total Pages</div><div class="drw-info-value" style="color:#a5b4fc">'+totalPg+'</div></div>';
-      h+='<div class="drw-info-box"><div class="drw-info-label">High Engagement</div><div class="drw-info-value" style="color:#34d399">'+hiEng+'</div></div>';
-      h+='<div class="drw-info-box"><div class="drw-info-label">Avg Pages/Person</div><div class="drw-info-value">'+Math.round(totalPg/visitors.length)+'</div></div>';
-      h+='</div></div>';
-    }
+
     h+='<div class="drw-section"><div class="drw-section-label">Identified Visitors'+(visitors.length?' ('+visitors.length+')':'')+'</div>';
     if(visitors.length){
       h+='<div class="drw-person-list">';
