@@ -707,7 +707,7 @@
       '<col class="c-person"><col class="c-sen"><col class="c-company">'+
       '<col class="c-location"><col class="c-industry"><col class="c-date">'+
       '</colgroup>';
-    var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Pages</th><th>Date</th></tr></thead>';
+    var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Date</th></tr></thead>';
     var b='<tbody>'+rows.map(function(p,i){
       var sen=getSeniority(p.title);
       return'<tr style="animation:row-in .25s ease '+(i*6)+'ms both" onclick="openPersonDrawer('+i+')" title="Click to view full profile">'+
