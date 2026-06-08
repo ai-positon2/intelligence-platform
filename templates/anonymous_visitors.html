@@ -710,7 +710,7 @@
     if(!rows||!rows.length)return'<div class="empty">No matching visitors found.</div>';
     var cols='<colgroup>'+
       '<col class="c-person"><col class="c-sen"><col class="c-company">'+
-      '<col class="c-location"><col class="c-industry"><col class="c-pages"><col class="c-date">'+
+      '<col class="c-location"><col class="c-industry"><col class="c-date">'+
       '</colgroup>';
     var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Pages</th><th>Date</th></tr></thead>';
     var b='<tbody>'+rows.map(function(p,i){
@@ -726,7 +726,7 @@
         '<td>'+(p.website?'<span class="domain-pill">'+esc(p.website)+'</span>':'—')+'</td>'+
         '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.location)+'</td>'+
         '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbd5e1">'+esc(p.industry)+'</td>'+
-        '<td><span class="pages-pill '+pagesClass(p.pages)+'">'+esc(p.pages)+'</span></td>'+
+        
         '<td style="color:#64748b;white-space:nowrap">'+esc(p.date)+'</td>'+
       '</tr>';
     }).join('')+'</tbody>';
