@@ -159,6 +159,7 @@
     thead { position: sticky; top: 0; z-index: 2; }
     thead th { padding: 11px 16px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(14,17,27,.99); white-space: nowrap; }
     #pane-people table { table-layout: fixed; }
+    #pane-companies table { table-layout: fixed; }
     #pane-people col.c-person   { width: 240px; }
     #pane-people col.c-sen      { width: 120px; }
     #pane-people col.c-company  { width: 130px; }
@@ -736,23 +737,22 @@
   /* RENDER — COMPANIES TABLE */
   function renderCompanies(rows){
     if(!rows||!rows.length)return'<div class="empty">No matching companies found.</div>';
-    var h='<thead><tr><th>Company</th><th>Industry</th><th>Location</th><th>Employees</th><th>Revenue</th><th>Visitors</th></tr></thead>';
+    var cols='<colgroup><col style="width:260px"><col style="width:220px"><col style="width:200px"><col style="width:100px"><col style="width:110px"></colgroup>';
+    var h='<thead><tr><th>Company</th><th>Industry</th><th>Location</th><th>Employees</th><th>Revenue</th></tr></thead>';
     var b='<tbody>'+rows.map(function(c,i){
       var loc=[c.city,c.state].filter(Boolean).join(', ')||c.country||'—';
-      var vc=_allPeople.filter(function(p){return p.website&&c.website&&p.website===c.website;}).length;
       return'<tr style="animation:row-in .25s ease '+(i*6)+'ms both" onclick="openCompanyDrawer('+i+')" title="Click to view company">'+
         '<td><div class="company-cell">'+
           '<div class="company-av">'+esc(initials(c.name))+'</div>'+
-          '<div><div class="company-name">'+esc(c.name)+'</div><div class="company-site">'+esc(c.website)+'</div></div>'+
+          '<div style="min-width:0;overflow:hidden"><div class="company-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.name)+'</div><div class="company-site" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.website)+'</div></div>'+
         '</div></td>'+
-        '<td style="color:#cbd5e1">'+esc(c.industry)+'</td>'+
-        '<td>'+esc(loc)+'</td>'+
+        '<td style="color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.industry)+'</td>'+
+        '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(loc)+'</td>'+
         '<td style="color:#94a3b8">'+fmtEmp(c.employees)+'</td>'+
         '<td><span class="revenue-badge">'+fmtRevenue(c.revenue)+'</span></td>'+
-        '<td>'+(vc?'<span class="pages-pill pages-hi">'+vc+(vc===1?' person':' people')+'</span>':'<span style="color:#475569">—</span>')+'</td>'+
       '</tr>';
     }).join('')+'</tbody>';
-    return'<div class="tbl-wrap"><table>'+h+b+'</table></div>';
+    return'<div class="tbl-wrap"><table>'+cols+h+b+'</table></div>';
   }
 
   /* FILTERS */
