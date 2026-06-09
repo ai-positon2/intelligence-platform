@@ -153,7 +153,12 @@ body::before{
 }
 .chip:hover{color:var(--tx);border-color:var(--b2)}
 .chip.on{background:var(--accent-d);border-color:var(--accent);color:var(--accent)}
-.sep{width:1px;height:14px;background:var(--b1);flex-shrink:0;margin:0 2px}
+.sep{
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin:0 6px;color:var(--b3);
+  font-size:20px;font-weight:300;line-height:1;user-select:none;
+}
+.sep::before{content:'|'}
 .srch{
   display:flex;align-items:center;gap:7px;margin-left:auto;
   background:var(--s2);border:1px solid var(--b1);border-radius:var(--rpill);
@@ -884,6 +889,7 @@ function buildPeopleTab(){
     </div>
     <div class="sep"></div>
     <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
+    <div class="sep"></div>
     <div class="srch"><span class="srch-ico">🔍</span><input placeholder="Search people…" oninput="PLF.q=this.value;applyPLF()"></div>
   </div>
   <div class="peoplayout">
