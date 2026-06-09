@@ -4407,11 +4407,14 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="ir9-chat-body" id="ir9-chat-body"></div>
   <div class="ir9-chat-foot">
+    <div class="ir9-att" id="ir9-att"></div>
     <div class="ir9-chat-inwrap">
-      <textarea class="ir9-chat-in" id="ir9-chat-in" rows="1" placeholder="Ask about any company, signal, news, or contact..."></textarea>
+      <button class="ir9-clip" id="ir9-clip" title="Attach files — PDF, DOCX, XLSX, CSV, PPTX" onclick="irAttach()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+      <textarea class="ir9-chat-in" id="ir9-chat-in" rows="1" placeholder="Ask anything, or attach a file (PDF, DOCX, XLSX, CSV, PPT)..."></textarea>
       <button class="ir9-send" id="ir9-chat-send" onclick="irChatSend()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
     </div>
-    <div class="ir9-chat-note">Kairo can search your signals and the web &middot; answers may need verifying</div>
+    <input type="file" id="ir9-file" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md,.json">
+    <div class="ir9-chat-note">Kairo can read attached files, search your signals and the web &middot; answers may need verifying</div>
   </div>
 </div>
 <script>
@@ -5159,6 +5162,10 @@ function mdLite(t){
   t=t.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
   t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
   t=t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  t=t.replace(/^### (.*)$/gm,'<b>$1</b>');
+  t=t.replace(/^## (.*)$/gm,'<b style="font-size:13.5px">$1</b>');
+  t=t.replace(/^# (.*)$/gm,'<b style="font-size:14.5px">$1</b>');
+  t=t.replace(/^[-*] /gm,'&bull; ');
   t=t.replace(/\n/g,'<br>');
   return t;
 }
@@ -5180,31 +5187,87 @@ function _chatRender(){
       +'</div></div>';
     return;
   }
-  body.innerHTML=h.map(function(m){
+  body.innerHTML=h.map(function(m,mi){
     var k=m.role!=='user';
-    return '<div class="ir9-msg '+(k?'k':'u')+'"><div class="ir9-msg-av">'+(k?'&#10022;':'&#128100;')+'</div><div class="ir9-bub">'+(k?mdLite(m.content):esc(m.content))+'</div></div>';
+    var extra='';
+    if(!k&&m.att&&m.att.length)extra='<div class="ir9-uatt">&#128206; '+esc(m.att.join(', '))+'</div>';
+    if(k){
+      var fmts=['csv','xlsx','docx','pdf','pptx'];
+      extra='<div class="ir9-exp">'+(m.exp?'<button class="ir9-exp-b hot" onclick="irExport('+mi+',\''+m.exp+'\')">&#11015; Download .'+m.exp+'</button>':'')
+        +fmts.filter(function(f){return f!==m.exp;}).map(function(f){return '<button class="ir9-exp-b" onclick="irExport('+mi+',\''+f+'\')">'+f+'</button>';}).join('')+'</div>';
+    }
+    return '<div class="ir9-msg '+(k?'k':'u')+'"><div class="ir9-msg-av">'+(k?'&#10022;':'&#128100;')+'</div><div class="ir9-bub">'+(k?mdLite(m.content):esc(m.content))+extra+'</div></div>';
   }).join('');
   body.scrollTop=body.scrollHeight;
 }
+var KF=[];
+function _kfRender(){
+  var w=$('ir9-att');if(!w)return;
+  w.innerHTML=KF.map(function(c,i){
+    var ic=c.state==='up'?'&#8987;':(c.state==='err'?'&#9888;':'&#128206;');
+    return '<span class="ir9-att-c '+c.state+'">'+ic+' '+esc(c.name)+(c.err?' — '+esc(c.err):'')
+      +'<button title="Remove" onclick="irKRemove('+i+')">&#10005;</button></span>';
+  }).join('');
+  w.style.display=KF.length?'flex':'none';
+}
+window.irKRemove=function(i){KF.splice(i,1);_kfRender();};
+window.irAttach=function(){var f=$('ir9-file');if(f)f.click();};
+(function(){
+  var f=$('ir9-file');if(!f)return;
+  f.addEventListener('change',function(){
+    Array.prototype.slice.call(f.files).forEach(function(file){
+      var chip={name:file.name,content:'',state:'up',err:''};
+      KF.push(chip);_kfRender();
+      var fd=new FormData();fd.append('file',file);
+      fetch('/api/ppc-upload',{method:'POST',body:fd})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.error){chip.state='err';chip.err=d.error;}
+          else if(d.is_image){chip.state='err';chip.err='Images not supported in Kairo chat';}
+          else{chip.content=d.content||'';chip.state='ok';}
+          _kfRender();
+        })
+        .catch(function(){chip.state='err';chip.err='Upload failed';_kfRender();});
+    });
+    f.value='';
+  });
+})();
+window.irExport=function(mi,fmt){
+  var h=chatHist();var m=h[mi];if(!m||!m.content)return;
+  fetch('/api/kairo-export',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({format:fmt,content:m.content,title:'Kairo Insights'})})
+    .then(function(r){if(!r.ok)throw new Error('export failed');return r.blob();})
+    .then(function(b){
+      var a=document.createElement('a');a.href=URL.createObjectURL(b);
+      a.download='kairo-insights.'+fmt;document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},800);
+    })
+    .catch(function(){alert('Export failed — try another format.');});
+};
 window.irChatSend=function(q){
   var inp=$('ir9-chat-in');
   var text=(typeof q==='string')?q:(inp?inp.value.trim():'');
-  if(!text)return;
+  var ready=KF.filter(function(c){return c.state==='ok'&&c.content;});
+  if(!text&&!ready.length)return;
+  if(!text)text='Analyse the attached file'+(ready.length>1?'s':'')+' and summarise the key points.';
   if(inp){inp.value='';inp.style.height='auto';}
-  var h=chatHist();h.push({role:'user',content:text});chatSave(h);_chatRender();
+  var h=chatHist();
+  h.push({role:'user',content:text,att:ready.map(function(c){return c.name;})});
+  chatSave(h);_chatRender();
   var body=$('ir9-chat-body');
   var tip=document.createElement('div');tip.className='ir9-msg k';tip.id='ir9-chat-tip';
   tip.innerHTML='<div class="ir9-msg-av">&#10022;</div><div class="ir9-bub"><div class="ir9-typing"><span></span><span></span><span></span></div></div>';
   body.appendChild(tip);body.scrollTop=body.scrollHeight;
   var send=$('ir9-chat-send');if(send)send.disabled=true;
   fetch('/api/kairo-chat/'+acct(),{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:text,history:h.slice(0,-1).slice(-8)})})
+    body:JSON.stringify({question:text,history:h.slice(0,-1).slice(-8),
+      files:ready.map(function(c){return {name:c.name,content:c.content};})})})
     .then(function(r){return r.json();})
     .then(function(d){
       var t=$('ir9-chat-tip');if(t)t.remove();
       if(send)send.disabled=false;
       var ans=d.error?('Sorry - '+d.error):(d.answer||'No answer returned.');
-      var h2=chatHist();h2.push({role:'assistant',content:ans});chatSave(h2);_chatRender();
+      var h2=chatHist();h2.push({role:'assistant',content:ans,exp:(d.export_format||'')});chatSave(h2);_chatRender();
     })
     .catch(function(){
       var t=$('ir9-chat-tip');if(t)t.remove();if(send)send.disabled=false;
@@ -5406,6 +5469,21 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 
 /* unified button radii */
 .refresh-btn, .filters-btn, .export-btn, .pag-btn, .copy-cmd-btn { border-radius: 10px; }
+
+/* Kairo attachments + export */
+.ir9-att{display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.ir9-att-c{display:inline-flex;align-items:center;gap:6px;background:rgba(99,102,241,.10);border:1px solid rgba(129,140,248,.35);color:#c7d2fe;border-radius:99px;font-size:11px;padding:4px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ir9-att-c.err{background:rgba(244,63,94,.10);border-color:rgba(244,63,94,.4);color:#fda4af}
+.ir9-att-c.up{opacity:.7}
+.ir9-att-c button{background:none;border:none;color:inherit;cursor:pointer;font-size:10px;padding:0 0 0 3px;line-height:1}
+.ir9-clip{background:none;border:none;color:#8b94be;cursor:pointer;padding:7px;border-radius:9px;flex-shrink:0;display:inline-flex;align-items:center;transition:all .15s}
+.ir9-clip:hover{color:#c7d2fe;background:rgba(99,102,241,.14)}
+.ir9-uatt{font-size:10px;opacity:.85;margin-top:6px;color:#e0e7ff}
+.ir9-exp{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;opacity:.5;transition:opacity .15s}
+.ir9-bub:hover .ir9-exp{opacity:1}
+.ir9-exp-b{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#9fabbe;border-radius:7px;font-size:9.5px;font-weight:700;padding:3px 9px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
+.ir9-exp-b:hover{border-color:rgba(129,140,248,.5);color:#c7d2fe}
+.ir9-exp-b.hot{background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;color:#fff;text-transform:none;font-size:10.5px}
 
 /* Insights (Kairo) tab readability */
 .ir9-hl { font-size: 14px; line-height: 1.65; }

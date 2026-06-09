@@ -1636,7 +1636,7 @@ def ppc_upload():
             content = _extract_docx(data)
         elif ext in ("xlsx", "xls"):
             content = _extract_xlsx(data)
-        elif ext == "pptx":
+        elif ext in ("pptx", "ppt"):
             content = _extract_pptx(data)
         elif ext in ("csv", "txt", "md", "json", "xml", "html", "htm"):
             content = data.decode("utf-8", errors="replace")
@@ -2332,8 +2332,33 @@ def kairo_chat(account_id):
     body = request.get_json(silent=True) or {}
     question = (body.get("question") or "").strip()
     history = body.get("history") or []
+    files = body.get("files") or []
     if not question:
         return jsonify({"error": "empty question"})
+
+    # Attached-file context (extracted client-side via /api/ppc-upload)
+    att_ctx = ""
+    if files:
+        chunks = []
+        for fobj in files[:4]:
+            nm = str(fobj.get("name") or "file")[:120]
+            ct = str(fobj.get("content") or "")[:12000]
+            if ct.strip():
+                chunks.append("=== ATTACHED FILE: %s ===\n%s" % (nm, ct))
+        if chunks:
+            att_ctx = ("\n\nATTACHED FILES (uploaded by the user — treat as primary context; quote and "
+                       "analyse their actual contents):\n" + "\n\n".join(chunks))
+
+    # Detect a requested output format (csv / xlsx / docx / pdf / pptx)
+    export_format = ""
+    _ql = question.lower()
+    if _re.search(r"\b(as|in|into|to|export|download|give|create|make|generate|build|produce|format|convert)\b", _ql):
+        for _f, _pat in (("csv", r"\bcsv\b"), ("xlsx", r"\b(xlsx|xls|excel|spreadsheet)\b"),
+                         ("docx", r"\b(docx|word)\b"), ("pdf", r"\bpdf\b"),
+                         ("pptx", r"\b(pptx|ppt|powerpoint|slide deck|slides|deck)\b")):
+            if _re.search(_pat, _ql):
+                export_format = _f
+                break
     try:
         conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
         counts = {r[0]: r[1] for r in conn.execute(
@@ -2375,8 +2400,14 @@ def kairo_chat(account_id):
             "Use the ACCOUNT SIGNAL DATA below for questions about tracked companies and signals; use web search "
             "for company research, recent news, people, contacts, or anything not in the data. If asked to draft an "
             "email or message, make it tight and personalised. Never invent revenue or dollar figures. Cite specific "
-            "companies and signals. Format with short, clean markdown (bold, links, short lists).\n\n"
-            "ACCOUNT OVERVIEW: %s\n\nRELEVANT SIGNAL DATA:\n%s" % (overview, ctx_str))
+            "companies and signals. Format with short, clean markdown (bold, links, short lists). "
+            "If files are attached, ground your answer in their ACTUAL contents — quote real numbers, names and rows "
+            "from them, and combine them with signal data where relevant. "
+            "If the user asks for output as a file or specific format (CSV, Excel/XLSX, Word/DOCX, PDF, "
+            "PowerPoint/PPTX, or a table), produce the COMPLETE content in clean markdown: a proper markdown table "
+            "for tabular data, headings (#, ##) to structure documents and slides. The platform converts your "
+            "markdown into the requested file, so never refuse a format and never truncate with placeholders.\n\n"
+            "ACCOUNT OVERVIEW: %s\n\nRELEVANT SIGNAL DATA:\n%s%s" % (overview, ctx_str, att_ctx))
 
         msgs = [{"role": "system", "content": system}]
         for m in history[-8:]:
@@ -2387,16 +2418,217 @@ def kairo_chat(account_id):
 
         from openai import OpenAI
         oai = OpenAI(api_key=api_key, timeout=80.0, max_retries=1)
+        _max_out = 2600 if (files or export_format) else 1100
         model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
-        answer, web = _responses_web_search(oai, model, msgs, 1100)
+        answer, web = _responses_web_search(oai, model, msgs, _max_out)
         if not answer:
-            answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, 1100)
+            answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, _max_out)
         if not answer:
-            answer, _m = _kairo_completion(oai, msgs, 1000)
-        return jsonify({"ok": True, "answer": answer, "web_search_used": web})
+            answer, _m = _kairo_completion(oai, msgs, _max_out)
+        return jsonify({"ok": True, "answer": answer, "web_search_used": web,
+                        "export_format": export_format})
     except Exception as e:
         import traceback; log.error("kairo_chat: %s", traceback.format_exc())
         return jsonify({"error": str(e)})
+
+
+# ── Kairo export: convert a markdown answer into a downloadable file ─────────
+
+def _md_blocks(content):
+    """Parse markdown-lite into (kind, payload) blocks: h1/h2/h3/li/p (str) and tr (list of cells)."""
+    blocks = []
+    for ln in content.splitlines():
+        st = ln.strip()
+        if not st:
+            continue
+        if st.startswith("|") and st.endswith("|") and st.count("|") >= 2:
+            cells = [c.strip() for c in st.strip("|").split("|")]
+            if all(set(c) <= set("-: ") for c in cells):
+                continue  # separator row
+            blocks.append(("tr", cells)); continue
+        if st.startswith("### "): blocks.append(("h3", st[4:])); continue
+        if st.startswith("## "):  blocks.append(("h2", st[3:])); continue
+        if st.startswith("# "):   blocks.append(("h1", st[2:])); continue
+        if st[:2] in ("- ", "* "): blocks.append(("li", st[2:])); continue
+        blocks.append(("p", st))
+    return blocks
+
+
+def _md_table_rows(content):
+    """First choice: markdown table rows. Fallback: CSV inside a code block."""
+    rows = [v for k, v in _md_blocks(content) if k == "tr"]
+    if rows:
+        return rows
+    import csv as _csv, io as _io, re as _re2
+    m = _re2.search(r"```(?:csv)?\s*([\s\S]*?)```", content)
+    blob = m.group(1).strip() if m else ""
+    if blob and ("," in blob or "\t" in blob):
+        return [r for r in _csv.reader(_io.StringIO(blob)) if any(x.strip() for x in r)]
+    return []
+
+
+def _strip_md(t):
+    import re as _re2
+    t = str(t)
+    t = _re2.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    t = _re2.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", r"\1 (\2)", t)
+    return t.strip()
+
+
+@app.route("/api/kairo-export", methods=["POST"])
+@login_required
+def kairo_export():
+    """Convert Kairo markdown output into CSV / XLSX / DOCX / PDF / PPTX and stream it back."""
+    import io
+    from flask import send_file
+    body = request.get_json(silent=True) or {}
+    fmt = (body.get("format") or "").lower().strip()
+    content = str(body.get("content") or "").strip()
+    title = (body.get("title") or "Kairo Insights").strip()[:80] or "Kairo Insights"
+    if not content:
+        return jsonify({"error": "no content"}), 400
+    if fmt not in ("csv", "xlsx", "docx", "pdf", "pptx"):
+        return jsonify({"error": "unsupported format"}), 400
+    fname = "kairo-insights." + fmt
+    try:
+        if fmt == "csv":
+            import csv as _csv
+            buf = io.StringIO()
+            w = _csv.writer(buf)
+            rows = _md_table_rows(content)
+            if rows:
+                for r in rows:
+                    w.writerow([_strip_md(c) for c in r])
+            else:
+                for kind, val in _md_blocks(content):
+                    w.writerow([_strip_md(val if isinstance(val, str) else " | ".join(val))])
+            data = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
+            return send_file(data, mimetype="text/csv", as_attachment=True, download_name=fname)
+
+        if fmt == "xlsx":
+            import openpyxl
+            from openpyxl.styles import Font
+            wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Kairo"
+            rows = _md_table_rows(content)
+            if rows:
+                for ri, r in enumerate(rows, 1):
+                    for ci, c in enumerate(r, 1):
+                        ws.cell(row=ri, column=ci, value=_strip_md(c))
+                for c in ws[1]:
+                    c.font = Font(bold=True)
+            else:
+                ri = 1
+                for kind, val in _md_blocks(content):
+                    cell = ws.cell(row=ri, column=1,
+                                   value=_strip_md(val if isinstance(val, str) else " | ".join(val)))
+                    if kind in ("h1", "h2", "h3"):
+                        cell.font = Font(bold=True, size=13 if kind == "h1" else 12)
+                    ri += 1
+            for col in ws.columns:
+                mx = max((len(str(c.value or "")) for c in col), default=10)
+                ws.column_dimensions[col[0].column_letter].width = min(60, max(12, mx + 2))
+            data = io.BytesIO(); wb.save(data); data.seek(0)
+            return send_file(data, as_attachment=True, download_name=fname,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        if fmt == "docx":
+            import docx
+            doc = docx.Document()
+            doc.add_heading(title, level=0)
+            tbl = []
+            def _flush():
+                if not tbl:
+                    return
+                t = doc.add_table(rows=0, cols=max(len(r) for r in tbl))
+                try: t.style = "Light Grid Accent 1"
+                except Exception: pass
+                for r in tbl:
+                    cells = t.add_row().cells
+                    for i2, c in enumerate(r):
+                        if i2 < len(cells):
+                            cells[i2].text = _strip_md(c)
+                del tbl[:]
+            for kind, val in _md_blocks(content):
+                if kind == "tr":
+                    tbl.append(val); continue
+                _flush()
+                if kind == "h1": doc.add_heading(_strip_md(val), level=1)
+                elif kind == "h2": doc.add_heading(_strip_md(val), level=2)
+                elif kind == "h3": doc.add_heading(_strip_md(val), level=3)
+                elif kind == "li": doc.add_paragraph(_strip_md(val), style="List Bullet")
+                else: doc.add_paragraph(_strip_md(val))
+            _flush()
+            data = io.BytesIO(); doc.save(data); data.seek(0)
+            return send_file(data, as_attachment=True, download_name=fname,
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+        if fmt == "pptx":
+            from pptx import Presentation
+            prs = Presentation()
+            slides, cur = [], [title, []]
+            for kind, val in _md_blocks(content):
+                txt = _strip_md(val if isinstance(val, str) else " | ".join(val))
+                if kind in ("h1", "h2"):
+                    if cur[1]:
+                        slides.append(cur)
+                    cur = [txt, []]
+                else:
+                    cur[1].append(("• " if kind == "li" else "") + txt)
+            if cur[1] or not slides:
+                slides.append(cur)
+            for stitle, lines in slides[:30]:
+                slide = prs.slides.add_slide(prs.slide_layouts[1])
+                slide.shapes.title.text = stitle[:90]
+                tf = slide.placeholders[1].text_frame
+                tf.text = ""
+                for i2, ln in enumerate(lines[:12]):
+                    p = tf.paragraphs[0] if i2 == 0 else tf.add_paragraph()
+                    p.text = ln[:180]
+            data = io.BytesIO(); prs.save(data); data.seek(0)
+            return send_file(data, as_attachment=True, download_name=fname,
+                mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+        # ── pdf ──
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        data = io.BytesIO()
+        docp = SimpleDocTemplate(data, pagesize=A4, topMargin=18*mm, bottomMargin=18*mm)
+        styles = getSampleStyleSheet()
+        story = [Paragraph(title, styles["Title"]), Spacer(1, 6)]
+        tbl = []
+        def _flush_pdf():
+            if not tbl:
+                return
+            t = Table([[_strip_md(c)[:90] for c in r] for r in tbl], hAlign="LEFT")
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4f46e5")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f5f9")]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]))
+            story.append(t); story.append(Spacer(1, 8)); del tbl[:]
+        for kind, val in _md_blocks(content):
+            if kind == "tr":
+                tbl.append(val); continue
+            _flush_pdf()
+            txt = _strip_md(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if kind == "h1": story.append(Paragraph(txt, styles["Heading1"]))
+            elif kind == "h2": story.append(Paragraph(txt, styles["Heading2"]))
+            elif kind == "h3": story.append(Paragraph(txt, styles["Heading3"]))
+            elif kind == "li": story.append(Paragraph("• " + txt, styles["Normal"]))
+            else: story.append(Paragraph(txt, styles["Normal"]))
+        _flush_pdf()
+        docp.build(story)
+        data.seek(0)
+        return send_file(data, mimetype="application/pdf", as_attachment=True, download_name=fname)
+    except Exception as e:
+        import traceback; log.error("kairo_export: %s", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/refresh-dashboard", methods=["POST"])
