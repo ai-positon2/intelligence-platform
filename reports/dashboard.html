@@ -5347,5 +5347,11 @@ window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getIte
 })();
 (function(){var _o=window.showRefreshModal;window.showRefreshModal=function(){if(typeof _o==='function')_o.apply(this,arguments);if(window.rfxResume)window.rfxResume();};})();
 </script>
+<style>
+/* force: no expand/tilt/scale on kpi-cards on hover */
+.kpi-card:hover { transform: none !important; }
+.kpi-card:hover .kpi-number { transform: none !important; }
+.kpi-card { transform-style: flat !important; will-change: auto !important; }
+</style>
 </body>
 </html>
