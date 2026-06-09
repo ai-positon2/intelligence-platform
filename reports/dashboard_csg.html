@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Signal Tracker Dashboard</title>
@@ -569,7 +570,7 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 .kpi-card:nth-child(2){animation-delay:.10s}
 .kpi-card:nth-child(3){animation-delay:.16s}
 .kpi-card:nth-child(4){animation-delay:.22s}
-.kpi-card:hover{transform:translateY(-5px);box-shadow:0 12px 32px rgba(59,130,246,.15)}
+.kpi-card:hover{box-shadow:0 12px 32px rgba(59,130,246,.15)}
 .kpi-card.high-card:hover{box-shadow:0 12px 32px rgba(239,68,68,.14)}
 
 /* ── Signal feed items — slide-right on hover ── */
@@ -4048,23 +4049,7 @@ window._showToast = function(msg, icon, durationMs) {
 // C ── 3D perspective tilt on KPI cards
 (function() {
   function initTilt() {
-    document.querySelectorAll('.kpi-card').forEach(function(card) {
-      if (card._tiltInited) return;
-      card._tiltInited = true;
-      card.addEventListener('mousemove', function(e) {
-        var rect = card.getBoundingClientRect();
-        var x = (e.clientX - rect.left) / rect.width - 0.5;
-        var y = (e.clientY - rect.top) / rect.height - 0.5;
-        var tx = -y * 12, ty = x * 12;
-        card.style.transform = 'translateY(-5px) rotateX(' + tx + 'deg) rotateY(' + ty + 'deg) scale(1.02)';
-        card.style.boxShadow = '0 16px 40px rgba(59,130,246,' + (0.1 + Math.abs(x) * 0.12) + ')';
-        card.style.transition = 'box-shadow .1s';
-      });
-      card.addEventListener('mouseleave', function() {
-        card.style.transform = '';
-        card.style.boxShadow = '';
-        card.style.transition = 'transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s';
-      });
+    // kpi-card tilt removed
     });
   }
   document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
