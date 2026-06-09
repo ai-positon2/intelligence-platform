@@ -41,6 +41,20 @@ body::before{
 .shell{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 28px 100px}
 
 /* NAV removed — breadcrumb in topbar */
+/* PAGE HEADER */
+.page-hdr{
+  display:flex;align-items:center;gap:12px;
+  padding:28px 0 20px;
+}
+.page-hdr-icon{
+  width:36px;height:36px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(124,131,245,0.25),rgba(139,92,246,0.18));
+  border:1px solid rgba(124,131,245,0.25);
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+}
+.page-hdr-title{font-size:22px;font-weight:700;color:var(--tx);letter-spacing:-0.02em}
+.page-hdr-sub{font-size:13px;color:var(--tx2);margin-top:2px}
+
 /* mega-tabs */
 .mega-tabs{
   display:flex;border:1px solid var(--b1);border-radius:var(--rxl);
@@ -590,7 +604,14 @@ body::before{
 
 <div class="shell">
 
-<div class="mega-tabs" style="margin-top:24px">
+<div class="page-hdr">
+  <div class="page-hdr-icon">🔗</div>
+  <div>
+    <div class="page-hdr-title">LinkedIn Intelligence</div>
+    <div class="page-hdr-sub">ABM signal tracking — people, companies &amp; post engagement</div>
+  </div>
+</div>
+<div class="mega-tabs">
   <button class="mtab active" onclick="switchTab('people')" id="nt-people">
     <div class="mtab-label">People</div>
     <div class="mtab-val vg" id="tc-people">99</div>
