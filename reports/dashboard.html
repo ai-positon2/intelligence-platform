@@ -5348,10 +5348,14 @@ window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getIte
 (function(){var _o=window.showRefreshModal;window.showRefreshModal=function(){if(typeof _o==='function')_o.apply(this,arguments);if(window.rfxResume)window.rfxResume();};})();
 </script>
 <style>
-/* force: no expand/tilt/scale on kpi-cards on hover */
-.kpi-card:hover { transform: none !important; }
-.kpi-card:hover .kpi-number { transform: none !important; }
+/* force: no expand/tilt/scale/lift on kpi-cards on hover — static tiles */
+.kpi-card:hover, .kpi-card:hover * { transform: none !important; }
 .kpi-card { transform-style: flat !important; will-change: auto !important; }
+.kpi-card:hover { box-shadow: none !important; }
+.kpi-card.high-card:hover { box-shadow: inset 12px 0 24px -12px rgba(239,68,68,.18) !important; }
+.kpi-card:hover::before { opacity: 0 !important; }
+.kpi-card:hover .kpi-number { filter: drop-shadow(0 2px 14px rgba(99,102,241,.28)) !important; }
+.kpi-card.high-card:hover .kpi-number { filter: drop-shadow(0 2px 14px rgba(239,68,68,.4)) !important; }
 </style>
 </body>
 </html>
