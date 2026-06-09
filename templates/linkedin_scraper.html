@@ -49,29 +49,26 @@ body::before{
 .nav-brand{font-size:12px;font-weight:700;color:var(--tx2);letter-spacing:0.04em;text-transform:uppercase}
 .nav-dot{width:3px;height:3px;border-radius:50%;background:var(--b3);flex-shrink:0}
 .nav-name{font-size:13px;font-weight:500;color:var(--tx)}
-/* tab-switcher replaces nav-tabs */
-.tab-switcher{
-  display:flex;gap:6px;
-  margin:0 0 24px;
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:16px;padding:5px;
-  width:fit-content;
+/* mega-tabs */
+.mega-tabs{
+  display:flex;border:1px solid var(--b1);border-radius:var(--rxl);
+  overflow:hidden;margin-bottom:24px;background:var(--s1);
 }
-.tsw{
-  padding:10px 28px;border:none;border-radius:11px;
-  background:none;color:var(--tx2);font-size:14px;font-weight:600;
-  cursor:pointer;transition:all 0.15s;font-family:inherit;
-  display:flex;align-items:center;gap:8px;
+.mtab{
+  flex:1;padding:18px 24px;border:none;border-right:1px solid var(--b1);
+  background:none;cursor:pointer;text-align:left;font-family:inherit;
+  transition:background 0.15s;position:relative;
 }
-.tsw:hover{background:rgba(255,255,255,0.06);color:var(--tx);}
-.tsw.active{background:var(--accent);color:#fff;box-shadow:0 4px 20px rgba(124,131,245,0.35);}
-.tsw-badge{
-  font-size:11px;font-weight:700;
-  background:rgba(255,255,255,0.18);
-  color:inherit;border-radius:20px;padding:2px 8px;
+.mtab:last-child{border-right:none;}
+.mtab:hover{background:var(--s2);}
+.mtab.active{background:rgba(124,131,245,0.08);}
+.mtab.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:var(--accent);border-radius:3px 3px 0 0;
 }
-.tsw.active .tsw-badge{background:rgba(255,255,255,0.25);}
+.mtab-label{font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+.mtab.active .mtab-label{color:var(--accent);}
+.mtab-val{font-size:32px;font-weight:700;line-height:1;letter-spacing:-0.02em;}
 .nav-tabs{
   margin-left:auto;display:flex;gap:2px;
   background:var(--s1);border:1px solid var(--b1);border-radius:9px;padding:3px;
@@ -600,10 +597,19 @@ body::before{
   <div class="nav-dot"></div>
   <div class="nav-name">LinkedIn Intelligence</div>
 </nav>
-<div class="tab-switcher">
-  <button class="tsw active" onclick="switchTab('people')" id="nt-people">People <span class="tsw-badge" id="tc-people">99+</span></button>
-  <button class="tsw" onclick="switchTab('companies')" id="nt-companies">Companies <span class="tsw-badge" id="tc-companies">—</span></button>
-  <button class="tsw" onclick="switchTab('post')" id="nt-post">Posts <span class="tsw-badge" id="tc-post">8</span></button>
+<div class="mega-tabs">
+  <button class="mtab active" onclick="switchTab('people')" id="nt-people">
+    <div class="mtab-label">People</div>
+    <div class="mtab-val vg" id="tc-people">99</div>
+  </button>
+  <button class="mtab" onclick="switchTab('companies')" id="nt-companies">
+    <div class="mtab-label">Companies</div>
+    <div class="mtab-val vc" id="tc-companies">—</div>
+  </button>
+  <button class="mtab" onclick="switchTab('post')" id="nt-post">
+    <div class="mtab-label">Posts</div>
+    <div class="mtab-val vi" id="tc-post">8</div>
+  </button>
 </div>
 <div id="tab-people" class="page active"></div>
 <div id="tab-companies" class="page"></div>
@@ -830,9 +836,7 @@ function buildPeopleTab(){
   const maxLb=company_lb[0]?company_lb[0][1]:1;
   const el=document.getElementById('tab-people');
   el.innerHTML=`
-  <div class="stat-row">
-    <div class="scard sg"><div class="sc-label">People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div></div>
-  </div>
+
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Seniority</span>
@@ -894,9 +898,7 @@ function buildCompaniesTab(){
   const {companies,stats}=D;
   const el=document.getElementById('tab-companies');
   el.innerHTML=`
-  <div class="stat-row">
-    <div class="scard sc"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
-  </div>
+
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Min People</span>
@@ -962,7 +964,7 @@ function applyPLF(){
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
     return true;
   });
-  document.getElementById('tc-people').textContent=fil.length+'+';
+  document.getElementById('tc-people').textContent=fil.length;
   if(!fil.length){main.innerHTML='<div class="nores"><div class="nores-ico">🔍</div><h3>No results</h3><p>Adjust filters</p></div>';return;}
   const bkts={};BKT.forEach(b=>{bkts[b.k]=fil.filter(p=>p.bucket===b.k);});
   main.innerHTML=BKT.map(b=>{
@@ -1226,6 +1228,8 @@ function closePostModal(){
 buildPostTab();
 buildPeopleTab();
 buildCompaniesTab();
+document.getElementById('tc-post').textContent=D.posts.length;
+document.getElementById('tc-companies').textContent=D.companies.length;
 switchTab('people');
 
 </script>
