@@ -1696,6 +1696,35 @@ def _responses_web_search(oai, model, input_msgs, max_tokens):
     return None, False
 
 
+def _kairo_model_chain():
+    """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > gpt-4o > OPENAI_MODEL/gpt-4o-mini."""
+    chain = []
+    for m in (os.environ.get("OPENAI_INSIGHTS_MODEL"), "gpt-4o",
+              os.environ.get("OPENAI_MODEL", "gpt-4o-mini")):
+        if m and m not in chain:
+            chain.append(m)
+    return chain
+
+
+def _kairo_chat_json(oai, messages, max_tokens):
+    """Chat completion in strict JSON mode, trying the strongest model first.
+    Returns (raw_text, model_used)."""
+    last_err = None
+    for model in _kairo_model_chain():
+        try:
+            resp = oai.chat.completions.create(
+                model=model, messages=messages,
+                max_completion_tokens=max_tokens,
+                response_format={"type": "json_object"})
+            txt = (resp.choices[0].message.content or "").strip()
+            if txt:
+                return txt, model
+        except Exception as e:
+            last_err = e
+            log.warning("kairo: model '%s' failed, trying next: %s", model, e)
+    raise last_err if last_err else RuntimeError("no usable OpenAI model")
+
+
 def _strip_revenue_fields(obj):
     """Recursively remove all revenue / pipeline-value fields from GPT output."""
     if isinstance(obj, dict):
@@ -1787,15 +1816,50 @@ def insights_generate(account_id):
                 by_co[co] = {"domain": s.get("domain",""), "industry": s.get("industry",""), "sigs":[]}
             by_co[co]["sigs"].append(s)
 
+        from datetime import date as _date
+        _today = _date.today()
+        def _age_days(d):
+            try:
+                return (_today - _date.fromisoformat(str(d)[:10])).days
+            except Exception:
+                return 9999
+
+        type_counts, ind_counts = {}, {}
+        for s in signals:
+            type_counts[s["signal_type"]] = type_counts.get(s["signal_type"], 0) + 1
+            if s.get("industry"):
+                ind_counts[s["industry"]] = ind_counts.get(s["industry"], 0) + 1
+
         ctx_lines = []
+        multi_intent = 0
         for co, info in sorted(by_co.items(),
-            key=lambda x: (-sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"), -len(x[1]["sigs"])))[:60]:
+            key=lambda x: (-sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"), -len(x[1]["sigs"])))[:80]:
+            sigs = info["sigs"]
+            stypes = sorted(set(s["signal_type"] for s in sigs))
+            recent = sum(1 for s in sigs if _age_days(s["signal_date"]) <= 30)
+            momentum = "RISING" if recent > len(sigs) - recent else ("ACTIVE" if recent else "COOLING")
+            flags = []
+            if len(stypes) >= 2:
+                flags.append("MULTI-INTENT")
+                multi_intent += 1
+            if any(_age_days(s["signal_date"]) <= 7 for s in sigs):
+                flags.append("FRESH<7d")
             sig_str = " | ".join(
                 "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
-                    ": "+s["signal_detail"][:80] if s.get("signal_detail") else "")
-                for s in info["sigs"][:5])
-            ctx_lines.append("[%s | %s | %s] %d sigs — %s" % (
-                co, info["domain"], info["industry"], len(info["sigs"]), sig_str))
+                    ": "+s["signal_detail"][:140] if s.get("signal_detail") else "")
+                for s in sigs[:6])
+            ctx_lines.append("[%s | %s | %s] %d sigs, %s%s — %s" % (
+                co, info["domain"], info["industry"], len(sigs), momentum,
+                (" " + ",".join(flags)) if flags else "", sig_str))
+
+        stats_lines = (
+            "DATASET STATS: %d signals across %d companies. "
+            "Signal-type distribution: %s. Top industries: %s. "
+            "Multi-intent companies (2+ distinct signal types): %d."
+            % (n_sig, n_co,
+               ", ".join("%s:%d" % kv for kv in sorted(type_counts.items(), key=lambda x: -x[1])),
+               ", ".join("%s:%d" % kv for kv in sorted(ind_counts.items(), key=lambda x: -x[1])[:8]),
+               multi_intent))
 
         schema = (
             '{"headline":"one punchy 8-12 word headline capturing this week in the market",'
@@ -1812,31 +1876,46 @@ def insights_generate(account_id):
         )
 
         system_prompt = (
-            "You are Kairo, Position2's revenue-intelligence AI. Position2 is a B2B digital "
+            "You are Kairo, Position2's elite revenue-intelligence AI. Position2 is a B2B digital "
             "marketing agency. Services: SEO & Organic Growth | Performance Marketing "
             "(Google/Meta/LinkedIn Ads) | Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
-            "Brief the CEO and Head of Sales on THIS WEEK's pipeline priorities like an elite analyst: "
-            "sharp, specific, pattern-driven. Name companies, cite signals, connect dots ACROSS companies "
-            "(shared investors, sector waves, leadership migrations, timing clusters). "
-            "NEVER include revenue estimates, pipeline values, or dollar figures of any kind. No fluff. "
-            "Return ONLY valid JSON (no markdown): "+schema+" "
-            "RULES: week_priority=top 6 by urgency; pipeline=top 14 scored 0-100 with honest momentum — include mid and lower-score watchlist companies too, not only the hot ones; "
-            "actions=6 ranked; outreach=8 personalised with <55-char subjects; "
-            "themes=4; risks=2-3 only if real. "
-            "Every field must cite actual signal data. Generic = failure."
+            "You brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
+            "METHOD — reason through these steps before writing: "
+            "(1) Weight every signal: severity (HIGH=3, MEDIUM=2, LOW=1) x recency (<7d x2, <30d x1.5, older x1); "
+            "MULTI-INTENT companies (2+ distinct signal types) are the strongest buying-window evidence. "
+            "(2) Score intent 0-100 from that weighting and be honest: most companies belong at 30-70; reserve 85+ "
+            "for multi-intent + HIGH + fresh. Momentum flags in the data (RISING/ACTIVE/COOLING) must drive the "
+            "pipeline momentum field. "
+            "(3) Hunt cross-company patterns: sector waves, leadership migrations between tracked companies, funding "
+            "clusters in one niche, timing coincidences. These power market_pulse, themes and kairo_take. "
+            "(4) For each company, reason WHY the signal opens a marketing-services window NOW: new CMO/CEO = vendor "
+            "review window (~90 days); funding = growth mandate and paid-media budget unlock; M&A = brand and website "
+            "consolidation work; IPO = scrutiny on organic visibility and analyst-facing content; expansion/news = "
+            "momentum to amplify. Map each to the single best-fit Position2 service. "
+            "(5) Write hooks and openers a rep could literally say on a call: cite the company's actual signal, its "
+            "date, and one specific implied pain. "
+            "BANNED: generic filler ('great fit', 'reach out to discuss', 'leverage synergies'), invented facts, and "
+            "ANY revenue estimates, pipeline values, or dollar figures. Every claim must trace to a signal in the "
+            "data. Specific beats clever; concise beats long. "
+            "Return ONLY valid JSON exactly matching this schema: "+schema+" "
+            "RULES: week_priority=top 6 by urgency; pipeline=top 14 scored 0-100 with honest momentum — include mid "
+            "and lower-score watchlist companies too, not only the hot ones; actions=6 ranked; outreach=8 "
+            "personalised with <55-char human, curiosity-driven subjects (no spammy caps); themes=4 each with a "
+            "usable campaign_angle; risks=2-3 only if real. kairo_take must be a genuinely non-obvious pattern, "
+            "never a summary."
         )
 
         from openai import OpenAI
-        oai  = OpenAI(api_key=api_key, timeout=95.0, max_retries=1)
-        resp = oai.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
-            messages=[
-                {"role":"system","content":system_prompt},
-                {"role":"user","content":"Analyse %d signals from %d %s-market companies:\n\n%s\n\nBrief the CEO." % (n_sig, n_co, acct, "\n".join(ctx_lines))}
-            ],
-            max_completion_tokens=5000,
-        )
-        raw = resp.choices[0].message.content.strip()
+        oai  = OpenAI(api_key=api_key, timeout=120.0, max_retries=1)
+        user_msg = (
+            "Analyse %d signals from %d %s-market companies.\n%s\n\n"
+            "COMPANY SIGNAL DATA (format: [name | domain | industry] n sigs, MOMENTUM FLAGS — "
+            "type(severity,date): detail):\n\n%s\n\nBrief the CEO. Respond with the JSON object only."
+            % (n_sig, n_co, acct, stats_lines, "\n".join(ctx_lines)))
+        raw, _used_model = _kairo_chat_json(oai, [
+            {"role":"system","content":system_prompt},
+            {"role":"user","content":user_msg}
+        ], 6000)
         if "```" in raw:
             m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
             raw = m.group(1).strip() if m else raw
@@ -1862,7 +1941,7 @@ def insights_generate(account_id):
         if insights is None:
             return jsonify({"error": "GPT returned invalid JSON. Try again."})
         insights = _strip_revenue_fields(insights)
-        return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"insights":insights})
+        return jsonify({"ok":True,"signals_analyzed":n_sig,"companies_analyzed":n_co,"model":_used_model,"insights":insights})
     except Exception as e:
         import traceback; log.error("insights_generate: %s", traceback.format_exc())
         return jsonify({"error": str(e)})
@@ -2015,14 +2094,22 @@ def company_analysis(account_id):
         if not rows:
             return jsonify({"error": "No signals found for this company"}), 200
         signals = [dict(r) for r in rows]
-        sig_str = "; ".join(
-            "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
-                ": "+s["signal_detail"][:100] if s.get("signal_detail") else "")
-            for s in signals[:10])
+        sig_str = "\n".join(
+            "- %s (%s, %s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                ": "+s["signal_detail"][:160] if s.get("signal_detail") else "")
+            for s in signals)
         industry = signals[0].get("industry","") if signals else ""
+        co_domain = signals[0].get("domain","") if signals else ""
+        co_loc = ", ".join(x for x in [signals[0].get("city") or "", signals[0].get("state") or ""] if x) if signals else ""
         system = (
-            "You are a senior B2B sales strategist at Position2 (SEO, PPC, Content, Brand, RevOps). "
-            "Generate a deep analysis of this prospect company in ONLY valid JSON: "
+            "You are Kairo, senior B2B sales strategist at Position2 (SEO & Organic Growth, PPC/Performance "
+            "Marketing, Content Strategy, Brand & Website, RevOps & HubSpot). Build a rigorous, signal-grounded "
+            "prospect analysis. Reason first: what do the signals (their types, severity, dates, and sequence) "
+            "imply about budget timing, internal change, and marketing gaps? Score honestly — most prospects are "
+            "40-75; reserve 85+ for multiple fresh HIGH signals. Talking points must reference the actual signals "
+            "and dates. Objections must be the realistic ones for this industry. Subject lines: human, specific, "
+            "curiosity-driven, <55 chars, no clickbait caps. NEVER include revenue estimates or dollar figures. "
+            "Return ONLY valid JSON: "
             '{"score":85,"score_reason":"one sentence why",'
             '"company_context":"2 sentences about what this company does and why they matter",'
             '"why_now":"2 sentences on why right now is the perfect time to reach out",'
@@ -2035,22 +2122,19 @@ def company_analysis(account_id):
             '"urgency":"HIGH|MEDIUM|LOW","urgency_reason":"why"}'
         )
         from openai import OpenAI
-        oai = OpenAI(api_key=api_key)
-        resp = oai.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": "Company: %s | Industry: %s | Signals: %s" % (company_name, industry, sig_str)}
-            ],
-            max_completion_tokens=1200,
-        )
-        raw = resp.choices[0].message.content.strip()
+        oai = OpenAI(api_key=api_key, timeout=90.0, max_retries=1)
+        raw, _used_model = _kairo_chat_json(oai, [
+            {"role": "system", "content": system},
+            {"role": "user", "content": "Company: %s\nDomain: %s\nIndustry: %s\nLocation: %s\nSignals (newest first):\n%s"
+                % (company_name, co_domain, industry, co_loc, sig_str)}
+        ], 1600)
         if "```" in raw:
             m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
             raw = m.group(1).strip() if m else raw
         s2=raw.find("{"); e2=raw.rfind("}")
         if s2!=-1 and e2!=-1: raw=raw[s2:e2+1]
-        return jsonify({"ok": True, "company": company_name, "analysis": json.loads(raw)})
+        return jsonify({"ok": True, "company": company_name, "model": _used_model,
+                        "analysis": _strip_revenue_fields(json.loads(raw))})
     except Exception as e:
         return jsonify({"error": str(e)})
 
@@ -2197,10 +2281,12 @@ def research_company(account_id):
 
         from openai import OpenAI
         oai   = OpenAI(api_key=api_key)
-        model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
-        raw, web_used = _responses_web_search(
-            oai, model,
-            [{"role":"system","content":system},{"role":"user","content":user_msg}], 2500)
+        _msgs = [{"role":"system","content":system},{"role":"user","content":user_msg}]
+        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-4o"
+        raw, web_used = _responses_web_search(oai, model, _msgs, 2500)
+        if not raw:
+            model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
+            raw, web_used = _responses_web_search(oai, model, _msgs, 2500)
         # Fallback: plain completion using only tracker signals
         if not raw:
             resp = oai.chat.completions.create(

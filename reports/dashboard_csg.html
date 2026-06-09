@@ -5348,14 +5348,107 @@ window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getIte
 (function(){var _o=window.showRefreshModal;window.showRefreshModal=function(){if(typeof _o==='function')_o.apply(this,arguments);if(window.rfxResume)window.rfxResume();};})();
 </script>
 <style>
-/* force: no expand/tilt/scale/lift on kpi-cards on hover — static tiles */
-.kpi-card:hover, .kpi-card:hover * { transform: none !important; }
+/* KPI tiles v3: FULLY STATIC — no expand/tilt/lift/scale/grow on hover, ever */
+.kpi-card, .kpi-card *, .kpi-card::before, .kpi-card::after {
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
 .kpi-card { transform-style: flat !important; will-change: auto !important; }
+.kpi-card::before, .kpi-card::after { display: none !important; }
 .kpi-card:hover { box-shadow: none !important; }
-.kpi-card.high-card:hover { box-shadow: inset 12px 0 24px -12px rgba(239,68,68,.18) !important; }
-.kpi-card:hover::before { opacity: 0 !important; }
+.kpi-card.high-card, .kpi-card.high-card:hover { box-shadow: inset 12px 0 24px -12px rgba(239,68,68,.18) !important; }
+.kpi-card:hover .kpi-tooltip { display: none !important; }
 .kpi-card:hover .kpi-number { filter: drop-shadow(0 2px 14px rgba(99,102,241,.28)) !important; }
 .kpi-card.high-card:hover .kpi-number { filter: drop-shadow(0 2px 14px rgba(239,68,68,.4)) !important; }
 </style>
+<style>
+/* ════ UIX v4 — global polish layer ════ */
+html { scroll-behavior: smooth; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* refined scrollbars */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(99,102,241,.28); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(99,102,241,.5); }
+
+/* keyboard focus visibility */
+:focus-visible { outline: 2px solid rgba(129,140,248,.75) !important; outline-offset: 2px; }
+
+/* sidebar nav — clearer hierarchy + active state */
+.sidebar-nav .nav-item { padding: 10px 12px; border-radius: 10px; }
+.sidebar-nav .nav-item:hover { background: rgba(99,102,241,.10); color: #c7d2fe; }
+.sidebar-nav .nav-item.active { background: linear-gradient(95deg, rgba(79,70,229,.28), rgba(124,58,237,.16)); color: #e0e7ff; box-shadow: inset 0 0 0 1px rgba(129,140,248,.30), 0 4px 14px rgba(79,70,229,.18); }
+
+/* section headers */
+.section-title { font-size: 20px; letter-spacing: -.02em; }
+
+/* panels: consistent radius, calm hover (no jumpy lift) */
+.panel { border-radius: 14px; }
+.panel:hover { transform: none !important; box-shadow: 0 10px 30px rgba(0,0,0,.25) !important; border-color: rgba(99,102,241,.22); }
+
+/* KPI tiles: refined static look */
+.kpi-card { border-radius: 14px !important; }
+.kpi-card:not(.high-card) { background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0)), var(--card) !important; }
+.kpi-label { letter-spacing: .16em; }
+
+/* search */
+#nav-search { border-radius: 10px; }
+#nav-search:focus { box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
+
+/* tables: calm hover, sticky header */
+.data-table tbody tr:hover { transform: none !important; background: rgba(99,102,241,.06); }
+.data-table thead th { position: sticky; top: 0; z-index: 2; background: var(--card); }
+
+/* signal feed rows: calmer slide */
+.signal-item:hover { transform: translateX(3px) !important; }
+
+/* unified button radii */
+.refresh-btn, .filters-btn, .export-btn, .pag-btn, .copy-cmd-btn { border-radius: 10px; }
+
+/* Insights (Kairo) tab readability */
+.ir9-hl { font-size: 14px; line-height: 1.65; }
+.ir9-tab { font-size: 12.5px; }
+.ir9-tab.active { box-shadow: 0 0 18px rgba(99,102,241,.12) inset, 0 2px 10px rgba(79,70,229,.15); }
+.ir9-gen:hover { transform: translateY(-1px); }
+.ir9-fpanel { box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(99,102,241,.12); }
+
+/* respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+<script>
+/* KPI tiles v3 guard: strip any JS-applied transform on tiles, now and forever */
+(function(){
+  function sweep(){
+    document.querySelectorAll('.kpi-card, .kpi-card *').forEach(function(el){
+      if (el.style && el.style.transform && el.style.transform !== 'none') el.style.transform = 'none';
+    });
+  }
+  sweep();
+  try {
+    new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        var el = m.target;
+        if (el.nodeType === 1 && el.closest && el.closest('.kpi-card')
+            && el.style && el.style.transform && el.style.transform !== 'none') {
+          el.style.transform = 'none';
+        }
+      });
+    }).observe(document.body, { attributes: true, attributeFilter: ['style'], subtree: true });
+  } catch(e) {}
+})();
+/* UIX v4: press "/" anywhere to jump to search */
+(function(){
+  var s = document.getElementById('nav-search');
+  if (!s) return;
+  document.addEventListener('keydown', function(e){
+    var tag = (document.activeElement || {}).tagName || '';
+    if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(tag)) { e.preventDefault(); s.focus(); }
+  });
+})();
+</script>
 </body>
 </html>
