@@ -1433,10 +1433,7 @@ def ppc_chat():
             {"role": "user", "content": f"{instruction}\n\nDATA TO REFORMAT:\n{source_text}"},
         ]
         try:
-            resp = oai.chat.completions.create(
-                model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=reformat_messages, max_completion_tokens=2000, temperature=0)
-            formatted = resp.choices[0].message.content.strip()
+            formatted, _m = _kairo_completion(oai, reformat_messages, 2000, temperature=0)
             is_csv = export_fmt in ("csv", "excel")
             return jsonify({"answer": formatted, "is_export": True,
                             "export_format": export_fmt, "is_csv": is_csv})
@@ -1524,17 +1521,8 @@ CSV/EXCEL EXPORT RULES:
     else:
         messages.append({"role": "user", "content": user_message})
 
-    # Use best model available for this project
-    _model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-
     try:
-        resp = oai.chat.completions.create(
-            model=_model,
-            messages=messages,
-            max_completion_tokens=2000,
-            temperature=0.1,
-        )
-        answer = resp.choices[0].message.content
+        answer, _m = _kairo_completion(oai, messages, 2000, temperature=0.1)
         return jsonify({
             "answer":          answer,
             "detected_format": export_fmt or "",
@@ -1697,13 +1685,35 @@ def _responses_web_search(oai, model, input_msgs, max_tokens):
 
 
 def _kairo_model_chain():
-    """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > gpt-4o > OPENAI_MODEL/gpt-4o-mini."""
+    """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > gpt-5.4 (ChatGPT 5.4) > OPENAI_MODEL/gpt-4o-mini."""
     chain = []
-    for m in (os.environ.get("OPENAI_INSIGHTS_MODEL"), "gpt-4o",
+    for m in (os.environ.get("OPENAI_INSIGHTS_MODEL"), "gpt-5.4",
               os.environ.get("OPENAI_MODEL", "gpt-4o-mini")):
         if m and m not in chain:
             chain.append(m)
     return chain
+
+
+def _kairo_completion(oai, messages, max_tokens, temperature=None):
+    """Plain-text chat completion on the primary Kairo model (GPT-5.4) with graceful
+    fallback down the model chain; retries without temperature if a model rejects it.
+    Returns (text, model_used)."""
+    last_err = None
+    for model in _kairo_model_chain():
+        attempts = [{"temperature": temperature}] if temperature is not None else []
+        attempts.append({})
+        for kw in attempts:
+            try:
+                resp = oai.chat.completions.create(
+                    model=model, messages=messages,
+                    max_completion_tokens=max_tokens, **kw)
+                txt = (resp.choices[0].message.content or "").strip()
+                if txt:
+                    return txt, model
+            except Exception as e:
+                last_err = e
+                log.warning("kairo: completion on '%s' (%s) failed: %s", model, kw, e)
+    raise last_err if last_err else RuntimeError("no usable OpenAI model")
 
 
 def _kairo_chat_json(oai, messages, max_tokens):
@@ -2200,12 +2210,8 @@ Return ONLY valid JSON:
 
         from openai import OpenAI
         oai = OpenAI(api_key=api_key)
-        resp = oai.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
-            messages=[{"role":"system","content":system},{"role":"user","content":user_msg}],
-            max_completion_tokens=800,
-        )
-        raw = resp.choices[0].message.content.strip()
+        raw, _m = _kairo_completion(
+            oai, [{"role":"system","content":system},{"role":"user","content":user_msg}], 800)
         if "```" in raw:
             m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
             raw = m.group(1).strip() if m else raw
@@ -2282,7 +2288,7 @@ def research_company(account_id):
         from openai import OpenAI
         oai   = OpenAI(api_key=api_key)
         _msgs = [{"role":"system","content":system},{"role":"user","content":user_msg}]
-        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-4o"
+        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
         raw, web_used = _responses_web_search(oai, model, _msgs, 2500)
         if not raw:
             model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
@@ -2381,11 +2387,12 @@ def kairo_chat(account_id):
 
         from openai import OpenAI
         oai = OpenAI(api_key=api_key, timeout=80.0, max_retries=1)
-        model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
         answer, web = _responses_web_search(oai, model, msgs, 1100)
         if not answer:
-            resp = oai.chat.completions.create(model=model, messages=msgs, max_completion_tokens=1000)
-            answer = resp.choices[0].message.content.strip()
+            answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, 1100)
+        if not answer:
+            answer, _m = _kairo_completion(oai, msgs, 1000)
         return jsonify({"ok": True, "answer": answer, "web_search_used": web})
     except Exception as e:
         import traceback; log.error("kairo_chat: %s", traceback.format_exc())
