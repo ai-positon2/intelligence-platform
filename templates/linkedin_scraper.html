@@ -40,17 +40,7 @@ body::before{
 /* SHELL */
 .shell{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 28px 100px}
 
-/* NAV */
-.nav{
-  position:sticky;top:0;z-index:100;
-  height:52px;margin:0 -28px 28px;padding:0 28px;
-  display:flex;align-items:center;gap:12px;
-  background:rgba(3,4,9,0.88);backdrop-filter:blur(20px) saturate(180%);
-  border-bottom:1px solid var(--b1);
-}
-.nav-brand{font-size:12px;font-weight:700;color:var(--tx2);letter-spacing:0.04em;text-transform:uppercase}
-.nav-dot{width:3px;height:3px;border-radius:50%;background:var(--b3);flex-shrink:0}
-.nav-name{font-size:13px;font-weight:500;color:var(--tx)}
+/* NAV removed — breadcrumb in topbar */
 /* mega-tabs */
 .mega-tabs{
   display:flex;border:1px solid var(--b1);border-radius:var(--rxl);
@@ -599,12 +589,8 @@ body::before{
 </div>
 
 <div class="shell">
-<nav class="nav">
-  <div class="nav-brand">Position²</div>
-  <div class="nav-dot"></div>
-  <div class="nav-name">LinkedIn Intelligence</div>
-</nav>
-<div class="mega-tabs">
+
+<div class="mega-tabs" style="margin-top:24px">
   <button class="mtab active" onclick="switchTab('people')" id="nt-people">
     <div class="mtab-label">People</div>
     <div class="mtab-val vg" id="tc-people">99</div>
