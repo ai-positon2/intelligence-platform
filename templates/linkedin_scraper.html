@@ -49,6 +49,29 @@ body::before{
 .nav-brand{font-size:12px;font-weight:700;color:var(--tx2);letter-spacing:0.04em;text-transform:uppercase}
 .nav-dot{width:3px;height:3px;border-radius:50%;background:var(--b3);flex-shrink:0}
 .nav-name{font-size:13px;font-weight:500;color:var(--tx)}
+/* tab-switcher replaces nav-tabs */
+.tab-switcher{
+  display:flex;gap:6px;
+  margin:0 0 24px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:16px;padding:5px;
+  width:fit-content;
+}
+.tsw{
+  padding:10px 28px;border:none;border-radius:11px;
+  background:none;color:var(--tx2);font-size:14px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;font-family:inherit;
+  display:flex;align-items:center;gap:8px;
+}
+.tsw:hover{background:rgba(255,255,255,0.06);color:var(--tx);}
+.tsw.active{background:var(--accent);color:#fff;box-shadow:0 4px 20px rgba(124,131,245,0.35);}
+.tsw-badge{
+  font-size:11px;font-weight:700;
+  background:rgba(255,255,255,0.18);
+  color:inherit;border-radius:20px;padding:2px 8px;
+}
+.tsw.active .tsw-badge{background:rgba(255,255,255,0.25);}
 .nav-tabs{
   margin-left:auto;display:flex;gap:2px;
   background:var(--s1);border:1px solid var(--b1);border-radius:9px;padding:3px;
@@ -104,22 +127,22 @@ body::before{
 
 /* FILTER BAR */
 .fbar{
-  display:flex;align-items:center;flex-wrap:wrap;gap:6px;
-  padding:8px 12px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);
-  margin-bottom:14px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  padding:12px 16px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);
+  margin-bottom:16px;
 }
 .fbar-wrap{display:flex;flex-direction:column;gap:0;margin-bottom:14px}
 .fbar-wrap .fbar{margin-bottom:0;border-radius:0}
 .fbar-wrap .fbar-primary{border-radius:var(--r) var(--r) 0 0;border-bottom:1px solid var(--b1)}
 .fbar-wrap .fbar-secondary{border-radius:0 0 var(--r) var(--r);padding-top:10px;padding-bottom:10px}
-.fbar-secondary .flabel{font-size:9.5px}
+.fbar-secondary .flabel{font-size:12px}
 .srch-comp{min-width:155px;flex-shrink:0}
-.fgroup{display:flex;align-items:center;gap:5px}
-.flabel{font-size:10px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap}
+.fgroup{display:flex;align-items:center;gap:7px}
+.flabel{font-size:12px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap}
 .chips{display:flex;gap:3px;flex-wrap:wrap}
 .chip{
-  padding:3px 10px;border:1px solid var(--b1);border-radius:var(--rpill);
-  background:none;color:var(--tx2);font-size:11px;font-weight:500;
+  padding:6px 14px;border:1px solid var(--b1);border-radius:var(--rpill);
+  background:none;color:var(--tx2);font-size:13px;font-weight:500;
   cursor:pointer;transition:all 0.12s;white-space:nowrap;font-family:inherit;
 }
 .chip:hover{color:var(--tx);border-color:var(--b2)}
@@ -576,12 +599,12 @@ body::before{
   <div class="nav-brand">Position²</div>
   <div class="nav-dot"></div>
   <div class="nav-name">LinkedIn Intelligence</div>
-  <div class="nav-tabs">
-    <button class="ntab active" onclick="switchTab('people')" id="nt-people">People <span class="tc" id="tc-people">99</span></button>
-    <button class="ntab" onclick="switchTab('companies')" id="nt-companies">Companies <span class="tc" id="tc-companies">—</span></button>
-    <button class="ntab" onclick="switchTab('post')" id="nt-post">Posts <span class="tc" id="tc-post">8</span></button>
-  </div>
 </nav>
+<div class="tab-switcher">
+  <button class="tsw active" onclick="switchTab('people')" id="nt-people">People <span class="tsw-badge" id="tc-people">99+</span></button>
+  <button class="tsw" onclick="switchTab('companies')" id="nt-companies">Companies <span class="tsw-badge" id="tc-companies">—</span></button>
+  <button class="tsw" onclick="switchTab('post')" id="nt-post">Posts <span class="tsw-badge" id="tc-post">8</span></button>
+</div>
 <div id="tab-people" class="page active"></div>
 <div id="tab-companies" class="page"></div>
 <div id="tab-post" class="page"></div>
