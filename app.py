@@ -2336,11 +2336,14 @@ def kairo_chat(account_id):
     if not question:
         return jsonify({"error": "empty question"})
 
+    img_files = [f for f in files if isinstance(f, dict) and f.get("image") and f.get("base64")][:4]
+    txt_attached = [f for f in files if isinstance(f, dict) and not f.get("image")]
+
     # Attached-file context (extracted client-side via /api/ppc-upload)
     att_ctx = ""
-    if files:
+    if txt_attached:
         chunks = []
-        for fobj in files[:4]:
+        for fobj in txt_attached[:4]:
             nm = str(fobj.get("name") or "file")[:120]
             ct = str(fobj.get("content") or "")[:12000]
             if ct.strip():
@@ -2401,7 +2404,7 @@ def kairo_chat(account_id):
             "for company research, recent news, people, contacts, or anything not in the data. If asked to draft an "
             "email or message, make it tight and personalised. Never invent revenue or dollar figures. Cite specific "
             "companies and signals. Format with short, clean markdown (bold, links, short lists). "
-            "If files are attached, ground your answer in their ACTUAL contents — quote real numbers, names and rows "
+            "If files, images or screenshots are attached, ground your answer in their ACTUAL contents — quote real numbers, names and rows "
             "from them, and combine them with signal data where relevant. "
             "If the user asks for output as a file or specific format (CSV, Excel/XLSX, Word/DOCX, PDF, "
             "PowerPoint/PPTX, or a table), produce the COMPLETE content in clean markdown: a proper markdown table "
@@ -2419,12 +2422,26 @@ def kairo_chat(account_id):
         from openai import OpenAI
         oai = OpenAI(api_key=api_key, timeout=80.0, max_retries=1)
         _max_out = 2600 if (files or export_format) else 1100
-        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
-        answer, web = _responses_web_search(oai, model, msgs, _max_out)
-        if not answer:
-            answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, _max_out)
-        if not answer:
+        if img_files:
+            # Vision path: send image(s) directly to the model as data URIs
+            parts = [{"type": "text", "text": question}]
+            for im in img_files:
+                mime = str(im.get("mime") or "image/png")[:50]
+                b64 = str(im.get("base64") or "")
+                if not b64 or len(b64) > 9_000_000:
+                    continue
+                parts.append({"type": "image_url",
+                              "image_url": {"url": "data:%s;base64,%s" % (mime, b64)}})
+            msgs[-1] = {"role": "user", "content": parts}
             answer, _m = _kairo_completion(oai, msgs, _max_out)
+            web = False
+        else:
+            model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+            answer, web = _responses_web_search(oai, model, msgs, _max_out)
+            if not answer:
+                answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, _max_out)
+            if not answer:
+                answer, _m = _kairo_completion(oai, msgs, _max_out)
         return jsonify({"ok": True, "answer": answer, "web_search_used": web,
                         "export_format": export_format})
     except Exception as e:
