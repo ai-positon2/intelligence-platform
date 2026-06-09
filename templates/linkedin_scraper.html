@@ -141,7 +141,10 @@ body::before{
 .fbar-secondary .flabel{font-size:12px}
 .srch-comp{min-width:155px;flex-shrink:0}
 .fgroup{display:flex;align-items:center;gap:7px}
-.flabel{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap}
+.flabel{font-size:13px;font-weight:700;color:var(--tx);text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap}
+.p2-exclude-btn{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.3);color:#f59e0b;font-weight:600}
+.p2-exclude-btn:hover{background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.5);color:#fbbf24}
+.p2-exclude-btn.on{background:rgba(245,158,11,0.18);border-color:#f59e0b;color:#fbbf24}
 .chips{display:flex;gap:3px;flex-wrap:wrap}
 .chip{
   padding:6px 14px;border:1px solid var(--b1);border-radius:var(--rpill);
@@ -684,7 +687,7 @@ const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').r
 /* ── state ── */
 let PF={sen:'all',deg:'all',react:'all',q:'',comp:''};
 let _filteredPosts=[];
-let PLF={sen:'all',deg:'all',minP:0,country:'all',q:''};
+let PLF={sen:'all',deg:'all',minP:0,country:'all',q:'',excludeP2:false};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
 
@@ -880,6 +883,7 @@ function buildPeopleTab(){
       </div>
     </div>
     <div class="sep"></div>
+    <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
     <div class="srch"><span class="srch-ico">🔍</span><input placeholder="Search people…" oninput="PLF.q=this.value;applyPLF()"></div>
   </div>
   <div class="peoplayout">
@@ -975,6 +979,7 @@ function applyPLF(){
     if(sen!=='all'&&p.bucket!==sen)return false;
     if(deg!=='all'&&p.degree!==deg)return false;
     if(minP>0&&p.posts_engaged<minP)return false;
+    if(PLF.excludeP2&&(p.company||'').toLowerCase().includes('position'))return false;
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
     return true;
   });
