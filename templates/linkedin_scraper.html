@@ -405,6 +405,51 @@ body::before{
 }
 .dpitem:hover{background:var(--s2)}
 
+
+/* === v3 POST POPUP + 2-COL GRID === */
+.post-modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);
+  z-index:950;display:none;align-items:flex-start;justify-content:center;
+  padding:48px 20px;overflow-y:auto;
+}
+.post-modal-bg.open{display:flex}
+.post-modal{
+  background:var(--bg2);border:1px solid var(--b2);border-radius:var(--r);
+  width:100%;max-width:680px;padding:28px 28px 24px;margin:auto;position:relative;
+}
+.modal-topbar{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.modal-close{
+  flex-shrink:0;background:var(--s2);border:1px solid var(--b1);color:var(--tx2);
+  font-size:15px;cursor:pointer;padding:5px 10px;border-radius:8px;
+  transition:all 0.12s;font-family:inherit;line-height:1;
+}
+.modal-close:hover{background:var(--s3);color:var(--tx)}
+.modal-snip{
+  font-size:14px;color:var(--tx);line-height:1.72;
+  padding:14px 0 16px;border-top:1px solid var(--b1);border-bottom:1px solid var(--b1);
+  margin-bottom:16px;
+}
+/* 2-col grid */
+.pgrid{display:grid!important;grid-template-columns:repeat(2,1fr);gap:14px}
+.pcard{
+  background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);
+  padding:18px 20px;cursor:pointer;transition:all 0.15s;
+  display:flex!important;flex-direction:column;min-height:148px;overflow:visible;
+}
+.pcard:hover{border-color:rgba(124,131,245,0.45);background:var(--s2);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.25)}
+.pcard .ptop{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:nowrap}
+.pcard .pdate{font-size:12px;font-weight:600;color:var(--accent);margin-left:auto;white-space:nowrap}
+.pcard .pauth{font-size:12.5px;font-weight:600;color:var(--tx)}
+.pcard .psnip{font-size:13px;color:var(--tx);line-height:1.6;flex:1;margin-bottom:14px;display:block;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.pcard .pmets{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:auto}
+/* Company dropdown */
+.comp-sel{
+  background:var(--s2);border:1px solid var(--b1);color:var(--tx2);
+  font-size:11.5px;font-family:inherit;padding:5px 10px;border-radius:var(--rpill);
+  cursor:pointer;outline:none;max-width:175px;
+}
+.comp-sel:hover,.comp-sel:focus{border-color:var(--b2);color:var(--tx)}
+.comp-sel option{background:#0f1119;color:var(--tx)}
 </style>
 </head>
 <body>
@@ -414,17 +459,29 @@ body::before{
   <div class="nav-dot"></div>
   <div class="nav-name">LinkedIn ABM Intelligence</div>
   <div class="nav-tabs">
-    <button class="ntab active" onclick="switchTab('post')" id="nt-post">Posts <span class="tc" id="tc-post">8</span></button>
-    <button class="ntab" onclick="switchTab('people')" id="nt-people">People &amp; Companies <span class="tc" id="tc-people">99</span></button>
+    <button class="ntab active" onclick="switchTab('people')" id="nt-people">People &amp; Companies <span class="tc" id="tc-people">99</span></button>
+    <button class="ntab" onclick="switchTab('post')" id="nt-post">Posts <span class="tc" id="tc-post">8</span></button>
   </div>
 </nav>
-<div id="tab-post" class="page active"></div>
-<div id="tab-people" class="page"></div>
+<div id="tab-people" class="page active"></div>
+<div id="tab-post" class="page"></div>
 </div>
 <div class="overlay" id="overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
   <div class="dhdr" id="dhdr"></div>
   <div class="dbody" id="dbody"></div>
+</div>
+<div class="post-modal-bg" id="post-modal-bg" onclick="if(event.target===this)closePostModal()">
+  <div class="post-modal">
+    <div class="modal-topbar">
+      <div class="ptop" id="modal-ptop" style="flex:1;margin-bottom:0"></div>
+      <button class="modal-close" onclick="closePostModal()">✕</button>
+    </div>
+    <div class="modal-snip" id="modal-snip"></div>
+    <div class="pmets" id="modal-metrics" style="margin-bottom:16px"></div>
+    <div class="el-hdr"><div></div><div>Engager</div><div>Signal</div></div>
+    <div id="modal-elist"></div>
+  </div>
 </div>
 {% include 'ppc_chat_widget.html' %}
 <script>
@@ -449,6 +506,7 @@ const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').r
 
 /* ── state ── */
 let PF={sen:'all',dm:false,deg:'all',react:'all',q:'',comp:''};
+let _filteredPosts=[];
 let PLF={sen:'all',dm:false,deg:'all',minP:0,country:'all',q:''};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
@@ -477,6 +535,8 @@ function switchTab(t){
 function buildPostTab(){
   const {posts,stats}=D;
   const el=document.getElementById('tab-post');
+  const _cos=[...new Set(D.posts.flatMap(p=>p.engagers.map(e=>e.company)).filter(Boolean))].sort();
+  const _compOpts='<option value="">All Companies</option>'+_cos.map(co=>'<option value="'+esc(co)+'">'+esc(co)+'</option>').join('');
   el.innerHTML=`
   <div class="stat-row">
     <div class="scard sg" onclick="postStatClick('all',this)" title="Show all posts">
@@ -507,54 +567,24 @@ function buildPostTab(){
     </div>
   </div>
 
-  <div class="fbar-wrap">
-    <div class="fbar fbar-primary">
-      <div class="fgroup">
-        <div class="chips" id="pf-sen">
-          <button class="chip on" onclick="setPF('sen','all',this)">All</button>
-          <button class="chip" onclick="setPF('sen','C-Level / Founder',this)">C-Level</button>
-          <button class="chip" onclick="setPF('sen','VP',this)">VP</button>
-          <button class="chip" onclick="setPF('sen','Director',this)">Director</button>
-          <button class="chip" onclick="setPF('sen','Manager',this)">Manager</button>
-          <button class="chip" onclick="setPF('sen','IC / Individual Contributor',this)">IC</button>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <button class="chip" id="pf-dm" onclick="togglePFDM()">🎯 DM Only</button>
-      <div class="srch">
-        <span class="srch-ico">🔍</span>
-        <input placeholder="Search people, companies…" oninput="PF.q=this.value;applyPF()">
+  <div class="fbar">
+    <div class="fgroup">
+      <div class="chips" id="pf-sen">
+        <button class="chip on" onclick="setPF('sen','all',this)">All</button>
+        <button class="chip" onclick="setPF('sen','C-Level / Founder',this)">C-Level</button>
+        <button class="chip" onclick="setPF('sen','VP',this)">VP</button>
+        <button class="chip" onclick="setPF('sen','Director',this)">Director</button>
+        <button class="chip" onclick="setPF('sen','Manager',this)">Manager</button>
+        <button class="chip" onclick="setPF('sen','IC / Individual Contributor',this)">IC</button>
       </div>
     </div>
-    <div class="fbar fbar-secondary">
-      <div class="fgroup">
-        <span class="flabel">Reaction</span>
-        <div class="chips" id="pf-react">
-          <button class="chip on" onclick="setPF('react','all',this)">All</button>
-          <button class="chip" onclick="setPF('react','LIKE',this)">👍 Like</button>
-          <button class="chip" onclick="setPF('react','PRAISE',this)">🙌 Praise</button>
-          <button class="chip" onclick="setPF('react','INTEREST',this)">🤔 Interest</button>
-          <button class="chip" onclick="setPF('react','APPRECIATION',this)">❤️ Apprecn.</button>
-          <button class="chip" onclick="setPF('react','EMPATHY',this)">🫂 Empathy</button>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div class="fgroup">
-        <span class="flabel">Degree</span>
-        <div class="chips" id="pf-deg">
-          <button class="chip on" onclick="setPF('deg','all',this)">All</button>
-          <button class="chip" onclick="setPF('deg','SECOND_DEGREE',this)">2nd</button>
-          <button class="chip" onclick="setPF('deg','THIRD_DEGREE',this)">3rd</button>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div class="fgroup">
-        <span class="flabel">Company</span>
-        <div class="srch srch-comp">
-          <span class="srch-ico">🏢</span>
-          <input placeholder="Filter by company…" oninput="PF.comp=this.value;applyPF()">
-        </div>
-      </div>
+    <div class="sep"></div>
+    <button class="chip" id="pf-dm" onclick="togglePFDM()">🎯 DM Only</button>
+    <div class="sep"></div>
+    <select class="comp-sel" id="pf-comp" onchange="PF.comp=this.value;applyPF()">${_compOpts}</select>
+    <div class="srch">
+      <span class="srch-ico">🔍</span>
+      <input placeholder="Search people…" oninput="PF.q=this.value;applyPF()">
     </div>
   </div>
 
@@ -596,7 +626,7 @@ function applyPF(){
       if(dm&&e.dm?.toLowerCase()!=='yes')return false;
       if(deg!=='all'&&e.degree!==deg)return false;
       if(react!=='all'&&e.reaction!==react)return false;
-      if(comp){const cl=comp.toLowerCase();if(!(e.company||'').toLowerCase().includes(cl))return false;}
+      if(comp&&e.company!==comp)return false;
       if(ql){const match=e.name.toLowerCase().includes(ql)||e.company.toLowerCase().includes(ql)||e.title.toLowerCase().includes(ql);if(!match&&!p.snippet.toLowerCase().includes(ql))return false;}
       return true;
     });
@@ -606,41 +636,24 @@ function applyPF(){
   document.getElementById('pst-cnt').textContent=filtered.length+' posts';
   document.getElementById('tc-post').textContent=filtered.length;
   if(!filtered.length){g.innerHTML='<div class="nores" style="grid-column:1/-1"><div class="nores-ico">🔍</div><h3>No results</h3><p>Try adjusting filters</p></div>';return;}
+  _filteredPosts=filtered;
   g.innerHTML=filtered.map((p,pi)=>{
     const eng=p.fe,dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
     const csN=eng.filter(e=>e.seniority?.includes('C-Level')||e.seniority?.includes('Founder')).length;
     const reacts=[...new Set(eng.map(e=>e.reaction).filter(Boolean))].slice(0,2);
     const ori=D.posts.indexOf(p);
-    return`<div class="pcard" id="pc-${pi}" style="animation-delay:${pi*.05}s">
-      <div class="ph" onclick="togglePost(${pi})">
-        <div class="ptop">
-          <div class="pdot"></div>
-          <div class="pauth">${esc(p.author||'Position²')}</div>
-          <div class="pdate">${esc(p.date)}</div>
-          ${p.url?`<a href="${esc(p.url)}" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>`:''}
-        </div>
-        <div class="psnip">${esc(p.snippet)}</div>
-        <div class="pmets">
-          <div class="mpill mp-g" onclick="event.stopPropagation()">${eng.length} Engager${eng.length!==1?'s':''}</div>
-          ${dmN?`<div class="mpill mp-a" onclick="event.stopPropagation();filterToDM(${ori})">${dmN} Decision Maker${dmN!==1?'s':''}</div>`:''}
-          ${csN?`<div class="mpill mp-p" onclick="event.stopPropagation()">${csN} C-Suite</div>`:''}
-          ${reacts.map(r=>`<div class="mpill mp-c" onclick="event.stopPropagation()">${RICO[r]||''} ${r.charAt(0)+r.slice(1).toLowerCase()}</div>`).join('')}
-          <button class="expbtn" id="eb-${pi}" onclick="event.stopPropagation();togglePost(${pi})">Show ▾</button>
-        </div>
+    return`<div class="pcard" id="pc-${pi}" onclick="openPostModal(${pi})" style="animation-delay:${pi*.05}s">
+      <div class="ptop">
+        <div class="pdot"></div>
+        <div class="pauth">${esc(p.author||'Position²')}</div>
+        <div class="pdate">${esc(p.date)}</div>
       </div>
-      <div class="elist" id="el-${pi}">
-        <div class="el-hdr"><div></div><div>Engager</div><div>Signal</div></div>
-        ${eng.map((e,ei)=>{const oi=p.engagers.indexOf(e);return`
-        <div class="eitem" onclick="openEngDrawer(${ori},${oi})" style="animation-delay:${ei*.035}s">
-          ${av(e.name,e.pic,36,'eavtr')}
-          <div><div class="ename">${esc(e.name)}</div><div class="esub">${esc(e.title||e.headline)}${e.company?' · '+esc(e.company):''}</div></div>
-          <div class="ebadges">
-            ${e.dm?.toLowerCase()==='yes'?'<span class="b bdm">🎯 DM</span>':''}
-            ${e.seniority?`<span class="b ${SCLS(e.seniority)}">${esc(SLBL(e.seniority))}</span>`:''}
-            ${e.reaction?`<span class="b ${RCLS[e.reaction]||'bic'}">${RICO[e.reaction]||''} ${e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()}</span>`:''}
-            ${e.degree?`<span class="b bdeg">${DLBL(e.degree)}</span>`:''}
-          </div>
-        </div>`}).join('')}
+      <div class="psnip">${esc(p.snippet)}</div>
+      <div class="pmets">
+        <div class="mpill mp-g">${eng.length} Engager${eng.length!==1?'s':''}</div>
+        ${dmN?`<div class="mpill mp-a">${dmN} DM${dmN!==1?'s':''}</div>`:''}
+        ${csN?`<div class="mpill mp-p">${csN} C-Suite</div>`:''}
+        ${p.url?`<a href="${esc(p.url)}" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1028,9 +1041,48 @@ function openCompanyDrawerByName(name){
   if(idx>=0)openCompanyDrawer(idx);
 }
 
+
+/* ── POST MODAL ── */
+function openPostModal(pi){
+  const p=_filteredPosts[pi];if(!p)return;
+  const eng=p.fe&&p.fe.length?p.fe:p.engagers;
+  const dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
+  const csN=eng.filter(e=>e.seniority?.includes('C-Level')||e.seniority?.includes('Founder')).length;
+  const ori=D.posts.indexOf(p);
+  document.getElementById('modal-ptop').innerHTML=
+    '<div class="pdot"></div>'+
+    '<div class="pauth">'+esc(p.author||'Position²')+'</div>'+
+    '<div class="pdate">'+esc(p.date)+'</div>'+
+    (p.url?'<a href="'+esc(p.url)+'" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>':'');
+  document.getElementById('modal-snip').textContent=p.snippet||'';
+  document.getElementById('modal-metrics').innerHTML=
+    '<div class="mpill mp-g">'+eng.length+' Engager'+(eng.length!==1?'s':'')+'</div>'+
+    (dmN?'<div class="mpill mp-a">'+dmN+' DM'+(dmN!==1?'s':'')+'</div>':'')+
+    (csN?'<div class="mpill mp-p">'+csN+' C-Suite</div>':'');
+  document.getElementById('modal-elist').innerHTML=eng.map((e,ei)=>{
+    const oi=p.engagers.indexOf(e);
+    return'<div class="eitem" onclick="openEngDrawer('+ori+','+oi+')" style="animation-delay:'+(ei*.025)+'s">'+
+      av(e.name,e.pic,36,'eavtr')+
+      '<div><div class="ename">'+esc(e.name)+'</div>'+
+      '<div class="esub">'+esc(e.title||e.headline||'')+(e.company?' · '+esc(e.company):'')+'</div></div>'+
+      '<div class="ebadges">'+
+        (e.dm?.toLowerCase()==='yes'?'<span class="b bdm">🎯 DM</span>':'')+
+        (e.seniority?'<span class="b '+SCLS(e.seniority)+'">'+esc(SLBL(e.seniority))+'</span>':'')+
+        (e.reaction?'<span class="b '+(RCLS[e.reaction]||'bic')+'">'+(RICO[e.reaction]||'')+' '+e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()+'</span>':'')+
+        (e.degree?'<span class="b bdeg">'+DLBL(e.degree)+'</span>':'')+
+      '</div></div>';
+  }).join('');
+  document.getElementById('post-modal-bg').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closePostModal(){
+  document.getElementById('post-modal-bg').classList.remove('open');
+  document.body.style.overflow='';
+}
 /* ── INIT ── */
 buildPostTab();
 buildPeopleTab();
+switchTab('people');
 
 </script>
 </body>
