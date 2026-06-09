@@ -1207,11 +1207,16 @@ function openPostModal(pi){
     (csN?'<div class="mpill mp-p">'+csN+' C-Suite</div>':'');
   document.getElementById('modal-elist').innerHTML=eng.map((e,ei)=>{
     const oi=p.engagers.indexOf(e);
+    const subLine=[e.title||e.headline||'',e.company].filter(Boolean).join(' · ');
     return'<div class="eitem" onclick="openEngDrawer('+ori+','+oi+')" style="animation-delay:'+(ei*.025)+'s">'+
       av(e.name,e.pic,36,'eavtr')+
       '<div><div class="ename">'+esc(e.name)+'</div>'+
-      '<div class="esub">'+esc(e.title||e.headline||'')+(e.company?' · '+esc(e.company):'')+'</div></div>'+
+      '<div class="esub">'+esc(subLine)+'</div>'+
+      (e.location?'<div class="esub" style="margin-top:1px;font-size:10px;opacity:0.65">📍 '+esc(e.location)+'</div>':'')+
+      (e.headline&&e.headline!==e.title?'<div class="esub" style="margin-top:1px;font-size:10px;opacity:0.55;font-style:italic">'+esc(e.headline)+'</div>':'')+
+      '</div>'+
       '<div class="ebadges">'+
+        (e.commented?'<span class="b blike" title="Commented">💬</span>':'')+
         (e.seniority?'<span class="b '+SCLS(e.seniority)+'">'+esc(SLBL(e.seniority))+'</span>':'')+
         (e.reaction?'<span class="b '+(RCLS[e.reaction]||'bic')+'">'+(RICO[e.reaction]||'')+' '+e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()+'</span>':'')+
         (e.degree?'<span class="b bdeg">'+DLBL(e.degree)+'</span>':'')+
