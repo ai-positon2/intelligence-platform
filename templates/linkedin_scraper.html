@@ -26,8 +26,9 @@ body{background:var(--bg);min-height:100vh;position:relative}
 body::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 55% at 0% 0%,rgba(99,102,241,0.055) 0%,transparent 60%),
-    radial-gradient(ellipse 50% 40% at 100% 100%,rgba(16,185,129,0.03) 0%,transparent 60%);
+    radial-gradient(ellipse 90% 60% at -5% -5%,rgba(79,70,229,0.22) 0%,transparent 55%),
+    radial-gradient(ellipse 70% 50% at 105% 105%,rgba(139,92,246,0.18) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 35% at 50% 0%,rgba(59,130,246,0.08) 0%,transparent 50%);
 }
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -450,6 +451,36 @@ body::before{
 }
 .comp-sel:hover,.comp-sel:focus{border-color:var(--b2);color:var(--tx)}
 .comp-sel option{background:#0f1119;color:var(--tx)}
+
+/* === v4 COOL UPGRADES === */
+.nav{
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  background:rgba(3,4,9,0.82);border-bottom:1px solid rgba(255,255,255,0.07);
+}
+.pcard,.scard,.pcrd,.post-modal{
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.pcard:hover{
+  border-color:rgba(124,131,245,0.5);
+  box-shadow:0 0 0 1px rgba(124,131,245,0.2),0 8px 32px rgba(0,0,0,0.4),0 0 40px rgba(79,70,229,0.08);
+}
+.scard{
+  background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);
+  border-radius:var(--r);padding:18px 22px;flex:1;min-width:0;
+  transition:all 0.18s;cursor:default;
+}
+.scard:hover{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1)}
+.sc-val{font-size:2.4rem;font-weight:700;letter-spacing:-0.03em;line-height:1;margin:10px 0 4px}
+.sc-label{font-size:11px;font-weight:500;color:var(--tx2);text-transform:uppercase;letter-spacing:0.08em}
+.stat-row{gap:16px}
+.subpage{display:block!important}
+.sec-label-row{
+  display:flex;align-items:center;gap:10px;
+  font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:0.1em;
+  padding:18px 0 8px;border-top:1px solid var(--b1);margin-top:8px;
+}
+.sec-lbl{color:var(--tx2)}
+.sec-label-row .tc{background:var(--s2)}
 </style>
 </head>
 <body>
@@ -505,9 +536,9 @@ const SLBL=s=>(s||'Unknown').replace('IC / Individual Contributor','IC').replace
 const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').replace('FIRST_DEGREE','1st'):'';
 
 /* ── state ── */
-let PF={sen:'all',dm:false,deg:'all',react:'all',q:'',comp:''};
+let PF={sen:'all',deg:'all',react:'all',q:'',comp:''};
 let _filteredPosts=[];
-let PLF={sen:'all',dm:false,deg:'all',minP:0,country:'all',q:''};
+let PLF={sen:'all',deg:'all',minP:0,country:'all',q:''};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
 
@@ -549,12 +580,7 @@ function buildPostTab(){
       <div class="sc-val vi" data-count="${stats.total_engagements}">0</div>
       <div class="sc-hint">Click to see all</div>
     </div>
-    <div class="scard sa" onclick="postStatClick('dm',this)" title="Decision makers only">
-      <div class="sc-ico">🎯</div><div class="sc-label">Decision Makers</div>
-      <div class="sc-val va" data-count="${stats.total_dms}">0</div>
-      <div class="sc-sub">${Math.round(stats.total_dms/stats.total_people*100)}% of audience</div>
-      <div class="sc-hint">Click to filter DMs</div>
-    </div>
+
     <div class="scard sp" onclick="postStatClick('csuite',this)" title="C-Suite engagers">
       <div class="sc-ico">👑</div><div class="sc-label">C-Suite / Founders</div>
       <div class="sc-val vp" data-count="${stats.csuite_count}">0</div>
@@ -575,11 +601,8 @@ function buildPostTab(){
         <button class="chip" onclick="setPF('sen','VP',this)">VP</button>
         <button class="chip" onclick="setPF('sen','Director',this)">Director</button>
         <button class="chip" onclick="setPF('sen','Manager',this)">Manager</button>
-        <button class="chip" onclick="setPF('sen','IC / Individual Contributor',this)">IC</button>
       </div>
     </div>
-    <div class="sep"></div>
-    <button class="chip" id="pf-dm" onclick="togglePFDM()">🎯 DM Only</button>
     <div class="sep"></div>
     <select class="comp-sel" id="pf-comp" onchange="PF.comp=this.value;applyPF()">${_compOpts}</select>
     <div class="srch">
@@ -599,12 +622,11 @@ function buildPostTab(){
 
 function postStatClick(mode,el){
   document.querySelectorAll('.scard').forEach(c=>c.classList.remove('active-filter'));
-  if(activeStatFilter===mode){activeStatFilter=null;PF.dm=false;PF.sen='all';document.getElementById('pf-dm').classList.remove('on');resetChips('pf-sen');return applyPF();}
+  if(activeStatFilter===mode){activeStatFilter=null;PF.sen='all';resetChips('pf-sen');return applyPF();}
   activeStatFilter=mode;
   el.classList.add('active-filter');
-  if(mode==='dm'){PF.dm=true;document.getElementById('pf-dm').classList.add('on');}
-  else if(mode==='csuite'){PF.sen='C-Level / Founder';setActiveChip('pf-sen','C-Level / Founder');}
-  else{PF.dm=false;PF.sen='all';}
+  if(mode==='csuite'){PF.sen='C-Level / Founder';setActiveChip('pf-sen','C-Level / Founder');}
+  else{PF.sen='all';}
   applyPF();
 }
 function resetChips(id){const g=document.getElementById(id);if(!g)return;g.querySelectorAll('.chip').forEach((c,i)=>{c.classList.toggle('on',i===0)});}
@@ -619,11 +641,10 @@ function togglePFDM(){PF.dm=!PF.dm;document.getElementById('pf-dm').classList.to
 
 function applyPF(){
   const g=document.getElementById('pgrid');if(!g)return;
-  const {sen,dm,deg,react,q,comp}=PF;const ql=q.toLowerCase();
+  const {sen,deg,react,q,comp}=PF;const ql=q.toLowerCase();
   const filtered=D.posts.map(p=>{
     let eng=p.engagers.filter(e=>{
       if(sen!=='all'&&e.seniority!==sen)return false;
-      if(dm&&e.dm?.toLowerCase()!=='yes')return false;
       if(deg!=='all'&&e.degree!==deg)return false;
       if(react!=='all'&&e.reaction!==react)return false;
       if(comp&&e.company!==comp)return false;
@@ -684,18 +705,12 @@ function buildPeopleTab(){
   const el=document.getElementById('tab-people');
   el.innerHTML=`
   <div class="stat-row">
-    <div class="scard sg" onclick="peoplStatClick('all',this)"><div class="sc-ico">👥</div><div class="sc-label">Total People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div><div class="sc-hint">Reset filters</div></div>
-    <div class="scard sa" onclick="peoplStatClick('dm',this)"><div class="sc-ico">🎯</div><div class="sc-label">Decision Makers</div><div class="sc-val va" data-count="${stats.total_dms}">0</div><div class="sc-sub">${Math.round(stats.total_dms/stats.total_people*100)}% of total</div><div class="sc-hint">Filter DMs</div></div>
-    <div class="scard sp" onclick="peoplStatClick('csuite',this)"><div class="sc-ico">👑</div><div class="sc-label">C-Suite</div><div class="sc-val vp" data-count="${stats.csuite_count}">0</div><div class="sc-hint">Filter C-Suite</div></div>
-    <div class="scard sc" onclick="switchSub('companies')"><div class="sc-ico">🏢</div><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div><div class="sc-hint">View companies →</div></div>
-  </div>
-
-  <div class="sub-tabs">
-    <button class="stab active" id="st-people" onclick="switchSub('people')">👤 People <span class="tc" id="stc-people">${people.length}</span></button>
-    <button class="stab" id="st-companies" onclick="switchSub('companies')">🏢 Companies <span class="tc" id="stc-companies">${companies.length}</span></button>
+    <div class="scard sg" onclick="peoplStatClick('all',this)"><div class="sc-label">People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div></div>
+    <div class="scard sc"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
   </div>
 
   <!-- PEOPLE SUBPAGE -->
+  <div class="sec-label-row"><span class="sec-lbl">People</span><span class="tc" id="stc-people">${people.length}</span></div>
   <div class="subpage active" id="sp-people">
     <div class="fbar">
       <div class="fgroup">
@@ -705,8 +720,6 @@ function buildPeopleTab(){
           <button class="chip" onclick="setPLF('sen','csuite',this)">👑 C-Suite</button>
           <button class="chip" onclick="setPLF('sen','vpdirector',this)">📈 VP/Dir</button>
           <button class="chip" onclick="setPLF('sen','managers',this)">🏗 Manager</button>
-          <button class="chip" onclick="setPLF('sen','ics',this)">💼 IC</button>
-          <button class="chip" onclick="setPLF('sen','unknown',this)">❓ Unknown</button>
         </div>
       </div>
       <div class="sep"></div>
@@ -728,7 +741,6 @@ function buildPeopleTab(){
         </div>
       </div>
       <div class="sep"></div>
-      <button class="chip" id="plf-dm" onclick="togglePLFDM()">🎯 DM Only</button>
       <div class="srch"><span class="srch-ico">🔍</span><input placeholder="Search people…" oninput="PLF.q=this.value;applyPLF()"></div>
     </div>
     <div class="peoplayout">
@@ -749,7 +761,8 @@ function buildPeopleTab(){
   </div>
 
   <!-- COMPANIES SUBPAGE -->
-  <div class="subpage" id="sp-companies">
+  <div class="sec-label-row"><span class="sec-lbl">Companies</span><span class="tc" id="stc-companies">${companies.length}</span></div>
+  <div class="subpage active" id="sp-companies">
     <div class="fbar">
       <div class="fgroup">
         <span class="flabel">Min People</span>
@@ -801,10 +814,9 @@ function togglePLFDM(){PLF.dm=!PLF.dm;document.getElementById('plf-dm').classLis
 
 function applyPLF(){
   const main=document.getElementById('people-main');if(!main)return;
-  const {sen,dm,deg,minP,q}=PLF;const ql=q.toLowerCase();
+  const {sen,deg,minP,q}=PLF;const ql=q.toLowerCase();
   const fil=D.people.filter(p=>{
     if(sen!=='all'&&p.bucket!==sen)return false;
-    if(dm&&p.dm?.toLowerCase()!=='yes')return false;
     if(deg!=='all'&&p.degree!==deg)return false;
     if(minP>0&&p.posts_engaged<minP)return false;
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
@@ -826,12 +838,10 @@ function applyPLF(){
         <div class="pgrd">
           ${grp.map((p,pi)=>{
             const idx=D.people.indexOf(p);
-            const isDM=p.dm?.toLowerCase()==='yes';
-            const pct=Math.round(p.posts_engaged/maxP*100);
+                      const pct=Math.round(p.posts_engaged/maxP*100);
             return`<div class="pcrd" onclick="openPersonDrawer(${idx})" style="animation-delay:${pi*.04}s">
               <div class="pctop">${av(p.name,'',44,'pcav')}<div><div class="pcn">${esc(p.name)}</div><div class="pct">${esc(p.title||p.headline)}</div></div></div>
               <div class="pcbdg">
-                ${isDM?'<span class="b bdm">🎯 DM</span>':''}
                 ${p.seniority?`<span class="b ${SCLS(p.seniority)}">${esc(SLBL(p.seniority))}</span>`:''}
                 ${p.degree?`<span class="b bdeg">${DLBL(p.degree)}</span>`:''}
                 ${p.country?`<span class="b bic">🌏 ${esc(p.country)}</span>`:''}
@@ -928,7 +938,6 @@ function openEngDrawer(pi,ei){
     ${e.url?`<a href="${esc(e.url)}" target="_blank" class="lilink">🔗 LinkedIn Profile</a>`:''}</div>
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const badges=[
-    isDM?'<span class="b bdm" style="font-size:12px;padding:4px 11px">🎯 Decision Maker</span>':'',
     e.seniority?`<span class="b ${SCLS(e.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(e.seniority))}</span>`:'',
     e.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(e.degree)} degree</span>`:'',
     e.reaction?`<span class="b ${RCLS[e.reaction]||'bic'}" style="font-size:12px;padding:4px 11px">${RICO[e.reaction]||''} ${e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()}</span>`:'',
@@ -954,7 +963,6 @@ function openEngDrawer(pi,ei){
 
 function openPersonDrawer(idx){
   const p=D.people[idx];if(!p)return;
-  const isDM=p.dm?.toLowerCase()==='yes';
   const pct=Math.round(p.posts_engaged/maxP*100);
   document.getElementById('dhdr').innerHTML=`
     ${av(p.name,'',58,'dav')}
@@ -962,7 +970,6 @@ function openPersonDrawer(idx){
     ${p.url?`<a href="${esc(p.url)}" target="_blank" class="lilink">🔗 LinkedIn Profile</a>`:''}</div>
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const badges=[
-    isDM?'<span class="b bdm" style="font-size:12px;padding:4px 11px">🎯 Decision Maker</span>':'',
     p.seniority?`<span class="b ${SCLS(p.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(p.seniority))}</span>`:'',
     p.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(p.degree)} degree</span>`:'',
     p.posts_engaged>0?`<span class="b bmg" style="font-size:12px;padding:4px 11px">⚡ ${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</span>`:'',
@@ -1046,7 +1053,6 @@ function openCompanyDrawerByName(name){
 function openPostModal(pi){
   const p=_filteredPosts[pi];if(!p)return;
   const eng=p.fe&&p.fe.length?p.fe:p.engagers;
-  const dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
   const csN=eng.filter(e=>e.seniority?.includes('C-Level')||e.seniority?.includes('Founder')).length;
   const ori=D.posts.indexOf(p);
   document.getElementById('modal-ptop').innerHTML=
@@ -1057,7 +1063,6 @@ function openPostModal(pi){
   document.getElementById('modal-snip').textContent=p.snippet||'';
   document.getElementById('modal-metrics').innerHTML=
     '<div class="mpill mp-g">'+eng.length+' Engager'+(eng.length!==1?'s':'')+'</div>'+
-    (dmN?'<div class="mpill mp-a">'+dmN+' DM'+(dmN!==1?'s':'')+'</div>':'')+
     (csN?'<div class="mpill mp-p">'+csN+' C-Suite</div>':'');
   document.getElementById('modal-elist').innerHTML=eng.map((e,ei)=>{
     const oi=p.engagers.indexOf(e);
@@ -1066,7 +1071,6 @@ function openPostModal(pi){
       '<div><div class="ename">'+esc(e.name)+'</div>'+
       '<div class="esub">'+esc(e.title||e.headline||'')+(e.company?' · '+esc(e.company):'')+'</div></div>'+
       '<div class="ebadges">'+
-        (e.dm?.toLowerCase()==='yes'?'<span class="b bdm">🎯 DM</span>':'')+
         (e.seniority?'<span class="b '+SCLS(e.seniority)+'">'+esc(SLBL(e.seniority))+'</span>':'')+
         (e.reaction?'<span class="b '+(RCLS[e.reaction]||'bic')+'">'+(RICO[e.reaction]||'')+' '+e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()+'</span>':'')+
         (e.degree?'<span class="b bdeg">'+DLBL(e.degree)+'</span>':'')+
