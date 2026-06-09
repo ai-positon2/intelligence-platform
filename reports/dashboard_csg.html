@@ -4409,11 +4409,11 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="ir9-chat-foot">
     <div class="ir9-att" id="ir9-att"></div>
     <div class="ir9-chat-inwrap">
-      <button class="ir9-clip" id="ir9-clip" title="Attach files — PDF, DOCX, XLSX, CSV, PPTX" onclick="irAttach()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
-      <textarea class="ir9-chat-in" id="ir9-chat-in" rows="1" placeholder="Ask anything, or attach a file (PDF, DOCX, XLSX, CSV, PPT)..."></textarea>
+      <button class="ir9-clip" id="ir9-clip" title="Attach files or images — PDF, DOCX, XLSX, CSV, PPTX, PNG, JPG (or paste a screenshot)" onclick="irAttach()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+      <textarea class="ir9-chat-in" id="ir9-chat-in" rows="1" placeholder="Ask anything — attach files or paste a screenshot..."></textarea>
       <button class="ir9-send" id="ir9-chat-send" onclick="irChatSend()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
     </div>
-    <input type="file" id="ir9-file" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md,.json">
+    <input type="file" id="ir9-file" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp,.bmp">
     <div class="ir9-chat-note">Kairo can read attached files, search your signals and the web &middot; answers may need verifying</div>
   </div>
 </div>
@@ -5204,33 +5204,54 @@ var KF=[];
 function _kfRender(){
   var w=$('ir9-att');if(!w)return;
   w.innerHTML=KF.map(function(c,i){
-    var ic=c.state==='up'?'&#8987;':(c.state==='err'?'&#9888;':'&#128206;');
-    return '<span class="ir9-att-c '+c.state+'">'+ic+' '+esc(c.name)+(c.err?' — '+esc(c.err):'')
+    var ic=c.state==='up'?'&#8987; ':(c.state==='err'?'&#9888; ':(c.kind==='img'?'':'&#128206; '));
+    var th=(c.kind==='img'&&c.state==='ok')?'<img src="data:'+c.mime+';base64,'+c.b64+'" alt="">':'';
+    return '<span class="ir9-att-c '+c.state+'">'+th+ic+esc(c.name)+(c.err?' — '+esc(c.err):'')
       +'<button title="Remove" onclick="irKRemove('+i+')">&#10005;</button></span>';
   }).join('');
   w.style.display=KF.length?'flex':'none';
 }
 window.irKRemove=function(i){KF.splice(i,1);_kfRender();};
 window.irAttach=function(){var f=$('ir9-file');if(f)f.click();};
+function _upFile(file){
+  if(!file)return;
+  var chip={name:file.name||('screenshot-'+Date.now()+'.png'),content:'',state:'up',err:'',kind:'',mime:'',b64:''};
+  KF.push(chip);_kfRender();
+  var fd=new FormData();fd.append('file',file,chip.name);
+  fetch('/api/ppc-upload',{method:'POST',body:fd})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){chip.state='err';chip.err=d.error;}
+      else if(d.is_image){chip.kind='img';chip.mime=d.mime||'image/png';chip.b64=d.base64||'';chip.state='ok';}
+      else{chip.content=d.content||'';chip.state='ok';}
+      _kfRender();
+    })
+    .catch(function(){chip.state='err';chip.err='Upload failed';_kfRender();});
+}
 (function(){
-  var f=$('ir9-file');if(!f)return;
-  f.addEventListener('change',function(){
-    Array.prototype.slice.call(f.files).forEach(function(file){
-      var chip={name:file.name,content:'',state:'up',err:''};
-      KF.push(chip);_kfRender();
-      var fd=new FormData();fd.append('file',file);
-      fetch('/api/ppc-upload',{method:'POST',body:fd})
-        .then(function(r){return r.json();})
-        .then(function(d){
-          if(d.error){chip.state='err';chip.err=d.error;}
-          else if(d.is_image){chip.state='err';chip.err='Images not supported in Kairo chat';}
-          else{chip.content=d.content||'';chip.state='ok';}
-          _kfRender();
-        })
-        .catch(function(){chip.state='err';chip.err='Upload failed';_kfRender();});
-    });
+  var f=$('ir9-file');
+  if(f)f.addEventListener('change',function(){
+    Array.prototype.slice.call(f.files).forEach(_upFile);
     f.value='';
   });
+  var inp=$('ir9-chat-in');
+  if(inp)inp.addEventListener('paste',function(e){
+    var items=(e.clipboardData||{}).items||[];var got=false;
+    for(var i=0;i<items.length;i++){
+      if(items[i].kind==='file'){var fl=items[i].getAsFile();if(fl){got=true;_upFile(fl);}}
+    }
+    if(got)e.preventDefault();
+  });
+  var drawer=$('ir9-chat');
+  if(drawer){
+    ['dragover','dragenter'].forEach(function(ev){drawer.addEventListener(ev,function(e){e.preventDefault();drawer.classList.add('drag');});});
+    drawer.addEventListener('dragleave',function(e){e.preventDefault();drawer.classList.remove('drag');});
+    drawer.addEventListener('drop',function(e){
+      e.preventDefault();drawer.classList.remove('drag');
+      var fs=(e.dataTransfer||{}).files||[];
+      Array.prototype.slice.call(fs).forEach(_upFile);
+    });
+  }
 })();
 window.irExport=function(mi,fmt){
   var h=chatHist();var m=h[mi];if(!m||!m.content)return;
@@ -5247,7 +5268,7 @@ window.irExport=function(mi,fmt){
 window.irChatSend=function(q){
   var inp=$('ir9-chat-in');
   var text=(typeof q==='string')?q:(inp?inp.value.trim():'');
-  var ready=KF.filter(function(c){return c.state==='ok'&&c.content;});
+  var ready=KF.filter(function(c){return c.state==='ok'&&(c.content||c.b64);});
   if(!text&&!ready.length)return;
   if(!text)text='Analyse the attached file'+(ready.length>1?'s':'')+' and summarise the key points.';
   if(inp){inp.value='';inp.style.height='auto';}
@@ -5261,7 +5282,7 @@ window.irChatSend=function(q){
   var send=$('ir9-chat-send');if(send)send.disabled=true;
   fetch('/api/kairo-chat/'+acct(),{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question:text,history:h.slice(0,-1).slice(-8),
-      files:ready.map(function(c){return {name:c.name,content:c.content};})})})
+      files:ready.map(function(c){return c.kind==='img'?{name:c.name,image:true,mime:c.mime,base64:c.b64}:{name:c.name,content:c.content};})})})
     .then(function(r){return r.json();})
     .then(function(d){
       var t=$('ir9-chat-tip');if(t)t.remove();
@@ -5484,6 +5505,9 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 .ir9-exp-b{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#9fabbe;border-radius:7px;font-size:9.5px;font-weight:700;padding:3px 9px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
 .ir9-exp-b:hover{border-color:rgba(129,140,248,.5);color:#c7d2fe}
 .ir9-exp-b.hot{background:linear-gradient(95deg,#4f46e5,#7c3aed);border:none;color:#fff;text-transform:none;font-size:10.5px}
+
+.ir9-att-c img{width:26px;height:26px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid rgba(129,140,248,.35)}
+.ir9-chat.drag{outline:2px dashed rgba(129,140,248,.65);outline-offset:-6px}
 
 /* Insights (Kairo) tab readability */
 .ir9-hl { font-size: 14px; line-height: 1.65; }
