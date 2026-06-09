@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LinkedIn Intelligence — Position²</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
 <style>
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -26,10 +27,11 @@ body{background:var(--bg);min-height:100vh;position:relative}
 body::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 50% at 0% 0%,rgba(99,102,241,0.55) 0%,transparent 50%),
-    radial-gradient(ellipse 60% 45% at 100% 100%,rgba(139,92,246,0.45) 0%,transparent 50%),
-    radial-gradient(ellipse 50% 35% at 50% 0%,rgba(79,70,229,0.30) 0%,transparent 45%),
-    radial-gradient(ellipse 35% 25% at 100% 0%,rgba(99,102,241,0.20) 0%,transparent 50%);
+    radial-gradient(ellipse 80% 60% at 15% 20%,rgba(99,102,241,0.60) 0%,transparent 55%),
+    radial-gradient(ellipse 70% 55% at 85% 75%,rgba(139,92,246,0.50) 0%,transparent 55%),
+    radial-gradient(ellipse 60% 50% at 50% 50%,rgba(79,70,229,0.25) 0%,transparent 60%),
+    radial-gradient(ellipse 55% 45% at 80% 15%,rgba(124,131,245,0.35) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 40% at 20% 80%,rgba(139,92,246,0.30) 0%,transparent 55%);
 }
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -550,6 +552,7 @@ body::before{
 .tb-dd-item:hover{background:rgba(255,255,255,0.05);color:#f1f5f9;}
 .tb-dd-item.danger{color:#f87171;}
 .tb-dd-item.danger:hover{background:rgba(239,68,68,0.1);color:#f87171;}
+.tb-dd-divider{height:1px;background:rgba(255,255,255,0.07);margin:4px 0;}
 </style>
 </head>
 <body>
@@ -584,6 +587,10 @@ body::before{
           <div class="tb-dd-email">{{ user.email }}</div>
         </div>
         <div class="tb-dd-items">
+          {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
+          <a href="/admin/usage" class="tb-dd-item"><span>⚙</span> Usage Dashboard</a>
+          <div class="tb-dd-divider"></div>
+          {% endif %}
           <a href="/logout" class="tb-dd-item danger"><span>→</span> Sign out</a>
         </div>
       </div>
@@ -986,10 +993,13 @@ function applyPLF(){
                 ${p.seniority?`<span class="b ${SCLS(p.seniority)}">${esc(SLBL(p.seniority))}</span>`:''}
                 ${p.degree?`<span class="b bdeg">${DLBL(p.degree)}</span>`:''}
                 ${p.country?`<span class="b bic">🌏 ${esc(p.country)}</span>`:''}
+                ${p.industry?`<span class="b bic" style="background:rgba(79,70,229,0.18);border-color:rgba(79,70,229,0.35)">${esc(p.industry)}</span>`:''}
               </div>
               <div class="pcmeta">
                 ${p.company?`<div class="pcmi">🏢 <span>${esc(p.company)}</span></div>`:''}
                 ${p.location?`<div class="pcmi">📍 <span>${esc(p.location)}</span></div>`:''}
+                ${p.size?`<div class="pcmi">👥 <span>${esc(p.size)}</span></div>`:''}
+                ${p.url?`<div class="pcmi"><a href="${esc(p.url)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--accent);text-decoration:none;font-size:10px;font-weight:600">↗ LinkedIn</a></div>`:''}
               </div>
               ${p.posts_engaged>0?`<div class="actbar"><div class="acttrack"><div class="actfill" style="width:${pct}%"></div></div><div class="actlbl">${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</div></div>`:''}
             </div>`;
@@ -1046,12 +1056,16 @@ function applyCF(){
     return`<div class="ccrd" onclick="openCompanyDrawer(${idx})" style="animation-delay:${ci*.04}s">
       <div class="cctop">
         <div class="ccico" style="background:linear-gradient(135deg,${cc1},${cc2})">${icos}</div>
-        <div><div class="ccn">${esc(c.name)}</div><div class="ccsub">${esc(c.industry||'—')}</div></div>
+        <div><div class="ccn">${esc(c.name)}</div><div class="ccsub">${esc(c.industry||'—')}${c.size?' · '+esc(c.size):''}</div></div>
       </div>
       <div class="cc-stats">
         <div class="cc-stat"><div class="cc-stat-val vg" data-count="${c.people_count}">0</div><div class="cc-stat-lbl">People</div></div>
         <div class="cc-stat"><div class="cc-stat-val va" data-count="${c.dm_count}">0</div><div class="cc-stat-lbl">Decision Makers</div></div>
       </div>
+      ${(c.hq||c.country)?`<div class="pcmeta" style="margin-top:6px;gap:6px">
+        ${c.hq?`<div class="pcmi">🏙 <span>${esc(c.hq)}</span></div>`:''}
+        ${c.country&&c.country!==c.hq?`<div class="pcmi">🌏 <span>${esc(c.country)}</span></div>`:''}
+      </div>`:``}
       <div class="cc-bar">${segs}</div>
       <div class="pcbdg">
         ${c.dm_count?`<span class="b bdm">🎯 ${c.dm_count} DM${c.dm_count!==1?'s':''}</span>`:''}
