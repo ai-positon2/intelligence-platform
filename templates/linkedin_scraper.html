@@ -479,11 +479,49 @@ body::before{
   font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:0.1em;
   padding:18px 0 8px;border-top:1px solid var(--b1);margin-top:8px;
 }
-.sec-lbl{color:var(--tx2)}
+.sec-lbl{color:var(--tx2);font-size:15px;font-weight:700;letter-spacing:0.02em}
 .sec-label-row .tc{background:var(--s2)}
+
+/* ── Topbar ── */
+.topbar{position:relative;z-index:10;height:62px;padding:0 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(6,7,15,0.75);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.06);}
+.topbar-left{display:flex;align-items:center;}
+.tb-brand{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.tb-brand-icon{width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  box-shadow:0 0 16px rgba(99,102,241,0.35);}
+.tb-brand-name{font-size:15px;font-weight:700;color:#f1f5f9;}
+.tb-breadcrumb{display:flex;align-items:center;gap:8px;
+  margin-left:18px;padding-left:18px;
+  border-left:1px solid rgba(255,255,255,0.08);}
+.tb-bc-link{font-size:13px;color:#3d4460;text-decoration:none;transition:color .15s;}
+.tb-bc-link:hover{color:#94a3b8;}
+.tb-bc-sep{font-size:13px;color:#1a1d27;}
+.tb-bc-cur{font-size:13px;font-weight:600;color:#818cf8;}
+.shell{padding-top:0;}
 </style>
 </head>
 <body>
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="/hub" class="tb-brand">
+      <div class="tb-brand-icon">📡</div>
+      <span class="tb-brand-name">Platform</span>
+    </a>
+    <div class="tb-breadcrumb">
+      <a href="/hub" class="tb-bc-link">Hub</a>
+      <span class="tb-bc-sep">›</span>
+      <a href="/ppc" class="tb-bc-link">PPC</a>
+      <span class="tb-bc-sep">›</span>
+      <span class="tb-bc-cur">LinkedIn ABM</span>
+    </div>
+  </div>
+</div>
+
 <div class="shell">
 <nav class="nav">
   <div class="nav-brand">Position²</div>
@@ -706,7 +744,7 @@ function buildPeopleTab(){
   el.innerHTML=`
   <div class="stat-row">
     <div class="scard sg" onclick="peoplStatClick('all',this)"><div class="sc-label">People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div></div>
-    <div class="scard sc"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
+    <div class="scard sc" onclick="document.getElementById('sp-companies').scrollIntoView({behavior:'smooth'})"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
   </div>
 
   <!-- PEOPLE SUBPAGE -->
@@ -802,11 +840,10 @@ function switchSub(t){
 let _pSF=null;
 function peoplStatClick(mode,el){
   document.querySelectorAll('#tab-people .scard').forEach(c=>c.classList.remove('active-filter'));
-  if(_pSF===mode){_pSF=null;PLF.dm=false;PLF.sen='all';return applyPLF();}
+  if(_pSF===mode){_pSF=null;PLF.sen='all';return applyPLF();}
   _pSF=mode;el.classList.add('active-filter');
-  if(mode==='dm'){PLF.dm=true;document.getElementById('plf-dm').classList.add('on');}
-  else if(mode==='csuite'){PLF.sen='csuite';}
-  else{PLF.dm=false;PLF.sen='all';}
+  if(mode==='csuite'){PLF.sen='csuite';}
+  else{PLF.sen='all';}
   applyPLF();
 }
 function setPLF(k,v,el){PLF[k]=v;el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');applyPLF();}
