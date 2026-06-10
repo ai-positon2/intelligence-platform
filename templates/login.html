@@ -147,6 +147,13 @@
     .feature:nth-child(1) { animation: fade-up 0.7s 0.3s ease both; }
     .feature:nth-child(2) { animation: fade-up 0.7s 0.4s ease both; }
     .feature:nth-child(3) { animation: fade-up 0.7s 0.5s ease both; }
+    .feature:nth-child(4) { animation: fade-up 0.7s 0.6s ease both; }
+    .fi-violet { background: rgba(168,85,247,0.14); border: 1px solid rgba(168,85,247,0.3); color:#c4b5fd; }
+    .fi-cyan   { background: rgba(34,211,238,0.10); border: 1px solid rgba(34,211,238,0.22); }
+    .stat-strip { display:flex; gap:30px; margin:-24px 0 36px; flex-wrap:wrap; animation: fade-up 0.7s 0.26s ease both; }
+    .ls b { display:block; font-size:22px; font-weight:700; color:#e2e8f0; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+    .ls b.ls-ai { background:linear-gradient(120deg,#a5b4fc,#c4b5fd); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .ls span { font-size:10px; color:#3d4460; text-transform:uppercase; letter-spacing:0.09em; font-weight:600; }
 
     .fi {
       width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
@@ -329,30 +336,45 @@
       Intelligence<br/>for <span class="grad">every channel.</span>
     </h1>
     <p class="left-sub">
-      One platform for PPC and SEO intelligence — company signals, ad monitoring,
-      competitor insights, and more. Built for the Position2 team.
+      PPC and SEO intelligence in one place — live company signals, AI research and
+      outreach with Kairo, competitor ads, visitor identity and organic insights.
+      Built for the Position2 team.
     </p>
+
+    <div class="stat-strip">
+      <div class="ls"><b data-n="1200" data-suf="+">0</b><span>Companies tracked</span></div>
+      <div class="ls"><b data-n="300" data-suf="+">0</b><span>Live signals</span></div>
+      <div class="ls"><b data-n="14" data-suf="">0</b><span>Dashboards</span></div>
+      <div class="ls"><b class="ls-ai">Kairo</b><span>AI on every page</span></div>
+    </div>
 
     <div class="features">
       <div class="feature">
-        <div class="fi fi-indigo">📡</div>
+        <div class="fi fi-violet">✦</div>
         <div class="feature-text">
-          <strong>Company Signal Tracker</strong>
-          <span>Real-time funding, C-suite &amp; M&amp;A signals across 1,500+ companies.</span>
+          <strong>Kairo AI</strong>
+          <span>Executive briefs, deep company dossiers and ready-to-send outreach — an AI analyst on every dashboard.</span>
         </div>
       </div>
       <div class="feature">
-        <div class="fi fi-purple">🎯</div>
+        <div class="fi fi-indigo">📡</div>
         <div class="feature-text">
-          <strong>Ad Intelligence</strong>
-          <span>Monitor competitor ad creatives and spend signals across paid channels.</span>
+          <strong>Signal Tracker</strong>
+          <span>Funding, C-suite and M&amp;A signals across 1,200+ companies, scored by buying intent.</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="fi fi-cyan">🔗</div>
+        <div class="feature-text">
+          <strong>LinkedIn &amp; Ad Intelligence</strong>
+          <span>People and post-engagement signals, competitor creatives, and anonymous visitor identity.</span>
         </div>
       </div>
       <div class="feature">
         <div class="fi fi-green">🔍</div>
         <div class="feature-text">
-          <strong>SERP Content Researcher</strong>
-          <span>Analyse top-ranking pages and surface keyword opportunities from live SERPs.</span>
+          <strong>SEO Suite</strong>
+          <span>Audits, content research, briefs and keyword intelligence across nine organic tools.</span>
         </div>
       </div>
     </div>
@@ -438,5 +460,31 @@
       });
     }
   </script>
+<script>
+  /* rotating gradient word */
+  (function(){
+    var words=['every channel.','every signal.','every decision.'],i=0;
+    var el=document.querySelector('.left-heading .grad');if(!el)return;
+    el.style.transition='opacity .32s ease';
+    setInterval(function(){
+      i=(i+1)%words.length;
+      el.style.opacity='0';
+      setTimeout(function(){el.textContent=words[i];el.style.opacity='1';},330);
+    },3600);
+  })();
+  /* stat count-up */
+  (function(){
+    document.querySelectorAll('.ls b[data-n]').forEach(function(el){
+      var target=parseInt(el.getAttribute('data-n'),10),suf=el.getAttribute('data-suf')||'',t0=null;
+      function step(ts){
+        if(!t0)t0=ts;
+        var p=Math.min(1,(ts-t0)/1100);p=1-Math.pow(1-p,3);
+        el.textContent=Math.round(target*p).toLocaleString('en-US')+(p>=1?suf:'');
+        if(p<1)requestAnimationFrame(step);
+      }
+      setTimeout(function(){requestAnimationFrame(step);},420);
+    });
+  })();
+</script>
 </body>
 </html>
