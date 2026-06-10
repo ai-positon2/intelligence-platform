@@ -1210,5 +1210,46 @@ html.lenis,html.lenis body{height:auto}
 })();
 </script>
 
+
+<style>
+/* ===== Anonymous Visitors — showpiece layer ===== */
+.av-aurora{position:fixed;inset:-25%;z-index:0;pointer-events:none;filter:blur(72px)}
+.av-aurora .b{position:absolute;border-radius:50%;mix-blend-mode:screen}
+.av-aurora .b1{width:46vw;height:46vw;left:-6vw;top:-10vh;background:radial-gradient(circle at 30% 30%,rgba(16,185,129,.34),transparent 60%);animation:avF1 26s ease-in-out infinite}
+.av-aurora .b2{width:42vw;height:42vw;right:-8vw;top:6vh;background:radial-gradient(circle at 60% 40%,rgba(45,212,191,.26),transparent 60%);animation:avF2 32s ease-in-out infinite}
+.av-aurora .b3{width:40vw;height:40vw;left:34vw;bottom:-14vh;background:radial-gradient(circle at 50% 50%,rgba(99,102,241,.22),transparent 62%);animation:avF3 36s ease-in-out infinite}
+@keyframes avF1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,6vh) scale(1.12)}}
+@keyframes avF2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,7vh) scale(1.1)}}
+@keyframes avF3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5vw,-6vh) scale(1.16)}}
+.av-grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:170px}
+.stat-card{will-change:transform}
+.stat-card::after{content:'';position:absolute;top:0;left:-65%;width:45%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.08),transparent);transform:skewX(-18deg);transition:left .7s ease;pointer-events:none;z-index:1}
+.stat-card:hover::after{left:135%}
+.stat-card:hover{transform:translateY(-5px)}
+.stat-value{font-variant-numeric:tabular-nums}
+.recent-row{transition:background .15s,transform .18s cubic-bezier(.22,1,.36,1),box-shadow .2s}
+.recent-row:hover{transform:translateX(5px);background:rgba(52,211,153,.07);box-shadow:-3px 0 0 0 #34d399}
+.av-in{animation:avIn .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes avIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.av-aurora .b{animation:none}.av-in{animation:none}.stat-card::after{display:none}}
+</style>
+<script>(function(){
+  if(window.__dashav)return;window.__dashav=1;
+  function mt(){var b=document.body;if(!b){return setTimeout(mt,40);}
+    var a=document.createElement('div');a.className='av-aurora';a.innerHTML='<div class="b b1"></div><div class="b b2"></div><div class="b b3"></div>';
+    var g=document.createElement('div');g.className='av-grain';
+    b.insertBefore(g,b.firstChild);b.insertBefore(a,b.firstChild);}
+  mt();
+  function countUp(el,target){var t0=null;function s(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1100);p=1-Math.pow(1-p,3);el.textContent=Math.round(target*p).toLocaleString('en-US');if(p<1)requestAnimationFrame(s);}requestAnimationFrame(s);}
+  function watch(id){var el=document.getElementById(id);if(!el)return;var done=false,mo;
+    function chk(){if(done)return;var t=(el.textContent||'').replace(/[,\s]/g,'');if(/^[0-9]+$/.test(t)&&parseInt(t,10)>0){done=true;if(mo)mo.disconnect();countUp(el,parseInt(t,10));}}
+    mo=new MutationObserver(chk);mo.observe(el,{childList:true,characterData:true,subtree:true});chk();}
+  watch('sv-people');watch('sv-companies');
+  function tagRow(n,i){if(n.nodeType===1&&n.classList&&n.classList.contains('recent-row')){n.classList.add('av-in');n.style.animationDelay=Math.min(i*45,520)+'ms';}}
+  function obs(id){var c=document.getElementById(id);if(!c)return;
+    Array.prototype.forEach.call(c.children,tagRow);
+    new MutationObserver(function(ms){ms.forEach(function(m){Array.prototype.forEach.call(m.addedNodes,function(n){tagRow(n,c.children.length);});});}).observe(c,{childList:true});}
+  obs('recent-body');
+})();</script>
 </body>
 </html>
