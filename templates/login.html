@@ -971,5 +971,37 @@ function start(){
   requestAnimationFrame(tick);
 }
 start();})();</script>
+<script>(function(){
+  if(window.__glx)return;window.__glx=1;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var cv=document.createElement('canvas');cv.id='glx';
+  cv.style.cssText='position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block';
+  var gl=null;try{gl=cv.getContext('webgl')||cv.getContext('experimental-webgl');}catch(e){}
+  if(!gl)return;
+  document.body.appendChild(cv);
+  var tint=document.createElement('div');tint.id='glx-tint';
+  tint.style.cssText='position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 120% 95% at 50% 38%,rgba(6,8,16,.16) 0%,rgba(6,8,16,.48) 68%,rgba(6,8,16,.72) 100%)';
+  document.body.appendChild(tint);
+  var vs='attribute vec2 p;void main(){gl_Position=vec4(p,0.0,1.0);}';
+  var fs="precision highp float;\nuniform vec2 u_res; uniform float u_time; uniform vec2 u_mouse;\nfloat hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453123); }\nfloat noise(vec2 p){\n  vec2 i=floor(p), f=fract(p);\n  float a=hash(i), b=hash(i+vec2(1.0,0.0)), c=hash(i+vec2(0.0,1.0)), d=hash(i+vec2(1.0,1.0));\n  vec2 u=f*f*(3.0-2.0*f);\n  return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);\n}\nfloat fbm(vec2 p){\n  float v=0.0, a=0.5;\n  for(int i=0;i<5;i++){ v+=a*noise(p); p=p*2.0+vec2(1.7,9.2); a*=0.5; }\n  return v;\n}\nvoid main(){\n  vec2 uv = gl_FragCoord.xy/u_res.xy;\n  vec2 p = uv; p.x *= u_res.x/u_res.y;\n  float t = u_time*0.045;\n  vec2 q = vec2(fbm(p*1.6 + vec2(0.0, t)), fbm(p*1.6 + vec2(5.2,-t)));\n  vec2 r = vec2(fbm(p*1.6 + 3.0*q + vec2(1.7,9.2) + t*0.4), fbm(p*1.6 + 3.0*q + vec2(8.3,2.8) - t*0.4));\n  float f = fbm(p*1.6 + 3.0*r);\n  float md = distance(uv, u_mouse);\n  f += 0.10*smoothstep(0.55,0.0,md);\n  vec3 base = vec3(0.018,0.026,0.075);\n  vec3 c1 = vec3(0.20,0.19,0.62);\n  vec3 c2 = vec3(0.42,0.27,0.86);\n  vec3 c3 = vec3(0.13,0.55,0.78);\n  vec3 col = base;\n  col = mix(col, c1, smoothstep(0.18,0.72,f));\n  col = mix(col, c2, smoothstep(0.55,1.0,f*f));\n  col += c3*0.30*smoothstep(0.72,1.0,f)*clamp(r.x,0.0,1.0);\n  col += vec3(0.16,0.20,0.32)*0.12*smoothstep(0.5,0.0,md);\n  float vig = smoothstep(1.25,0.30,length(uv-0.5));\n  col *= (0.50 + 0.50*vig);\n  col += (hash(uv*(u_time+1.0))-0.5)*0.02;\n  gl_FragColor = vec4(col*0.92, 1.0);\n}";
+  function mk(t,src){var o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)){return null;}return o;}
+  var v=mk(gl.VERTEX_SHADER,vs),fsh=mk(gl.FRAGMENT_SHADER,fs);
+  if(!v||!fsh){cv.remove();tint.remove();return;}
+  var pr=gl.createProgram();gl.attachShader(pr,v);gl.attachShader(pr,fsh);gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){cv.remove();tint.remove();return;}
+  gl.useProgram(pr);
+  var bf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  var lp=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(lp);gl.vertexAttribPointer(lp,2,gl.FLOAT,false,0,0);
+  var uRes=gl.getUniformLocation(pr,'u_res'),uTime=gl.getUniformLocation(pr,'u_time'),uMouse=gl.getUniformLocation(pr,'u_mouse');
+  var mx=0.5,my=0.55,tmx=0.5,tmy=0.55;
+  window.addEventListener('mousemove',function(e){tmx=e.clientX/window.innerWidth;tmy=1.0-e.clientY/window.innerHeight;},{passive:true});
+  function resize(){var s=0.55;cv.width=Math.max(2,Math.round(window.innerWidth*s));cv.height=Math.max(2,Math.round(window.innerHeight*s));gl.viewport(0,0,cv.width,cv.height);}
+  resize();window.addEventListener('resize',resize);
+  var hidden=false;document.addEventListener('visibilitychange',function(){hidden=document.hidden;});
+  var t0=performance.now();
+  function draw(now){if(!hidden){mx+=(tmx-mx)*0.045;my+=(tmy-my)*0.045;gl.uniform2f(uRes,cv.width,cv.height);gl.uniform1f(uTime,(now-t0)/1000.0);gl.uniform2f(uMouse,mx,my);gl.drawArrays(gl.TRIANGLES,0,3);}if(!reduce)requestAnimationFrame(draw);}
+  if(reduce){gl.uniform2f(uRes,cv.width,cv.height);gl.uniform1f(uTime,14.0);gl.uniform2f(uMouse,0.5,0.55);gl.drawArrays(gl.TRIANGLES,0,3);}else{requestAnimationFrame(draw);}
+})();</script>
 </body>
 </html>
