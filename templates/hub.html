@@ -830,5 +830,79 @@ html.lenis,html.lenis body{height:auto}
 })();
 </script>
 
+
+<style>
+/* AMBIENCE v2 — aurora + grain */
+.amb-aurora{position:fixed;inset:-25%;z-index:0;pointer-events:none;filter:blur(70px)}
+.amb-b{position:absolute;border-radius:50%;mix-blend-mode:screen}
+.amb-b1{width:48vw;height:48vw;left:-6vw;top:-10vh;background:radial-gradient(circle at 30% 30%,rgba(99,102,241,.38),transparent 60%);animation:ambF1 24s ease-in-out infinite}
+.amb-b2{width:42vw;height:42vw;right:-8vw;top:8vh;background:radial-gradient(circle at 60% 40%,rgba(139,92,246,.34),transparent 60%);animation:ambF2 30s ease-in-out infinite}
+.amb-b3{width:40vw;height:40vw;left:32vw;bottom:-14vh;background:radial-gradient(circle at 50% 50%,rgba(34,211,238,.20),transparent 62%);animation:ambF3 34s ease-in-out infinite}
+@keyframes ambF1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,6vh) scale(1.14)}}
+@keyframes ambF2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,7vh) scale(1.1)}}
+@keyframes ambF3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5vw,-6vh) scale(1.18)}}
+.amb-grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:170px}
+@media (prefers-reduced-motion:reduce){.amb-b{animation:none}}
+</style>
+<script>(function(){if(window.__amb)return;window.__amb=1;
+var a=document.createElement('div');a.className='amb-aurora';
+a.innerHTML='<div class="amb-b amb-b1"></div><div class="amb-b amb-b2"></div><div class="amb-b amb-b3"></div>';
+var g=document.createElement('div');g.className='amb-grain';
+function mt(){var b=document.body;if(!b){return setTimeout(mt,40);}b.insertBefore(g,b.firstChild);b.insertBefore(a,b.firstChild);}
+mt();})();</script>
+
+
+<style>
+.hb-hero{position:relative}
+.hb-hero>.eyebrow,.hb-hero>.main-heading,.hb-hero>.main-sub,.hb-hero>.hb-cue{position:relative;z-index:2}
+.hb-radar{position:absolute;left:50%;top:48%;width:min(760px,90vw);height:min(760px,90vw);transform:translate(-50%,-50%);z-index:0;pointer-events:none;opacity:.6}
+.hb-radar svg{width:100%;height:100%;overflow:visible}
+.hb-spin{transform-origin:200px 200px;animation:hbR 46s linear infinite}
+.hb-spin2{transform-origin:200px 200px;animation:hbR 72s linear infinite reverse}
+.hb-sweep{transform-origin:200px 200px;animation:hbR 7s linear infinite}
+@keyframes hbR{to{transform:rotate(360deg)}}
+.hb-nd{animation:hbND 3.2s ease-in-out infinite}
+.hb-nd.b{animation-delay:1s}.hb-nd.c{animation-delay:2s}
+@keyframes hbND{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.hb-spin,.hb-spin2,.hb-sweep,.hb-nd{animation:none}}
+</style>
+<script>(function(){
+function build(){
+  var hero=document.querySelector('.hb-hero');if(!hero){return setTimeout(build,60);}
+  if(hero.querySelector('.hb-radar'))return;
+  var d=document.createElement('div');d.className='hb-radar';
+  d.innerHTML=''
+   +'<svg viewBox="0 0 400 400" aria-hidden="true">'
+   +'<defs>'
+   +'<radialGradient id="hbsw" cx="50%" cy="50%" r="50%">'
+   +'<stop offset="0%" stop-color="rgba(129,140,248,.30)"/>'
+   +'<stop offset="100%" stop-color="rgba(129,140,248,0)"/>'
+   +'</radialGradient>'
+   +'<radialGradient id="hbcore" cx="50%" cy="50%" r="50%">'
+   +'<stop offset="0%" stop-color="rgba(167,139,250,.9)"/>'
+   +'<stop offset="100%" stop-color="rgba(99,102,241,0)"/>'
+   +'</radialGradient>'
+   +'</defs>'
+   +'<g class="hb-spin">'
+   +'<circle cx="200" cy="200" r="70" fill="none" stroke="rgba(129,140,248,.16)" stroke-width="1"/>'
+   +'<circle cx="200" cy="200" r="120" fill="none" stroke="rgba(129,140,248,.13)" stroke-width="1" stroke-dasharray="2 7"/>'
+   +'<circle cx="200" cy="200" r="170" fill="none" stroke="rgba(34,211,238,.10)" stroke-width="1"/>'
+   +'</g>'
+   +'<g class="hb-spin2">'
+   +'<circle cx="200" cy="200" r="195" fill="none" stroke="rgba(139,92,246,.10)" stroke-width="1" stroke-dasharray="1 10"/>'
+   +'</g>'
+   +'<g class="hb-sweep"><path d="M200 200 L200 25 A175 175 0 0 1 360 150 Z" fill="url(#hbsw)"/></g>'
+   +'<circle cx="200" cy="200" r="34" fill="url(#hbcore)"/>'
+   +'<circle class="hb-nd" cx="200" cy="80" r="3.5" fill="#a5b4fc"/>'
+   +'<circle class="hb-nd b" cx="318" cy="248" r="3" fill="#67e8f9"/>'
+   +'<circle class="hb-nd c" cx="96" cy="262" r="3" fill="#c4b5fd"/>'
+   +'<circle class="hb-nd" cx="286" cy="120" r="2.5" fill="#a5b4fc"/>'
+   +'<circle class="hb-nd b" cx="120" cy="120" r="2.5" fill="#67e8f9"/>'
+   +'</svg>';
+  hero.insertBefore(d,hero.firstChild);
+}
+build();})();</script>
+
 </body>
 </html>
