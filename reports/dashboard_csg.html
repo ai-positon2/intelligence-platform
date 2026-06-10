@@ -5687,15 +5687,22 @@ body::after{content:'';position:fixed;width:760px;height:760px;top:-280px;right:
     if(!/^[\d,]+$/.test(txt))return;
     var target=parseInt(txt.replace(/,/g,''),10);
     if(!isFinite(target)||target<=0)return;
-    var t0=null,dur=900;
+    var fin=target.toLocaleString('en-US');
+    /* never animate in hidden tabs - rAF is paused there and numbers freeze */
+    if(document.visibilityState!=='visible'){el.textContent=fin;return;}
+    var t0=null,dur=900,ended=false;
     function step(ts){
+      if(ended)return;
       if(!t0)t0=ts;
       var p=Math.min(1,(ts-t0)/dur);p=1-Math.pow(1-p,3);
       el.textContent=Math.round(target*p).toLocaleString('en-US');
       if(p<1)requestAnimationFrame(step);
-      else el.textContent=target.toLocaleString('en-US');
+      else{ended=true;el.textContent=fin;}
     }
     requestAnimationFrame(step);
+    /* hard guarantee: real value lands no matter what happens to rAF */
+    setTimeout(function(){ended=true;el.textContent=fin;},dur+400);
+    document.addEventListener('visibilitychange',function(){ended=true;el.textContent=fin;});
   }
   function run(){
     if(done)return;
