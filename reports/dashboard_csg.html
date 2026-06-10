@@ -5608,10 +5608,10 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 .ir9-gen:hover { transform: translateY(-1px); }
 .ir9-fpanel { box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(99,102,241,.12); }
 
-/* Signal Feed: fill the panel height — no clipped card + dead space below */
+/* Signal Feed: panel height locked to the charts column; list scrolls inside */
 .two-col{align-items:stretch}
-.two-col .panel{min-height:0}
-.signal-feed-list{max-height:none !important;flex:1 1 auto;min-height:0}
+.two-col .panel{height:0;min-height:100%}
+.signal-feed-list{max-height:none !important;flex:1 1 auto;min-height:0;overflow-y:auto}
 
 /* respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
