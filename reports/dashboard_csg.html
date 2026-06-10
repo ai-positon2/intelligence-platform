@@ -5025,9 +5025,25 @@ function irDeep(name){
       var box=$('ir9-deep');if(!box)return;
       if(d.error){box.innerHTML='<div class="ir9-note">Deep dossier unavailable: '+esc(d.error)+'</div>';return;}
       var a=d.analysis||{};
-      var html='<div style="border-top:1px solid rgba(255,255,255,.07);margin:6px 0 16px;padding-top:16px"><span class="ir9-kbadge">&#10022; KAIRO DEEP DOSSIER</span></div>';
+      var sc=parseInt(a.score||0,10)||0;
+      var scol=sc>=80?'#fb7185':sc>=60?'#fbbf24':'#818cf8';
+      var circ=2*Math.PI*26,off=circ*(1-Math.min(sc,100)/100);
+      var html='<div style="border-top:1px solid rgba(255,255,255,.07);margin:6px 0 14px;padding-top:14px"><span class="ir9-kbadge">&#10022; KAIRO DEEP DOSSIER</span></div>'
+        +'<div class="ir9-hero">'
+          +'<div class="ir9-gauge"><svg width="74" height="74" viewBox="0 0 64 64">'
+            +'<circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/>'
+            +'<circle cx="32" cy="32" r="26" fill="none" stroke="'+scol+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
+          +'</svg><div class="ir9-gauge-n" style="color:'+scol+'">'+sc+'</div></div>'
+          +'<div class="ir9-hero-meta">'
+            +'<div class="ir9-hero-t">Intent score</div>'
+            +'<div class="ir9-chips" style="margin-top:6px">'
+              +(a.urgency?'<span class="ir9-tchip '+(a.urgency==='HIGH'?'ir9-t-now':a.urgency==='MEDIUM'?'ir9-t-week':'ir9-t-email')+'" style="font-size:10px;padding:4px 11px">'+esc(a.urgency)+' URGENCY</span>':'')
+              +(a.recommended_service?'<span class="ir9-chip">&#9670; '+esc(a.recommended_service)+'</span>':'')
+            +'</div>'
+            +(a.score_reason?'<div class="ir9-hero-r">'+esc(a.score_reason)+'</div>':'')
+          +'</div>'
+        +'</div>';
       if(a.company_context)html+='<div class="ir9-ds"><div class="ir9-ds-l">Company context</div><div class="ir9-ds-v">'+esc(a.company_context)+'</div></div>';
-      if(a.score&&a.score_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Score rationale ('+esc(String(a.score))+'/100)</div><div class="ir9-ds-v">'+esc(a.score_reason)+'</div></div>';
       if(a.why_now)html+='<div class="ir9-ds"><div class="ir9-ds-l">Why now</div><div class="ir9-hl">'+esc(a.why_now)+'</div></div>';
       var objs=a.objections||[];
       if(objs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Objections &amp; counters</div>'+objs.map(function(o){
@@ -5036,7 +5052,7 @@ function irDeep(name){
       if(subs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Subject lines that will land</div>'+subs.map(function(sl){
         return '<div class="ir9-subj"><div class="ir9-subj-t">'+esc(sl)+'</div><button class="ir9-btn" style="padding:3px 9px;font-size:10px" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button></div>';}).join('')+'</div>';
       if(a.recommended_service&&a.service_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Best-fit service: '+esc(a.recommended_service)+'</div><div class="ir9-ds-v">'+esc(a.service_reason)+'</div></div>';
-      if(a.urgency)html+='<div class="ir9-ds"><div class="ir9-ds-l">Urgency</div><div class="ir9-ds-v"><span class="ir9-tchip '+(a.urgency==='HIGH'?'ir9-t-now':a.urgency==='MEDIUM'?'ir9-t-week':'ir9-t-email')+'" style="font-size:10px;padding:4px 10px">'+esc(a.urgency)+'</span>'+(a.urgency_reason?' &nbsp;'+esc(a.urgency_reason):'')+'</div></div>';
+      if(a.urgency_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Timing read</div><div class="ir9-ds-v">'+esc(a.urgency_reason)+'</div></div>';
       DEEP[name]=html;
       box.innerHTML=html;
     })
@@ -5096,6 +5112,7 @@ window.irAIEmail=function(co,svc,tone){
       if(d.error){out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">'+esc(d.error)+'</div>';return;}
       var em=d.email||{};
       var full='Subject: '+(em.subject||'')+'\n\n'+(em.greeting||'')+'\n\n'+(em.opening||'')+'\n\n'+(em.body||'')+'\n\n'+(em.cta||'')+(em.ps?'\n\nP.S. '+em.ps:'');
+      var wc=((em.opening||'')+' '+(em.body||'')+' '+(em.cta||'')).split(/\s+/).filter(Boolean).length;
       out.innerHTML=(em.why_now?'<div class="ir9-hl" style="margin-bottom:13px">&#9201; '+esc(em.why_now)+'</div>':'')
         +'<div class="ir9-mail">'
           +(em.subject?'<div class="ir9-mail-sub">'+esc(em.subject)+'</div>':'')
@@ -5105,7 +5122,12 @@ window.irAIEmail=function(co,svc,tone){
           +(em.cta?'<p style="color:#a5b4fc">'+esc(em.cta)+'</p>':'')
           +(em.ps?'<p style="color:#55617a;font-size:12px;margin-bottom:0">P.S. '+esc(em.ps)+'</p>':'')
         +'</div>'
-        +'<div class="ir9-note">&#10022; Written by Kairo · '+(em.recommended_service?'recommended service: '+esc(em.recommended_service)+' · ':'')+'replace {FirstName} before sending</div>'
+        +'<div class="ir9-meta">'
+          +(em.recommended_service?'<span class="ir9-mchip svc">&#9670; '+esc(em.recommended_service)+'</span>':'')
+          +'<span class="ir9-mchip">'+wc+' words</span>'
+          +'<span class="ir9-mchip warn">&#9998; {FirstName}</span>'
+          +'<span class="ir9-mchip ai">&#10022; Kairo</span>'
+        +'</div>'
         +'<textarea id="ir9-fullmail" style="display:none">'+esc(full)+'</textarea>'
         +'<div class="ir9-tonerow"><span class="ir9-tone-l">&#10022; Rewrite as</span>'
           +[['direct','Direct'],['warm','Warm'],['executive','Executive']].map(function(t){
@@ -5509,6 +5531,46 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 
 /* unified button radii */
 .refresh-btn, .filters-btn, .export-btn, .pag-btn, .copy-cmd-btn { border-radius: 10px; }
+
+/* ════ Kairo modal redesign: centered command palette ════ */
+.ir9-drw{
+  top:50% !important; left:50% !important; right:auto !important;
+  width:min(760px,94vw) !important; max-width:94vw !important;
+  height:auto !important; max-height:88vh !important;
+  border-radius:22px !important;
+  border:1px solid rgba(129,140,248,.3) !important;
+  transform:translate(-50%,-50%) scale(.95) translateY(16px);
+  opacity:0; pointer-events:none;
+  transition:transform .34s cubic-bezier(.22,1.25,.36,1),opacity .24s ease !important;
+  box-shadow:0 40px 140px rgba(0,0,0,.85),0 0 90px rgba(99,102,241,.15) !important;
+  overflow:hidden;
+}
+.ir9-drw.on{right:auto !important;transform:translate(-50%,-50%) scale(1) translateY(0);opacity:1;pointer-events:auto}
+.ir9-scrim{background:rgba(2,4,16,.78) !important;backdrop-filter:blur(10px) !important}
+.ir9-drw-top{padding:16px 24px !important}
+.ir9-drw-body{padding:24px 28px !important;max-height:calc(88vh - 70px)}
+
+/* section cards instead of bare text */
+.ir9-ds{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:14px 17px;margin-bottom:11px}
+.ir9-ds-l{display:flex;align-items:center;gap:8px;color:#7c83f5;font-size:9.5px;letter-spacing:.13em;margin-bottom:9px}
+.ir9-ds-l::before{content:'';width:14px;height:2px;border-radius:2px;background:linear-gradient(90deg,#6366f1,#a855f7);flex-shrink:0}
+.ir9-note{font-style:normal}
+
+/* dossier hero: intent gauge */
+.ir9-hero{display:flex;gap:17px;align-items:center;background:linear-gradient(135deg,rgba(79,70,229,.14),rgba(124,58,237,.05));border:1px solid rgba(129,140,248,.28);border-radius:16px;padding:15px 18px;margin-bottom:11px}
+.ir9-gauge{position:relative;width:74px;height:74px;flex-shrink:0}
+.ir9-gauge svg circle:last-child{transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1)}
+.ir9-gauge-n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800}
+.ir9-hero-meta{flex:1;min-width:0}
+.ir9-hero-t{font-size:9.5px;font-weight:800;color:#55617a;text-transform:uppercase;letter-spacing:.13em}
+.ir9-hero-r{font-size:12px;color:#9fabbe;line-height:1.62;margin-top:8px}
+
+/* email meta chips */
+.ir9-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.ir9-mchip{font-size:10px;font-weight:700;letter-spacing:.04em;color:#8b94be;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:99px;padding:4px 12px}
+.ir9-mchip.svc{color:#a5b4fc;border-color:rgba(129,140,248,.4);background:rgba(99,102,241,.1)}
+.ir9-mchip.warn{color:#fcd34d;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.ir9-mchip.ai{color:#c4b5fd;border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.1)}
 
 /* Drawer back + email tone controls */
 .ir9-back{display:none;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);color:#9fabbe;border-radius:9px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;line-height:1;transition:all .15s;flex-shrink:0}
