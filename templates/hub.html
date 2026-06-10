@@ -904,5 +904,21 @@ function build(){
 }
 build();})();</script>
 
+<style>
+/* ambience intensity tune */
+.amb-aurora{opacity:1;filter:blur(62px)}
+.amb-b1{background:radial-gradient(circle at 30% 30%,rgba(99,102,241,.52),transparent 60%)}
+.amb-b2{background:radial-gradient(circle at 60% 40%,rgba(139,92,246,.46),transparent 60%)}
+.amb-b3{background:radial-gradient(circle at 50% 50%,rgba(34,211,238,.30),transparent 62%)}
+.amb-grain{opacity:.06}
+</style>
+<style>.hb-radar{opacity:.9}</style>
+<script>(function(){var r=null,tx=0,ty=0,cx=0,cy=0;
+function loop(){cx+=(tx-cx)*.06;cy+=(ty-cy)*.06;if(r)r.style.transform='translate(-50%,-50%) translate('+cx.toFixed(2)+'px,'+cy.toFixed(2)+'px)';requestAnimationFrame(loop);}
+function init(){r=document.querySelector('.hb-radar');if(!r){return setTimeout(init,80);}
+if(window.matchMedia&&window.matchMedia('(pointer:fine)').matches){
+document.addEventListener('mousemove',function(e){tx=(e.clientX/window.innerWidth-.5)*42;ty=(e.clientY/window.innerHeight-.5)*32;});
+requestAnimationFrame(loop);}}
+init();})();</script>
 </body>
 </html>
