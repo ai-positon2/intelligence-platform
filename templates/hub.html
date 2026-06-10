@@ -281,11 +281,16 @@
 
   <!-- Main -->
   <div class="main">
-    <div class="eyebrow">Position2 Intelligence Platform</div>
-    <h1 class="main-heading">What are you<br/>working on today?</h1>
-    <p class="main-sub">Choose a discipline to access your dashboards.</p>
+    <section class="hb-hero">
+      <div class="eyebrow">Position2 Intelligence Platform</div>
+      <h1 class="main-heading">What are you<br/>working on today?</h1>
+      <p class="main-sub">Choose a discipline to access your dashboards.</p>
+      <div class="hb-cue"><span></span></div>
+    </section>
 
-    <div class="hub-grid">
+    <section class="hb-disc">
+      <div class="hb-eyebrow">Two disciplines &middot; one intelligence layer</div>
+    <div class="hub-grid" data-cz-reveal>
 
       <!-- PPC -->
       <a href="/ppc" class="hub-card card-ppc">
@@ -338,6 +343,28 @@
       </a>
 
     </div>
+    </section>
+
+    <section class="lx-sec" data-cz-reveal>
+      <div class="lx-sec-eyebrow">By the numbers</div>
+      <div class="lx-stats2">
+        <div><b data-lxn="1200" data-lxs="+">0</b><span>companies tracked</span></div>
+        <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
+        <div><b data-lxn="14">0</b><span>dashboards</span></div>
+        <div><b class="grad-k">Kairo</b><span>ai on every page</span></div>
+      </div>
+    </section>
+
+    <section class="lx-sec" data-cz-reveal>
+      <div class="lx-sec-eyebrow">Jump straight in</div>
+      <a class="lx-trow" href="/signal-tracker/healthcare"><span class="n">01</span><span class="t">Signal Tracker — Healthcare</span><span class="d">Company signals &amp; insights</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/signal-tracker/csg"><span class="n">02</span><span class="t">Signal Tracker — CSG</span><span class="d">Company signals &amp; insights</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/ppc/linkedin-scraper"><span class="n">03</span><span class="t">LinkedIn Intelligence</span><span class="d">People, companies &amp; posts</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/ppc/ad-intelligence"><span class="n">04</span><span class="t">Ad Intelligence</span><span class="d">Competitor ad monitoring</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/ppc/anonymous-visitors"><span class="n">05</span><span class="t">Anonymous Visitors</span><span class="d">Website visitor signals</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/ppc"><span class="n">06</span><span class="t">PPC Tools</span><span class="d">Paid media intelligence</span><span class="a">→</span></a>
+      <a class="lx-trow" href="/seo"><span class="n">07</span><span class="t">SEO Tools</span><span class="d">Organic intelligence</span><span class="a">→</span></a>
+    </section>
 
     <p class="footer-note">Position2 · Internal use only</p>
   </div>
@@ -686,5 +713,122 @@ window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
 .card-title{font-size:26px}
 @media (prefers-reduced-motion: reduce){.hub-card::before,.card-preview,.card-preview-icon{animation:none}}
 </style>
+<style>
+/* hub scroll-journey layout */
+.topbar{position:sticky;top:0}
+.main{padding-top:0 !important}
+.hb-hero{min-height:calc(100vh - 62px);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;width:100%;padding:24px 0}
+.hb-cue{margin-top:52px;width:22px;height:36px;border:2px solid rgba(139,148,190,.35);border-radius:12px;position:relative}
+.hb-cue span{position:absolute;left:50%;top:7px;width:3px;height:7px;margin-left:-1.5px;border-radius:3px;background:#818cf8;animation:hbCue 1.8s ease-in-out infinite}
+@keyframes hbCue{0%,100%{transform:translateY(0);opacity:1}70%{transform:translateY(12px);opacity:0}}
+.hb-disc{width:100%;display:flex;flex-direction:column;align-items:center;margin-top:10px}
+.hb-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5d6890;margin-bottom:34px}
+.hb-disc .hub-card{animation:none !important}
+.main-sub{margin-bottom:0}
+@media (prefers-reduced-motion:reduce){.hb-cue span{animation:none}}
+</style>
+
+<style>
+/* ===== CINEMA kit ===== */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto !important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+.lenis.lenis-smooth iframe{pointer-events:none}
+.cz-prog{position:fixed;top:0;left:0;height:2.5px;width:0;z-index:99996;pointer-events:none;
+  background:linear-gradient(90deg,#6366f1,#8b5cf6,#22d3ee);box-shadow:0 0 12px rgba(129,140,248,.55)}
+.cz-par{will-change:transform}
+.cz-reveal{opacity:0;transform:translateY(34px);transition:opacity .9s cubic-bezier(.22,1,.36,1),transform .9s cubic-bezier(.22,1,.36,1)}
+.cz-reveal.cz-in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.cz-prog{display:none}.cz-reveal{opacity:1;transform:none;transition:none}}
+</style>
+<script>
+/* ===== CINEMA kit — inertia smooth scroll, progress, parallax, reveals ===== */
+(function(){
+  if(window.__cinema)return;window.__cinema=1;
+  var RM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  var bar=document.createElement('div');bar.className='cz-prog';
+  (document.body||document.documentElement).appendChild(bar);
+  function setProg(y){
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    bar.style.width=(h>0?Math.min(100,Math.max(0,(y/h)*100)):0)+'%';
+  }
+
+  var pars=[];
+  function collect(){
+    pars=[];
+    document.querySelectorAll('[data-cz-par]').forEach(function(el){
+      el.classList.add('cz-par');
+      pars.push({el:el,sp:parseFloat(el.getAttribute('data-cz-par'))||0.1});
+    });
+  }
+  function applyPar(){
+    var vh=window.innerHeight;
+    for(var i=0;i<pars.length;i++){
+      var p=pars[i],r=p.el.getBoundingClientRect();
+      var d=(r.top+r.height/2)-vh/2;
+      p.el.style.transform='translate3d(0,'+(-d*p.sp).toFixed(2)+'px,0)';
+    }
+  }
+  function frame(y){setProg(y);if(!RM&&pars.length)applyPar();}
+
+  // reveal engine for opt-in [data-cz-reveal]
+  function reveals(){
+    var els=document.querySelectorAll('[data-cz-reveal]');
+    if(!els.length)return;
+    els.forEach(function(e,i){e.classList.add('cz-reveal');
+      var d=e.getAttribute('data-cz-reveal');if(d&&d!=='')e.style.transitionDelay=d+'ms';});
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('cz-in');});return;}
+    var io=new IntersectionObserver(function(es){es.forEach(function(en){
+      if(en.isIntersecting){en.target.classList.add('cz-in');io.unobserve(en.target);}});},
+      {threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){io.observe(e);});
+  }
+
+  function autoPrevent(){
+    ['#kpal-list','.kpal-box','[data-lenis-stop]'].forEach(function(s){
+      document.querySelectorAll(s).forEach(function(e){e.setAttribute('data-lenis-prevent','');});
+    });
+  }
+
+  function go(){
+    collect();reveals();autoPrevent();
+    var L=window.Lenis||(window.lenis&&window.lenis.default)||null;
+    if(!L||RM){
+      window.addEventListener('scroll',function(){frame(window.scrollY||window.pageYOffset||0);},{passive:true});
+      window.addEventListener('resize',function(){collect();frame(window.scrollY||0);});
+      frame(window.scrollY||0);return;
+    }
+    var lenis=new L({duration:1.15,
+      easing:function(t){return Math.min(1,1.001-Math.pow(2,-10*t));},
+      smoothWheel:true,wheelMultiplier:1,touchMultiplier:1.5,gestureOrientation:'vertical'});
+    window.__lenis=lenis;
+    lenis.on('scroll',function(e){frame(e.scroll||e.animatedScroll||0);});
+    function raf(t){lenis.raf(t);requestAnimationFrame(raf);}
+    requestAnimationFrame(raf);
+    window.addEventListener('resize',function(){collect();});
+    document.addEventListener('click',function(e){
+      var a=e.target.closest&&e.target.closest('a[href^="#"]');
+      if(!a)return;var id=a.getAttribute('href');if(!id||id.length<2)return;
+      var t=document.querySelector(id);if(!t)return;
+      e.preventDefault();lenis.scrollTo(t,{offset:-78,duration:1.3});
+    });
+    frame(0);
+  }
+
+  function boot(){
+    if(RM){go();return;}
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/lenis@1/dist/lenis.min.js';
+    s.onload=go;s.onerror=go;
+    document.head.appendChild(s);
+    setTimeout(function(){if(!window.__lenis&&!window.__czfb){window.__czfb=1;go();}},2500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+})();
+</script>
+
 </body>
 </html>
