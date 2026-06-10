@@ -374,6 +374,19 @@ def dashboard(account_id: str, section: str = None):
                          "Pragma": "no-cache", "Expires": "0"})
     return resp
 
+@app.after_request
+def _no_html_cache(resp):
+    """Never let browsers cache HTML pages — UI updates must show immediately after deploys."""
+    try:
+        if resp.mimetype == "text/html":
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+    except Exception:
+        pass
+    return resp
+
+
 @app.route("/dashboard/<account_id>")
 @app.route("/dashboard/<account_id>/<section>")
 @login_required
