@@ -4394,7 +4394,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- INSIGHTS v10 JS (Kairo) -->
 <div class="ir9-scrim" id="ir9-scrim" onclick="irClose()"></div>
 <div class="ir9-drw" id="ir9-drw">
-  <div class="ir9-drw-top"><button class="ir9-x" onclick="irClose()">&#10005;</button><div class="ir9-drw-title" id="ir9-drw-title"></div><span class="ir9-kbadge">&#10022; KAIRO</span></div>
+  <div class="ir9-drw-top"><button class="ir9-x" onclick="irClose()">&#10005;</button><button class="ir9-back" id="ir9-drw-back" onclick="irBack()" style="display:none" title="Back">&#8592; Back</button><div class="ir9-drw-title" id="ir9-drw-title"></div><span class="ir9-kbadge">&#10022; KAIRO</span></div>
   <div class="ir9-drw-body" id="ir9-drw-body"></div>
 </div>
 <div class="ir9-scrim" id="ir9-cscrim" onclick="irChatClose()"></div>
@@ -4502,13 +4502,26 @@ function setDone(d){try{localStorage.setItem(doneKey(),JSON.stringify(d));}catch
 function actId(a){return (a.rank||'')+'|'+String(a.action||'').slice(0,60);}
 function cacheKey(){return 'kairo_cache_'+acct();}
 
-/* ── Drawer ── */
-window.irClose=function(){$('ir9-drw').classList.remove('on');$('ir9-scrim').classList.remove('on');};
+/* ── Drawer (with back-stack) ── */
+var IRSTK=[];
+window.irClose=function(){IRSTK=[];$('ir9-drw').classList.remove('on');$('ir9-scrim').classList.remove('on');};
+function _irBackBtn(){var b=$('ir9-drw-back');if(b)b.style.display=IRSTK.length?'inline-flex':'none';}
 function irOpen(title,html){
+  var drw=$('ir9-drw');
+  if(drw.classList.contains('on')){
+    IRSTK.push({t:$('ir9-drw-title').textContent,h:$('ir9-drw-body').innerHTML});
+    if(IRSTK.length>8)IRSTK.shift();
+  }else{IRSTK=[];}
   $('ir9-drw-title').textContent=title;$('ir9-drw-body').innerHTML=html;
-  $('ir9-drw').classList.add('on');$('ir9-scrim').classList.add('on');
+  drw.classList.add('on');$('ir9-scrim').classList.add('on');
   $('ir9-drw-body').scrollTop=0;
+  _irBackBtn();
 }
+window.irBack=function(){
+  var p=IRSTK.pop();if(!p)return;
+  $('ir9-drw-title').textContent=p.t;$('ir9-drw-body').innerHTML=p.h;
+  $('ir9-drw-body').scrollTop=0;_irBackBtn();
+};
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){irClose();var p=$('ir9-fpanel');if(p)p.style.display='none';}
 });
@@ -4859,7 +4872,7 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('[data-iract]');if(!b)return;
   var a=b.getAttribute('data-iract');
   if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
-  else if(a==='email'){e.stopPropagation();irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'');}
+  else if(a==='email'){e.stopPropagation();irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone')||'');}
   else if(a==='research'){e.stopPropagation();irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
@@ -5065,7 +5078,8 @@ function irShowBrief(){
 }
 
 /* ── Kairo Email ── */
-window.irAIEmail=function(co,svc){
+window.irAIEmail=function(co,svc,tone){
+  tone=tone||'direct';
   if(!co)return;
   var f=D.feed.filter(function(x){return x.name.toLowerCase()===co.toLowerCase();})[0];
   var ctx=coHeader(co,(f&&f.domain)||'','#4f46e5')
@@ -5074,7 +5088,7 @@ window.irAIEmail=function(co,svc){
   irOpen('✉ Kairo Email — '+co,ctx
     +'<div class="ir9-load" id="ir9-mload"><span class="ir9-spin">&#10227;</span> Kairo is writing a personalised email from this company’s live signals, with Position2’s services in mind…</div>'
     +'<div id="ir9-mout"></div>');
-  fetch('/api/generate-email/'+acct()+'?company='+encodeURIComponent(co)+(svc?'&service='+encodeURIComponent(svc):''))
+  fetch('/api/generate-email/'+acct()+'?company='+encodeURIComponent(co)+(svc?'&service='+encodeURIComponent(svc):'')+'&tone='+encodeURIComponent(tone))
     .then(function(r){return r.json();})
     .then(function(d){
       var L=$('ir9-mload');if(L)L.remove();
@@ -5091,12 +5105,17 @@ window.irAIEmail=function(co,svc){
           +(em.cta?'<p style="color:#a5b4fc">'+esc(em.cta)+'</p>':'')
           +(em.ps?'<p style="color:#55617a;font-size:12px;margin-bottom:0">P.S. '+esc(em.ps)+'</p>':'')
         +'</div>'
-        +'<div class="ir9-note">&#10022; Written by Kairo · '+(em.recommended_service?'recommended service: '+esc(em.recommended_service)+' · ':'')+(d.signals_used||0)+' signals used</div>'
+        +'<div class="ir9-note">&#10022; Written by Kairo · '+(em.recommended_service?'recommended service: '+esc(em.recommended_service)+' · ':'')+'replace {FirstName} before sending</div>'
         +'<textarea id="ir9-fullmail" style="display:none">'+esc(full)+'</textarea>'
+        +'<div class="ir9-tonerow"><span class="ir9-tone-l">&#10022; Rewrite as</span>'
+          +[['direct','Direct'],['warm','Warm'],['executive','Executive']].map(function(t){
+            return '<button class="ir9-tone'+(t[0]===tone?' on':'')+'" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(svc||'')+'" data-tone="'+t[0]+'">'+t[1]+'</button>';
+          }).join('')
+        +'</div>'
         +'<div class="ir9-drw-btns">'
           +'<button class="ir9-btn prim" data-iract="copyid" data-id="ir9-fullmail">&#128203; Copy email</button>'
           +'<button class="ir9-btn" data-iract="copy" data-copy="'+esc(em.subject||'')+'">Copy subject</button>'
-          +'<button class="ir9-btn" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(svc||'')+'">&#8635; Ask Kairo again</button>'
+          +'<button class="ir9-btn" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(svc||'')+'" data-tone="'+tone+'">&#8635; Regenerate</button>'
         +'</div>';
     })
     .catch(function(){var L=$('ir9-mload');if(L)L.remove();var out=$('ir9-mout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo could not finish the email. Try again.</div>';});
@@ -5490,6 +5509,17 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 
 /* unified button radii */
 .refresh-btn, .filters-btn, .export-btn, .pag-btn, .copy-cmd-btn { border-radius: 10px; }
+
+/* Drawer back + email tone controls */
+.ir9-back{display:none;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.13);color:#9fabbe;border-radius:9px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;line-height:1;transition:all .15s;flex-shrink:0}
+.ir9-back:hover{color:#e0e7ff;border-color:rgba(129,140,248,.5);background:rgba(99,102,241,.14)}
+.ir9-tonerow{display:flex;align-items:center;gap:6px;margin:16px 0 2px;flex-wrap:wrap}
+.ir9-tone-l{font-size:10px;font-weight:700;color:#55617a;text-transform:uppercase;letter-spacing:.09em}
+.ir9-tone{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.11);color:#9fabbe;border-radius:99px;font-family:inherit;font-size:11px;font-weight:600;padding:4px 13px;cursor:pointer;transition:all .15s}
+.ir9-tone:hover{border-color:rgba(129,140,248,.5);color:#c7d2fe}
+.ir9-tone.on{background:linear-gradient(95deg,rgba(79,70,229,.32),rgba(124,58,237,.22));border-color:rgba(129,140,248,.55);color:#e0e7ff}
+.ir9-mail{font-size:13.5px;line-height:1.8}
+.ir9-mail .ir9-mail-sub{font-size:14px;font-weight:700;color:#eef2ff;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:10px;margin-bottom:12px}
 
 /* Kairo attachments + export */
 .ir9-att{display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px}
