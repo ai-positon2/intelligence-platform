@@ -347,6 +347,7 @@
 
   <main class="ts-main">
 
+    <div class="pinwrap login-pin">
     <section class="ts-hero">
       <div class="lx-ghost" aria-hidden="true">POSITION2</div>
       <h1 class="lx-h">
@@ -368,6 +369,7 @@
       </div>
       <div class="ts-cue"><span></span></div>
     </section>
+    </div>
 
     <section class="ts-sec" id="s-kairo">
       <div class="ts-copy ts-rv">
@@ -939,5 +941,35 @@ html.lenis,html.lenis body{height:auto}
 })();
 </script>
 
+<style>
+/* login scroll-pinned hero */
+.login-pin{position:relative;height:172vh}
+.login-pin .ts-hero{position:sticky;top:108px;min-height:0;height:calc(100vh - 120px);will-change:transform}
+@media (max-height:640px),(prefers-reduced-motion:reduce){.login-pin{height:auto}.login-pin .ts-hero{position:relative;height:auto;min-height:calc(88vh - 110px)}}
+@media (max-width:900px){.login-pin{height:auto}.login-pin .ts-hero{position:relative;height:auto}}
+</style>
+<script>(function(){
+function start(){
+  var wrap=document.querySelector('.login-pin');if(!wrap){return setTimeout(start,80);}
+  var hero=wrap.querySelector('.ts-hero');
+  var h=hero.querySelector('.lx-h'),sub=hero.querySelector('.ts-herosub'),ct=hero.querySelector('.ts-heroctas'),st=hero.querySelector('.ts-herostats'),cue=hero.querySelector('.ts-cue');
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce||window.innerHeight<640||window.innerWidth<900)return;
+  function cl(v){return v<0?0:v>1?1:v;}
+  function tick(){
+    var r=wrap.getBoundingClientRect();var total=wrap.offsetHeight-window.innerHeight;
+    var p=total>0?cl(-r.top/total):0;
+    var fade=cl((p-0.55)/0.45);
+    if(h){h.style.transform='translateY('+(-p*60).toFixed(1)+'px) scale('+(1-p*0.06).toFixed(3)+')';h.style.opacity=(1-fade).toFixed(3);}
+    var f2=(1-cl(p/0.55)).toFixed(3);
+    if(sub)sub.style.opacity=f2;
+    if(ct){ct.style.opacity=f2;ct.style.transform='translateY('+(p*16).toFixed(1)+'px)';}
+    if(st)st.style.opacity=f2;
+    if(cue)cue.style.opacity=(1-cl(p/0.25)).toFixed(3);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+start();})();</script>
 </body>
 </html>
