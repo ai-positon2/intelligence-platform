@@ -1902,8 +1902,12 @@ def insights_generate(account_id):
             "review window (~90 days); funding = growth mandate and paid-media budget unlock; M&A = brand and website "
             "consolidation work; IPO = scrutiny on organic visibility and analyst-facing content; expansion/news = "
             "momentum to amplify. Map each to the single best-fit Position2 service. "
-            "(5) Write hooks and openers a rep could literally say on a call: cite the company's actual signal, its "
-            "date, and one specific implied pain. "
+            "(5) Separate INTERNAL fields from PROSPECT-FACING copy. Internal fields (signal, why_now, reason, "
+            "rationale, pitch, impact) may cite signal types and dates. PROSPECT-FACING copy (hook, subject, opening, "
+            "talking_points, cta) is what a rep would actually say or send: NEVER mention dates, the word 'signal', "
+            "or anything implying we monitor the company ('I saw', 'I noticed', 'your May 13 announcement'). Refer "
+            "to public events naturally and obliquely ('as the new facility comes online'). Lead with their problem, "
+            "sound human, zero buzzwords, no exclamation marks. "
             "BANNED: generic filler ('great fit', 'reach out to discuss', 'leverage synergies'), invented facts, and "
             "ANY revenue estimates, pipeline values, or dollar figures. Every claim must trace to a signal in the "
             "data. Specific beats clever; concise beats long. "
@@ -2116,9 +2120,13 @@ def company_analysis(account_id):
             "Marketing, Content Strategy, Brand & Website, RevOps & HubSpot). Build a rigorous, signal-grounded "
             "prospect analysis. Reason first: what do the signals (their types, severity, dates, and sequence) "
             "imply about budget timing, internal change, and marketing gaps? Score honestly — most prospects are "
-            "40-75; reserve 85+ for multiple fresh HIGH signals. Talking points must reference the actual signals "
-            "and dates. Objections must be the realistic ones for this industry. Subject lines: human, specific, "
-            "curiosity-driven, <55 chars, no clickbait caps. NEVER include revenue estimates or dollar figures. "
+            "40-75; reserve 85+ for multiple fresh HIGH signals. talking_points, subject_lines and email_opening are "
+            "PROSPECT-FACING: ground them in the signals but NEVER cite dates, the word 'signal', or anything that "
+            "sounds like surveillance ('I saw', 'I noticed', 'your May 13 announcement') - refer to public events "
+            "naturally and obliquely, lead with their problem, zero buzzwords, no exclamation marks. score_reason, "
+            "why_now and urgency_reason are INTERNAL: dates allowed there. Objections must be the realistic ones "
+            "for this industry. Subject lines: human, specific, curiosity-driven, <55 chars, no clickbait caps. "
+            "NEVER include revenue estimates or dollar figures. "
             "Return ONLY valid JSON: "
             '{"score":85,"score_reason":"one sentence why",'
             '"company_context":"2 sentences about what this company does and why they matter",'
@@ -2166,6 +2174,7 @@ def generate_email(account_id):
         return jsonify({"error": "OpenAI API key not configured"})
     company = request.args.get("company","").strip()
     service = request.args.get("service","")
+    tone    = (request.args.get("tone","") or "direct").strip().lower()
     if not company:
         return jsonify({"error": "company parameter required"})
     try:
@@ -2191,19 +2200,46 @@ def generate_email(account_id):
             ) for s in signals[:10]
         )
 
-        system = """You are Kairo, Position2’s sales-intelligence AI, writing as a senior B2B sales rep at Position2 (digital marketing agency).
-Services: SEO | Performance Marketing (PPC) | Content Strategy | Brand & Website | Revenue Operations.
-Write a highly personalised cold outreach email using the company signals provided.
+        tone_guide = {
+            "direct":    "TONE: confident and direct, zero fluff - a sharp consultant who respects the reader's time.",
+            "warm":      "TONE: warm and human, lightly conversational, still professional.",
+            "executive": "TONE: senior executive to senior executive - measured, strategic, no casual phrases.",
+        }.get(tone, "TONE: confident and direct, zero fluff.")
 
-Rules:
-- Reference specific signals by name and date (e.g. "I noticed [Name] joined as CMO on [date]")
-- Connect signals to a clear business pain that Position2 solves
-- Keep under 180 words
-- Conversational, not salesy
-- End with ONE specific, low-friction CTA (15-minute call, quick audit offer)
-
-Return ONLY valid JSON:
-{"subject":"<compelling subject under 55 chars>","greeting":"Hi [Name/Team],","opening":"<1 sentence referencing their specific signal>","body":"<2-3 sentences connecting signal to business need and Position2 value>","cta":"<specific ask>","ps":"<optional P.S. referencing another signal>","recommended_service":"<one of: SEO|PPC|Content|Brand|RevOps>","why_now":"<one sentence on timing urgency>"}"""
+        system = (
+            "You are Kairo, writing outreach for Position2, a B2B digital marketing agency "
+            "(SEO | Performance Marketing/PPC | Content Strategy | Brand & Website | Revenue Operations). "
+            "Write an email a thoughtful senior consultant would actually send - never anything that smells of "
+            "AI or mail-merge.\n\n"
+            "The signals provided are INTERNAL intelligence. Use them ONLY to understand the company situation.\n"
+            "HARD RULES:\n"
+            "- NEVER mention dates, the word signal, announcements you saw or noticed, or anything implying we "
+            "monitor them. Banned openers: I saw / I noticed / I came across / Congratulations on / Hope this "
+            "finds you well / Quick question.\n"
+            "- Refer to public events only obliquely and naturally (as the new facility comes online; with the "
+            "team growing) - no dates, no press-release specifics.\n"
+            "- The first sentence must be about THEIR world - a real problem or opportunity - and it must earn "
+            "the second sentence. Never open with us.\n"
+            "- Include one concrete, useful observation or idea they could act on even without replying. That "
+            "is the value of the email.\n"
+            "- Mention Position2 once, briefly, as credibility - no service list, no we-help-companies-like-you.\n"
+            "- ONE low-friction CTA phrased as an easy yes/no question. Never hop-on-a-call-to-discuss.\n"
+            "- Under 110 words across opening+body+cta. Short sentences. 7th-grade readability. No buzzwords "
+            "(leverage, synergies, streamline, elevate, unlock, empower, seamless, cutting-edge) and no "
+            "exclamation marks.\n"
+            "- subject: under 45 characters, natural and specific, sentence case, no clickbait.\n"
+            "- greeting: exactly Hi {FirstName}, so the rep can personalise.\n"
+            "- ps: only if there is a genuinely useful extra thought, otherwise an empty string. Never a second "
+            "pitch.\n"
+            "- Never invent facts, metrics, client names, or revenue/dollar figures.\n"
+            + tone_guide + "\n\n"
+            "Return ONLY valid JSON:\n"
+            '{"subject":"","greeting":"Hi {FirstName},","opening":"<1 sentence about their world>",'
+            '"body":"<2-3 short sentences: useful insight, then one line of Position2 credibility>",'
+            '"cta":"<one easy yes/no question>","ps":"",'
+            '"recommended_service":"<SEO|PPC|Content|Brand|RevOps>",'
+            '"why_now":"<INTERNAL rep note on timing - dates allowed here; one sentence>"}'
+        )
 
         user_msg = "Company: %s\nIndustry: %s\nDomain: %s\nPreferred service: %s\n\nSignals:\n%s\n\nWrite the email." % (
             company, industry, domain, service or "best fit", sig_lines)
@@ -2278,7 +2314,7 @@ def research_company(account_id):
             '"opportunities":["specific marketing gap or opportunity Position2 could address"],'
             '"position2_angle":"2 sentences: which Position2 services fit and why, tied to findings",'
             '"recommended_services":["SEO|PPC|Content|Brand|RevOps"],'
-            '"conversation_starters":["specific opener referencing a real finding"],'
+            '"conversation_starters":["natural human opener grounded in a real finding - no dates, never sounding like surveillance"],'
             '"sources":[{"title":"","url":""}]}'
         )
         user_msg = "Research this company NOW:\nCompany: %s\nDomain: %s\n%s" % (
@@ -2402,7 +2438,9 @@ def kairo_chat(account_id):
             "agency (SEO, PPC, Content, Brand & Website, RevOps). Answer the user accurately and concisely. "
             "Use the ACCOUNT SIGNAL DATA below for questions about tracked companies and signals; use web search "
             "for company research, recent news, people, contacts, or anything not in the data. If asked to draft an "
-            "email or message, make it tight and personalised. Never invent revenue or dollar figures. Cite specific "
+            "email or message, make it tight, personalised and HUMAN: never cite signal dates or imply we monitor "
+            "the company ('I saw your May 13 announcement') in prospect-facing copy - refer to public events "
+            "naturally and obliquely. Never invent revenue or dollar figures. Cite specific "
             "companies and signals. Format with short, clean markdown (bold, links, short lists). "
             "If files, images or screenshots are attached, ground your answer in their ACTUAL contents — quote real numbers, names and rows "
             "from them, and combine them with signal data where relevant. "
