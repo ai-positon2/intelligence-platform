@@ -324,60 +324,50 @@
 
   <!-- Left panel (desktop) -->
   <div class="left-panel">
-    <div class="brand">
-      <div class="brand-icon">📡</div>
-      <div>
-        <div class="brand-name">Platform</div>
-        <div class="brand-sub">by Position2</div>
+
+    <div class="lx-ghost" aria-hidden="true">POSITION2</div>
+
+    <div class="lx-top">
+      <div class="brand">
+        <div class="brand-icon">📡</div>
+        <div>
+          <div class="brand-name">Platform</div>
+          <div class="brand-sub">by Position2</div>
+        </div>
+      </div>
+      <div class="lx-status"><span class="lx-dot"></span><span id="lx-clock">—</span><em>monitoring live</em></div>
+    </div>
+
+    <div class="lx-hero">
+      <h1 class="lx-h">
+        <span class="lx-line"><span class="lx-word">Every</span> <span class="lx-word">signal.</span></span>
+        <span class="lx-line"><span class="lx-word">Every</span> <span class="lx-word">move.</span></span>
+        <span class="lx-line"><span class="lx-word lx-ink">One</span> <span class="lx-word lx-ink">platform.</span></span>
+      </h1>
+      <p class="lx-sub">Live company signals, AI research &amp; outreach with Kairo, competitor ads,
+      visitor identity and organic intelligence — built for the Position2 team.</p>
+    </div>
+
+    <div class="lx-stats">
+      <div class="lx-stat"><b data-n="1200" data-suf="+">0</b><span>companies tracked</span></div>
+      <div class="lx-stat"><b data-n="300" data-suf="+">0</b><span>live signals</span></div>
+      <div class="lx-stat"><b data-n="14" data-suf="">0</b><span>dashboards</span></div>
+      <div class="lx-stat"><b class="lx-k">Kairo</b><span>ai on every page</span></div>
+    </div>
+
+    <div class="lx-index">
+      <div class="lx-row"><span class="lx-n">01</span><span class="lx-t">Kairo AI</span><span class="lx-d">briefs · dossiers · outreach</span><span class="lx-a">→</span></div>
+      <div class="lx-row"><span class="lx-n">02</span><span class="lx-t">Signal Tracker</span><span class="lx-d">funding · C-suite · M&amp;A</span><span class="lx-a">→</span></div>
+      <div class="lx-row"><span class="lx-n">03</span><span class="lx-t">LinkedIn &amp; Ad Intel</span><span class="lx-d">people · creatives · visitors</span><span class="lx-a">→</span></div>
+      <div class="lx-row"><span class="lx-n">04</span><span class="lx-t">SEO Suite</span><span class="lx-d">audits · content · keywords</span><span class="lx-a">→</span></div>
+    </div>
+
+    <div class="lx-marquee" aria-hidden="true">
+      <div class="lx-mq">
+        <span>SIGNAL INTELLIGENCE ✦ KAIRO AI ✦ AD INTELLIGENCE ✦ LINKEDIN SIGNALS ✦ SEO SUITE ✦ VISITOR IDENTITY ✦&nbsp;</span><span>SIGNAL INTELLIGENCE ✦ KAIRO AI ✦ AD INTELLIGENCE ✦ LINKEDIN SIGNALS ✦ SEO SUITE ✦ VISITOR IDENTITY ✦&nbsp;</span>
       </div>
     </div>
 
-    <h1 class="left-heading">
-      Intelligence<br/>for <span class="grad">every channel.</span>
-    </h1>
-    <p class="left-sub">
-      PPC and SEO intelligence in one place — live company signals, AI research and
-      outreach with Kairo, competitor ads, visitor identity and organic insights.
-      Built for the Position2 team.
-    </p>
-
-    <div class="stat-strip">
-      <div class="ls"><b data-n="1200" data-suf="+">0</b><span>Companies tracked</span></div>
-      <div class="ls"><b data-n="300" data-suf="+">0</b><span>Live signals</span></div>
-      <div class="ls"><b data-n="14" data-suf="">0</b><span>Dashboards</span></div>
-      <div class="ls"><b class="ls-ai">Kairo</b><span>AI on every page</span></div>
-    </div>
-
-    <div class="features">
-      <div class="feature">
-        <div class="fi fi-violet">✦</div>
-        <div class="feature-text">
-          <strong>Kairo AI</strong>
-          <span>Executive briefs, deep company dossiers and ready-to-send outreach — an AI analyst on every dashboard.</span>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="fi fi-indigo">📡</div>
-        <div class="feature-text">
-          <strong>Signal Tracker</strong>
-          <span>Funding, C-suite and M&amp;A signals across 1,200+ companies, scored by buying intent.</span>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="fi fi-cyan">🔗</div>
-        <div class="feature-text">
-          <strong>LinkedIn &amp; Ad Intelligence</strong>
-          <span>People and post-engagement signals, competitor creatives, and anonymous visitor identity.</span>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="fi fi-green">🔍</div>
-        <div class="feature-text">
-          <strong>SEO Suite</strong>
-          <span>Audits, content research, briefs and keyword intelligence across nine organic tools.</span>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Right panel -->
@@ -460,30 +450,99 @@
       });
     }
   </script>
+<style>
+  /* ════ LUX layer ════ */
+  .left-panel{justify-content:space-between !important;padding:38px 64px 0 64px !important;position:relative;overflow:hidden}
+  .lx-top{display:flex;align-items:flex-start;justify-content:space-between;animation:fade-up .7s ease both}
+  .lx-status{display:flex;align-items:center;gap:8px;font-size:11px;color:#8b96b8;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:99px;padding:7px 14px;font-variant-numeric:tabular-nums}
+  .lx-status em{font-style:normal;color:#525d80;text-transform:uppercase;font-size:9px;letter-spacing:.12em;font-weight:600}
+  .lx-dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.8);animation:lx-pulse 2.2s infinite}
+  @keyframes lx-pulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
+
+  .lx-ghost{position:absolute;left:-14px;bottom:96px;font-size:178px;font-weight:700;letter-spacing:-.04em;color:transparent;-webkit-text-stroke:1px rgba(129,140,248,.07);pointer-events:none;user-select:none;white-space:nowrap;line-height:1;transition:transform .6s cubic-bezier(.22,1,.36,1)}
+
+  .lx-h{font-size:clamp(46px,4.6vw,72px);font-weight:700;line-height:1.04;letter-spacing:-.035em;color:#f1f5f9;margin:0 0 22px}
+  .lx-line{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+  .lx-word{display:inline-block;transform:translateY(110%);animation:lx-rise .85s cubic-bezier(.22,1,.36,1) forwards}
+  .lx-line:nth-child(1) .lx-word{animation-delay:.15s}
+  .lx-line:nth-child(2) .lx-word{animation-delay:.27s}
+  .lx-line:nth-child(3) .lx-word{animation-delay:.39s}
+  @keyframes lx-rise{to{transform:translateY(0)}}
+  .lx-ink{background:linear-gradient(110deg,#a5b4fc 5%,#c4b5fd 45%,#93c5fd 90%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:lx-rise .85s .39s cubic-bezier(.22,1,.36,1) forwards,lx-shimmer 7s 1.4s ease-in-out infinite}
+  @keyframes lx-shimmer{0%,100%{background-position:0% 0}50%{background-position:100% 0}}
+  .lx-sub{font-size:14.5px;color:#94a0c0;line-height:1.75;max-width:470px;animation:fade-up .8s .55s ease both}
+
+  .lx-stats{display:flex;gap:0;margin:34px 0 30px;animation:fade-up .8s .68s ease both}
+  .lx-stat{padding:0 26px;border-left:1px solid rgba(255,255,255,.08)}
+  .lx-stat:first-child{padding-left:0;border-left:none}
+  .lx-stat b{display:block;font-size:26px;font-weight:700;color:#eef2ff;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+  .lx-stat b.lx-k{background:linear-gradient(120deg,#a5b4fc,#c4b5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .lx-stat span{display:block;font-size:9.5px;color:#5d6890;text-transform:uppercase;letter-spacing:.13em;font-weight:600;margin-top:5px}
+
+  .lx-index{animation:fade-up .8s .8s ease both}
+  .lx-row{display:flex;align-items:baseline;gap:18px;padding:13px 4px;border-top:1px solid rgba(255,255,255,.07);cursor:default;transition:background .2s,padding-left .25s cubic-bezier(.22,1,.36,1)}
+  .lx-row:hover{padding-left:14px;background:linear-gradient(90deg,rgba(99,102,241,.07),transparent 70%)}
+  .lx-n{font-size:10px;color:#525d80;font-variant-numeric:tabular-nums;font-weight:600}
+  .lx-t{font-size:15.5px;font-weight:600;color:#dbe2f4;letter-spacing:-.01em;transition:color .2s}
+  .lx-row:hover .lx-t{color:#fff}
+  .lx-d{font-size:11.5px;color:#5d6890;margin-left:auto;letter-spacing:.02em}
+  .lx-a{font-size:14px;color:#818cf8;opacity:0;transform:translateX(-6px);transition:all .22s}
+  .lx-row:hover .lx-a{opacity:1;transform:translateX(0)}
+
+  .lx-marquee{margin:26px -64px 0;padding:14px 0;border-top:1px solid rgba(255,255,255,.05);overflow:hidden;animation:fade-up .8s .95s ease both}
+  .lx-mq{display:flex;white-space:nowrap;width:max-content;animation:lx-scroll 36s linear infinite}
+  .lx-mq span{font-size:13px;font-weight:700;letter-spacing:.22em;color:transparent;-webkit-text-stroke:1px rgba(139,148,190,.34)}
+  @keyframes lx-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* cursor halo + card tilt */
+  #lx-halo{position:fixed;width:340px;height:340px;border-radius:50%;pointer-events:none;z-index:2;background:radial-gradient(circle,rgba(129,140,248,.10),transparent 65%);transform:translate(-50%,-50%);transition:opacity .3s;opacity:0;mix-blend-mode:screen}
+  .card-border-wrap{transition:transform .18s ease-out;will-change:transform}
+
+  @media (prefers-reduced-motion: reduce){.lx-word{animation-duration:.01s}.lx-mq{animation:none}}
+  @media (max-height: 800px){.lx-ghost{font-size:130px;bottom:80px}.lx-h{font-size:clamp(40px,4vw,58px)}.lx-stats{margin:24px 0 20px}}
+</style>
 <script>
-  /* rotating gradient word */
   (function(){
-    var words=['every channel.','every signal.','every decision.'],i=0;
-    var el=document.querySelector('.left-heading .grad');if(!el)return;
-    el.style.transition='opacity .32s ease';
-    setInterval(function(){
-      i=(i+1)%words.length;
-      el.style.opacity='0';
-      setTimeout(function(){el.textContent=words[i];el.style.opacity='1';},330);
-    },3600);
-  })();
-  /* stat count-up */
-  (function(){
-    document.querySelectorAll('.ls b[data-n]').forEach(function(el){
+    /* live IST clock */
+    var c=document.getElementById('lx-clock');
+    function tick(){
+      try{c.textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'})+' IST';}catch(e){c.textContent=new Date().toLocaleTimeString();}
+    }
+    if(c){tick();setInterval(tick,30000);}
+
+    /* stat count-up */
+    document.querySelectorAll('.lx-stat b[data-n]').forEach(function(el){
       var target=parseInt(el.getAttribute('data-n'),10),suf=el.getAttribute('data-suf')||'',t0=null;
       function step(ts){
         if(!t0)t0=ts;
-        var p=Math.min(1,(ts-t0)/1100);p=1-Math.pow(1-p,3);
+        var p=Math.min(1,(ts-t0)/1200);p=1-Math.pow(1-p,3);
         el.textContent=Math.round(target*p).toLocaleString('en-US')+(p>=1?suf:'');
         if(p<1)requestAnimationFrame(step);
       }
-      setTimeout(function(){requestAnimationFrame(step);},420);
+      setTimeout(function(){requestAnimationFrame(step);},650);
     });
+
+    /* cursor halo + parallax + card tilt (fine pointers only) */
+    if(window.matchMedia&&window.matchMedia('(pointer:fine)').matches){
+      var halo=document.createElement('div');halo.id='lx-halo';document.body.appendChild(halo);
+      var ghost=document.querySelector('.lx-ghost');
+      var card=document.querySelector('.card-border-wrap');
+      var w=window.innerWidth,h=window.innerHeight;
+      window.addEventListener('resize',function(){w=window.innerWidth;h=window.innerHeight;});
+      document.addEventListener('mousemove',function(e){
+        halo.style.left=e.clientX+'px';halo.style.top=e.clientY+'px';halo.style.opacity='1';
+        var dx=(e.clientX/w-.5),dy=(e.clientY/h-.5);
+        if(ghost)ghost.style.transform='translate('+(dx*-18)+'px,'+(dy*-10)+'px)';
+        if(card){
+          var r=card.getBoundingClientRect();
+          if(e.clientX>r.left-80&&e.clientX<r.right+80&&e.clientY>r.top-80&&e.clientY<r.bottom+80){
+            var cx=(e.clientX-(r.left+r.width/2))/r.width,cy=(e.clientY-(r.top+r.height/2))/r.height;
+            card.style.transform='perspective(900px) rotateY('+(cx*4)+'deg) rotateX('+(cy*-4)+'deg)';
+          }else{card.style.transform='perspective(900px) rotateY(0) rotateX(0)';}
+        }
+      });
+      document.addEventListener('mouseleave',function(){halo.style.opacity='0';if(card)card.style.transform='';});
+    }
   })();
 </script>
 </body>
