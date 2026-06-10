@@ -5608,6 +5608,11 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
 .ir9-gen:hover { transform: translateY(-1px); }
 .ir9-fpanel { box-shadow: 0 24px 80px rgba(0,0,0,.8), 0 0 40px rgba(99,102,241,.12); }
 
+/* Signal Feed: fill the panel height — no clipped card + dead space below */
+.two-col{align-items:stretch}
+.two-col .panel{min-height:0}
+.signal-feed-list{max-height:none !important;flex:1 1 auto;min-height:0}
+
 /* respect reduced-motion preference */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
