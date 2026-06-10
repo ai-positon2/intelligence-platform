@@ -1270,5 +1270,101 @@ document.getElementById('tc-companies').textContent=D.companies.length;
 switchTab('people');
 
 </script>
+<script>
+/* ════ Platform command palette — Ctrl/Cmd+K ════ */
+(function(){
+  if(window.__kpal)return;window.__kpal=1;
+  var BASE=[
+    {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
+    {t:'PPC Tools',d:'Paid media intelligence',u:'/ppc',i:'◎'},
+    {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
+    {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
+    {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/ppc/linkedin-scraper',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/ppc/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/ppc/anonymous-visitors',i:'◌'},
+    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/accounts',i:'⇄'}
+  ];
+  var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
+  var css=document.createElement('style');
+  css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+    +'#kpal.on{display:block;animation:kpalF .14s ease}'
+    +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+    +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(11,14,28,.96);border:1px solid rgba(129,140,248,.3);border-radius:18px;box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(99,102,241,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+    +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+    +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+    +'.kpal-iw .ic{color:#7c83f5;font-size:15px}'
+    +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+    +'#kpal-in::placeholder{color:#4b5572}'
+    +'.kpal-iw kbd{font-family:inherit;font-size:9.5px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:3px 7px}'
+    +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+    +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:11px;cursor:pointer;border:1px solid transparent}'
+    +'.kpal-it .ki{width:30px;height:30px;border-radius:9px;background:rgba(99,102,241,.12);border:1px solid rgba(129,140,248,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#a5b4fc;flex-shrink:0}'
+    +'.kpal-it .kt{font-size:13.5px;font-weight:600;color:#dbe2f1}'
+    +'.kpal-it .kd{font-size:11px;color:#55617a;margin-top:1px}'
+    +'.kpal-it.sel{background:linear-gradient(95deg,rgba(79,70,229,.22),rgba(124,58,237,.12));border-color:rgba(129,140,248,.35)}'
+    +'.kpal-it.sel .kt{color:#fff}'
+    +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:12.5px}'
+    +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4763;display:flex;gap:14px}'
+    +'#kpal-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99998;background:rgba(11,14,28,.95);border:1px solid rgba(129,140,248,.35);color:#a9b4d8;border-radius:99px;font-size:12px;padding:9px 18px;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:kpalF .3s ease}'
+    +'#kpal-toast b{color:#c7d2fe}';
+  document.head.appendChild(css);
+  var ov=document.createElement('div');ov.id='kpal';
+  ov.innerHTML='<div class="kpal-box">'
+    +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+    +'<div id="kpal-list"></div>'
+    +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+  document.body.appendChild(ov);
+  var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+  var cur=[],sel=0;
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function render(){
+    if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+    list.innerHTML=cur.map(function(x,i){
+      return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc(x.t)+'</div><div class="kd">'+esc(x.d||'')+'</div></span></div>';
+    }).join('');
+    var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+  }
+  function filter(q){
+    q=(q||'').toLowerCase().trim();
+    cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+    sel=0;render();
+  }
+  function go(x){
+    if(!x)return;
+    close();
+    if(x.u==='!kairo'){if(window.irChat)window.irChat();return;}
+    if(x.u.charAt(0)==='#'){location.hash=x.u;return;}
+    if(location.pathname===x.u)return;
+    window.location.href=x.u;
+  }
+  function open(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+  function close(){ov.classList.remove('on');}
+  inp.addEventListener('input',function(){filter(inp.value);});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+    else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+  });
+  list.addEventListener('click',function(e){
+    var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+  });
+  ov.addEventListener('mousedown',function(e){if(e.target===ov)close();});
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?close():open();}
+    else if(e.key==='Escape'&&ov.classList.contains('on')){close();}
+  });
+  try{
+    if(!localStorage.getItem('kpal_hint_v1')){
+      localStorage.setItem('kpal_hint_v1','1');
+      var t=document.createElement('div');t.id='kpal-toast';
+      t.innerHTML='Pro tip: press <b>Ctrl K</b> to jump anywhere on the platform';
+      document.body.appendChild(t);
+      setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';},6000);
+      setTimeout(function(){t.remove();},6700);
+    }
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
