@@ -869,5 +869,30 @@ mt();})();</script>
 .amb-b3{background:radial-gradient(circle at 50% 50%,rgba(34,211,238,.30),transparent 62%)}
 .amb-grain{opacity:.06}
 </style>
+
+<style>
+.seo-motif{position:absolute;right:4%;top:50%;width:min(420px,36vw);height:min(420px,36vw);transform:translateY(-50%);z-index:0;pointer-events:none;opacity:.9}
+.seo-motif svg{width:100%;height:100%;overflow:visible}
+.page-header>.section-label,.page-header>.page-title,.page-header>.page-sub,.page-header>.hb-cue{position:relative;z-index:2}
+.sm-ring{fill:none;stroke:rgba(52,211,153,.45);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:smRing 3.4s ease-out infinite}
+.sm-ring.d2{animation-delay:1.7s}
+@keyframes smRing{0%{transform:scale(.3);opacity:.7}100%{transform:scale(2.1);opacity:0}}
+.sm-line{fill:none;stroke:url(#smg);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:420;stroke-dashoffset:420;animation:smDraw 3.6s ease-in-out infinite}
+@keyframes smDraw{0%{stroke-dashoffset:420}45%,100%{stroke-dashoffset:0}}
+.sm-area{fill:url(#sma);opacity:0;animation:smArea 3.6s ease-in-out infinite}
+@keyframes smArea{0%,30%{opacity:0}55%,100%{opacity:.5}}
+.sm-dot{fill:#34d399;transform-box:fill-box;transform-origin:center;animation:smDot 3.6s ease-in-out infinite}
+.sm-dot.v2{animation-delay:.5s}.sm-dot.v3{animation-delay:1s}.sm-dot.v4{animation-delay:1.5s}.sm-dot.v5{animation-delay:2s}
+@keyframes smDot{0%,40%{transform:scale(0);opacity:0}55%{transform:scale(1.4);opacity:1}70%,100%{transform:scale(1);opacity:.9}}
+@media (prefers-reduced-motion:reduce){.sm-ring,.sm-line,.sm-area,.sm-dot{animation:none;stroke-dashoffset:0;opacity:.8}}
+</style>
+<script>(function(){function b(){var h=document.querySelector('.page-header');if(!h){return setTimeout(b,60);}if(h.querySelector('.seo-motif'))return;
+var d=document.createElement('div');d.className='seo-motif';
+d.innerHTML='<svg viewBox="0 0 300 300" aria-hidden="true"><defs><linearGradient id="smg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#10b981"/><stop offset="1" stop-color="#6ee7b7"/></linearGradient><linearGradient id="sma" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(52,211,153,.32)"/><stop offset="1" stop-color="rgba(52,211,153,0)"/></linearGradient></defs>'
++'<circle class="sm-ring" cx="248" cy="78" r="34"/><circle class="sm-ring d2" cx="248" cy="78" r="34"/>'
++'<path class="sm-area" d="M44 232 L96 196 L150 168 L200 118 L248 78 L248 250 L44 250 Z"/>'
++'<polyline class="sm-line" points="44,232 96,196 150,168 200,118 248,78"/>'
++'<circle class="sm-dot" cx="44" cy="232" r="5.5"/><circle class="sm-dot v2" cx="96" cy="196" r="5.5"/><circle class="sm-dot v3" cx="150" cy="168" r="5.5"/><circle class="sm-dot v4" cx="200" cy="118" r="5.5"/><circle class="sm-dot v5" cx="248" cy="78" r="6.5"/></svg>';
+h.insertBefore(d,h.firstChild);}b();})();</script>
 </body>
 </html>

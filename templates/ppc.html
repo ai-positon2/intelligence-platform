@@ -863,5 +863,27 @@ mt();})();</script>
 .amb-b3{background:radial-gradient(circle at 50% 50%,rgba(34,211,238,.30),transparent 62%)}
 .amb-grain{opacity:.06}
 </style>
+
+<style>
+.ppc-motif{position:absolute;right:4%;top:50%;width:min(420px,36vw);height:min(420px,36vw);transform:translateY(-50%);z-index:0;pointer-events:none;opacity:.85}
+.ppc-motif svg{width:100%;height:100%;overflow:visible}
+.page-header>.section-label,.page-header>.page-title,.page-header>.page-sub,.page-header>.hb-cue{position:relative;z-index:2}
+.pm-ring{fill:none;stroke:rgba(129,140,248,.5);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:pmRing 3.2s ease-out infinite}
+.pm-ring.d2{animation-delay:1.06s}.pm-ring.d3{animation-delay:2.13s}
+@keyframes pmRing{0%{transform:scale(.28);opacity:.85}100%{transform:scale(2.4);opacity:0}}
+.pm-eq rect{fill:url(#pmg);transform-box:fill-box;transform-origin:center bottom;animation:pmEq 1.4s ease-in-out infinite}
+.pm-eq rect:nth-child(2){animation-delay:.12s}.pm-eq rect:nth-child(3){animation-delay:.24s}.pm-eq rect:nth-child(4){animation-delay:.36s}.pm-eq rect:nth-child(5){animation-delay:.48s}.pm-eq rect:nth-child(6){animation-delay:.6s}.pm-eq rect:nth-child(7){animation-delay:.72s}
+@keyframes pmEq{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.pm-core{animation:pmCore 3.2s ease-in-out infinite}
+@keyframes pmCore{0%,100%{opacity:.6}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.pm-ring,.pm-eq rect,.pm-core{animation:none}}
+</style>
+<script>(function(){function b(){var h=document.querySelector('.page-header');if(!h){return setTimeout(b,60);}if(h.querySelector('.ppc-motif'))return;
+var d=document.createElement('div');d.className='ppc-motif';
+d.innerHTML='<svg viewBox="0 0 300 300" aria-hidden="true"><defs><linearGradient id="pmg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#c084fc"/></linearGradient><radialGradient id="pmc" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(167,139,250,.95)"/><stop offset="1" stop-color="rgba(99,102,241,0)"/></radialGradient></defs>'
++'<circle class="pm-ring" cx="150" cy="120" r="40"/><circle class="pm-ring d2" cx="150" cy="120" r="40"/><circle class="pm-ring d3" cx="150" cy="120" r="40"/>'
++'<circle class="pm-core" cx="150" cy="120" r="30" fill="url(#pmc)"/><circle cx="150" cy="120" r="6" fill="#c4b5fd"/>'
++'<g class="pm-eq"><rect x="78" y="200" width="13" height="64" rx="4"/><rect x="100" y="200" width="13" height="64" rx="4"/><rect x="122" y="200" width="13" height="64" rx="4"/><rect x="144" y="200" width="13" height="64" rx="4"/><rect x="166" y="200" width="13" height="64" rx="4"/><rect x="188" y="200" width="13" height="64" rx="4"/><rect x="210" y="200" width="13" height="64" rx="4"/></g></svg>';
+h.insertBefore(d,h.firstChild);}b();})();</script>
 </body>
 </html>
