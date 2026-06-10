@@ -1476,5 +1476,44 @@ html.lenis,html.lenis body{height:auto}
 })();
 </script>
 
+
+<style>
+/* ===== LinkedIn Intelligence — showpiece layer ===== */
+.li-aurora{position:fixed;inset:-25%;z-index:0;pointer-events:none;filter:blur(72px)}
+.li-aurora .b{position:absolute;border-radius:50%;mix-blend-mode:screen}
+.li-aurora .b1{width:46vw;height:46vw;left:-6vw;top:-10vh;background:radial-gradient(circle at 30% 30%,rgba(99,102,241,.34),transparent 60%);animation:liF1 26s ease-in-out infinite}
+.li-aurora .b2{width:42vw;height:42vw;right:-8vw;top:6vh;background:radial-gradient(circle at 60% 40%,rgba(139,92,246,.28),transparent 60%);animation:liF2 32s ease-in-out infinite}
+.li-aurora .b3{width:40vw;height:40vw;left:34vw;bottom:-14vh;background:radial-gradient(circle at 50% 50%,rgba(14,165,233,.20),transparent 62%);animation:liF3 36s ease-in-out infinite}
+@keyframes liF1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,6vh) scale(1.12)}}
+@keyframes liF2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6vw,7vh) scale(1.1)}}
+@keyframes liF3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5vw,-6vh) scale(1.16)}}
+.li-grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:170px}
+.pcard{animation:liIn .55s cubic-bezier(.22,1,.36,1) both;will-change:transform}
+.pcard:nth-child(1){animation-delay:.02s}.pcard:nth-child(2){animation-delay:.06s}.pcard:nth-child(3){animation-delay:.10s}.pcard:nth-child(4){animation-delay:.14s}.pcard:nth-child(5){animation-delay:.18s}.pcard:nth-child(6){animation-delay:.22s}.pcard:nth-child(7){animation-delay:.26s}.pcard:nth-child(8){animation-delay:.30s}.pcard:nth-child(9){animation-delay:.34s}.pcard:nth-child(10){animation-delay:.38s}.pcard:nth-child(11){animation-delay:.42s}.pcard:nth-child(12){animation-delay:.46s}
+@keyframes liIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+.pcard{transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .25s,border-color .2s}
+.pcard:hover{transform:translateY(-5px);box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 30px rgba(129,140,248,.14);border-color:rgba(129,140,248,.4) !important}
+.bar-seg{transform-origin:left center;animation:liBar 1s cubic-bezier(.34,.6,.6,1) both}
+@keyframes liBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.tab-val{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.li-aurora .b,.pcard,.bar-seg{animation:none}}
+</style>
+<script>(function(){
+  if(window.__dashli)return;window.__dashli=1;
+  function mt(){var b=document.body;if(!b){return setTimeout(mt,40);}
+    var a=document.createElement('div');a.className='li-aurora';a.innerHTML='<div class="b b1"></div><div class="b b2"></div><div class="b b3"></div>';
+    var g=document.createElement('div');g.className='li-grain';
+    b.insertBefore(g,b.firstChild);b.insertBefore(a,b.firstChild);}
+  mt();
+  function countUp(el,target){var t0=null;function s(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1000);p=1-Math.pow(1-p,3);el.textContent=Math.round(target*p).toLocaleString('en-US');if(p<1)requestAnimationFrame(s);}requestAnimationFrame(s);}
+  function run(){
+    document.querySelectorAll('.tab-val').forEach(function(el){
+      if(el.__cu)return;var t=(el.textContent||'').replace(/[,\s]/g,'');
+      if(/^[0-9]+$/.test(t)&&parseInt(t,10)>0){el.__cu=1;countUp(el,parseInt(t,10));}
+    });
+  }
+  var tries=0,iv=setInterval(function(){run();if(++tries>20)clearInterval(iv);},250);
+  run();
+})();</script>
 </body>
 </html>
