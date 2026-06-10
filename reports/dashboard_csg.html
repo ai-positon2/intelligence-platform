@@ -6088,5 +6088,15 @@ html.lenis,html.lenis body{height:auto}
 })();
 </script>
 
+<style>
+/* Signal Tracker — safe glow-up (KPI tiles intentionally left frozen per design mandate) */
+.sev-badge.sev-high,.sev-badge.sev-HIGH{box-shadow:0 0 10px rgba(251,113,133,.4)}
+.signal-item{transition:background .15s,box-shadow .2s}
+.signal-item:hover{background:rgba(129,140,248,.07);box-shadow:inset 3px 0 0 0 #818cf8}
+.signal-item:nth-child(-n+12){animation:sigIn .55s cubic-bezier(.22,1,.36,1) both}
+.signal-item:nth-child(1){animation-delay:.03s}.signal-item:nth-child(2){animation-delay:.06s}.signal-item:nth-child(3){animation-delay:.09s}.signal-item:nth-child(4){animation-delay:.12s}.signal-item:nth-child(5){animation-delay:.15s}.signal-item:nth-child(6){animation-delay:.18s}.signal-item:nth-child(7){animation-delay:.21s}.signal-item:nth-child(8){animation-delay:.24s}
+@keyframes sigIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.signal-item{animation:none}}
+</style>
 </body>
 </html>
