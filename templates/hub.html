@@ -339,25 +339,6 @@
 
     </div>
 
-    <div class="lx-sec">
-      <div class="lx-sec-eyebrow">Quick index — every tool</div>
-      <div class="lx-tools">
-        <a class="lx-trow" href="/signal-tracker/healthcare"><span class="n">01</span><span class="t">Signal Tracker — Healthcare</span><span class="a">→</span></a>
-        <a class="lx-trow" href="/signal-tracker/csg"><span class="n">02</span><span class="t">Signal Tracker — CSG</span><span class="a">→</span></a>
-        <a class="lx-trow" href="/ppc/linkedin-scraper"><span class="n">03</span><span class="t">LinkedIn Intelligence</span><span class="a">→</span></a>
-        <a class="lx-trow" href="/ppc/ad-intelligence"><span class="n">04</span><span class="t">Ad Intelligence</span><span class="a">→</span></a>
-        <a class="lx-trow" href="/ppc/anonymous-visitors"><span class="n">05</span><span class="t">Anonymous Visitors</span><span class="a">→</span></a>
-        <a class="lx-trow" href="/seo"><span class="n">06</span><span class="t">SEO Suite</span><span class="a">→</span></a>
-      </div>
-      <div class="lx-stats2">
-        <div><b data-lxn="1200" data-lxs="+">0</b><span>companies tracked</span></div>
-        <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        <div><b data-lxn="14">0</b><span>dashboards</span></div>
-        <div><b class="grad-k">Kairo</b><span>AI everywhere</span></div>
-      </div>
-      <div class="lx-hint">Press <kbd>Ctrl</kbd><kbd>K</kbd> to jump anywhere on the platform</div>
-    </div>
-
     <p class="footer-note">Position2 · Internal use only</p>
   </div>
 
@@ -523,7 +504,7 @@
 window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
   marquee:'SIGNAL INTELLIGENCE ✦ KAIRO AI ✦ PAID MEDIA ✦ ORGANIC GROWTH ✦ VISITOR IDENTITY ✦',
   marqueeHost:'.main',tilt:'.hub-card',tiltDeg:3.5,
-  reveal:['.lx-trow','.lx-stats2>div','.lx-hint'],status:1,statusHost:'.topbar-right'};
+  reveal:[],status:1,statusHost:'.topbar-right'};
 </script>
 <script>
 /* ════ LUX kit — kinetic type, scroll reveals, tilt, halo, ghost, marquee, status ════ */
@@ -677,5 +658,33 @@ window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
   });
 })();
 </script>
+<style>
+/* ════ Hub hero cards — showcase mode ════ */
+@property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.hub-grid{grid-template-columns:repeat(auto-fit,minmax(400px,500px));gap:30px;max-width:1080px}
+.hub-card{border-radius:24px}
+.hub-card:hover{box-shadow:0 30px 80px rgba(0,0,0,.65),0 0 60px var(--card-glow)}
+/* rotating gradient border on hover */
+.hub-card::before{content:'';position:absolute;inset:-1px;border-radius:25px;padding:1.5px;
+  background:conic-gradient(from var(--ang),transparent 0%,var(--card-accent) 14%,transparent 32%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:0;transition:opacity .35s;animation:hubSpin 3s linear infinite;pointer-events:none;z-index:3}
+.hub-card:hover::before{opacity:1}
+@keyframes hubSpin{to{--ang:360deg}}
+/* shine sweep across the preview band */
+.card-preview{height:172px;background-size:180% 180%;animation:hubGrad 9s ease-in-out infinite}
+@keyframes hubGrad{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.card-preview::before{content:'';position:absolute;top:0;left:-70%;width:50%;height:100%;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.13),transparent);
+  transform:skewX(-18deg);transition:left .65s ease;z-index:2}
+.hub-card:hover .card-preview::before{left:135%}
+/* floating glowing icon */
+.card-preview-icon{font-size:64px;opacity:.6;animation:hubFloat 5s ease-in-out infinite;
+  filter:drop-shadow(0 0 32px rgba(255,255,255,.28))}
+@keyframes hubFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.card-title{font-size:26px}
+@media (prefers-reduced-motion: reduce){.hub-card::before,.card-preview,.card-preview-icon{animation:none}}
+</style>
 </body>
 </html>
