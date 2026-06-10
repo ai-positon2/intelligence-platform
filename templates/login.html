@@ -534,6 +534,7 @@
         var dx=(e.clientX/w-.5),dy=(e.clientY/h-.5);
         if(ghost)ghost.style.transform='translate('+(dx*-18)+'px,'+(dy*-10)+'px)';
         if(card){
+          if(!card.__a){card.style.animation='none';card.__a=1;}
           var r=card.getBoundingClientRect();
           if(e.clientX>r.left-80&&e.clientX<r.right+80&&e.clientY>r.top-80&&e.clientY<r.bottom+80){
             var cx=(e.clientX-(r.left+r.width/2))/r.width,cy=(e.clientY-(r.top+r.height/2))/r.height;
