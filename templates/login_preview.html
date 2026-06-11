@@ -26,7 +26,6 @@ body{
 }
 @media (pointer:coarse){ body{cursor:auto} }
 
-/* ── WebGL scene ── */
 #scene{position:fixed; inset:0; width:100%; height:100%; z-index:0; display:block}
 #fallback-bg{position:fixed; inset:0; z-index:0; display:none;
   background:
@@ -38,7 +37,6 @@ body{
 }
 @keyframes fbDrift{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(28deg)}}
 
-/* ── Atmosphere overlays ── */
 .vignette{position:fixed; inset:0; z-index:2; pointer-events:none;
   background:radial-gradient(120% 90% at 50% 45%, transparent 52%, rgba(2,3,9,.55) 82%, rgba(2,3,9,.92) 100%)}
 .grain{position:fixed; inset:-50%; z-index:3; pointer-events:none; opacity:.045; mix-blend-mode:overlay;
@@ -48,7 +46,6 @@ body{
 .scanline{position:fixed; inset:0; z-index:3; pointer-events:none; opacity:.5;
   background:repeating-linear-gradient(180deg, transparent 0 3px, rgba(0,0,0,.10) 3px 4px)}
 
-/* ── HUD chrome ── */
 .hud{position:fixed; inset:0; z-index:5; pointer-events:none}
 .hud .edge{position:absolute; background:rgba(140,160,230,.22)}
 .hud .edge.t{top:18px; left:64px; right:64px; height:1px}
@@ -93,7 +90,6 @@ body{
 .sound-btn:not(.on) .eq i{animation-play-state:paused;height:4px}
 @keyframes eq{0%,100%{height:3px}50%{height:12px}}
 
-/* ── Sign-in card ── */
 .stage{position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; pointer-events:none; padding:24px}
 .card{pointer-events:auto; width:min(440px,92vw); position:relative;
   background:linear-gradient(165deg, rgba(14,18,38,.72), rgba(8,10,22,.66));
@@ -121,14 +117,12 @@ body{
 .divider-text{font-family:var(--mono);font-size:9px;letter-spacing:.28em;color:var(--dim2)}
 .footer{margin-top:14px;font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--dim2)}
 
-/* ── custom cursor ── */
 #cur-ring,#cur-dot{position:fixed;top:0;left:0;z-index:60;pointer-events:none;border-radius:50%;mix-blend-mode:screen}
 #cur-ring{width:34px;height:34px;border:1px solid rgba(120,200,240,.6);margin:-17px 0 0 -17px;transition:width .2s,height .2s,margin .2s,border-color .2s,background .2s}
 #cur-dot{width:5px;height:5px;background:var(--cyan);margin:-2.5px 0 0 -2.5px;box-shadow:0 0 10px var(--cyan)}
 #cur-ring.hot{width:54px;height:54px;margin:-27px 0 0 -27px;border-color:rgba(139,92,246,.9);background:rgba(139,92,246,.08)}
 @media (pointer:coarse){ #cur-ring,#cur-dot{display:none} }
 
-/* ── preloader ── */
 #preloader{position:fixed;inset:0;z-index:200;background:#04050d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
 .pl-wrap{width:min(520px,80vw)}
 .pl-top{display:flex;justify-content:space-between;align-items:flex-end;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--dim);margin-bottom:14px}
@@ -163,7 +157,6 @@ body{
   <div class="scanline"></div>
   <div class="grain"></div>
 
-  <!-- HUD -->
   <div class="hud">
     <span class="corner tl"></span><span class="corner tr"></span>
     <span class="corner bl"></span><span class="corner br"></span>
@@ -195,7 +188,6 @@ body{
     </div>
   </div>
 
-  <!-- Sign-in -->
   <main class="stage">
     <div class="card" id="card">
       <div class="card-mark">
@@ -235,7 +227,6 @@ body{
 
   <div class="enter-hint" id="enterHint"><span data-scramble>MOVE · LISTEN · ENTER</span><span class="arrow"></span></div>
 
-  <!-- Preloader -->
   <div id="preloader">
     <div class="pl-logo">
       <svg viewBox="0 0 40 40" fill="none">
@@ -270,7 +261,6 @@ body{
     var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var IS_MOBILE = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
 
-    /* ===== Live IST clock ===== */
     function tickClock(){
       var el=document.getElementById('clock'); if(!el) return;
       var now=new Date(); var ist=new Date(now.getTime()+(now.getTimezoneOffset()+330)*60000);
@@ -279,7 +269,6 @@ body{
     }
     setInterval(tickClock,1000); tickClock();
 
-    /* ===== Text scramble ===== */
     var CHARS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&/<>*+=';
     function scramble(el, dur){
       var target=el.getAttribute('data-final')||el.textContent;
@@ -303,7 +292,6 @@ body{
       els.forEach(function(el,i){ el.setAttribute('data-final',el.textContent); el.textContent=''; setTimeout(function(){scramble(el,700+Math.random()*500);}, 120+i*90); });
     }
 
-    /* ===== Custom cursor ===== */
     if(!IS_MOBILE){
       var ring=document.createElement('div'); ring.id='cur-ring';
       var dot=document.createElement('div'); dot.id='cur-dot';
@@ -315,13 +303,9 @@ body{
       document.addEventListener('mouseout',function(e){ if(e.target.closest('[data-cursor],button,a,.g_id_signin')) ring.classList.remove('hot'); });
     }
 
-    /* ===== Pointer tracking for parallax ===== */
     var pointer={x:0,y:0,tx:0,ty:0};
     addEventListener('mousemove',function(e){ pointer.tx=(e.clientX/innerWidth-.5); pointer.ty=(e.clientY/innerHeight-.5); });
 
-    /* =========================================================
-       WEBGL PARTICLE CONSTELLATION
-       ========================================================= */
     var GL_OK=false, scene, camera, renderer, group, points, lines, uniforms;
     var N = IS_MOBILE?1500:3000;
     var BASE_SZ = IS_MOBILE?0.62:0.5;
@@ -330,7 +314,6 @@ body{
     var pulse=0, pulseTarget=0, clock;
 
     function buildLogoTargets(){
-      // sample the wordmark INTELLIGENCE into points
       var cw=1024, ch=256, c=document.createElement('canvas'); c.width=cw; c.height=ch;
       var x=c.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,cw,ch);
       x.fillStyle='#fff'; x.textAlign='center'; x.textBaseline='middle';
@@ -339,11 +322,10 @@ body{
       var data=x.getImageData(0,0,cw,ch).data, pts=[];
       var step=2;
       for(var yy=0;yy<ch;yy+=step){ for(var xx=0;xx<cw;xx+=step){ if(data[(yy*cw+xx)*4]>120) pts.push([xx,yy]); } }
-      // shuffle
       for(var i=pts.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=pts[i]; pts[i]=pts[j]; pts[j]=t; }
-      var SCALE=12.6/cw; // world width ~12.6
+      var SCALE=12.6/cw;
       for(var k=0;k<N;k++){
-        var p=pts[k%pts.length];
+        var p=pts.length?pts[k%pts.length]:[cw/2,ch/2];
         var jx=(Math.random()-.5)*0.04, jy=(Math.random()-.5)*0.04;
         posLogo[k*3]  =(p[0]-cw/2)*SCALE + jx;
         posLogo[k*3+1]=-(p[1]-ch/2)*SCALE + jy;
@@ -355,7 +337,7 @@ body{
       var canvas=document.getElementById('scene');
       try{ renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true}); }
       catch(e){ return false; }
-      renderer.setPixelRatio(Math.min(devicePixelRatio, IS_MOBILE?2:2));
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.setSize(innerWidth, innerHeight);
       scene=new THREE.Scene();
       camera=new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 100); camera.position.set(0,0,9.2);
@@ -366,7 +348,6 @@ body{
       colors=new Float32Array(N*3); sizes=new Float32Array(N); drift=new Float32Array(N*4);
       var cA=new THREE.Color(0x22d3ee), cB=new THREE.Color(0x8b5cf6), cC=new THREE.Color(0xa5b4fc), tmp=new THREE.Color();
       for(var i=0;i<N;i++){
-        // nebula: sphere shell + noise
         var u=Math.random(), v=Math.random(), th=u*Math.PI*2, ph=Math.acos(2*v-1);
         var r=4.6+Math.random()*2.2;
         posNeb[i*3]=r*Math.sin(ph)*Math.cos(th); posNeb[i*3+1]=r*Math.sin(ph)*Math.sin(th)*0.7; posNeb[i*3+2]=r*Math.cos(ph);
@@ -410,7 +391,6 @@ body{
       });
       points=new THREE.Points(geo,mat); group.add(points);
 
-      // edges: connect a subset of connector nodes to nearest neighbours (computed on nebula layout)
       var CONN=IS_MOBILE?0:520, K=3, elist=[];
       for(var a=0;a<CONN;a++){
         var ai=(a*4+1)%N; var best=[];
@@ -436,13 +416,12 @@ body{
     function render(){
       if(!GL_OK) return;
       var t=clock.getElapsedTime(); uniforms.uTime.value=t;
-      // audio/idle pulse
       pulse+=(pulseTarget-pulse)*0.08;
       var idle=0.18+0.12*Math.sin(t*0.9);
       uniforms.uPulse.value=Math.max(idle, pulse);
       var m=state.morph;
-      uniforms.uSize.value=BASE_SZ-0.2*m; // crisper points when forming the wordmark
-      var driftK=(1-0.82*m); // less drift when formed
+      uniforms.uSize.value=BASE_SZ-0.2*m;
+      var driftK=(1-0.82*m);
       for(var i=0;i<N;i++){
         var ph=drift[i*4]+t*drift[i*4+1];
         var dax=Math.sin(ph)*0.14*driftK, day=Math.cos(ph*0.9)*0.14*driftK, daz=Math.sin(ph*0.6)*0.14*driftK;
@@ -472,7 +451,6 @@ body{
     }
     function loop(){ render(); requestAnimationFrame(loop); }
 
-    /* ===== Generative audio (Web Audio) ===== */
     var audio={ctx:null,on:false,analyser:null,freq:null,master:null};
     function startAudio(){
       if(audio.ctx){ if(audio.ctx.state==='suspended') audio.ctx.resume(); return; }
@@ -481,22 +459,18 @@ body{
       var master=ctx.createGain(); master.gain.value=0.0001; master.connect(ctx.destination); audio.master=master;
       var analyser=ctx.createAnalyser(); analyser.fftSize=512; analyser.smoothingTimeConstant=0.82;
       master.connect(analyser); audio.analyser=analyser; audio.freq=new Uint8Array(analyser.frequencyBinCount);
-      // reverb-ish feedback delay
       var delay=ctx.createDelay(); delay.delayTime.value=0.42; var fb=ctx.createGain(); fb.gain.value=0.38;
       delay.connect(fb); fb.connect(delay); delay.connect(master);
-      // drone chord (D minor-ish): 73.4, 110, 146.8, 220
-      var freqs=[73.4,110,146.8,220], types=['sine','sine','triangle','sine'];
+      var freqs=[73.4,110,146.8,220], types=['sine','sine','triangle','sine'], gains=[0.16,0.12,0.07,0.05];
       freqs.forEach(function(f,i){
         var o=ctx.createOscillator(); o.type=types[i]; o.frequency.value=f; o.detune.value=(Math.random()-.5)*8;
-        var g=ctx.createGain(); g.gain.value=[0.16,0.12,0.07,0.05][i];
-        // slow tremolo
+        var g=ctx.createGain(); g.gain.value=gains[i];
         var lfo=ctx.createOscillator(); lfo.frequency.value=0.05+i*0.03; var lg=ctx.createGain(); lg.gain.value=0.04;
         lfo.connect(lg); lg.connect(g.gain); lfo.start();
         o.connect(g); g.connect(master); g.connect(delay); o.start();
       });
-      // airy noise pad through moving bandpass
-      var buf=ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); var d=buf.getChannelData(0);
-      for(var s=0;s<d.length;s++) d[s]=(Math.random()*2-1)*0.5;
+      var buf=ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); var dd=buf.getChannelData(0);
+      for(var s=0;s<dd.length;s++) dd[s]=(Math.random()*2-1)*0.5;
       var noise=ctx.createBufferSource(); noise.buffer=buf; noise.loop=true;
       var bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=600; bp.Q.value=4;
       var ng=ctx.createGain(); ng.gain.value=0.05;
@@ -524,17 +498,15 @@ body{
     }
     if(soundBtn) soundBtn.addEventListener('click', toggleSound);
 
-    /* ===== Intro orchestration ===== */
     function reveal(){
       scrambleAll();
       if(window.gsap && !REDUCED && GL_OK){
-        // Cinematic one-shot: cloud blooms in -> converges into INTELLIGENCE -> disperses to nebula -> card arrives
         state.scale=1.85; state.morph=0;
         var tl=gsap.timeline();
         tl.to(state,{scale:1,duration:2.3,ease:'power2.out'},0);
-        tl.to(state,{morph:1,duration:2.4,ease:'power2.inOut'},0.5);   // converge to wordmark
-        tl.to(state,{morph:1,duration:1.5},'>');                        // hold the word
-        tl.to(state,{morph:0,duration:2.7,ease:'power2.inOut'},'>');    // disperse into nebula
+        tl.to(state,{morph:1,duration:2.4,ease:'power2.inOut'},0.5);
+        tl.to(state,{morph:1,duration:1.5},'>');
+        tl.to(state,{morph:0,duration:2.7,ease:'power2.inOut'},'>');
         tl.fromTo('#card',{opacity:0,y:26,scale:.985},{opacity:1,y:0,scale:1,duration:1.25,ease:'power3.out'},'-=1.6');
         tl.to('#enterHint',{opacity:1,duration:1},'-=0.6');
       } else if(window.gsap && !REDUCED){
@@ -547,7 +519,6 @@ body{
       }
     }
 
-    /* ===== Preloader ===== */
     function runPreloader(onDone){
       var blocks=document.getElementById('plBlocks'); var NB=16;
       for(var i=0;i<NB;i++){ var b=document.createElement('i'); blocks.appendChild(b); }
@@ -557,7 +528,7 @@ body{
       var si=0, started=performance.now(), DUR=REDUCED?400:2200;
       function step(t){
         var p=Math.min(1,(t-started)/DUR);
-        var e=1-Math.pow(1-p,2);               // easeOutQuad, guaranteed to reach 100
+        var e=1-Math.pow(1-p,2);
         var pct=e*100, ip=Math.round(pct);
         pctEl.textContent=ip;
         var on=Math.round(pct/100*NB);
@@ -575,6 +546,16 @@ body{
       requestAnimationFrame(step);
     }
 
-    /* ===== Boot ===== */
     function boot(){
       var ok=false; try{ ok=initGL(); }catch(e){ ok=false; }
+      if(!ok){ document.getElementById('scene').style.display='none'; document.getElementById('fallback-bg').style.display='block'; }
+      else { loop(); }
+      runPreloader(reveal);
+      window.__LP={state:state,uniforms:uniforms,audio:audio,GL_OK:function(){return GL_OK;},reveal:reveal,toggleSound:toggleSound};
+    }
+    if(document.fonts && document.fonts.ready){ document.fonts.ready.then(boot); setTimeout(function(){ if(!window.__LP) boot(); },1500); }
+    else boot();
+  })();
+  </script>
+</body>
+</html>
