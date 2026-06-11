@@ -441,8 +441,9 @@ body{
         lines.material.opacity=(0.05+0.17*(1-m))*(0.6+0.8*uniforms.uPulse.value);
       }
       pointer.x+=(pointer.tx-pointer.x)*0.05; pointer.y+=(pointer.ty-pointer.y)*0.05;
-      group.rotation.y=t*0.04 + pointer.x*0.5;
-      group.rotation.x=pointer.y*0.32;
+      var rotDamp=1-0.93*m; // wordmark faces camera when formed
+      group.rotation.y=(t*0.04 + pointer.x*0.5)*rotDamp;
+      group.rotation.x=(pointer.y*0.32)*rotDamp;
       var s=state.scale*(1+uniforms.uPulse.value*0.02); group.scale.set(s,s,s);
       camera.position.x+=((pointer.tx*1.2)-camera.position.x)*0.04;
       camera.position.y+=((-pointer.ty*0.8)-camera.position.y)*0.04;
