@@ -570,7 +570,7 @@ def _fetch_usage_data() -> dict:
                    for r in reversed(login_data)][:100]
     page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
                     "url": col(r,6), "duration": col(r,8)}
-                   for r in reversed(page_data)][:200]
+                   for r in reversed(page_data)]
 
     return dict(total_logins=total_logins, unique_users=unique_users,
                 total_page_views=total_page_views, total_time_fmt=total_time_fmt,
