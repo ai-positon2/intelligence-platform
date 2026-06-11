@@ -5491,6 +5491,8 @@ window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getIte
 <style>
 /* ── SIDEBAR REDESIGN v2 ─────────────────────────────── */
 :root{--sb-w:268px}
+/* v2 sidebar is in-flow flex (position:relative) — drop legacy fixed-sidebar margin to kill the gap */
+#main{margin-left:0!important}
 #sidebar{
   width:var(--sb-w)!important;min-width:var(--sb-w)!important;
   background:#0b0c1a!important;
