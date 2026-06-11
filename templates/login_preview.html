@@ -86,8 +86,9 @@ main{position:relative;z-index:10}
 .sec.al-r .inner{text-align:right}
 .inner{max-width:560px;opacity:0;transform:translateY(40px);will-change:opacity,transform}
 .inner{position:relative}
-.inner::before{content:'';position:absolute;inset:-50px -70px;background:radial-gradient(60% 72% at 50% 50%,rgba(4,5,13,.6),transparent 76%);z-index:-1;filter:blur(8px);pointer-events:none}
-.sec h1,.sec h2{text-shadow:0 2px 26px rgba(2,4,12,.55)}
+.inner::before{content:'';position:absolute;inset:-64px -110px;background:radial-gradient(66% 80% at 50% 50%,rgba(3,4,11,.9),rgba(3,4,11,.55) 50%,transparent 82%);z-index:-1;filter:blur(16px);pointer-events:none}
+.sec h1,.sec h2{text-shadow:0 2px 32px rgba(2,4,12,.92),0 1px 3px rgba(0,0,0,.55)}
+.sec p.lead{text-shadow:0 1px 16px rgba(2,4,12,.85)}
 .kick{font-family:var(--mono);font-size:11px;letter-spacing:.4em;color:var(--cyan);text-transform:uppercase;margin-bottom:18px}
 .sec h1{font-size:clamp(40px,6.4vw,86px);font-weight:700;line-height:1.02;letter-spacing:-.02em;margin-bottom:22px}
 .sec h2{font-size:clamp(30px,4.4vw,60px);font-weight:700;line-height:1.06;letter-spacing:-.015em;margin-bottom:18px}
@@ -95,6 +96,9 @@ main{position:relative;z-index:10}
 .sec p.lead{font-size:clamp(15px,1.5vw,19px);line-height:1.6;color:var(--dim);max-width:460px}
 .sec.al-c p.lead,.sec.al-c .inner{margin-left:auto;margin-right:auto}
 .sec.al-r p.lead{margin-left:auto}
+.tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.sec.al-c .tags{justify-content:center}
+.tags span{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--cyan);border:1px solid rgba(34,211,238,.32);border-radius:99px;padding:7px 14px}
 .scroll-hint{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim3);display:flex;flex-direction:column;align-items:center;gap:9px}
 .scroll-hint .ar{width:1px;height:22px;background:linear-gradient(var(--cyan),transparent);animation:fall 1.8s ease-in-out infinite}
 @keyframes fall{0%{opacity:.2;transform:translateY(-6px)}50%{opacity:1}100%{opacity:.2;transform:translateY(6px)}}
@@ -140,7 +144,6 @@ main{position:relative;z-index:10}
   <div class="grain"></div>
 
   <div class="hud">
-    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
     <div class="hud-row top">
       <div class="hud-brand">
         <div class="brand-mark"><svg viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/><circle cx="33" cy="27" r="1.3" fill="#67e8f9"/></svg></div>
@@ -150,7 +153,6 @@ main{position:relative;z-index:10}
     </div>
     <div class="hud-row bot">
       <button class="sound-btn" id="soundBtn" data-cursor><span class="eq"><i></i><i></i><i></i><i></i></span><span id="soundLabel">ENABLE SOUND</span></button>
-      <div class="hud-foot" id="hudFoot">SCROLL TO BEGIN</div>
     </div>
   </div>
 
@@ -161,14 +163,13 @@ main{position:relative;z-index:10}
       <div class="inner">
         <div class="kick" data-scramble>POSITION2 // SIGNAL INTELLIGENCE</div>
         <h1>See who's ready<br><span class="grad">before they raise a hand.</span></h1>
-        <p class="lead">An intelligence layer for modern marketing teams. Scroll to see how it works.</p>
+        <p class="lead">An intelligence layer for modern marketing teams.</p>
       </div>
       <div class="scroll-hint" id="scrollHint"><span>SCROLL</span><span class="ar"></span></div>
     </section>
 
     <section class="sec al-l" data-form="1" data-rail="01">
       <div class="inner">
-        <div class="kick" data-scramble>01 — THE PROBLEM</div>
         <h2>Pipeline built on<br><span class="grad">guesswork.</span></h2>
         <p class="lead">By the time an account finally looks ready, the moment has usually passed — and so has the deal. Most teams are reacting to history, not intent.</p>
       </div>
@@ -176,7 +177,6 @@ main{position:relative;z-index:10}
 
     <section class="sec al-r" data-form="2" data-rail="02">
       <div class="inner">
-        <div class="kick" data-scramble>02 — THE TRUTH</div>
         <h2>Every company is<br><span class="grad">always in motion.</span></h2>
         <p class="lead">Growth, change, momentum. The open web is full of clues about who is about to move — long before they ever fill out a form.</p>
       </div>
@@ -184,7 +184,6 @@ main{position:relative;z-index:10}
 
     <section class="sec al-l" data-form="3" data-rail="03">
       <div class="inner">
-        <div class="kick" data-scramble>03 — WHAT WE DO</div>
         <h2>We listen to all of it.<br><span class="grad">Continuously.</span></h2>
         <p class="lead">Across the open web, in real time, we connect the moments that matter to the accounts you care about — so nothing important slips past you.</p>
       </div>
@@ -192,7 +191,6 @@ main{position:relative;z-index:10}
 
     <section class="sec al-r" data-form="4" data-rail="04">
       <div class="inner">
-        <div class="kick" data-scramble>04 — THE EDGE</div>
         <h2>Know the exact<br><span class="grad">moment to act.</span></h2>
         <p class="lead">Reach the right accounts the instant interest peaks — while your competitors are still guessing who to call next.</p>
       </div>
@@ -200,7 +198,6 @@ main{position:relative;z-index:10}
 
     <section class="sec al-l" data-form="5" data-rail="05">
       <div class="inner">
-        <div class="kick" data-scramble>05 — CLARITY</div>
         <h2>Signal,<br><span class="grad">not noise.</span></h2>
         <p class="lead">Every account scored, prioritized and explained in plain language — so every conversation your team starts is already warm.</p>
       </div>
@@ -208,7 +205,6 @@ main{position:relative;z-index:10}
 
     <section class="sec al-c" data-form="6" data-rail="06">
       <div class="inner">
-        <div class="kick" data-scramble>06 — THE OUTCOME</div>
         <h2>Turn movement<br><span class="grad">into momentum.</span></h2>
         <p class="lead">More pipeline. Less guesswork. Earlier than the competition. That is the difference intelligence makes.</p>
       </div>
@@ -216,11 +212,18 @@ main{position:relative;z-index:10}
 
     <section class="sec al-c" data-form="7" data-rail="07">
       <div class="inner">
+        <h2>Intelligence,<br><span class="grad">by Position2.</span></h2>
+        <p class="lead">A living read on your market. We surface the companies showing real momentum, score and explain each one in plain language, and point your team to the conversations most likely to convert — so your pipeline is built on what is happening now, not what already has.</p>
+        <div class="tags"><span>LIVE SIGNALS</span><span>ACCOUNT SCORING</span><span>PRIORITIZED INSIGHTS</span></div>
+      </div>
+    </section>
+    <section class="sec al-c" data-form="8" data-rail="08">
+      <div class="inner">
         <div class="card" id="card">
           <div class="card-mark"><svg viewBox="0 0 40 40" fill="none"><g style="transform-origin:50% 50%;animation:spin 16s linear infinite"><circle cx="20" cy="20" r="16" stroke="#67e8f9" stroke-width="1" opacity=".4"/></g><circle cx="20" cy="20" r="10" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/></svg></div>
           <div class="kick">ACCESS · INTELLIGENCE</div>
-          <h3>Ready when you are.</h3>
-          <p class="sub">Sign in with your Position2 Google account to enter the dashboard.</p>
+          <h3>See what&#39;s moving.</h3>
+          <p class="sub">Sign in with your Position2 Google account to open your live intelligence dashboard.</p>
           <div class="error-msg" id="error-banner" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
           <div class="google-wrap">
             <div class="google-btn-glow"></div>
@@ -228,7 +231,7 @@ main{position:relative;z-index:10}
             <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
             <div class="divider"><div class="divider-line"></div><span class="divider-text">INTERNAL USE ONLY</span><div class="divider-line"></div></div>
           </div>
-          <div class="footer">POSITION2 · MMXXVI</div>
+          <div class="footer">POSITION2</div>
         </div>
       </div>
     </section>
@@ -252,7 +255,7 @@ main{position:relative;z-index:10}
     "use strict";
     var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var IS_MOBILE = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
-    var FORMS=8;
+    var FORMS=9;
 
     function tickClock(){ var el=document.getElementById('clock'); if(!el) return; var now=new Date(); var ist=new Date(now.getTime()+(now.getTimezoneOffset()+330)*60000); var p=function(n){return (n<10?'0':'')+n;}; el.textContent=p(ist.getHours())+':'+p(ist.getMinutes())+':'+p(ist.getSeconds())+' IST'; }
     setInterval(tickClock,1000); tickClock();
@@ -282,7 +285,7 @@ main{position:relative;z-index:10}
     /* WebGL */
     var GL_OK=false, scene, camera, renderer, group, points, lines, uniforms, clock;
     var N = IS_MOBILE?1800:4200;
-    var BASE_SZ = IS_MOBILE?0.9:0.74;
+    var BASE_SZ = IS_MOBILE?0.8:0.66;
     var forms=[], cur, colors, sizes, R, edges, linePos;
     var pulse=0, pulseTarget=0;
     var prog=0, progSmooth=0, tT=0;
@@ -315,8 +318,11 @@ main{position:relative;z-index:10}
         // F6 ascending helix (growth)
         var t6=fi*Math.PI*12; var r6=4.6+Math.sin(fi*4)*0.8;
         st(6,i, Math.cos(t6)*r6, (fi-0.5)*17, Math.sin(t6)*r6);
-        // F7 wordmark filled below
-        st(7,i,0,0,0);
+        // F7 platform: orbital ring system (the hub)
+        var ring=Math.floor(b*3); var rad=3.2+ring*2.5; var ang=a*6.2832;
+        st(7,i, Math.cos(ang)*rad, Math.sin(ang)*rad*0.4 + (ring-1)*0.7, Math.sin(ang)*rad*0.5 + (c-0.5)*1.1);
+        // F8 wordmark filled below
+        st(8,i,0,0,0);
       }
       // F7: sample INTELLIGENCE
       var cw=1100, ch=240, cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
@@ -328,7 +334,7 @@ main{position:relative;z-index:10}
       for(var s=pts.length-1;s>0;s--){ var j=(Math.random()*(s+1))|0; var tmp=pts[s]; pts[s]=pts[j]; pts[j]=tmp; }
       var SC=16/cw;
       for(var k=0;k<N;k++){ var pp=pts.length?pts[k%pts.length]:[cw/2,ch/2];
-        st(7,k,(pp[0]-cw/2)*SC+(Math.random()-.5)*0.05, -(pp[1]-ch/2)*SC+(Math.random()-.5)*0.05, (Math.random()-.5)*0.3); }
+        st(8,k,(pp[0]-cw/2)*SC+(Math.random()-.5)*0.05, -(pp[1]-ch/2)*SC+(Math.random()-.5)*0.05, (Math.random()-.5)*0.3); }
     }
 
     function initGL(){
@@ -351,7 +357,7 @@ main{position:relative;z-index:10}
       uniforms={ uSize:{value:BASE_SZ}, uPulse:{value:0}, uTime:{value:0} };
       var mat=new THREE.ShaderMaterial({ uniforms:uniforms, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
         vertexShader:['attribute vec3 aColor; attribute float aSize;','uniform float uSize; uniform float uPulse; uniform float uTime;','varying vec3 vColor; varying float vTw;','void main(){','vColor=aColor;','vTw=0.6+0.4*sin(uTime*1.4+aSize*9.0);','vec4 mv=modelViewMatrix*vec4(position,1.0);','float sz=aSize*uSize*(1.0+uPulse*0.9);','gl_PointSize=sz*(300.0/-mv.z);','gl_Position=projectionMatrix*mv;','}'].join('\n'),
-        fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float a=smoothstep(0.5,0.0,dd); a=pow(a,1.7);','vec3 col=vColor*(0.6+0.85*uPulse)*vTw;','gl_FragColor=vec4(col,a);','}'].join('\n') });
+        fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float core=smoothstep(0.5,0.14,dd);','float glow=smoothstep(0.5,0.0,dd);','float a=pow(core,2.0)*0.95+pow(glow,3.0)*0.4;','vec3 col=vColor*(0.6+0.85*uPulse)*vTw;','gl_FragColor=vec4(col,a);','}'].join('\n') });
       points=new THREE.Points(geo,mat); group.add(points);
       var CONN=IS_MOBILE?0:560, K=3, el=[];
       for(var aa=0;aa<CONN;aa++){ var ai=(aa*5+1)%N; var best=[];
@@ -375,7 +381,7 @@ main{position:relative;z-index:10}
       var ci=Math.floor(t), nf=Math.min(ci+1,FORMS-1), fr=t-ci; fr=fr*fr*(3-2*fr);
       var A=forms[ci], B=forms[nf];
       pulse+=(pulseTarget-pulse)*0.06; var idle=0.15+0.1*Math.sin(time*0.55); uniforms.uPulse.value=Math.max(idle,pulse);
-      var wm=Math.max(0,Math.min(1,t-6));
+      var wm=Math.max(0,Math.min(1,t-7));
       uniforms.uSize.value=BASE_SZ-0.16*wm;
       var driftK=0.4*(1-0.7*wm);
       for(var i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
@@ -415,17 +421,17 @@ main{position:relative;z-index:10}
     /* audio */
     var audio={ctx:null,on:false,analyser:null,freq:null,master:null};
     function startAudio(){ if(audio.ctx){ if(audio.ctx.state==='suspended') audio.ctx.resume(); return; }
-      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; var ctx=new AC(); audio.ctx=ctx;
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; var ctx=new AC(); audio.ctx=ctx; try{ctx.resume();}catch(e){}
       var master=ctx.createGain(); master.gain.value=0.0001; master.connect(ctx.destination); audio.master=master;
       var an=ctx.createAnalyser(); an.fftSize=512; an.smoothingTimeConstant=0.84; master.connect(an); audio.analyser=an; audio.freq=new Uint8Array(an.frequencyBinCount);
       var delay=ctx.createDelay(); delay.delayTime.value=0.45; var fb=ctx.createGain(); fb.gain.value=0.4; delay.connect(fb); fb.connect(delay); delay.connect(master);
-      var freqs=[55,73.4,110,146.8], types=['sine','sine','triangle','sine'], gains=[0.14,0.13,0.09,0.05];
+      var freqs=[110,164.81,220,329.63], types=['sine','sine','triangle','sine'], gains=[0.17,0.14,0.10,0.06];
       freqs.forEach(function(f,i){ var o=ctx.createOscillator(); o.type=types[i]; o.frequency.value=f; o.detune.value=(Math.random()-.5)*7; var g=ctx.createGain(); g.gain.value=gains[i];
         var lfo=ctx.createOscillator(); lfo.frequency.value=0.04+i*0.025; var lg=ctx.createGain(); lg.gain.value=0.035; lfo.connect(lg); lg.connect(g.gain); lfo.start(); o.connect(g); g.connect(master); g.connect(delay); o.start(); });
       var buf=ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); var dch=buf.getChannelData(0); for(var s=0;s<dch.length;s++) dch[s]=(Math.random()*2-1)*0.5;
       var noise=ctx.createBufferSource(); noise.buffer=buf; noise.loop=true; var bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=520; bp.Q.value=4; var ng=ctx.createGain(); ng.gain.value=0.045;
       var nlfo=ctx.createOscillator(); nlfo.frequency.value=0.06; var nlg=ctx.createGain(); nlg.gain.value=420; nlfo.connect(nlg); nlg.connect(bp.frequency); nlfo.start(); noise.connect(bp); bp.connect(ng); ng.connect(master); ng.connect(delay); noise.start();
-      master.gain.linearRampToValueAtTime(0.16, ctx.currentTime+2.0); audio.on=true; }
+      master.gain.linearRampToValueAtTime(0.28, ctx.currentTime+2.5); audio.on=true; }
     function audioFrame(){ if(audio.on&&audio.analyser){ audio.analyser.getByteFrequencyData(audio.freq); var bass=0; for(var i=0;i<10;i++) bass+=audio.freq[i]; bass/=10; var mid=0; for(var j=20;j<60;j++) mid+=audio.freq[j]; mid/=40; pulseTarget=Math.min(1,(bass*0.7+mid*0.5)/255*1.8); } else { pulseTarget=0; } requestAnimationFrame(audioFrame); }
     audioFrame();
     var soundBtn=document.getElementById('soundBtn'), soundLabel=document.getElementById('soundLabel');
