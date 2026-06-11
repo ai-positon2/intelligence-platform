@@ -154,12 +154,14 @@
     </div>
   </div>
   <div class="main">
+    <div class="pinwrap ac-pin">
     <section class="ac-hero">
     <div class="label">Company Intelligence</div>
     <h1 class="heading">Company Signal Tracker</h1>
     <p class="sub">Choose a company list to open the dashboard</p>
     <div class="hb-cue"><span></span></div>
     </section>
+    </div>
     <div class="grid">{{ account_cards | safe }}</div>
     <p class="foot">Position2 · Internal use only</p>
   </div>
@@ -586,5 +588,62 @@ d.innerHTML='<svg viewBox="0 0 400 400" aria-hidden="true">'
 +'<circle class="ac-node" cx="200" cy="200" r="6"/><circle class="ac-node b" cx="90" cy="96" r="4.5"/><circle class="ac-node c" cx="318" cy="120" r="4.5"/><circle class="ac-node" cx="320" cy="280" r="4.5"/><circle class="ac-node b" cx="110" cy="300" r="4.5"/><circle class="ac-node c" cx="250" cy="60" r="3.5"/><circle class="ac-node" cx="60" cy="210" r="3.5"/><circle class="ac-node b" cx="340" cy="200" r="3.5"/></svg>';
 h.insertBefore(d,h.firstChild);}b();})();</script>
 <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Signal Tracker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+
+<style>
+/* accounts scroll-pinned hero */
+.ac-pin{position:relative;height:210vh}
+.ac-pin .ac-hero{position:sticky;top:0;height:100vh;min-height:0;will-change:transform}
+.ac-pintag{position:absolute;left:50%;bottom:16%;transform:translateX(-50%) translateY(22px);opacity:0;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#67e8f9;z-index:2;white-space:nowrap;display:flex;align-items:center;gap:10px}
+.ac-pintag::after{content:'↓';font-size:12px;opacity:.7}
+@media (max-height:600px),(prefers-reduced-motion:reduce){
+  .ac-pin{height:auto}
+  .ac-pin .ac-hero{position:relative;height:auto;min-height:calc(100vh - 62px)}
+}
+</style>
+<script>(function(){
+if(window.__acpin)return;window.__acpin=1;
+function start(){
+  var wrap=document.querySelector('.ac-pin');
+  if(!wrap){return setTimeout(start,80);}
+  var hero=wrap.querySelector('.ac-hero');
+  var head=hero.querySelector('.heading'),lbl=hero.querySelector('.label'),sub=hero.querySelector('.sub'),cue=hero.querySelector('.hb-cue');
+  var tag=document.createElement('div');tag.className='ac-pintag';tag.textContent='Intelligence, signal by signal';hero.appendChild(tag);
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce||window.innerHeight<600)return;
+  function cl(v){return v<0?0:v>1?1:v;}
+  function ease(t){return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+  function tick(){
+    var r=wrap.getBoundingClientRect();
+    var total=wrap.offsetHeight-window.innerHeight;
+    var raw=total>0?cl(-r.top/total):0;
+    var p=ease(raw);
+    /* constellation: scale + brighten */
+    var motif=hero.querySelector('.ac-motif');
+    if(motif){
+      motif.style.transform='translate(-50%,-50%) scale('+(1+raw*0.45).toFixed(3)+')';
+      motif.style.opacity=(0.55+raw*0.38).toFixed(3);
+    }
+    /* heading: drift up + shrink + fade late */
+    var fade=cl((p-0.58)/0.42);
+    if(head){
+      head.style.transform='translateY('+(-raw*56).toFixed(1)+'px) scale('+(1-raw*0.065).toFixed(3)+')';
+      head.style.opacity=(1-fade).toFixed(3);
+    }
+    /* label + sub: fade out early */
+    var ef=(1-cl(raw/0.42)).toFixed(3);
+    if(lbl)lbl.style.opacity=ef;
+    if(sub)sub.style.opacity=ef;
+    /* scroll cue: fade out fast */
+    if(cue)cue.style.opacity=(1-cl(raw/0.22)).toFixed(3);
+    /* tagline: fade in mid, fade out with heading */
+    var tin=cl((raw-0.38)/0.30)*(1-fade);
+    tag.style.opacity=tin.toFixed(3);
+    tag.style.transform='translateX(-50%) translateY('+(22-tin*22).toFixed(1)+'px)';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+start();
+})();</script>
 </body>
 </html>
