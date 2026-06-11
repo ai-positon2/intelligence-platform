@@ -6302,8 +6302,8 @@ html.lenis,html.lenis body{height:auto}
     var stats=[stat('Employees',c.employees?(+c.employees).toLocaleString():''),stat('Founded',c.founded_year||''),stat('Revenue',c.annual_revenue_fmt||''),stat('Funding',(c.latest_funding_amount_fmt||c.total_funding_fmt||'')+(c.latest_funding_type?' '+c.latest_funding_type:'')),stat('Open Jobs',(c.open_job_count!=null&&c.open_job_count!=='')?c.open_job_count:''),stat('Signals',cnt(c))].join('');
     var al=c.alerts||[];
     var sigs=al.length?'<div class="smap-dalerts">'+al.map(alertHTML).join('')+'</div>':'<div class="smap-co-none">No active signals — this company is being monitored.</div>';
-    var tech='';if(c.tech_stack&&c.tech_stack.length){tech='<div class="smap-sec-l">Tech stack</div><div class="smap-chips">'+c.tech_stack.slice(0,18).map(function(t){return '<span class="smap-chip">'+esc(t)+'</span>';}).join('')+'</div>';}
-    var kw='';if(c.keywords&&c.keywords.length){kw='<div class="smap-sec-l">Keywords</div><div class="smap-chips">'+c.keywords.slice(0,14).map(function(t){return '<span class="smap-chip">'+esc(t)+'</span>';}).join('')+'</div>';}
+    var tech='';if(Array.isArray(c.tech_stack)&&c.tech_stack.length){tech='<div class="smap-sec-l">Tech stack</div><div class="smap-chips">'+c.tech_stack.slice(0,18).map(function(t){return '<span class="smap-chip">'+esc(t)+'</span>';}).join('')+'</div>';}
+    var kw='';if(Array.isArray(c.keywords)&&c.keywords.length){kw='<div class="smap-sec-l">Keywords</div><div class="smap-chips">'+c.keywords.slice(0,14).map(function(t){return '<span class="smap-chip">'+esc(t)+'</span>';}).join('')+'</div>';}
     var desc=c.description?'<div class="smap-sec-l">About</div><div class="smap-desc">'+esc(c.description.slice(0,420))+'</div>':'';
     return '<div class="smap-detail"><div class="smap-dhero">'+logoHTML(c,'lg')+'<div style="min-width:0"><div class="smap-dh-name">'+esc(c.name)+'</div><div class="smap-dh-sub">'+sub+'</div><div class="smap-dh-meta">'+links+'</div></div></div>'
       +(stats.replace(/\s/g,'')?'<div class="smap-stats">'+stats+'</div>':'')+desc
@@ -6343,7 +6343,7 @@ html.lenis,html.lenis body{height:auto}
     back.classList.add('show');
     t1.innerHTML=esc(c.name);
     t2.innerHTML=esc(c.industry||'')+(c.city?' &middot; '+esc(c.city):'')+(c.state?', '+esc(c.state):'');
-    body.scrollTop=0;body.innerHTML=detailHTML(c);
+    body.scrollTop=0;try{body.innerHTML=detailHTML(c);}catch(e){body.innerHTML='<div class="smap-co-none">Details unavailable for this company.</div>';}
   }
   function openState(state){if(!(stateMap[state]&&stateMap[state].length))return;ensureModal();showList(state);mbg.classList.add('on');modal.classList.add('on');}
   function buildGauge(wrap){
