@@ -1515,5 +1515,61 @@ html.lenis,html.lenis body{height:auto}
   var tries=0,iv=setInterval(function(){run();if(++tries>20)clearInterval(iv);},250);
   run();
 })();</script>
+<script>window.__ALIVE_CFG={"spotlight": true, "tilt": ".pcard", "tiltDeg": 5};</script>
+
+<style>
+#alive-spot{position:fixed;width:620px;height:620px;border-radius:50%;pointer-events:none;z-index:2;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(129,140,248,.11),rgba(99,102,241,.05) 38%,transparent 64%);mix-blend-mode:screen;opacity:0;transition:opacity .45s;will-change:left,top}
+.alive-rv{opacity:0;transform:translateY(30px);transition:opacity .85s cubic-bezier(.22,1,.36,1),transform .85s cubic-bezier(.22,1,.36,1)}
+.alive-rv.alive-in{opacity:1;transform:none}
+.alive-mag{transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.alive-tilt{transition:transform .3s cubic-bezier(.22,1,.36,1)}
+@media (prefers-reduced-motion:reduce){.alive-rv{opacity:1 !important;transform:none !important;transition:none}#alive-spot{display:none}}
+</style>
+<script>(function(){
+  if(window.__alive)return;window.__alive=1;
+  var CFG=window.__ALIVE_CFG||{};
+  var fine=window.matchMedia&&window.matchMedia('(pointer:fine)').matches;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function ready(fn){if(document.readyState!=='loading')fn();else document.addEventListener('DOMContentLoaded',fn);}
+  if(CFG.spotlight!==false&&fine&&!reduce){
+    ready(function(){
+      var sp=document.createElement('div');sp.id='alive-spot';document.body.appendChild(sp);
+      var tx=innerWidth/2,ty=innerHeight*0.4,cx=tx,cy=ty;
+      document.addEventListener('mousemove',function(e){tx=e.clientX;ty=e.clientY;sp.style.opacity='1';},{passive:true});
+      document.addEventListener('mouseleave',function(){sp.style.opacity='0';});
+      (function loop(){cx+=(tx-cx)*.13;cy+=(ty-cy)*.13;sp.style.left=cx+'px';sp.style.top=cy+'px';requestAnimationFrame(loop);})();
+    });
+  }
+  function reveal(){
+    var sels=CFG.reveal||[];if(!sels.length)return;var els=[];
+    sels.forEach(function(q){document.querySelectorAll(q).forEach(function(e){if(!e.__arv){e.__arv=1;e.classList.add('alive-rv');els.push(e);}});});
+    if(!els.length)return;
+    if(reduce||!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('alive-in');});return;}
+    var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('alive-in');io.unobserve(x.target);}});},{threshold:.06,rootMargin:'0px 0px -5% 0px'});
+    els.forEach(function(e){io.observe(e);});
+    setTimeout(function(){els.forEach(function(e){e.classList.add('alive-in');});},1700);
+  }
+  function tilt(){
+    if(!fine||reduce||!CFG.tilt)return;var d=CFG.tiltDeg||5;
+    document.querySelectorAll(CFG.tilt).forEach(function(c){
+      if(c.__at)return;c.__at=1;c.classList.add('alive-tilt');
+      c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();var dx=(e.clientX-r.left)/r.width-.5,dy=(e.clientY-r.top)/r.height-.5;c.style.transform='perspective(950px) rotateY('+(dx*d)+'deg) rotateX('+(-dy*d)+'deg) translateY(-4px)';});
+      c.addEventListener('mouseleave',function(){c.style.transform='';});
+    });
+  }
+  function magnetic(){
+    if(!fine||reduce||!CFG.magnetic)return;
+    document.querySelectorAll(CFG.magnetic).forEach(function(b){
+      if(b.__am)return;b.__am=1;b.classList.add('alive-mag');
+      b.addEventListener('mousemove',function(e){var r=b.getBoundingClientRect();b.style.transform='translate('+((e.clientX-(r.left+r.width/2))*.25)+'px,'+((e.clientY-(r.top+r.height/2))*.4)+'px)';});
+      b.addEventListener('mouseleave',function(){b.style.transform='';});
+    });
+  }
+  function run(){reveal();tilt();magnetic();}
+  ready(run);
+  var pend=null;
+  ready(function(){new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;run();},320);}).observe(document.body,{childList:true,subtree:true});});
+})();</script>
+<script>(function(){var a=document.querySelector(".li-aurora");if(!a||!(window.matchMedia&&matchMedia("(pointer:fine)").matches))return;addEventListener("mousemove",function(e){a.style.transform="translate("+((e.clientX/innerWidth-.5)*-26)+"px,"+((e.clientY/innerHeight-.5)*-18)+"px)";},{passive:true});})();</script>
 </body>
 </html>
