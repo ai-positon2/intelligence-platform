@@ -536,7 +536,7 @@ def _fetch_usage_data() -> dict:
         t = col(r, 5)
         if t:
             page_counts[t] = page_counts.get(t, 0) + 1
-    top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+    top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:15]
 
     # Logins per day (last 14 days)
     login_days = Counter(col(r, 1) for r in login_data if col(r, 1))
