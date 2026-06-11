@@ -887,7 +887,7 @@ def _build_account_card(account_id, cfg):
             f'<div class="card-name">{cfg["name"]}</div>'
             f'<div class="card-desc">{cfg["description"]}</div>'
             f'<div class="card-footer">'
-            f'<div class="stat"><span>{count}</span> companies · <span style="color:#64748b;font-weight:400">refreshed {refreshed}</span></div>'
+            f'<div class="stat"><span>{count}</span> companies</div>'
             f'<span class="arrow">→</span></div></div></a>'
         )
     return (
