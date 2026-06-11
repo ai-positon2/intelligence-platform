@@ -323,7 +323,8 @@ body{
        WEBGL PARTICLE CONSTELLATION
        ========================================================= */
     var GL_OK=false, scene, camera, renderer, group, points, lines, uniforms;
-    var N = IS_MOBILE?1100:2400;
+    var N = IS_MOBILE?1500:3000;
+    var BASE_SZ = IS_MOBILE?0.62:0.5;
     var posNeb, posLogo, cur, colors, sizes, drift, edges, linePos;
     var state={morph:0, intro:0, scale:1};
     var pulse=0, pulseTarget=0, clock;
@@ -340,13 +341,13 @@ body{
       for(var yy=0;yy<ch;yy+=step){ for(var xx=0;xx<cw;xx+=step){ if(data[(yy*cw+xx)*4]>120) pts.push([xx,yy]); } }
       // shuffle
       for(var i=pts.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=pts[i]; pts[i]=pts[j]; pts[j]=t; }
-      var SCALE=11/cw; // world width ~11
+      var SCALE=12.6/cw; // world width ~12.6
       for(var k=0;k<N;k++){
         var p=pts[k%pts.length];
-        var jx=(Math.random()-.5)*0.05, jy=(Math.random()-.5)*0.05;
+        var jx=(Math.random()-.5)*0.04, jy=(Math.random()-.5)*0.04;
         posLogo[k*3]  =(p[0]-cw/2)*SCALE + jx;
         posLogo[k*3+1]=-(p[1]-ch/2)*SCALE + jy;
-        posLogo[k*3+2]=(Math.random()-.5)*0.6;
+        posLogo[k*3+2]=(Math.random()-.5)*0.2;
       }
     }
 
@@ -381,7 +382,7 @@ body{
       geo.setAttribute('position', new THREE.BufferAttribute(cur,3));
       geo.setAttribute('aColor', new THREE.BufferAttribute(colors,3));
       geo.setAttribute('aSize', new THREE.BufferAttribute(sizes,1));
-      uniforms={ uSize:{value:IS_MOBILE?2.0:2.6}, uPulse:{value:0}, uTime:{value:0} };
+      uniforms={ uSize:{value:BASE_SZ}, uPulse:{value:0}, uTime:{value:0} };
       var mat=new THREE.ShaderMaterial({
         uniforms:uniforms, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
         vertexShader:[
@@ -402,7 +403,7 @@ body{
           'void main(){',
           '  float d=length(gl_PointCoord-0.5);',
           '  float a=smoothstep(0.5,0.0,d); a=pow(a,1.7);',
-          '  vec3 col=vColor*(0.75+0.9*uPulse)*vTw;',
+          '  vec3 col=vColor*(0.58+0.85*uPulse)*vTw;',
           '  gl_FragColor=vec4(col,a);',
           '}'
         ].join('\n')
@@ -440,6 +441,7 @@ body{
       var idle=0.18+0.12*Math.sin(t*0.9);
       uniforms.uPulse.value=Math.max(idle, pulse);
       var m=state.morph;
+      uniforms.uSize.value=BASE_SZ-0.2*m; // crisper points when forming the wordmark
       var driftK=(1-0.82*m); // less drift when formed
       for(var i=0;i<N;i++){
         var ph=drift[i*4]+t*drift[i*4+1];
@@ -457,7 +459,7 @@ body{
           linePos[o+3]=cur[i1*3];linePos[o+4]=cur[i1*3+1];linePos[o+5]=cur[i1*3+2];
         }
         lines.geometry.attributes.position.needsUpdate=true;
-        lines.material.opacity=(0.10+0.16*(1-m))*(0.6+0.8*uniforms.uPulse.value);
+        lines.material.opacity=(0.05+0.17*(1-m))*(0.6+0.8*uniforms.uPulse.value);
       }
       pointer.x+=(pointer.tx-pointer.x)*0.05; pointer.y+=(pointer.ty-pointer.y)*0.05;
       group.rotation.y=t*0.04 + pointer.x*0.5;
@@ -525,23 +527,23 @@ body{
     /* ===== Intro orchestration ===== */
     function reveal(){
       scrambleAll();
-      if(window.gsap && !REDUCED){
-        gsap.fromTo('#card',{opacity:0,y:24,scale:.985},{opacity:1,y:0,scale:1,duration:1.1,delay:.15,ease:'power3.out'});
+      if(window.gsap && !REDUCED && GL_OK){
+        // Cinematic one-shot: cloud blooms in -> converges into INTELLIGENCE -> disperses to nebula -> card arrives
+        state.scale=1.85; state.morph=0;
+        var tl=gsap.timeline();
+        tl.to(state,{scale:1,duration:2.3,ease:'power2.out'},0);
+        tl.to(state,{morph:1,duration:2.4,ease:'power2.inOut'},0.5);   // converge to wordmark
+        tl.to(state,{morph:1,duration:1.5},'>');                        // hold the word
+        tl.to(state,{morph:0,duration:2.7,ease:'power2.inOut'},'>');    // disperse into nebula
+        tl.fromTo('#card',{opacity:0,y:26,scale:.985},{opacity:1,y:0,scale:1,duration:1.25,ease:'power3.out'},'-=1.6');
+        tl.to('#enterHint',{opacity:1,duration:1},'-=0.6');
+      } else if(window.gsap && !REDUCED){
+        gsap.fromTo('#card',{opacity:0,y:24,scale:.985},{opacity:1,y:0,scale:1,duration:1.1,delay:.3,ease:'power3.out'});
         gsap.to('#enterHint',{opacity:1,duration:1,delay:1.1});
-        if(GL_OK){
-          state.scale=1.7; state.morph=0;
-          gsap.to(state,{scale:1,duration:2.2,ease:'power2.out'});
-          // breathing identity loop: nebula <-> wordmark
-          var tl=gsap.timeline({repeat:-1, delay:1.0});
-          tl.to(state,{morph:1,duration:3.2,ease:'power2.inOut'})
-            .to(state,{morph:1,duration:2.4})
-            .to(state,{morph:0,duration:3.0,ease:'power2.inOut'})
-            .to(state,{morph:0,duration:3.4});
-        }
       } else {
         document.getElementById('card').style.cssText+=';opacity:1;transform:none;';
         document.getElementById('enterHint').style.opacity='1';
-        if(GL_OK && REDUCED){ state.morph=1; state.scale=1; }
+        if(GL_OK){ state.morph=0; state.scale=1; }
       }
     }
 
@@ -552,17 +554,17 @@ body{
       var bEls=blocks.children;
       var pctEl=document.getElementById('plPct'), stEl=document.getElementById('plStatus');
       var steps=[[18,'CALIBRATING PARTICLE FIELD'],[42,'LINKING SIGNAL NODES'],[68,'ESTABLISHING <b>SECURE CHANNEL</b>'],[88,'SYNCING INTERFACE'],[100,'<b>READY</b>']];
-      var pct=0, si=0, started=performance.now();
+      var si=0, started=performance.now(), DUR=REDUCED?400:2200;
       function step(t){
-        var target = REDUCED?100:Math.min(100, ((t-started)/1900)*100);
-        pct+=(target-pct)*0.12; if(target>=100 && pct>99.4) pct=100;
-        var ip=Math.round(pct);
+        var p=Math.min(1,(t-started)/DUR);
+        var e=1-Math.pow(1-p,2);               // easeOutQuad, guaranteed to reach 100
+        var pct=e*100, ip=Math.round(pct);
         pctEl.textContent=ip;
         var on=Math.round(pct/100*NB);
         for(var i=0;i<NB;i++){ bEls[i].className=i<on?'on':''; }
         while(si<steps.length && ip>=steps[si][0]){ stEl.innerHTML=steps[si][1]; si++; }
-        if(pct<100) requestAnimationFrame(step);
-        else finish();
+        if(p<1){ requestAnimationFrame(step); }
+        else { pctEl.textContent=100; for(var k=0;k<NB;k++) bEls[k].className='on'; stEl.innerHTML=steps[steps.length-1][1]; finish(); }
       }
       var done=false;
       function finish(){ if(done)return; done=true;
@@ -576,15 +578,3 @@ body{
     /* ===== Boot ===== */
     function boot(){
       var ok=false; try{ ok=initGL(); }catch(e){ ok=false; }
-      if(!ok){ document.getElementById('scene').style.display='none'; document.getElementById('fallback-bg').style.display='block'; }
-      else { loop(); }
-      runPreloader(reveal);
-      // expose for live tuning
-      window.__LP={state:state,uniforms:uniforms,audio:audio,GL_OK:function(){return GL_OK;},reveal:reveal};
-    }
-    if(document.fonts && document.fonts.ready){ document.fonts.ready.then(boot); setTimeout(function(){ if(!window.__LP) boot(); },1200); }
-    else boot();
-  })();
-  </script>
-</body>
-</html
