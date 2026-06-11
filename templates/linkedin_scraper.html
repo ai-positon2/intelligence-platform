@@ -1571,5 +1571,41 @@ html.lenis,html.lenis body{height:auto}
   ready(function(){new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;run();},320);}).observe(document.body,{childList:true,subtree:true});});
 })();</script>
 <script>(function(){var a=document.querySelector(".li-aurora");if(!a||!(window.matchMedia&&matchMedia("(pointer:fine)").matches))return;addEventListener("mousemove",function(e){a.style.transform="translate("+((e.clientX/innerWidth-.5)*-26)+"px,"+((e.clientY/innerHeight-.5)*-18)+"px)";},{passive:true});})();</script>
+
+<style>
+/* LinkedIn — race-style leaderboard */
+.lbfill{transition:width 1.1s cubic-bezier(.22,1,.36,1)}
+.lbitem:first-child .lbfill{background:linear-gradient(90deg,#f59e0b,#fbbf24) !important;box-shadow:0 0 12px rgba(251,191,36,.55)}
+.lbitem:first-child .lbname{color:#fde68a !important;font-weight:700}
+.lbitem:first-child .lbrank{color:#fbbf24 !important}
+.lbnum{font-variant-numeric:tabular-nums}
+.lbitem{transition:background .2s}
+.lbitem:hover{background:rgba(129,140,248,.07)}
+@media (prefers-reduced-motion:reduce){.lbfill{transition:none}}
+</style>
+<script>(function(){
+  if(window.__lbrace)return;window.__lbrace=1;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function race(){
+    var items=document.querySelectorAll('.lbitem');if(!items.length)return;
+    items.forEach(function(it,i){
+      if(it.__raced)return;it.__raced=1;
+      var dl=60+Math.min(i*70,1000);
+      var fill=it.querySelector('.lbfill');
+      if(fill){
+        var tw=fill.style.width||getComputedStyle(fill).width;
+        if(reduce){return;}
+        fill.style.transition='none';fill.style.width='0%';void fill.offsetWidth;
+        setTimeout(function(){fill.style.transition='width 1.1s cubic-bezier(.22,1,.36,1)';fill.style.width=tw;},dl);
+      }
+      var num=it.querySelector('.lbnum');
+      if(num&&!reduce){var t=parseInt((num.textContent||'').replace(/[^0-9]/g,''),10);
+        if(t>0){num.textContent='0';setTimeout(function(){var t0=null;function s(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/900);p=1-Math.pow(1-p,3);num.textContent=Math.round(t*p);if(p<1)requestAnimationFrame(s);}requestAnimationFrame(s);},dl);}}
+    });
+  }
+  function go(){try{race();}catch(e){}}
+  if(document.readyState!=='loading')setTimeout(go,500);else document.addEventListener('DOMContentLoaded',function(){setTimeout(go,500);});
+  var pend=null;new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;go();},350);}).observe(document.documentElement,{childList:true,subtree:true});
+})();</script>
 </body>
 </html>
