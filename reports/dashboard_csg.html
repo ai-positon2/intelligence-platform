@@ -5492,12 +5492,12 @@ window.rfxResume=function(){var since=0;try{since=parseFloat(localStorage.getIte
 /* ── SIDEBAR REDESIGN v2 ─────────────────────────────── */
 :root{--sb-w:268px}
 /* v2 sidebar is in-flow flex (position:relative) — drop legacy fixed-sidebar margin to kill the gap */
-#main{margin-left:0!important}
+#main{margin-left:var(--sb-w)!important}
 #sidebar{
   width:var(--sb-w)!important;min-width:var(--sb-w)!important;
   background:#0b0c1a!important;
   border-right:1px solid rgba(99,102,241,.25)!important;
-  position:relative!important;overflow:hidden!important;
+  position:fixed!important;overflow:hidden!important;
 }
 /* top indigo glow band */
 #sidebar::before{
