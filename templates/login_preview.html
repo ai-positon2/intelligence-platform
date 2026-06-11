@@ -10,7 +10,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
-  --bg:#04050d; --ink:#e8ecf8; --dim:#9aa6cc; --dim2:#5b6party; --dim3:#566089;
+  --bg:#04050d; --ink:#e8ecf8; --dim:#9aa6cc; --dim2:#7c89b0; --dim3:#566089;
   --cyan:#22d3ee; --violet:#8b5cf6; --indigo:#6366f1;
   --line:rgba(120,140,210,.16);
   --mono:'JetBrains Mono',ui-monospace,monospace;
@@ -85,6 +85,9 @@ main{position:relative;z-index:10}
 .sec.al-r{justify-content:flex-end}
 .sec.al-r .inner{text-align:right}
 .inner{max-width:560px;opacity:0;transform:translateY(40px);will-change:opacity,transform}
+.inner{position:relative}
+.inner::before{content:'';position:absolute;inset:-50px -70px;background:radial-gradient(60% 72% at 50% 50%,rgba(4,5,13,.6),transparent 76%);z-index:-1;filter:blur(8px);pointer-events:none}
+.sec h1,.sec h2{text-shadow:0 2px 26px rgba(2,4,12,.55)}
 .kick{font-family:var(--mono);font-size:11px;letter-spacing:.4em;color:var(--cyan);text-transform:uppercase;margin-bottom:18px}
 .sec h1{font-size:clamp(40px,6.4vw,86px);font-weight:700;line-height:1.02;letter-spacing:-.02em;margin-bottom:22px}
 .sec h2{font-size:clamp(30px,4.4vw,60px);font-weight:700;line-height:1.06;letter-spacing:-.015em;margin-bottom:18px}
@@ -282,7 +285,7 @@ main{position:relative;z-index:10}
     var BASE_SZ = IS_MOBILE?0.9:0.74;
     var forms=[], cur, colors, sizes, R, edges, linePos;
     var pulse=0, pulseTarget=0;
-    var prog=0, progSmooth=0;
+    var prog=0, progSmooth=0, tT=0;
 
     function st(f,i,x,y,z){ forms[f][i*3]=x; forms[f][i*3+1]=y; forms[f][i*3+2]=z; }
 
@@ -368,13 +371,13 @@ main{position:relative;z-index:10}
       var sTop=(lenis? lenis.scroll : (window.pageYOffset||document.documentElement.scrollTop))||0;
       prog=maxScroll>0?Math.max(0,Math.min(1,sTop/maxScroll)):0;
       progSmooth+=(prog-progSmooth)*0.08;
-      var t=progSmooth*(FORMS-1);
+      var targetT=Math.max(0,Math.min(FORMS-1, sTop/innerHeight)); tT+=(targetT-tT)*0.08; var t=tT;
       var ci=Math.floor(t), nf=Math.min(ci+1,FORMS-1), fr=t-ci; fr=fr*fr*(3-2*fr);
       var A=forms[ci], B=forms[nf];
       pulse+=(pulseTarget-pulse)*0.06; var idle=0.15+0.1*Math.sin(time*0.55); uniforms.uPulse.value=Math.max(idle,pulse);
       var wm=Math.max(0,Math.min(1,t-6));
       uniforms.uSize.value=BASE_SZ-0.16*wm;
-      var driftK=0.55*(1-0.7*wm);
+      var driftK=0.4*(1-0.7*wm);
       for(var i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
         var dax=Math.sin(ph)*driftK, day=Math.cos(ph*0.9)*driftK, daz=Math.sin(ph*0.7)*driftK;
         var ax=A[i*3],ay=A[i*3+1],az=A[i*3+2], bx=B[i*3],by=B[i*3+1],bz=B[i*3+2];
