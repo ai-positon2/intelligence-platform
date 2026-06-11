@@ -83,4 +83,76 @@ Opens a redesigned dark modal (4-step flow: HIGH from Sheets, LOW from Google Ne
 - The local git working copy has occasionally gotten into a corrupt/locked state; the reliable push pattern is: **clone the remote fresh, copy edited files in, commit, push** (and don't delete the clone until the push is confirmed).
 - Current state: Kairo "v10.x" (Command Center/Pipeline/Actions/Radar, chat, deep dossier, infographics, Platform header, clickable cards, `/signal-tracker` URLs, live-progress refresh modal). Performance was tuned (rAF-throttled scroll, removed `backdrop-filter` on repeated cards, `content-visibility:auto` on long lists).
 
+## Frontend / UX overhaul (2026) — injected design layers
+Every page got a cinematic, premium redesign layered on top of existing markup as self-contained
+`<style>+<script>` blocks placed before the LAST `</body>`, each guarded by a `window.__flag` so it runs
+once. All injected CSS/JS is jinja-safe (contains NO `{{` `{%` `{#`).
+
+Reusable engines (namespaces / guards):
+- **CINEMA kit** (`cz-`, `__cinema`) — every page. Lenis inertia smooth-scroll (CDN jsdelivr `lenis@1`) +
+  top scroll-progress bar (`.cz-prog`) + parallax `[data-cz-par]` + reveals `[data-cz-reveal]` + a Lenis
+  `prevent()` so any natively-scrollable inner element (tables/feeds/modals/command palette) keeps native
+  scroll. Reduced-motion + graceful native-scroll fallback.
+- **AMBIENCE** (`amb-`/`av-`/`li-`, `__amb`) — animated aurora gradient blobs + film grain on landing pages
+  (hub/ppc/seo/accounts); tinted variants on anonymous_visitors (green) and linkedin (indigo).
+- **ALIVE engine** (`alive-`, `__alive`, config `window.__ALIVE_CFG`) — cursor SPOTLIGHT (`#alive-spot`),
+  scroll reveals (`.alive-rv`, with a 1.7s FAIL-SAFE so content is never left hidden), 3D tilt, magnetic
+  buttons; re-applies to JS-rendered content via a throttled MutationObserver.
+
+Per page:
+- **login.html** — scroll-PINNED hero (`.login-pin`) + WebGL aurora/nebula SHADER background (`#glx` canvas,
+  GLSL fbm domain-warp, mouse-reactive, reduced-motion static frame, no-WebGL fallback, `__glx`). GIS sign-in
+  untouched. (Login also pre-existed as a ThoughtSpot-style scroll story, namespace `ts-`/`lx-`.)
+- **hub.html** — scroll-pinned hero (`.hub-pin`) with a signature animated SVG "signal radar" (`.hb-radar`:
+  rings + rotating sweep + pulsing nodes + mouse parallax) and a count-up stats band. The old "Jump straight in"
+  index was REMOVED on request.
+- **ppc / seo / accounts** — taller cinematic hero + scroll cue + per-discipline signature SVG motifs:
+  PPC sonar-pulse + equalizer (`.ppc-motif`), SEO growth-trend line (`.seo-motif`), Accounts company
+  constellation (`.ac-motif`).
+- **Signal Tracker dashboards (both)** — US "Signal Map" (`smap-`, `__smap`): d3@7 + topojson-client@3 +
+  us-atlas@3 (jsdelivr), geoAlbersUsa, glowing per-state pins aggregated from `const DATA.companies` (reads
+  global `DATA`, else bracket-match-parses the companies array from page script text, else regex-tally of
+  `"state"`). Pins CLICKABLE -> CENTERED modal (`.smap-modal`): company list -> per-company "Signals" toggle
+  (`.smap-sigbtn`) expands alerts inline -> click company -> full DETAIL profile (stats, intent, About,
+  signals); each signal click opens its `source_url`; back button. "Market Heat" radial gauge (`.smap-gauge`)
+  bottom-right of the map = `(High + 0.5*Med + 0.15*Low)/total` of alert severities, with a hover explainer.
+  Graceful fallback to a top-states bar list if CDNs fail. KPI tiles LEFT FROZEN. Plus hot-signal glow + feed
+  hover/entrance. NOTE: CSG companies have no `state` field, so the map does NOT render on /signal-tracker/csg (expected, not a bug).
+- **LinkedIn Intelligence** — race-style leaderboard (`.lbitem/.lbfill/.lbnum`: bars sweep from 0, values
+  count up, #1 goes gold, re-runs on filter), people-card 3D tilt, aurora. (Never touch the giant minified `const D = {...}`.)
+- **Ad Intelligence (React build)** — flowing aurora via `main.bg-orbs::before`, 3D tilt on `.spotlight`
+  cards, gallery cards fade-in + hover lift. The detail lightbox is the app's own `AdModal`.
+- **Anonymous Visitors** — count-up KPIs (`#sv-people/#sv-companies` via MutationObserver), stat-card shine,
+  live-feed slide-in, green aurora.
+
+CDN deps (browser-loaded, jsdelivr): `lenis@1`, `d3@7`, `topojson-client@3`, `us-atlas@3`.
+
+## Usage analytics changes (app.py + admin_usage.html, namespaces `ux-`/`uxm-`, `__uxx`)
+- The `/api/track` page-view snippet was ADDED to all previously-untracked pages (accounts,
+  anonymous_visitors, linkedin_scraper, both signal dashboards, ad_intelligence, admin_usage) so they now
+  appear in "Top Pages" (titles e.g. "Signal Tracker - Healthcare", "Ad Intelligence", "Anonymous Visitors",
+  "LinkedIn Intelligence"). `/api/track` now falls back to `session["google_user"]` email when the POST email
+  is blank, so static dashboards attribute to the logged-in user.
+- `_fetch_usage_data()`: the page-view table `[:200]` cap was REMOVED (show all); Top Pages raised 8 -> 15;
+  added `device_breakdown`, `os_breakdown`, `busiest_day`, `avg_view_fmt`, `views_per_user`.
+- admin_usage.html: "Users activity" (`#users-wrap`, 360px) and the Page Views/Logins tables
+  (`#c-tables .tbl-wrap`, 560px) are SCROLL-CONTAINED with sticky headers + gradient scrollbars; row-entrance
+  animation capped (`tbody tr:nth-child(n+45)`). New cards: Devices, Operating Systems, Quick Facts. The four
+  top KPI cards (`sc0`-`sc3`) are CLICKABLE -> detail modal (`.uxm`).
+
+## Added conventions/gotchas (overhaul)
+- Inject custom blocks before the LAST `</body>`; assert exactly one `</body>` after.
+- Injected CSS/JS into Jinja templates must avoid `{{ {% {#`. `reports/*.html` and `ad_intelligence/index.html`
+  are NOT Jinja — don't jinja-parse them and don't put `{{ }}` inside them.
+- The Signal Map block is currently the LAST injected block before `</body>` on both dashboards (locate via
+  `.smap-panel{` -> preceding `<style>` -> up to `</body>`); preserve the layer markers
+  (`KPI tiles v3`, `DSv2`, `__cinema`, `__alive`).
+- Guard JS field types: company `keywords`/`tech_stack` can be strings, not arrays (use `Array.isArray`).
+- `.kpi-card` tiles on Signal Tracker MUST stay frozen (no hover transforms) — design mandate.
+- The BASH sandbox has NO general outbound network (CDN/npm registry time out) and resets/wipes `/tmp`
+  between some calls; do package checks and ALL live verification in the BROWSER (Claude in Chrome), and
+  re-clone if `/tmp` is wiped. Tab can close mid-session -> re-create via tabs_context_mcp.
+- Verify live with a `?v=` cache-buster; template deploys ~60-120s, app.py deploys ~2 min.
+
+
 When making changes, follow these conventions, preserve Kairo, keep the no-revenue rule, verify, and push to `ai-positon2/intelligence-platform` main.
