@@ -417,7 +417,7 @@ def track_page():
         data    = data or {}
         page    = data.get("page", "unknown")
         seconds = int(data.get("seconds", 0))
-        email   = data.get("email", "")
+        email   = data.get("email", "") or (session.get("google_user") or {}).get("email", "")
         title   = data.get("title", page)
         if seconds < 1:
             return jsonify({"ok": True})
@@ -546,6 +546,16 @@ def _fetch_usage_data() -> dict:
     browser_counts = Counter(col(r, 10) for r in login_data if col(r, 10))
     browser_breakdown = browser_counts.most_common(5)
 
+    # Device / OS breakdown + quick facts (from page views)
+    device_breakdown = Counter(col(r,12) for r in page_data if col(r,12)).most_common(5)
+    os_breakdown     = Counter(col(r,11) for r in page_data if col(r,11)).most_common(5)
+    _day_counts      = Counter(col(r,3) for r in page_data if col(r,3))
+    busiest_day      = list(_day_counts.most_common(1)[0]) if _day_counts else ["—", 0]
+    _avg             = round(total_secs/total_page_views) if total_page_views else 0
+    _am, _as         = divmod(_avg, 60)
+    avg_view_fmt     = (f"{_am}m {_as}s" if _am else f"{_as}s") if _avg else "—"
+    views_per_user   = round(total_page_views/unique_users, 1) if unique_users else 0
+
     # Per-user activity
     user_map: dict = {}
     for r in login_data:
@@ -576,7 +586,10 @@ def _fetch_usage_data() -> dict:
                 total_page_views=total_page_views, total_time_fmt=total_time_fmt,
                 top_pages=top_pages, login_days=sorted_days,
                 browser_breakdown=browser_breakdown, user_activity=user_activity,
-                login_table=login_table, page_table=page_table)
+                login_table=login_table, page_table=page_table,
+                device_breakdown=device_breakdown, os_breakdown=os_breakdown,
+                busiest_day=busiest_day, avg_view_fmt=avg_view_fmt,
+                views_per_user=views_per_user)
 
 
 @app.route("/admin/usage")

@@ -1307,5 +1307,6 @@ html.lenis,html.lenis body{height:auto}
   ready(function(){new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;run();},320);}).observe(document.body,{childList:true,subtree:true});});
 })();</script>
 <script>(function(){var a=document.querySelector(".av-aurora");if(!a||!(window.matchMedia&&matchMedia("(pointer:fine)").matches))return;addEventListener("mousemove",function(e){a.style.transform="translate("+((e.clientX/innerWidth-.5)*-26)+"px,"+((e.clientY/innerHeight-.5)*-18)+"px)";},{passive:true});})();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Anonymous Visitors',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 </body>
 </html>

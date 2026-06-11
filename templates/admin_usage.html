@@ -962,5 +962,125 @@ tbody tr:nth-child(n+45){animation:none}
   var pend=null;
   ready(function(){new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;run();},320);}).observe(document.body,{childList:true,subtree:true});});
 })();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Usage Dashboard',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+
+<style>
+/* clickable KPI cards */
+.stat-card{cursor:pointer;position:relative}
+.stat-card::after{content:'view \2197';position:absolute;top:13px;right:15px;font-size:9px;font-weight:800;letter-spacing:.08em;color:#3d4460;opacity:0;transition:opacity .2s}
+.stat-card:hover::after{opacity:.75}
+.stat-card:active{transform:scale(.99)}
+/* extra info cards */
+.ux-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px}
+@media(max-width:900px){.ux-grid3{grid-template-columns:1fr}}
+.ux-bar-row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.ux-bar-name{font-size:12px;color:#94a3b8;width:104px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ux-bar-wrap{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:99px;overflow:hidden}
+.ux-bar{height:100%;border-radius:99px;width:0;transition:width .9s cubic-bezier(.34,.6,.6,1)}
+.ux-bar-val{font-size:11px;font-weight:700;color:#a5b4fc;width:34px;text-align:right;flex-shrink:0}
+.ux-fact{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ux-fact:last-child{border-bottom:none}
+.ux-fact-l{font-size:12px;color:#64748b}
+.ux-fact-v{font-size:14px;font-weight:700;color:#e2e8f0}
+.ux-fact-v.g{color:#34d399}.ux-fact-v.v{color:#a5b4fc}.ux-fact-v.a{color:#fbbf24}
+/* kpi modal */
+.uxm-bg{position:fixed;inset:0;background:rgba(4,6,14,.74);backdrop-filter:blur(6px);z-index:9000;opacity:0;pointer-events:none;transition:opacity .25s}
+.uxm-bg.on{opacity:1;pointer-events:auto}
+.uxm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.96);width:min(720px,94vw);max-height:84vh;background:rgba(11,14,26,.99);border:1px solid rgba(129,140,248,.25);border-radius:18px;box-shadow:0 50px 130px rgba(0,0,0,.75),0 0 70px rgba(99,102,241,.1);z-index:9001;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .26s,transform .26s cubic-bezier(.22,1.3,.36,1)}
+.uxm.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.uxm-head{display:flex;align-items:center;justify-content:space-between;padding:17px 20px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.uxm-title{font-size:17px;font-weight:800;color:#f1f5f9;display:flex;align-items:center;gap:9px}
+.uxm-big{font-size:13px;color:#67e8f9;font-weight:700}
+.uxm-x{width:31px;height:31px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#94a3b8;cursor:pointer;font-size:13px;transition:all .15s}
+.uxm-x:hover{color:#fff;border-color:rgba(129,140,248,.5)}
+.uxm-body{overflow-y:auto;padding:14px 18px 22px;flex:1}
+.uxm-sec{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#5d6890;margin:6px 0 10px}
+.uxm-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px;color:#cbd5e1}
+.uxm-row:last-child{border-bottom:none}
+.uxm-row .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.uxm-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uxm-row .nm b{color:#eef2ff;font-weight:700}.uxm-row .nm span{color:#5d6890;font-size:11px}
+.uxm-row .vv{font-weight:800;color:#a5b4fc;flex-shrink:0}
+.uxm-row .vv.g{color:#34d399}
+.uxm-bars{margin-bottom:6px}
+@media (prefers-reduced-motion:reduce){.uxm{transition:opacity .1s}}
+</style>
+<script>(function(){
+  if(window.__uxx)return;window.__uxx=1;
+  var COLORS=['#6366f1','#34d399','#a78bfa','#fbbf24','#22d3ee'];
+  var D=null,pending=[];
+  function load(cb){pending.push(cb);if(D){flush();return;}if(load.__l)return;load.__l=1;fetch('/admin/usage/data').then(function(r){return r.json();}).then(function(j){D=j||{};flush();}).catch(function(){D={};flush();});}
+  function flush(){pending.splice(0).forEach(function(cb){try{cb(D);}catch(e){}});}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function bars(items){if(!items||!items.length)return '<div style="color:#475569;font-size:12px;padding:10px 0">No data yet</div>';var max=items[0][1]||1;return items.map(function(it,i){var pct=Math.round(it[1]/max*100);var c=COLORS[i%COLORS.length];return '<div class="ux-bar-row"><span class="ux-bar-name">'+esc(it[0]||'—')+'</span><span class="ux-bar-wrap"><span class="ux-bar" data-w="'+pct+'" style="background:'+c+'"></span></span><span class="ux-bar-val">'+it[1]+'</span></div>';}).join('');}
+  function animateBars(root){(root||document).querySelectorAll('.ux-bar[data-w]').forEach(function(b){setTimeout(function(){b.style.width=b.getAttribute('data-w')+'%';},60);});}
+  // ---- extra info cards ----
+  function ensureRow(){
+    var tables=document.getElementById('c-tables');if(!tables||document.getElementById('c-devices'))return;
+    var row=document.createElement('div');row.className='ux-grid3';
+    row.innerHTML='<div class="card" id="c-devices"><div class="card-head"><div class="card-title"><span class="card-title-icon">🖥️</span> Devices</div><span class="card-meta">by page view</span></div><div class="card-body"><div id="ux-dev"><div class="skel" style="height:90px"></div></div></div></div>'
+      +'<div class="card" id="c-os"><div class="card-head"><div class="card-title"><span class="card-title-icon">⚙️</span> Operating Systems</div><span class="card-meta">by page view</span></div><div class="card-body"><div id="ux-os"><div class="skel" style="height:90px"></div></div></div></div>'
+      +'<div class="card" id="c-facts"><div class="card-head"><div class="card-title"><span class="card-title-icon">✦</span> Quick Facts</div></div><div class="card-body"><div id="ux-facts"><div class="skel" style="height:90px"></div></div></div></div>';
+    tables.parentNode.insertBefore(row,tables);
+  }
+  function renderExtras(d){
+    ensureRow();
+    var dev=document.getElementById('ux-dev'),os=document.getElementById('ux-os'),fa=document.getElementById('ux-facts');
+    if(dev){dev.innerHTML=bars(d.device_breakdown);}
+    if(os){os.innerHTML=bars(d.os_breakdown);}
+    if(fa){
+      var bd=d.busiest_day||['—',0];
+      fa.innerHTML='<div class="ux-fact"><span class="ux-fact-l">Busiest day</span><span class="ux-fact-v v">'+esc(bd[0])+' <span style="color:#5d6890;font-size:11px;font-weight:600">('+bd[1]+')</span></span></div>'
+        +'<div class="ux-fact"><span class="ux-fact-l">Avg time / view</span><span class="ux-fact-v g">'+esc(d.avg_view_fmt||'—')+'</span></div>'
+        +'<div class="ux-fact"><span class="ux-fact-l">Views per user</span><span class="ux-fact-v a">'+esc(d.views_per_user||'—')+'</span></div>'
+        +'<div class="ux-fact"><span class="ux-fact-l">Total time</span><span class="ux-fact-v">'+esc(d.total_time_fmt||'—')+'</span></div>'
+        +'<div class="ux-fact"><span class="ux-fact-l">Top page</span><span class="ux-fact-v">'+esc((d.top_pages&&d.top_pages[0]&&d.top_pages[0][0])||'—')+'</span></div>';
+    }
+    animateBars(document.querySelector('.ux-grid3'));
+  }
+  // ---- KPI modal ----
+  var mbg,modal,mt,mb;
+  function ensureModal(){
+    if(modal)return;
+    mbg=document.createElement('div');mbg.className='uxm-bg';document.body.appendChild(mbg);
+    modal=document.createElement('div');modal.className='uxm';
+    modal.innerHTML='<div class="uxm-head"><div class="uxm-title" id="uxm-t"></div><button class="uxm-x" id="uxm-x">✕</button></div><div class="uxm-body" id="uxm-b"></div>';
+    document.body.appendChild(modal);mt=modal.querySelector('#uxm-t');mb=modal.querySelector('#uxm-b');
+    function close(){modal.classList.remove('on');mbg.classList.remove('on');}
+    mbg.addEventListener('click',close);modal.querySelector('#uxm-x').addEventListener('click',close);
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  }
+  function userRows(list,valKey,valFmt){return (list||[]).slice(0,60).map(function(u){var init=esc((u.name||u.email||'U').slice(0,2).toUpperCase());var v=valFmt?valFmt(u):u[valKey];return '<div class="uxm-row"><span class="av">'+init+'</span><span class="nm"><b>'+esc(u.name||u.email||'—')+'</b><br><span>'+esc(u.email||'')+'</span></span><span class="vv">'+esc(v)+'</span></div>';}).join('');}
+  function openKpi(type){
+    ensureModal();mt.innerHTML='<span class="skel" style="width:160px;height:18px;display:inline-block"></span>';mb.innerHTML='<div class="skel" style="height:200px"></div>';
+    mbg.classList.add('on');modal.classList.add('on');
+    load(function(d){
+      var h='';
+      if(type==='logins'){
+        mt.innerHTML='📈 Total Logins <span class="uxm-big">'+(d.total_logins||0)+'</span>';
+        h='<div class="uxm-sec">Logins per day</div><div class="uxm-bars">'+bars((d.login_days||[]).map(function(x){return [x[0],x[1]];}))+'</div>';
+        h+='<div class="uxm-sec">Recent logins</div>'+(d.login_table||[]).slice(0,40).map(function(r){return '<div class="uxm-row"><span class="nm"><b>'+esc(r.name||r.email||'—')+'</b><br><span>'+esc(r.email||'')+' · '+esc(r.browser||'')+' · '+esc(r.device||'')+'</span></span><span class="vv" style="font-size:11px;color:#5d6890">'+esc(r.ts||'')+'</span></div>';}).join('');
+      } else if(type==='users'){
+        mt.innerHTML='👤 Unique Users <span class="uxm-big">'+(d.unique_users||0)+'</span>';
+        h='<div class="uxm-sec">By login count</div>'+userRows(d.user_activity,'logins',function(u){return (u.logins||0)+' logins';});
+      } else if(type==='views'){
+        mt.innerHTML='📄 Page Views <span class="uxm-big">'+(d.total_page_views||0)+'</span>';
+        h='<div class="uxm-sec">Top pages</div><div class="uxm-bars">'+bars(d.top_pages||[])+'</div>';
+        h+='<div class="uxm-sec">Avg time / view: '+esc(d.avg_view_fmt||'—')+' · '+esc(d.views_per_user||'—')+' views/user</div>';
+      } else {
+        mt.innerHTML='⏱ Time Spent <span class="uxm-big">'+esc(d.total_time_fmt||'—')+'</span>';
+        var byTime=(d.user_activity||[]).slice().sort(function(a,b){return (b.total_secs||0)-(a.total_secs||0);});
+        h='<div class="uxm-sec">Time on site by user</div>'+byTime.slice(0,60).map(function(u){var init=esc((u.name||u.email||'U').slice(0,2).toUpperCase());return '<div class="uxm-row"><span class="av">'+init+'</span><span class="nm"><b>'+esc(u.name||u.email||'—')+'</b><br><span>'+esc(u.email||'')+'</span></span><span class="vv g">'+esc(u.time_fmt||'—')+'</span></div>';}).join('');
+      }
+      mb.innerHTML=h;animateBars(mb);
+    });
+  }
+  function init(){
+    ensureRow();load(renderExtras);
+    [['sc0','logins'],['sc1','users'],['sc2','views'],['sc3','time']].forEach(function(p){var el=document.getElementById(p[0]);if(el&&!el.__k){el.__k=1;el.addEventListener('click',function(){openKpi(p[1]);});}});
+  }
+  if(document.readyState!=='loading')setTimeout(init,600);else document.addEventListener('DOMContentLoaded',function(){setTimeout(init,600);});
+  var pend=null;new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;init();},500);}).observe(document.body,{childList:true,subtree:true});
+})();</script>
 </body>
 </html>
