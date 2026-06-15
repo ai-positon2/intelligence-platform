@@ -4777,7 +4777,7 @@ function _renderCC(ins,cachedTs){
         +'<div class="ir9-spot-hook">'+esc(f.hook||f.why||'')+'</div>'
         +'<div class="ir9-spot-foot">'+(f.svc[0]?'<span class="ir9-svc">'+esc(f.svc[0])+'</span>':'')
           +'<span style="flex:1"></span>'
-          +'<button class="ir9-act em sm" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
+          +'<button class="ir9-act em sm" data-iract="email" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain||'')+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
           +'<button class="ir9-act rs sm" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain)+'">&#10022; Research</button>'
         +'</div>'
       +'</div></div>';
@@ -4821,7 +4821,7 @@ function _renderPip(){
           +'</div>'
         +'</div>'
         +'<div class="ir9-card-btns">'
-          +'<button class="ir9-act em" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
+          +'<button class="ir9-act em" data-iract="email" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain||'')+'" data-svc="'+esc(f.svc[0]||'')+'">&#9993; Kairo Email</button>'
           +'<button class="ir9-act rs" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain)+'">&#10022; Research</button>'
           +'<a class="ir9-act" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">&#128100; Contacts</a>'
           +'<a class="ir9-act" href="'+liCo(f.name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
@@ -4924,7 +4924,7 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('[data-iract]');if(!b)return;
   var a=b.getAttribute('data-iract');
   if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
-  else if(a==='email'){e.stopPropagation();irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone')||'');}
+  else if(a==='email'){e.stopPropagation();if(b.getAttribute('data-tone')){irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone'));}else{irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'','','');}}
   else if(a==='research'){e.stopPropagation();irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
   else if(a==='signal-email'){e.stopPropagation();irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'',b.getAttribute('data-sig-type')||'',b.getAttribute('data-sig-detail')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
@@ -5211,7 +5211,7 @@ window.irSigModalClose=function(e){
 
 /* ── Signal Email Setup ── */
 window.irSignalEmailSetup=function(co,dom,apolloId,sigType,sigDetail){
-  var coObj=(DATA.companies||[]).filter(function(x){return x.apollo_id==apolloId;})[0];
+  var coObj=(DATA.companies||[]).filter(function(x){return x.apollo_id==apolloId||(apolloId===''&&(x.name||'').toLowerCase()===co.toLowerCase());})[0];
   var allSigs=(coObj&&coObj.alerts)||[];
   var sigOpts='<option value="ALL">&#9733; All signals (let Kairo choose best)</option>'
     +(allSigs.length
