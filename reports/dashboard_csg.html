@@ -1264,6 +1264,15 @@ h2::after,.section-title::after{
 .ir9-act.rs{border-color:rgba(167,139,250,.4);color:#c4b5fd;background:rgba(124,58,237,.08)}
 .ir9-act.rs:hover{background:rgba(124,58,237,.18)}
 .ir9-act.sm{font-size:10px;padding:4px 9px}
+.sig-kairo-acts{flex-basis:100%;display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.ir9-setup{display:flex;flex-direction:column;gap:14px;padding:2px 0}
+.ir9-setup-sec{display:flex;flex-direction:column;gap:6px}
+.ir9-setup-lbl{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.05em;text-transform:uppercase}
+.ir9-setup-sel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 10px;font-size:12px;font-family:inherit;width:100%;outline:none}
+.ir9-pill-row{display:flex;flex-wrap:wrap;gap:6px}
+.ir9-pill{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:20px;color:var(--text2);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;padding:5px 13px;transition:all .15s;white-space:nowrap}
+.ir9-pill:hover{border-color:rgba(255,255,255,.25);color:var(--text)}
+.ir9-pill.on{background:rgba(99,102,241,.18);border-color:rgba(99,102,241,.5);color:#a5b4fc}
 
 /* ── Pipeline cards ── */
 .ir9-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;row-gap:18px}
@@ -2576,6 +2585,12 @@ function renderSignalFeed(containerId, signals) {
             ${c.linkedin_url ? `<a class="signal-link" href="${esc(c.linkedin_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">LinkedIn</a>` : ''}
             ${domain ? `<a class="signal-link" href="${safeUrl(domain)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Website</a>` : ''}
           </div>
+          <div class="sig-kairo-acts" onclick="event.stopPropagation()">
+            <button class="ir9-act em sm" data-iract="signal-email" data-co="${esc(companyName)}" data-dom="${esc(domain||'')}"
+              data-apollo="${esc(apolloId)}" data-sig-type="${esc(s.signal_type||'')}"
+              data-sig-detail="${esc((s.signal_detail||'').substring(0,200))}">&#9993; Email</button>
+            <button class="ir9-act rs sm" data-iract="research" data-co="${esc(companyName)}" data-dom="${esc(domain||'')}">&#10022; Research</button>
+          </div>
         </div>
         <div class="signal-feed-expand" style="display:none">
           <div style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:6px">${esc(s.signal_detail||'')}</div>
@@ -3527,6 +3542,15 @@ function renderSignalsTab(c) {
         <strong style="color:var(--blue);font-size:12px">${esc(a.signal_type)}</strong>
         <span class="sig-time">${relTime(a.signal_date || a.sent_at)}</span>
         <button id="btn-${uid}" onclick="toggleModalSigExpand('${uid}')" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text2);border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:inherit;white-space:nowrap">▶ View Details</button>
+        <button class="ir9-act em sm" data-iract="signal-email"
+          data-co="${esc(c.name||c.company_name||'')}"
+          data-dom="${esc(c.domain||c.website||'')}"
+          data-apollo="${esc(c.apollo_id||'')}"
+          data-sig-type="${esc(a.signal_type||'')}"
+          data-sig-detail="${esc((a.signal_detail||'').substring(0,200))}">&#9993; Email</button>
+        <button class="ir9-act rs sm" data-iract="research"
+          data-co="${esc(c.name||c.company_name||'')}"
+          data-dom="${esc(c.domain||c.website||'')}">&#10022; Research</button>
       </div>
       <div class="sig-detail">${esc((a.signal_detail||'').substring(0,120))}${(a.signal_detail||'').length>120?'…':''}</div>
       <div id="exp-${uid}" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
@@ -4874,6 +4898,7 @@ document.addEventListener('click',function(e){
   if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='email'){e.stopPropagation();irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone')||'');}
   else if(a==='research'){e.stopPropagation();irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
+  else if(a==='signal-email'){e.stopPropagation();irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'',b.getAttribute('data-sig-type')||'',b.getAttribute('data-sig-detail')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
   else if(a==='brief'){irShowBrief();}
@@ -5142,6 +5167,127 @@ window.irAIEmail=function(co,svc,tone){
     })
     .catch(function(){var L=$('ir9-mload');if(L)L.remove();var out=$('ir9-mout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo could not finish the email. Try again.</div>';});
 };
+
+/* ── Signal Email Setup ── */
+window.irSignalEmailSetup=function(co,dom,apolloId,sigType,sigDetail){
+  var coObj=(DATA.companies||[]).filter(function(x){return x.apollo_id==apolloId;})[0];
+  var allSigs=(coObj&&coObj.alerts)||[];
+  var sigOpts=allSigs.length
+    ?allSigs.map(function(s,i){
+        var isMat=(s.signal_type||'')===sigType&&(s.signal_detail||'').substring(0,80)===(sigDetail||'').substring(0,80);
+        return '<option value="'+i+'"'+(isMat?' selected':'')+'>'+esc(s.signal_type||'Signal')+' — '+esc((s.signal_detail||'').substring(0,70))+'</option>';
+      }).join('')
+    :'<option value="0">'+esc(sigType||'Signal')+'</option>';
+  var tones=[['direct','Direct'],['warm','Warm'],['friendly','Friendly'],['professional','Professional'],['crisp','Crisp'],['short','Short & Punchy']];
+  var svcs=[['Paid Marketing','Paid Marketing'],['SEO','SEO'],['Website','Website'],['Creatives','Creatives'],['Arena/AI Dashboards','Arena / AI'],['ALL','All Services']];
+  var f=(D.feed||[]).filter(function(x){return x.name&&x.name.toLowerCase()===co.toLowerCase();})[0];
+  var ctx=coHeader(co,dom||'','#4f46e5')
+    +((f&&f.signals&&f.signals.length)?'<div class="ir9-ds"><div class="ir9-ds-l">Live signals on file</div><div class="ir9-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'');
+  irOpen('&#9993; Generate Email — '+co,ctx
+    +'<div class="ir9-setup">'
+    +'<div class="ir9-setup-sec"><div class="ir9-setup-lbl">Signal to anchor the email</div>'
+    +'<select class="ir9-setup-sel" id="ir9-sig-sel">'+sigOpts+'</select></div>'
+    +'<div class="ir9-setup-sec"><div class="ir9-setup-lbl">Email tone / style</div>'
+    +'<div class="ir9-pill-row" id="ir9-tone-row">'
+    +tones.map(function(t,i){return '<button class="ir9-pill'+(i===0?' on':'')+'" data-val="'+t[0]+'">'+t[1]+'</button>';}).join('')
+    +'</div></div>'
+    +'<div class="ir9-setup-sec"><div class="ir9-setup-lbl">Position2 service to highlight</div>'
+    +'<div class="ir9-pill-row" id="ir9-svc-row">'
+    +svcs.map(function(s,i){return '<button class="ir9-pill'+(i===5?' on':'')+'" data-val="'+s[0]+'">'+s[1]+'</button>';}).join('')
+    +'</div></div>'
+    +'<div class="ir9-setup-sec"><label style="display:flex;align-items:center;gap:9px;cursor:pointer">'
+    +'<input type="checkbox" id="ir9-res-tog" style="width:15px;height:15px;accent-color:#6366f1;cursor:pointer">'
+    +'<span style="font-size:12px;color:var(--text)">Research company and include insights in email</span></label></div>'
+    +'<div style="margin-top:4px"><button class="ir9-btn prim" id="ir9-gen-btn"'
+    +' onclick="irSigEmailGen(\''+esc(co)+'\',\''+esc(dom||'')+'\',\''+esc(apolloId)+'\')"'
+    +' style="width:100%;justify-content:center;padding:11px 0">&#10022; Generate Email</button></div>'
+    +'</div>');
+  function wirePills(rowId){
+    document.querySelectorAll('#'+rowId+' .ir9-pill').forEach(function(p){
+      p.onclick=function(){
+        document.querySelectorAll('#'+rowId+' .ir9-pill').forEach(function(x){x.classList.remove('on');});
+        p.classList.add('on');
+      };
+    });
+  }
+  wirePills('ir9-tone-row'); wirePills('ir9-svc-row');
+};
+
+/* ── Signal Email Generate ── */
+window.irSigEmailGen=function(co,dom,apolloId){
+  var toneEl=document.querySelector('#ir9-tone-row .ir9-pill.on');
+  var svcEl=document.querySelector('#ir9-svc-row .ir9-pill.on');
+  var sigSel=document.getElementById('ir9-sig-sel');
+  var researchOn=!!(document.getElementById('ir9-res-tog')&&document.getElementById('ir9-res-tog').checked);
+  var tone=(toneEl&&toneEl.getAttribute('data-val'))||'direct';
+  var svc=(svcEl&&svcEl.getAttribute('data-val'))||'';
+  var coObj=(DATA.companies||[]).filter(function(x){return x.apollo_id==apolloId;})[0];
+  var allSigs=(coObj&&coObj.alerts)||[];
+  var sigIdx=sigSel?parseInt(sigSel.value,10):0;
+  var selSig=allSigs[sigIdx]||null;
+  var sigParam=selSig?((selSig.signal_type||'')+': '+(selSig.signal_detail||'').substring(0,280)):'';
+  var f=(D.feed||[]).filter(function(x){return x.name&&x.name.toLowerCase()===co.toLowerCase();})[0];
+  var ctx=coHeader(co,dom||'','#4f46e5')
+    +((f&&f.signals&&f.signals.length)?'<div class="ir9-ds"><div class="ir9-ds-l">Signals</div><div class="ir9-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'')
+    +(sigParam?'<div class="ir9-ds"><div class="ir9-ds-l">Anchored signal</div><div class="ir9-ds-v" style="font-size:12px">'+esc(sigParam.substring(0,150))+'</div></div>':'');
+  irOpen('&#9993; Kairo Email — '+co,ctx
+    +'<div class="ir9-load" id="ir9-mload"><span class="ir9-spin">&#10227;</span> Kairo is writing a personalised email…</div>'
+    +'<div id="ir9-mout"></div>');
+  var url='/api/generate-email/'+acct()+'?company='+encodeURIComponent(co)
+    +(svc?'&service='+encodeURIComponent(svc):'')
+    +'&tone='+encodeURIComponent(tone)
+    +(sigParam?'&signal='+encodeURIComponent(sigParam.substring(0,300)):'')
+    +(researchOn?'&research=1':'');
+  function doEmail(extraCtx){
+    var finalUrl=url+(extraCtx?'&context='+encodeURIComponent(extraCtx.substring(0,600)):'');
+    fetch(finalUrl)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var L=$('ir9-mload');if(L)L.remove();
+        var out=$('ir9-mout');if(!out)return;
+        if(d.error){out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">'+esc(d.error)+'</div>';return;}
+        var em=d.email||{};
+        var full='Subject: '+(em.subject||'')+'\n\n'+(em.greeting||'')+'\n\n'+(em.opening||'')+'\n\n'+(em.body||'')+'\n\n'+(em.cta||'')+(em.ps?'\n\nP.S. '+em.ps:'');
+        var wc=((em.opening||'')+' '+(em.body||'')+' '+(em.cta||'')).split(/\s+/).filter(Boolean).length;
+        out.innerHTML=(em.why_now?'<div class="ir9-hl" style="margin-bottom:13px">&#9201; '+esc(em.why_now)+'</div>':'')
+          +'<div class="ir9-mail">'
+            +(em.subject?'<div class="ir9-mail-sub">'+esc(em.subject)+'</div>':'')
+            +(em.greeting?'<p>'+esc(em.greeting)+'</p>':'')
+            +(em.opening?'<p>'+esc(em.opening)+'</p>':'')
+            +(em.body?'<p>'+esc(em.body)+'</p>':'')
+            +(em.cta?'<p style="color:#a5b4fc">'+esc(em.cta)+'</p>':'')
+            +(em.ps?'<p style="color:#55617a;font-size:12px;margin-bottom:0">P.S. '+esc(em.ps)+'</p>':'')
+          +'</div>'
+          +'<div class="ir9-meta">'
+            +(em.recommended_service?'<span class="ir9-mchip svc">&#9670; '+esc(em.recommended_service)+'</span>':'')
+            +'<span class="ir9-mchip">'+wc+' words</span>'
+            +'<span class="ir9-mchip warn">&#9998; {FirstName}</span>'
+            +'<span class="ir9-mchip ai">&#10022; Kairo</span>'
+          +'</div>'
+          +'<textarea id="ir9-fullmail" style="display:none">'+esc(full)+'</textarea>'
+          +'<div class="ir9-tonerow"><span class="ir9-tone-l">&#10022; Rewrite as</span>'
+            +[['direct','Direct'],['warm','Warm'],['executive','Executive']].map(function(t){return '<button class="ir9-tone'+(t[0]===tone?' on':'')+'" data-iract="email" data-co="'+esc(co)+'" data-svc="'+esc(svc)+'" data-tone="'+t[0]+'">'+t[1]+'</button>';}).join('')
+          +'</div>'
+          +'<div class="ir9-drw-btns">'
+            +'<button class="ir9-btn prim" data-iract="copyid" data-id="ir9-fullmail">&#128203; Copy email</button>'
+            +'<button class="ir9-btn" data-iract="copy" data-copy="'+esc(em.subject||'')+'">Copy subject</button>'
+            +'<button class="ir9-btn" data-iract="signal-email" data-co="'+esc(co)+'" data-dom="'+esc(dom||'')+'" data-apollo="'+esc(apolloId)+'" data-sig-type="" data-sig-detail="">&#8592; Change options</button>'
+          +'</div>';
+      })
+      .catch(function(){var L=$('ir9-mload');if(L)L.remove();var out=$('ir9-mout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo could not generate the email. Try again.</div>';});
+  }
+  if(researchOn){
+    fetch('/api/research-company/'+acct()+'?company='+encodeURIComponent(co)+(dom?'&domain='+encodeURIComponent(dom):''))
+      .then(function(r){return r.json();})
+      .then(function(rd){
+        var rc='';
+        if(rd&&!rd.error){rc=((rd.overview||rd.summary||'')+(rd.opportunities?' Opportunities: '+rd.opportunities:'')).substring(0,500);}
+        doEmail(rc);
+      })
+      .catch(function(){doEmail('');});
+  } else { doEmail(''); }
+};
+
 
 /* ── Research with Kairo ── */
 window.irResearch=function(co,dom){
