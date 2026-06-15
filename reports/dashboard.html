@@ -5335,7 +5335,7 @@ window.irSigEmailGen=function(co,dom,apolloId){
 /* ── Research with Kairo ── */
 window.irResearch=function(co,dom){
   if(!co)return;
-  irOpen('✦ Kairo Research — '+co,coHeader(co,dom||'','#7c3aed')
+  irSigModalOpen('&#10022; Kairo Research &mdash; '+co,coHeader(co,dom||'','#7c3aed')
     +'<div class="ir9-load" id="ir9-rload"><span class="ir9-spin">&#10227;</span> Kairo is researching '+esc(co)+' across the web — news, leadership, market position and marketing gaps…</div>'
     +'<div id="ir9-rout"></div>');
   fetch('/api/research-company/'+acct()+'?company='+encodeURIComponent(co)+(dom?'&domain='+encodeURIComponent(dom):''))
