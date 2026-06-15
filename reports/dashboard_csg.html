@@ -439,6 +439,8 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 }
 #modal-overlay.open{display:flex}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes ir9ModalIn{from{opacity:0;transform:scale(.95) translateY(12px)}to{opacity:1;transform:none}}
+#ir9-sig-box{animation:ir9ModalIn .22s cubic-bezier(.34,1.2,.45,1) both}
 #modal-box{
   background:var(--card);border:1px solid var(--border);border-radius:16px;
   width:100%;max-width:940px;max-height:90vh;overflow:hidden;
@@ -2085,6 +2087,24 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
         <div class="tab-content" id="modal-tab-content"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ✦ Signal Email Centered Modal -->
+<div id="ir9-sig-overlay" onclick="irSigModalClose(event)" style="display:none;position:fixed;inset:0;background:rgba(2,4,16,.88);z-index:700;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)">
+  <div id="ir9-sig-box" style="background:linear-gradient(180deg,#0a1029 0%,#090d1f 100%);
+    border:1px solid rgba(129,140,248,.28);border-radius:16px;width:100%;max-width:620px;
+    max-height:88vh;overflow:hidden;display:flex;flex-direction:column;
+    box-shadow:0 32px 96px rgba(0,0,0,.85),0 0 60px rgba(99,102,241,.12)">
+    <div id="ir9-sig-hdr" style="display:flex;align-items:center;gap:10px;padding:14px 18px;
+      border-bottom:1px solid rgba(129,140,248,.15);flex-shrink:0;
+      background:linear-gradient(95deg,rgba(79,70,229,.14),rgba(124,58,237,.07))">
+      <div id="ir9-sig-title" style="flex:1;font-size:13px;font-weight:700;color:#e6edf6;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <span class="ir9-kbadge">&#10022; KAIRO</span>
+      <button class="ir9-x" onclick="irSigModalClose()">&#10005;</button>
+    </div>
+    <div id="ir9-sig-body" style="overflow-y:auto;flex:1;padding:18px 20px 22px"></div>
   </div>
 </div>
 
@@ -5176,6 +5196,19 @@ window.irAIEmail=function(co,svc,tone){
     .catch(function(){var L=$('ir9-mload');if(L)L.remove();var out=$('ir9-mout');if(out)out.innerHTML='<div class="ir9-err" style="margin:0;max-width:none">Kairo could not finish the email. Try again.</div>';});
 };
 
+/* ── Signal Email Modal ── */
+window.irSigModalOpen=function(title,html){
+  var ov=document.getElementById('ir9-sig-overlay');
+  document.getElementById('ir9-sig-title').innerHTML=title;
+  document.getElementById('ir9-sig-body').innerHTML=html;
+  ov.style.display='flex';
+  document.getElementById('ir9-sig-body').scrollTop=0;
+};
+window.irSigModalClose=function(e){
+  if(e&&e.target!==document.getElementById('ir9-sig-overlay'))return;
+  document.getElementById('ir9-sig-overlay').style.display='none';
+};
+
 /* ── Signal Email Setup ── */
 window.irSignalEmailSetup=function(co,dom,apolloId,sigType,sigDetail){
   var coObj=(DATA.companies||[]).filter(function(x){return x.apollo_id==apolloId;})[0];
@@ -5192,7 +5225,7 @@ window.irSignalEmailSetup=function(co,dom,apolloId,sigType,sigDetail){
   var f=(D.feed||[]).filter(function(x){return x.name&&x.name.toLowerCase()===co.toLowerCase();})[0];
   var ctx=coHeader(co,dom||'','#4f46e5')
     +((f&&f.signals&&f.signals.length)?'<div class="ir9-ds"><div class="ir9-ds-l">Live signals on file</div><div class="ir9-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'');
-  irOpen('&#9993; Generate Email — '+co,ctx
+  irSigModalOpen('&#9993; Generate Email &mdash; '+co,ctx
     +'<div class="ir9-setup">'
     +'<div class="ir9-setup-sec"><div class="ir9-setup-lbl">Signal to anchor the email</div>'
     +'<select class="ir9-setup-sel" id="ir9-sig-sel">'+sigOpts+'</select></div>'
@@ -5240,7 +5273,7 @@ window.irSigEmailGen=function(co,dom,apolloId){
   var ctx=coHeader(co,dom||'','#4f46e5')
     +((f&&f.signals&&f.signals.length)?'<div class="ir9-ds"><div class="ir9-ds-l">Signals</div><div class="ir9-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'')
     +(sigParam?'<div class="ir9-ds"><div class="ir9-ds-l">Anchored signal</div><div class="ir9-ds-v" style="font-size:12px">'+esc(sigParam.substring(0,150))+'</div></div>':'');
-  irOpen('&#9993; Kairo Email — '+co,ctx
+  irSigModalOpen('&#9993; Kairo Email &mdash; '+co,ctx
     +'<div class="ir9-load" id="ir9-mload"><span class="ir9-spin">&#10227;</span> Kairo is writing a personalised email…</div>'
     +'<div id="ir9-mout"></div>');
   var url='/api/generate-email/'+acct()+'?company='+encodeURIComponent(co)
