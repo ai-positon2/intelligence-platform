@@ -2123,7 +2123,7 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
         <div class="ir9-empty" id="ir9-empty">
           <div class="ir9-eorb"><svg width="46" height="46" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c7d2fe" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="12s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#a5b4fc" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="20s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#c4b5fd" stroke-width="1.2"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="28s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.5" fill="#e0e7ff"><animate attributeName="r" values="2.5;3.2;2.5" dur="3s" repeatCount="indefinite"/></circle></svg></div>
           <div class="ir9-etitle">Meet Kairo</div>
-          <div class="ir9-esub">Your AI revenue analyst. Kairo reads every signal in this account, ranks the companies worth calling this week, writes personalised outreach, and researches any prospect across the web &mdash; in one click. Every card opens into deeper intelligence.</div>
+          <div class="ir9-esub">Spots funding rounds, leadership moves &amp; hiring surges before your competitors do. Ranks who to call <em>this week</em>, writes the email, handles the objections &mdash; and tells you exactly why the timing is right.</div>
           <button class="ir9-gen-lg" onclick="irGenerate()">&#10022; Generate briefing</button><div style="margin-top:14px"><button class="ir9-chatlink" onclick="irChat()">&#128172; &hellip;or ask Kairo anything</button></div>
         </div>
         <div class="ir9-loading" id="ir9-loading" style="display:none">
@@ -5238,7 +5238,7 @@ function irShowCo(i){
       if(objs.length){
         dossHtml+='<div class="dv3-section"><div class="dv3-section-head">&#128737; Objections &amp; counters</div>';
         dossHtml+=objs.map(function(o){
-          return '<div class="dv3-obj-card" onclick="this.classList.toggle('open')">'
+          return '<div class="dv3-obj-card" onclick="this.classList.toggle(\'open\')">'
             +'<div class="dv3-obj-q"><span class="dv3-obj-icon">&#9888;</span><span class="dv3-obj-qtext">'+esc(o.objection||'')+'</span><span class="dv3-obj-chevron">&#8964;</span></div>'
             +'<div class="dv3-obj-a"><span style="color:#5ec987;font-weight:600;margin-right:6px">&#8594;</span>'+esc(o.response||'')+'</div>'
           +'</div>';}).join('');
