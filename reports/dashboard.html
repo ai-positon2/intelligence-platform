@@ -1451,6 +1451,83 @@ h2::after,.section-title::after{
 .doss-c2-lbl{font-size:9px;font-weight:800;color:#4b5675;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
 .doss-c2-val{font-size:13px;font-weight:700;color:#a5b4fc;margin-bottom:6px}
 .doss-c2-txt{font-size:11.5px;color:#6e7d98;line-height:1.67}
+/* ── Kairo Deep Dossier Modal v3 ── */
+#ir9-doss-overlay{display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)}
+#ir9-doss-box{background:linear-gradient(180deg,#0a0e24 0%,#08091e 100%);border:1px solid rgba(129,140,248,.22);border-radius:20px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 80px rgba(99,102,241,.1)}
+#ir9-doss-hdr{display:flex;align-items:center;gap:10px;padding:16px 22px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+#ir9-doss-title{flex:1;font-size:13px;font-weight:700;color:#e6edf6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ir9-doss-body{overflow-y:auto;flex:1;padding:22px 24px 28px}
+
+/* score hero */
+.dv3-hero{display:grid;grid-template-columns:auto 1fr auto;gap:0;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,rgba(15,14,40,.9),rgba(10,9,30,.95));border:1px solid rgba(129,140,248,.18);margin-bottom:20px;position:relative}
+.dv3-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 15% 50%,var(--sglow,rgba(129,140,248,.18)) 0%,transparent 65%);pointer-events:none}
+.dv3-ring-col{padding:28px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-right:1px solid rgba(255,255,255,.055);flex-shrink:0;position:relative;z-index:1}
+.dv3-ring-wrap{position:relative;width:110px;height:110px;display:flex;align-items:center;justify-content:center}
+.dv3-ring-svg{position:absolute;top:0;left:0}
+.dv3-ring-num{font-size:30px;font-weight:900;letter-spacing:-.04em;line-height:1}
+.dv3-ring-sub{font-size:9px;font-weight:700;color:#4b5675;letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+.dv3-ring-label{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.1em;text-transform:uppercase;margin-top:6px}
+.dv3-mid-col{padding:24px 22px;display:flex;flex-direction:column;justify-content:center;gap:10px;position:relative;z-index:1}
+.dv3-score-eyebrow{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.14em;text-transform:uppercase}
+.dv3-urg-row{display:flex;align-items:center;gap:10px}
+.dv3-urg-badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 13px;border:1px solid;font-size:10px;font-weight:800;letter-spacing:.07em}
+.dv3-urg-dot{width:7px;height:7px;border-radius:50%;animation:doss-pulse 1.8s infinite;flex-shrink:0}
+.dv3-urg-meter{flex:1;max-width:120px;height:5px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
+.dv3-urg-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.dv3-score-reason{font-size:12px;color:#6e7d98;line-height:1.65;max-width:380px}
+.dv3-svc-col{padding:24px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-left:1px solid rgba(255,255,255,.055);flex-shrink:0;min-width:120px;position:relative;z-index:1}
+.dv3-svc-icon{font-size:22px;color:#818cf8}
+.dv3-svc-lbl{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.1em;text-transform:uppercase}
+.dv3-svc-val{font-size:13px;font-weight:700;color:#a5b4fc;text-align:center;line-height:1.3}
+
+/* intel 3-grid */
+.dv3-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+@media(max-width:680px){.dv3-grid{grid-template-columns:1fr}}
+.dv3-intel{border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,.07);position:relative;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+.dv3-intel.why{background:linear-gradient(145deg,rgba(79,70,229,.1),rgba(99,102,241,.05));border-color:rgba(129,140,248,.2)}
+.dv3-intel.ctx{background:rgba(255,255,255,.022);border-color:rgba(255,255,255,.07)}
+.dv3-intel.timing{background:linear-gradient(145deg,rgba(245,158,11,.07),rgba(251,191,36,.03));border-color:rgba(251,191,36,.2)}
+.dv3-intel-icon{font-size:20px;line-height:1}
+.dv3-intel-lbl{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.11em;text-transform:uppercase}
+.dv3-intel-text{font-size:12px;color:#9fabbe;line-height:1.7;flex:1}
+.dv3-intel-highlight{font-size:12.5px;font-weight:600;color:#c4cde8;line-height:1.65;flex:1}
+.dv3-timing-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:4px}
+.dv3-timing-fill{height:100%;border-radius:3px}
+
+/* objections */
+.dv3-section{margin-bottom:20px}
+.dv3-section-head{font-size:10px;font-weight:800;color:#4b5675;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.dv3-section-head::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+.dv3-obj-card{border-radius:12px;border:1px solid rgba(244,63,94,.15);overflow:hidden;cursor:pointer;transition:all .2s;margin-bottom:8px}
+.dv3-obj-card:last-child{margin-bottom:0}
+.dv3-obj-card:hover{border-color:rgba(244,63,94,.3)}
+.dv3-obj-q{display:grid;grid-template-columns:auto 1fr auto;align-items:start;gap:10px;padding:12px 14px;background:rgba(244,63,94,.04)}
+.dv3-obj-icon{font-size:13px;color:#fb7185;margin-top:1px;flex-shrink:0}
+.dv3-obj-qtext{font-size:12px;color:#fb7185;font-weight:600;line-height:1.5}
+.dv3-obj-chevron{font-size:15px;color:#fb718540;transition:transform .25s;line-height:1;margin-top:1px}
+.dv3-obj-a{max-height:0;overflow:hidden;transition:max-height .32s ease,padding .32s ease;padding:0 14px;font-size:12px;color:#8db39b;line-height:1.7}
+.dv3-obj-card.open .dv3-obj-a{max-height:300px;padding:11px 14px 13px}
+.dv3-obj-card.open .dv3-obj-q{border-bottom:1px solid rgba(244,63,94,.1)}
+.dv3-obj-card.open .dv3-obj-chevron{transform:rotate(180deg)}
+
+/* subject lines */
+.dv3-subj-grid{display:flex;flex-direction:column;gap:7px}
+.dv3-subj-row{border-radius:12px;border:1px solid rgba(255,255,255,.08);padding:13px 16px;display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.025);cursor:pointer;transition:all .2s;group:1}
+.dv3-subj-row:hover{background:rgba(99,102,241,.09);border-color:rgba(129,140,248,.35);transform:translateX(4px)}
+.dv3-subj-num{width:22px;height:22px;border-radius:6px;background:rgba(99,102,241,.15);border:1px solid rgba(129,140,248,.25);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#818cf8;flex-shrink:0}
+.dv3-subj-text{font-size:13px;font-weight:600;color:#dce6f5;flex:1;letter-spacing:-.01em;line-height:1.4}
+.dv3-copy-btn{background:rgba(99,102,241,.12);border:1px solid rgba(129,140,248,.25);border-radius:7px;color:#a5b4fc;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:5px 11px;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.dv3-copy-btn:hover{background:rgba(99,102,241,.28);border-color:rgba(129,140,248,.5);color:#c4b5fd}
+
+/* open dossier button in drawer */
+.ir9-doss-btn{display:flex;align-items:center;gap:10px;width:100%;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.07));border:1px solid rgba(129,140,248,.25);border-radius:12px;padding:13px 16px;cursor:pointer;transition:all .2s;margin:14px 0 6px;font-family:inherit}
+.ir9-doss-btn:hover{background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(139,92,246,.12));border-color:rgba(129,140,248,.45);transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.2)}
+.ir9-doss-btn-icon{font-size:16px;color:#818cf8;flex-shrink:0}
+.ir9-doss-btn-text{flex:1;text-align:left}
+.ir9-doss-btn-title{font-size:12px;font-weight:700;color:#a5b4fc;display:block;letter-spacing:.01em}
+.ir9-doss-btn-sub{font-size:10px;color:#4b5675;display:block;margin-top:1px}
+.ir9-doss-btn-arr{font-size:14px;color:#4b5675;transition:transform .2s}
+.ir9-doss-btn:hover .ir9-doss-btn-arr{transform:translateX(3px);color:#818cf8}
 
 
 /* ── v10.1 Pipeline polish ── */
@@ -5107,72 +5184,108 @@ function irShowCo(i){
     +(f.svc.length?'<div class="ir9-ds"><div class="ir9-ds-l">Service fit</div><div class="ir9-chips">'+f.svc.map(function(s){return chip(s,true);}).join('')+'</div></div>':'')
     +(tps.length?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Talking points</div>'+tps.map(function(t,j){return '<div class="ir9-tp"><div class="ir9-tp-n">'+(j+1)+'</div><div class="ir9-tp-t">'+esc(t)+'</div></div>';}).join('')+'</div>':'')
     +(f.next?'<div class="ir9-ds"><div class="ir9-ds-l">Next step</div><div class="ir9-ds-v">'+esc(f.next)+'</div></div>':'')
-    +'<div id="ir9-deep"></div>'
+    +'<button class="ir9-doss-btn" onclick="irDeepOpen('+JSON.stringify(f.name)+')">'
+      +'<span class="ir9-doss-btn-icon">&#10022;</span>'
+      +'<span class="ir9-doss-btn-text"><span class="ir9-doss-btn-title">Kairo Deep Dossier</span><span class="ir9-doss-btn-sub">Objections &middot; Subject lines &middot; Intent score &middot; Timing read</span></span>'
+      +'<span class="ir9-doss-btn-arr">&#8594;</span>'
+    +'</button>'
     +aiBtns(f.name,f.domain,f.svc[0]||'');
   irOpen(f.name,html);
-  irDeep(f.name);
 }
-function irDeep(name){
-  var box=$('ir9-deep');if(!box)return;
-  if(DEEP[name]){box.innerHTML=DEEP[name];return;}
-  box.innerHTML='<div class="ir9-load"><span class="ir9-spin">&#10227;</span> Kairo is preparing the deep dossier &mdash; objections, angles and subject lines&hellip;</div>';
+window.irDossClose=function(e){
+  if(e&&e.target!==document.getElementById('ir9-doss-overlay'))return;
+  document.getElementById('ir9-doss-overlay').style.display='none';
+};
+window.irDeepOpen=function(name){
+  var ov=document.getElementById('ir9-doss-overlay');
+  var body=document.getElementById('ir9-doss-body');
+  var title=document.getElementById('ir9-doss-title');
+  if(!ov||!body)return;
+  title.textContent=name;
+  ov.style.display='flex';
+  body.scrollTop=0;
+  if(DEEP[name]){body.innerHTML=DEEP[name];return;}
+  body.innerHTML='<div class="ir9-load" style="margin:40px auto;justify-content:center"><span class="ir9-spin">&#10227;</span>&nbsp; Kairo is building your dossier&hellip;</div>';
   fetch('/api/company-analysis/'+acct()+'?company='+encodeURIComponent(name))
     .then(function(r){return r.json();})
     .then(function(d){
-      var box=$('ir9-deep');if(!box)return;
-      if(d.error){box.innerHTML='<div class="ir9-note">Deep dossier unavailable: '+esc(d.error)+'</div>';return;}
+      var body=document.getElementById('ir9-doss-body');if(!body)return;
+      if(d.error){body.innerHTML='<div class="ir9-note">Deep dossier unavailable: '+esc(d.error)+'</div>';return;}
       var a=d.analysis||{};
       var sc=parseInt(a.score||0,10)||0;
       var scol=sc>=80?'#fb7185':sc>=60?'#fbbf24':'#818cf8';
-      var sglow=sc>=80?'rgba(251,113,133,.3)':sc>=60?'rgba(251,191,36,.25)':'rgba(129,140,248,.25)';
+      var sglow=sc>=80?'rgba(251,113,133,.28)':sc>=60?'rgba(251,191,36,.22)':'rgba(129,140,248,.22)';
       var urgCol=a.urgency==='HIGH'?'#fb7185':a.urgency==='MEDIUM'?'#fbbf24':'#818cf8';
       var urgBg=a.urgency==='HIGH'?'rgba(251,113,133,.1)':a.urgency==='MEDIUM'?'rgba(251,191,36,.08)':'rgba(129,140,248,.08)';
-      var R=44,circ=2*Math.PI*R,off=circ*(1-Math.min(sc,100)/100);
-      var html='<div class="doss-wrap">'
-        +'<div class="doss-hero-card" style="--scol:'+scol+';--sglow:'+sglow+'">'
-          +'<div class="doss-hero-ring-wrap">'
-            +'<svg width="100" height="100" viewBox="0 0 100 100" class="doss-ring-svg">'
-              +'<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="9"/>'
-              +'<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="'+scol+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 50 50)" style="filter:drop-shadow(0 0 7px '+scol+')"/>'
-            +'</svg>'
-            +'<div class="doss-ring-num" style="color:'+scol+'">'+sc+'</div>'
+      var urgPct=a.urgency==='HIGH'?95:a.urgency==='MEDIUM'?58:28;
+      var R=48,circ=2*Math.PI*R,off=circ*(1-Math.min(sc,100)/100);
+      var html='<div>'
+        /* ── SCORE HERO ── */
+        +'<div class="dv3-hero" style="--sglow:'+sglow+'">'
+          +'<div class="dv3-ring-col">'
+            +'<div class="dv3-ring-wrap">'
+              +'<svg width="110" height="110" viewBox="0 0 110 110" class="dv3-ring-svg">'
+                +'<circle cx="55" cy="55" r="'+R+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="9"/>'
+                +'<circle cx="55" cy="55" r="'+R+'" fill="none" stroke="'+scol+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 55 55)" style="filter:drop-shadow(0 0 10px '+scol+')"/>'
+              +'</svg>'
+              +'<div class="dv3-ring-num" style="color:'+scol+'">'+sc+'</div>'
+            +'</div>'
+            +'<div class="dv3-ring-label">Intent Score</div>'
           +'</div>'
-          +'<div class="doss-hero-info">'
-            +'<div class="doss-hero-label">Kairo Intent Score</div>'
-            +(a.urgency?'<div class="doss-urg-badge" style="background:'+urgBg+';color:'+urgCol+';border-color:'+urgCol+'44"><span class="doss-urg-dot" style="background:'+urgCol+'"></span>'+esc(a.urgency)+' URGENCY</div>':'')
-            +(a.recommended_service?'<span class="doss-svc-tag">&#9670; '+esc(a.recommended_service)+'</span>':'')
-            +(a.score_reason?'<div class="doss-hero-reason" style="margin-top:6px">'+esc(a.score_reason)+'</div>':'')
+          +'<div class="dv3-mid-col">'
+            +'<div class="dv3-score-eyebrow">Kairo Analysis</div>'
+            +'<div class="dv3-urg-row">'
+              +(a.urgency?'<div class="dv3-urg-badge" style="background:'+urgBg+';color:'+urgCol+';border-color:'+urgCol+'44"><span class="dv3-urg-dot" style="background:'+urgCol+'"></span>'+esc(a.urgency)+' URGENCY</div>':'')
+              +'<div class="dv3-urg-meter"><div class="dv3-urg-fill" style="width:'+urgPct+'%;background:'+urgCol+'"></div></div>'
+            +'</div>'
+            +(a.score_reason?'<div class="dv3-score-reason">'+esc(a.score_reason)+'</div>':'')
           +'</div>'
+          +(a.recommended_service?'<div class="dv3-svc-col"><div class="dv3-svc-icon">&#9670;</div><div class="dv3-svc-lbl">Best fit</div><div class="dv3-svc-val">'+esc(a.recommended_service)+'</div></div>':'')
+        +'</div>'
+        /* ── INTEL 3-GRID ── */
+        +'<div class="dv3-grid">'
+          +(a.why_now?'<div class="dv3-intel why"><div class="dv3-intel-icon">&#9889;</div><div class="dv3-intel-lbl">Why now</div><div class="dv3-intel-highlight">'+esc(a.why_now)+'</div></div>':'')
+          +(a.company_context?'<div class="dv3-intel ctx"><div class="dv3-intel-icon">&#127970;</div><div class="dv3-intel-lbl">Company context</div><div class="dv3-intel-text">'+esc(a.company_context)+'</div></div>':'')
+          +(a.urgency_reason?'<div class="dv3-intel timing"><div class="dv3-intel-icon">&#128336;</div><div class="dv3-intel-lbl">Timing read</div><div class="dv3-timing-bar"><div class="dv3-timing-fill" style="width:'+urgPct+'%;background:'+urgCol+'"></div></div><div class="dv3-intel-text" style="margin-top:6px">'+esc(a.urgency_reason)+'</div></div>':'')
         +'</div>';
-      if(a.company_context)html+='<div class="doss-section"><div class="doss-sec-label">&#127970; Company context</div>'
-        +'<div class="doss-ctx-card"><div class="doss-ctx-quote">&#8220;</div><div class="doss-ctx-text">'+esc(a.company_context)+'</div></div></div>';
-      if(a.why_now)html+='<div class="doss-section"><div class="doss-sec-label">&#9889; Why now</div>'
-        +'<div class="doss-now-card">'+esc(a.why_now)+'</div></div>';
+      /* ── OBJECTIONS ── */
       var objs=a.objections||[];
-      if(objs.length)html+='<div class="doss-section"><div class="doss-sec-label">&#128737; Objections &amp; counters</div>'
-        +objs.map(function(o){
-          return '<div class="doss-obj-card" onclick="this.classList.toggle(\'open\')">'
-            +'<div class="doss-obj-q"><span class="doss-obj-icon">&#9888;</span><span class="doss-obj-qtext">'+esc(o.objection||'')+'</span><span class="doss-obj-arr">&#8964;</span></div>'
-            +'<div class="doss-obj-a"><span style="color:#5ec987;margin-right:5px">&#8594;</span>'+esc(o.response||'')+'</div>'
-          +'</div>';}).join('')+'</div>';
+      if(objs.length){
+        html+='<div class="dv3-section"><div class="dv3-section-head">&#128737; Objections &amp; counters</div>';
+        html+=objs.map(function(o){
+          return '<div class="dv3-obj-card" onclick="this.classList.toggle(\'open\')">'
+            +'<div class="dv3-obj-q"><span class="dv3-obj-icon">&#9888;</span><span class="dv3-obj-qtext">'+esc(o.objection||'')+'</span><span class="dv3-obj-chevron">&#8964;</span></div>'
+            +'<div class="dv3-obj-a"><span style="color:#5ec987;font-weight:600;margin-right:6px">&#8594;</span>'+esc(o.response||'')+'</div>'
+          +'</div>';}).join('');
+        html+='</div>';
+      }
+      /* ── SUBJECT LINES ── */
       var subs=a.subject_lines||[];
-      if(subs.length)html+='<div class="doss-section"><div class="doss-sec-label">&#9993; Subject lines that will land</div>'
-        +'<div class="doss-subj-list">'
-        +subs.map(function(sl){
-          return '<div class="doss-subj-row"><div class="doss-subj-text">'+esc(sl)+'</div>'
-            +'<button class="doss-copy-btn" onclick="event.stopPropagation()" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button></div>';}).join('')
-        +'</div></div>';
-      var hasSvc=(a.recommended_service&&a.service_reason),hasTiming=!!a.urgency_reason;
-      if(hasSvc||hasTiming)html+='<div class="doss-row2">'
-        +(hasSvc?'<div class="doss-card2"><div class="doss-c2-icon">&#9670;</div><div class="doss-c2-lbl">Best-fit service</div><div class="doss-c2-val">'+esc(a.recommended_service)+'</div><div class="doss-c2-txt">'+esc(a.service_reason)+'</div></div>':'')
-        +(hasTiming?'<div class="doss-card2"><div class="doss-c2-icon">&#128336;</div><div class="doss-c2-lbl">Timing read</div><div class="doss-c2-txt">'+esc(a.urgency_reason)+'</div></div>':'')
-        +'</div>';
+      if(subs.length){
+        html+='<div class="dv3-section"><div class="dv3-section-head">&#9993; Subject lines that will land</div><div class="dv3-subj-grid">';
+        html+=subs.map(function(sl,i){
+          return '<div class="dv3-subj-row"><div class="dv3-subj-num">'+(i+1)+'</div>'
+            +'<div class="dv3-subj-text">'+esc(sl)+'</div>'
+            +'<button class="dv3-copy-btn" onclick="event.stopPropagation()" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button>'
+          +'</div>';}).join('');
+        html+='</div></div>';
+      }
+      /* ── SERVICE FIT ── */
+      if(a.recommended_service&&a.service_reason){
+        html+='<div class="dv3-section"><div class="dv3-section-head">&#9670; Service fit</div>'
+          +'<div class="dv3-intel ctx" style="flex-direction:row;align-items:center;gap:14px">'
+            +'<div style="font-size:13px;font-weight:700;color:#a5b4fc;white-space:nowrap">'+esc(a.recommended_service)+'</div>'
+            +'<div style="height:30px;width:1px;background:rgba(255,255,255,.07);flex-shrink:0"></div>'
+            +'<div class="dv3-intel-text" style="margin:0">'+esc(a.service_reason)+'</div>'
+          +'</div></div>';
+      }
       html+='</div>';
       DEEP[name]=html;
-      box.innerHTML=html;
+      body.innerHTML=html;
     })
-    .catch(function(){var box=$('ir9-deep');if(box)box.innerHTML='<div class="ir9-note">Deep dossier failed to load.</div>';});
-}
+    .catch(function(){var body=document.getElementById('ir9-doss-body');if(body)body.innerHTML='<div class="ir9-note">Deep dossier failed to load.</div>';});
+};
+function irDeep(name){irDeepOpen(name);}
 function irShowAct(i){
   var a=D.acts.filter(function(x){return x._i===i;})[0];if(!a)return;
   var hi=a.urgency==='HIGH',dn=!!getDone()[actId(a)];
@@ -5910,4 +6023,15 @@ nav#sidebar .sidebar-footer,#sidebar>.sidebar-footer{margin-top:auto!important}
   else{doUser();}
 })();
 </script>
+
+<div id="ir9-doss-overlay" onclick="irDossClose(event)" style="display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)">
+  <div id="ir9-doss-box" style="background:linear-gradient(180deg,#0a0e24 0%,#08091e 100%);border:1px solid rgba(129,140,248,.22);border-radius:20px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 80px rgba(99,102,241,.1)">
+    <div id="ir9-doss-hdr" style="display:flex;align-items:center;gap:10px;padding:16px 22px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+      <div id="ir9-doss-title" style="flex:1;font-size:13px;font-weight:700;color:#e6edf6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <span class="ir9-kbadge">&#10022; KAIRO DEEP DOSSIER</span>
+      <button class="ir9-x" onclick="irDossClose()">&#10005;</button>
+    </div>
+    <div id="ir9-doss-body" style="overflow-y:auto;flex:1;padding:22px 24px 28px"></div>
+  </div>
+</div>
 </body>
