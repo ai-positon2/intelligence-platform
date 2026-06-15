@@ -1409,6 +1409,50 @@ h2::after,.section-title::after{
 .ir9-src:hover{color:#a5cdf9}
 .ir9-note{font-size:11px;color:#55617a;font-style:italic;margin-top:9px}
 
+/* ── Kairo Deep Dossier v2 ── */
+.doss-wrap{display:flex;flex-direction:column;gap:16px;padding:2px 0 6px}
+.doss-hero-card{border-radius:16px;padding:22px 20px;background:linear-gradient(135deg,rgba(99,102,241,.13) 0%,rgba(139,92,246,.08) 60%,rgba(255,255,255,.025) 100%);border:1px solid rgba(129,140,248,.22);display:flex;gap:18px;align-items:center;position:relative;overflow:hidden}
+.doss-hero-card::before{content:'';position:absolute;top:-40px;right:-20px;width:140px;height:140px;border-radius:50%;background:var(--sglow,rgba(129,140,248,.22));filter:blur(50px);pointer-events:none;z-index:0}
+.doss-hero-ring-wrap{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center;width:100px;height:100px;z-index:1}
+.doss-ring-svg{position:absolute;top:0;left:0}
+.doss-ring-num{font-size:26px;font-weight:900;line-height:1;letter-spacing:-.04em}
+.doss-ring-lbl{display:none}
+.doss-hero-info{flex:1;min-width:0;z-index:1}
+.doss-hero-label{font-size:9px;font-weight:800;color:#4b5675;text-transform:uppercase;letter-spacing:.14em;margin-bottom:9px}
+.doss-urg-badge{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 12px;border:1px solid;font-size:10px;font-weight:800;letter-spacing:.07em;margin-bottom:7px}
+.doss-urg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:doss-pulse 1.8s infinite}
+@keyframes doss-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+.doss-svc-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,.11);border:1px solid rgba(129,140,248,.24);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;color:#a5b4fc;margin:0 0 8px 6px}
+.doss-hero-reason{font-size:11.5px;color:#6e7d98;line-height:1.62}
+.doss-section{display:flex;flex-direction:column;gap:7px}
+.doss-sec-label{font-size:10px;font-weight:800;color:#4b5675;text-transform:uppercase;letter-spacing:.1em}
+.doss-ctx-card{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:16px 18px 14px;position:relative;overflow:hidden}
+.doss-ctx-quote{position:absolute;top:-8px;left:11px;font-size:60px;color:rgba(99,102,241,.13);font-family:Georgia,serif;line-height:1;pointer-events:none;user-select:none}
+.doss-ctx-text{font-size:12.5px;color:#8e9db8;line-height:1.78;padding-left:6px}
+.doss-now-card{background:linear-gradient(135deg,rgba(79,70,229,.1),rgba(99,102,241,.05));border-left:3px solid rgba(129,140,248,.7);border-top:1px solid rgba(129,140,248,.14);border-right:1px solid rgba(129,140,248,.07);border-bottom:1px solid rgba(129,140,248,.07);border-radius:0 12px 12px 0;padding:14px 16px;font-size:13px;color:#b8c6e3;line-height:1.75}
+.doss-obj-card{background:rgba(244,63,94,.04);border:1px solid rgba(244,63,94,.14);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color .2s,background .2s}
+.doss-obj-card:hover{border-color:rgba(244,63,94,.28);background:rgba(244,63,94,.06)}
+.doss-obj-q{display:flex;align-items:flex-start;gap:8px;padding:11px 13px;font-size:12px;color:#fb7185;font-weight:600;line-height:1.5}
+.doss-obj-icon{flex-shrink:0;margin-top:1px}
+.doss-obj-qtext{flex:1}
+.doss-obj-arr{margin-left:auto;flex-shrink:0;font-size:16px;color:#fb718555;transition:transform .25s;line-height:1}
+.doss-obj-a{max-height:0;overflow:hidden;font-size:12px;color:#9aac98;line-height:1.68;padding:0 13px;transition:max-height .32s ease,padding .32s ease;border-top:0px solid transparent;transition:all .3s ease}
+.doss-obj-card.open .doss-obj-a{max-height:200px;padding:10px 13px 13px;border-top:1px solid rgba(244,63,94,.1)}
+.doss-obj-card.open .doss-obj-arr{transform:rotate(180deg)}
+.doss-subj-list{display:flex;flex-direction:column;gap:6px}
+.doss-subj-row{background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.075);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .18s}
+.doss-subj-row:hover{background:rgba(99,102,241,.09);border-color:rgba(129,140,248,.38);transform:translateX(4px)}
+.doss-subj-text{font-size:13px;font-weight:600;color:#dce6f5;flex:1;letter-spacing:-.01em}
+.doss-copy-btn{background:rgba(99,102,241,.12);border:1px solid rgba(129,140,248,.28);border-radius:7px;color:#a5b4fc;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;padding:4px 10px;transition:all .15s;white-space:nowrap;letter-spacing:.03em;flex-shrink:0}
+.doss-copy-btn:hover{background:rgba(99,102,241,.26);color:#c4b5fd;border-color:rgba(129,140,248,.55)}
+.doss-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.doss-card2{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 15px}
+.doss-c2-icon{font-size:20px;margin-bottom:7px}
+.doss-c2-lbl{font-size:9px;font-weight:800;color:#4b5675;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.doss-c2-val{font-size:13px;font-weight:700;color:#a5b4fc;margin-bottom:6px}
+.doss-c2-txt{font-size:11.5px;color:#6e7d98;line-height:1.67}
+
+
 /* ── v10.1 Pipeline polish ── */
 .ir9-tierhead{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:10px 0 -4px;padding:0 2px}
 .ir9-tier-t{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
@@ -5080,32 +5124,50 @@ function irDeep(name){
       var a=d.analysis||{};
       var sc=parseInt(a.score||0,10)||0;
       var scol=sc>=80?'#fb7185':sc>=60?'#fbbf24':'#818cf8';
-      var circ=2*Math.PI*26,off=circ*(1-Math.min(sc,100)/100);
-      var html='<div style="border-top:1px solid rgba(255,255,255,.07);margin:6px 0 14px;padding-top:14px"><span class="ir9-kbadge">&#10022; KAIRO DEEP DOSSIER</span></div>'
-        +'<div class="ir9-hero">'
-          +'<div class="ir9-gauge"><svg width="74" height="74" viewBox="0 0 64 64">'
-            +'<circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/>'
-            +'<circle cx="32" cy="32" r="26" fill="none" stroke="'+scol+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 32 32)"/>'
-          +'</svg><div class="ir9-gauge-n" style="color:'+scol+'">'+sc+'</div></div>'
-          +'<div class="ir9-hero-meta">'
-            +'<div class="ir9-hero-t">Intent score</div>'
-            +'<div class="ir9-chips" style="margin-top:6px">'
-              +(a.urgency?'<span class="ir9-tchip '+(a.urgency==='HIGH'?'ir9-t-now':a.urgency==='MEDIUM'?'ir9-t-week':'ir9-t-email')+'" style="font-size:10px;padding:4px 11px">'+esc(a.urgency)+' URGENCY</span>':'')
-              +(a.recommended_service?'<span class="ir9-chip">&#9670; '+esc(a.recommended_service)+'</span>':'')
-            +'</div>'
-            +(a.score_reason?'<div class="ir9-hero-r">'+esc(a.score_reason)+'</div>':'')
+      var sglow=sc>=80?'rgba(251,113,133,.3)':sc>=60?'rgba(251,191,36,.25)':'rgba(129,140,248,.25)';
+      var urgCol=a.urgency==='HIGH'?'#fb7185':a.urgency==='MEDIUM'?'#fbbf24':'#818cf8';
+      var urgBg=a.urgency==='HIGH'?'rgba(251,113,133,.1)':a.urgency==='MEDIUM'?'rgba(251,191,36,.08)':'rgba(129,140,248,.08)';
+      var R=44,circ=2*Math.PI*R,off=circ*(1-Math.min(sc,100)/100);
+      var html='<div class="doss-wrap">'
+        +'<div class="doss-hero-card" style="--scol:'+scol+';--sglow:'+sglow+'">'
+          +'<div class="doss-hero-ring-wrap">'
+            +'<svg width="100" height="100" viewBox="0 0 100 100" class="doss-ring-svg">'
+              +'<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="9"/>'
+              +'<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="'+scol+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 50 50)" style="filter:drop-shadow(0 0 7px '+scol+')"/>'
+            +'</svg>'
+            +'<div class="doss-ring-num" style="color:'+scol+'">'+sc+'</div>'
+          +'</div>'
+          +'<div class="doss-hero-info">'
+            +'<div class="doss-hero-label">Kairo Intent Score</div>'
+            +(a.urgency?'<div class="doss-urg-badge" style="background:'+urgBg+';color:'+urgCol+';border-color:'+urgCol+'44"><span class="doss-urg-dot" style="background:'+urgCol+'"></span>'+esc(a.urgency)+' URGENCY</div>':'')
+            +(a.recommended_service?'<span class="doss-svc-tag">&#9670; '+esc(a.recommended_service)+'</span>':'')
+            +(a.score_reason?'<div class="doss-hero-reason" style="margin-top:6px">'+esc(a.score_reason)+'</div>':'')
           +'</div>'
         +'</div>';
-      if(a.company_context)html+='<div class="ir9-ds"><div class="ir9-ds-l">Company context</div><div class="ir9-ds-v">'+esc(a.company_context)+'</div></div>';
-      if(a.why_now)html+='<div class="ir9-ds"><div class="ir9-ds-l">Why now</div><div class="ir9-hl">'+esc(a.why_now)+'</div></div>';
+      if(a.company_context)html+='<div class="doss-section"><div class="doss-sec-label">&#127970; Company context</div>'
+        +'<div class="doss-ctx-card"><div class="doss-ctx-quote">&#8220;</div><div class="doss-ctx-text">'+esc(a.company_context)+'</div></div></div>';
+      if(a.why_now)html+='<div class="doss-section"><div class="doss-sec-label">&#9889; Why now</div>'
+        +'<div class="doss-now-card">'+esc(a.why_now)+'</div></div>';
       var objs=a.objections||[];
-      if(objs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Objections &amp; counters</div>'+objs.map(function(o){
-        return '<div class="ir9-obj"><div class="ir9-obj-q">&#9888; '+esc(o.objection||'')+'</div><div class="ir9-obj-a">&#8594; '+esc(o.response||'')+'</div></div>';}).join('')+'</div>';
+      if(objs.length)html+='<div class="doss-section"><div class="doss-sec-label">&#128737; Objections &amp; counters</div>'
+        +objs.map(function(o){
+          return '<div class="doss-obj-card" onclick="this.classList.toggle(\'open\')">'
+            +'<div class="doss-obj-q"><span class="doss-obj-icon">&#9888;</span><span class="doss-obj-qtext">'+esc(o.objection||'')+'</span><span class="doss-obj-arr">&#8964;</span></div>'
+            +'<div class="doss-obj-a"><span style="color:#5ec987;margin-right:5px">&#8594;</span>'+esc(o.response||'')+'</div>'
+          +'</div>';}).join('')+'</div>';
       var subs=a.subject_lines||[];
-      if(subs.length)html+='<div class="ir9-ds"><div class="ir9-ds-l">Subject lines that will land</div>'+subs.map(function(sl){
-        return '<div class="ir9-subj"><div class="ir9-subj-t">'+esc(sl)+'</div><button class="ir9-btn" style="padding:3px 9px;font-size:10px" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button></div>';}).join('')+'</div>';
-      if(a.recommended_service&&a.service_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Best-fit service: '+esc(a.recommended_service)+'</div><div class="ir9-ds-v">'+esc(a.service_reason)+'</div></div>';
-      if(a.urgency_reason)html+='<div class="ir9-ds"><div class="ir9-ds-l">Timing read</div><div class="ir9-ds-v">'+esc(a.urgency_reason)+'</div></div>';
+      if(subs.length)html+='<div class="doss-section"><div class="doss-sec-label">&#9993; Subject lines that will land</div>'
+        +'<div class="doss-subj-list">'
+        +subs.map(function(sl){
+          return '<div class="doss-subj-row"><div class="doss-subj-text">'+esc(sl)+'</div>'
+            +'<button class="doss-copy-btn" onclick="event.stopPropagation()" data-iract="copy" data-copy="'+esc(sl)+'">Copy</button></div>';}).join('')
+        +'</div></div>';
+      var hasSvc=(a.recommended_service&&a.service_reason),hasTiming=!!a.urgency_reason;
+      if(hasSvc||hasTiming)html+='<div class="doss-row2">'
+        +(hasSvc?'<div class="doss-card2"><div class="doss-c2-icon">&#9670;</div><div class="doss-c2-lbl">Best-fit service</div><div class="doss-c2-val">'+esc(a.recommended_service)+'</div><div class="doss-c2-txt">'+esc(a.service_reason)+'</div></div>':'')
+        +(hasTiming?'<div class="doss-card2"><div class="doss-c2-icon">&#128336;</div><div class="doss-c2-lbl">Timing read</div><div class="doss-c2-txt">'+esc(a.urgency_reason)+'</div></div>':'')
+        +'</div>';
+      html+='</div>';
       DEEP[name]=html;
       box.innerHTML=html;
     })
