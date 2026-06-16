@@ -1464,6 +1464,28 @@ h2::after,.section-title::after{
 .cm-ring-svg{display:block}
 .cm-ring-num{font-size:18px;font-weight:900;letter-spacing:-.03em;text-align:center}
 .cm-ring-lbl{font-size:8px;font-weight:700;color:#4b5675;letter-spacing:.1em;text-transform:uppercase;text-align:center}
+/* better ring */
+.cm-ring-track{opacity:.12}
+.cm-ring-fill{transition:stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)}
+/* logo img */
+.cm-avatar img{width:100%;height:100%;object-fit:contain;border-radius:12px}
+/* decision makers modal */
+.cm-dm-overlay{position:fixed;inset:0;background:rgba(2,4,18,.88);z-index:900;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(12px)}
+.cm-dm-box{background:linear-gradient(160deg,#0d0c22,#0a0918);border:1px solid rgba(129,140,248,.2);border-radius:20px;width:100%;max-width:620px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.cm-dm-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.cm-dm-title{font-size:15px;font-weight:800;color:#f1f5f9;letter-spacing:-.02em}
+.cm-dm-badge{font-size:9px;font-weight:800;color:#818cf8;letter-spacing:.1em;background:rgba(79,70,229,.12);border:1px solid rgba(129,140,248,.22);border-radius:20px;padding:3px 10px}
+.cm-dm-body{overflow-y:auto;flex:1;padding:18px 22px 22px}
+.cm-dm-person{display:flex;align-items:flex-start;gap:13px;padding:13px 14px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);margin-bottom:9px;transition:all .18s}
+.cm-dm-person:last-child{margin-bottom:0}
+.cm-dm-person:hover{background:rgba(99,102,241,.07);border-color:rgba(129,140,248,.2)}
+.cm-dm-initials{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#4f46e5,#818cf8);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0}
+.cm-dm-info{flex:1;min-width:0}
+.cm-dm-name{font-size:13px;font-weight:700;color:#e2e8f0;letter-spacing:-.01em}
+.cm-dm-role{font-size:11px;color:#6e7d98;margin-top:2px}
+.cm-dm-bio{font-size:11px;color:#8b98ab;margin-top:4px;line-height:1.5}
+.cm-dm-li{display:inline-flex;align-items:center;gap:5px;margin-top:6px;background:rgba(10,102,194,.15);border:1px solid rgba(10,102,194,.3);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:#60a5fa;text-decoration:none;transition:all .15s}
+.cm-dm-li:hover{background:rgba(10,102,194,.25);border-color:rgba(10,102,194,.5)}
 .cm-badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cm-mom-badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 11px;font-size:10px;font-weight:800;letter-spacing:.04em}
 .cm-timing-badge{border-radius:20px;padding:4px 12px;font-size:10px;font-weight:800;letter-spacing:.04em}
@@ -5131,6 +5153,7 @@ document.addEventListener('click',function(e){
   if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='email'){e.stopPropagation();var _dov=document.getElementById('ir9-doss-overlay');if(_dov)_dov.style.display='none';if(b.getAttribute('data-tone')){irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone'));}else{irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'','','');}}
   else if(a==='research'){e.stopPropagation();var _dov2=document.getElementById('ir9-doss-overlay');if(_dov2)_dov2.style.display='none';irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
+  else if(a==='dm'){e.stopPropagation();irDecisionMakers(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
   else if(a==='signal-email'){e.stopPropagation();irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'',b.getAttribute('data-sig-type')||'',b.getAttribute('data-sig-detail')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
@@ -5250,6 +5273,36 @@ function aiBtns(name,domain,svc){
     +'<a class="ir9-btn" href="'+liCo(name)+'" target="_blank" rel="noopener">&#128188; LinkedIn</a>'
   +'</div>';
 }
+window.irDecisionMakers=function(name,domain){
+  var ov=document.getElementById('cm-dm-overlay');if(!ov)return;
+  var body=document.getElementById('cm-dm-body');
+  var title=document.getElementById('cm-dm-title');
+  title.textContent=name+' — Key People';
+  body.innerHTML='<div class="ir9-load" style="margin:40px auto;justify-content:center"><span class="ir9-spin">&#10227;</span>&nbsp; Finding decision-makers&hellip;</div>';
+  ov.style.display='flex';
+  var acct=window._ACCT_ID||'healthcare';
+  fetch('/api/decision-makers/'+acct+'?company='+encodeURIComponent(name)+'&domain='+encodeURIComponent(domain||''))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){body.innerHTML='<div style="color:#f87171;padding:20px">'+esc(d.error)+'</div>';return;}
+      var people=d.people||[];
+      if(!people.length){body.innerHTML='<div style="color:#6e7d98;padding:20px;text-align:center">No contacts found.</div>';return;}
+      body.innerHTML=people.map(function(p){
+        var ini2=(p.name||'?').trim().split(/\s+/).map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase();
+        return '<div class="cm-dm-person">'
+          +'<div class="cm-dm-initials">'+esc(ini2)+'</div>'
+          +'<div class="cm-dm-info">'
+            +'<div class="cm-dm-name">'+esc(p.name||'')+'</div>'
+            +'<div class="cm-dm-role">'+esc(p.role||'')+'</div>'
+            +(p.bio?'<div class="cm-dm-bio">'+esc(p.bio)+'</div>':'')
+            +(p.linkedin?'<a class="cm-dm-li" href="'+esc(p.linkedin)+'" target="_blank" rel="noopener">&#128279; LinkedIn</a>':'')
+          +'</div>'
+        +'</div>';
+      }).join('');
+    })
+    .catch(function(e){body.innerHTML='<div style="color:#f87171;padding:20px">Error: '+esc(String(e))+'</div>';});
+};
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var ov=document.getElementById('cm-dm-overlay');if(ov)ov.style.display='none';}});
 function irShowCo(i){
   var f=D.feed[i];if(!f)return;
   var c=f.score!=null?scC(f.score):'#a5b4fc';
@@ -5268,10 +5321,10 @@ function irShowCo(i){
         +'<div class="cm-act-icon">&#10022;</div>'
         +'<div><div class="cm-act-label">Research with Kairo</div><div class="cm-act-sub">Deep web intelligence</div></div>'
       +'</button>'
-      +'<a class="cm-act-btn secondary" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">'
+      +'<button class="cm-act-btn secondary" data-iract="dm" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain||'')+'">'
         +'<div class="cm-act-icon">&#128100;</div>'
         +'<div><div class="cm-act-label">Decision Makers</div><div class="cm-act-sub">Find key contacts</div></div>'
-      +'</a>'
+      +'</button>'
       +'<a class="cm-act-btn secondary" href="'+liCo(f.name)+'" target="_blank" rel="noopener">'
         +'<div class="cm-act-icon">&#128188;</div>'
         +'<div><div class="cm-act-label">LinkedIn</div><div class="cm-act-sub">Company profile</div></div>'
@@ -5280,15 +5333,18 @@ function irShowCo(i){
     /* ── HERO ── */
     +'<div class="cm-hero" style="--hcol:'+hcol+'44">'
       +'<div class="cm-hero-top">'
-        +'<div class="cm-avatar" style="background:'+hcol+'">'+esc(ini(f.name))+'</div>'
+        +'<div class="cm-avatar" style="background:'+hcol+';padding:0;overflow:hidden">'
+        +(f.domain?'<img src="https://logo.clearbit.com/'+esc(f.domain)+'" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'" alt="" style="display:block"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff">'+esc(ini(f.name))+'</span>'
+        :'<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff">'+esc(ini(f.name))+'</span>')
+      +'</div>'
         +'<div class="cm-name-block">'
           +'<div class="cm-name">'+esc(f.name)+'</div>'
           +(f.domain?'<div class="cm-domain">'+esc(f.domain)+'</div>':'')
         +'</div>'
         +(f.score!=null
           ?'<div class="cm-score-wrap"><svg width="80" height="80" viewBox="0 0 80 80" class="cm-ring-svg">'
-            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>'
-            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="'+c+'" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+scCirc.toFixed(1)+'" stroke-dashoffset="'+scOff.toFixed(1)+'" transform="rotate(-90 40 40)" style="filter:drop-shadow(0 0 6px '+c+')"/>'
+            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6" class="cm-ring-track"/>'
+            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="'+c+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+scCirc.toFixed(1)+'" stroke-dashoffset="'+scOff.toFixed(1)+'" transform="rotate(-90 40 40)" class="cm-ring-fill" opacity=".9"/>'
            +'</svg>'
            +'<div class="cm-ring-num" style="color:'+c+';margin-top:-56px;position:relative;z-index:1">'+f.score+'</div>'
            +'<div class="cm-ring-lbl" style="position:relative;z-index:1">score</div>'
@@ -6261,7 +6317,19 @@ nav#sidebar .sidebar-footer,#sidebar>.sidebar-footer{margin-top:auto!important}
 })();
 </script>
 
-<div id="ir9-doss-overlay" onclick="irDossClose(event)" style="display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)">
+<div id="cm-dm-overlay" class="cm-dm-overlay" onclick="if(event.target===this)this.style.display='none'">
+  <div class="cm-dm-box">
+    <div class="cm-dm-hdr">
+      <div class="cm-dm-title" id="cm-dm-title">Decision Makers</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="cm-dm-badge">&#128100; KEY PEOPLE</span>
+        <button class="ir9-x" onclick="document.getElementById('cm-dm-overlay').style.display='none'">&#x2715;</button>
+      </div>
+    </div>
+    <div class="cm-dm-body" id="cm-dm-body"></div>
+  </div>
+</div>
+<div id="ir9-doss-overlay"  onclick="irDossClose(event)" style="display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)">
   <div id="ir9-doss-box" style="background:linear-gradient(180deg,#0a0e24 0%,#08091e 100%);border:1px solid rgba(129,140,248,.22);border-radius:20px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 80px rgba(99,102,241,.1)">
     <div id="ir9-doss-hdr" style="display:flex;align-items:center;gap:10px;padding:16px 22px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
       <div id="ir9-doss-title" style="flex:1;font-size:13px;font-weight:700;color:#e6edf6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>

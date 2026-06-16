@@ -2389,6 +2389,60 @@ def research_company(account_id):
         return jsonify({"error": str(e)})
 
 
+
+@app.route("/api/decision-makers/<account_id>")
+@login_required
+def decision_makers(account_id):
+    """Use OpenAI web search to find C-suite / key people at a company with LinkedIn URLs."""
+    import re as _re
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "OpenAI API key not configured"})
+    company = request.args.get("company", "").strip()
+    domain  = request.args.get("domain", "").strip()
+    if not company:
+        return jsonify({"error": "company parameter required"})
+    try:
+        system = (
+            "You are a B2B sales research assistant. Find the current key decision-makers "
+            "at the given company — CEO, CFO, CMO, CTO, COO, VP Marketing, VP Sales, "
+            "Founders, Managing Directors, Partners, and other senior leaders. "
+            "Use web search to find real, current people. For each person find their LinkedIn profile URL. "
+            "Return ONLY valid JSON (no markdown, no commentary):\n"
+            '{"people":['
+            '{"name":"Full Name","role":"Job Title","linkedin":"https://linkedin.com/in/handle or empty string","bio":"1 short sentence about them"}'
+            ']}'
+            "\nReturn up to 10 people. If you cannot find a LinkedIn URL leave it as empty string."
+        )
+        user_msg = f"Find decision-makers at: {company}" + (f" (website: {domain})" if domain else "")
+        from openai import OpenAI
+        oai   = OpenAI(api_key=api_key)
+        _msgs = [{"role": "system", "content": system}, {"role": "user", "content": user_msg}]
+        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+        raw, web_used = _responses_web_search(oai, model, _msgs, 1500)
+        if not raw:
+            model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+            raw, web_used = _responses_web_search(oai, model, _msgs, 1500)
+        if not raw:
+            resp = oai.chat.completions.create(
+                model=model,
+                messages=[{"role":"system","content":system},{"role":"user","content":user_msg}],
+                max_completion_tokens=1200,
+            )
+            raw = resp.choices[0].message.content.strip()
+            web_used = False
+        if "```" in raw:
+            m2 = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
+            raw = m2.group(1).strip() if m2 else raw
+        s2 = raw.find("{"); e2 = raw.rfind("}")
+        if s2 != -1 and e2 != -1: raw = raw[s2:e2+1]
+        data = json.loads(raw)
+        return jsonify({"ok": True, "company": company, "web_search_used": web_used,
+                        "people": data.get("people", [])})
+    except Exception as exc:
+        import traceback; log.error("decision_makers: %s", traceback.format_exc())
+        return jsonify({"error": str(exc)})
+
 @app.route("/api/kairo-chat/<account_id>", methods=["POST"])
 @login_required
 def kairo_chat(account_id):
