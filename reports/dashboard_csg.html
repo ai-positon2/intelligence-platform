@@ -4738,6 +4738,12 @@ function ir9bars(rows){
     return '<div class="ir9-mb-row"><span class="ir9-mb-l">'+esc(r.l)+'</span><div class="ir9-mb-track"><div class="ir9-mb-fill" style="background:'+r.c+'" data-fw="'+Math.round((r.v||0)/mx*100)+'"></div></div><span class="ir9-mb-v">'+(r.v||0)+'</span></div>';
   }).join('')+'</div>';
 }
+function ir9barsClickable(rows){
+  var mx=Math.max.apply(null,rows.map(function(r){return r.v||0;}).concat([1]));
+  return '<div class="ir9-mini-bars">'+rows.map(function(r){
+    return '<div class="ir9-mb-row ir9-click" style="cursor:pointer" data-iract="kpi" data-k="sig-type" data-sig="'+esc(r.l)+'"><span class="ir9-mb-l">'+esc(r.l)+'</span><div class="ir9-mb-track"><div class="ir9-mb-fill" style="background:'+r.c+'" data-fw="'+Math.round((r.v||0)/mx*100)+'"></div></div><span class="ir9-mb-v">'+(r.v||0)+'</span></div>';
+  }).join('')+'</div>';
+}
 function ir9seg(parts,iract){
   var tot=parts.reduce(function(a,p){return a+(p.v||0);},0)||1;
   var bar='<div class="ir9-segbar">'+parts.map(function(p){
@@ -5107,15 +5113,15 @@ function _renderRad(ins){
   var maxT=Math.max.apply(null,themes.map(function(t){return t.count||1;}).concat([1]));
   var tCol=['#818cf8','#fbbf24','#34d399','#f472b6'];
   var g=_glanceCounts();
-  var intentParts=[{l:'Critical',v:g.crit,c:'#fb7185',k:'hot'},{l:'High',v:g.high,c:'#fbbf24'},{l:'Watch',v:g.watch,c:'#a5b4fc'}];
-  var momParts=[{l:'Rising',v:g.rising,c:'#34d399',k:'rise'},{l:'Steady',v:g.steady,c:'#fbbf24'},{l:'Cooling',v:g.cooling,c:'#94a3b8'}];
+  var intentParts=[{l:'Critical',v:g.crit,c:'#fb7185',k:'hot'},{l:'High',v:g.high,c:'#fbbf24',k:'high'},{l:'Watch',v:g.watch,c:'#a5b4fc',k:'watch'}];
+  var momParts=[{l:'Rising',v:g.rising,c:'#34d399',k:'rise'},{l:'Steady',v:g.steady,c:'#fbbf24',k:'steady'},{l:'Cooling',v:g.cooling,c:'#94a3b8',k:'cooling'}];
   var counts=(META&&META.counts)||{};
   var sigRows=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,5).map(function(t,i){return {l:t,v:counts[t],c:['#818cf8','#34d399','#fbbf24','#f472b6','#7cb3f5'][i%5]};});
 
   var h='<div class="ir9-glance">'
-    +'<div class="ir9-viz"><div class="ir9-viz-t">&#127919; Intent distribution</div><div class="ir9-donutwrap">'+ir9donut(intentParts,D.feed.length,'in play')+ir9leg(intentParts,'kpi')+'</div></div>'
-    +'<div class="ir9-viz"><div class="ir9-viz-t">&#128200; Momentum</div><div class="ir9-donutwrap">'+ir9donut(momParts,g.rising,'rising')+ir9leg(momParts,'kpi')+'</div></div>'
-    +'<div class="ir9-viz"><div class="ir9-viz-t">&#128225; Account signal mix</div>'+(sigRows.length?ir9bars(sigRows):'<div style="font-size:11px;color:#3b4763;line-height:1.6">Signal mix loads with the account meta.</div>')+'</div>'
+    +'<div class="ir9-viz ir9-click" style="cursor:pointer" data-iract="kpi" data-k="intent-all"><div class="ir9-viz-t">&#127919; Intent distribution<span style="margin-left:auto;opacity:.45;font-size:13px">&#8250;</span></div><div class="ir9-donutwrap">'+ir9donut(intentParts,D.feed.length,'in play')+ir9leg(intentParts,'kpi')+'</div></div>'
+    +'<div class="ir9-viz ir9-click" style="cursor:pointer" data-iract="kpi" data-k="mom-all"><div class="ir9-viz-t">&#128200; Momentum<span style="margin-left:auto;opacity:.45;font-size:13px">&#8250;</span></div><div class="ir9-donutwrap">'+ir9donut(momParts,g.rising,'rising')+ir9leg(momParts,'kpi')+'</div></div>'
+    +'<div class="ir9-viz ir9-click" style="cursor:pointer" data-iract="kpi" data-k="sig-all"><div class="ir9-viz-t">&#128225; Account signal mix<span style="margin-left:auto;opacity:.45;font-size:13px">&#8250;</span></div>'+(sigRows.length?ir9barsClickable(sigRows):'<div style="font-size:11px;color:#3b4763;line-height:1.6">Signal mix loads with the account meta.</div>')+'</div>'
   +'</div>';
 
   h+='<div class="ir9-rcard wide"><div class="ir9-rcard-t">&#128225; Market pulse <span class="ir9-kbadge">&#10022; KAIRO</span></div>'
@@ -5160,7 +5166,7 @@ document.addEventListener('click',function(e){
   else if(a==='brief'){irShowBrief();}
   else if(a==='scoreinfo'){irScoreInfo();}
   else if(a==='gotopip'){var _t=document.querySelector('.ir9-tab[data-p="pip"]');if(_t)ir9Tab(_t);}
-  else if(a==='kpi'){irShowKpi(b.getAttribute('data-k'));}
+  else if(a==='kpi'){var _k=b.getAttribute('data-k');if(_k==='sig-type'){irShowKpi('sig-type',b.getAttribute('data-sig')||'');}else{irShowKpi(_k);}}
   else if(a==='theme'){irShowTheme(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='pulse'){irShowPulse(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='risk'){irShowRisk(parseInt(b.getAttribute('data-i'),10));}
@@ -5203,16 +5209,76 @@ function irShowKpi(k){
       +'<div class="ir9-ds"><div class="ir9-ds-l">How Kairo prioritised</div><div class="ir9-ds-v">Kairo continuously tracks <b style="color:#e6edf6">'+(((META&&META.total_companies)||D.meta.cos)||0).toLocaleString()+'</b> companies and <b style="color:#e6edf6">'+(((META&&META.total_signals)||D.meta.sigs)||0).toLocaleString()+'</b> signals in this account. For this run it focused on the <b style="color:#e6edf6">'+D.meta.sigs+'</b> highest-priority signals &mdash; ranked by severity (HIGH&rarr;LOW) and recency &mdash; which surfaced from the <b style="color:#e6edf6">'+D.meta.cos+'</b> companies showing the most significant activity right now. The rest are still tracked &mdash; they simply didn&rsquo;t rise into this week&rsquo;s priority cut.</div></div>';
     irOpen('Signals — full breakdown',html);return;
   }
+  if(k==='intent-all'||k==='mom-all'||k==='sig-all'){irShowKpiOverview(k);return;}
+  if(k==='sig-type'){irShowSigType(arguments[1]||'');return;}
   var defs={
     hot:{t:'Hot targets — intent 80+',f:function(x){return (x.score||0)>=80;},e:'No companies above 80 right now. Kairo flags them the moment they heat up.'},
+    high:{t:'High intent — score 60–79',f:function(x){return (x.score||0)>=60&&(x.score||0)<80;},e:'No companies in the high-intent band right now.'},
+    watch:{t:'Watchlist — score below 60',f:function(x){return (x.score||0)<60;},e:'No watchlist companies in this batch.'},
     due:{t:'Calls due this week',f:function(x){var t=(x.timing||'').toLowerCase();return t.indexOf('today')>-1||t.indexOf('week')>-1;},e:'Nothing time-critical this week.'},
-    rise:{t:'Rising momentum',f:function(x){return (x.momentum||'').toLowerCase().indexOf('ris')>-1;},e:'No accelerating accounts in this batch.'}};
+    rise:{t:'Rising momentum',f:function(x){return (x.momentum||'').toLowerCase().indexOf('ris')>-1;},e:'No accelerating accounts in this batch.'},
+    steady:{t:'Steady momentum',f:function(x){return (x.momentum||'').toLowerCase().indexOf('stead')>-1;},e:'No steady-momentum accounts.'},
+    cooling:{t:'Cooling — monitor',f:function(x){return (x.momentum||'').toLowerCase().indexOf('cool')>-1;},e:'No cooling accounts right now.'}};
   var d=defs[k];if(!d)return;
   var items=[];D.feed.forEach(function(f,i){if(d.f(f))items.push({f:f,i:i});});
   var html=(items.length?items.map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join(''):'<div class="ir9-note">'+d.e+'</div>');
   irOpen(d.t,html);
 }
 
+/* ── KPI overview drawers ── */
+function irShowKpiOverview(k){
+  var g=_glanceCounts();
+  if(k==='intent-all'){
+    var bands=[
+      {label:'Critical (80+)',color:'#fb7185',desc:'Act today',filter:function(f){return (f.score||0)>=80;}},
+      {label:'High (60–79)',color:'#fbbf24',desc:'Engage this week',filter:function(f){return (f.score||0)>=60&&(f.score||0)<80;}},
+      {label:'Watchlist (<60)',color:'#a5b4fc',desc:'Nurture',filter:function(f){return (f.score||0)<60;}}
+    ];
+    var html='<div style="font-size:16px;font-weight:800;color:#eef2ff;margin-bottom:6px">&#127919; Intent distribution</div>'
+      +'<div style="font-size:12px;color:#4b5675;margin-bottom:20px">'+D.feed.length+' companies in this run</div>'
+      +bands.map(function(b){
+        var items=D.feed.map(function(f,i){return {f:f,i:i};}).filter(function(o){return b.filter(o.f);});
+        return '<div style="margin-bottom:18px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+          +'<span style="width:10px;height:10px;border-radius:3px;background:'+b.color+';display:inline-block"></span>'
+          +'<span style="font-size:13px;font-weight:700;color:'+b.color+'">'+b.label+'</span>'
+          +'<span style="font-size:11px;color:#4b5675">'+b.desc+'</span>'
+          +'<span style="margin-left:auto;font-size:15px;font-weight:800;color:#dee5ef">'+items.length+'</span></div>'
+          +(items.length?items.slice(0,6).map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join(''):'<div class="ir9-note">None in this band.</div>')
+          +(items.length>6?'<div style="font-size:11px;color:#4b5675;padding:6px 0">+' +(items.length-6)+' more in the Companies tab</div>':'')
+        +'</div>';
+      }).join('');
+    irOpen('Intent distribution',html);
+  } else if(k==='mom-all'){
+    var momBands=[
+      {label:'Rising ↑',color:'#34d399',f:function(x){return (x.momentum||'').toLowerCase().indexOf('ris')>-1;}},
+      {label:'Steady →',color:'#fbbf24',f:function(x){return (x.momentum||'').toLowerCase().indexOf('stead')>-1;}},
+      {label:'Cooling ↓',color:'#94a3b8',f:function(x){return (x.momentum||'').toLowerCase().indexOf('cool')>-1;}}
+    ];
+    var html2='<div style="font-size:16px;font-weight:800;color:#eef2ff;margin-bottom:6px">&#128200; Momentum breakdown</div>'
+      +'<div style="font-size:12px;color:#4b5675;margin-bottom:20px">How company activity is trending</div>'
+      +momBands.map(function(b){
+        var items=D.feed.map(function(f,i){return {f:f,i:i};}).filter(function(o){return b.f(o.f);});
+        return '<div style="margin-bottom:18px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+          +'<span style="font-size:14px;font-weight:700;color:'+b.color+'">'+b.label+'</span>'
+          +'<span style="margin-left:auto;font-size:15px;font-weight:800;color:#dee5ef">'+items.length+'</span></div>'
+          +(items.length?items.slice(0,6).map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join(''):'<div class="ir9-note">None here.</div>')
+        +'</div>';
+      }).join('');
+    irOpen('Momentum breakdown',html2);
+  } else if(k==='sig-all'){
+    irShowKpi('sig');
+  }
+}
+function irShowSigType(sigType){
+  if(!sigType)return;
+  var matches=D.feed.map(function(f,i){return {f:f,i:i};}).filter(function(o){
+    return (o.f.signals||[]).some(function(s){return (s||'').toLowerCase().indexOf(sigType.toLowerCase())>-1;});
+  });
+  var html='<div style="font-size:16px;font-weight:800;color:#eef2ff;margin-bottom:4px">'+esc(sigType)+'</div>'
+    +'<div style="font-size:12px;color:#4b5675;margin-bottom:20px">'+matches.length+' companies with this signal</div>'
+    +(matches.length?matches.map(function(o){return miniRow(o.f.name,o.f.domain,o.f.score,o.f.timing,o.i);}).join(''):'<div class="ir9-note">No matches.</div>');
+  irOpen(sigType,html);
+}
 /* ── Radar drawers ── */
 function irShowTheme(i){
   var t=(D.ins&&D.ins.themes||[])[i];if(!t)return;
