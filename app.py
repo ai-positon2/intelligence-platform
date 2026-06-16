@@ -266,6 +266,12 @@ def auth_google():
 
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
+
+@app.route("/robots.txt")
+def robots_txt():
+    from flask import Response
+    return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+
 @app.route("/")
 def index():
     return redirect(url_for("hub") if _get_user() else url_for("login_page"))
