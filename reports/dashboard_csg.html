@@ -1451,6 +1451,74 @@ h2::after,.section-title::after{
 .doss-c2-lbl{font-size:9px;font-weight:800;color:#4b5675;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
 .doss-c2-val{font-size:13px;font-weight:700;color:#a5b4fc;margin-bottom:6px}
 .doss-c2-txt{font-size:11.5px;color:#6e7d98;line-height:1.67}
+/* ── Company Modal Beautiful v1 ── */
+.cm-wrap{display:flex;flex-direction:column;gap:0}
+.cm-hero{border-radius:16px;padding:22px 22px 18px;background:linear-gradient(135deg,rgba(15,14,42,.95),rgba(10,9,28,.98));border:1px solid rgba(129,140,248,.18);margin-bottom:18px;position:relative;overflow:hidden}
+.cm-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:radial-gradient(circle,var(--hcol,rgba(129,140,248,.2)) 0%,transparent 70%);pointer-events:none}
+.cm-hero-top{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.cm-avatar{width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.cm-name-block{flex:1;min-width:0}
+.cm-name{font-size:20px;font-weight:800;color:#f1f5f9;letter-spacing:-.025em;line-height:1.2}
+.cm-domain{font-size:11px;color:#4b5675;margin-top:3px}
+.cm-score-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}
+.cm-ring-svg{display:block}
+.cm-ring-num{font-size:18px;font-weight:900;letter-spacing:-.03em;text-align:center}
+.cm-ring-lbl{font-size:8px;font-weight:700;color:#4b5675;letter-spacing:.1em;text-transform:uppercase;text-align:center}
+.cm-badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cm-mom-badge{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 11px;font-size:10px;font-weight:800;letter-spacing:.04em}
+.cm-timing-badge{border-radius:20px;padding:4px 12px;font-size:10px;font-weight:800;letter-spacing:.04em}
+.cm-contact{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 12px;font-size:11px;color:#8b98ab}
+.cm-contact b{color:#c4cde8;font-weight:700}
+
+/* opener */
+.cm-opener{border-radius:14px;padding:16px 18px;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(99,102,241,.06));border:1px solid rgba(129,140,248,.2);margin-bottom:18px;position:relative;overflow:hidden}
+.cm-opener::before{content:'\201C';position:absolute;top:-8px;left:12px;font-size:64px;color:rgba(129,140,248,.12);font-family:Georgia,serif;line-height:1;pointer-events:none}
+.cm-opener-lbl{font-size:9px;font-weight:800;color:#4f46e5;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.cm-opener-text{font-size:13.5px;color:#c4cde8;line-height:1.7;font-style:italic;padding-left:6px}
+
+/* 2-col grid */
+.cm-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+@media(max-width:560px){.cm-2col{grid-template-columns:1fr}}
+.cm-card{border-radius:14px;padding:15px 16px;border:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:7px}
+.cm-card.why{background:linear-gradient(145deg,rgba(99,102,241,.09),rgba(79,70,229,.05));border-color:rgba(129,140,248,.18)}
+.cm-card.pitch{background:linear-gradient(145deg,rgba(16,185,129,.07),rgba(5,150,105,.04));border-color:rgba(16,185,129,.18)}
+.cm-card-icon{font-size:18px;line-height:1}
+.cm-card-lbl{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.1em;text-transform:uppercase}
+.cm-card-text{font-size:12.5px;line-height:1.7}
+.cm-card.why .cm-card-text{color:#b8c6e8}
+.cm-card.pitch .cm-card-text{color:#9fcfbd}
+
+/* signals */
+.cm-signals-block{margin-bottom:18px}
+.cm-block-lbl{font-size:9px;font-weight:800;color:#4b5675;letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.cm-block-lbl::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+.cm-sig-chips{display:flex;flex-wrap:wrap;gap:7px}
+.cm-sig-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:5px 12px;font-size:11px;color:#8b98ab;font-weight:500;cursor:default;transition:all .15s}
+.cm-sig-chip:hover{background:rgba(99,102,241,.1);border-color:rgba(129,140,248,.3);color:#a5b4fc}
+.cm-sig-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* service fit */
+.cm-svc-block{margin-bottom:18px}
+.cm-svc-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cm-svc-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#34d399;transition:all .15s}
+.cm-svc-chip:hover{background:rgba(16,185,129,.14);border-color:rgba(52,211,153,.4)}
+
+/* talking points */
+.cm-tps-block{margin-bottom:18px}
+.cm-tp-card{display:flex;align-items:flex-start;gap:11px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:11px 14px;margin-bottom:7px;transition:all .18s}
+.cm-tp-card:last-child{margin-bottom:0}
+.cm-tp-card:hover{background:rgba(99,102,241,.07);border-color:rgba(129,140,248,.2)}
+.cm-tp-num{width:20px;height:20px;border-radius:6px;background:rgba(99,102,241,.16);border:1px solid rgba(129,140,248,.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#818cf8;flex-shrink:0;margin-top:1px}
+.cm-tp-text{font-size:12.5px;color:#9fabbe;line-height:1.6;flex:1}
+
+/* next step */
+.cm-next{border-radius:12px;padding:13px 16px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);margin-bottom:18px;font-size:12.5px;color:#d4a847;line-height:1.65;display:flex;gap:10px;align-items:flex-start}
+.cm-next-icon{flex-shrink:0;font-size:15px}
+
+/* dossier divider */
+.cm-doss-divider{display:flex;align-items:center;gap:12px;margin:4px 0 20px;padding-top:4px}
+.cm-doss-divider-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(129,140,248,.25),transparent)}
+.cm-doss-divider-badge{font-size:9px;font-weight:800;color:#4f46e5;letter-spacing:.12em;background:rgba(79,70,229,.1);border:1px solid rgba(129,140,248,.22);border-radius:20px;padding:4px 12px;white-space:nowrap}
 /* ── Kairo Deep Dossier Modal v3 ── */
 #ir9-doss-overlay{display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)}
 #ir9-doss-box{background:linear-gradient(180deg,#0a0e24 0%,#08091e 100%);border:1px solid rgba(129,140,248,.22);border-radius:20px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 80px rgba(99,102,241,.1)}
@@ -5171,20 +5239,81 @@ function irShowCo(i){
   var c=f.score!=null?scC(f.score):'#a5b4fc';
   var m=(D.out||[]).filter(function(o){return (o.company||'').toLowerCase()===f.name.toLowerCase();})[0];
   var tps=(m&&m.talking_points)||[];
-  var coHtml=coHeader(f.name,f.domain,AVC[i%AVC.length])
-    +'<div style="display:flex;align-items:center;gap:13px;margin-bottom:18px;flex-wrap:wrap">'
-      +(f.score!=null?'<div class="ir9-ring" style="--p:'+f.score+';--c:'+c+';width:58px;height:58px"><span>'+f.score+'</span></div>':'')
-      +'<div>'+momB(f.momentum)+(f.timing?' <span class="ir9-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')
-      +(f.contact?'<div class="ir9-contact" style="margin-top:7px">&#127919; Approach: <b>'+esc(f.contact)+'</b></div>':'')+'</div>'
+  var hcol=AVC[i%AVC.length];
+  var scR=36,scCirc=2*Math.PI*scR,scOff=scCirc*(1-Math.min(f.score||0,100)/100);
+  var coHtml='<div class="cm-wrap">'
+    /* ── HERO ── */
+    +'<div class="cm-hero" style="--hcol:'+hcol+'44">'
+      +'<div class="cm-hero-top">'
+        +'<div class="cm-avatar" style="background:'+hcol+'">'+esc(ini(f.name))+'</div>'
+        +'<div class="cm-name-block">'
+          +'<div class="cm-name">'+esc(f.name)+'</div>'
+          +(f.domain?'<div class="cm-domain">'+esc(f.domain)+'</div>':'')
+        +'</div>'
+        +(f.score!=null
+          ?'<div class="cm-score-wrap"><svg width="80" height="80" viewBox="0 0 80 80" class="cm-ring-svg">'
+            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/>'
+            +'<circle cx="40" cy="40" r="'+scR+'" fill="none" stroke="'+c+'" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+scCirc.toFixed(1)+'" stroke-dashoffset="'+scOff.toFixed(1)+'" transform="rotate(-90 40 40)" style="filter:drop-shadow(0 0 6px '+c+')"/>'
+           +'</svg>'
+           +'<div class="cm-ring-num" style="color:'+c+';margin-top:-56px;position:relative;z-index:1">'+f.score+'</div>'
+           +'<div class="cm-ring-lbl" style="position:relative;z-index:1">score</div>'
+           +'</div>'
+          :'')
+      +'</div>'
+      +'<div class="cm-badges">'
+        +(f.momentum?momB(f.momentum):'')
+        +(f.timing?'<span class="ir9-tchip '+tCls(f.timing)+'">'+tLbl(f.timing)+'</span>':'')
+        +(f.contact?'<span class="cm-contact">&#127919; Approach: <b>'+esc(f.contact)+'</b></span>':'')
+      +'</div>'
     +'</div>'
-    +(f.hook?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Kairo&rsquo;s opener</div><div class="ir9-hl">&ldquo;'+esc(f.hook)+'&rdquo;</div></div>':'')
-    +(f.why?'<div class="ir9-ds"><div class="ir9-ds-l">Why now</div><div class="ir9-ds-v">'+esc(f.why)+'</div></div>':'')
-    +(f.pitch&&f.pitch!==f.why?'<div class="ir9-ds"><div class="ir9-ds-l">What to pitch</div><div class="ir9-ds-v">'+esc(f.pitch)+'</div></div>':'')
-    +(f.signals.length?'<div class="ir9-ds"><div class="ir9-ds-l">Signals</div><div class="ir9-chips">'+f.signals.map(function(s){return chip(s);}).join('')+'</div></div>':'')
-    +(f.svc.length?'<div class="ir9-ds"><div class="ir9-ds-l">Service fit</div><div class="ir9-chips">'+f.svc.map(function(s){return chip(s,true);}).join('')+'</div></div>':'')
-    +(tps.length?'<div class="ir9-ds"><div class="ir9-ds-l">&#10022; Talking points</div>'+tps.map(function(t,j){return '<div class="ir9-tp"><div class="ir9-tp-n">'+(j+1)+'</div><div class="ir9-tp-t">'+esc(t)+'</div></div>';}).join('')+'</div>':'')
-    +(f.next?'<div class="ir9-ds"><div class="ir9-ds-l">Next step</div><div class="ir9-ds-v">'+esc(f.next)+'</div></div>':'')
-    +aiBtns(f.name,f.domain,f.svc[0]||'');
+    /* ── OPENER ── */
+    +(f.hook
+      ?'<div class="cm-opener">'
+        +'<div class="cm-opener-lbl">&#10022; Kairo&rsquo;s opener</div>'
+        +'<div class="cm-opener-text">&ldquo;'+esc(f.hook)+'&rdquo;</div>'
+      +'</div>'
+      :'')
+    /* ── WHY NOW + WHAT TO PITCH ── */
+    +((f.why||(f.pitch&&f.pitch!==f.why))
+      ?'<div class="cm-2col">'
+        +(f.why
+          ?'<div class="cm-card why"><div class="cm-card-icon">&#9889;</div><div class="cm-card-lbl">Why now</div><div class="cm-card-text">'+esc(f.why)+'</div></div>'
+          :'')
+        +(f.pitch&&f.pitch!==f.why
+          ?'<div class="cm-card pitch"><div class="cm-card-icon">&#9670;</div><div class="cm-card-lbl">What to pitch</div><div class="cm-card-text">'+esc(f.pitch)+'</div></div>'
+          :'')
+      +'</div>'
+      :'')
+    /* ── SIGNALS ── */
+    +(f.signals.length
+      ?'<div class="cm-signals-block">'
+        +'<div class="cm-block-lbl">&#128268; Signals</div>'
+        +'<div class="cm-sig-chips">'+f.signals.map(function(s){return '<span class="cm-sig-chip"><span class="cm-sig-dot"></span>'+esc(s)+'</span>';}).join('')+'</div>'
+      +'</div>'
+      :'')
+    /* ── SERVICE FIT ── */
+    +(f.svc.length
+      ?'<div class="cm-svc-block">'
+        +'<div class="cm-block-lbl">&#9670; Service fit</div>'
+        +'<div class="cm-svc-chips">'+f.svc.map(function(s){return '<span class="cm-svc-chip">'+esc(s)+'</span>';}).join('')+'</div>'
+      +'</div>'
+      :'')
+    /* ── TALKING POINTS ── */
+    +(tps.length
+      ?'<div class="cm-tps-block">'
+        +'<div class="cm-block-lbl">&#10022; Talking points</div>'
+        +tps.map(function(t,j){return '<div class="cm-tp-card"><div class="cm-tp-num">'+(j+1)+'</div><div class="cm-tp-text">'+esc(t)+'</div></div>';}).join('')
+      +'</div>'
+      :'')
+    /* ── NEXT STEP ── */
+    +(f.next
+      ?'<div class="cm-next"><span class="cm-next-icon">&#8594;</span>'+esc(f.next)+'</div>'
+      :'')
+    /* ── AI BUTTONS ── */
+    +aiBtns(f.name,f.domain,f.svc[0]||'')
+    /* ── DOSSIER DIVIDER ── */
+    +'<div class="cm-doss-divider"><div class="cm-doss-divider-line"></div><div class="cm-doss-divider-badge">&#10022; KAIRO DEEP DOSSIER</div><div class="cm-doss-divider-line"></div></div>'
+  +'</div>';
   var ov=document.getElementById('ir9-doss-overlay');
   var body=document.getElementById('ir9-doss-body');
   var title=document.getElementById('ir9-doss-title');
@@ -6096,7 +6225,6 @@ nav#sidebar .sidebar-footer,#sidebar>.sidebar-footer{margin-top:auto!important}
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){doUser();fixGap();});}
   else{doUser();fixGap();}
   function fixGap(){var sf=document.querySelector('#sidebar .sidebar-footer');if(sf)sf.style.marginTop='0';}
-  else{doUser();}
 })();
 </script>
 
