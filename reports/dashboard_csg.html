@@ -1519,6 +1519,22 @@ h2::after,.section-title::after{
 .cm-doss-divider{display:flex;align-items:center;gap:12px;margin:4px 0 20px;padding-top:4px}
 .cm-doss-divider-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(129,140,248,.25),transparent)}
 .cm-doss-divider-badge{font-size:9px;font-weight:800;color:#4f46e5;letter-spacing:.12em;background:rgba(79,70,229,.1);border:1px solid rgba(129,140,248,.22);border-radius:20px;padding:4px 12px;white-space:nowrap}
+/* ── Action card (top of modal) ── */
+.cm-action-card{border-radius:16px;padding:16px;background:linear-gradient(135deg,rgba(15,14,42,.98),rgba(10,9,30,.98));border:1px solid rgba(129,140,248,.2);margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cm-act-btn{display:flex;align-items:center;gap:10px;border-radius:12px;padding:12px 14px;border:none;cursor:pointer;text-align:left;transition:all .18s;font-family:inherit;text-decoration:none}
+.cm-act-btn.primary{background:linear-gradient(135deg,#4f46e5,#6366f1);box-shadow:0 4px 16px rgba(79,70,229,.35)}
+.cm-act-btn.primary:hover{background:linear-gradient(135deg,#4338ca,#4f46e5);transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,.45)}
+.cm-act-btn.secondary{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.cm-act-btn.secondary:hover{background:rgba(129,140,248,.1);border-color:rgba(129,140,248,.3);transform:translateY(-1px)}
+.cm-act-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.cm-act-btn.primary .cm-act-icon{background:rgba(255,255,255,.18)}
+.cm-act-btn.secondary .cm-act-icon{background:rgba(129,140,248,.12)}
+.cm-act-label{font-size:12px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.cm-act-btn.primary .cm-act-label{color:#fff}
+.cm-act-btn.secondary .cm-act-label{color:#c4cde8}
+.cm-act-sub{font-size:10px;margin-top:2px;opacity:.65}
+.cm-act-btn.primary .cm-act-sub{color:#e0e7ff}
+.cm-act-btn.secondary .cm-act-sub{color:#8b98ab}
 /* ── Kairo Deep Dossier Modal v3 ── */
 #ir9-doss-overlay{display:none;position:fixed;inset:0;background:rgba(2,4,18,.92);z-index:800;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(10px)}
 #ir9-doss-box{background:linear-gradient(180deg,#0a0e24 0%,#08091e 100%);border:1px solid rgba(129,140,248,.22);border-radius:20px;width:100%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 80px rgba(99,102,241,.1)}
@@ -5113,8 +5129,8 @@ document.addEventListener('click',function(e){
   var b=e.target.closest('[data-iract]');if(!b)return;
   var a=b.getAttribute('data-iract');
   if(a==='co'){irShowCo(parseInt(b.getAttribute('data-i'),10));}
-  else if(a==='email'){e.stopPropagation();if(b.getAttribute('data-tone')){irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone'));}else{irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'','','');}}
-  else if(a==='research'){e.stopPropagation();irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
+  else if(a==='email'){e.stopPropagation();var _dov=document.getElementById('ir9-doss-overlay');if(_dov)_dov.style.display='none';if(b.getAttribute('data-tone')){irAIEmail(b.getAttribute('data-co')||'',b.getAttribute('data-svc')||'',b.getAttribute('data-tone'));}else{irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'','','');}}
+  else if(a==='research'){e.stopPropagation();var _dov2=document.getElementById('ir9-doss-overlay');if(_dov2)_dov2.style.display='none';irResearch(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'');}
   else if(a==='signal-email'){e.stopPropagation();irSignalEmailSetup(b.getAttribute('data-co')||'',b.getAttribute('data-dom')||'',b.getAttribute('data-apollo')||'',b.getAttribute('data-sig-type')||'',b.getAttribute('data-sig-detail')||'');}
   else if(a==='act'){irShowAct(parseInt(b.getAttribute('data-i'),10));}
   else if(a==='ado'){e.stopPropagation();var i=parseInt(b.getAttribute('data-i'),10);var ac=D.acts.filter(function(x){return x._i===i;})[0];if(ac){var d=getDone(),id=actId(ac);if(d[id])delete d[id];else d[id]=Date.now();setDone(d);_renderActs();if(b.hasAttribute('data-redrw'))irShowAct(i);}}
@@ -5242,6 +5258,25 @@ function irShowCo(i){
   var hcol=AVC[i%AVC.length];
   var scR=36,scCirc=2*Math.PI*scR,scOff=scCirc*(1-Math.min(f.score||0,100)/100);
   var coHtml='<div class="cm-wrap">'
+    /* ── ACTION CARD (top) ── */
+    +'<div class="cm-action-card">'
+      +'<button class="cm-act-btn primary" data-iract="email" data-co="'+esc(f.name)+'" data-svc="'+esc(f.svc[0]||'')+'">'
+        +'<div class="cm-act-icon">&#9993;</div>'
+        +'<div><div class="cm-act-label">Kairo Email</div><div class="cm-act-sub">Write personalised outreach</div></div>'
+      +'</button>'
+      +'<button class="cm-act-btn secondary" data-iract="research" data-co="'+esc(f.name)+'" data-dom="'+esc(f.domain||'')+'">'
+        +'<div class="cm-act-icon">&#10022;</div>'
+        +'<div><div class="cm-act-label">Research with Kairo</div><div class="cm-act-sub">Deep web intelligence</div></div>'
+      +'</button>'
+      +'<a class="cm-act-btn secondary" href="'+liPpl(f.name)+'" target="_blank" rel="noopener">'
+        +'<div class="cm-act-icon">&#128100;</div>'
+        +'<div><div class="cm-act-label">Decision Makers</div><div class="cm-act-sub">Find key contacts</div></div>'
+      +'</a>'
+      +'<a class="cm-act-btn secondary" href="'+liCo(f.name)+'" target="_blank" rel="noopener">'
+        +'<div class="cm-act-icon">&#128188;</div>'
+        +'<div><div class="cm-act-label">LinkedIn</div><div class="cm-act-sub">Company profile</div></div>'
+      +'</a>'
+    +'</div>'
     /* ── HERO ── */
     +'<div class="cm-hero" style="--hcol:'+hcol+'44">'
       +'<div class="cm-hero-top">'
@@ -5309,8 +5344,6 @@ function irShowCo(i){
     +(f.next
       ?'<div class="cm-next"><span class="cm-next-icon">&#8594;</span>'+esc(f.next)+'</div>'
       :'')
-    /* ── AI BUTTONS ── */
-    +aiBtns(f.name,f.domain,f.svc[0]||'')
     /* ── DOSSIER DIVIDER ── */
     +'<div class="cm-doss-divider"><div class="cm-doss-divider-line"></div><div class="cm-doss-divider-badge">&#10022; KAIRO DEEP DOSSIER</div><div class="cm-doss-divider-line"></div></div>'
   +'</div>';
