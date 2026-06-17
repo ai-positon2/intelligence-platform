@@ -290,165 +290,28 @@
     <div class="page-header">
       <div class="section-label">Organic Growth</div>
       <h1 class="page-title">SEO Dashboards</h1>
-      <p class="page-sub">9 SEO and content intelligence tools — powered by SERP Researcher.</p>
+      <p class="page-sub">{{ seo_tools|length }} SEO and content intelligence tools — powered by SERP Researcher.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
     <div class="dash-grid">
-
-      <!-- 1. SEO & GEO Audit -->
-      <a href="/seo/seo-geo-audit" class="dash-card active c-seo-geo">
+      {% for t in seo_tools %}
+      <a href="/seo/{{ t.slug }}" class="dash-card active">
         <div class="card-band"></div>
         <div class="card-thumb">
-          <div class="card-thumb-icon">✅</div>
+          <div class="card-thumb-icon">{{ t.icon or "🌿" }}</div>
           <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
         </div>
         <div class="card-body">
-          <div class="card-name">SEO & GEO Audit</div>
-          <div class="card-desc">Run 200+ checks across all SEO and GEO parameters. Get a scored report with AI-powered recommendations.</div>
+          <div class="card-name">{{ t.name }}</div>
+          <div class="card-desc">{{ t.desc }}</div>
           <div class="card-footer">
-            <div class="card-tags"><span class="tag">SEO</span><span class="tag">GEO</span><span class="tag">AI</span></div>
+            <div class="card-tags">{% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>
             <span class="card-arrow">→</span>
           </div>
         </div>
       </a>
-
-      <!-- 2. Article Recommendation -->
-      <a href="/seo/article-recommendation" class="dash-card active c-article">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">📋</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Article Recommendation</div>
-          <div class="card-desc">Analyse top 10 ranking pages for any keyword and generate a complete article brief with H1/H2/H3 structure and writing instructions.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">Briefs</span><span class="tag">SERP</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 3. Content Enhancement -->
-      <a href="/seo/content-enhancement" class="dash-card active c-enhancement">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">⚡</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Content Enhancement</div>
-          <div class="card-desc">Analyse a live URL or pasted HTML and generate copy-ready upgrades for structure, authority, citations, FAQs, schema, and AI-search readiness.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">AEO</span><span class="tag">E-E-A-T</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 4. Content Research -->
-      <a href="/seo/content-research" class="dash-card active c-research">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">🔎</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Content Research</div>
-          <div class="card-desc">Scrape the top 10 ranking pages for any keyword, extract their structure, and generate a ready-to-use content brief with H2 recommendations.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">Content</span><span class="tag">Competitors</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 5. Keyword Research -->
-      <a href="/seo/keyword-research" class="dash-card active c-keyword">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">🔑</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Keyword Research</div>
-          <div class="card-desc">Enter a seed keyword, find top ranking competitors, pull their SEMrush keyword rankings, and let AI shortlist primary and secondary keywords.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">Keywords</span><span class="tag">SEMrush</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 6. Agent Readiness Audit -->
-      <a href="/seo/agent-readiness-audit" class="dash-card active c-agent">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">🤖</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Agent Readiness Audit</div>
-          <div class="card-desc">Score any site's AI agent readiness in 15s across 13 checks — discoverability, bot access, MCP, OAuth, and protocol support. GPT-4o CMO brief included.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">AI Audit</span><span class="tag">MCP</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 7. Image Alt Tag Audit -->
-      <a href="/seo/image-alt-audit" class="dash-card active c-image">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">🖼️</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Image Alt Tag Audit</div>
-          <div class="card-desc">Scrape 100+ location pages, classify every image by type, generate SEO-optimised alt tags and filenames, and export a colour-coded Excel workbook.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">Images</span><span class="tag">Bulk</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 8. Knowledge Base -->
-      <a href="/seo/knowledge-base" class="dash-card active c-knowledge">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">📚</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Knowledge Base</div>
-          <div class="card-desc">Create and maintain knowledge base entries for clients, industries, and best practices. KB context is automatically injected into AI tools when a client is selected.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">Knowledge</span><span class="tag">Context</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
-      <!-- 9. Team Insights -->
-      <a href="/seo/team-insights" class="dash-card active c-team">
-        <div class="card-band"></div>
-        <div class="card-thumb">
-          <div class="card-thumb-icon">📊</div>
-          <div class="card-thumb-badge tb-live"><span class="tb-dot live"></span> Live</div>
-        </div>
-        <div class="card-body">
-          <div class="card-name">Team Insights</div>
-          <div class="card-desc">Connect to your team's task sheet and surface daily intelligence — blocked tasks, overdue work, WIP limits, capacity vs load, client health, and team signals.</div>
-          <div class="card-footer">
-            <div class="card-tags"><span class="tag">PM</span><span class="tag">Sheets</span></div>
-            <span class="card-arrow">→</span>
-          </div>
-        </div>
-      </a>
-
+      {% endfor %}
     </div>
 
     <p class="footer-note">Position2 · Internal use only</p>

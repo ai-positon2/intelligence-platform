@@ -1,6 +1,7 @@
 """Platform hub server — Google Sign-In + multi-dashboard routing."""
 
 import os
+import time
 import json
 import uuid
 import logging
@@ -307,7 +308,7 @@ def ppc():
 @app.route("/seo")
 @login_required
 def seo():
-    return render_template("seo.html", user=_get_user())
+    return render_template("seo.html", user=_get_user(), seo_tools=_seo_tools())
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 _SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
@@ -333,34 +334,61 @@ def ad_intelligence_favicon():
 def ad_intelligence_icons():
     return send_from_directory("ad_intelligence", "icons.svg")
 
-_SEO_TOOLS = {
-    "seo-geo-audit":          ("/seo-geo-audit",          "SEO & GEO Audit"),
-    "article-recommendation": ("/article-recommendation", "Article Recommendation"),
-    "content-enhancement":    ("/content-enhancement",    "Content Enhancement"),
-    "content-research":       ("/content-research",       "Content Research"),
-    "keyword-research":       ("/keyword-research",       "Keyword Research"),
-    "agent-readiness-audit":  ("/agent-readiness-audit",  "Agent Readiness Audit"),
-    "image-alt-audit":        ("/image-alt-audit",        "Image Alt Tag Audit"),
-    "knowledge-base":         ("/kb",                     "Knowledge Base"),
-    "team-insights":          ("/team-insights",          "Team Insights"),
-    "serp-researcher":        ("/",                       "SERP Content Researcher"),
-}
+_SEO_TOOLS_FALLBACK = [
+    {"slug": "seo-geo-audit",          "path": "/seo-geo-audit",          "name": "SEO & GEO Audit",                 "desc": "200+ checks · scored · AI recommendations", "icon": "✅", "tags": ["SEO", "GEO", "AI"]},
+    {"slug": "article-recommendation", "path": "/article-recommendation", "name": "Article Recommendation",          "desc": "Structured content briefs from SERP data",  "icon": "📋", "tags": ["Briefs", "SERP"]},
+    {"slug": "content-enhancement",    "path": "/content-enhancement",    "name": "Content Enhancement",             "desc": "Structure & authority recommendations",     "icon": "⚡", "tags": ["AEO", "E-E-A-T"]},
+    {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",                "desc": "Competitor-based content briefs",           "icon": "🔎", "tags": ["Content", "SERP"]},
+    {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",                "desc": "AI-powered keyword shortlisting",           "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
+    {"slug": "agent-readiness-audit",  "path": "/agent-readiness-audit",  "name": "Agent Readiness Audit",           "desc": "Score any site's AI agent readiness in 15s", "icon": "🤖", "tags": ["AI Audit"]},
+    {"slug": "image-alt-audit",        "path": "/image-alt-audit",        "name": "Image Alt Tag Audit",             "desc": "Bulk alt tag generation for location pages", "icon": "🖼️", "tags": ["Images"]},
+    {"slug": "location-page-builder",  "path": "/location-page-builder",  "name": "Location + Service Page Builder", "desc": "Composed, approved, dev-ready location pages", "icon": "📍", "tags": ["Local SEO", "Pages"]},
+    {"slug": "team-insights",          "path": "/team-insights",          "name": "Team Insights",                   "desc": "Live SEO PM dashboard from Google Sheets",  "icon": "📊", "tags": ["PM", "Sheets"]},
+    {"slug": "knowledge-base",         "path": "/kb",                     "name": "Knowledge Base",                  "desc": "Client & industry context management",      "icon": "📚", "tags": ["Knowledge", "Context"]},
+]
+
+# Live SEO tool list is fetched from the SERP app's /tools.json manifest (cached).
+# Add a tool on the SERP side -> it appears here automatically, no redeploy needed.
+_SEO_MANIFEST = {"ts": 0.0, "tools": None}
+_SEO_MANIFEST_TTL = 300  # seconds
+
+def _seo_tools():
+    now = time.time()
+    cached = _SEO_MANIFEST["tools"]
+    if cached is not None and now - _SEO_MANIFEST["ts"] < _SEO_MANIFEST_TTL:
+        return cached
+    tools = None
+    try:
+        pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
+        url = f"{_SERP_BASE}/tools.json" + (f"?pt={pt}" if pt else "")
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
+        data = r.json().get("tools")
+        if isinstance(data, list) and data:
+            tools = data
+    except Exception as e:
+        logging.warning("SEO manifest fetch failed, using fallback: %s", e)
+    if tools is None:
+        tools = _SEO_TOOLS_FALLBACK
+    _SEO_MANIFEST.update(ts=now, tools=tools)
+    return tools
 
 @app.route("/seo/<tool_slug>")
 @login_required
 def seo_tool(tool_slug: str):
-    if tool_slug not in _SEO_TOOLS:
+    tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
+    if not tool:
         abort(404)
-    tool_path, tool_name = _SEO_TOOLS[tool_slug]
     pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
-    sep = "?" if "?" not in tool_path else "&"
-    embed_url = f"{_SERP_BASE}{tool_path}{sep + 'pt=' + pt if pt else ''}"
+    path = tool["path"]
+    sep = "?" if "?" not in path else "&"
+    embed_url = f"{_SERP_BASE}{path}{sep + 'pt=' + pt if pt else ''}"
     return render_template("embed.html",
         user=_get_user(),
-        title=tool_name,
+        title=tool["name"],
         embed_url=embed_url,
         breadcrumb=[("Hub", "/hub"), ("SEO", "/seo")],
-        current=tool_name,
+        current=tool["name"],
         accent="#34d399",
     )
 
