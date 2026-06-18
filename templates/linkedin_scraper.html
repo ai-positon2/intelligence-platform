@@ -76,6 +76,23 @@ body::before{
 .hl-go{font-size:11.5px;font-weight:700;color:#fff;background:linear-gradient(135deg,#7c83f5,#9b87fd);padding:8px 13px;border-radius:9px;white-space:nowrap;flex-shrink:0;transition:box-shadow .15s;}
 .hl-row:hover .hl-go{box-shadow:0 7px 18px -6px rgba(124,131,245,.95);}
 @media(max-width:620px){.hl-meta,.hl-tags{display:none;}}
+/* hot-leads tab + modal */
+.mtab-hot{background:linear-gradient(135deg,rgba(255,122,89,.16),rgba(245,166,35,.09))!important;}
+.mtab-hot:hover{background:linear-gradient(135deg,rgba(255,122,89,.24),rgba(245,166,35,.15))!important;}
+.mtab-hot::after{display:none!important;}
+.mtab-hot .mtab-label{color:#ff9b80!important;}
+.mtab-hot-v{font-size:14px!important;font-weight:800;line-height:1.25;background:linear-gradient(90deg,#ff7a59,#f5a623);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.hlm-ov{position:fixed;inset:0;z-index:4000;display:none;align-items:flex-start;justify-content:center;padding:42px 18px;overflow-y:auto;background:radial-gradient(1100px 500px at 50% -8%,rgba(255,122,89,.12),transparent 60%),rgba(3,5,14,.86);}
+.hlm-ov.open{display:flex;animation:hlm-fade .24s ease both;}
+@keyframes hlm-fade{from{opacity:0}to{opacity:1}}
+.hlm-card{width:100%;max-width:720px;background:linear-gradient(180deg,#10162b,#0a0e1d);border:1px solid rgba(255,122,89,.3);border-radius:20px;box-shadow:0 40px 120px -20px rgba(0,0,0,.85);overflow:hidden;animation:hlm-pop .26s cubic-bezier(.16,1,.3,1) both;}
+@keyframes hlm-pop{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+.hlm-head{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08);}
+.hlm-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#ff7a59,#f5a623);font-size:19px;flex-shrink:0;box-shadow:0 8px 20px -6px rgba(255,122,89,.8);}
+.hlm-x{width:32px;height:32px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:var(--muted);font-size:15px;cursor:pointer;flex-shrink:0;transition:.15s;}
+.hlm-x:hover{background:rgba(255,80,80,.14);color:#ff8a8a;}
+.hlm-body{padding:8px 10px 14px;max-height:calc(90vh - 96px);overflow-y:auto;}
+.hlm-body .hl-row:first-child{border-top:0;}
 /* mega-tabs */
 .mega-tabs{
   display:flex;border:1px solid var(--b1);border-radius:var(--rxl);
@@ -653,10 +670,23 @@ body::before{
     <div class="mtab-label">Posts</div>
     <div class="mtab-val vi" id="tc-post">8</div>
   </button>
+  <button class="mtab mtab-hot" onclick="openHotLeads()" id="nt-hotleads">
+    <div class="mtab-label">🔥 Hot Leads</div>
+    <div class="mtab-val mtab-hot-v">Matched from HubSpot</div>
+  </button>
 </div>
 <div id="tab-people" class="page active"></div>
 <div id="tab-companies" class="page"></div>
 <div id="tab-post" class="page"></div>
+</div>
+<div class="hlm-ov" id="hlm-ov" onclick="if(event.target===this)closeHotLeads()">
+  <div class="hlm-card">
+    <div class="hlm-head"><div class="hlm-ic">🔥</div>
+      <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.2px">Hot Leads — People matched with the HubSpot list</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">Engaged with your LinkedIn content and already in your CRM · click anyone to reach out</div></div>
+      <button class="hlm-x" onclick="closeHotLeads()" aria-label="Close">✕</button></div>
+    <div class="hlm-body" id="hlm-list"></div>
+  </div>
 </div>
 <div class="overlay" id="overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -881,23 +911,21 @@ window.KE_HOTLEADS=[
   {name:'Marcus Bell',title:'Director of Growth',company:'Vanta Logistics',email:'marcus.bell@vantalogistics.com',location:'Atlanta, GA',industry:'Logistics & Supply Chain',post:'Full-funnel attribution without the spreadsheets',commented:false,when:'6 days ago',reactions:96},
   {name:'Sofia Castellano',title:'SVP Marketing',company:'Helio Health',email:'s.castellano@heliohealth.com',location:'New York, NY',industry:'Healthcare',post:'Turning website + LinkedIn signals into pipeline',commented:true,when:'yesterday',reactions:231}
 ];
-function keHotLeadsCard(){
+function keHotLeadRows(){
   var L=window.KE_HOTLEADS||[];
-  var rows=L.map(function(p,i){
+  return L.map(function(p,i){
     var g=(typeof gradFor==='function')?gradFor(p.name):['#7c83f5','#9b87fd'];
     return '<div class="hl-row" onclick="keHotLead('+i+')">'
       +'<div class="hl-av" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')">'+ini(p.name)+'</div>'
       +'<div class="hl-info"><div class="hl-nm">'+esc(p.name)+'</div>'
         +'<div class="hl-rl">'+esc(p.title)+' · '+esc(p.company)+'</div>'
-        +'<div class="hl-meta">'+(p.commented?'💬 commented on':'👍 liked')+' “'+esc(p.post)+'” · '+esc(p.when)+'</div></div>'
+        +'<div class="hl-meta">📍 '+esc(p.location)+' · '+esc(p.industry)+' · '+(p.commented?'💬 commented on':'👍 liked')+' “'+esc(p.post)+'”</div></div>'
       +'<div class="hl-tags"><span class="hl-hs">● HubSpot list</span><span class="hl-eng">'+(p.commented?'Commented':'Reacted')+'</span></div>'
       +'<div class="hl-go">Engage →</div></div>';
   }).join('');
-  return '<div class="hl-card"><div class="hl-head"><div class="hl-ic">🔥</div>'
-    +'<div class="hl-htx"><div class="hl-title">Hot Leads — People matched with the HubSpot list</div>'
-    +'<div class="hl-sub">Engaged with your LinkedIn content and already in your CRM · click to reach out</div></div>'
-    +'<span class="hl-count">'+L.length+' matched</span></div>'+rows+'</div>';
 }
+function openHotLeads(){var el=document.getElementById('hlm-list');if(el)el.innerHTML=keHotLeadRows();var ov=document.getElementById('hlm-ov');if(ov){ov.classList.add('open');document.body.style.overflow='hidden';}}
+function closeHotLeads(){var ov=document.getElementById('hlm-ov');if(ov){ov.classList.remove('open');document.body.style.overflow='';}}
 function keHotLead(i){
   var p=(window.KE_HOTLEADS||[])[i];if(!p)return;
   var dom=(p.email||'').split('@')[1]||'';
@@ -911,7 +939,6 @@ function buildPeopleTab(){
   const el=document.getElementById('tab-people');
   el.innerHTML=`
 
-  ${keHotLeadsCard()}
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Seniority</span>
