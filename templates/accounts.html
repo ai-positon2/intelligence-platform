@@ -714,7 +714,7 @@ opos[j*3]=bx;opos[j*3+1]=by;opos[j*3+2]=bz;}orb.geometry.attributes.position.nee
 px+=(tx-px)*0.04;py+=(ty-py)*0.04;grp.rotation.y=t*0.02+px*0.32;grp.rotation.x=py*0.2;
 cam.position.x+=(px*0.9-cam.position.x)*0.03;cam.position.y+=(-py*0.6-cam.position.y)*0.03;cam.lookAt(0,0,0);
 rnd.render(scn,cam);requestAnimationFrame(loop);});
-setTimeout(function(){cv.style.opacity=MOB?'0.32':'0.42';},80);}
+setTimeout(function(){cv.style.opacity=MOB?'0.12':'0.18';},80);}
 function ens(cb){if(window.THREE)return cb();var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';s.onload=cb;s.onerror=function(){};document.head.appendChild(s);}
 if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentLoaded',function(){ens(start);});
 })();
