@@ -55,10 +55,27 @@ body::before{
 .page-hdr-title{font-size:22px;font-weight:700;color:var(--tx);letter-spacing:-0.02em}
 .page-hdr-sub{font-size:13px;color:var(--tx2);margin-top:2px}
 
-/* hubspot strip */
-.hs-strip{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 13px;border-radius:10px;font-size:12px;color:#ffd9c7;background:rgba(255,122,89,.08);border:1px solid rgba(255,122,89,.26);}
-.hs-strip b{color:#ffb38a;font-weight:700;}
-.hs-strip-dot{width:8px;height:8px;border-radius:50%;background:#ff7a59;box-shadow:0 0 7px rgba(255,122,89,.8);flex-shrink:0;}
+/* hot leads card */
+.hl-card{background:linear-gradient(180deg,rgba(255,122,89,.07),rgba(124,131,245,.03));border:1px solid rgba(255,122,89,.24);border-radius:16px;margin:0 0 18px;overflow:hidden;}
+.hl-head{display:flex;align-items:center;gap:11px;padding:15px 17px 11px;}
+.hl-ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#ff7a59,#f5a623);font-size:18px;flex-shrink:0;box-shadow:0 6px 16px -5px rgba(255,122,89,.7);}
+.hl-htx{flex:1;min-width:0;}
+.hl-title{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.hl-sub{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.hl-count{font-size:11px;font-weight:700;color:#ffb38a;background:rgba(255,122,89,.14);border:1px solid rgba(255,122,89,.32);padding:4px 10px;border-radius:999px;white-space:nowrap;}
+.hl-row{display:flex;align-items:center;gap:13px;padding:12px 17px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer;transition:background .15s,transform .15s;}
+.hl-row:hover{background:rgba(255,122,89,.07);transform:translateX(3px);}
+.hl-av{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-weight:700;color:#fff;font-size:14px;flex-shrink:0;}
+.hl-info{flex:1;min-width:0;}
+.hl-nm{font-size:14px;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hl-rl{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.hl-meta{font-size:10.5px;color:#7f8aa3;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hl-tags{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+.hl-hs{font-size:9.5px;font-weight:700;color:#ffb38a;background:rgba(255,122,89,.13);border:1px solid rgba(255,122,89,.32);padding:3px 8px;border-radius:999px;white-space:nowrap;}
+.hl-eng{font-size:9.5px;font-weight:600;color:#9ccaf5;background:rgba(10,102,194,.16);border:1px solid rgba(10,102,194,.4);padding:3px 8px;border-radius:999px;white-space:nowrap;}
+.hl-go{font-size:11.5px;font-weight:700;color:#fff;background:linear-gradient(135deg,#7c83f5,#9b87fd);padding:8px 13px;border-radius:9px;white-space:nowrap;flex-shrink:0;transition:box-shadow .15s;}
+.hl-row:hover .hl-go{box-shadow:0 7px 18px -6px rgba(124,131,245,.95);}
+@media(max-width:620px){.hl-meta,.hl-tags{display:none;}}
 /* mega-tabs */
 .mega-tabs{
   display:flex;border:1px solid var(--b1);border-radius:var(--rxl);
@@ -857,13 +874,44 @@ const BKT=[
 ];
 const maxP=Math.max(...D.people.map(p=>p.posts_engaged),1);
 
+window.KE_HOTLEADS=[
+  {name:'Mary Whitfield',title:'VP of Demand Generation',company:'Trivium Corporate Solutions',email:'mary.whitfield@triviumcorp.com',location:'Boston, MA',industry:'B2B SaaS',post:'How we cut CAC 38% with signal-based selling',commented:true,when:'2 days ago',reactions:142},
+  {name:'Daniel Osei',title:'Chief Marketing Officer',company:'Northwind Analytics',email:'d.osei@northwind.io',location:'Austin, TX',industry:'Data & Analytics',post:'The AI automation stack reshaping B2B marketing',commented:false,when:'4 days ago',reactions:208},
+  {name:'Priya Raman',title:'Head of Performance Marketing',company:'Lumio Retail Group',email:'priya.raman@lumioretail.com',location:'Chicago, IL',industry:'Retail / eCommerce',post:'Why GEO is the new SEO (and what to do about it)',commented:true,when:'last week',reactions:175},
+  {name:'Marcus Bell',title:'Director of Growth',company:'Vanta Logistics',email:'marcus.bell@vantalogistics.com',location:'Atlanta, GA',industry:'Logistics & Supply Chain',post:'Full-funnel attribution without the spreadsheets',commented:false,when:'6 days ago',reactions:96},
+  {name:'Sofia Castellano',title:'SVP Marketing',company:'Helio Health',email:'s.castellano@heliohealth.com',location:'New York, NY',industry:'Healthcare',post:'Turning website + LinkedIn signals into pipeline',commented:true,when:'yesterday',reactions:231}
+];
+function keHotLeadsCard(){
+  var L=window.KE_HOTLEADS||[];
+  var rows=L.map(function(p,i){
+    var g=(typeof gradFor==='function')?gradFor(p.name):['#7c83f5','#9b87fd'];
+    return '<div class="hl-row" onclick="keHotLead('+i+')">'
+      +'<div class="hl-av" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')">'+ini(p.name)+'</div>'
+      +'<div class="hl-info"><div class="hl-nm">'+esc(p.name)+'</div>'
+        +'<div class="hl-rl">'+esc(p.title)+' · '+esc(p.company)+'</div>'
+        +'<div class="hl-meta">'+(p.commented?'💬 commented on':'👍 liked')+' “'+esc(p.post)+'” · '+esc(p.when)+'</div></div>'
+      +'<div class="hl-tags"><span class="hl-hs">● HubSpot list</span><span class="hl-eng">'+(p.commented?'Commented':'Reacted')+'</span></div>'
+      +'<div class="hl-go">Engage →</div></div>';
+  }).join('');
+  return '<div class="hl-card"><div class="hl-head"><div class="hl-ic">🔥</div>'
+    +'<div class="hl-htx"><div class="hl-title">Hot Leads — People matched with the HubSpot list</div>'
+    +'<div class="hl-sub">Engaged with your LinkedIn content and already in your CRM · click to reach out</div></div>'
+    +'<span class="hl-count">'+L.length+' matched</span></div>'+rows+'</div>';
+}
+function keHotLead(i){
+  var p=(window.KE_HOTLEADS||[])[i];if(!p)return;
+  var dom=(p.email||'').split('@')[1]||'';
+  window._kePerson={name:p.name,title:p.title,company:p.company,domain:dom,email:p.email,source:'linkedin',
+    act:{post:p.post,postUrl:'',commented:!!p.commented,when:p.when,reactions:(p.reactions||0)}};
+  if(window.KairoEngage)window.KairoEngage.open(window._kePerson);
+}
 function buildPeopleTab(){
   const {people,companies,company_lb,stats}=D;
   const maxLb=company_lb[0]?company_lb[0][1]:1;
   const el=document.getElementById('tab-people');
   el.innerHTML=`
 
-  <div class="hs-strip"><span class="hs-strip-dot"></span><b>HubSpot list matched</b> — these engaged profiles are already in your CRM list</div>
+  ${keHotLeadsCard()}
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Seniority</span>
