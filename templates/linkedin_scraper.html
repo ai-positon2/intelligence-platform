@@ -1899,40 +1899,40 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
   }
 
   function subjectFor(p,c,post){
-    var fn=first(p.name), comp=p.company||'your team', ts=post.topic, seed=hashN(p.name+comp);
+    var fn=first(p.name), comp=p.company||'your team', topic=post.topic, aw=post.commented?'comment':'like', seed=hashN(p.name+comp);
     var pool = p.source==='linkedin'
-      ? ['Following up on your comment, '+fn,
-         'Glad our '+ts+' post resonated, '+fn,
-         comp+' + Position²: worth a quick chat?',
-         'Saw you engaged with our '+ts+' post',
-         'A quick idea after your LinkedIn note, '+fn]
-      : ['Glad our '+ts+' post caught your eye, '+fn,
-         'Following up after your visit, '+fn,
-         comp+' + Position²: turning signals into pipeline',
-         'Saw '+comp+' exploring our site, '+fn,
-         'A quick idea on '+ts+' for '+comp];
+      ? ['saw your '+aw+' on our '+topic+' post',
+         topic+' at '+comp+'?',
+         'quick idea on '+topic+' for '+comp,
+         'glad our '+topic+' post landed, '+fn]
+      : ['quick idea on '+topic+' for '+comp,
+         comp+' + '+topic+'?',
+         'a quick thought for '+comp,
+         'worth 15 minutes on '+topic+', '+fn+'?'];
     return pick(pool,seed);
   }
 
   function draft(p,c,tone){
-    var fn=first(p.name), comp=p.company||'your team', sender=(c.owner||'Krishna Ladha'), post=liPost(p);
-    var opener, hook;
+    var fn=first(p.name), comp=p.company||'your team', sender=(c.owner||'Krishna Ladha'), post=liPost(p), topic=post.topic;
+    var av=post.commented?'commented on':'liked';
+    var sign='\n\nBest,\n'+sender+'\nPosition²';
+    var bodies;
     if(p.source==='linkedin'){
-      opener='I saw you '+(post.commented?'commented on':'liked')+' our post, “'+post.title+'”.';
-      hook=' We’re building something in that exact space right now ('+post.topic+'), and I think it could be genuinely useful for '+comp+'.';
+      var eng=post.commented?('your comment on our post about '+topic):('that you liked our post on '+topic);
+      var engCap=post.commented?('Your comment on our '+topic+' post'):('Your interest in our '+topic+' post');
+      bodies={
+        Warm:'Hi '+fn+',\n\nSaw '+eng+', and it’s always good to see the topic landing with people actually doing the work.\n\nWe help teams like '+comp+' turn that idea into measurable pipeline: tying paid, SEO and intent signals back to revenue so the wins, and the wasted spend, are easy to see. One client cut wasted spend by about 30% in a quarter.\n\nWant me to send a short, '+comp+'-specific breakdown? No pitch, just the playbook.'+sign,
+        Direct:'Hi '+fn+',\n\nNoticed '+eng+'. If '+topic+' is on your plate at '+comp+', here’s the short version of how we help:\n\nWe connect paid, SEO and intent data to revenue, so you can double down on what works and cut what doesn’t. Recent client: about 30% less wasted spend in one quarter.\n\nOpen to 15 minutes next week? If the timing’s off, I’ll send the breakdown to read on your own.'+sign,
+        Consultative:'Hi '+fn+',\n\n'+engCap+' suggests '+topic+' is something your team is weighing, so here’s a thought rather than a pitch.\n\nMost teams we speak with don’t struggle to run campaigns; they struggle to prove what’s actually driving pipeline. That’s the gap we help close, connecting spend to revenue signal by signal.\n\nIf it’s useful, I’d be glad to map what this could look like for '+comp+'. Want me to put a short note together?'+sign
+      };
     }else{
-      opener='I noticed '+comp+' spending time across our site, and that you also '+(post.commented?'commented on':'liked')+' our LinkedIn post “'+post.title+'”.';
-      hook=' Since '+post.topic+' is exactly what we’re building toward, I figured it was worth a quick note.';
+      bodies={
+        Warm:'Hi '+fn+',\n\n'+comp+' has been spending time on our site this week, and I noticed you’d also '+av+' our post on '+topic+', so the timing felt right to reach out.\n\nWe help teams like '+comp+' connect paid, SEO and intent signals back to revenue, so the wins are measurable and wasted spend is easy to spot. One client cut about 30% of wasted spend in a quarter.\n\nWant me to send a short, '+comp+'-specific breakdown? Happy to, no meeting needed.'+sign,
+        Direct:'Hi '+fn+',\n\nSaw '+comp+' looking around our site, and that '+topic+' is on your radar (you '+av+' our post on it).\n\nShort version of what we do: tie paid, SEO and intent data to revenue so you can scale what works and cut what doesn’t. Recent client cut wasted spend by about 30% in a quarter.\n\nWorth 15 minutes next week? If not, I’ll send the breakdown over to read whenever suits.'+sign,
+        Consultative:'Hi '+fn+',\n\n'+comp+'’s time on our site, plus your interest in '+topic+' on LinkedIn, suggests this is live for your team right now.\n\nIn our experience the hard part isn’t running campaigns; it’s proving what’s moving pipeline. That’s exactly the gap we help close, connecting spend to revenue signal by signal.\n\nIf helpful, I can put together a short view of what this might look like for '+comp+'. Want me to?'+sign
+      };
     }
-    var toneTail={
-      Warm:' Wanted to reach out personally while it’s top of mind.',
-      Direct:' I’ll keep this short.',
-      Consultative:' Had a thought I think is worth sharing.'
-    };
-    var open='Hi '+fn+',\n\n'+opener+hook+toneTail[tone];
-    var body='Most teams like '+comp+' tell us the hard part isn’t running campaigns. It’s proving what’s actually moving pipeline. That’s where Position² comes in: we tie paid, SEO and signal data back to revenue so you can double down on what works.\n\nWorth a quick 20 minutes this week? I can walk you through what we’d do specifically for '+comp+'.';
-    var sign='\n\nBest,\n'+sender+'\nPosition²  ·  Intelligence';
-    return { subject: subjectFor(p,c,post), body: open+'\n\n'+body+sign };
+    return { subject: subjectFor(p,c,post), body: bodies[tone]||bodies.Warm };
   }
 
   function slackMsg(p,c){
