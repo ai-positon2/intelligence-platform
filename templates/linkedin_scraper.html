@@ -524,6 +524,20 @@ body::before{
 }
 .comp-sel:hover,.comp-sel:focus{border-color:var(--b2);color:var(--tx)}
 .comp-sel option{background:#0f1119;color:var(--tx)}
+/* ── enhanced filters (lkf) ── */
+.fbar-secondary{flex-wrap:wrap;row-gap:9px}
+.lkf-sel{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rpill);color:var(--tx2);font-size:12px;font-weight:600;padding:5px 11px;font-family:inherit;cursor:pointer;max-width:180px;transition:.12s}
+.lkf-sel:hover,.lkf-sel:focus{border-color:var(--accent);color:var(--tx);outline:none}
+.lkf-sel option{background:#0f1119;color:var(--tx)}
+.lkf-dwrap{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--rpill);padding:3px 11px}
+.lkf-dwrap:focus-within{border-color:var(--accent)}
+.lkf-dlbl{font-size:12px;line-height:1}
+.lkf-dsep{color:var(--tx3);font-size:11px}
+.lkf-date{background:none;border:none;outline:none;color:var(--tx2);font-size:11.5px;font-family:inherit;cursor:pointer;color-scheme:dark;width:116px}
+.lkf-date:hover{color:var(--tx)}
+.lkf-reset{padding:5px 13px;border:1px solid var(--b1);border-radius:var(--rpill);background:none;color:var(--tx2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.12s;white-space:nowrap}
+.lkf-reset:hover{color:#ff8a8a;border-color:rgba(255,120,120,.4);background:rgba(255,80,80,.08)}
+.lkf-count{margin-left:6px;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-d);border:1px solid var(--accent-g);padding:4px 11px;border-radius:var(--rpill);white-space:nowrap;flex-shrink:0}
 
 /* === v4 COOL UPGRADES === */
 .nav{
@@ -747,9 +761,9 @@ const SLBL=s=>(s||'Unknown').replace('IC / Individual Contributor','IC').replace
 const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').replace('FIRST_DEGREE','1st'):'';
 
 /* ── state ── */
-let PF={sen:'all',deg:'all',react:'all',q:'',comp:''};
+let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:''};
 let _filteredPosts=[];
-let PLF={sen:'all',deg:'all',minP:0,country:'all',q:'',excludeP2:false};
+let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
 
@@ -816,6 +830,7 @@ function buildPostTab(){
     </div>
     <div class="sep"></div>
     <select class="comp-sel" id="pf-comp" onchange="PF.comp=this.value;applyPF()">${_compOpts}</select>
+    <div class="lkf-dwrap" title="Filter posts by date"><span class="lkf-dlbl">📅</span><input type="date" class="lkf-date" onchange="PF.dFrom=this.value;applyPF()"><span class="lkf-dsep">→</span><input type="date" class="lkf-date" onchange="PF.dTo=this.value;applyPF()"></div>
     <div class="srch">
       <span class="srch-ico">🔍</span>
       <input placeholder="Search people…" oninput="PF.q=this.value;applyPF()">
@@ -853,7 +868,7 @@ function togglePFDM(){PF.dm=!PF.dm;document.getElementById('pf-dm').classList.to
 function applyPF(){
   const g=document.getElementById('pgrid');if(!g)return;
   const {sen,deg,react,q,comp}=PF;const ql=q.toLowerCase();
-  const filtered=D.posts.map(p=>{
+  const filtered=D.posts.filter(p=>{if(PF.dFrom&&p.date<PF.dFrom)return false;if(PF.dTo&&p.date>PF.dTo)return false;return true;}).map(p=>{
     let eng=p.engagers.filter(e=>{
       if(sen!=='all'&&e.seniority!==sen)return false;
       if(deg!=='all'&&e.degree!==deg)return false;
@@ -943,40 +958,54 @@ function buildPeopleTab(){
   const {people,companies,company_lb,stats}=D;
   const maxLb=company_lb[0]?company_lb[0][1]:1;
   const el=document.getElementById('tab-people');
+  var _KNOWN_C=['India','United States','United Kingdom','Canada','Australia','Germany','France','Singapore','Netherlands','Ireland','Spain','Italy','Brazil','Mexico','Japan','China','United Arab Emirates','Philippines','Israel','Sweden'];
+  D.people.forEach(function(p){ if(p._aug)return; p._aug=1;
+    var parts=(p.location||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+    p._city=parts.length?parts[0]:'';
+    var last=parts.length>1?parts[parts.length-1]:'';
+    p._country=_KNOWN_C.indexOf(last)>=0?last:'';
+  });
+  if(!window.PDATES){window.PDATES={};(D.posts||[]).forEach(function(po){(po.engagers||[]).forEach(function(e){var k=(e.name||'').toLowerCase();(window.PDATES[k]=window.PDATES[k]||[]).push(po.date);});});}
+  var _countries=[...new Set(D.people.map(function(p){return p._country;}).filter(Boolean))].sort();
+  var _cities=[...new Set(D.people.map(function(p){return p._city;}).filter(Boolean))].sort();
+  var _ctryOpts='<option value="all">🌍 All countries</option>'+_countries.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('');
+  var _cityOpts='<option value="all">📍 All locations</option>'+_cities.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('');
   el.innerHTML=`
 
-  <div class="fbar">
-    <div class="fgroup">
-      <span class="flabel">Seniority</span>
-      <div class="chips">
-        <button class="chip on" onclick="setPLF('sen','all',this)">All</button>
-        <button class="chip" onclick="setPLF('sen','csuite',this)">👑 C-Suite</button>
-        <button class="chip" onclick="setPLF('sen','vpdirector',this)">📈 VP/Dir</button>
-        <button class="chip" onclick="setPLF('sen','managers',this)">🏗 Manager</button>
+  <div class="fbar-wrap">
+    <div class="fbar fbar-primary">
+      <div class="fgroup">
+        <span class="flabel">Seniority</span>
+        <div class="chips">
+          <button class="chip on" onclick="setPLF('sen','all',this)">All</button>
+          <button class="chip" onclick="setPLF('sen','csuite',this)">👑 C-Suite</button>
+          <button class="chip" onclick="setPLF('sen','vpdirector',this)">📈 VP/Dir</button>
+          <button class="chip" onclick="setPLF('sen','managers',this)">🏗 Manager</button>
+          <button class="chip" onclick="setPLF('sen','ics',this)">💼 IC</button>
+        </div>
       </div>
+      <div style="flex:1"></div>
+      <div class="srch"><span class="srch-ico">🔍</span><input placeholder="Search name, title, company…" oninput="PLF.q=this.value;applyPLF()"></div>
+      <span class="lkf-count" id="plf-count">—</span>
     </div>
-    <div class="sep"></div>
-    <div class="fgroup">
-      <span class="flabel">Degree</span>
-      <div class="chips">
-        <button class="chip on" onclick="setPLF('deg','all',this)">All</button>
-        <button class="chip" onclick="setPLF('deg','SECOND_DEGREE',this)">2nd</button>
-        <button class="chip" onclick="setPLF('deg','THIRD_DEGREE',this)">3rd</button>
+    <div class="fbar fbar-secondary">
+      <select class="lkf-sel" onchange="PLF.country=this.value;applyPLF()">${_ctryOpts}</select>
+      <select class="lkf-sel" onchange="PLF.city=this.value;applyPLF()">${_cityOpts}</select>
+      <select class="lkf-sel" onchange="PLF.deg=this.value;applyPLF()">
+        <option value="all">All degrees</option><option value="SECOND_DEGREE">2nd degree</option><option value="THIRD_DEGREE">3rd degree</option>
+      </select>
+      <select class="lkf-sel" onchange="PLF.minP=+this.value;applyPLF()">
+        <option value="0">Any activity</option><option value="1">1+ posts</option><option value="2">2+ posts</option><option value="3">3+ posts</option>
+      </select>
+      <div class="lkf-dwrap" title="Filter by engagement date">
+        <span class="lkf-dlbl">📅</span>
+        <input type="date" class="lkf-date" onchange="PLF.dFrom=this.value;applyPLF()">
+        <span class="lkf-dsep">→</span>
+        <input type="date" class="lkf-date" onchange="PLF.dTo=this.value;applyPLF()">
       </div>
+      <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
+      <button class="lkf-reset" onclick="resetPLF()">↺ Reset</button>
     </div>
-    <div class="sep"></div>
-    <div class="fgroup">
-      <span class="flabel">Activity</span>
-      <div class="chips">
-        <button class="chip on" onclick="setPLF('minP',0,this)">All</button>
-        <button class="chip" onclick="setPLF('minP',1,this)">1+ Posts</button>
-        <button class="chip" onclick="setPLF('minP',2,this)">2+ Posts</button>
-      </div>
-    </div>
-    <div class="sep"></div>
-    <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
-    <div class="sep"></div>
-    <div class="srch"><span class="srch-ico">🔍</span><input placeholder="Search people…" oninput="PLF.q=this.value;applyPLF()"></div>
   </div>
   <div class="peoplayout">
     <div id="people-main"></div>
@@ -1062,20 +1091,25 @@ function peoplStatClick(mode,el){
   applyPLF();
 }
 function setPLF(k,v,el){PLF[k]=v;el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');applyPLF();}
+function resetPLF(){PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false};buildPeopleTab();}
 function togglePLFDM(){PLF.dm=!PLF.dm;document.getElementById('plf-dm').classList.toggle('on',PLF.dm);applyPLF();}
 
 function applyPLF(){
   const main=document.getElementById('people-main');if(!main)return;
-  const {sen,deg,minP,q}=PLF;const ql=q.toLowerCase();
+  const {sen,deg,minP,q,country,city,dFrom,dTo}=PLF;const ql=q.toLowerCase();
   const fil=D.people.filter(p=>{
     if(sen!=='all'&&p.bucket!==sen)return false;
     if(deg!=='all'&&p.degree!==deg)return false;
     if(minP>0&&p.posts_engaged<minP)return false;
+    if(country&&country!=='all'&&p._country!==country)return false;
+    if(city&&city!=='all'&&p._city!==city)return false;
+    if(dFrom||dTo){var ds=(window.PDATES&&window.PDATES[(p.name||'').toLowerCase()])||[];if(!ds.some(function(d){return (!dFrom||d>=dFrom)&&(!dTo||d<=dTo);}))return false;}
     if(PLF.excludeP2&&(p.company||'').toLowerCase().includes('position'))return false;
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
     return true;
   });
-  document.getElementById('tc-people').textContent=fil.length;
+  var _tc=document.getElementById('tc-people');if(_tc)_tc.textContent=fil.length;
+  var _pc=document.getElementById('plf-count');if(_pc)_pc.textContent=fil.length+' '+(fil.length===1?'person':'people');
   if(!fil.length){main.innerHTML='<div class="nores"><div class="nores-ico">🔍</div><h3>No results</h3><p>Adjust filters</p></div>';return;}
   const bkts={};BKT.forEach(b=>{bkts[b.k]=fil.filter(p=>p.bucket===b.k);});
   main.innerHTML=BKT.map(b=>{
