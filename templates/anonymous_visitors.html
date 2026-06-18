@@ -706,7 +706,7 @@
     var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Date</th></tr></thead>';
     var b='<tbody>'+rows.map(function(p,i){
       var sen=getSeniority(p.title);
-      return'<tr style="animation:row-in .25s ease '+(i*6)+'ms both" onclick="openPersonDrawer('+i+')" title="Click to view full profile">'+
+      return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openPersonDrawer('+i+')" title="Click to view full profile">'+
         '<td style="overflow:hidden"><div class="person-cell">'+
           '<div class="person-av" style="flex-shrink:0">'+esc(initials(p.name))+'</div>'+
           '<div style="min-width:0;overflow:hidden">'+
@@ -731,7 +731,7 @@
     var h='<thead><tr><th>Company</th><th>Industry</th><th>Location</th><th>Employees</th><th>Revenue</th></tr></thead>';
     var b='<tbody>'+rows.map(function(c,i){
       var loc=[c.city,c.state].filter(Boolean).join(', ')||c.country||'-';
-      return'<tr style="animation:row-in .25s ease '+(i*6)+'ms both" onclick="openCompanyDrawer('+i+')" title="Click to view company">'+
+      return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openCompanyDrawer('+i+')" title="Click to view company">'+
         '<td><div class="company-cell">'+
           '<div class="company-av">'+esc(initials(c.name))+'</div>'+
           '<div style="min-width:0;overflow:hidden"><div class="company-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.name)+'</div><div class="company-site" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.website)+'</div></div>'+
@@ -1544,17 +1544,34 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     var stages=['Marketing Qualified Lead','Sales Qualified Lead','In Discovery','Demo Scheduled','Proposal Sent'];
     var owners=['Krishna Ladha','Sudheer D.'];
     var when=['3 days ago','last week','2 weeks ago','9 days ago','yesterday','last month'];
-    var topics=['pricing for the growth tier','a pilot for paid search','your reporting dashboards','SEO + paid media bundle','attribution and tracking setup'];
+    var topics=['pricing for the growth tier','a pilot for paid search','your reporting dashboards','an SEO + paid media bundle','attribution and tracking setup'];
+    var shorts=['pricing','paid search','reporting','SEO + paid media','attribution'];
     return {
       stage:pick(stages,seed),
       owner:pick(owners,seed>>3),
       last:pick(when,seed>>5),
       topic:pick(topics,seed>>7),
-      deal:'$'+(12+(seed%40))+'K'+' · '+(seed%2?'Annual':'Pilot')
+      topicShort:pick(shorts,seed>>7),
+      deal:'$'+(12+(seed%40))+'K · '+(seed%2?'Annual':'Pilot')
     };
   }
 
-  // ── Kairo email draft (client-side, personalised) ──
+  function subjectFor(p,c){
+    var fn=first(p.name), comp=p.company||'your team', ts=c.topicShort||'growth', seed=hashN(p.name+comp);
+    var pool = p.source==='linkedin'
+      ? ['Following up on your comment, '+fn,
+         'Your take on '+ts+' got me thinking',
+         comp+' + Position²: worth a quick chat?',
+         'Picking up where your comment left off, '+fn,
+         'A quick idea on '+ts+' for '+comp]
+      : ['A quick idea for '+comp+'’s '+ts,
+         'Following up after your visit, '+fn,
+         comp+' + Position²: turning signals into pipeline',
+         'Worth 20 minutes on '+comp+'’s '+ts+'?',
+         'Re: '+ts+' for '+comp];
+    return pick(pool,seed);
+  }
+
   function draft(p,c,tone){
     var fn=first(p.name), comp=p.company||'your team', sender=(c.owner||'Krishna Ladha');
     var actLine = p.source==='linkedin'
@@ -1567,14 +1584,10 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     };
     var body='Most teams like '+comp+' tell us the hard part isn’t running campaigns. It’s proving what’s actually moving pipeline. That’s exactly where Position² plugs in: we tie paid, SEO and signal data back to revenue so you can double down on what works.\n\nWorth a quick 20 minutes this week? I can walk you through what we’d do specifically for '+comp+'.';
     var sign='\n\nBest,\n'+sender+'\nPosition²  ·  Intelligence';
-    return {
-      subject: p.source==='linkedin' ? 'Following up on your note, '+fn : 'Saw '+comp+' on our radar, '+fn,
-      body: opensByTone[tone]+'\n\n'+body+sign
-    };
+    return { subject: subjectFor(p,c), body: opensByTone[tone]+'\n\n'+body+sign };
   }
 
   function slackMsg(p,c){
-    var fn=first(p.name);
     var act=p.source==='linkedin'
       ? 'engaged with a Position² LinkedIn post'
       : 'visited '+(p.act&&p.act.page?'the *'+p.act.page+'* page':'the website');
@@ -1587,42 +1600,65 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
   var ST={p:null,c:null,tone:'Warm',tab:'email',channel:'#sales-signals'};
 
-  function render(){
-    var p=ST.p, c=ST.c, seed=hashN(p.name);
-    var g=pick(GRAD,seed), d=draft(p,c,ST.tone), em=emailFor(p);
-    document.getElementById('ke-sub').textContent='Matched in HubSpot · '+c.stage;
-    var actHtml = p.source==='linkedin'
-      ? '<div class="ke-act-ic">👍</div><div class="ke-act-t"><div class="h">Engaged with your <b>LinkedIn</b> content</div>'
-        +'<div class="s">'+(p.act&&p.act.commented?'Commented on':'Reacted to')+' a Position² post'+(p.act&&p.act.when?' · '+esc(p.act.when):'')+'</div>'
-        +(p.act&&p.act.post?'<div class="ke-pagebar">“'+esc(p.act.post)+'”</div>':'')+'</div>'
-      : '<div class="ke-act-ic">🌐</div><div class="ke-act-t"><div class="h">Visited your <b>website</b></div>'
-        +'<div class="s">'+(p.act&&p.act.pages?esc(p.act.pages)+' page'+(p.act.pages!=1?'s':'')+' viewed':'Tracked anonymous session, now de-anonymised')+(p.act&&p.act.when?' · '+esc(p.act.when):'')+'</div>'
-        +'<div class="ke-pagebar">position2.com'+(p.act&&p.act.page?'/'+esc((''+p.act.page).toLowerCase().replace(/[^a-z0-9]+/g,'-')):'')+'</div></div>';
-
-    var html=''
-    +'<div class="ke-int">'
-      +'<div class="ke-int-pill"><div class="ke-int-ic" style="background:#ff7a59">H</div><div class="ke-int-meta"><b>HubSpot CRM</b><span>Contacts &amp; deals</span></div><span class="ke-dot">Connected</span></div>'
+  function intStrip(extra){
+    return '<div class="ke-int">'+extra
       +'<div class="ke-int-pill"><div class="ke-int-ic" style="background:#4a154b">💬</div><div class="ke-int-meta"><b>Slack</b><span>'+esc(ST.channel)+'</span></div><span class="ke-dot">Connected</span></div>'
-    +'</div>'
+    +'</div>';
+  }
+
+  function intelAnon(p,c,seed){
+    var g=pick(GRAD,seed);
+    return intStrip('<div class="ke-int-pill"><div class="ke-int-ic" style="background:#ff7a59">H</div><div class="ke-int-meta"><b>HubSpot CRM</b><span>Contacts &amp; deals</span></div><span class="ke-dot">Connected</span></div>')
     +'<div class="ke-lbl">CRM Match <span class="ke-ai">via Kairo</span></div>'
     +'<div class="ke-match"><div class="ke-m-top">'
       +'<div class="ke-av" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')">'+esc(ini(p.name))+'</div>'
       +'<div class="ke-m-id"><div class="ke-nm">'+esc(p.name)+'</div><div class="ke-rl">'+esc(p.title||'-')+(p.company?' · '+esc(p.company):'')+'</div></div>'
       +'<div class="ke-tag">★ Prospective Client</div>'
     +'</div>'
-    +'<p class="ke-narr">We checked your <b>HubSpot CRM</b> and found <b>'+esc(first(p.name))+'</b> is already a known contact, and your team chatted with '+(/^(she|her)/i.test('')?'her':'them')+' about <b>'+esc(c.topic)+'</b>, and '+esc(first(p.name))+' is flagged as a <b>prospective client</b>. '+(p.source==='linkedin'?'They just engaged with one of your LinkedIn posts.':'They just visited a page on your website.')+' Now’s a great time to reach out.</p>'
+    +'<p class="ke-narr">We checked your <b>HubSpot CRM</b> and found <b>'+esc(first(p.name))+'</b> is already a known contact. Your team chatted with them about <b>'+esc(c.topic)+'</b>, and they’re flagged as a <b>prospective client</b>. They just visited a page on your website, so now’s a great time to reach out.</p>'
     +'<div class="ke-chat">“Thanks for the breakdown on '+esc(c.topic)+', let me take this back to the team and circle back.”<span>'+esc(p.name)+' · HubSpot conversation · '+esc(c.last)+'</span></div>'
     +'<div class="ke-meta">'
       +'<div class="ke-mb"><div class="k">Deal Stage</div><div class="v">'+esc(c.stage)+'</div></div>'
       +'<div class="ke-mb"><div class="k">Owner</div><div class="v">'+esc(c.owner)+'</div></div>'
       +'<div class="ke-mb"><div class="k">Open Deal</div><div class="v">'+esc(c.deal)+'</div></div>'
     +'</div></div>'
-    +'<div class="ke-act">'+actHtml+'</div>'
+    +'<div class="ke-act"><div class="ke-act-ic">🌐</div><div class="ke-act-t"><div class="h">Visited your <b>website</b></div>'
+      +'<div class="s">'+(p.act&&p.act.pages?esc(p.act.pages)+' page'+(p.act.pages!=1?'s':'')+' viewed':'Tracked anonymous session, now de-anonymised')+(p.act&&p.act.when?' · '+esc(p.act.when):'')+'</div>'
+      +'<div class="ke-pagebar">position2.com'+(p.act&&p.act.page?'/'+esc((''+p.act.page).toLowerCase().replace(/[^a-z0-9]+/g,'-')):'')+'</div></div></div>';
+  }
+
+  function intelLinkedIn(p,c){
+    var commented=p.act&&p.act.commented, BLU='#0a66c2';
+    return intStrip('<div class="ke-int-pill" style="border-color:rgba(10,102,194,.4)"><div class="ke-int-ic" style="background:#0a66c2;font-size:10px">in</div><div class="ke-int-meta"><b>LinkedIn</b><span>Engagement signal</span></div><span class="ke-dot">Synced</span></div>'
+      +'<div class="ke-int-pill"><div class="ke-int-ic" style="background:#ff7a59">H</div><div class="ke-int-meta"><b>HubSpot</b><span>Cross-referenced</span></div><span class="ke-dot">Connected</span></div>')
+    +'<div class="ke-lbl">LinkedIn Engagement <span class="ke-ai" style="background:rgba(10,102,194,.18);color:#8fc1f5;border-color:rgba(10,102,194,.45)">live signal</span></div>'
+    +'<div class="ke-match" style="background:linear-gradient(135deg,rgba(10,102,194,.16),rgba(124,131,245,.04));border-color:rgba(10,102,194,.32)">'
+      +'<div class="ke-m-top">'
+        +'<div class="ke-av" style="background:linear-gradient(135deg,#0a66c2,#378fe9)">'+esc(ini(p.name))+'</div>'
+        +'<div class="ke-m-id"><div class="ke-nm">'+esc(p.name)+'</div><div class="ke-rl">'+esc(p.title||'-')+(p.company?' · '+esc(p.company):'')+'</div></div>'
+        +'<div class="ke-tag" style="background:rgba(10,102,194,.18);color:#9ccaf5;border-color:rgba(10,102,194,.45)">'+(commented?'💬 Commented':'👍 Reacted')+'</div>'
+      +'</div>'
+      +'<div class="ke-act-t" style="margin-bottom:11px"><div class="s" style="font-size:12.5px;color:#cfe0f5">'+esc(first(p.name))+' '+(commented?'commented on':'reacted to')+' your post'+(p.act&&p.act.when?' · '+esc(p.act.when):'')+'</div></div>'
+      +(p.act&&p.act.post?'<div class="ke-chat" style="background:rgba(10,102,194,.07);border-color:rgba(10,102,194,.24);border-left-color:'+BLU+';color:#cfe0f5">“'+esc(p.act.post)+'”<span>Your Position² LinkedIn post'+(p.act&&p.act.when?' · '+esc(p.act.when):'')+'</span></div>':'')
+    +'</div>'
+    +'<div class="ke-lbl">HubSpot Cross-Reference <span class="ke-ai">via Kairo</span></div>'
+    +'<div class="ke-act" style="background:rgba(255,122,89,.06);border-color:rgba(255,122,89,.24)">'
+      +'<div class="ke-act-ic" style="background:rgba(255,122,89,.16)">⚡</div>'
+      +'<div class="ke-act-t"><div class="h">This isn’t a cold lead</div>'
+        +'<div class="s" style="line-height:1.5">'+esc(first(p.name))+' is flagged as a <b style="color:#ffce7a">prospective client</b> in HubSpot (<b style="color:#cdd4e8">'+esc(c.stage)+'</b>, owned by '+esc(c.owner)+'). Your team already discussed <b style="color:#cdd4e8">'+esc(c.topic)+'</b> '+esc(c.last)+'. Strike while it’s warm.</div></div>'
+    +'</div>';
+  }
+
+  function render(){
+    var p=ST.p, c=ST.c, seed=hashN(p.name);
+    var d=draft(p,c,ST.tone), em=emailFor(p);
+    document.getElementById('ke-sub').textContent=(p.source==='linkedin')?'LinkedIn signal · cross-referenced in HubSpot':'Matched in HubSpot · '+c.stage;
+    var intel=(p.source==='linkedin')?intelLinkedIn(p,c):intelAnon(p,c,seed);
+    var html=intel
     +'<div class="ke-tabs">'
       +'<button class="ke-tab'+(ST.tab==='email'?' on':'')+'" onclick="KairoEngage.tab(\'email\')">✉ Write Email</button>'
       +'<button class="ke-tab'+(ST.tab==='slack'?' on':'')+'" onclick="KairoEngage.tab(\'slack\')">💬 Notify on Slack</button>'
     +'</div>'
-    // EMAIL pane
     +'<div class="ke-pane'+(ST.tab==='email'?' on':'')+'" id="ke-pane-email">'
       +'<div class="ke-field"><label>To</label><input class="ke-inp" id="ke-to" value="'+esc(em)+'"></div>'
       +'<div class="ke-lbl" style="margin-bottom:7px">Tone</div>'
@@ -1636,7 +1672,6 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
         +'<button class="ke-btn ke-btn-pri" onclick="KairoEngage.sendEmail()">✉ Send Email</button>'
       +'</div>'
     +'</div>'
-    // SLACK pane
     +'<div class="ke-pane'+(ST.tab==='slack'?' on':'')+'" id="ke-pane-slack">'
       +'<div class="ke-field"><label>Channel</label><select class="ke-sel" id="ke-chan" onchange="KairoEngage.setChan(this.value)">'
         +['#sales-signals','#deal-room','#growth-team','Direct message to '+c.owner].map(function(ch){return '<option'+(ST.channel===ch?' selected':'')+'>'+esc(ch)+'</option>';}).join('')
