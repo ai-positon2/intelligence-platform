@@ -1,0 +1,3 @@
+Hands-off deploy pipeline smoke test — 2026-06-18T07:51Z.
+This file was created by Claude and committed+pushed automatically by the CoworkAutoDeploy task.
+Safe to delete; it will be removed in the cleanup step.
