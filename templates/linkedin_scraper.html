@@ -765,7 +765,7 @@ const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').r
 /* ── state ── */
 let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};
 let _filteredPosts=[];
-let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false};
+let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
 
@@ -976,6 +976,12 @@ function buildPeopleTab(){
   var _cityOpts='<option value="all">📍 All locations</option>'+_cities.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('');
   el.innerHTML=`
 
+  <div class="stat-row">
+    <div class="scard sg active-filter" onclick="resetPLF()" title="All people"><div class="sc-label">Unique People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div></div>
+    <div class="scard sa" onclick="plStat('dm',this)" title="Decision makers"><div class="sc-label">Decision Makers</div><div class="sc-val va" data-count="${stats.total_dms}">0</div></div>
+    <div class="scard sp" onclick="plStat('csuite',this)" title="C-Suite / Founders"><div class="sc-label">C-Suite / Founders</div><div class="sc-val vp" data-count="${stats.csuite_count}">0</div></div>
+    <div class="scard sc" onclick="switchTab('companies')" title="View companies"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
+  </div>
   <div class="fbar-wrap">
     <div class="fbar fbar-primary">
       <div class="fgroup">
@@ -1042,6 +1048,12 @@ function buildCompaniesTab(){
   const el=document.getElementById('tab-companies');
   el.innerHTML=`
 
+  <div class="stat-row">
+    <div class="scard sg active-filter" onclick="applyCF()" title="All companies"><div class="sc-label">Companies</div><div class="sc-val vg" data-count="${companies.length}">0</div></div>
+    <div class="scard si" onclick="switchTab('people')" title="View people"><div class="sc-label">People</div><div class="sc-val vi" data-count="${stats.total_people}">0</div></div>
+    <div class="scard sa" onclick="switchTab('people')" title="Decision makers"><div class="sc-label">Decision Makers</div><div class="sc-val va" data-count="${stats.total_dms}">0</div></div>
+    <div class="scard sp" onclick="switchTab('post')" title="View posts"><div class="sc-label">Posts</div><div class="sc-val vp" data-count="${stats.total_posts}">0</div></div>
+  </div>
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Min People</span>
@@ -1095,7 +1107,8 @@ function peoplStatClick(mode,el){
   applyPLF();
 }
 function setPLF(k,v,el){PLF[k]=v;el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');applyPLF();}
-function resetPLF(){PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false};buildPeopleTab();}
+function resetPLF(){PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false};buildPeopleTab();}
+function plStat(mode,el){document.querySelectorAll('#tab-people .scard').forEach(c=>c.classList.remove('active-filter'));if(el)el.classList.add('active-filter');if(mode==='dm'){PLF.dm=true;PLF.sen='all';}else if(mode==='csuite'){PLF.dm=false;PLF.sen='csuite';}else{PLF.dm=false;PLF.sen='all';}applyPLF();}
 function togglePLFDM(){PLF.dm=!PLF.dm;document.getElementById('plf-dm').classList.toggle('on',PLF.dm);applyPLF();}
 
 function applyPLF(){
@@ -1105,6 +1118,7 @@ function applyPLF(){
     if(sen!=='all'&&p.bucket!==sen)return false;
     if(deg!=='all'&&p.degree!==deg)return false;
     if(minP>0&&p.posts_engaged<minP)return false;
+    if(PLF.dm&&(p.dm||'').toLowerCase()!=='yes')return false;
     if(country&&country!=='all'&&p._country!==country)return false;
     if(city&&city!=='all'&&p._city!==city)return false;
     if(dFrom||dTo){var ds=(window.PDATES&&window.PDATES[(p.name||'').toLowerCase()])||[];if(!ds.some(function(d){return (!dFrom||d>=dFrom)&&(!dTo||d<=dTo);}))return false;}
