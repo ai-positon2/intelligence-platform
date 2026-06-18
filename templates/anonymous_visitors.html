@@ -124,6 +124,8 @@
 
     /* Recent visitors */
     .recent-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .15s; }
+    .hs-pill { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700; color:#ffb38a; background:rgba(255,122,89,.12); border:1px solid rgba(255,122,89,.32); padding:3px 8px; border-radius:999px; white-space:nowrap; letter-spacing:.2px; }
+    .hs-pill::before { content:""; width:6px; height:6px; border-radius:50%; background:#ff7a59; box-shadow:0 0 6px rgba(255,122,89,.7); }
     .recent-row:hover { background: rgba(52,211,153,.05); }
 
     /* Filter bar */
@@ -372,8 +374,8 @@
       </div>
       <div class="card" id="c-recent">
         <div class="card-head">
-          <span class="card-title">⏱ Recent Visitors</span>
-          <span class="card-meta">click to view profile</span>
+          <span class="card-title">🔥 Hot Signals</span>
+          <span class="card-meta">in your HubSpot list · click to engage</span>
         </div>
         <div class="card-body" id="recent-body" style="padding:0">
           <div class="skel" style="height:150px;margin:16px"></div>
@@ -689,6 +691,7 @@
           '<div style="font-size:12px;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name)+'</div>'+
           '<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.title)+'</div>'+
         '</div>'+
+        '<span class="hs-pill" title="This contact is in your HubSpot list">HubSpot list</span>'+
         '<span class="seniority-badge '+senClass(sen)+'">'+esc(sen)+'</span>'+
         '<div style="font-size:10px;color:#64748b;margin-left:8px;white-space:nowrap">'+esc(p.date)+'</div>'+
         '<div style="font-size:14px;color:#334155;margin-left:6px">›</div>'+
