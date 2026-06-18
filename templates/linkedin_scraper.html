@@ -763,7 +763,7 @@ const SLBL=s=>(s||'Unknown').replace('IC / Individual Contributor','IC').replace
 const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').replace('FIRST_DEGREE','1st'):'';
 
 /* ── state ── */
-let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:''};
+let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};
 let _filteredPosts=[];
 let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false};
 let CF={q:'',dm:false,minPpl:0};
@@ -849,12 +849,13 @@ function buildPostTab(){
 }
 
 function postStatClick(mode,el){
-  document.querySelectorAll('.scard').forEach(c=>c.classList.remove('active-filter'));
-  if(activeStatFilter===mode){activeStatFilter=null;PF.sen='all';resetChips('pf-sen');return applyPF();}
-  activeStatFilter=mode;
-  el.classList.add('active-filter');
-  if(mode==='csuite'){PF.sen='C-Level / Founder';setActiveChip('pf-sen','C-Level / Founder');}
-  else{PF.sen='all';}
+  if(mode==='people'){switchTab('people');return;}
+  document.querySelectorAll('#tab-post .scard').forEach(c=>c.classList.remove('active-filter'));
+  if(activeStatFilter===mode){activeStatFilter=null;PF.sen='all';PF.sort='none';resetChips('pf-sen');return applyPF();}
+  activeStatFilter=mode;el.classList.add('active-filter');
+  if(mode==='csuite'){PF.sen='C-Level / Founder';PF.sort='none';setActiveChip('pf-sen','C-Level / Founder');}
+  else if(mode==='eng'){PF.sen='all';PF.sort='eng';resetChips('pf-sen');}
+  else{PF.sen='all';PF.sort='none';resetChips('pf-sen');}
   applyPF();
 }
 function resetChips(id){const g=document.getElementById(id);if(!g)return;g.querySelectorAll('.chip').forEach((c,i)=>{c.classList.toggle('on',i===0)});}
@@ -885,6 +886,7 @@ function applyPF(){
   document.getElementById('pst-cnt').textContent=filtered.length+' posts';
   document.getElementById('tc-post').textContent=filtered.length;
   if(!filtered.length){g.innerHTML='<div class="nores" style="grid-column:1/-1"><div class="nores-ico">🔍</div><h3>No results</h3><p>Try adjusting filters</p></div>';return;}
+  if(PF.sort==='eng')filtered.sort((a,b)=>b.fe.length-a.fe.length);
   _filteredPosts=filtered;
   g.innerHTML=filtered.map((p,pi)=>{
     const eng=p.fe,dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
