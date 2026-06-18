@@ -234,7 +234,7 @@
       --card-glow: rgba(16,185,129,0.2);
     }
 
-    .footer-note { margin-top: 56px; font-size: 12px; color: #1a1d27; }
+    .footer-note { margin-top: 30px; font-size: 12px; color: #1a1d27; }
   </style>
 </head>
 <body>
@@ -496,7 +496,7 @@
 <script>(function(){document.querySelectorAll('.hub-card').forEach(function(c){c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');});});})();</script>
 <style>
 /* LUX hub sections */
-.lx-sec{width:100%;max-width:980px;margin-top:90px;position:relative;z-index:1}
+.lx-sec{width:100%;max-width:980px;margin-top:46px;position:relative;z-index:1}
 .lx-sec-eyebrow{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6366f1;margin-bottom:14px;display:flex;align-items:center;gap:12px}
 .lx-sec-eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(99,102,241,.35),transparent)}
 .lx-trow{display:flex;align-items:baseline;gap:18px;padding:17px 6px;border-top:1px solid rgba(255,255,255,.07);text-decoration:none;color:inherit;transition:padding-left .25s cubic-bezier(.22,1,.36,1),background .2s}
@@ -508,7 +508,7 @@
 .lx-trow .d{font-size:11.5px;color:#5d6890;margin-left:auto;letter-spacing:.02em}
 .lx-trow .a{color:#818cf8;opacity:0;transform:translateX(-6px);transition:all .22s;margin-left:auto}
 .lx-trow:hover .a{opacity:1;transform:none}
-.lx-stats2{display:flex;margin-top:60px;flex-wrap:wrap;row-gap:22px}
+.lx-stats2{display:flex;margin-top:30px;flex-wrap:wrap;row-gap:22px}
 .lx-stats2>div{padding:0 32px;border-left:1px solid rgba(255,255,255,.08)}
 .lx-stats2>div:first-child{padding-left:0;border-left:none}
 .lx-stats2 b{display:block;font-size:30px;font-weight:700;color:#eef2ff;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
@@ -712,7 +712,7 @@ window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
 .hb-cue span{position:absolute;left:50%;top:7px;width:3px;height:7px;margin-left:-1.5px;border-radius:3px;background:#818cf8;animation:hbCue 1.8s ease-in-out infinite}
 @keyframes hbCue{0%,100%{transform:translateY(0);opacity:1}70%{transform:translateY(12px);opacity:0}}
 .hb-disc{width:100%;display:flex;flex-direction:column;align-items:center;margin-top:10px}
-.hb-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5d6890;margin-bottom:34px}
+.hb-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5d6890;margin-bottom:24px}
 .hb-disc .hub-card{animation:none !important}
 .main-sub{margin-bottom:0}
 @media (prefers-reduced-motion:reduce){.hb-cue span{animation:none}}
@@ -912,7 +912,7 @@ requestAnimationFrame(loop);}}
 init();})();</script>
 <style>
 /* hub scroll-pinned hero */
-.hub-pin{position:relative;height:205vh}
+.hub-pin{position:relative;height:142vh}
 .hub-pin .hb-hero{position:sticky;top:0;height:100vh;min-height:0;will-change:transform}
 .hb-pintag{position:absolute;left:50%;bottom:18%;transform:translateX(-50%) translateY(20px);opacity:0;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#7c83f5;z-index:2;white-space:nowrap;display:flex;align-items:center;gap:10px}
 .hb-pintag::after{content:'↓';font-size:13px}
