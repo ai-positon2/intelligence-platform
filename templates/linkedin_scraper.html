@@ -266,9 +266,11 @@ body::before{
   border-top:1px solid var(--b1);background:rgba(255,255,255,0.012);
 }
 .eitem{
-  display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;
+  display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;
   padding:9px 20px;border-top:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.1s;
 }
+.eitem>div{min-width:0}
+.ebadges{max-width:150px}
 .eitem:hover{background:var(--s2)}
 .eavtr{
   border-radius:50%;overflow:hidden;flex-shrink:0;
