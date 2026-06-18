@@ -796,30 +796,6 @@ function buildPostTab(){
   const _cos=[...new Set(D.posts.flatMap(p=>p.engagers.map(e=>e.company)).filter(Boolean))].sort();
   const _compOpts='<option value="">All Companies</option>'+_cos.map(co=>'<option value="'+esc(co)+'">'+esc(co)+'</option>').join('');
   el.innerHTML=`
-  <div class="stat-row">
-    <div class="scard sg" onclick="postStatClick('all',this)" title="Show all posts">
-      <div class="sc-ico">📊</div><div class="sc-label">Total Posts</div>
-      <div class="sc-val vg" data-count="${stats.total_posts}">0</div>
-      <div class="sc-hint">Click to reset filters</div>
-    </div>
-    <div class="scard si" onclick="postStatClick('eng',this)" title="Filter by engagements">
-      <div class="sc-ico">✨</div><div class="sc-label">Engagements</div>
-      <div class="sc-val vi" data-count="${stats.total_engagements}">0</div>
-      <div class="sc-hint">Click to see all</div>
-    </div>
-
-    <div class="scard sp" onclick="postStatClick('csuite',this)" title="C-Suite engagers">
-      <div class="sc-ico">👑</div><div class="sc-label">C-Suite / Founders</div>
-      <div class="sc-val vp" data-count="${stats.csuite_count}">0</div>
-      <div class="sc-hint">Click to filter C-Suite</div>
-    </div>
-    <div class="scard sc" onclick="postStatClick('people',this)" title="Unique people">
-      <div class="sc-ico">🌐</div><div class="sc-label">Unique People</div>
-      <div class="sc-val vc" data-count="${stats.total_people}">0</div>
-      <div class="sc-hint">Click to reset</div>
-    </div>
-  </div>
-
   <div class="fbar">
     <div class="fgroup">
       <div class="chips" id="pf-sen">
@@ -833,6 +809,7 @@ function buildPostTab(){
     <div class="sep"></div>
     <select class="comp-sel" id="pf-comp" onchange="PF.comp=this.value;applyPF()">${_compOpts}</select>
     <div class="lkf-dwrap" title="Filter posts by date"><span class="lkf-dlbl">📅</span><input type="date" class="lkf-date" onchange="PF.dFrom=this.value;applyPF()"><span class="lkf-dsep">→</span><input type="date" class="lkf-date" onchange="PF.dTo=this.value;applyPF()"></div>
+    <button class="chip" id="pf-sort" onclick="PF.sort=(PF.sort==='eng'?'none':'eng');this.classList.toggle('on',PF.sort==='eng');applyPF()">↕ Most engaged</button>
     <div class="srch">
       <span class="srch-ico">🔍</span>
       <input placeholder="Search people…" oninput="PF.q=this.value;applyPF()">
@@ -976,12 +953,6 @@ function buildPeopleTab(){
   var _cityOpts='<option value="all">📍 All locations</option>'+_cities.map(function(x){return '<option value="'+esc(x)+'">'+esc(x)+'</option>';}).join('');
   el.innerHTML=`
 
-  <div class="stat-row">
-    <div class="scard sg active-filter" onclick="resetPLF()" title="All people"><div class="sc-label">Unique People</div><div class="sc-val vg" data-count="${stats.total_people}">0</div></div>
-    <div class="scard sa" onclick="plStat('dm',this)" title="Decision makers"><div class="sc-label">Decision Makers</div><div class="sc-val va" data-count="${stats.total_dms}">0</div></div>
-    <div class="scard sp" onclick="plStat('csuite',this)" title="C-Suite / Founders"><div class="sc-label">C-Suite / Founders</div><div class="sc-val vp" data-count="${stats.csuite_count}">0</div></div>
-    <div class="scard sc" onclick="switchTab('companies')" title="View companies"><div class="sc-label">Companies</div><div class="sc-val vc" data-count="${companies.length}">0</div></div>
-  </div>
   <div class="fbar-wrap">
     <div class="fbar fbar-primary">
       <div class="fgroup">
@@ -1013,6 +984,7 @@ function buildPeopleTab(){
         <span class="lkf-dsep">→</span>
         <input type="date" class="lkf-date" onchange="PLF.dTo=this.value;applyPLF()">
       </div>
+      <button class="chip" id="plf-dm" onclick="PLF.dm=!PLF.dm;this.classList.toggle('on',PLF.dm);applyPLF()">🎯 Decision Makers</button>
       <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
       <button class="lkf-reset" onclick="resetPLF()">↺ Reset</button>
     </div>
@@ -1048,12 +1020,6 @@ function buildCompaniesTab(){
   const el=document.getElementById('tab-companies');
   el.innerHTML=`
 
-  <div class="stat-row">
-    <div class="scard sg active-filter" onclick="applyCF()" title="All companies"><div class="sc-label">Companies</div><div class="sc-val vg" data-count="${companies.length}">0</div></div>
-    <div class="scard si" onclick="switchTab('people')" title="View people"><div class="sc-label">People</div><div class="sc-val vi" data-count="${stats.total_people}">0</div></div>
-    <div class="scard sa" onclick="switchTab('people')" title="Decision makers"><div class="sc-label">Decision Makers</div><div class="sc-val va" data-count="${stats.total_dms}">0</div></div>
-    <div class="scard sp" onclick="switchTab('post')" title="View posts"><div class="sc-label">Posts</div><div class="sc-val vp" data-count="${stats.total_posts}">0</div></div>
-  </div>
   <div class="fbar">
     <div class="fgroup">
       <span class="flabel">Min People</span>
