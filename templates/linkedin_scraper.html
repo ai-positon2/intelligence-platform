@@ -1974,37 +1974,42 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
   }
 
   function subjectFor(p,c,post){
-    var fn=first(p.name), comp=p.company||'your team', topic=post.topic, aw=post.commented?'comment':'like', seed=hashN(p.name+comp);
+    var fn=first(p.name), comp=p.company||'your team', topic=post.topic, seed=hashN(p.name+comp);
+    var noted=post.commented?'comment':'note';
     var pool = p.source==='linkedin'
-      ? ['saw your '+aw+' on our '+topic+' post',
-         topic+' at '+comp+'?',
-         'quick idea on '+topic+' for '+comp,
-         'glad our '+topic+' post landed, '+fn]
-      : ['quick idea on '+topic+' for '+comp,
-         comp+' + '+topic+'?',
-         'a quick thought for '+comp,
-         'worth 15 minutes on '+topic+', '+fn+'?'];
+      ? ['Your take on '+topic+', '+fn,
+         'A quick thought on '+topic+' for '+comp,
+         'Following your '+topic+' '+noted+', '+fn,
+         topic+': one idea for '+comp]
+      : ['A quick thought on '+topic+' for '+comp,
+         topic+' at '+comp,
+         'An idea for '+comp+' on '+topic,
+         'Worth a look: '+topic+' for '+comp];
     return pick(pool,seed);
   }
 
   function draft(p,c,tone){
     var fn=first(p.name), comp=p.company||'your team', sender=(c.owner||'Krishna Ladha'), post=liPost(p), topic=post.topic;
     var av=post.commented?'commented on':'liked';
-    var sign='\n\nBest,\n'+sender+'\nPosition²';
+    var sign='\n\nBest,\n'+sender+'\nPosition² | Growth & Marketing Intelligence';
     var bodies;
     if(p.source==='linkedin'){
-      var eng=post.commented?('your comment on our post about '+topic):('that you liked our post on '+topic);
-      var engCap=post.commented?('Your comment on our '+topic+' post'):('Your interest in our '+topic+' post');
+      var openWarm=post.commented
+        ? 'Your comment on our post about '+topic+' stuck with me. It’s clearly something you’re weighing at '+comp+', not just in theory.'
+        : 'I saw you liked our post on '+topic+', so it felt like the right moment to reach out.';
+      var openCons=post.commented
+        ? 'Since you took the time to comment on our post about '+topic+', I wanted to share a thought rather than a pitch.'
+        : 'Since our post on '+topic+' caught your attention, I wanted to share a thought rather than a pitch.';
       bodies={
-        Warm:'Hi '+fn+',\n\nSaw '+eng+', and it’s always good to see the topic landing with people actually doing the work.\n\nWe help teams like '+comp+' turn that idea into measurable pipeline: tying paid, SEO and intent signals back to revenue so the wins, and the wasted spend, are easy to see. One client cut wasted spend by about 30% in a quarter.\n\nWant me to send a short, '+comp+'-specific breakdown? No pitch, just the playbook.'+sign,
-        Direct:'Hi '+fn+',\n\nNoticed '+eng+'. If '+topic+' is on your plate at '+comp+', here’s the short version of how we help:\n\nWe connect paid, SEO and intent data to revenue, so you can double down on what works and cut what doesn’t. Recent client: about 30% less wasted spend in one quarter.\n\nOpen to 15 minutes next week? If the timing’s off, I’ll send the breakdown to read on your own.'+sign,
-        Consultative:'Hi '+fn+',\n\n'+engCap+' suggests '+topic+' is something your team is weighing, so here’s a thought rather than a pitch.\n\nMost teams we speak with don’t struggle to run campaigns; they struggle to prove what’s actually driving pipeline. That’s the gap we help close, connecting spend to revenue signal by signal.\n\nIf it’s useful, I’d be glad to map what this could look like for '+comp+'. Want me to put a short note together?'+sign
+        Warm:'Hi '+fn+',\n\n'+openWarm+'\n\nThat’s the problem we work on every day at Position². We help marketing teams connect their paid, SEO and intent data to real revenue, so it’s clear what’s driving pipeline and what to stop funding. For one client that meant cutting about 30% of wasted ad spend in a single quarter, with no drop in results.\n\nWould a quick call be worth it to see how this might apply to '+comp+'? If the timing isn’t right, I’m glad to send over a short breakdown so you have it on hand.\n\nThanks again for engaging with the post.'+sign,
+        Direct:'Hi '+fn+',\n\nYour '+(post.commented?'comment':'interest')+' on our '+topic+' post suggests it’s on your radar at '+comp+', so I’ll be brief.\n\nWe help marketing teams tie paid, SEO and intent data back to revenue, so you can double down on what works and stop funding what doesn’t. A recent client cut wasted ad spend by about 30% in a quarter.\n\nAre you open to 15 minutes next week to see if it’s a fit for '+comp+'? If not, I’ll send a short breakdown you can review on your own time.'+sign,
+        Consultative:'Hi '+fn+',\n\n'+openCons+'\n\nIn our experience, the hard part for teams like '+comp+' isn’t running campaigns. It’s proving which ones actually move pipeline. We help close that gap by connecting spend to revenue, signal by signal, so the next budget call is an easy one.\n\nIf that’s useful, I’d be glad to map out what it could look like for '+comp+'. Would a short overview help?'+sign
       };
     }else{
       bodies={
-        Warm:'Hi '+fn+',\n\n'+comp+' has been spending time on our site this week, and I noticed you’d also '+av+' our post on '+topic+', so the timing felt right to reach out.\n\nWe help teams like '+comp+' connect paid, SEO and intent signals back to revenue, so the wins are measurable and wasted spend is easy to spot. One client cut about 30% of wasted spend in a quarter.\n\nWant me to send a short, '+comp+'-specific breakdown? Happy to, no meeting needed.'+sign,
-        Direct:'Hi '+fn+',\n\nSaw '+comp+' looking around our site, and that '+topic+' is on your radar (you '+av+' our post on it).\n\nShort version of what we do: tie paid, SEO and intent data to revenue so you can scale what works and cut what doesn’t. Recent client cut wasted spend by about 30% in a quarter.\n\nWorth 15 minutes next week? If not, I’ll send the breakdown over to read whenever suits.'+sign,
-        Consultative:'Hi '+fn+',\n\n'+comp+'’s time on our site, plus your interest in '+topic+' on LinkedIn, suggests this is live for your team right now.\n\nIn our experience the hard part isn’t running campaigns; it’s proving what’s moving pipeline. That’s exactly the gap we help close, connecting spend to revenue signal by signal.\n\nIf helpful, I can put together a short view of what this might look like for '+comp+'. Want me to?'+sign
+        Warm:'Hi '+fn+',\n\nI noticed '+comp+' spending some time on our site this week, and that '+topic+' is clearly on your radar (you '+av+' our post on it). It felt like the right moment to reach out.\n\nWe help teams like '+comp+' connect their paid, SEO and intent data to real revenue, so it’s clear what’s driving pipeline and what to stop funding. For one client that meant cutting about 30% of wasted ad spend in a single quarter, with no drop in results.\n\nWould a quick call be worth it to see how this might apply to '+comp+'? If the timing isn’t right, I’m glad to send over a short breakdown so you have it on hand.'+sign,
+        Direct:'Hi '+fn+',\n\nSaw '+comp+' exploring our site, and that '+topic+' is on your radar (you '+av+' our post on it), so I’ll keep this short.\n\nWe tie paid, SEO and intent data back to revenue, so you can scale what works and stop funding what doesn’t. A recent client cut wasted ad spend by about 30% in a quarter.\n\nOpen to 15 minutes next week to see if it’s a fit for '+comp+'? If not, I’ll send a short breakdown you can read whenever it suits.'+sign,
+        Consultative:'Hi '+fn+',\n\nBetween '+comp+'’s visit to our site and your interest in '+topic+' on LinkedIn, it looks like this is live for your team right now, so here’s a thought rather than a pitch.\n\nIn our experience, the hard part isn’t running campaigns. It’s proving which ones actually move pipeline. We help close that gap by connecting spend to revenue, signal by signal.\n\nIf it’s helpful, I’d be glad to put together a short view of what this could look like for '+comp+'. Want me to?'+sign
       };
     }
     return { subject: subjectFor(p,c,post), body: bodies[tone]||bodies.Warm };
