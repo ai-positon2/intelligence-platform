@@ -768,7 +768,12 @@ def anonymous_visitors_data():
 @login_required
 def linkedin_scraper():
     """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""
-    return render_template("linkedin_scraper.html", user=_get_user())
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "data", "linkedin.json"), encoding="utf-8") as _f:
+            li_data = json.load(_f)
+    except Exception:
+        li_data = {"posts": [], "people": [], "companies": [], "company_lb": [], "stats": {}}
+    return render_template("linkedin_scraper.html", user=_get_user(), li_data=li_data)
 
 @app.route("/health")
 def health():
