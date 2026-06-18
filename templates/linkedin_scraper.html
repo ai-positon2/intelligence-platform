@@ -270,7 +270,7 @@ body::before{
   padding:9px 20px;border-top:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.1s;
 }
 .eitem>div{min-width:0}
-.ebadges{max-width:150px}
+.ebadges{width:150px;align-content:flex-start}
 .eitem:hover{background:var(--s2)}
 .eavtr{
   border-radius:50%;overflow:hidden;flex-shrink:0;
@@ -752,9 +752,9 @@ const GRAD=[['#6366f1','#22d3ee'],['#8b5cf6','#06b6d4'],['#059669','#818cf8'],['
 function gradFor(name){const i=Math.abs((name||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0))%GRAD.length;return GRAD[i]}
 function av(name,pic,sz,cls){
   const s=sz||44,c=cls||'pcav';
-  if(pic&&pic.startsWith('http'))return`<div class="${c}" style="width:${s}px;height:${s}px"><img src="${esc(pic)}" alt="" onerror="this.parentElement.innerHTML='${ini(name)}'"></div>`;
-  const [c1,c2]=gradFor(name);
-  return`<div class="${c}" style="width:${s}px;height:${s}px;background:linear-gradient(135deg,${c1},${c2})">${ini(name)}</div>`;
+  const g=gradFor(name);
+  const img=(pic&&pic.startsWith('http'))?`<img src="${esc(pic)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.style.display='none'">`:'';
+  return`<div class="${c}" style="width:${s}px;height:${s}px;position:relative;background:linear-gradient(135deg,${g[0]},${g[1]})">${ini(name)}${img}</div>`;
 }
 const RICO={LIKE:'👍',PRAISE:'🙌',INTEREST:'🤔',APPRECIATION:'❤️',EMPATHY:'🫂'};
 const RCLS={LIKE:'blike',PRAISE:'bprs',INTEREST:'bint',APPRECIATION:'bapp',EMPATHY:'bemp'};
@@ -1349,13 +1349,14 @@ function openPostModal(pi){
     (csN?'<div class="mpill mp-p">'+csN+' C-Suite</div>':'');
   document.getElementById('modal-elist').innerHTML=eng.map((e,ei)=>{
     const oi=p.engagers.indexOf(e);
-    const subLine=[e.title||e.headline||'',e.company].filter(Boolean).join(' · ');
+    const _t=(e.title&&!/^[\d.,\s]+$/.test(e.title))?e.title:'';
+    const subLine=[_t,e.company].filter(Boolean).join(' · ')||e.headline||'';
     return'<div class="eitem" onclick="openEngDrawer('+ori+','+oi+')" style="animation-delay:'+(ei*.025)+'s">'+
       av(e.name,e.pic,36,'eavtr')+
       '<div><div class="ename">'+esc(e.name)+'</div>'+
       '<div class="esub">'+esc(subLine)+'</div>'+
       (e.location?'<div class="esub" style="margin-top:1px;font-size:10px;opacity:0.65">📍 '+esc(e.location)+'</div>':'')+
-      (e.headline&&e.headline!==e.title?'<div class="esub" style="margin-top:1px;font-size:10px;opacity:0.55;font-style:italic">'+esc(e.headline)+'</div>':'')+
+      (e.headline&&e.headline!==subLine&&e.headline!==_t?'<div class="esub" style="margin-top:1px;font-size:10px;opacity:0.55;font-style:italic">'+esc(e.headline)+'</div>':'')+
       '</div>'+
       '<div class="ebadges">'+
         (e.commented?'<span class="b blike" title="Commented">💬</span>':'')+
