@@ -476,6 +476,7 @@
     var src=fromAll?_allPeople:_filteredPeople;
     var p=src[idx]; if(!p)return;
     (function(){var comp=(p.website||'').replace(/^www\./,'').split('.')[0];comp=comp?comp.charAt(0).toUpperCase()+comp.slice(1):(p.industry||'this company');var tdisp=(p.time_raw||'').replace('T',' ').substring(11,16);window._kePerson={name:p.name,title:p.title||'',company:comp,domain:p.website||'',email:p.email||'',source:'anonymous',act:{pages:parseInt(p.pages)||0,when:[p.date,tdisp].filter(Boolean).join(' ')}};})();
+    if(window.KairoEngage&&window._kePerson){window.KairoEngage.open(window._kePerson);return;}
     var sen=getSeniority(p.title);
     var col=engColor(p.pages);
     var pct=engPct(p.pages);
@@ -1391,15 +1392,15 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
      ════════════════════════════════════════════════════════════════ -->
 <style id="ke-styles">
 :root{--ke-accent:#7c83f5;--ke-accent2:#9b87fd;--ke-green:#2dd4aa;--ke-amber:#f5a623;--ke-hub:#ff7a59;--ke-slack:#36c5f0;--ke-tx:#e8ecf8;--ke-mut:#8a93ad;--ke-card:#0e1426;--ke-line:rgba(255,255,255,.08);}
-.ke-ov{position:fixed;inset:0;z-index:5000;display:none;align-items:flex-start;justify-content:center;padding:38px 18px;overflow-y:auto;background:radial-gradient(1200px 600px at 50% -10%,rgba(124,131,245,.16),transparent 60%),rgba(3,5,14,.74);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);}
+.ke-ov{position:fixed;inset:0;z-index:5000;display:none;align-items:flex-start;justify-content:center;padding:38px 18px;overflow-y:auto;background:radial-gradient(1200px 600px at 50% -10%,rgba(124,131,245,.14),transparent 60%),rgba(3,5,14,.93);will-change:opacity;}
 .ke-ov.open{display:flex;animation:ke-fade .28s ease both;}
 @keyframes ke-fade{from{opacity:0}to{opacity:1}}
-.ke-card{position:relative;width:100%;max-width:730px;background:linear-gradient(180deg,#10162b,#0a0e1d);border:1px solid rgba(124,131,245,.28);border-radius:22px;box-shadow:0 40px 120px -20px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.02) inset;overflow:hidden;animation:ke-pop .42s cubic-bezier(.16,1,.3,1) both;}
+.ke-card{position:relative;width:100%;max-width:730px;background:linear-gradient(180deg,#10162b,#0a0e1d);border:1px solid rgba(124,131,245,.28);border-radius:22px;box-shadow:0 40px 120px -20px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.02) inset;overflow:hidden;animation:ke-pop .26s cubic-bezier(.16,1,.3,1) both;will-change:transform,opacity;}
 @keyframes ke-pop{from{opacity:0;transform:translateY(22px) scale(.965)}to{opacity:1;transform:none}}
 .ke-glow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:420px;height:160px;background:radial-gradient(closest-side,rgba(124,131,245,.55),transparent);filter:blur(34px);pointer-events:none;opacity:.6;}
 /* header */
 .ke-hd{position:relative;display:flex;align-items:center;gap:13px;padding:20px 22px 16px;border-bottom:1px solid var(--ke-line);}
-.ke-mark{width:42px;height:42px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;font-size:20px;background:linear-gradient(135deg,var(--ke-accent),var(--ke-accent2));box-shadow:0 8px 24px -6px rgba(124,131,245,.7);animation:ke-breathe 3.4s ease-in-out infinite;}
+.ke-mark{width:42px;height:42px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;font-size:20px;background:linear-gradient(135deg,var(--ke-accent),var(--ke-accent2));box-shadow:0 8px 24px -6px rgba(124,131,245,.7);}
 @keyframes ke-breathe{0%,100%{box-shadow:0 8px 24px -6px rgba(124,131,245,.55)}50%{box-shadow:0 8px 34px -4px rgba(124,131,245,.95)}}
 .ke-hd-t{flex:1;min-width:0;}
 .ke-hd-t h3{margin:0;font-size:17px;font-weight:700;color:var(--ke-tx);letter-spacing:-.2px;display:flex;align-items:center;gap:8px;}
@@ -1417,8 +1418,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 .ke-int-meta b{font-weight:650;font-size:12px;}
 .ke-int-meta span{font-size:10px;color:var(--ke-mut);}
 .ke-dot{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--ke-green);}
-.ke-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ke-green);box-shadow:0 0 0 0 rgba(45,212,170,.6);animation:ke-pulse 2s infinite;}
-@keyframes ke-pulse{0%{box-shadow:0 0 0 0 rgba(45,212,170,.55)}70%{box-shadow:0 0 0 7px rgba(45,212,170,0)}100%{box-shadow:0 0 0 0 rgba(45,212,170,0)}}
+.ke-dot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ke-green);}
 /* section label */
 .ke-lbl{font-size:10.5px;letter-spacing:1.3px;text-transform:uppercase;color:var(--ke-mut);font-weight:700;margin:0 0 9px;display:flex;align-items:center;gap:7px;}
 .ke-lbl .ke-ai{padding:2px 7px;border-radius:6px;font-size:9px;letter-spacing:.5px;background:rgba(124,131,245,.15);color:#b9bdff;border:1px solid rgba(124,131,245,.3);}
@@ -1534,7 +1534,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
   function ini(n){n=(n||'?').trim();var p=n.split(/\s+/);return((p[0]||'')[0]||'?').toUpperCase()+((p[1]||'')[0]||'').toUpperCase();}
   function first(n){return (n||'there').trim().split(/\s+/)[0];}
   function hashN(s){var h=0;s=s||'';for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;}
-  function pick(arr,seed){return arr[seed%arr.length];}
+  function pick(arr,seed){var i=((seed%arr.length)+arr.length)%arr.length;return arr[i];}
   function domainFrom(p){if(p.domain)return p.domain.replace(/^https?:\/\//,'').replace(/\/.*$/,'');var c=(p.company||'').toLowerCase().replace(/[^a-z0-9]/g,'');return c?c+'.com':'company.com';}
   function emailFor(p){if(p.email)return p.email;return first(p.name).toLowerCase()+'@'+domainFrom(p);}
 
@@ -1542,7 +1542,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
   function crm(p){
     var seed=hashN(p.name+p.company);
     var stages=['Marketing Qualified Lead','Sales Qualified Lead','In Discovery','Demo Scheduled','Proposal Sent'];
-    var owners=['Krishna Ladha','Sudheer D.','Priya Menon','Alex Rivera'];
+    var owners=['Krishna Ladha','Sudheer D.'];
     var when=['3 days ago','last week','2 weeks ago','9 days ago','yesterday','last month'];
     var topics=['pricing for the growth tier','a pilot for paid search','your reporting dashboards','SEO + paid media bundle','attribution and tracking setup'];
     return {
@@ -1556,7 +1556,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
   // ── Kairo email draft (client-side, personalised) ──
   function draft(p,c,tone){
-    var fn=first(p.name), comp=p.company||'your team', sender='Krishna';
+    var fn=first(p.name), comp=p.company||'your team', sender=(c.owner||'Krishna Ladha');
     var actLine = p.source==='linkedin'
       ? 'I noticed you '+(p.act&&p.act.commented?'commented on':'engaged with')+' our recent post'+(p.act&&p.act.post?' on '+p.act.post:'')+'. Really appreciate you weighing in.'
       : 'I saw '+comp+' was taking a close look at our '+(p.act&&p.act.page?p.act.page:'services')+' page';
