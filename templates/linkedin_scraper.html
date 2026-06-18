@@ -1186,14 +1186,8 @@ function applyCF(){
       </div>
       ${(c.hq||c.country)?`<div class="pcmeta" style="margin-top:6px;gap:6px">
         ${c.hq?`<div class="pcmi">🏙 <span>${esc(c.hq)}</span></div>`:''}
-        ${c.country&&c.country!==c.hq?`<div class="pcmi">🌏 <span>${esc(c.country)}</span></div>`:''}
       </div>`:``}
       <div class="cc-bar">${segs}</div>
-      <div class="pcbdg">
-        ${c.dm_count?`<span class="b bdm">🎯 ${c.dm_count} DM${c.dm_count!==1?'s':''}</span>`:''}
-        ${c.posts_engaged?`<span class="b blike">⚡ ${c.posts_engaged} post${c.posts_engaged!==1?'s':''}</span>`:''}
-      </div>
-      <div class="cc-ppl">${avs}${c.people_count>5?`<div class="cc-more">+${c.people_count-5}</div>`:''}</div>
     </div>`;
   }).join('');
   setTimeout(countUp,50);
