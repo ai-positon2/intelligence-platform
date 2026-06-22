@@ -73,6 +73,56 @@ _SUFFIXES = ("inc", "llc", "corp", "corporation", "ltd", "limited", "co",
 
 _RELEVANT_RE = [re.compile(re.escape(k)) for k in RELEVANT_KEYWORDS]
 
+# ── "Important news" gate (stricter than RELEVANT_KEYWORDS) ───────────────────
+# News Mention is the catch-all LOW bucket. To keep it signal-rich for sales,
+# a stored News Mention must name a HIGH-VALUE, action-worthy business event in
+# its TITLE (launches/partnerships already have their own signal types). This is
+# deliberately narrower than RELEVANT_KEYWORDS so generic PR / mentions drop out.
+IMPORTANT_NEWS_KEYWORDS = [
+    # funding / investment
+    "funding", "raises", "raised", "investment", "valuation", "series a",
+    "series b", "series c", "series d", "seed round", "venture round",
+    # M&A / corporate structure
+    "acqui", "merger", "merges", "buyout", "takeover", "majority stake", "spins off",
+    # leadership
+    "appoints", "names new", "new ceo", "new cfo", "new cmo", "new coo", "new cto",
+    "chief executive", "chief financial", "chief marketing", "chief operating",
+    "chief technology", "steps down", "resigns", "resignation", "appointed", "hires",
+    # expansion / footprint
+    "expand", "expansion", "new market", "new factory", "new plant", "new facility",
+    "new headquarters", "opens factory", "opens plant", "enters the", "global expansion",
+    # contracts / wins
+    "wins contract", "secures contract", "awarded contract", "major contract",
+    "selected by", "wins deal", "multi-year deal",
+    # restructuring / distress
+    "layoff", "restructur", "cuts jobs", "downsiz", "shuts down", "closure",
+    "bankrupt", "receivership", "insolvency", "files for bankruptcy",
+    # public-market / brand
+    "ipo", "goes public", "spac", "rebrand", "relaunch", "record revenue", "record sales",
+]
+_IMPORTANT_RE = [re.compile(re.escape(k)) for k in IMPORTANT_NEWS_KEYWORDS]
+
+# Extra low-value noise (commerce / reviews / rumor) — dropped from News Mention.
+EXTRA_NOISE_PATTERNS = [
+    r"coupon", r"promo code", r"discount code", r"% off",
+    r"on sale", r"price drop", r"deal of the day", r"best deals?",
+    r"review", r"hands[- ]on", r"unboxing", r"rumou?r", r"leak(?:ed|s)?",
+    r"giveaway", r"sweepstakes", r"sponsored", r"podcast", r"episode",
+    r"explained", r"roundup", r"tutorial", r"guide", r"tips",
+]
+_EXTRA_NOISE_RE = [re.compile(p) for p in EXTRA_NOISE_PATTERNS]
+
+
+def is_important_news(text: str) -> bool:
+    """True only if the headline names a high-value business event and is not
+    commerce/review/rumor noise. Used to gate the News Mention bucket."""
+    t = _norm(text or "")
+    if not t:
+        return False
+    if any(r.search(t) for r in _NOISE_RE) or any(r.search(t) for r in _EXTRA_NOISE_RE):
+        return False
+    return any(r.search(t) for r in _IMPORTANT_RE)
+
 # ── Signal-type classification (keyword-only, no LLM, zero cost) ──────────────
 # Splits the generic "News Mention" stream into first-class signal types.
 # M&A / IPO / funding deliberately stay as News Mention here (those HIGH signals
