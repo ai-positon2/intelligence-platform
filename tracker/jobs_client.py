@@ -80,10 +80,84 @@ def _build_query(company_name: str) -> str:
     return urllib.parse.quote_plus(f'"{company_name}" {roles} {hiring}')
 
 
+CAREER_PATHS = [
+    "/careers", "/career", "/jobs", "/en/careers", "/en/career",
+    "/company/careers", "/about/careers", "/join-us", "/work-with-us",
+]
+CAREER_SUBDOMAINS = ["careers.", "jobs."]
+_TAG_RE = __import__("re").compile(r"<[^>]+>")
+_WS_RE = __import__("re").compile(r"\s+")
+
+
+def _fetch_text(url: str, timeout: int = 10) -> str:
+    """GET a URL and return de-tagged text (empty string on any failure)."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; SignalTrackerBot/1.0)"})
+        raw = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "ignore")
+    except Exception as exc:
+        logger.debug("careers fetch failed %s: %s", url, exc)
+        return ""
+    text = _TAG_RE.sub(" ", raw)
+    return _WS_RE.sub(" ", text)
+
+
+def _candidate_career_urls(domain: str) -> list[str]:
+    d = (domain or "").strip().lower().replace("https://", "").replace("http://", "").strip("/")
+    if not d:
+        return []
+    urls = [f"https://{d}{p}" for p in CAREER_PATHS]
+    urls += [f"https://{sub}{d}" for sub in CAREER_SUBDOMAINS]
+    return urls
+
+
+def get_career_page_postings(company_name: str, domain: str, max_results: int = 5) -> list[dict]:
+    """Scan a company's own careers page(s) for creative-role hiring.
+
+    Tries common careers URLs/subdomains, de-tags the HTML, and if a marketing-
+    creative role keyword appears in a hiring context, emits a posting pointing
+    at that careers page. Heuristic but free and runs in the weekly Action.
+    """
+    results: list[dict] = []
+    seen = set()
+    for url in _candidate_career_urls(domain):
+        text = _fetch_text(url)
+        if not text:
+            continue
+        low = _norm(text)
+        if not _looks_like_hiring(low):
+            continue
+        # collect each creative role keyword actually present (and not excluded)
+        if any(r.search(low) for r in _ROLE_EXCLUDE_RE) and not any(r.search(low) for r in _ROLE_RE):
+            continue
+        roles = [k for k in CREATIVE_ROLE_KEYWORDS if k in low]
+        if not roles:
+            continue
+        for role in roles:
+            if role in seen:
+                continue
+            seen.add(role)
+            results.append({
+                "title": f"{company_name} careers page lists open role: {role.title()}",
+                "url": url,
+                "summary": "",
+                "source": "Careers page",
+                "published": "",
+                "role": role,
+            })
+            if len(results) >= max_results:
+                return results
+        if results:
+            return results  # one good careers page is enough
+    return results
+
+
 def get_job_postings(
     company_name: str,
     max_results: int = 5,
     max_age_days: int = MAX_JOB_AGE_DAYS,
+    domain: str = "",
 ) -> list[dict]:
     """Return creative-hiring posting dicts for a company (may be empty).
 
@@ -138,4 +212,11 @@ def get_job_postings(
             })
             if len(results) >= max_results:
                 return results
+    # Fallback / augment: scan the company's own careers page(s).
+    if domain and len(results) < max_results:
+        for p in get_career_page_postings(company_name, domain, max_results=max_results - len(results)):
+            key = (p.get("title") or "").strip().lower()
+            if key and key not in seen_titles:
+                seen_titles.add(key)
+                results.append(p)
     return results

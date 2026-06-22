@@ -106,7 +106,7 @@ def fetch_csg_jobs(
             continue
         print(f"[{i}/{total}] {name}")
         try:
-            postings = get_job_postings(name, max_results=max_postings, max_age_days=max_age_days)
+            postings = get_job_postings(name, max_results=max_postings, max_age_days=max_age_days, domain=company.get("domain",""))
         except Exception as exc:
             print(f"  ! error: {exc}")
             time.sleep(RATE_LIMIT_SLEEP)
