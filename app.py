@@ -2848,6 +2848,7 @@ def _refresh_stage(name):
     n = (name or "").lower()
     if "fetch healthcare" in n: return "Fetching Healthcare signals (Sheets + News)…"
     if "hiring" in n or "creative" in n or "3d" in n: return "Scanning creative / 3D hiring…"
+    if "sheet" in n or "high signals" in n: return "Fetching CSG C-Suite / IPO / M&A / Funding (Sheets)…"
     if "fetch csg" in n:        return "Fetching CSG news…"
     if "rebuild" in n:          return "Rebuilding & scoring both accounts…"
     if "commit" in n or "publish" in n: return "Publishing…"
