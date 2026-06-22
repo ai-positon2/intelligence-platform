@@ -86,27 +86,15 @@ def reclassify(db):
     con.close()
     return changed
 
-NEWS_CAP_PER_COMPANY = 2
-
 def prune_news(db):
-    """Keep News Mention high-value (important events only) and cap to the
-    NEWS_CAP_PER_COMPANY most recent per company. Returns (dropped, total)."""
+    """Keep only important/relevant News Mentions (strict quality gate, no count
+    cap — a company keeps every genuinely important item). Returns (dropped, total)."""
     con = sqlite3.connect(db)
     rows = con.execute(
-        "SELECT id, signal_detail, apollo_id, signal_date, sent_at "
-        "FROM alerts_sent WHERE signal_type='News Mention' AND dry_run=0").fetchall()
+        "SELECT id, signal_detail FROM alerts_sent "
+        "WHERE signal_type='News Mention' AND dry_run=0").fetchall()
     total = len(rows)
-    drop = []
-    survivors = {}
-    for rid, detail, aid, sd, sent in rows:
-        if not is_important_news(detail or ""):
-            drop.append((rid,)); continue
-        survivors.setdefault(aid, []).append((sd or sent or "", rid))
-    # cap most-recent N per company
-    for aid, lst in survivors.items():
-        lst.sort(reverse=True)
-        for _, rid in lst[NEWS_CAP_PER_COMPANY:]:
-            drop.append((rid,))
+    drop = [(rid,) for rid, detail in rows if not is_important_news(detail or "")]
     if drop:
         con.executemany("DELETE FROM alerts_sent WHERE id=?", drop)
         con.commit(); con.execute("VACUUM"); con.commit()

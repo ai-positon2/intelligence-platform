@@ -51,7 +51,7 @@ DB_PATH = ROOT / "data" / "tracker_csg_v2.db"
 DEFAULT_MAX_AGE_DAYS = 90
 
 # Articles per company per run  (Google News RSS typically returns ≤10 anyway)
-DEFAULT_MAX_ARTICLES = 2
+DEFAULT_MAX_ARTICLES = 10
 
 # Seconds between company fetches — keeps Google from rate-limiting us
 RATE_LIMIT_SLEEP = 1.2
