@@ -112,6 +112,106 @@ def _candidate_career_urls(domain: str) -> list[str]:
     return urls
 
 
+import json as _json
+import re as _re2
+
+def _http_json(url, timeout=10):
+    """GET a URL and parse JSON; return dict/list or None on any failure."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; SignalTrackerBot/1.0)",
+            "Accept": "application/json"})
+        raw = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "ignore")
+        return _json.loads(raw)
+    except Exception as exc:
+        logger.debug("ATS json fetch failed %s: %s", url, exc)
+        return None
+
+def _company_slugs(company_name, domain):
+    """Candidate ATS slugs derived from domain root and company name."""
+    slugs = []
+    d = (domain or "").lower().replace("https://", "").replace("http://", "").strip("/")
+    root = d.split("/")[0].split(".")[0] if d else ""
+    if root:
+        slugs.append(root)
+    nm = _re2.sub(r"[^a-z0-9]", "", (company_name or "").lower())
+    if nm and nm not in slugs:
+        slugs.append(nm)
+    nm2 = _re2.sub(r"[^a-z0-9]+", "-", (company_name or "").lower()).strip("-")
+    if nm2 and nm2 not in slugs:
+        slugs.append(nm2)
+    return slugs[:3]
+
+def get_ats_postings(company_name, domain):
+    """Query common ATS public JSON APIs for the company's full job list.
+    Returns [{title,url,location,source}] (may be empty). Structured + reliable."""
+    out = []
+    for slug in _company_slugs(company_name, domain):
+        # Greenhouse
+        d = _http_json(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs")
+        if isinstance(d, dict) and isinstance(d.get("jobs"), list) and d["jobs"]:
+            for j in d["jobs"]:
+                out.append({"title": j.get("title", ""), "url": j.get("absolute_url", ""),
+                            "location": (j.get("location") or {}).get("name", ""), "source": "Greenhouse"})
+            return out
+        # Lever
+        d = _http_json(f"https://api.lever.co/v0/postings/{slug}?mode=json")
+        if isinstance(d, list) and d:
+            for j in d:
+                out.append({"title": j.get("text", ""), "url": j.get("hostedUrl", ""),
+                            "location": (j.get("categories") or {}).get("location", ""), "source": "Lever"})
+            return out
+        # Ashby
+        d = _http_json(f"https://api.ashbyhq.com/posting-api/job-board/{slug}")
+        if isinstance(d, dict) and isinstance(d.get("jobs"), list) and d["jobs"]:
+            for j in d["jobs"]:
+                out.append({"title": j.get("title", ""), "url": j.get("jobUrl", ""),
+                            "location": j.get("location", ""), "source": "Ashby"})
+            return out
+        # SmartRecruiters
+        d = _http_json(f"https://api.smartrecruiters.com/v1/companies/{slug}/postings")
+        if isinstance(d, dict) and isinstance(d.get("content"), list) and d["content"]:
+            for j in d["content"]:
+                loc = (j.get("location") or {})
+                out.append({"title": j.get("name", ""), "url": (j.get("ref") or ""),
+                            "location": loc.get("city", ""), "source": "SmartRecruiters"})
+            return out
+        # Recruitee
+        d = _http_json(f"https://{slug}.recruitee.com/api/offers/")
+        if isinstance(d, dict) and isinstance(d.get("offers"), list) and d["offers"]:
+            for j in d["offers"]:
+                out.append({"title": j.get("title", ""), "url": j.get("careers_url", ""),
+                            "location": j.get("location", ""), "source": "Recruitee"})
+            return out
+    return out
+
+def _discover_careers_links(domain):
+    """Fetch the homepage and pull out any links pointing at careers/jobs pages."""
+    d = (domain or "").lower().replace("https://", "").replace("http://", "").strip("/")
+    if not d:
+        return []
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"https://{d}", headers={"User-Agent": "Mozilla/5.0 (compatible; SignalTrackerBot/1.0)"})
+        html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "ignore")
+    except Exception:
+        return []
+    links = []
+    for m in _re2.finditer(r'href=["\']([^"\']+)["\']', html):
+        href = m.group(1)
+        if _re2.search(r'career|jobs|join-us|join_us|/join', href, _re2.I):
+            if href.startswith("http"):
+                links.append(href)
+            elif href.startswith("/"):
+                links.append(f"https://{d}{href}")
+    seen=set(); uniq=[]
+    for u in links:
+        if u not in seen:
+            seen.add(u); uniq.append(u)
+    return uniq[:5]
+
+
 def get_career_page_postings(company_name: str, domain: str, max_results: int = 5) -> list[dict]:
     """Scan a company's own careers page(s) for creative-role hiring.
 
@@ -121,14 +221,41 @@ def get_career_page_postings(company_name: str, domain: str, max_results: int = 
     """
     results: list[dict] = []
     seen = set()
-    for url in _candidate_career_urls(domain):
+
+    # 1) Structured ATS APIs — real job titles, reliable. Keep creative roles only.
+    for job in get_ats_postings(company_name, domain):
+        title = (job.get("title") or "").strip()
+        if not title or not is_creative_role(title):
+            continue
+        key = title.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        role = next((k for k in CREATIVE_ROLE_KEYWORDS if k in _norm(title)), "creative")
+        loc = job.get("location", "")
+        results.append({
+            "title": f"{company_name} hiring: {title}" + (f" ({loc})" if loc else ""),
+            "url": job.get("url", ""), "summary": "", "source": job.get("source", "Careers"),
+            "published": "", "role": role,
+        })
+        if len(results) >= max_results:
+            return results
+    if results:
+        return results
+
+    # 2) Careers-page HTML fallback: discovered links first, then common paths.
+    urls = _discover_careers_links(domain) + _candidate_career_urls(domain)
+    seen_url = set()
+    for url in urls:
+        if url in seen_url:
+            continue
+        seen_url.add(url)
         text = _fetch_text(url)
         if not text:
             continue
         low = _norm(text)
         if not _looks_like_hiring(low):
             continue
-        # collect each creative role keyword actually present (and not excluded)
         if any(r.search(low) for r in _ROLE_EXCLUDE_RE) and not any(r.search(low) for r in _ROLE_RE):
             continue
         roles = [k for k in CREATIVE_ROLE_KEYWORDS if k in low]
@@ -140,16 +267,12 @@ def get_career_page_postings(company_name: str, domain: str, max_results: int = 
             seen.add(role)
             results.append({
                 "title": f"{company_name} careers page lists open role: {role.title()}",
-                "url": url,
-                "summary": "",
-                "source": "Careers page",
-                "published": "",
-                "role": role,
+                "url": url, "summary": "", "source": "Careers page", "published": "", "role": role,
             })
             if len(results) >= max_results:
                 return results
         if results:
-            return results  # one good careers page is enough
+            return results
     return results
 
 
