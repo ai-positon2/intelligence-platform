@@ -53,6 +53,10 @@ jobs:
         run: python fetch_csg_jobs.py
         continue-on-error: true
 
+      - name: Fetch CSG HIGH signals (Sheets - C-Suite / IPO / M&A / Funding)
+        run: python fetch_csg_sheets.py
+        continue-on-error: true
+
       - name: Restore Kairo dashboards
         run: |
           cp /tmp/kairo_health.html reports/dashboard.html
