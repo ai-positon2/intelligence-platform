@@ -93,6 +93,38 @@ PARTNERSHIP_KEYWORDS = [
 _PRODUCT_RE     = [re.compile(re.escape(k)) for k in PRODUCT_LAUNCH_KEYWORDS]
 _PARTNERSHIP_RE = [re.compile(re.escape(k)) for k in PARTNERSHIP_KEYWORDS]
 
+# ── Position2 relevance lens ─────────────────────────────────────────────────
+# Position2 sells digital-marketing services (PPC, paid social, SEO/GEO,
+# creative & ad production, performance marketing, web). A signal only earns a
+# first-class type if it gives a salesperson a pitch hook. Otherwise it falls
+# back to a plain News Mention (LOW) instead of inflating the new tiles.
+
+# Product "launches" that are really minor technical/version updates → not a pitch hook.
+PRODUCT_EXCLUDE_KEYWORDS = [
+    "driver", "firmware", "bios", "sdk", "api ", "patch", "hotfix", "bug fix",
+    "bugfix", "security update", "security patch", "kernel", "beta", "release candidate",
+    "maintenance", "minor update", "point release", "update v", "version update",
+    "vulnerability", "cve", "changelog", "service pack",
+]
+# Partnerships that are pure tech/component/supply/infra → no marketing hook.
+PARTNERSHIP_TECH_EXCLUDE = [
+    "powered by", "chipset", "processor", "cpu", "gpu", "silicon", "semiconductor",
+    "foundry", "wafer", "reference design", "component supply", "supply agreement",
+    "manufacturing agreement", "fabrication", "soc", "embeds", "embed ", "api integration",
+    "technology integration", "technical integration", "connectivity", "data center infrastructure",
+]
+# Marketing/GTM/brand/channel context → confirms a partnership is pitch-relevant.
+MARKETING_RELEVANT_KEYWORDS = [
+    "co marketing", "brand", "campaign", "retail", "retailer", "distribution",
+    "distributor", "channel", "go to market", "sponsor", "sponsorship", "marketing",
+    "advertising", "agency", "launch", "consumer", "ecommerce", "e commerce",
+    "store", "omnichannel", "loyalty", "promotion", "audience", "content",
+    "media", "creator", "influencer",
+]
+_PRODUCT_EXCLUDE_RE = [re.compile(re.escape(k)) for k in PRODUCT_EXCLUDE_KEYWORDS]
+_PARTNER_TECH_EXCLUDE_RE = [re.compile(re.escape(k)) for k in PARTNERSHIP_TECH_EXCLUDE]
+_MARKETING_RE = [re.compile(re.escape(k)) for k in MARKETING_RELEVANT_KEYWORDS]
+
 
 def classify_signal_type(article: dict) -> tuple[str, str]:
     """Return (signal_type, severity) for a news article using keywords only.
@@ -101,10 +133,22 @@ def classify_signal_type(article: dict) -> tuple[str, str]:
     headline is a partnership first). Falls back to ("News Mention", "LOW").
     """
     text = _norm((article.get("title", "") or "") + " " + (article.get("summary", "") or ""))
+    has_marketing = any(r.search(text) for r in _MARKETING_RE)
+
+    # Partnership: keep only if it carries a marketing/GTM/brand/channel angle and
+    # is not a pure tech/component/supply integration.
     if any(r.search(text) for r in _PARTNERSHIP_RE):
+        is_tech = any(r.search(text) for r in _PARTNER_TECH_EXCLUDE_RE)
+        if is_tech and not has_marketing:
+            return ("News Mention", "LOW")
         return ("Partnership", "MEDIUM")
+
+    # Product Launch: drop minor technical/version updates (driver/firmware/patch…).
     if any(r.search(text) for r in _PRODUCT_RE):
+        if any(r.search(text) for r in _PRODUCT_EXCLUDE_RE):
+            return ("News Mention", "LOW")
         return ("Product Launch", "MEDIUM")
+
     return ("News Mention", "LOW")
 _NOISE_RE = [re.compile(p) for p in NOISE_PATTERNS]
 

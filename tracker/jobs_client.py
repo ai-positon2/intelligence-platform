@@ -26,16 +26,26 @@ logger = logging.getLogger(__name__)
 MAX_JOB_AGE_DAYS = 90
 
 # Creative / 3D role terms we care about (lowercased, matched as substrings).
+# Marketing-creative content roles only — the kind that signal a company is
+# investing in brand/ad/video/social output (a Position2 pitch hook).
 CREATIVE_ROLE_KEYWORDS = [
-    "3d artist", "3d animator", "3d designer", "3d modeler", "3d modeller",
-    "3d generalist", "animator", "animation", "motion designer",
-    "motion graphics", "vfx", "cgi", "rigging", "rigger", "texture artist",
-    "lighting artist", "render", "cinematic artist", "art director",
-    "creative director", "visual designer", "graphic designer", "ux designer",
-    "ui designer", "game artist", "character artist", "environment artist",
-    "concept artist", "designer",
+    "3d artist", "3d animator", "3d generalist", "animator", "animation",
+    "motion designer", "motion graphics", "vfx", "cgi", "video editor",
+    "video producer", "videographer", "content creator", "content designer",
+    "social media", "brand designer", "graphic designer", "art director",
+    "creative director", "creative producer", "performance marketing",
+    "growth marketer", "digital marketing", "campaign manager", "brand manager",
+]
+# Hard excludes: engineering / product / hardware / UX roles that merely contain
+# the word "design" but are NOT marketing-creative — never a Position2 hook.
+CREATIVE_ROLE_EXCLUDE = [
+    "ux", "ui", "product designer", "industrial designer", "hardware",
+    "mechanical", "pcb", "firmware", "embedded", "asic", "fpga", "chip",
+    "electrical", "qa", "test engineer", "data engineer", "software engineer",
+    "backend", "frontend", "devops", "sales", "accountant", "hr ",
 ]
 _ROLE_RE = [re.compile(re.escape(k)) for k in CREATIVE_ROLE_KEYWORDS]
+_ROLE_EXCLUDE_RE = [re.compile(re.escape(k)) for k in CREATIVE_ROLE_EXCLUDE]
 
 # Hiring-context terms — at least one should be present to avoid pure news.
 _HIRING_RE = [re.compile(re.escape(k)) for k in
@@ -54,6 +64,8 @@ def _norm(t: str) -> str:
 
 def is_creative_role(text: str) -> bool:
     t = _norm(text)
+    if any(r.search(t) for r in _ROLE_EXCLUDE_RE):
+        return False
     return any(r.search(t) for r in _ROLE_RE)
 
 
