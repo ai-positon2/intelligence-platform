@@ -1,0 +1,169 @@
+rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
+1,ClearSky Health,http://www.clearskyhealth.com,hospital & health care,147.0,C-Suite Exit + C-Suite Join,Darby Brockette — Role change as Chief Executive Officer,2026-05-01
+2,Hippocratic AI,http://www.hippocraticai.com,hospital & health care,86.8,C-Suite Join + Funding Round + Product Launch,Kashif Rashid — Appointed as Chief Legal Officer,2026-05-14
+3,Los Alamos Medical Center,http://www.losalamosmedicalcenter.com,hospital & health care,69.7,C-Suite Join + News Mention,Michael Covert — Appointed as Chief Executive Officer,2026-06-15
+4,Karyopharm Therapeutics Inc.,http://www.karyopharm.com,pharmaceuticals,64.5,C-Suite Exit + C-Suite Join + Funding Round,Funding: Public Offering / ATM — $400M shelf / $100M ATM,2026-05-04
+5,"ProgenyHealth, LLC",http://www.progenyhealth.com,hospital & health care,59.8,C-Suite Join + Product Launch,Mark Sprague — Appointed as Chief Financial Officer,2026-04-29
+6,GoodRx,http://www.goodrx.com,hospital & health care,57.0,C-Suite Exit + C-Suite Join,Amit Pandey — Appointed as Chief Technology Officer,2026-05-01
+7,American Hospital Association,http://www.aha.org,hospital & health care,52.5,Acquisition / M&A + Funding Round,"Funding: Accelerator/Initiative Funding — $12,000,000",2026-04-29
+8,Providence Medical Center,http://www.providencekc.com,hospital & health care,51.0,C-Suite Join,Unknown — Appointed as Chief Nursing Officer,2026-03-26
+9,Carrum Health Inc,http://www.carrumhealth.com,hospital & health care,45.0,C-Suite Join,"[Two unnamed executives] — Appointed as Chief Technology Officer, Chief Data Officer (exact titles pending clarification",2026-04-29
+10,Glooko,http://www.glooko.com,hospital & health care,41.8,C-Suite Join + Partnership,Vinayak Hegde — Appointed as Chief Executive Officer,2026-05-02
+11,Mesa View Regional Hospital,http://www.mesaviewhospital.com,hospital & health care,39.7,C-Suite Join + News Mention,Matt Lutz — Appointed as Chief Executive Officer,2026-04-21
+12,Bicycle Health Inc,http://www.bicyclehealth.com,hospital & health care,39.0,C-Suite Join,"Travis Schamber, MD — Promoted as Chief Medical Officer",2026-05-05
+13,Kearney Regional Medical Center,http://www.kearneyregional.com,hospital & health care,33.0,C-Suite Exit + C-Suite Join,Jonathan Rood — Appointed as Chief Operating Officer,2026-03-25
+14,Bartlett Regional Hospital,http://www.bartletthospital.org,hospital & health care,30.0,Funding Round,"Funding: Capital Project / Federal Grant — $13,500,000",2026-04-14
+15,Community Health Center of Branch County,http://www.chcbc.com,hospital & health care,30.0,C-Suite Join,Justin Doss — Promoted as Chief Operating Officer,2026-07-05
+16,Eastern New Mexico Medical Center,http://www.enmmc.com,hospital & health care,30.0,C-Suite Join,Michael Covert — Appointed as Chief Executive Officer,2026-06-15
+17,SKYGEN,http://www.skygenusa.com,hospital & health care,23.8,C-Suite Join + Product Launch,Jeff Spahr — Appointed as Chief Client Success Officer,2026-05-06
+18,Onvida Health,http://www.onvidahealth.org,hospital & health care,23.8,Funding Round + Partnership,"Funding: Grant — $500,000",2026-04-16
+19,Humboldt Park Health,http://www.hph.care,hospital & health care,22.5,C-Suite Join,Jose R. Sanchez — Retired as Chief Executive Officer,2026-05-31
+20,New Jersey Urology,http://www.njurology.com,hospital & health care,22.3,Acquisition / M&A + Partnership,M&A: IR Centers® and Prostate Centers USA® announced a strategic partnership with New,2026-04-21
+21,Cape Fear Valley Harnett Health,http://www.harnetthealth.org,hospital & health care,21.7,Funding Round + News Mention,"Funding: Grant — $410,000",2026-05-05
+22,Wilson Medical Center,http://www.wilsonmedical.com,hospital & health care,21.7,C-Suite Join + News Mention,Jason L. Kimbrell — Appointed as Chief Executive Officer,2026-05-18
+23,Nutex Health,http://www.nutexhealth.com,hospital & health care,21.7,Funding Round + News Mention,Funding: Public Company – Share Buyback / Expansion Capital — N/A,2026-04-30
+24,Nomad Health,http://www.nomadhealth.com,hospital & health care,21.7,Funding Round + News Mention,Funding: Strategic Pivot / Business Model Transformation — Undisclosed,2026-04-24
+25,TriStar StoneCrest Medical Center,http://www.tristarstonecrest.com,hospital & health care,21.7,C-Suite Join + News Mention,Ryan LeMasters — Appointed as Chief Executive Officer,Unknown
+26,Somatus,http://www.somatus.com,hospital & health care,21.7,C-Suite Join + News Mention,"Taris Osborne, PhD — Appointed as Chief Science Officer",2026-04-18
+27,Soleo Health,http://www.soleohealth.com,hospital & health care,21.7,C-Suite Join + News Mention,"Cheryl Saenz, PharmD, MS — Appointed as Chief Clinical Officer",2026-03-26
+28,Aspen Valley Health,http://www.aspenvalleyhealth.org,hospital & health care,21.0,C-Suite Join,Michelle Gelroth — Promoted as Chief Transformation Officer,2026-04-24
+29,LifeLink Foundation,http://www.lifelinkfoundation.org,hospital & health care,21.0,C-Suite Join,Dr. Clark Kensinger — Appointed as Chief Medical Officer,2026-04-16
+30,Strive Health,http://www.strivehealth.com,hospital & health care,15.0,C-Suite Join,Michele Paige — Appointed as Chief Growth Officer,2026-03-24
+31,AngioDynamics,http://www.angiodynamics.com,medical devices,15.0,Funding Round,Funding: SEC Filing / Corporate Event — N/A,2026-04-23
+32,The Renfrew Center,http://www.renfrewcenter.com,mental health care,15.0,C-Suite Join,Laurie McKenzie — Appointed as Chief Operating Officer,2026-04-01
+33,Del Amo Behavioral Health System,http://www.delamobehavioralhealth.com,mental health care,15.0,C-Suite Join,Jennifer Gates — Appointed as Chief Executive Officer,2026-04-03
+34,Omada Health,http://www.omadahealth.com,hospital & health care,15.0,Funding Round,Funding: Public Company — Q1 2026 Earnings — $322M–$330M 2026 revenue guidance (public company),2026-05-07
+35,Catapult Health,http://www.catapulthealth.com,hospital & health care,15.0,C-Suite Join,John D. Arnold — Appointed as Chief Executive Officer,2026-04-15
+36,AHIP,http://www.ahip.org,hospital & health care,15.0,C-Suite Join,Laurie Brady — Appointed as Board Director,2026-04-15
+37,Oregon Medical Group,http://www.oregonmedicalgroup.com,hospital & health care,15.0,C-Suite Join,Ryan Becker — Appointed as Chief Executive Officer,2026-04-01
+38,"Cranial Technologies, Inc.",http://www.cranialtech.com,medical devices,15.0,C-Suite Join,Catherine Dederick — Appointed as Chief Operating Officer,2026-04-22
+39,Genova Diagnostics,http://www.gdx.net,hospital & health care,15.0,C-Suite Join,Keith Meadors — Appointed as Chief Commercial Officer,2026-04-20
+40,WinnMed,http://www.winnmed.org,hospital & health care,15.0,Funding Round,"Funding: Debt Financing — $35,000,000",2026-05-11
+41,Sandstone Care LLC,http://www.sandstonecare.com,hospital & health care,15.0,C-Suite Join,Ron Zaccari — Appointed as Chief Clinical Officer,2026-04-12
+42,Accuray,http://www.accuray.com,medical devices,15.0,C-Suite Join,Paul Miele — Appointed as Senior Vice President and Chief Commercial Officer,2026-04-06
+43,Duke Cancer Institute,http://www.dukecancerinstitute.org,hospital & health care,15.0,C-Suite Join,David Zaas — Appointed as Chief Executive Officer,2026-05-01
+44,NantHealth Inc,http://www.nanthealth.com,hospital & health care,15.0,C-Suite Join,"Deepak Dubey, PhD, MBA — Appointed as President and Chief Operating Officer",2026-04-30
+45,Collective Health Inc,http://www.collectivehealth.com,hospital & health care,15.0,C-Suite Join,"Kaushik Bhaumik, PhD — Appointed as Chief Revenue Officer",2026-04-14
+46,Tennessee Oncology,http://www.tnoncology.com,hospital & health care,15.0,C-Suite Join,"Johnetta Blakely, MD — Appointed as Chief Medical Officer",2026-05-07
+47,Symbria,http://www.symbria.com,hospital & health care,15.0,C-Suite Join,Venkat Kavarthapu — Appointed as Chief Executive Officer,2026-04-13
+48,El Paso Children's Hospital,http://www.elpasochildrens.org,hospital & health care,15.0,C-Suite Join,Maria Zampini — Appointed as Chief Executive Officer,2026-04-17
+49,"St. Joseph Regional Medical Center, Inc.",http://www.sjrmc.org,hospital & health care,15.0,C-Suite Join,Angela Green — Appointed as Chief Nursing Officer and Chief Operating Officer,2026-04-21
+50,MIMEDX Group Inc,http://www.mimedx.com,medical devices,15.0,Funding Round,Funding: N/A — $40M restructuring/cost reduction initiative,2026-04-16
+51,Hannibal Regional,http://www.hannibalregional.org,hospital & health care,15.0,Funding Round,Funding: Grant — Unknown,2026-04-23
+52,Mozaic Senior Life,http://www.mozaicsl.org,hospital & health care,15.0,Funding Round,"Funding: Grant/State Award — $630,000+",2026-04-15
+53,NMC Health,http://www.mynmchealth.org,hospital & health care,15.0,Funding Round,Funding: Interim Financing / Restructuring — $250 million,2026-04-17
+54,Quartz Health Solutions,http://www.quartzbenefits.com,insurance,15.0,C-Suite Join,"Laura Berndt, PharmD, MBA — Appointed as Chief Pharmacy Officer",2026-05-06
+55,Newman Regional Health,http://www.newmanrh.org,hospital & health care,15.0,Funding Round,Funding: Capital Campaign / Bond Financing — $46M–$57M (total campaign target),2026-04-29
+56,Northwest Healthcare Tucson,http://www.healthiertucson.com,hospital & health care,15.0,C-Suite Join,"Andrew ""Drew"" Emery — Appointed as Market Chief Executive Officer",2026-04-13
+57,Olean General Hospital,http://www.brmc-ogh.org,hospital & health care,13.5,Acquisition / M&A,"M&A: NAPA Anesthesia (North American Partners in Anesthesia) announced on May 13, 202",2026-05-13
+58,National Research Corporation,http://www.nrchealth.com,hospital & health care,13.5,Acquisition / M&A,M&A: National Research Corporation officially changed its corporate name to NRC Healt,2026-04-20
+59,Access TeleCare,http://www.accesstelecare.com,hospital & health care,13.5,Acquisition / M&A,M&A: Access TeleCare is repositioning following a $400 million take-private deal. The,2026-05-01
+60,Witham Health Services,http://www.witham.org,hospital & health care,13.5,Acquisition / M&A,M&A: Boone County Government and Witham Health Services jointly affirmed their commit,2026-05-08
+61,Neosho Memorial Regional Medical Center,http://www.neoshomemorial.com,hospital & health care,13.5,Acquisition / M&A,"M&A: Neosho Memorial Regional Medical Center (NMRMC) in Chanute, KS finalized the pur",2026-05-14
+62,Angelica,http://www.angelica.com,hospital & health care,13.5,Acquisition / M&A,M&A: Note: This signal is for Angelini Pharma (not Angelica the healthcare linen/serv,2026-05-07
+63,Haven Health Group,http://www.havenhealthaz.com,hospital & health care,13.5,Acquisition / M&A,M&A: MKH Capital Partners acquired Haven Health Management (part of Haven Health Grou,2026-04-15
+64,"Guardian Flight, LLC",http://www.guardianflight.com,hospital & health care,13.5,IPO Signal,IPO: Guardian Flight is a core operating brand of GMR Solutions Inc. (parent: Global ,2026-05-12
+65,"White-Wilson Medical Center, P.A.",http://www.white-wilson.com,medical practice,12.7,C-Suite Join + News Mention,Brad Logan — Appointed as Chief Executive Officer,Unknown
+66,Mammoth Hospital,http://www.mammothhospital.org,hospital & health care,12.7,C-Suite Join + News Mention,Melanie Van Winkle — Appointed as Chief Executive Officer,Unknown
+67,Mad River Community Hospital,http://www.madriverhospital.com,hospital & health care,12.7,C-Suite Join + News Mention, — Retired,Unknown
+68,Lakeland Regional Health,http://www.spectrumhealthlakeland.org,hospital & health care,12.0,C-Suite Join,Cheryl Kennison — Appointed as Senior Vice President and Chief Marketing Officer,Unknown
+69,Kittitas Valley Healthcare,http://www.kvhealthcare.org,hospital & health care,12.0,C-Suite Join,Unknown — Retired as Chief Executive Officer,Unknown
+70,Mary Rutan Health,http://www.maryrutan.org,hospital & health care,12.0,C-Suite Join,"Tammy Gump — Retired as Chief Operating Officer, Mary Rutan Foundation",End of May 2026
+71,Sonoma Valley Hospital,http://www.sonomavalleyhospital.org,hospital & health care,6.0,C-Suite Join,Benjamin J. Armfield — Interim appointment as Interim Chief Executive Officer,Unknown
+72,Perry County Memorial Hospital,http://www.pchospital.org,hospital & health care,6.0,C-Suite Join,Nick Harley — Appointed as Chief Executive Officer,Unknown
+73,Ottumwa Regional Health Center,http://www.ottumwaregionalhealth.com,hospital & health care,6.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+74,Gila Regional Medical Center,http://www.grmc.org,hospital & health care,6.0,C-Suite Join,Drew H. Dostal — Appointed as Chief Executive Officer,Unknown
+75,Olympia Medical Center,http://www.olympiamc.com,hospital & health care,6.0,C-Suite Join,Robert Allen — Retired as Chief Executive Officer,Unknown
+76,Chesapeake Urology Associates,http://www.unitedurology.com,hospital & health care,6.0,C-Suite Join,Russ Adkins — Appointed as Chief Legal Officer,Unknown
+77,eventuswh.com,http://www.eventuswholehealth.com,hospital & health care,6.0,C-Suite Join,Cameron Routh — Appointed as Chief Executive Officer,Unknown
+78,Littleton Regional Healthcare,http://www.littletonhealthcare.org,hospital & health care,6.0,C-Suite Join,Dr. Richard McKenzie — Promoted as Chief Medical Officer,Unknown
+79,Athens Orthopedic Clinic,http://www.athensorthopedicclinic.com,hospital & health care,6.0,C-Suite Join,Michael Boblitz — Appointed as Chief Executive Officer,Unknown
+80,Lane Regional Medical Center,http://www.lanermc.org,hospital & health care,6.0,C-Suite Join,Allyson Bennett — Promoted as Chief Nursing Officer,Unknown
+81,Memorial Hospital and Manor,http://www.mh-m.org,hospital & health care,5.6,Product Launch,In the news: Bainbridge hospital launches program to cut ER wait times in half - WTXL ABC 27 ,"Mon, 16 Mar 2026 07:00:00 GMT"
+82,Amberwell Health,http://www.amberwellhealth.org,hospital & health care,5.6,Partnership,In the news: Health partnership to benefit Atchison patients - MSC News,"Mon, 01 Jun 2026 12:08:20 GMT"
+83,Permian Regional Medical Center,http://www.permianregional.com,hospital & health care,3.0,C-Suite Exit,Donny Booth — exited as Chief Executive Officer,Unknown
+84,LabConnect,http://www.labconnect.com,pharmaceuticals,2.8,Product Launch,In the news: LabConnect unveils SampleGISTICS 2.0 for trial sample digitisation - Clinical Tr,"Wed, 01 Apr 2026 07:00:00 GMT"
+85,Vera Whole Health,http://www.verawholehealth.com,hospital & health care,2.8,Partnership,In the news: Cobb County Overhauls Employee Healthcare with Vera Partnership - BriefGlance,"Wed, 29 Apr 2026 17:07:02 GMT"
+86,Impact Advisors,http://www.impact-advisors.com,hospital & health care,2.8,Partnership,In the news: Impact Advisors Announces Acquisition of Canopii Collaborative | Carlyle Acquire,"Fri, 15 May 2026 07:00:00 GMT"
+87,Correctional Healthcare Companies,http://www.correctioncare.com,hospital & health care,2.8,Product Launch,In the news: Blackstone Trial Group Launches as the Nation's Premier Law Firm Dedicated Exclu,"Thu, 12 Mar 2026 07:00:00 GMT"
+88,Vicar's Landing,http://www.vicarslanding.com,hospital & health care,2.8,Product Launch,"In the news: Vicar’s Landing launching $318 million eTown senior living, its third area commu","Fri, 17 Apr 2026 07:00:00 GMT"
+89,County of Santa Clara Health System,http://www.sccgov.org,hospital & health care,2.8,Partnership,In the news: County of Santa Clara and VTA Launch Affordable Housing Partnership - Santa Clar,"Fri, 29 May 2026 12:00:00 GMT"
+90,Imperial Health,http://www.imperialhealth.com,hospital & health care,2.8,Partnership,In the news: Imperial Health Charity and the Trust launch bold new partnership to improve pop,"Wed, 29 Apr 2026 07:00:00 GMT"
+91,Helen Hayes Hospital,http://www.helenhayeshospital.org,hospital & health care,2.8,Product Launch,"In the news: Nyack Awarded $200,000 Technical Assistance Grant; RCC Launches Renovation for N","Thu, 05 Mar 2026 08:00:00 GMT"
+92,Vitality,http://www.vitalitygroup.com,hospital & health care,2.8,Partnership,In the news: ASUS ROG Computex 2026: New Ace Esports Gear & Partnerships - ASUS Pressroom,"Mon, 01 Jun 2026 09:36:24 GMT"
+93,National Healthcareer Association (NHA),http://www.nhanow.com,hospital & health care,2.8,Product Launch,"In the news: Mansfield U launches clinical medical assistant, phlebotomy programs - Northcent","Sat, 30 May 2026 22:00:00 GMT"
+94,BeneCard PBF,http://www.benecardpbf.com,hospital & health care,2.8,Partnership,"In the news: BeneCard PBF Reappointed by DVHCC, Extending Trusted PBM Partnership - Yahoo Fin","Thu, 05 Mar 2026 08:00:00 GMT"
+95,Centre for Neuro Skills,http://www.neuroskills.com,hospital & health care,2.8,Partnership,"In the news: Centre for Neuro Skills Expands Employer Partnerships Strategy, Appoints Jay Var","Wed, 18 Mar 2026 07:00:00 GMT"
+96,ProPath,http://www.propath.com,hospital & health care,2.8,Partnership,In the news: Paschal Air Plumbing & Electric Announces NIL Partnership with Hagen Smith to Pr,"Sat, 14 Mar 2026 07:00:00 GMT"
+97,Carrot Fertility Inc,http://www.get-carrot.com,hospital & health care,2.8,Product Launch,In the news: Carrot Unveils Carrot Intelligence: A Proprietary Global AI Platform for Fertili,"Thu, 16 Apr 2026 07:00:00 GMT"
+98,Vida Health,http://www.vida.com,hospital & health care,2.8,Partnership,In the news: Oura takes ring data into the doctor’s office with its latest partnership - Andr,"Tue, 14 Apr 2026 07:00:00 GMT"
+99,Calvary Hospital,http://www.calvaryhospital.org,hospital & health care,2.8,Product Launch,In the news: Calvary Hospital Unveils New Lobby and Family Care Center at Bronx Campus - The ,"Mon, 18 May 2026 07:00:00 GMT"
+100,Rocky Mountain Cancer Centers,http://www.rockymountaincancercenters.com,hospital & health care,2.8,Partnership,In the news: West Cancer Center and IDEOlogy Health Announce Strategic Partnership to Advance,"Tue, 07 Apr 2026 07:00:00 GMT"
+101,Oncology Consultants,http://www.oncologyconsultants.com,hospital & health care,2.8,Partnership,In the news: South Texas cancer patients gain bigger network in new AON partnership - Stock T,"Thu, 05 Mar 2026 08:00:00 GMT"
+102,Grace Health Care,http://www.gracehc.com,hospital & health care,2.8,Partnership,In the news: Partnership helping health care in the region - CTV News,"Sat, 23 May 2026 07:00:00 GMT"
+103,City Ambulance Service,http://www.cityambu.com,hospital & health care,2.8,Product Launch,In the news: Evansville Fire Department prepares to launch city-run ambulance service July 1 ,"Thu, 12 Mar 2026 07:00:00 GMT"
+104,"RQI Partners, LLC",http://www.rqipartners.com,hospital & health care,2.8,Product Launch,"In the news: Resuscitation science, training and technology leaders launch new self-guided re","Wed, 04 Mar 2026 08:00:00 GMT"
+105,Family Dental Health,http://www.fdhonline.com,hospital & health care,2.8,Product Launch,In the news: Sun Life introduces Kid Smile Complete and expands Lifetime of Smiles® to suppor,"Mon, 06 Apr 2026 07:00:00 GMT"
+106,Ryan Health,http://www.ryanhealth.org,hospital & health care,2.8,Partnership,In the news: Molecule Science Foundation Announces Partnership with O'Ryan Hea - The National,"Tue, 26 May 2026 14:26:35 GMT"
+107,Charter Senior Living,http://www.charterseniorliving.com,hospital & health care,2.8,Partnership,"In the news: Senior Living Operators Eke Out Partnerships, Projects to Grow Amid Development ","Mon, 27 Apr 2026 07:00:00 GMT"
+108,Fair Acres Geriatric Center,http://www.fairacres.org,hospital & health care,2.8,Product Launch,In the news: Delaware County unveils $5.6 million kitchen at Fair Acres Geriatric Center - De,"Fri, 22 May 2026 11:41:26 GMT"
+109,Watertown Regional Medical Center,http://www.watertownregional.com,hospital & health care,2.8,Partnership,In the news: New ER Partnership Aims to Improve Care in Watertown - Daily Dodge,"Mon, 11 May 2026 07:00:00 GMT"
+110,Monarch Healthcare Management,http://www.monarchmn.com,hospital & health care,2.8,Partnership,In the news: Monarch Healthcare Management Partners with Envoy America to Accelerate Patient ,"Tue, 12 May 2026 14:47:10 GMT"
+111,SSTAR,http://www.sstar.org,hospital & health care,2.8,Product Launch,In the news: Dongfeng Forthing'sStar Sea V6 was successfully launched on stage in Beijing Mot,"Mon, 27 Apr 2026 07:00:00 GMT"
+112,The Urology Group,http://www.urologygroup.com,hospital & health care,2.8,Partnership,In the news: Dykema Congratulates The Urology Group of Virginia on its Strategic Partnership ,"Wed, 18 Mar 2026 07:00:00 GMT"
+113,Rehoboth McKinley Christian Health Care Services,http://www.rmch.org,hospital & health care,2.8,Partnership,In the news: Rehoboth McKinley Christian Health Care Services Announces Upcoming Partnership ,"Mon, 25 May 2026 10:12:52 GMT"
+114,Revecore,http://www.revecore.com,hospital & health care,2.8,Product Launch,In the news: Revecore Launches AI-Powered Underpayment Recovery and Denial Appeals Capabiliti,"Tue, 28 Apr 2026 07:00:00 GMT"
+115,XSOLIS,http://www.xsolis.com,hospital & health care,2.8,Partnership,In the news: HTEC and Xsolis’ Strategic Partnership to Tackle Inefficiencies in Healthcare De,"Tue, 02 Jun 2026 12:38:00 GMT"
+116,Shields Health,http://www.shields.com,hospital & health care,2.8,Partnership,In the news: UMass Improved Diabetes Outcomes With Specialty Pharmacy Partnership - Specialty,"Thu, 30 Apr 2026 07:00:00 GMT"
+117,Frankfort Regional Medical Center,http://www.frankfortregional.com,hospital & health care,2.8,Product Launch,In the news: Frankfort Regional Medical Center unveils new transport ambulance - State-Journa,"Tue, 02 Jun 2026 02:43:47 GMT"
+118,CareBridge,http://www.carebridgehealth.com,hospital & health care,2.8,Product Launch,In the news: The CareBridge Group Announces $91 Million Corporate Master Grant to Launch the ,"Mon, 01 Jun 2026 14:05:00 GMT"
+119,Palmetto Primary Care Physicians,http://www.palmettoprimarycare.com,hospital & health care,1.4,News Mention,In the news: Medical University of South Carolina acquires Palmetto Primary Care Physicians -,"Thu, 05 Mar 2026 08:00:00 GMT"
+120,Ohio Valley Surgical Hospital,http://www.ovsurgical.com,hospital & health care,1.4,News Mention,In the news: Ohio Valley Surgical Hospital names new CEO - Springfield News-Sun,"Thu, 02 Apr 2026 07:00:00 GMT"
+121,The Villages Health,http://www.thevillageshealth.com,hospital & health care,1.4,News Mention,In the news: Deals tracker: HCA to acquire Texas college - Modern Healthcare,"Wed, 27 May 2026 22:02:00 GMT"
+122,AMC Health,http://www.amchealth.com,hospital & health care,0.7,News Mention,In the news: AMC Health Appoints Sol Babani and Symbiosis Advisors as Strategic Advisor to It,"Tue, 05 May 2026 07:00:00 GMT"
+123,Titus Regional Medical Center,http://www.titusregional.com,hospital & health care,0.7,News Mention,In the news: Titus Regional Medical Center rebrands as CHRISTUS Health takes over operations ,"Sat, 02 May 2026 07:00:00 GMT"
+124,EPOCH Senior Living,http://www.epochsl.com,hospital & health care,0.7,News Mention,"In the news: Cogir Senior Living Names New U.S. Leader, With Plans to Restart Development - S","Mon, 06 Apr 2026 07:00:00 GMT"
+125,Athelas,http://www.athelas.com,hospital & health care,0.7,News Mention,In the news: Commure Raises $70M at $7B Valuation to Transform Healthcare Operations Using AI,"Tue, 19 May 2026 07:00:00 GMT"
+126,Fellowship Community,http://www.fellowshipcommunity.com,hospital & health care,0.7,News Mention,"In the news: Fellowship Community, Whitehall, appoints Director of Rehabilitation - Lehigh Va","Mon, 25 May 2026 12:50:42 GMT"
+127,Borland Groover,http://www.borlandgroover.com,hospital & health care,0.7,News Mention,"In the news: Borland Groover 5K raises $100,000 for cancer screenings and awareness - The Flo","Wed, 01 Apr 2026 20:39:23 GMT"
+128,Era Living,http://www.eraliving.com,hospital & health care,0.7,News Mention,In the news: Era Living’s New CEO Sets Course for Modernization and Operational Excellence - ,"Fri, 20 Mar 2026 07:00:00 GMT"
+129,CADUCEUSHEALTH®,http://www.caduceushealth.com,hospital & health care,0.7,News Mention,In the news: Innovaccer Acquires CaduceusHealth to Make Revenue Cycle Autonomous - Business W,"Thu, 21 May 2026 07:00:00 GMT"
+130,Palestine Regional Medical Center,http://www.palestineregional.com,hospital & health care,0.7,News Mention,In the news: ScionHealth Announces Agreement for Lifepoint Health to Acquire Eight Community ,"Sat, 28 Mar 2026 07:00:00 GMT"
+131,LetsGetChecked,http://www.letsgetchecked.com,hospital & health care,0.7,News Mention,In the news: LetsGetChecked - 2026 Funding Rounds & List of Investors - Tracxn,"Fri, 15 May 2026 03:49:09 GMT"
+132,Baptist Memorial Hospital-Oktibbeha County,http://www.och.org,hospital & health care,0.7,News Mention,In the news: BMH-OC appoints Carter as Chief Medical Officer - Starkville Daily News,"Thu, 12 Mar 2026 07:00:00 GMT"
+133,Hillsdale Hospital,http://www.hillsdalehospital.com,hospital & health care,0.7,News Mention,In the news: Hillsdale hospital raises Medicaid cut concerns - WLNS 6 News,"Fri, 17 Apr 2026 23:24:37 GMT"
+134,Lighthouse Guild,http://www.lighthouseguild.org,hospital & health care,0.7,News Mention,In the news: Lighthouse Guild Appoints Kathryn Webster to Its Board of Directors - VisionMond,"Tue, 05 May 2026 07:00:00 GMT"
+135,Crossover Health,http://www.crossoverhealth.com,hospital & health care,0.7,News Mention,In the news: Latham & Watkins Advises Crossover Health in Merger With Premise Health - Latham,"Mon, 16 Mar 2026 07:00:00 GMT"
+136,Center for Family Health,http://www.centerforfamilyhealth.org,hospital & health care,0.7,News Mention,In the news: Center for Family Health names Sara Benedetto as chief executive officer - MLive,"Wed, 06 May 2026 07:00:00 GMT"
+137,YAKIMA NEIGHBORHOOD HEALTH SERVICES,http://www.ynhs.org,hospital & health care,0.7,News Mention,In the news: Yakima Neighborhood Health Services appoints Dr. Daniel Dunbar as chief medical ,"Tue, 28 Apr 2026 07:00:00 GMT"
+138,Bako Diagnostics,http://www.bakodx.com,hospital & health care,0.7,News Mention,In the news: Fulgent Genetics Completes Acquisition of Bako Diagnostics and StrataDx - Yahoo ,"Tue, 17 Mar 2026 07:00:00 GMT"
+139,Health Management Associates,http://www.healthmanagement.com,hospital & health care,0.7,News Mention,"In the news: HMA Acquires HealthTech Solutions, Expanding Technology Capabilities and Medicai","Fri, 27 Mar 2026 07:00:00 GMT"
+140,Partners Health Management,http://www.partnersbhm.org,hospital & health care,0.7,News Mention,In the news: Vaya Health and Partners Health Management Merger - High Country Press,"Sun, 31 May 2026 13:05:31 GMT"
+141,Saban Community Clinic,http://www.sabancommunityclinic.org,hospital & health care,0.7,News Mention,In the news: “Let’s Get Real” fundraiser honoring Corie Henson raises $150K for Saban Communi,"Fri, 22 May 2026 04:07:30 GMT"
+142,Hilco Vision,http://www.hilcovision.com,hospital & health care,0.7,News Mention,In the news: Hilco Vision Appoints John Lakey as Interim President and CEO - VisionMonday.com,"Mon, 23 Mar 2026 07:00:00 GMT"
+143,Spencer Hospital,http://www.spencerhospital.org,hospital & health care,0.7,News Mention,In the news: Earl Spencer praises Northampton hospice on 50th anniversary - BBC,"Fri, 15 May 2026 07:00:00 GMT"
+144,Pikes Peak Hospice & Palliative Care,http://www.pikespeakhospice.org,hospital & health care,0.7,News Mention,In the news: Voices of Grief merges with Pikes Peak Hospice & Palliative Care - Colorado Spri,"Fri, 10 Apr 2026 07:00:00 GMT"
+145,Bolivar Medical Center,http://www.bolivarmedical.com,hospital & health care,0.7,News Mention,In the news: ScionHealth Announces Agreement for Lifepoint Health to Acquire Eight Community ,"Sat, 28 Mar 2026 07:00:00 GMT"
+146,Legent Health,http://www.legenthealth.com,hospital & health care,0.7,News Mention,In the news: Legent Health Appoints Brad Stoltz as Chief Operating Officer - Business Wire,"Mon, 04 May 2026 07:00:00 GMT"
+147,Mizell Memorial Hospital,http://www.mizellmh.com,hospital & health care,0.7,News Mention,In the news: Rural Alabama hospital files for bankruptcy: ‘We will continue with our mission’,"Thu, 07 May 2026 07:00:00 GMT"
+148,St. Mary's Medical Center,http://www.stmaryskc.com,hospital & health care,0.7,News Mention,In the news: Marshall Health Network Foundations Gala raises support for advanced heart care ,"Wed, 20 May 2026 14:23:54 GMT"
+149,San Ramon Regional Medical Center,http://www.sanramonmedctr.com,hospital & health care,0.7,News Mention,In the news: New CEO on board at San Ramon hospital - Danville San Ramon,"Tue, 07 Apr 2026 07:00:00 GMT"
+150,SimiTree,http://www.simitreehc.com,hospital & health care,0.7,News Mention,In the news: SimiTree Appoints Technology Executive Zain Jafri as First-Ever Chief Product & ,"Tue, 03 Mar 2026 14:34:48 GMT"
+151,BioMatrix Infusion Pharmacy,http://www.biomatrixsprx.com,medical practice,0.7,News Mention,"In the news: BioMatrix Infusion Pharmacy Rebrands as LUX Infusion, Signaling a Unified Vision","Wed, 01 Apr 2026 07:00:00 GMT"
+152,Intellivo,http://www.intellivo.com,hospital & health care,0.7,News Mention,In the news: Intellivo Appoints Dhiraj Sankala as Chief AI and Technology Officer - Business ,"Tue, 17 Mar 2026 07:00:00 GMT"
+153,Navvis (healthcare),http://www.navvishealthcare.com,hospital & health care,0.7,News Mention,"In the news: Vitae Health taps new CEO, shuffles leadership as it looks to scale up in nursin","Fri, 03 Apr 2026 07:00:00 GMT"
+154,Stratus,http://www.stratusneuro.com,hospital & health care,0.7,News Mention,"In the news: Infosys to Acquire Leading Insurance Consulting Technology Company, Stratus - PR","Wed, 25 Mar 2026 07:00:00 GMT"
+155,"Integrated Home Care Services, Inc.",http://www.ihcscorp.com,hospital & health care,0.7,News Mention,"In the news: Integrated Home Care Services Acquires Dina, Creating the Category-Defining Plat","Wed, 20 May 2026 12:35:00 GMT"
+156,Ramp Health,http://www.ramphealth.com,hospital & health care,0.7,News Mention,In the news: Vitality acquires Ramp Health to merge AI behavioral health and workplace safety,"Wed, 25 Mar 2026 07:00:00 GMT"
+157,Lucent Health,http://www.lucenthealth.com,hospital & health care,0.7,News Mention,In the news: LUCENT Appoints Simon Doyle as CEO with Matthew Goodman Taking Chief Medical Off,"Mon, 01 Jun 2026 07:00:00 GMT"
+158,Knowtion Health,http://www.knowtionhealth.com,hospital & health care,0.7,News Mention,In the news: Knowtion Health Acquires revly - PR Newswire,"Tue, 17 Mar 2026 07:00:00 GMT"
+159,North Shore Medical Center,http://www.northshoremedical.com,hospital & health care,0.7,News Mention,In the news: North Shore Medical Center owner files for bankruptcy - The Miami Times,"Wed, 01 Apr 2026 07:00:00 GMT"
+160,Zeel,http://www.zeel.com,hospital & health care,0.7,News Mention,"In the news: ZEEL appoints Rahj Kumar Agarwal as SVP – marketing (Zee TV, Zee Anmol, &TV) - I","Tue, 02 Jun 2026 06:13:37 GMT"
+161,Foundations Recovery Network,http://www.foundationsrecoverynetwork.com,hospital & health care,0.7,News Mention,"In the news: Exclusive: MKH Capital Partners Acquires Haven Health Management, Names New CEO ","Fri, 10 Apr 2026 07:00:00 GMT"
+162,Aria Care Partners,http://www.ariacarepartners.com,hospital & health care,0.7,News Mention,In the news: Aria Care Partners Acquires Coronado Dental to Enter Arizona Market - PR Newswir,"Wed, 18 Mar 2026 07:00:00 GMT"
+163,Mankato Clinic,http://www.mankatoclinic.com,medical practice,0.7,News Mention,In the news: Mankato Clinic names new CFO - KEYC News Now,"Mon, 01 Jun 2026 22:24:24 GMT"
+164,DMC Huron Valley-Sinai Hospital,http://www.hvsh.org,hospital & health care,0.7,News Mention,In the news: DMC names new CEO of Oakland County hospital - Crain's Detroit Business,"Mon, 01 Jun 2026 18:24:00 GMT"
+165,"Valley Medical Group, P.C.",http://www.vmgma.com,hospital & health care,0.7,News Mention,In the news: Archer Property Partners Acquires MemorialCare-Anchored Orange County Medical Of,"Mon, 16 Mar 2026 07:00:00 GMT"
+166,PRCS,http://www.prcshealthcare.com,hospital & health care,0.7,News Mention,In the news: City Appoints New PRCS Director – Tomás Herrera-Mishler - Culver City Crossroads,"Mon, 01 Jun 2026 16:05:34 GMT"
+167,Medical Center Clinic,http://www.medicalcenterclinic.com,hospital & health care,0.7,News Mention,"In the news: Deals tracker: Ohio hospital, OhioHealth drop merger plans - Modern Healthcare","Mon, 01 Jun 2026 22:50:29 GMT"
+168,United Vein & Vascular Centers,http://www.unitedveincenters.com,hospital & health care,0.7,News Mention,In the news: VCD Medical Appoints Renowned Commercial and Vascular Leader Denna Babul as Gene,"Thu, 07 May 2026 07:00:00 GMT"

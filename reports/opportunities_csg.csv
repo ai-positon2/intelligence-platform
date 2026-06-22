@@ -1,0 +1,109 @@
+rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
+1,Kontron,kontron.com,Technology,75.9,News Mention + Partnership + Product Launch,Kontron launches CERES-TSN Networking Switch for defense systems - eeNews Europe,2026-06-17
+2,Grundig,grundig.com,Technology,73.5,Acquisition / M&A + Partnership + Product Launch,Changhong and Grundig Announce Strategic Partnership — Changhong acquires Grundig brand license,2026-03-30
+3,Moto,motorola.com,Technology,69.2,Acquisition / M&A + News Mention + Partnership + Product Launch,FRP Moto Launches Summer Campaign to Encourage Outdoor Family Riding - The National Law Review,2026-06-22
+4,Supermicro,supermicro.com,Technology,64.7,C-Suite Exit + C-Suite Join + News Mention + Partnership + Product Launch,Supermicro appoints DeAnna Luna as acting Chief Compliance Officer and Scott Angel as new independent director following,2026-03-31
+5,Realme,realme.com,Technology,58.0,News Mention + Product Launch,Budget smartphone realme C100 Series launches - GadgetMatch,2026-06-19
+6,HPE,hpe.com,Technology,56.7,News Mention + Partnership,IQM Named Among Quantum Collaborators in HPE's New Hybrid Quantum-HPC Platform - PA Media,2026-06-22
+7,"AVer Information, Inc.",aver.com,Technology,55.3,News Mention + Partnership + Product Launch,AVer Information Inc. to Showcase Range of Communication and Collaboration Technologies at InfoComm 2026 - rAVe [PUBS],2026-06-16
+8,Fujitsu,fujitsu.com,Technology,50.5,Partnership + Product Launch,Fujitsu signs strategic partnership with Anthropic - Fujitsu Global,2026-05-27
+9,Apple Inc.,apple.com,Technology,48.6,C-Suite Exit + C-Suite Join + News Mention + Partnership,"John Ternus named Apple CEO, succeeding Tim Cook effective September 2026",2026-04-20
+10,Sharp Corp,sharp.com,Technology,48.5,C-Suite Join + Product Launch,"Sharp names Tetsuji Kawamura (BD chief) as new President and CEO effective April 1, 2026, shifting company from restruct",2026-04-01
+11,Acer Inc.,acer.com,Technology,47.0,Partnership + Product Launch,Acer Launches New Swift Air 14 Powered by Latest Intel Core Series 3 Processors - Acer Newsroom,2026-05-29
+12,MiTAC,mitac.com,Technology,46.2,News Mention + Partnership,COMPUTEX 2026: MiTAC Advances Diversified AI Infrastructure Through Strategic Ecosystem Partnerships - PR Newswire,2026-06-03
+13,Getac,getac.com,Technology,45.5,Product Launch,"Getac unveils 8-inch ZX80W rugged, submersible tablet with ARM CPU, 1,000 nits display, and Windows 11 IoT Enterprise LT",2026-06-04
+14,Brother Industries,brother.com,Technology,44.6,C-Suite Join + News Mention + Product Launch,"Brother International Corporation appoints Kenji Kamei as new President effective April 1, 2026",2026-04-01
+15,Valve Corporation,valvesoftware.com,Technology,42.7,News Mention + Product Launch,Valve launches Steam Machine and Steam Frame in summer 2026,2026-06-18
+16,Winmate,winmate.com,Technology,42.0,Partnership,Blaize Partners With Winmate to Deliver Rugged Edge AI - Let's Data Science,2026-06-04
+17,Basler AG,baslerweb.com,Technology,41.8,News Mention + Partnership,Orbbec. Basler Launch Industrial 3D Vision Partnership - Photonics Spectra,2026-06-16
+18,HCLTech,hcltech.com,Technology,40.6,News Mention + Partnership,"Circles, Greyskies, and HCLTech Collaborate in TM Forum Catalyst Program to Accelerate AI-led Autonomous Network Operati",2026-06-22
+19,Epson,epson.com,Technology,40.6,News Mention + Partnership + Product Launch,"Epson Robots to Showcase SafeSense Technology, High-Performance, Compact SCARA and 6-Axis Solutions and First Look at Ep",2026-06-18
+20,Bang & Olufsen A-S,bang-olufsen.com,Technology,40.5,C-Suite Exit + Partnership + Product Launch,Bang & Olufsen EVP Chief Corporate Commercial Officer Line Køhler Ljungdahl steps down,2026-05-08
+21,Dell Technologies,dell.com,Technology,39.7,News Mention + Product Launch,Dell Technologies introduces Dell PowerEdge XE8812 server - TipRanks,2026-06-22
+22,Sony Group Corporation,sony.com,Technology,38.8,News Mention + Partnership + Product Launch,Sony Group (SONY) launches preliminary U.S.$ senior notes prospectus for 2031 and 2036 tranches - Stock Titan,2026-06-22
+23,Huawei,huawei.com,Technology,38.4,News Mention + Partnership + Product Launch,Huawei-backed Aistaland to launch first model GT7 shooting-brake on June 26 - CnEVPost,2026-06-22
+24,ZOTAC,zotac.com,Technology,38.4,News Mention + Product Launch,"ZOTAC Unveils Mini-PCs for Robotics and IoT, the Most Compact Prebuilt with a Desktop RTX 5080 - TechPowerUp",2026-06-03
+25,Maingear,maingear.com,Technology,34.8,News Mention + Product Launch,"Maingear launches MG-1 Mk.II AMD Ryzen 9950X3D2 PC with ""bloatware-free Windows 11"" - Neowin",2026-04-22
+26,"Aterian, Inc.",aterian.io,Technology,34.5,Acquisition / M&A + C-Suite Join,Aterian appoints David Lazar as CEO following strategic portfolio sale,2026-04-27
+27,Xiaomi,mi.com,Technology,32.7,News Mention + Partnership + Product Launch,Xiaomi Redmi Buds 8 launch globally as budget earbuds with ANC and LHDC - Notebookcheck,2026-06-21
+28,RCA,rca.com,Technology,31.8,News Mention + Partnership + Product Launch,"PARTNERSHIP FOR SECURITY – Strong command and planning are vital to effective leadership and operations. In this video, ",2026-06-22
+29,Panasonic Corp,panasonic.com,Technology,29.4,C-Suite Join + News Mention,Panasonic Connect Announces Transition of President and CEO in April 2026,2026-04-01
+30,Kyocera Corp,kyocera.com,Technology,28.0,C-Suite Join + Product Launch,"Kyocera Overhauls Top Management, Names New President Shiro Sakushima Effective April 1 2026",2026-04-01
+31,"Casio Computer Co.,Ltd.",casio.com,Technology,28.0,Partnership,Casio to Release G-SHOCK Collaboration Watches Featuring XG - PR Newswire,2026-05-27
+32,Compal Electronics,compal.com,Technology,28.0,Partnership,Compal and GMI Cloud Announce Collaboration on AI Infrastructure Development - PR Newswire,2026-05-27
+33,DFI,dfi.com,Technology,28.0,Product Launch,"DFI, DPI Launch Grant Initiative to Strengthen Financial Literacy Education - KFIZ",2026-06-18
+34,Panasonic Toughbook,panasonic.com/toughbook,Technology,28.0,Product Launch,Panasonic Connect Launches the TOUGHBOOK 56 - jems.com,2026-04-16
+35,Puget Systems,pugetsystems.com,Technology,27.0,Partnership + Product Launch,Puget Systems and SOKRISPYMEDIA debut video game at Unreal Fest by Jose Antunes - ProVideo Coalition - ProVideo Coalitio,2026-06-18
+36,"GoPro, Inc.",gopro.com,Technology,26.5,Acquisition / M&A + Product Launch,GoPro retains Houlihan Lokey to evaluate potential sale and strategic alternatives,2026-05-19
+37,NZXT,nzxt.com,Technology,24.9,News Mention + Product Launch,NZXT launches new H6 Series cases and RGB fans at Computex 2026,2026-06-02
+38,Gradiente,gradiente.com.br,Technology,24.5,Product Launch,Taekwondo Premier League (TPL) Curtain Raiser with Franchise Launch Event; Founder Ganesh Duvvuri's Initiative Backed by,2026-06-09
+39,HP Inc,hp.com,Technology,22.7,News Mention + Partnership,HP Debuts AI-Powered Unified Collaboration Ecosystem at InfoComm 2026 - HP,2026-06-19
+40,Gigabyte,gigabyte.com,Technology,22.7,News Mention + Product Launch,"GIGABYTE Launches RTX 5080 AORUS Infinity Wood, RTX 5080 and RTX 5070 Ti AORUS Infinity Graphics Cards - TechPowerUp",2026-06-22
+41,NEC,nec.com,Technology,22.2,Acquisition / M&A + News Mention,NEC Completes Acquisition of CSG Systems; Netcracker to Lead Combined Business,2026-05-15
+42,CyberPowerPC,cyberpowerpc.com,Technology,22.0,Creative Hiring + Partnership,CyberPowerPC hiring Social Media Content Creator for video and social advertising content,2026-06-01
+43,Casper,casper.com.tr,Technology,21.8,News Mention + Product Launch,Casper father shares love of trades with next generation as Hedlund Electric celebrates 20 years of service - Oil City N,2026-06-21
+44,Xiaomi Technology,mi.com,Technology,21.4,News Mention + Product Launch,Xiaomi poaches Tesla’s delivery operations manager in Europe ahead of 2027 launch - Electrek,2026-04-06
+45,Durabook,durabook.com,Technology,21.0,Product Launch,Durabook launches Z14I-HG rugged mobile workstation - Engineering.com,2026-03-30
+46,Machenike,machenike.com,Technology,21.0,Product Launch,"Machenike launches new mini PC with Ryzen 7 8745H, 16GB DDR5 RAM & 1TB SSD - MSN",2026-05-21
+47,OverPowered,walmart.com,Technology,20.1,News Mention + Product Launch,From Overshadowed to Overpowered: Second Reincarnation of a Talentless Sage Anime Reveals July 1 Debut in New Trailer - ,2026-06-06
+48,Star Labs,starlabs.systems,Technology,19.6,News Mention + Product Launch,"New Linux StarFighter laptop family debuts starting at $1,878 — Star Labs Systems' laptops arrive with spacious RAM, sev",2026-05-06
+49,XMG,xmg.gg,Technology,18.3,News Mention + Product Launch,XMG unveils PRO 18 gaming laptops and RTX 5070 lineup at Computex 2026,2026-06-02
+50,Corsair,corsair.com,Technology,17.7,Creative Hiring + News Mention,Corsair hiring Video Producer and Senior Short-Form Video Content Creators for marketing content,2026-06-01
+51,Sony Electronics,sony.com,Technology,17.5,Product Launch,"Sony Electronics to Launch Two Compact, Lightweight 4K PTZ Cameras Featuring 4K 60p Support and Enhanced Pan/Tilt Perfor",2026-06-02
+52,Samsung Electronics,samsung.com,Technology,15.7,News Mention + Partnership,"Samsung partners with Spider-Man: Brand New Day, integrating Galaxy devices into the film",2026-04-01
+53,"Japan Display, Inc.",j-display.com,Technology,15.0,C-Suite Join,Japan Display Revamps Board as It Prepares U.S. Advanced Display Expansion,2026-05-01
+54,JVC KENWOOD Corp,jvckenwood.com,Technology,15.0,C-Suite Join,JVC Kenwood Takes Bold Steps to Reconstruct Its Core DNA — Shaking Up Structure and Management,2026-05-01
+55,Maxell Holdings Ltd,maxell.co.jp,Technology,15.0,C-Suite Join,"Maxell Ltd. Announces Executive Changes, Effective April 1, 2026",2026-04-01
+56,Maytronics Ltd,maytronics.com,Technology,15.0,C-Suite Join,Maytronics appoints Rafael Benami as new CEO,2026-04-14
+57,Positivo,positivo.com.br,Technology,14.8,News Mention + Product Launch,Positivo and Tencent Cloud launch palm-based payments in Brazil - Telecompaper,2026-04-01
+58,Powersoft S.p.A.,powersoft.com,Technology,14.8,News Mention + Product Launch,Powersoft to Debut PRIMA Series Compact Install Amplifiers at InfoComm 2026 - rAVe [PUBS],2026-05-22
+59,Aigo,aigo.com.cn,Technology,14.0,Product Launch,"AIGO Launches with a Bang | Backed by the BNB Foundation, a New Benchmark for Decentralized Ecosystems, Creating New Wea",2026-04-26
+60,Indel B S.p.A.,indelbgroup.com,Technology,14.0,Product Launch,Indel B Renews Governance and Launches €2.6 Million Share Buyback Plan - TipRanks,2026-06-16
+61,Lava International,lavamobiles.com,Technology,14.0,Partnership,"Lava Partners with Uttar Pradesh Government to Digitally Empower 20,941 Anganwadi Workers - TheCSRUniverse",2026-04-29
+62,Micro Center,microcenter.com,Technology,14.0,Product Launch,Limited Gigabyte The RTX 5090 AORUS INFINITY is now available at Micro Center for $5300. - GameGPU,2026-06-17
+63,Razer Inc.,razer.com,Technology,14.0,Partnership,Razer Releases NiKo Collaboration Collection! Mice and Keyboards Featuring a Flame Motif Arrive - Saiga NAK,2026-04-07
+64,Walton,waltonbd.com,Technology,14.0,Product Launch,‘Bill Walton Way’ honorary street sign unveiled in front of Helix High School - fox5sandiego.com,2026-06-21
+65,Groupe Bull,bull.fr,Technology,13.5,Acquisition / M&A,France buys supercomputer-maker Bull from Atos for €404M,2026-04-01
+66,TCL Electronics Holdings Ltd,tcl.com,Technology,13.5,Acquisition / M&A,"TCL and Sony sign definitive agreements for BRAVIA Inc. joint venture (TCL 51%, Sony 49%) valued at ¥102.8B (~USD 650M);",2026-03-31
+67,Cabasse Group,cabasse.com,Technology,13.5,Acquisition / M&A,"Loewe Technology acquires Cabasse Group out of receivership, saving the French speaker brand",2026-04-20
+68,Hisense,hisense.com,Technology,10.5,Product Launch,"Hisense Launches World’s First RGB Mini LED Monitor, Boasting 4K@180Hz And Peak Brightness Of 2000 Nits - Wccftech",2026-05-28
+69,"LG Electronics, Inc.",lge.com,Technology,10.5,Partnership,LG ELECTRONICS ANNOUNCES NEW SOLUTIONS FOR AUTOMOTIVE INNOVATION PARTNERSHIP WITH GOOGLE - PR Newswire,2026-05-28
+70,Optima,optima.es,Technology,10.5,Product Launch,Dynasty launches RIA consulting arm with Optima Group acquisition - InvestmentNews,2026-06-11
+71,D-Box Technologies Inc.,d-box.com,Technology,10.5,Partnership,D-BOX Technologies partners with B&B Theatres to bring premium haptic cinema experience,2026-06-03
+72,Honor,honor.com,Technology,10.5,Product Launch,Honor launches Honor 600 series and Magic V6 foldable,2026-05-25
+73,Koss Corporation,koss.com,Technology,10.5,Product Launch,Koss launches Porta Pro Wireless 2.0 and A/550 open-back headphones,2026-06-01
+74,BigBen Interactive,bigben.fr,Technology,7.0,Product Launch,PRESS RELEASE: BIGBEN INTERACTIVE ANNOUNCES POSTPONEMENT OF RELEASE OF ITS 2025/2026 SALES AND FULL-YEAR 2025/2026 RESUL,2026-04-16
+75,Evoo,evoo.biz,Technology,7.0,Product Launch,"Biotech and Olive Agriculture Veterans Launch Oleocan™, Delivering Broad-Spectrum EVOO Polyphenols Without the Calories ",2026-04-30
+76,Hyundai Technology,hyundaitechnology.com,Technology,7.0,Product Launch,"Hyundai Launches Next-Gen Nexo Hydrogen Car in Japan with Over $20,000 Subsidies - Fuel Cells Works",2026-04-08
+77,Inventec,inventec.com,Technology,7.0,Partnership,Taiwan’s Inventec expands partnership with NXP - Taiwan News,2026-05-20
+78,System76,system76.com,Technology,7.0,Product Launch,System76 has launched Thelio Mira desktop and Thelio Major workstation based on Linux - Neowin,2026-04-23
+79,Alps Alpine Co Ltd,alpsalpine.com,Technology,7.0,Partnership,"Alpine announces retailing agreement with Mopar; products available through Chrysler, Dodge, Jeep and Ram dealerships",2026-04-02
+80,Anker Innovations Ltd,anker.com,Technology,7.0,Product Launch,Anker unveils next-generation products across brands at Anker Day 2026,2026-05-21
+81,Aorus (Gigabyte Group),aorus.com,Technology,7.0,Partnership,GIGABYTE AORUS partners with VALORANT Esports EMEA as official hardware partner,2026-03-24
+82,Atomos Limited,atomos.com,Technology,7.0,Product Launch,"Atomos unveils broadest NAB 2026 lineup: Sumo PRO-19, Shogun AV-19, A-Eye and ATOMOSphere Editor",2026-04-17
+83,Framework Computer,frame.work,Technology,7.0,Product Launch,Framework launches next-gen Laptop 13 Pro and Laptop 16 at its 2026 event,2026-04-21
+84,"Sichuan Changhong Electric Co.,Ltd.",changhong.com,Technology,7.0,Partnership,Changhong partners with Grundig under strategic brand-license agreement for global markets,2026-03-30
+85,V-ZUG Holding AG,vzug.com,Technology,7.0,Product Launch,V-ZUG unveils V6000 Integra invisible induction cooktop at Milan Design Week,2026-04-15
+86,Xolo,xolo.in,Technology,6.3,News Mention,"Xolo Maridueña praises 'Practical Magic 2' costars Nicole Kidman, Sandra Bullock: 'Legends that totally lead by example'",2026-06-16
+87,zSpace,zspace.com,Technology,6.3,News Mention,"2026-06-21 | ZSPC DEADLINE REMINDER: Bronstein, Gewirtz & Grossman LLC Reminds zSpace, Inc. Investors to Join the Class ",2026-06-21
+88,Lite-On,liteon.com,Technology,6.3,News Mention,Lite-On Technology Acquires Business Equipment For T$1.15 Bln - TradingView,2026-06-17
+89,Foxconn,foxconn.com,Technology,5.4,News Mention,Taiwan's Foxconn raises guidance for second-quarter outlook - Yahoo Finance,2026-06-05
+90,Image Systems AB,imagesystems.se,Technology,5.4,News Mention,Image Systems AB (publ) Appoints New CFO - Cision News,2026-06-08
+91,Razer,razer.com,Technology,5.4,News Mention,"AI mega-listings are 'just the start,' Razer CEO says, ahead of historic SpaceX IPO - CNBC",2026-06-11
+92,Geo,geo.co.uk,Technology,4.5,News Mention,Avanti trims GEO exposure with Hylas-3 sale - SpaceNews,2026-06-12
+93,Bmax,bmaxco.com,Technology,3.6,News Mention,Luxury E-commerce 'Gondolier' BMax Files For Hong Kong IPO - Benzinga,2026-05-07
+94,Vant,vant.com.br,Technology,3.6,News Mention,XLA Names James Vant as Chief Executive Officer - citybiz,2026-04-07
+95,Kingclean Electric Co.Ltd,kingclean.com.cn,Technology,3.6,News Mention,"KingClean Electric Co., Ltd's Brand JIMMY Launches Matrix Series Countertop Ro Water Purifier with Hot, Cold, Sparkling,",2026-06-15
+96,Turtle Beach Corporation,turtlebeach.com,Technology,3.6,News Mention,"Turtle Beach (TBCH) appoints interim CFO and reiterates 2026 revenue, EBITDA targets - Stock Titan",2026-05-20
+97,LG,lg.com,Technology,3.6,News Mention,LG Chem spins off aesthetics business in 3-way merger - koreabiomed.com,2026-06-22
+98,VIT,vitvietnam.com,Technology,3.6,News Mention,Vitality’s IEM Cologne upset raises questions for VIT fan token holders - Crypto Briefing,2026-06-20
+99,Nokia,nokia.com,Technology,3.6,News Mention,Will Nokia Hit An All-Time High Within Years And Takeover its Legacy Since Dot-Com Crash ? - Moomoo,2026-06-22
+100,Axioo,axioo.com,Technology,2.7,News Mention,"Axioo Expands Into Enterprise AI, Partnering With Primacom On Local Sovereign Infrastructure - Qoo Media",2026-05-23
+101,Cellularline S.p.A.,cellularline.com,Technology,2.7,News Mention,Cellularline Approves Coverlab Merger and Launches €4 Million Share Buyback - TipRanks,2026-05-25
+102,ASRock,asrock.com,Technology,2.7,News Mention,[Round-up] ASRock Unveil Their Latest Monitors and Taichi Series at Computex 2026 - TFTCentral,2026-06-07
+103,Microtech,microtech.it,Technology,2.7,News Mention,"Shanghai Microtech Equipment Co., Ltd. (688630) has passed the Hong Kong IPO listing hearing, with CICC as the sole spon",2026-06-11
+104,Stratus Technologies,stratus.com,Technology,1.8,News Mention,"Infosys to Acquire Leading Insurance Consulting Technology Company, Stratus - PR Newswire",2026-03-25
+105,Sun Corp,sun-denshi.co.jp,Technology,1.8,News Mention,"Last Week In Event SPACE: Tokyo Steel, Yancoal, Sun Corp/Cellebrite, Barito Pacific/Renewables - Smartkarma",2026-04-25
+106,Vuzix Corporation,vuzix.com,Technology,1.8,News Mention,"Mitsubishi UFJ Asset Management Co. Ltd. Acquires 848,142 Shares of Vuzix Corporation $VUZI - MarketBeat",2026-05-11
+107,Walton Group,waltongroup.com,Technology,1.8,News Mention,Walton HiTech sets EGM for merger approval - The Financial Express,2026-04-13
+108,"Trutankless, Inc.",trutankless.com,Technology,1.8,News Mention,"Trutankless, Inc. Auditor Raises 'Going Concern' Doubt - marketscreener.com",2026-05-21
