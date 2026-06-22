@@ -170,6 +170,9 @@ def build_dashboard(
     ma_signals      = sum(1 for a in recent_alerts if a.get("signal_type") == "Acquisition / M&A")
     ipo_signals     = sum(1 for a in recent_alerts if a.get("signal_type") == "IPO Signal")
     news_signals    = sum(1 for a in recent_alerts if a.get("signal_type") == "News Mention")
+    product_signals    = sum(1 for a in recent_alerts if a.get("signal_type") == "Product Launch")
+    partnership_signals = sum(1 for a in recent_alerts if a.get("signal_type") == "Partnership")
+    hiring_signals      = sum(1 for a in recent_alerts if a.get("signal_type") == "Creative Hiring")
     _age_cutoff = datetime.now(timezone.utc) - timedelta(days=max_signal_age_days)
 
     def _raised_recently(c: dict) -> bool:
@@ -252,6 +255,9 @@ def build_dashboard(
             "ma_signals":      ma_signals,
             "ipo_signals":     ipo_signals,
             "news_signals":    news_signals,
+            "product_signals":    product_signals,
+            "partnership_signals": partnership_signals,
+            "hiring_signals":      hiring_signals,
             "funding_activity": funding_activity,
             "max_signal_age_days": max_signal_age_days,
             "industry_counts": industry_counts,
@@ -1767,6 +1773,9 @@ const DATA = __DATA_JSON__;
   k.ma_signals      = countType('Acquisition / M&A');
   k.ipo_signals     = countType('IPO Signal');
   k.news_signals    = countType('News Mention');
+  k.product_signals    = countType('Product Launch');
+  k.partnership_signals = countType('Partnership');
+  k.hiring_signals      = countType('Creative Hiring');
   if (before !== after && window.console) console.info('[dedup] signals: ' + before + ' -> ' + after);
 })();
 
@@ -2151,6 +2160,21 @@ function renderKPIs() {
       trend:_weeklySignalTrend('News Mention'),
       action:'knews', cls:'', chip:'',
       tooltip:`<div class="kpi-tooltip"><p>News Mention signals (last 90d) <span>${k.news_signals}</span></p></div>` },
+    { id:'ksp8', icon:'🚀', num:k.product_signals,    label:'Product Launches',
+      hex:'#ec4899', bg:'rgba(236,72,153,0.15)',
+      trend:_weeklySignalTrend('Product Launch'),
+      action:'kproduct', cls:'', chip:'',
+      tooltip:`<div class="kpi-tooltip"><p>Product Launch / update signals (last 90d) <span>${k.product_signals}</span></p></div>` },
+    { id:'ksp9', icon:'🔗', num:k.partnership_signals, label:'Partnerships',
+      hex:'#14b8a6', bg:'rgba(20,184,166,0.15)',
+      trend:_weeklySignalTrend('Partnership'),
+      action:'kpartner', cls:'', chip:'',
+      tooltip:`<div class="kpi-tooltip"><p>Partnership signals (last 90d) <span>${k.partnership_signals}</span></p></div>` },
+    { id:'ksp10', icon:'🎨', num:k.hiring_signals,     label:'Creative Hiring',
+      hex:'#f97316', bg:'rgba(249,115,22,0.15)',
+      trend:_weeklySignalTrend('Creative Hiring'),
+      action:'khiring', cls:'', chip:'',
+      tooltip:`<div class="kpi-tooltip"><p>3D / creative hiring signals (last 90d) <span>${k.hiring_signals}</span></p></div>` },
   ];
 
   const row = document.getElementById('kpi-row');
@@ -2451,7 +2475,7 @@ function renderCharts() {
   }
 
   // ── Signals by Category bar chart ──
-  const catLabels = ['Funding','M&A','IPO','C-Suite Join','C-Suite Exit','News Mention','Other'];
+  const catLabels = ['Funding','M&A','IPO','C-Suite Join','C-Suite Exit','News Mention','Product Launch','Partnership','Creative Hiring','Other'];
   const catMap    = {
     'Funding':       'Funding Round',
     'M&A':           'Acquisition / M&A',
@@ -2459,8 +2483,11 @@ function renderCharts() {
     'C-Suite Join':  'C-Suite Join',
     'C-Suite Exit':  'C-Suite Exit',
     'News Mention':  'News Mention',
+    'Product Launch':'Product Launch',
+    'Partnership':   'Partnership',
+    'Creative Hiring':'Creative Hiring',
   };
-  const catColors = ['#f59e0b','#10b981','#06b6d4','#8b5cf6','#a78bfa','#6b7280','#374151'];
+  const catColors = ['#f59e0b','#10b981','#06b6d4','#8b5cf6','#a78bfa','#6b7280','#ec4899','#14b8a6','#f97316','#374151'];
   const catCounts = catLabels.map(lbl => {
     if (lbl === 'Other') {
       const known = new Set(Object.values(catMap));
@@ -3005,6 +3032,9 @@ function buildSignalTypeFilter() {
     { value: 'IPO Signal',         label: 'IPO' },
     { value: 'News Mention',       label: 'News' },
     { value: 'Subsidiary Change',  label: 'Subsidiary Change' },
+    { value: 'Product Launch',     label: 'Product Launch' },
+    { value: 'Partnership',        label: 'Partnership' },
+    { value: 'Creative Hiring',    label: 'Creative Hiring' },
   ];
   // Also add any signal types present in data but not in the canonical list above
   const canonical = new Set(SIGNAL_TYPES.map(t => t.value));
@@ -3335,6 +3365,33 @@ function openKpiModal(type) {
       badge: `<span class="sev-badge sev-LOW" style="font-size:10px">📰 News</span>`,
       action: () => { closeKpiModal(); openSigDetail(s); },
     })) : [{ _empty: true, _msg: 'No news signals detected yet.' }];
+  } else if (type === 'kproduct') {
+    const rows = DATA.signals.filter(s => s.signal_type === 'Product Launch');
+    titleEl.textContent = 'Product Launches (' + rows.length + ')';
+    _kpiRows = rows.length ? rows.map(s => ({
+      id: s.apollo_id, name: s.company_name || '—',
+      meta: (s.signal_detail || '').substring(0, 80) + (s.sent_at ? ' · ' + relTime(s.sent_at) : ''),
+      badge: `<span class="sev-badge sev-MEDIUM" style="font-size:10px">🚀 Launch</span>`,
+      action: () => { closeKpiModal(); openSigDetail(s); },
+    })) : [{ _empty: true, _msg: 'No product launch signals detected yet.' }];
+  } else if (type === 'kpartner') {
+    const rows = DATA.signals.filter(s => s.signal_type === 'Partnership');
+    titleEl.textContent = 'Partnerships (' + rows.length + ')';
+    _kpiRows = rows.length ? rows.map(s => ({
+      id: s.apollo_id, name: s.company_name || '—',
+      meta: (s.signal_detail || '').substring(0, 80) + (s.sent_at ? ' · ' + relTime(s.sent_at) : ''),
+      badge: `<span class="sev-badge sev-MEDIUM" style="font-size:10px">🔗 Partnership</span>`,
+      action: () => { closeKpiModal(); openSigDetail(s); },
+    })) : [{ _empty: true, _msg: 'No partnership signals detected yet.' }];
+  } else if (type === 'khiring') {
+    const rows = DATA.signals.filter(s => s.signal_type === 'Creative Hiring');
+    titleEl.textContent = 'Creative Hiring (' + rows.length + ')';
+    _kpiRows = rows.length ? rows.map(s => ({
+      id: s.apollo_id, name: s.company_name || '—',
+      meta: (s.signal_detail || '').substring(0, 80) + (s.sent_at ? ' · ' + relTime(s.sent_at) : ''),
+      badge: `<span class="sev-badge sev-MEDIUM" style="font-size:10px">🎨 Hiring</span>`,
+      action: () => { closeKpiModal(); openSigDetail(s); },
+    })) : [{ _empty: true, _msg: 'No creative-hiring signals detected yet.' }];
   } else if (type === 'funding') {
     const ageDays = (DATA.kpis && DATA.kpis.max_signal_age_days) || 90;
     const cutoff  = Date.now() - ageDays * 86400000;

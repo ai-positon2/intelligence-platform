@@ -164,6 +164,20 @@ def _detect_sheet_events(
         # Subsidiary
         "subsidiary":       ("Subsidiary Change",   "HIGH"),
         "subsidiary_change":("Subsidiary Change",   "HIGH"),
+        # Product Launch / update  (Sheet override → HIGH; news auto-detect → MEDIUM)
+        "product_launch":   ("Product Launch",      "HIGH"),
+        "product":          ("Product Launch",      "HIGH"),
+        "product_update":   ("Product Launch",      "HIGH"),
+        "launch":           ("Product Launch",      "HIGH"),
+        # Partnership  (Sheet override → HIGH; news auto-detect → MEDIUM)
+        "partnership":      ("Partnership",         "HIGH"),
+        "partner":          ("Partnership",         "HIGH"),
+        "alliance":         ("Partnership",         "HIGH"),
+        "collaboration":    ("Partnership",         "HIGH"),
+        # Creative / 3D hiring  (Sheet override → HIGH; jobs RSS auto-detect → MEDIUM)
+        "creative_hiring":  ("Creative Hiring",     "HIGH"),
+        "hiring":           ("Creative Hiring",     "HIGH"),
+        "3d_hiring":        ("Creative Hiring",     "HIGH"),
     }
 
     def _route_signal_type(raw: str, default_signal: str, default_sev: str) -> tuple[str, str]:
