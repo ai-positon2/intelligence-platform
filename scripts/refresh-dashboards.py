@@ -24,6 +24,8 @@ from tracker.dashboard_builder import build_dashboard
 from tracker.snapshot_store import SnapshotStore
 from tracker.csv_loader import load_companies
 from tracker.news_relevance import _RELEVANT_RE, _NOISE_RE, _norm
+from tracker.news_relevance import classify_signal_type
+import datetime as _dt
 
 _PREFIX = re.compile(r"^\s*in the news:\s*", re.I)
 _DATA_RE = re.compile(r'^const DATA = .*;$', re.M)
@@ -31,6 +33,58 @@ _DATA_RE = re.compile(r'^const DATA = .*;$', re.M)
 def _keep_news(detail):
     t = _norm(_PREFIX.sub("", detail or "").strip())
     return bool(t) and any(r.search(t) for r in _RELEVANT_RE) and not any(r.search(t) for r in _NOISE_RE)
+
+MAX_AGE_DAYS = 90
+
+def _parse_date(s):
+    s = (s or "").strip()
+    if not s:
+        return None
+    try:
+        return _dt.date.fromisoformat(s[:10])
+    except Exception:
+        for f in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                return _dt.datetime.strptime(s[:19], f).date()
+            except Exception:
+                pass
+    return None
+
+def prune_old(db, max_age_days=MAX_AGE_DAYS):
+    """Delete signals whose event date (signal_date, else sent_at) is older than
+    max_age_days. Enforces the 'last 90 days only' retention policy."""
+    cutoff = _dt.date.today() - _dt.timedelta(days=max_age_days)
+    con = sqlite3.connect(db)
+    rows = con.execute("SELECT id, signal_date, sent_at FROM alerts_sent").fetchall()
+    drop = []
+    for rid, sd, sent in rows:
+        d = _parse_date(sd) or _parse_date(sent)
+        if d is not None and d < cutoff:
+            drop.append((rid,))
+    if drop:
+        con.executemany("DELETE FROM alerts_sent WHERE id=?", drop)
+        con.commit(); con.execute("VACUUM"); con.commit()
+    con.close()
+    return len(drop), len(rows)
+
+def reclassify(db):
+    """Re-apply the Position2 relevance filter to Product Launch / Partnership
+    rows; downgrade anything no longer relevant to a plain News Mention."""
+    con = sqlite3.connect(db)
+    rows = con.execute(
+        "SELECT id, signal_type, signal_detail FROM alerts_sent "
+        "WHERE signal_type IN ('Product Launch','Partnership')").fetchall()
+    changed = 0
+    for rid, st, detail in rows:
+        new_st, new_sev = classify_signal_type({"title": detail or "", "summary": ""})
+        if new_st != st:
+            con.execute("UPDATE alerts_sent SET signal_type=?, severity=? WHERE id=?",
+                        (new_st, new_sev, rid))
+            changed += 1
+    if changed:
+        con.commit()
+    con.close()
+    return changed
 
 def prune_news(db):
     con = sqlite3.connect(db)
@@ -80,7 +134,10 @@ ACCOUNTS = [
 
 def main():
     for name, db, kairo, builder in ACCOUNTS:
+        pruned_old, _tot = prune_old(str(ROOT / db))
+        reclassed = reclassify(str(ROOT / db))
         dropped, total = prune_news(str(ROOT / db))
+        print("[refresh] %-11s pruned %d signals >90d, reclassified %d launch/partnership" % (name, pruned_old, reclassed))
         fd, tmp = tempfile.mkstemp(suffix=".html"); os.close(fd)
         try:
             builder(tmp)
