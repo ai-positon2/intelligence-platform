@@ -172,7 +172,7 @@ def build_csg():
         companies_from_csv=companies,
         store=store,
         output_path=OUT_PATH,
-        max_signal_age_days=365,
+        max_signal_age_days=90,
         refresh_opts=csg_refresh_opts,
     )
 
