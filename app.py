@@ -1844,6 +1844,39 @@ def insights_meta(account_id):
         return jsonify({"error": str(e)})
 
 
+# ── Signal importance scoring (drives what the Insights tab surfaces) ──────────
+# Points per signal type from Position2's sales-value perspective (a marketing
+# agency): budget/decision-window events score highest, generic news lowest.
+SIGNAL_WEIGHTS = {
+    "Funding Round":      10,   # budget unlock + growth mandate
+    "C-Suite Join":       10,   # new exec = vendor-review window (~90d)
+    "Acquisition / M&A":   9,   # brand/website consolidation work
+    "IPO Signal":          9,   # organic visibility + analyst content
+    "Partnership":         7,   # co-marketing / GTM
+    "Product Launch":      7,   # launch marketing + paid media
+    "Creative Hiring":     6,   # investing in creative/marketing output
+    "Subsidiary Change":   6,
+    "C-Suite Exit":        5,
+    "News Mention":        3,   # already strictly filtered; lowest weight
+}
+_SEVERITY_MULT = {"HIGH": 1.5, "MEDIUM": 1.0, "LOW": 0.6}
+
+def _signal_importance(signal_type, severity, signal_date):
+    """Deterministic 0-30ish importance score = type weight x severity x recency."""
+    from datetime import date as _d
+    w = SIGNAL_WEIGHTS.get(signal_type, 4)
+    sev = _SEVERITY_MULT.get((severity or "").upper(), 1.0)
+    try:
+        age = (_d.today() - _d.fromisoformat(str(signal_date)[:10])).days
+    except Exception:
+        age = 9999
+    rec = 2.0 if age <= 7 else 1.5 if age <= 30 else 1.0 if age <= 90 else 0.4
+    return round(w * sev * rec, 1)
+
+# Only signals at/above this score reach the Insights tab; the rest are noise.
+INSIGHTS_MIN_SCORE = 6.0
+INSIGHTS_MAX_SIGNALS = 120
+
 @app.route("/api/insights/<account_id>")
 @login_required
 def insights_generate(account_id):
@@ -1887,6 +1920,20 @@ def insights_generate(account_id):
             return jsonify({"error": "No signals found for those filters."}), 200
 
         signals = [dict(r) for r in rows]
+        # Deterministic importance score per signal, + multi-intent company bonus,
+        # then keep only the important ones for the Insights tab.
+        _types_by_co = {}
+        for s in signals:
+            _types_by_co.setdefault(s["name"], set()).add(s["signal_type"])
+        for s in signals:
+            base = _signal_importance(s["signal_type"], s["severity"], s["signal_date"])
+            if len(_types_by_co.get(s["name"], ())) >= 2:
+                base += 3  # multi-intent buying-window bonus
+            s["_score"] = round(base, 1)
+        signals.sort(key=lambda s: s["_score"], reverse=True)
+        signals = [s for s in signals if s["_score"] >= INSIGHTS_MIN_SCORE][:INSIGHTS_MAX_SIGNALS]
+        if not signals:
+            return jsonify({"error": "No sufficiently important signals for those filters."}), 200
         n_sig = len(signals); n_co = len(set(s["name"] for s in signals))
         acct  = "Healthcare" if account_id == "healthcare" else "CSG"
 
@@ -1914,7 +1961,7 @@ def insights_generate(account_id):
         ctx_lines = []
         multi_intent = 0
         for co, info in sorted(by_co.items(),
-            key=lambda x: (-sum(1 for s in x[1]["sigs"] if s["severity"]=="HIGH"), -len(x[1]["sigs"])))[:80]:
+            key=lambda x: -sum(s.get("_score",0) for s in x[1]["sigs"]))[:80]:
             sigs = info["sigs"]
             stypes = sorted(set(s["signal_type"] for s in sigs))
             recent = sum(1 for s in sigs if _age_days(s["signal_date"]) <= 30)
@@ -1926,9 +1973,9 @@ def insights_generate(account_id):
             if any(_age_days(s["signal_date"]) <= 7 for s in sigs):
                 flags.append("FRESH<7d")
             sig_str = " | ".join(
-                "%s(%s,%s)%s" % (s["signal_type"], s["severity"], s["signal_date"],
+                "%s(%s,%s,score=%s)%s" % (s["signal_type"], s["severity"], s["signal_date"], s.get("_score","?"),
                     ": "+s["signal_detail"][:140] if s.get("signal_detail") else "")
-                for s in sigs[:6])
+                for s in sorted(sigs, key=lambda x: x.get("_score",0), reverse=True)[:6])
             ctx_lines.append("[%s | %s | %s] %d sigs, %s%s — %s" % (
                 co, info["domain"], info["industry"], len(sigs), momentum,
                 (" " + ",".join(flags)) if flags else "", sig_str))
@@ -1962,7 +2009,7 @@ def insights_generate(account_id):
             "(Google/Meta/LinkedIn Ads) | Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
             "You brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
             "METHOD — reason through these steps before writing: "
-            "(1) Weight every signal: severity (HIGH=3, MEDIUM=2, LOW=1) x recency (<7d x2, <30d x1.5, older x1); "
+            "(1) Each signal carries a precomputed importance score (shown as score=NN; signal-type points x severity x recency) — higher means more sales-relevant; rank companies by their total score; "
             "MULTI-INTENT companies (2+ distinct signal types) are the strongest buying-window evidence. "
             "(2) Score intent 0-100 from that weighting and be honest: most companies belong at 30-70; reserve 85+ "
             "for multi-intent + HIGH + fresh. Momentum flags in the data (RISING/ACTIVE/COOLING) must drive the "
