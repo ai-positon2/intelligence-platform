@@ -40,7 +40,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-from tracker.news_relevance import classify_signal_type
+from tracker.news_relevance import classify_signal_type, is_important_news
 
 from tracker.news_client import get_news_articles, _parse_article_date
 from tracker.snapshot_store import SnapshotStore
@@ -51,7 +51,7 @@ DB_PATH = ROOT / "data" / "tracker_csg_v2.db"
 DEFAULT_MAX_AGE_DAYS = 90
 
 # Articles per company per run  (Google News RSS typically returns ≤10 anyway)
-DEFAULT_MAX_ARTICLES = 5
+DEFAULT_MAX_ARTICLES = 2
 
 # Seconds between company fetches — keeps Google from rate-limiting us
 RATE_LIMIT_SLEEP = 1.2
@@ -197,6 +197,10 @@ def fetch_csg_news(
 
             # Classify into first-class signal type (keyword-only, no LLM)
             sig_type, sig_sev = classify_signal_type(article)
+            # News Mention bucket: keep only high-value/important events
+            if sig_type == "News Mention" and not is_important_news(title):
+                skipped_total += 1
+                continue
 
             # Dedup: skip if this exact headline was already stored (per type)
             if store.was_alert_sent_recently(

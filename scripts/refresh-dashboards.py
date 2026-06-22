@@ -24,7 +24,7 @@ from tracker.dashboard_builder import build_dashboard
 from tracker.snapshot_store import SnapshotStore
 from tracker.csv_loader import load_companies
 from tracker.news_relevance import _RELEVANT_RE, _NOISE_RE, _norm
-from tracker.news_relevance import classify_signal_type
+from tracker.news_relevance import classify_signal_type, is_important_news
 import datetime as _dt
 
 _PREFIX = re.compile(r"^\s*in the news:\s*", re.I)
@@ -86,15 +86,32 @@ def reclassify(db):
     con.close()
     return changed
 
+NEWS_CAP_PER_COMPANY = 2
+
 def prune_news(db):
+    """Keep News Mention high-value (important events only) and cap to the
+    NEWS_CAP_PER_COMPANY most recent per company. Returns (dropped, total)."""
     con = sqlite3.connect(db)
-    rows = con.execute("SELECT id, signal_detail FROM alerts_sent WHERE signal_type='News Mention'").fetchall()
-    drop = [(i,) for i, d in rows if not _keep_news(d)]
+    rows = con.execute(
+        "SELECT id, signal_detail, apollo_id, signal_date, sent_at "
+        "FROM alerts_sent WHERE signal_type='News Mention' AND dry_run=0").fetchall()
+    total = len(rows)
+    drop = []
+    survivors = {}
+    for rid, detail, aid, sd, sent in rows:
+        if not is_important_news(detail or ""):
+            drop.append((rid,)); continue
+        survivors.setdefault(aid, []).append((sd or sent or "", rid))
+    # cap most-recent N per company
+    for aid, lst in survivors.items():
+        lst.sort(reverse=True)
+        for _, rid in lst[NEWS_CAP_PER_COMPANY:]:
+            drop.append((rid,))
     if drop:
         con.executemany("DELETE FROM alerts_sent WHERE id=?", drop)
         con.commit(); con.execute("VACUUM"); con.commit()
     con.close()
-    return len(drop), len(rows)
+    return len(drop), total
 
 def fresh_data_line(plain_html):
     s = io.open(plain_html, encoding="utf-8").read()
