@@ -40,6 +40,8 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
+from tracker.news_relevance import classify_signal_type
+
 from tracker.news_client import get_news_articles, _parse_article_date
 from tracker.snapshot_store import SnapshotStore
 
@@ -193,9 +195,12 @@ def fetch_csg_news(
                 skipped_total += 1
                 continue
 
-            # Dedup: skip if this exact headline was already stored
+            # Classify into first-class signal type (keyword-only, no LLM)
+            sig_type, sig_sev = classify_signal_type(article)
+
+            # Dedup: skip if this exact headline was already stored (per type)
             if store.was_alert_sent_recently(
-                apollo_id, "News Mention",
+                apollo_id, sig_type,
                 dedup_days=DEDUP_DAYS,
                 signal_detail=title,
             ):
@@ -208,9 +213,9 @@ def fetch_csg_news(
             if not dry_run:
                 store.record_alert(
                     apollo_id=apollo_id,
-                    signal_type="News Mention",
+                    signal_type=sig_type,
                     signal_detail=title,
-                    severity="LOW",
+                    severity=sig_sev,
                     dry_run=False,
                     signal_date=_fmt_signal_date(pub_str),
                     source_url=source_url,

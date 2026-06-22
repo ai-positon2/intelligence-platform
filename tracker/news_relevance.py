@@ -72,6 +72,40 @@ _SUFFIXES = ("inc", "llc", "corp", "corporation", "ltd", "limited", "co",
              "company", "group", "holdings", "plc", "the")
 
 _RELEVANT_RE = [re.compile(re.escape(k)) for k in RELEVANT_KEYWORDS]
+
+# ── Signal-type classification (keyword-only, no LLM, zero cost) ──────────────
+# Splits the generic "News Mention" stream into first-class signal types.
+# M&A / IPO / funding deliberately stay as News Mention here (those HIGH signals
+# are sourced from curated Google Sheets, per the tracker design).
+PRODUCT_LAUNCH_KEYWORDS = [
+    "launch", "launches", "launched", "launching", "unveil", "unveils", "unveiled",
+    "rollout", "roll out", "rolls out", "new product", "introduc", "debut", "debuts",
+    "releases", "release of", "now available", "general availability",
+    "new feature", "new version", "new app", "new platform", "new tool",
+    "next-generation", "next generation", "product update", "new offering",
+]
+PARTNERSHIP_KEYWORDS = [
+    "partnership", "partners with", "partner with", "partnered with", "collaborat",
+    "alliance", "joins forces", "teams up", "team up", "strategic partner",
+    "signs deal with", "signs agreement", "agreement with", "joint venture",
+    "to power", "selects", "chosen by",
+]
+_PRODUCT_RE     = [re.compile(re.escape(k)) for k in PRODUCT_LAUNCH_KEYWORDS]
+_PARTNERSHIP_RE = [re.compile(re.escape(k)) for k in PARTNERSHIP_KEYWORDS]
+
+
+def classify_signal_type(article: dict) -> tuple[str, str]:
+    """Return (signal_type, severity) for a news article using keywords only.
+
+    Partnership is checked before Product Launch (a "launches partnership"
+    headline is a partnership first). Falls back to ("News Mention", "LOW").
+    """
+    text = _norm((article.get("title", "") or "") + " " + (article.get("summary", "") or ""))
+    if any(r.search(text) for r in _PARTNERSHIP_RE):
+        return ("Partnership", "MEDIUM")
+    if any(r.search(text) for r in _PRODUCT_RE):
+        return ("Product Launch", "MEDIUM")
+    return ("News Mention", "LOW")
 _NOISE_RE = [re.compile(p) for p in NOISE_PATTERNS]
 
 

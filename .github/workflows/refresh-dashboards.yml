@@ -49,6 +49,10 @@ jobs:
         run: python fetch_csg_news.py
         continue-on-error: true
 
+      - name: Fetch CSG creative / 3D hiring signals
+        run: python fetch_csg_jobs.py
+        continue-on-error: true
+
       - name: Restore Kairo dashboards
         run: |
           cp /tmp/kairo_health.html reports/dashboard.html
