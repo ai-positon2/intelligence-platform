@@ -68,12 +68,14 @@ def prune_old(db, max_age_days=MAX_AGE_DAYS):
     return len(drop), len(rows)
 
 def reclassify(db):
-    """Re-apply the Position2 relevance filter to Product Launch / Partnership
-    rows; downgrade anything no longer relevant to a plain News Mention."""
+    """Normalise news-derived signal types with the Position2 classifier:
+    promote News Mentions into Product Launch / Partnership when they qualify,
+    and downgrade non-relevant Product Launch / Partnership back to News Mention.
+    Applies the same criteria to BOTH accounts."""
     con = sqlite3.connect(db)
     rows = con.execute(
         "SELECT id, signal_type, signal_detail FROM alerts_sent "
-        "WHERE signal_type IN ('Product Launch','Partnership')").fetchall()
+        "WHERE signal_type IN ('Product Launch','Partnership','News Mention')").fetchall()
     changed = 0
     for rid, st, detail in rows:
         new_st, new_sev = classify_signal_type({"title": detail or "", "summary": ""})
