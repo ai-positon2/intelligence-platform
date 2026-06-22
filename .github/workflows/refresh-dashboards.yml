@@ -69,6 +69,10 @@ jobs:
       - name: Rebuild dashboards from fresh data (preserve Kairo) + prune news
         run: python scripts/refresh-dashboards.py
 
+      - name: Generate weekly opportunity brief (CSV + AI brief + Slack)
+        run: python weekly_digest.py
+        continue-on-error: true
+
       - name: Commit & publish
         run: |
           git config user.name "github-actions[bot]"

@@ -1845,33 +1845,8 @@ def insights_meta(account_id):
 
 
 # ── Signal importance scoring (drives what the Insights tab surfaces) ──────────
-# Points per signal type from Position2's sales-value perspective (a marketing
-# agency): budget/decision-window events score highest, generic news lowest.
-SIGNAL_WEIGHTS = {
-    "Funding Round":      10,   # budget unlock + growth mandate
-    "C-Suite Join":       10,   # new exec = vendor-review window (~90d)
-    "Acquisition / M&A":   9,   # brand/website consolidation work
-    "IPO Signal":          9,   # organic visibility + analyst content
-    "Partnership":         7,   # co-marketing / GTM
-    "Product Launch":      7,   # launch marketing + paid media
-    "Creative Hiring":     6,   # investing in creative/marketing output
-    "Subsidiary Change":   6,
-    "C-Suite Exit":        5,
-    "News Mention":        3,   # already strictly filtered; lowest weight
-}
-_SEVERITY_MULT = {"HIGH": 1.5, "MEDIUM": 1.0, "LOW": 0.6}
-
-def _signal_importance(signal_type, severity, signal_date):
-    """Deterministic 0-30ish importance score = type weight x severity x recency."""
-    from datetime import date as _d
-    w = SIGNAL_WEIGHTS.get(signal_type, 4)
-    sev = _SEVERITY_MULT.get((severity or "").upper(), 1.0)
-    try:
-        age = (_d.today() - _d.fromisoformat(str(signal_date)[:10])).days
-    except Exception:
-        age = 9999
-    rec = 2.0 if age <= 7 else 1.5 if age <= 30 else 1.0 if age <= 90 else 0.4
-    return round(w * sev * rec, 1)
+# Single source of truth shared with weekly_digest.py.
+from tracker.signal_score import SIGNAL_WEIGHTS, signal_importance as _signal_importance
 
 # Only signals at/above this score reach the Insights tab; the rest are noise.
 INSIGHTS_MIN_SCORE = 6.0
