@@ -79,26 +79,29 @@ _RELEVANT_RE = [re.compile(re.escape(k)) for k in RELEVANT_KEYWORDS]
 # its TITLE (launches/partnerships already have their own signal types). This is
 # deliberately narrower than RELEVANT_KEYWORDS so generic PR / mentions drop out.
 IMPORTANT_NEWS_KEYWORDS = [
-    # funding / investment
-    "funding", "raises", "raised", "investment", "valuation", "series a",
-    "series b", "series c", "series d", "seed round", "venture round",
+    # funding / investment (capacity + intent to spend)
+    "raises", "raised", "secures funding", "closes funding", "funding round",
+    "series a", "series b", "series c", "series d", "seed round", "venture round",
+    "investment round", "valuation of", "capital raise",
     # M&A / corporate structure
-    "acqui", "merger", "merges", "buyout", "takeover", "majority stake", "spins off",
-    # leadership
+    "acquires", "acquired by", "acquisition of", "to acquire", "merger", "merges with",
+    "buyout", "takeover", "majority stake", "spins off",
+    # leadership (esp. growth/marketing buyers)
     "appoints", "names new", "new ceo", "new cfo", "new cmo", "new coo", "new cto",
     "chief executive", "chief financial", "chief marketing", "chief operating",
-    "chief technology", "steps down", "resigns", "resignation", "appointed", "hires",
-    # expansion / footprint
-    "expand", "expansion", "new market", "new factory", "new plant", "new facility",
-    "new headquarters", "opens factory", "opens plant", "enters the", "global expansion",
+    "chief technology", "steps down as", "resigns as", "appointed ceo",
+    # footprint / market expansion (corporate, not product lineups)
+    "expands into", "expansion into", "enters the", "new market", "new factory",
+    "new plant", "new facility", "new headquarters", "opens factory", "opens plant",
+    "global expansion", "launches operations",
     # contracts / wins
     "wins contract", "secures contract", "awarded contract", "major contract",
-    "selected by", "wins deal", "multi-year deal",
-    # restructuring / distress
-    "layoff", "restructur", "cuts jobs", "downsiz", "shuts down", "closure",
+    "multi-year deal", "signs deal",
+    # restructuring / distress (timing + need)
+    "layoff", "lays off", "restructur", "cuts jobs", "downsiz", "shuts down",
     "bankrupt", "receivership", "insolvency", "files for bankruptcy",
     # public-market / brand
-    "ipo", "goes public", "spac", "rebrand", "relaunch", "record revenue", "record sales",
+    "ipo", "goes public", "files for ipo", "spac", "rebrand", "rebrands",
 ]
 _IMPORTANT_RE = [re.compile(re.escape(k)) for k in IMPORTANT_NEWS_KEYWORDS]
 
