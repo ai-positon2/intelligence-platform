@@ -310,6 +310,12 @@ def ppc():
 def seo():
     return render_template("seo.html", user=_get_user(), seo_tools=_seo_tools())
 
+@app.route("/context-graph")
+@login_required
+def context_graph():
+    """Interactive Context Graph — explains how data flows into the intelligence layer."""
+    return render_template("context_graph.html", user=_get_user())
+
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
 _SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
 
