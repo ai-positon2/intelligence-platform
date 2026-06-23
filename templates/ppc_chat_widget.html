@@ -110,12 +110,6 @@
 .k-hb-badge.show{ display:flex; }
 
 /* account segmented control */
-.k-pills{ position:relative; z-index:1; display:flex; gap:4px; margin-top:13px; padding:4px; border-radius:13px;
-  background:rgba(0,0,0,.16); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.14); }
-.k-pill{ flex:1; display:flex; align-items:center; justify-content:center; gap:5px; font-size:11.5px; font-weight:600; padding:7px 8px;
-  border-radius:9px; color:rgba(255,255,255,.78); cursor:pointer; transition:.2s var(--easeio); user-select:none; }
-.k-pill:hover{ color:#fff; background:rgba(255,255,255,.12); }
-.k-pill.active{ background:#fff; color:#5b3fd6; box-shadow:0 3px 10px rgba(0,0,0,.2); }
 
 /* ============================ BODY ============================ */
 #k-body{ position:relative; z-index:2; flex:1; overflow-y:auto; padding:22px 16px 12px; scroll-behavior:smooth; }
@@ -381,7 +375,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
           </div>
           <div class="k-hinfo">
             <div class="k-hname">Kairo <span class="k-spark">✦</span></div>
-            <div class="k-hstatus"><span class="k-live"></span><span id="k-status-txt">Revenue copilot · Online</span></div>
+            <div class="k-hstatus"><span class="k-live"></span><span id="k-status-txt">AI Assistant · Online</span></div>
           </div>
           <div class="k-hbtns">
             <button class="k-hb" onclick="kHistory()" title="Chat history" aria-label="History"><svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-7 3.3M3 4v3.5h3.5M12 7v5l3 2"/></svg></button>
@@ -391,11 +385,6 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
             <button class="k-hb" onclick="ppcToggleExpand()" title="Expand" aria-label="Expand"><svg id="k-expand-ico" width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
             <button class="k-hb" onclick="ppcOpen()" title="Close" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" d="M18 6 6 18M6 6l12 12"/></svg></button>
           </div>
-        </div>
-        <div class="k-pills">
-          <span class="k-pill active" data-acct="all" onclick="kSetAcct('all',this)">✦ All accounts</span>
-          <span class="k-pill" data-acct="healthcare" onclick="kSetAcct('healthcare',this)">🏥 Healthcare</span>
-          <span class="k-pill" data-acct="csg" onclick="kSetAcct('csg',this)">📟 CSG</span>
         </div>
       </div>
 
@@ -527,7 +516,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
       '<div class="k-orbwrap"><div class="k-ring"></div><div class="k-ring k-ring2"></div>'+
         '<div class="k-bigorb">'+orbSvg(36)+'</div></div>'+
       '<div class="k-greet">Hi '+esc(name)+' 👋</div>'+
-      '<div class="k-sub">I’m Kairo — your revenue-intelligence copilot. Pick a starting point or ask me anything.</div>'+
+      '<div class="k-sub">I’m Kairo — ask me about your accounts, signals and outreach, or pick a starting point below.</div>'+
       '<div class="k-cards">'+
         card('k-ic-leads','🔥','Hot leads','Top scored companies this week','Show me this week’s hottest leads')+
         card('k-ic-ads','🎯','Competitor ads','See who’s advertising & how','What competitor ads are running now?')+
@@ -614,7 +603,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
       acts.appendChild(act('🔎 Why hot?','',function(){ ask('Explain why '+co+' is a hot lead — break the intent score into its components (signal types, severity, recency, multi-intent).'); }));
     }
     if(/funding|m&a|acquisition|launch|signal/.test(lower)){
-      acts.appendChild(act('📣 Send to Slack','k-act-slk',function(){ confirmWrite('Slack','Post this summary to your #revenue channel.',text,'slack'); }));
+      acts.appendChild(act('📣 Send to Slack','k-act-slk',function(){ confirmWrite('Slack','Post this summary to your team Slack channel.',text,'slack'); }));
     }
     acts.appendChild(act('🖼 Slide','',function(){ confirmWrite('Deck','Generate a Position²-branded slide from this content.',text,'deck'); }));
     if(acts.children.length){ bub.parentNode.appendChild(acts); }
@@ -889,7 +878,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   var _onbStep=0;
   function onboarding(){ _onbStep=0; renderOnb(); openOv('k-onb'); }
   function renderOnb(){ var steps=[
-      {h:'Meet Kairo',p:'Your revenue-intelligence copilot. Ask about leads, visitors, competitor ads and buying signals in plain English.'},
+      {h:'Meet Kairo',p:'Ask about leads, visitors, competitor ads and buying signals in plain English.'},
       {h:'Act in one click',p:'Draft outreach, pull decision-makers, push to HubSpot or Slack, and export to Excel, Sheets, PDF or a slide — right from a reply.'},
       {h:'It remembers',p:'Tell Kairo your focus vertical, target CPA and tone in Settings & Memory. Use / for commands and @ to mention an account.'}
     ]; var s=steps[_onbStep]; var b=document.getElementById('k-onb-body');
