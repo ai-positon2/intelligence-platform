@@ -514,18 +514,12 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     var name = window.KAIRO_NAME || 'there';
     body.innerHTML =
       '<div class="k-greet">Hi '+esc(name)+'</div>'+
-      '<div class="k-sub">I’m Kairo — ask me about your accounts, signals and outreach, or pick a starting point below.</div>'+
+      '<div class="k-sub">Pick a starting point, or ask me anything.</div>'+
       '<div class="k-cards">'+
-        card('k-ic-leads','🔥','Hot leads','Top scored companies this week','Show me this week’s hottest leads')+
-        card('k-ic-ads','🎯','Competitor ads','See who’s advertising & how','What competitor ads are running now?')+
-        card('k-ic-sig','📡','Buying signals','Funding, M&A, launches, hiring','What are the strongest buying signals right now?')+
-        card('k-ic-mail','✍️','Draft outreach','Personalised email in seconds','Draft an outreach email for a hot lead')+
-      '</div>'+
-      '<div class="k-sugt"><span>Try asking</span></div>'+
-      '<div class="k-chips">'+
-        chip('👥','Who visited us this week?')+
-        chip('💰','Any recent funding rounds?')+
-        chip('📊','Give me a funding & M&A digest')+
+        card('k-ic-leads','🔥','Hot leads','Top scored this week','Show me this week’s hottest leads')+
+        card('k-ic-ads','🎯','Competitor ads','Who’s advertising now','What competitor ads are running now?')+
+        card('k-ic-sig','📡','Buying signals','Funding, M&A, hiring','What are the strongest buying signals right now?')+
+        card('k-ic-mail','✍️','Draft outreach','Email in seconds','Draft an outreach email for a hot lead')+
       '</div>';
   }
   function orbSvg(s){ return '<svg width="'+s+'" height="'+s+'" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/></svg>'; }
