@@ -656,6 +656,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
 
 
+  <script>window.KAIRO_NAME = {{ (user.given_name or user.name or 'there')|tojson|safe }};</script>
   {% include 'ppc_chat_widget.html' %}
 
   <!-- Kairo — transient greeting bubble (opens the Kairo chatbot) -->
