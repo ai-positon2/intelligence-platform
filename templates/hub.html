@@ -656,17 +656,21 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
 
 
-  <!-- Kairo — minimal greeting pill -->
+  {% include 'ppc_chat_widget.html' %}
+
+  <!-- Kairo — transient greeting bubble (opens the Kairo chatbot) -->
   <style>
-    #kairo{position:fixed;right:24px;bottom:24px;z-index:70;font-family:'Space Grotesk',system-ui,sans-serif}
-    .kairo-pill{display:flex;align-items:center;gap:11px;max-width:380px;
-      background:linear-gradient(120deg,rgba(20,23,42,.96),rgba(13,16,32,.96));
+    #kairo{position:fixed;right:28px;bottom:100px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
+    .kairo-pill{display:flex;align-items:center;gap:11px;max-width:360px;
+      background:linear-gradient(120deg,rgba(20,23,42,.97),rgba(13,16,32,.97));
       border:1px solid rgba(129,140,248,.34);border-radius:999px;padding:8px 14px 8px 9px;
       box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 26px rgba(99,102,241,.16);backdrop-filter:blur(10px);
-      cursor:pointer;transform:translateY(14px) scale(.96);opacity:0;transition:transform .4s cubic-bezier(.2,1.2,.3,1),opacity .4s,box-shadow .25s}
+      cursor:pointer;transform:translateY(14px) scale(.96);opacity:0;transition:transform .4s cubic-bezier(.2,1.2,.3,1),opacity .35s,box-shadow .25s}
     #kairo.show .kairo-pill{transform:translateY(0) scale(1);opacity:1}
-    #kairo.mini .kairo-pill{display:none}
-    .kairo-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.28);border-color:rgba(129,140,248,.55)}
+    #kairo.gone{display:none}
+    .kairo-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.3);border-color:rgba(129,140,248,.55)}
+    .kairo-pill::after{content:"";position:absolute;right:26px;bottom:-7px;width:14px;height:14px;
+      background:linear-gradient(135deg,rgba(20,23,42,.97),rgba(13,16,32,.97));border-right:1px solid rgba(129,140,248,.34);border-bottom:1px solid rgba(129,140,248,.34);transform:rotate(45deg)}
     .kairo-ic{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
       background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.45)}
     .kairo-tx{min-width:0;line-height:1.25}
@@ -675,15 +679,10 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     .kairo-x{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:#8b94be;
       font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;margin-left:2px}
     .kairo-x:hover{background:rgba(255,255,255,.14);color:#fff}
-    .kairo-mini{display:none;width:50px;height:50px;border-radius:50%;cursor:pointer;border:none;position:relative;
-      background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 12px 34px rgba(99,102,241,.5);align-items:center;justify-content:center}
-    #kairo.mini .kairo-mini{display:flex;animation:kpop .35s cubic-bezier(.2,1.3,.3,1)}
-    @keyframes kpop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
-    .kairo-mini .dot{position:absolute;top:2px;right:2px;width:11px;height:11px;border-radius:50%;background:#2dd4aa;border:2px solid #0d1020}
-    @media (max-width:560px){.kairo-pill{max-width:calc(100vw - 90px)}.kairo-tx .h,.kairo-tx .q{white-space:normal}}
+    @media (max-width:560px){ #kairo{right:18px;bottom:92px}.kairo-pill{max-width:calc(100vw - 50px)}.kairo-tx .h,.kairo-tx .q{white-space:normal}}
   </style>
   <div id="kairo">
-    <div class="kairo-pill" id="kairoPill" title="Ask Kairo">
+    <div class="kairo-pill" id="kairoPill" title="Chat with Kairo">
       <span class="kairo-ic">
         <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
           <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
@@ -698,27 +697,20 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
       </span>
       <button class="kairo-x" id="kairoX" aria-label="Dismiss">✕</button>
     </div>
-    <button class="kairo-mini" id="kairoMini" aria-label="Open Kairo" title="Kairo">
-      <span class="dot"></span>
-      <svg width="26" height="26" fill="none" viewBox="0 0 24 24">
-        <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
-        <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse>
-        <circle cx="12" cy="12" r="2.4" fill="#fff"/>
-      </svg>
-    </button>
   </div>
   <script>
   (function(){
     var box=document.getElementById('kairo'),pill=document.getElementById('kairoPill'),
-        x=document.getElementById('kairoX'),mini=document.getElementById('kairoMini'),q=document.getElementById('kairoQ');
+        x=document.getElementById('kairoX'),q=document.getElementById('kairoQ');
     var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
     q.textContent=lines[Math.floor(Math.random()*lines.length)];
     setTimeout(function(){box.classList.add('show');},700);
-    function openPalette(e){if(e)e.stopPropagation();try{document.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));}catch(_){}}
-    pill.addEventListener('click',openPalette);
-    x.addEventListener('click',function(e){e.stopPropagation();box.classList.remove('show');box.classList.add('mini');});
-    mini.addEventListener('click',function(){box.classList.remove('mini');box.classList.add('show');});
+    function openChat(){box.classList.remove('show');box.classList.add('gone');
+      if(window.ppcOpen)window.ppcOpen();}
+    pill.addEventListener('click',openChat);
+    x.addEventListener('click',function(e){e.stopPropagation();box.classList.remove('show');setTimeout(function(){box.classList.add('gone');},350);});
   })();
   </script>
+
 </body>
 </html>
