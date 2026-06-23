@@ -705,14 +705,17 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
     q.textContent=lines[Math.floor(Math.random()*lines.length)];
     setTimeout(function(){box.classList.add('show');},700);
-    function openChat(){
+    function openChat(e){
+      if(e&&e.stopPropagation)e.stopPropagation();          // don't let the click reach the widget's close-on-outside handler
       box.classList.remove('show');box.classList.add('gone');
-      var n=0;(function go(){
+      var n=0;
+      function go(){
         if(typeof window.ppcOpen==='function'){window.ppcOpen();return;}
         var b=document.getElementById('ppc-btn');
         if(b){b.click();return;}
         if(n++<25)setTimeout(go,100);
-      })();
+      }
+      setTimeout(go,0);                                      // defer so the originating click finishes bubbling first
     }
     pill.addEventListener('click',openChat);
     x.addEventListener('click',function(e){e.stopPropagation();box.classList.remove('show');setTimeout(function(){box.classList.add('gone');},350);});
