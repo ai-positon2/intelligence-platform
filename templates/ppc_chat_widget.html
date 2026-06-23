@@ -11,7 +11,7 @@
   --t1:#f4f5fb; --t2:#aeb3c9; --t3:#71768f;
   --brand:#6d6af6; --brand2:#9b6dff; --accent:#37e5c0; --danger:#ff6b6b; --warn:#ffb45c; --pos:#34d399;
   --hdr:linear-gradient(135deg,#5b5bf0 0%,#7c5cff 52%,#a45cff 100%);
-  --r1:7px; --r2:11px; --r3:15px; --r4:20px; --r5:28px;
+  --r1:5px; --r2:8px; --r3:11px; --r4:14px; --r5:18px;
   --sh1:0 2px 8px rgba(0,0,0,.3); --sh2:0 14px 40px rgba(0,0,0,.45);
   --shpop:0 28px 70px rgba(0,0,0,.6); --glow:0 10px 30px rgba(109,106,246,.5);
   --ease:cubic-bezier(.34,1.56,.64,1); --easeio:cubic-bezier(.4,0,.2,1);
@@ -27,7 +27,7 @@
   --scrim:rgba(20,22,46,.34);
   --sh2:0 14px 40px rgba(45,49,90,.16); --shpop:0 28px 70px rgba(45,49,90,.22);
 }
-#k-root[data-kdensity="compact"]{ --r4:16px; --r5:22px; }
+#k-root[data-kdensity="compact"]{ --r4:12px; --r5:15px; }
 #k-root, #k-root *{ box-sizing:border-box; }
 #k-root button{ font-family:inherit; }
 
@@ -90,7 +90,7 @@
   background:radial-gradient(160px 100px at 12% -20%,rgba(255,255,255,.32),transparent 70%),radial-gradient(160px 140px at 108% 120%,rgba(55,229,192,.28),transparent 70%); }
 #k-hdr::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent); }
 .k-htop{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; }
-.k-av{ position:relative; width:42px; height:42px; border-radius:13px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+.k-av{ position:relative; width:42px; height:42px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
   background:rgba(255,255,255,.17); backdrop-filter:blur(8px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.3),0 8px 20px rgba(0,0,0,.28); }
 .k-av .k-av-dot{ position:absolute; bottom:-2px; right:-2px; width:13px; height:13px; border-radius:50%; background:var(--accent); border:2.5px solid #6a51e6; box-shadow:0 0 8px var(--accent); }
 .k-hinfo{ flex:1; min-width:0; overflow:hidden; }
@@ -159,12 +159,12 @@
 .k-row{ position:relative; display:flex; gap:10px; margin-bottom:16px; animation:k-msgin .4s var(--ease) both; }
 @keyframes k-msgin{ from{ opacity:0; transform:translateY(14px) scale(.97);} to{ opacity:1; transform:none;} }
 .k-row.user{ flex-direction:row-reverse; }
-.k-ra{ width:32px; height:32px; border-radius:11px; flex-shrink:0; align-self:flex-end; display:flex; align-items:center; justify-content:center; }
+.k-ra{ width:32px; height:32px; border-radius:9px; flex-shrink:0; align-self:flex-end; display:flex; align-items:center; justify-content:center; }
 .k-row.assistant .k-ra{ background:var(--hdr); box-shadow:0 5px 14px rgba(124,92,255,.5); }
 .k-row.user .k-ra{ background:var(--s2); border:1px solid var(--st1); font-size:10px; font-weight:700; color:var(--t2); }
 .k-bcol{ display:flex; flex-direction:column; max-width:80%; }
 .k-row.user .k-bcol{ align-items:flex-end; }
-.k-bub{ padding:11px 14px; font-size:13.5px; line-height:1.72; border-radius:18px; position:relative; }
+.k-bub{ padding:11px 14px; font-size:13.5px; line-height:1.72; border-radius:13px; position:relative; }
 .k-row.assistant .k-bub{ background:var(--s1); border:1px solid var(--st1); color:var(--t1); border-bottom-left-radius:6px; }
 .k-row.user .k-bub{ background:linear-gradient(135deg,#6d6af6,#9b6dff); color:#fff; border-bottom-right-radius:6px; box-shadow:0 6px 18px rgba(124,92,255,.32); }
 .k-bub b,.k-bub strong{ font-weight:700; }
@@ -281,6 +281,8 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
 .k-sheet{ position:absolute; left:16px; right:16px; top:50%; transform:translateY(-50%) scale(.94); z-index:22; background:var(--bg); border:1px solid var(--st2);
   border-radius:var(--r4); box-shadow:var(--shpop); opacity:0; pointer-events:none; transition:.26s var(--ease); max-height:86%; display:flex; flex-direction:column; overflow:hidden; }
 .k-sheet.on{ opacity:1; pointer-events:all; transform:translateY(-50%) scale(1); }
+.k-sheet.tall{ top:16px; bottom:16px; transform:scale(.96); max-height:none; }
+.k-sheet.tall.on{ transform:scale(1); }
 .k-ph{ display:flex; align-items:center; gap:9px; padding:15px 16px; border-bottom:1px solid var(--st1); flex-shrink:0; }
 .k-ph h4{ margin:0; font-family:'Sora',sans-serif; font-size:14.5px; font-weight:700; color:var(--t1); flex:1; }
 .k-ph .x{ width:30px; height:30px; border-radius:9px; border:1px solid var(--st1); background:var(--s1); color:var(--t2); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
@@ -428,8 +430,8 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
         </div>
       </div>
 
-      <div class="k-sheet" id="k-settings"><div class="k-ph"><h4>Settings</h4><button class="x" onclick="kCloseAll()">✕</button></div><div class="k-pbody" id="k-settings-body"></div></div>
-      <div class="k-sheet" id="k-memsheet"><div class="k-ph"><h4>Memory</h4><button class="x" onclick="kCloseAll()">✕</button></div><div class="k-pbody" id="k-mem-body"></div></div>
+      <div class="k-sheet tall" id="k-settings"><div class="k-ph"><h4>Settings</h4><button class="x" onclick="kCloseAll()">✕</button></div><div class="k-pbody" id="k-settings-body"></div></div>
+      <div class="k-sheet tall" id="k-memsheet"><div class="k-ph"><h4>Memory</h4><button class="x" onclick="kCloseAll()">✕</button></div><div class="k-pbody" id="k-mem-body"></div></div>
       <div class="k-sheet" id="k-confirm"><div class="k-pbody" id="k-confirm-body"></div></div>
       <div class="k-sheet" id="k-onb"><div class="k-pbody" id="k-onb-body"></div></div>
 
