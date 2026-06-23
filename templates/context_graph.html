@@ -57,7 +57,7 @@ a{color:inherit;text-decoration:none}
   box-shadow:0 0 0 6px var(--ring), 0 18px 50px rgba(0,0,0,.5), inset 0 2px 14px rgba(255,255,255,.12);
   transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s}
 .core:hover{transform:scale(1.06)}
-.core .ct{font-family:'Sora';font-weight:700;font-size:14px;color:#fff;letter-spacing:.02em;text-transform:uppercase}
+.core .ct{font-family:'Sora';font-weight:700;font-size:13.5px;color:#fff;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}
 .core .cs{font-size:9.5px;color:rgba(255,255,255,.7);margin-top:4px;line-height:1.35;max-width:80%}
 .core .cpulse{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);opacity:.5;animation:cpulse 2.8s ease-out infinite;pointer-events:none}
 @keyframes cpulse{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.35);opacity:0}}
@@ -248,6 +248,8 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
   /* ---------------- layout + DOM ---------------- */
   var stage=document.getElementById('stage'), cv=document.getElementById('edges'), ctx=cv.getContext('2d');
   var W=0,H=0,dpr=Math.min(window.devicePixelRatio||1,2);
+  var LX=0,LY=0,LW=0,LH=0;
+  function computeLayout(){ var padX=Math.max(108,W*0.055), padTop=150, padBot=104; LX=padX; LW=Math.max(220,W-2*padX); LY=padTop; LH=Math.max(260,H-padTop-padBot); var aura=document.getElementById('aura'); if(aura){ aura.style.left=(LX+LW/2)+'px'; aura.style.top=(LY+LH*0.46)+'px'; } }
   var els={}, HOVER=null, SELECT=null, FOCUS=null;
   var MOUSE={x:window.innerWidth/2,y:window.innerHeight/2}, PT={x:0,y:0,tx:0,ty:0}, DRAG=null;
   var packets=[], rings=[], spawnT=0;
@@ -261,7 +263,7 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
     Object.keys(NODES).forEach(function(id){
       var n=NODES[id]; var cat=CAT[n.cat];
       n.id=id; n.ph1=Math.random()*6.2832; n.ph2=Math.random()*6.2832; n.ds=0.45+Math.random()*0.45;
-      n.amp=n.core?5:10; n.depth=n.core?(id==='intel'?0.5:0.55):1.2; n.ox=0; n.oy=0; n.drag=false; n._x=0; n._y=0;
+      n.amp=n.core?4:7; n.depth=n.core?(id==='intel'?0.45:0.5):1.05; n.ox=0; n.oy=0; n.drag=false; n._x=0; n._y=0;
       var el=document.createElement('div');
       el.className='node '+(n.core?'core-w':'box-w');
       el.setAttribute('tabindex','0'); el.setAttribute('role','button'); el.setAttribute('aria-label',n.label);
@@ -286,7 +288,7 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
     });
   }
 
-  function placeNodes(){ Object.keys(NODES).forEach(function(id){ setT(els[id], NODES[id].nx*W, NODES[id].ny*H); }); }
+  function placeNodes(){ Object.keys(NODES).forEach(function(id){ var n=NODES[id]; setT(els[id], LX+n.nx*LW, LY+n.ny*LH); }); }
 
   function bindPointer(){
     window.addEventListener('pointermove', function(e){ MOUSE.x=e.clientX; MOUSE.y=e.clientY; if(W&&H){ PT.tx=(e.clientX/W-0.5)*2; PT.ty=(e.clientY/H-0.5)*2; } }, {passive:true});
@@ -316,7 +318,7 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
     W=window.innerWidth; H=window.innerHeight;
     cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    placeNodes();
+    computeLayout(); placeNodes();
   }
   function ctrl(ax,ay,bx,by,curve){ var mx=(ax+bx)/2,my=(ay+by)/2,dx=bx-ax,dy=by-ay,len=Math.sqrt(dx*dx+dy*dy)||1; var off=curve*Math.min(95,len*0.18); return {cx:mx-dy/len*off, cy:my+dx/len*off, len:len}; }
   function bez(ax,ay,bx,by,c,t){ var it=1-t; return {x:it*it*ax+2*it*t*c.cx+t*t*bx, y:it*it*ay+2*it*t*c.cy+t*t*by}; }
@@ -327,13 +329,13 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
   function draw(now){
     var dt=Math.min(0.05,(now-last)/1000); last=now; var t=now/1000;
     PT.x+=(PT.tx-PT.x)*0.06; PT.y+=(PT.ty-PT.y)*0.06;
-    var cxr=W/2, cyr=H*0.52, rot=Math.sin(t*0.08)*0.02 + PT.x*0.03, cosR=Math.cos(rot), sinR=Math.sin(rot);
+    var cxr=LX+LW/2, cyr=LY+LH/2, rot=Math.sin(t*0.08)*0.018 + PT.x*0.025, cosR=Math.cos(rot), sinR=Math.sin(rot);
 
     Object.keys(NODES).forEach(function(id){
-      var n=NODES[id]; var bx=n.nx*W, by=n.ny*H, ox=bx-cxr, oy=by-cyr;
+      var n=NODES[id]; var bx=LX+n.nx*LW, by=LY+n.ny*LH, ox=bx-cxr, oy=by-cyr;
       var rx=cxr+ox*cosR-oy*sinR, ry=cyr+ox*sinR+oy*cosR;
       var dx=Math.sin(t*n.ds+n.ph1)*n.amp, dy=Math.cos(t*n.ds*0.92+n.ph2)*n.amp;
-      var natx=rx+dx+PT.x*n.depth*22, naty=ry+dy+PT.y*n.depth*15;
+      var natx=rx+dx+PT.x*n.depth*18, naty=ry+dy+PT.y*n.depth*13;
       if(n.drag && DRAG===n){ n.ox=MOUSE.x-natx; n.oy=MOUSE.y-naty; }
       else { n.ox*=0.86; n.oy*=0.86; if(Math.abs(n.ox)<0.4){ n.ox=0; } if(Math.abs(n.oy)<0.4){ n.oy=0; } }
       n._x=natx+n.ox; n._y=naty+n.oy; setT(n._el, n._x, n._y);
