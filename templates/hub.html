@@ -660,7 +660,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
   <!-- Kairo — transient greeting bubble (opens the Kairo chatbot) -->
   <style>
-    #kairo{position:fixed;right:28px;bottom:100px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
+    #kairo{position:fixed;right:100px;bottom:33px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
     .kairo-pill{display:flex;align-items:center;gap:11px;max-width:360px;
       background:linear-gradient(120deg,rgba(20,23,42,.97),rgba(13,16,32,.97));
       border:1px solid rgba(129,140,248,.34);border-radius:999px;padding:8px 14px 8px 9px;
@@ -669,8 +669,8 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     #kairo.show .kairo-pill{transform:translateY(0) scale(1);opacity:1}
     #kairo.gone{display:none}
     .kairo-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.3);border-color:rgba(129,140,248,.55)}
-    .kairo-pill::after{content:"";position:absolute;right:26px;bottom:-7px;width:14px;height:14px;
-      background:linear-gradient(135deg,rgba(20,23,42,.97),rgba(13,16,32,.97));border-right:1px solid rgba(129,140,248,.34);border-bottom:1px solid rgba(129,140,248,.34);transform:rotate(45deg)}
+    .kairo-pill::after{content:"";position:absolute;right:-6px;top:50%;margin-top:-7px;width:14px;height:14px;
+      background:linear-gradient(135deg,rgba(20,23,42,.97),rgba(13,16,32,.97));border-top:1px solid rgba(129,140,248,.34);border-right:1px solid rgba(129,140,248,.34);transform:rotate(45deg)}
     .kairo-ic{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
       background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.45)}
     .kairo-tx{min-width:0;line-height:1.25}
@@ -679,7 +679,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     .kairo-x{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:#8b94be;
       font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;margin-left:2px}
     .kairo-x:hover{background:rgba(255,255,255,.14);color:#fff}
-    @media (max-width:560px){ #kairo{right:18px;bottom:92px}.kairo-pill{max-width:calc(100vw - 50px)}.kairo-tx .h,.kairo-tx .q{white-space:normal}}
+    @media (max-width:560px){ #kairo{right:84px;bottom:30px}.kairo-pill{max-width:calc(100vw - 110px)}.kairo-tx .h,.kairo-tx .q{white-space:normal}}
   </style>
   <div id="kairo">
     <div class="kairo-pill" id="kairoPill" title="Chat with Kairo">
@@ -705,8 +705,15 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
     var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
     q.textContent=lines[Math.floor(Math.random()*lines.length)];
     setTimeout(function(){box.classList.add('show');},700);
-    function openChat(){box.classList.remove('show');box.classList.add('gone');
-      if(window.ppcOpen)window.ppcOpen();}
+    function openChat(){
+      box.classList.remove('show');box.classList.add('gone');
+      var n=0;(function go(){
+        if(typeof window.ppcOpen==='function'){window.ppcOpen();return;}
+        var b=document.getElementById('ppc-btn');
+        if(b){b.click();return;}
+        if(n++<25)setTimeout(go,100);
+      })();
+    }
     pill.addEventListener('click',openChat);
     x.addEventListener('click',function(e){e.stopPropagation();box.classList.remove('show');setTimeout(function(){box.classList.add('gone');},350);});
   })();
