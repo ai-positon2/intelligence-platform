@@ -513,9 +513,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function welcome(){
     var name = window.KAIRO_NAME || 'there';
     body.innerHTML =
-      '<div class="k-orbwrap"><div class="k-ring"></div><div class="k-ring k-ring2"></div>'+
-        '<div class="k-bigorb">'+orbSvg(36)+'</div></div>'+
-      '<div class="k-greet">Hi '+esc(name)+' 👋</div>'+
+      '<div class="k-greet">Hi '+esc(name)+'</div>'+
       '<div class="k-sub">I’m Kairo — ask me about your accounts, signals and outreach, or pick a starting point below.</div>'+
       '<div class="k-cards">'+
         card('k-ic-leads','🔥','Hot leads','Top scored companies this week','Show me this week’s hottest leads')+
