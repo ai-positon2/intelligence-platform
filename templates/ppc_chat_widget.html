@@ -281,8 +281,14 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
 .k-sheet{ position:absolute; left:16px; right:16px; top:50%; transform:translateY(-50%) scale(.94); z-index:22; background:var(--bg); border:1px solid var(--st2);
   border-radius:var(--r4); box-shadow:var(--shpop); opacity:0; pointer-events:none; transition:.26s var(--ease); max-height:86%; display:flex; flex-direction:column; overflow:hidden; }
 .k-sheet.on{ opacity:1; pointer-events:all; transform:translateY(-50%) scale(1); }
-.k-sheet.tall{ top:16px; bottom:16px; transform:scale(.96); max-height:none; }
+.k-sheet.tall{ top:16px; bottom:16px; transform:scale(.96); max-height:none; display:block; overflow-y:auto; overflow-x:hidden; }
 .k-sheet.tall.on{ transform:scale(1); }
+.k-sheet.tall .k-ph{ position:sticky; top:0; z-index:3; background:var(--bg); }
+.k-sheet.tall .k-pbody{ overflow:visible; flex:none; min-height:auto; padding-bottom:18px; }
+.k-sheet.tall::-webkit-scrollbar{ width:9px; }
+.k-sheet.tall::-webkit-scrollbar-track{ background:transparent; }
+.k-sheet.tall::-webkit-scrollbar-thumb{ background:var(--st2); border-radius:9px; border:2px solid transparent; background-clip:padding-box; }
+.k-sheet.tall::-webkit-scrollbar-thumb:hover{ background:var(--t3); background-clip:padding-box; }
 .k-ph{ display:flex; align-items:center; gap:9px; padding:15px 16px; border-bottom:1px solid var(--st1); flex-shrink:0; }
 .k-ph h4{ margin:0; font-family:'Sora',sans-serif; font-size:14.5px; font-weight:700; color:var(--t1); flex:1; }
 .k-ph .x{ width:30px; height:30px; border-radius:9px; border:1px solid var(--st1); background:var(--s1); color:var(--t2); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
