@@ -84,29 +84,29 @@
 #k-resize::after{ content:''; position:absolute; top:6px; left:6px; width:7px; height:7px; border-top:2px solid var(--t3); border-left:2px solid var(--t3); opacity:.45; }
 
 /* ============================ HEADER ============================ */
-#k-hdr{ position:relative; z-index:3; padding:15px 14px 14px; background:var(--hdr); overflow:hidden; cursor:grab; }
+#k-hdr{ position:relative; z-index:3; padding:13px 12px 13px 14px; background:rgba(255,255,255,.025); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--st1); overflow:hidden; cursor:grab; }
 #k-hdr:active{ cursor:grabbing; }
-#k-hdr::before{ content:''; position:absolute; inset:0; pointer-events:none; opacity:.9;
-  background:radial-gradient(160px 100px at 12% -20%,rgba(255,255,255,.32),transparent 70%),radial-gradient(160px 140px at 108% 120%,rgba(55,229,192,.28),transparent 70%); }
-#k-hdr::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent); }
+#k-hdr::before{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(220px 80px at 50% -50%,rgba(109,106,246,.20),transparent 70%); }
+#k-hdr::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg,transparent,var(--st2),transparent); }
 .k-htop{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; }
 .k-av{ position:relative; width:42px; height:42px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
-  background:rgba(255,255,255,.17); backdrop-filter:blur(8px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.3),0 8px 20px rgba(0,0,0,.28); }
-.k-av .k-av-dot{ position:absolute; bottom:-2px; right:-2px; width:13px; height:13px; border-radius:50%; background:var(--accent); border:2.5px solid #6a51e6; box-shadow:0 0 8px var(--accent); }
+  background:linear-gradient(135deg,#6d6af6,#9b6dff); box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 20px rgba(109,106,246,.45); }
+.k-av .k-av-dot{ position:absolute; bottom:-2px; right:-2px; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2.5px solid #0c0d16; box-shadow:0 0 8px var(--accent); }
 .k-hinfo{ flex:1; min-width:0; overflow:hidden; }
-.k-hname{ font-family:'Sora',sans-serif; font-size:16px; font-weight:700; color:#fff; letter-spacing:-.02em; line-height:1; margin-bottom:4px; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.k-hname{ font-family:'Sora',sans-serif; font-size:16px; font-weight:700; color:var(--t1); letter-spacing:-.02em; line-height:1; margin-bottom:4px; display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .k-hname .k-spark{ font-size:13px; opacity:.9; }
-.k-hstatus{ display:flex; align-items:center; gap:6px; font-size:11px; color:rgba(255,255,255,.86); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.k-hstatus{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--t2); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .k-live{ width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 9px var(--accent); animation:k-live 2.2s infinite; }
 @keyframes k-live{ 0%,100%{ opacity:1; box-shadow:0 0 0 0 rgba(55,229,192,.5);} 55%{ opacity:.7; box-shadow:0 0 0 7px rgba(55,229,192,0);} }
 .k-hbtns{ display:flex; gap:4px; flex-shrink:0; }
-.k-hb{ width:30px; height:30px; border-radius:10px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.13);
-  color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; flex-shrink:0;
-  transition:transform .18s var(--ease), background .18s, box-shadow .18s; }
-.k-hb:hover{ background:rgba(255,255,255,.3); transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.25); }
+.k-hb{ width:30px; height:30px; border-radius:9px; border:1px solid var(--st1); background:var(--s2);
+  color:var(--t2); display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; flex-shrink:0;
+  transition:transform .18s var(--ease), background .18s, color .18s, box-shadow .18s; }
+.k-hb:hover{ background:var(--s3); color:var(--t1); transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.25); }
 .k-hb:active{ transform:translateY(0) scale(.92); }
 .k-hb-badge{ position:absolute; top:-5px; right:-5px; min-width:15px; height:15px; padding:0 3px; border-radius:8px; background:var(--accent);
-  color:#053b30; font-size:8.5px; font-weight:800; display:none; align-items:center; justify-content:center; border:2px solid #6a51e6; }
+  color:#053b30; font-size:8.5px; font-weight:800; display:none; align-items:center; justify-content:center; border:2px solid #0c0d16; }
+#k-root[data-ktheme="light"] .k-av .k-av-dot,#k-root[data-ktheme="light"] .k-hb-badge{ border-color:#fff; }
 .k-hb-badge.show{ display:flex; }
 
 /* account segmented control */
@@ -159,6 +159,20 @@
   background:rgba(255,255,255,.16); backdrop-filter:blur(6px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 8px 20px rgba(0,0,0,.25); animation:k-float 5s var(--easeio) infinite; }
 .k-hero-tile::before{ content:'✦'; position:absolute; top:-7px; right:-5px; font-size:12px; color:rgba(255,255,255,.85); }
 .k-hero-tile::after{ content:''; position:absolute; bottom:-4px; left:-5px; width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); }
+.k-hello{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:100%; padding:8px 8px 16px; }
+.k-sphere{ position:relative; width:128px; height:128px; border-radius:50%; margin-bottom:30px; flex-shrink:0;
+  background:radial-gradient(circle at 30% 26%, rgba(255,255,255,.95), rgba(255,255,255,0) 24%), radial-gradient(circle at 72% 80%, rgba(18,8,55,.92), transparent 60%), conic-gradient(from 210deg at 50% 50%, #6d6af6, #22d3ee, #8b5cf6, #ec4899, #6d6af6);
+  box-shadow:0 26px 60px rgba(80,60,210,.55), inset -12px -16px 42px rgba(0,0,0,.55), inset 10px 12px 32px rgba(255,255,255,.22); filter:saturate(1.15);
+  animation:k-float 6s var(--easeio) infinite, k-orbhue 14s linear infinite; }
+@keyframes k-orbhue{ to{ filter:saturate(1.15) hue-rotate(360deg); } }
+.k-sphere::before{ content:''; position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.55), transparent 32%); mix-blend-mode:screen; }
+.k-sphere::after{ content:''; position:absolute; inset:-36px; border-radius:50%; z-index:-1; background:radial-gradient(circle, rgba(109,106,246,.5), transparent 65%); filter:blur(18px); }
+.k-hello-t{ font-family:'Sora',sans-serif; font-size:23px; font-weight:700; color:var(--t1); line-height:1.3; letter-spacing:-.02em; max-width:280px; margin-bottom:22px; }
+.k-replies{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:340px; }
+.k-reply{ display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; font-size:12px; font-weight:500; color:var(--t2); cursor:pointer;
+  background:var(--s1); border:1px solid var(--st2); transition:.18s var(--ease); }
+.k-reply:hover{ background:var(--s2); border-color:rgba(124,92,255,.55); color:var(--t1); transform:translateY(-2px); box-shadow:0 8px 20px rgba(109,106,246,.22); }
+.k-reply .re{ font-size:13px; }
 .k-sugt{ display:flex; align-items:center; justify-content:space-between; font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--t3); margin:0 2px 11px; }
 .k-chips{ display:flex; flex-direction:column; gap:7px; }
 .k-chip{ display:flex; align-items:center; gap:10px; font-size:12px; font-weight:500; color:var(--t2); padding:9px 12px; border-radius:11px; cursor:pointer;
@@ -242,9 +256,9 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
 
 /* ============================ COMPOSER ============================ */
 #k-input-area{ position:relative; z-index:3; padding:12px 14px 14px; border-top:1px solid var(--st1); }
-#k-irow{ display:flex; flex-direction:column; gap:9px; padding:11px 12px; border-radius:var(--r4); background:var(--s1); border:1px solid var(--st1); transition:border-color .2s, box-shadow .2s, background .2s; }
+#k-irow{ display:flex; align-items:center; gap:6px; padding:7px 7px 7px 12px; border-radius:16px; background:var(--s1); border:1px solid var(--st1); transition:border-color .2s, box-shadow .2s, background .2s; }
 #k-irow:focus-within{ border-color:rgba(124,92,255,.55); background:var(--s2); box-shadow:0 0 0 4px rgba(109,106,246,.14); }
-#k-input{ width:100%; background:transparent; border:none; outline:none; color:var(--t1); font-size:14px; font-family:inherit; resize:none; line-height:1.55; max-height:120px; min-height:22px; }
+#k-input{ flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--t1); font-size:14px; font-family:inherit; resize:none; line-height:1.55; max-height:120px; min-height:22px; }
 #k-input::placeholder{ color:var(--t3); }
 .k-comp-bar{ display:flex; align-items:center; gap:7px; }
 .k-comp-left{ display:flex; align-items:center; gap:6px; }
@@ -420,19 +434,12 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
         <div class="k-emoji" id="k-emoji"></div>
         <div class="k-filepill" id="k-filepill"><span class="fi">📎</span><span class="fl" id="k-filelabel"></span><button onclick="kRemoveFile()" aria-label="Remove file">✕</button></div>
         <div id="k-irow">
-          <textarea id="k-input" rows="1" placeholder="Ask Kairo anything…"></textarea>
-          <div class="k-comp-bar">
-            <div class="k-comp-left">
-              <button class="k-ib" onclick="kAttach()" title="Attach file" aria-label="Attach"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-              <button class="k-ib" id="k-voice" onclick="kVoice()" title="Voice input" aria-label="Voice"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-              <button class="k-ib" onclick="kEmojiToggle(event)" title="Emoji" aria-label="Emoji"><svg width="17" height="17" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M9 10h.01M15 10h.01M8.5 14.5a4 4 0 0 0 7 0"/></svg></button>
-              <span class="k-hint"><b>/</b> commands · <b>@</b> mention</span>
-            </div>
-            <div class="k-comp-right">
-              <button id="k-stop" onclick="kStop()" title="Stop" aria-label="Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button>
-              <button id="k-send" onclick="ppcSend()" aria-label="Send"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
-            </div>
-          </div>
+          <button class="k-ib" onclick="kAttach()" title="Attach file" aria-label="Attach"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+          <button class="k-ib" id="k-voice" onclick="kVoice()" title="Voice input" aria-label="Voice"><svg width="16" height="16" fill="none" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <button class="k-ib" onclick="kEmojiToggle(event)" title="Emoji" aria-label="Emoji"><svg width="17" height="17" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M9 10h.01M15 10h.01M8.5 14.5a4 4 0 0 0 7 0"/></svg></button>
+          <textarea id="k-input" rows="1" placeholder="Ask anything…"></textarea>
+          <button id="k-stop" onclick="kStop()" title="Stop" aria-label="Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button>
+          <button id="k-send" onclick="ppcSend()" aria-label="Send"><svg width="17" height="17" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/></svg></button>
         </div>
         <div id="k-foot">Kairo can make mistakes · verify important details</div>
       </div>
@@ -535,21 +542,20 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function welcome(){
     var name = window.KAIRO_NAME || 'there';
     body.innerHTML =
-      '<div class="k-hero">'+
-        '<div class="k-hero-txt"><div class="k-hero-hi">Hi '+esc(name)+'</div>'+
-          '<div class="k-hero-sub">Your assistant for leads, signals, visitors and outreach — ask me anything.</div></div>'+
-        '<div class="k-hero-art"><div class="k-hero-tile">✦</div></div>'+
-      '</div>'+
-      '<div class="k-seclabel">Quick actions</div>'+
-      '<div class="k-cards">'+
-        card('k-ic-leads','🔥','Hot leads','Top scored this week','Show me this week’s hottest leads')+
-        card('k-ic-ads','🎯','Competitor ads','Who’s advertising now','What competitor ads are running now?')+
-        card('k-ic-sig','📡','Buying signals','Funding, M&A, hiring','What are the strongest buying signals right now?')+
-        card('k-ic-mail','✍️','Draft outreach','Email in seconds','Draft an outreach email for a hot lead')+
+      '<div class="k-hello">'+
+        '<div class="k-sphere"></div>'+
+        '<div class="k-hello-t">Hi '+esc(name)+'! How can I help you today?</div>'+
+        '<div class="k-replies">'+
+          reply('🔥','Hot leads','Show me this week’s hottest leads')+
+          reply('🎯','Competitor ads','What competitor ads are running now?')+
+          reply('📡','Buying signals','What are the strongest buying signals right now?')+
+          reply('✍️','Draft outreach','Draft an outreach email for a hot lead')+
+        '</div>'+
       '</div>';
   }
   function orbSvg(s){ return '<svg width="'+s+'" height="'+s+'" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/></svg>'; }
   function card(cls,ic,t,d,q){ var ac=cls.replace('k-ic-','k-ac-'); return '<div class="k-card '+ac+'" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><div class="k-card-ic '+cls+'">'+ic+'</div><div class="k-card-t">'+t+'</div><div class="k-card-d">'+d+'</div><span class="k-card-go">→</span></div>'; }
+  function reply(ic,label,q){ return '<div class="k-reply" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><span class="re">'+ic+'</span>'+label+'</div>'; }
   function chip(e,q){ return '<div class="k-chip" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><span class="ke">'+e+'</span>'+q+'<span class="kg">→</span></div>'; }
   window.ppcSugg = function(el){ input.value=el.getAttribute('data-q'); ppcSend(); };
 
@@ -635,7 +641,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     var msg=(input.value||'').trim();
     if(!msg && !_file){ return; }
     hidePops();
-    var wlc=body.querySelector('.k-hero'); if(wlc){ body.innerHTML=''; }
+    var wlc=body.querySelector('.k-hello'); if(wlc){ body.innerHTML=''; }
     if(!_curId){ newSession(); }
     /* slash command expansion */
     msg = expandSlash(msg);
