@@ -160,13 +160,10 @@
 .k-hero-tile::before{ content:'✦'; position:absolute; top:-7px; right:-5px; font-size:12px; color:rgba(255,255,255,.85); }
 .k-hero-tile::after{ content:''; position:absolute; bottom:-4px; left:-5px; width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); }
 .k-hello{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:100%; padding:8px 8px 16px; }
-.k-sphere{ position:relative; width:128px; height:128px; border-radius:50%; margin-bottom:30px; flex-shrink:0;
-  background:radial-gradient(circle at 30% 26%, rgba(255,255,255,.95), rgba(255,255,255,0) 24%), radial-gradient(circle at 72% 80%, rgba(18,8,55,.92), transparent 60%), conic-gradient(from 210deg at 50% 50%, #6d6af6, #22d3ee, #8b5cf6, #ec4899, #6d6af6);
-  box-shadow:0 26px 60px rgba(80,60,210,.55), inset -12px -16px 42px rgba(0,0,0,.55), inset 10px 12px 32px rgba(255,255,255,.22); filter:saturate(1.15);
-  animation:k-float 6s var(--easeio) infinite, k-orbhue 14s linear infinite; }
-@keyframes k-orbhue{ to{ filter:saturate(1.15) hue-rotate(360deg); } }
-.k-sphere::before{ content:''; position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.55), transparent 32%); mix-blend-mode:screen; }
-.k-sphere::after{ content:''; position:absolute; inset:-36px; border-radius:50%; z-index:-1; background:radial-gradient(circle, rgba(109,106,246,.5), transparent 65%); filter:blur(18px); }
+.k-orb3d{ position:relative; width:152px; height:152px; margin-bottom:24px; flex-shrink:0; animation:k-float 6.5s var(--easeio) infinite; }
+.k-orb3d canvas{ display:block; width:152px; height:152px; position:relative; z-index:1; }
+.k-orb3d::after{ content:''; position:absolute; inset:-24px; border-radius:50%; z-index:0; background:radial-gradient(circle, rgba(109,106,246,.42), rgba(124,92,255,.12) 46%, transparent 68%); filter:blur(20px); animation:k-orbglow 4.2s var(--easeio) infinite; }
+@keyframes k-orbglow{ 0%,100%{ opacity:.7; transform:scale(1);} 50%{ opacity:1; transform:scale(1.1);} }
 .k-hello-t{ font-family:'Sora',sans-serif; font-size:23px; font-weight:700; color:var(--t1); line-height:1.3; letter-spacing:-.02em; max-width:280px; margin-bottom:22px; }
 .k-replies{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:340px; }
 .k-reply{ display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; font-size:12px; font-weight:500; color:var(--t2); cursor:pointer;
@@ -539,11 +536,47 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   window.kSetAcct = function(a,el){ _acct=a; var p=root.querySelectorAll('.k-pill'); for(var i=0;i<p.length;i++){p[i].classList.remove('active');} el.classList.add('active'); loadCompanies(); };
 
   /* ---------- welcome ---------- */
+  function kOrb(cv){
+    var ctx=cv.getContext('2d'); if(!ctx){ return; }
+    var dpr=Math.min(window.devicePixelRatio||1,2), SZ=152;
+    cv.width=SZ*dpr; cv.height=SZ*dpr; cv.style.width=SZ+'px'; cv.style.height=SZ+'px'; ctx.scale(dpr,dpr);
+    var cx=SZ/2, cy=SZ/2, R=60, N=160, pts=[];
+    for(var i=0;i<N;i++){ var y=1-(i/(N-1))*2; var rr=Math.sqrt(Math.max(0,1-y*y)); var th=i*2.399963229; pts.push({x:Math.cos(th)*rr, y:y, z:Math.sin(th)*rr, h:(Math.cos(th)+1)/2}); }
+    var pal=[[109,106,246],[34,211,238],[139,92,246],[236,72,153]];
+    function col(t,a){ t=(t%1+1)%1; var seg=t*pal.length, i=Math.floor(seg)%pal.length, j=(i+1)%pal.length, fr=seg-Math.floor(seg); var c0=pal[i],c1=pal[j]; return 'rgba('+Math.round(c0[0]+(c1[0]-c0[0])*fr)+','+Math.round(c0[1]+(c1[1]-c0[1])*fr)+','+Math.round(c0[2]+(c1[2]-c0[2])*fr)+','+a+')'; }
+    var t0=performance.now();
+    function frame(now){
+      if(!document.body.contains(cv)){ return; }
+      if(document.hidden){ requestAnimationFrame(frame); return; }
+      var t=(now-t0)/1000, ay=t*0.5, ax=Math.sin(t*0.32)*0.45+0.35;
+      var cY=Math.cos(ay),sY=Math.sin(ay),cX=Math.cos(ax),sX=Math.sin(ax);
+      ctx.clearRect(0,0,SZ,SZ);
+      ctx.globalCompositeOperation='lighter';
+      var cg=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.95);
+      cg.addColorStop(0,'rgba(124,92,255,0.22)'); cg.addColorStop(1,'rgba(124,92,255,0)');
+      ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(cx,cy,R*0.95,0,6.2832); ctx.fill();
+      var pr=[];
+      for(var i=0;i<N;i++){ var p=pts[i];
+        var x=p.x*cY - p.z*sY, z=p.x*sY + p.z*cY, y=p.y*cX - z*sX, z2=p.y*sX + z*cX;
+        var depth=(z2+1)/2;
+        pr.push({sx:cx+x*R, sy:cy+y*R, d:depth, h:p.h});
+      }
+      for(var a=0;a<N;a++){ var pa=pr[a]; if(pa.d<0.34){ continue; }
+        for(var b=a+1;b<N;b++){ var pb=pr[b]; var dx=pa.sx-pb.sx, dy=pa.sy-pb.sy, d2=dx*dx+dy*dy;
+          if(d2<340){ var al=(1-d2/340)*0.20*pa.d; ctx.strokeStyle=col(pa.h+t*0.05,al); ctx.lineWidth=0.6; ctx.beginPath(); ctx.moveTo(pa.sx,pa.sy); ctx.lineTo(pb.sx,pb.sy); ctx.stroke(); } } }
+      for(var i=0;i<N;i++){ var p=pr[i]; var rad=0.6+p.d*2.1, al=0.22+p.d*0.78, c=col(p.h+t*0.05,al);
+        ctx.fillStyle=c; ctx.beginPath(); ctx.arc(p.sx,p.sy,rad,0,6.2832); ctx.fill();
+        if(p.d>0.72){ ctx.fillStyle=col(p.h+t*0.05,al*0.22); ctx.beginPath(); ctx.arc(p.sx,p.sy,rad*2.8,0,6.2832); ctx.fill(); } }
+      ctx.globalCompositeOperation='source-over';
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
   function welcome(){
     var name = window.KAIRO_NAME || 'there';
     body.innerHTML =
       '<div class="k-hello">'+
-        '<div class="k-sphere"></div>'+
+        '<div class="k-orb3d"><canvas id="k-orb" width="152" height="152"></canvas></div>'+
         '<div class="k-hello-t">Hi '+esc(name)+'! How can I help you today?</div>'+
         '<div class="k-replies">'+
           reply('🔥','Hot leads','Show me this week’s hottest leads')+
@@ -552,6 +585,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
           reply('✍️','Draft outreach','Draft an outreach email for a hot lead')+
         '</div>'+
       '</div>';
+    var orb=document.getElementById('k-orb'); if(orb){ kOrb(orb); }
   }
   function orbSvg(s){ return '<svg width="'+s+'" height="'+s+'" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/></svg>'; }
   function card(cls,ic,t,d,q){ var ac=cls.replace('k-ic-','k-ac-'); return '<div class="k-card '+ac+'" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><div class="k-card-ic '+cls+'">'+ic+'</div><div class="k-card-t">'+t+'</div><div class="k-card-d">'+d+'</div><span class="k-card-go">→</span></div>'; }
