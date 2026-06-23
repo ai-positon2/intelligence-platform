@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>The Context Graph · Intelligence by Position²</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#070810; --bg1:#0b0d18; --ink:#eef1fb; --ink2:#aab2cf; --ink3:#6b7398; 
+  --person:#4f8ef7; --account:#23c08a; --deal:#f0843a; --intel:#9b8bf5;
+  --line:rgba(255,255,255,.08); --glass:rgba(255,255,255,.045);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:
+  radial-gradient(1100px 700px at 18% -8%, rgba(79,142,247,.10), transparent 60%),
+  radial-gradient(1000px 700px at 85% 8%, rgba(35,192,138,.09), transparent 60%),
+  radial-gradient(900px 800px at 50% 120%, rgba(155,139,245,.12), transparent 60%),
+  linear-gradient(180deg,#070810,#0a0c16 55%,#06070e);
+  color:#eef1fb;font-family:'Inter',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+#bg{position:fixed;inset:0;z-index:0;opacity:.5;pointer-events:none}
+
+/* top bar */
+.top{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;gap:16px;padding:18px 26px}
+.back{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink2);padding:8px 14px;border-radius:11px;background:var(--glass);border:1px solid var(--line);transition:.18s}
+.back:hover{color:#fff;background:rgba(255,255,255,.08);transform:translateX(-2px)}
+.logo{margin-left:auto;width:36px;height:36px;border-radius:10px;background:#0d0f1a;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'Sora';font-weight:800;color:#fff}
+.logo sup{font-size:9px}
+
+/* heading */
+.head{position:fixed;top:64px;left:0;right:0;z-index:20;text-align:center;pointer-events:none;padding:0 20px}
+.head h1{margin:0;font-family:'Sora';font-weight:700;font-size:clamp(20px,3.2vw,34px);letter-spacing:-.02em;
+  background:linear-gradient(180deg,#fff,#aeb6e6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.head p{margin:7px 0 0;font-size:13.5px;color:var(--ink2)}
+.head .accent{color:#b9c0ff}
+
+/* stage */
+#stage{position:fixed;inset:0;z-index:10}
+#edges{position:absolute;inset:0;z-index:11}
+#aura{position:absolute;z-index:10;width:420px;height:420px;border-radius:50%;left:50%;top:46%;transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(circle, rgba(155,139,245,.22), rgba(124,92,255,.06) 45%, transparent 70%);filter:blur(16px);animation:aura 6s ease-in-out infinite}
+@keyframes aura{0%,100%{opacity:.65;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}
+
+/* nodes */
+.node{position:absolute;z-index:14;transform:translate(-50%,-50%);cursor:pointer;transition:opacity .3s, filter .2s;will-change:transform}
+.node.dim{opacity:.18;filter:saturate(.4)}
+.node:focus{outline:none}
+
+.core{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-radius:50%;
+  border:2px solid var(--c);background:radial-gradient(circle at 35% 28%, rgba(255,255,255,.12), transparent 60%), var(--fill);
+  box-shadow:0 0 0 6px var(--ring), 0 18px 50px rgba(0,0,0,.5), inset 0 2px 14px rgba(255,255,255,.12);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s}
+.core:hover{transform:scale(1.06)}
+.core .ct{font-family:'Sora';font-weight:700;font-size:14px;color:#fff;letter-spacing:.02em;text-transform:uppercase}
+.core .cs{font-size:9.5px;color:rgba(255,255,255,.7);margin-top:4px;line-height:1.35;max-width:80%}
+.core .cpulse{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);opacity:.5;animation:cpulse 2.8s ease-out infinite;pointer-events:none}
+@keyframes cpulse{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.35);opacity:0}}
+
+.box{position:relative;min-width:172px;padding:11px 13px;border-radius:12px;background:var(--glass);border:1px solid var(--line);
+  border-left:3px solid var(--c);backdrop-filter:blur(8px);box-shadow:0 8px 26px rgba(0,0,0,.35);transition:transform .2s, box-shadow .2s, border-color .2s}
+.box:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.5);border-color:var(--c)}
+.box .bt{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--c);letter-spacing:.04em;text-transform:uppercase}
+.box .bs{font-size:10.5px;color:var(--ink2);margin-top:4px;letter-spacing:.01em}
+.box .bdot{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+
+/* legend */
+.legend{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:25;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+  padding:8px;border-radius:14px;background:rgba(10,12,22,.7);border:1px solid var(--line);backdrop-filter:blur(12px)}
+.lg{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--ink2);padding:7px 12px;border-radius:9px;cursor:pointer;transition:.16s;border:1px solid transparent}
+.lg:hover{color:#fff;background:rgba(255,255,255,.05)}
+.lg.on{color:#fff;border-color:var(--c);background:rgba(255,255,255,.06)}
+.lg .d{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.hint{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:24;font-size:11.5px;color:var(--ink3);opacity:.0;transition:.4s}
+
+/* detail drawer */
+#scrim{position:fixed;inset:0;z-index:40;background:rgba(5,6,12,.55);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s}
+#scrim.on{opacity:1;pointer-events:all}
+#panel{position:fixed;top:0;right:0;bottom:0;z-index:41;width:392px;max-width:92vw;transform:translateX(104%);transition:transform .4s cubic-bezier(.3,1,.4,1);
+  background:linear-gradient(180deg,#0d0f1c,#0a0b14);border-left:1px solid var(--line);box-shadow:-30px 0 80px rgba(0,0,0,.6);display:flex;flex-direction:column}
+#panel.on{transform:translateX(0)}
+.ph{position:relative;padding:26px 24px 20px;overflow:hidden;flex-shrink:0}
+.ph::after{content:'';position:absolute;inset:0;background:radial-gradient(220px 120px at 16% -10%, var(--c), transparent 70%);opacity:.22;pointer-events:none}
+.ph .tag{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c);position:relative;z-index:1}
+.ph h2{margin:10px 0 6px;font-family:'Sora';font-weight:700;font-size:24px;color:#fff;position:relative;z-index:1}
+.ph .lead{font-size:13px;color:var(--ink2);line-height:1.6;position:relative;z-index:1}
+.pclose{position:absolute;top:18px;right:18px;z-index:2;width:32px;height:32px;border:1px solid var(--line);border-radius:9px;background:var(--glass);color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pclose:hover{color:#fff;background:rgba(255,255,255,.08)}
+.pbody{padding:6px 24px 28px;overflow-y:auto}
+.sec{margin-top:20px}
+.sec h4{margin:0 0 10px;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{font-size:11.5px;font-weight:500;color:var(--ink);padding:7px 11px;border-radius:9px;background:var(--glass);border:1px solid var(--line)}
+.flow{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);padding:11px 12px;border-radius:11px;background:var(--glass);border:1px solid var(--line);margin-bottom:8px}
+.flow .fi{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.06);font-size:14px}
+.flow b{font-weight:600}
+.flow .fs{display:block;font-size:11px;color:var(--ink2)}
+.intelbox{margin-top:20px;padding:14px;border-radius:13px;background:linear-gradient(135deg, rgba(155,139,245,.14), rgba(124,92,255,.05));border:1px solid rgba(155,139,245,.3)}
+.intelbox .il{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#bcb4ff;margin-bottom:8px}
+.intelbox p{margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6}
+.pcta{display:block;margin-top:18px;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:13px;color:#fff;background:linear-gradient(135deg,#6d6af6,#9b6dff);box-shadow:0 8px 22px rgba(124,92,255,.4);transition:.2s}
+.pcta:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(124,92,255,.55)}
+
+@media (max-width:760px){
+  .box{ min-width:130px;padding:9px 10px }
+  .head p{ display:none }
+}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div class="top">
+  <a class="back" href="/hub"><svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6"/></svg> Back to hub</a>
+  <div class="logo">p<sup>2</sup></div>
+</div>
+
+<div class="head">
+  <h1>The Context Graph</h1>
+  <p>One connected record per buyer — every signal, action and outcome unified, then scored by the <span class="accent">Kairo intelligence layer</span>.</p>
+</div>
+
+<div id="stage">
+  <canvas id="edges"></canvas>
+  <div id="aura"></div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div id="scrim" onclick="closePanel()"></div>
+<aside id="panel" aria-live="polite">
+  <div class="ph" id="ph">
+    <button class="pclose" onclick="closePanel()" aria-label="Close">✕</button>
+    <div class="tag" id="p-tag"></div>
+    <h2 id="p-title"></h2>
+    <div class="lead" id="p-lead"></div>
+  </div>
+  <div class="pbody" id="p-body"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if user else None) or 'there') | tojson }};
+</script>
+<script>
+(function(){
+  "use strict";
+  /* ---------------- data model ---------------- */
+  var CAT = {
+    person:{c:'#4f8ef7', rgb:[79,142,247], name:'Person signals'},
+    account:{c:'#23c08a', rgb:[35,192,138], name:'Account signals'},
+    deal:{c:'#f0843a', rgb:[240,132,58], name:'Deal & outcomes'},
+    intel:{c:'#9b8bf5', rgb:[155,139,245], name:'Intelligence layer'}
+  };
+  var NODES = {
+    person:{label:'Person', sub:'name · title · linkedin', cat:'person', core:1, r:74, nx:.30, ny:.45,
+      tag:'Core entity', lead:'The individual buyer — who they are and everything they have done with us.',
+      points:['Name','Title / seniority','LinkedIn profile','Engagement timeline'],
+      source:['Visitor de-anonymisation','LinkedIn scraper','Form fills & email'],
+      flows:['Rolls up to the Account','Joins the Deal record','Feeds the intelligence layer'],
+      intel:'Kairo links every person-level signal to one identity, so a pricing-page visit, an email reply and a LinkedIn comment all land on the same record.'},
+    account:{label:'Account', sub:'company · ICP tier · tech stack', cat:'account', core:1, r:74, nx:.70, ny:.45,
+      tag:'Core entity', lead:'The company the person belongs to — the unit you actually sell to.',
+      points:['Company & domain','ICP tier / fit','Tech stack','Employee count'],
+      source:['Firmographic enrichment','Signal Tracker','CRM sync'],
+      flows:['Groups all its people','Anchors the Deal','Feeds the intelligence layer'],
+      intel:'Kairo aggregates every person and account signal into a single account-level intent picture, so committee-wide activity is visible at a glance.'},
+    deal:{label:'Deal', sub:'stage · owner · history', cat:'deal', core:1, r:66, nx:.50, ny:.70,
+      tag:'Core entity', lead:'The opportunity — where Person and Account meet a revenue motion.',
+      points:['Pipeline stage','Owner','Activity history','Forecast'],
+      source:['HubSpot','Outreach activity','Meeting outcomes'],
+      flows:['Drives outreach','Produces outcomes','Feeds the intelligence layer'],
+      intel:'Kairo ties signals to deal stage, surfacing which open opportunities are heating up and which need a nudge.'},
+    intel:{label:'Kairo', sub:'intelligence layer', cat:'intel', core:1, r:60, nx:.50, ny:.18,
+      tag:'Intelligence layer', lead:'The brain on top of the graph — it scores, prioritises and acts.',
+      points:['Intent scoring','Account prioritisation','Next-best-action','Drafted outreach'],
+      source:['Every node in the graph'],
+      flows:['Ranks hottest accounts','Explains why an account is hot','Triggers outreach'],
+      intel:'This is the layer we add. Raw signals are just data — Kairo reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
+
+    pages:{label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.18, side:'L',
+      tag:'Person signal', lead:'Which pages the buyer browsed — the clearest first-party intent signal.',
+      points:['Pricing','Case studies','Product pages','Blog'], source:['Anonymous visitor de-anonymisation'],
+      flows:['Attaches to the Person','Raises the Intent Score'],
+      intel:'Repeat visits to pricing or a specific product page push the person toward HOT in Kairo’s scoring.'},
+    email:{label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.34, side:'L',
+      tag:'Person signal', lead:'How the buyer engaged with email — opens, clicks and replies.',
+      points:['Opens','Clicks','Replies','Sequence step'], source:['Email / sequencing tool','CRM'],
+      flows:['Attaches to the Person','Informs outreach timing'],
+      intel:'A reply or repeated clicks tell Kairo the thread is warm and worth a fast, personalised follow-up.'},
+    linkedin:{label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.52, side:'L',
+      tag:'Person signal', lead:'Public LinkedIn engagement from the buyer and their org.',
+      points:['Likes','Comments','Reactions','Post topics'], source:['LinkedIn scraper'],
+      flows:['Attaches to the Person','Adds context for outreach'],
+      intel:'Kairo uses what someone engages with publicly to make outreach relevant, not generic.'},
+    intent:{label:'Intent Score', sub:'HOT · WARM · COLD', cat:'intel', nx:.085, ny:.70, side:'L',
+      tag:'Intelligence layer', lead:'A computed score — not a raw signal — that ranks how ready a person is.',
+      points:['HOT / WARM / COLD','Score 0–100','Trend over time'], source:['Computed by Kairo from all person signals'],
+      flows:['Prioritises the Person','Surfaces in Hot Leads'],
+      intel:'This is intelligence, not input. Kairo blends every person signal — weighted by type, severity and recency — into one number reps can act on.'},
+
+    crm:{label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.18, side:'R',
+      tag:'Account signal', lead:'The system-of-record state for the account in HubSpot.',
+      points:['HubSpot company','Deal stage','Owner','Lifecycle'], source:['HubSpot CRM'],
+      flows:['Attaches to the Account','Keeps the graph in sync'],
+      intel:'Kairo reads and (with confirmation) writes back to HubSpot, so the graph and CRM never drift apart.'},
+    market:{label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.34, side:'R',
+      tag:'Account signal', lead:'External buying triggers happening at the company.',
+      points:['Funding rounds','Leadership change','M&A','Product launch','Creative hiring'], source:['Signal Tracker'],
+      flows:['Attaches to the Account','Boosts account intent'],
+      intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Kairo flags these as outreach windows.'},
+    committee:{label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.52, side:'R',
+      tag:'Account signal', lead:'The set of people who actually decide — mapped to roles.',
+      points:['Champion','Decision-maker','Approver','Blocker'], source:['Enrichment','Apollo','Engagement mapping'],
+      flows:['Links people to the Account','Shapes multi-thread outreach'],
+      intel:'Kairo shows whether you are engaging the people who can actually sign — or just a champion.'},
+    readiness:{label:'Readiness State', sub:'state-machine position', cat:'intel', nx:.915, ny:.70, side:'R',
+      tag:'Intelligence layer', lead:'Where the account sits in its buying journey — a computed state.',
+      points:['New','Engaged','Evaluating','In motion'], source:['Computed by Kairo from account signals'],
+      flows:['Prioritises the Account','Picks the right play'],
+      intel:'Like Intent Score, this is derived. Kairo moves an account through states automatically as signals accumulate.'},
+
+    outreach:{label:'Outreach Sent', sub:'kairo · slack · email · crm', cat:'deal', nx:.30, ny:.90,
+      tag:'Action', lead:'The action taken on the buyer — informed by the whole graph.',
+      points:['Kairo-drafted email','Slack alert to rep','Sequence enrolment','CRM task'], source:['Kairo','Email','Slack','HubSpot'],
+      flows:['Acts on the Deal','Produces an Outcome'],
+      intel:'Because Kairo sees the full record, outreach references the exact signal that triggered it — not a generic blast.'},
+    outcome:{label:'Outcome', sub:'reply · meeting · pipeline', cat:'deal', nx:.70, ny:.90,
+      tag:'Outcome', lead:'What the outreach produced — the loop that trains prioritisation.',
+      points:['Reply','Meeting booked','Pipeline created','Closed-won'], source:['Email','Calendar','HubSpot'],
+      flows:['Updates the Deal','Feeds back into the intelligence layer'],
+      intel:'Outcomes close the loop: Kairo learns which signals actually convert and sharpens future scoring.'}
+  };
+  var EDGES = [
+    ['pages','person'],['email','person'],['linkedin','person'],['intent','person'],
+    ['crm','account'],['market','account'],['committee','account'],['readiness','account'],
+    ['person','account'],['person','deal'],['account','deal'],
+    ['person','intel'],['account','intel'],['deal','intel'],
+    ['intel','outreach'],['deal','outreach'],['outreach','outcome'],['deal','outcome']
+  ];
+
+  /* ---------------- layout + DOM ---------------- */
+  var stage=document.getElementById('stage'), cv=document.getElementById('edges'), ctx=cv.getContext('2d');
+  var W=0,H=0,dpr=Math.min(window.devicePixelRatio||1,2);
+  var els={}, HOVER=null, SELECT=null, FOCUS=null;
+
+  function px(n){ return {x: n.nx*W, y: n.ny*H}; }
+
+  function buildNodes(){
+    Object.keys(NODES).forEach(function(id){
+      var n=NODES[id]; var cat=CAT[n.cat];
+      var el=document.createElement('div');
+      el.className='node '+(n.core?'core-w':'box-w');
+      el.setAttribute('tabindex','0'); el.setAttribute('role','button');
+      el.style.setProperty('--c', cat.c);
+      if(n.core){
+        var sz=n.r*2;
+        el.innerHTML='<div class="core" style="width:'+sz+'px;height:'+sz+'px;--fill:radial-gradient(circle at 50% 50%, '+rgba(cat.rgb,.30)+', '+rgba(cat.rgb,.10)+');--ring:'+rgba(cat.rgb,.10)+'">'+
+          '<span class="cpulse"></span><span class="ct">'+n.label+'</span><span class="cs">'+n.sub+'</span></div>';
+      } else {
+        el.innerHTML='<div class="box"><div class="bt"><span class="bdot"></span>'+n.label+'</div><div class="bs">'+n.sub+'</div></div>';
+      }
+      el.addEventListener('click', function(){ openPanel(id); });
+      el.addEventListener('mouseenter', function(){ HOVER=id; });
+      el.addEventListener('mouseleave', function(){ HOVER=null; });
+      el.addEventListener('focus', function(){ HOVER=id; });
+      el.addEventListener('blur', function(){ HOVER=null; });
+      el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openPanel(id); } });
+      stage.appendChild(el); els[id]=el;
+    });
+  }
+  function rgba(a,al){ return 'rgba('+a[0]+','+a[1]+','+a[2]+','+al+')'; }
+
+  function placeNodes(){
+    Object.keys(NODES).forEach(function(id){ var p=px(NODES[id]); var e=els[id]; e.style.left=p.x+'px'; e.style.top=p.y+'px'; });
+  }
+
+  /* ---------------- particle edges ---------------- */
+  var parts=[];
+  function buildEdges(){
+    parts=[];
+    EDGES.forEach(function(e){
+      var a=NODES[e[0]], b=NODES[e[1]];
+      var toIntel=(e[1]==='intel'||e[0]==='intel');
+      var rgb = toIntel?CAT.intel.rgb:CAT[a.cat].rgb;
+      var n=8;
+      var arr=[];
+      for(var i=0;i<n;i++){ arr.push(Math.random()); }
+      parts.push({from:e[0],to:e[1],rgb:rgb,ts:arr,curve:(Math.random()-0.5)});
+    });
+  }
+  function edgeActive(ed){
+    if(FOCUS){ if(NODES[ed.from].cat!==FOCUS && NODES[ed.to].cat!==FOCUS) return false; }
+    if(HOVER){ if(ed.from!==HOVER && ed.to!==HOVER) return (FOCUS?true:false); }
+    if(SELECT){ if(ed.from!==SELECT && ed.to!==SELECT && !FOCUS && !HOVER) return false; }
+    return true;
+  }
+
+  function resize(){
+    W=window.innerWidth; H=window.innerHeight;
+    cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    placeNodes();
+  }
+
+  var last=performance.now();
+  function draw(now){
+    var dt=Math.min(0.05,(now-last)/1000); last=now;
+    ctx.clearRect(0,0,W,H);
+
+    /* core glows */
+    ['intel','person','account','deal'].forEach(function(id){
+      var n=NODES[id], p=px(n), cat=CAT[n.cat];
+      var g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,n.r*1.9);
+      g.addColorStop(0, rgba(cat.rgb,.18)); g.addColorStop(1, rgba(cat.rgb,0));
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,n.r*1.9,0,6.2832); ctx.fill();
+    });
+
+    ctx.globalCompositeOperation='lighter';
+    for(var k=0;k<parts.length;k++){
+      var ed=parts[k]; var act=edgeActive(ed);
+      var a=px(NODES[ed.from]), b=px(NODES[ed.to]);
+      var mx=(a.x+b.x)/2, my=(a.y+b.y)/2; var dx=b.x-a.x, dy=b.y-a.y; var len=Math.sqrt(dx*dx+dy*dy)||1;
+      var off=ed.curve*Math.min(90,len*0.18); var cxp=mx - dy/len*off, cyp=my + dx/len*off;
+      /* base filament */
+      ctx.strokeStyle=rgba(ed.rgb, act?0.16:0.04); ctx.lineWidth=act?1.1:0.7;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(cxp,cyp,b.x,b.y); ctx.stroke();
+      /* travelling particles */
+      var spd=(70/len);
+      for(var i=0;i<ed.ts.length;i++){
+        ed.ts[i]+=dt*spd; if(ed.ts[i]>1) ed.ts[i]-=1;
+        var t=ed.ts[i], it=1-t;
+        var x=it*it*a.x+2*it*t*cxp+t*t*b.x, y=it*it*a.y+2*it*t*cyp+t*t*b.y;
+        var fade=Math.sin(t*Math.PI); /* dim at endpoints */
+        var al=(act?0.95:0.18)*fade;
+        var r=(act?2.2:1.4)*(0.6+0.6*fade);
+        ctx.fillStyle=rgba(ed.rgb,al); ctx.beginPath(); ctx.arc(x,y,r,0,6.2832); ctx.fill();
+        if(act){ ctx.fillStyle=rgba(ed.rgb,al*0.18); ctx.beginPath(); ctx.arc(x,y,r*3.2,0,6.2832); ctx.fill(); }
+      }
+    }
+    ctx.globalCompositeOperation='source-over';
+    requestAnimationFrame(draw);
+  }
+
+  /* ---------------- focus / dim ---------------- */
+  function applyDim(){
+    Object.keys(NODES).forEach(function(id){
+      var n=NODES[id], on=true;
+      if(FOCUS){ on = (n.cat===FOCUS); }
+      if(SELECT && !FOCUS){ on = (id===SELECT) || EDGES.some(function(e){ return (e[0]===SELECT&&e[1]===id)||(e[1]===SELECT&&e[0]===id); }); }
+      els[id].classList.toggle('dim', !on);
+    });
+  }
+
+  /* ---------------- detail panel ---------------- */
+  function openPanel(id){
+    var n=NODES[id], cat=CAT[n.cat]; SELECT=id; applyDim();
+    var ph=document.getElementById('ph'); ph.style.setProperty('--c', cat.c);
+    document.getElementById('p-tag').innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+cat.c+';box-shadow:0 0 8px '+cat.c+';display:inline-block"></span> '+n.tag;
+    document.getElementById('p-title').textContent=n.label;
+    document.getElementById('p-lead').textContent=n.lead;
+    var body=document.getElementById('p-body');
+    var pts=(n.points||[]).map(function(p){return '<span class="chip">'+p+'</span>';}).join('');
+    var src=(n.source||[]).map(function(s){return '<div class="flow"><span class="fi">⇲</span><div><b>'+s+'</b></div></div>';}).join('');
+    var fl=(n.flows||[]).map(function(s){return '<div class="flow"><span class="fi" style="color:'+cat.c+'">→</span><div><b>'+s+'</b></div></div>';}).join('');
+    var cta = (n.cat==='intel') ? '<a class="pcta" href="javascript:void(0)" onclick="askKairo(\''+id+'\')">Ask Kairo about this ✦</a>'
+            : '<a class="pcta" href="/signal-tracker/healthcare">Open the Signal Tracker →</a>';
+    body.innerHTML =
+      '<div class="sec"><h4>What it holds</h4><div class="chips">'+pts+'</div></div>'+
+      '<div class="sec"><h4>Where the data comes from</h4>'+src+'</div>'+
+      '<div class="sec"><h4>Where it flows</h4>'+fl+'</div>'+
+      '<div class="intelbox"><div class="il">✦ Intelligence layer</div><p>'+n.intel+'</p></div>'+
+      cta;
+    document.getElementById('scrim').classList.add('on');
+    document.getElementById('panel').classList.add('on');
+  }
+  window.closePanel=function(){ SELECT=null; applyDim(); document.getElementById('scrim').classList.remove('on'); document.getElementById('panel').classList.remove('on'); };
+  window.askKairo=function(id){ var n=NODES[id]; try{ if(window.ppcOpen){ window.ppcOpen(); var inp=document.getElementById('k-input'); if(inp){ inp.value='Explain the '+n.label+' and how the intelligence layer uses it.'; if(window.ppcSend) setTimeout(window.ppcSend,400); } } }catch(e){} closePanel(); };
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closePanel(); });
+
+  /* ---------------- legend ---------------- */
+  function buildLegend(){
+    var L=document.getElementById('legend');
+    Object.keys(CAT).forEach(function(c){
+      var d=document.createElement('div'); d.className='lg'; d.style.setProperty('--c',CAT[c].c);
+      d.innerHTML='<span class="d"></span>'+CAT[c].name;
+      d.addEventListener('click',function(){ FOCUS=(FOCUS===c?null:c); applyDim();
+        [].forEach.call(L.children,function(x){ x.classList.remove('on'); }); if(FOCUS) d.classList.add('on'); });
+      L.appendChild(d);
+    });
+  }
+
+  /* ---------------- ambient three.js field (matches login/hub) ---------------- */
+  function ambient(){
+    if(!window.THREE){ return; }
+    var T=window.THREE, c=document.getElementById('bg'); var rnd;
+    try{ rnd=new T.WebGLRenderer({canvas:c,antialias:true,alpha:true}); }catch(e){ return; }
+    rnd.setPixelRatio(Math.min(devicePixelRatio,2)); rnd.setSize(innerWidth,innerHeight);
+    var sc=new T.Scene(), cam=new T.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); cam.position.z=60;
+    var N=420, pos=new Float32Array(N*3), col=new Float32Array(N*3), sz=new Float32Array(N);
+    var cA=new T.Color(0x4f8ef7), cB=new T.Color(0x9b8bf5), cC=new T.Color(0x23c08a), tmp=new T.Color();
+    for(var i=0;i<N;i++){ pos[i*3]=(Math.random()-.5)*120; pos[i*3+1]=(Math.random()-.5)*80; pos[i*3+2]=(Math.random()-.5)*60;
+      var m=Math.random(); tmp.copy(m<.4?cA:(m<.7?cB:cC)); col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b; sz[i]=Math.random()*Math.random()*2+0.5; }
+    var g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3)); g.setAttribute('aColor',new T.BufferAttribute(col,3)); g.setAttribute('aSize',new T.BufferAttribute(sz,1));
+    var u={uTime:{value:0}};
+    var vs=['attribute vec3 aColor; attribute float aSize; uniform float uTime; varying vec3 vC; varying float vT;','void main(){','vC=aColor; vT=0.5+0.5*sin(uTime*1.2+aSize*7.0);','vec4 mv=modelViewMatrix*vec4(position,1.0);','gl_PointSize=aSize*(260.0/-mv.z);','gl_Position=projectionMatrix*mv;','}'].join(String.fromCharCode(10));
+    var fs=['varying vec3 vC; varying float vT;','void main(){','float d=length(gl_PointCoord-0.5);','float core=smoothstep(0.5,0.0,d);','gl_FragColor=vec4(vC*vT, pow(core,2.0));','}'].join(String.fromCharCode(10));
+    var m=new T.ShaderMaterial({uniforms:u,transparent:true,depthWrite:false,blending:T.AdditiveBlending,vertexShader:vs,fragmentShader:fs});
+    var pts=new T.Points(g,m); sc.add(pts);
+    var clk=new T.Clock();
+    function loop(){ if(document.hidden){ requestAnimationFrame(loop); return; } var t=clk.getElapsedTime(); u.uTime.value=t; pts.rotation.y=t*0.04; pts.rotation.x=Math.sin(t*0.1)*0.1; rnd.render(sc,cam); requestAnimationFrame(loop); }
+    loop();
+    window.addEventListener('resize',function(){ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); rnd.setSize(innerWidth,innerHeight); });
+  }
+
+  /* ---------------- boot ---------------- */
+  buildNodes(); buildLegend(); buildEdges(); resize();
+  window.addEventListener('resize', resize);
+  try{ ambient(); }catch(e){}
+  requestAnimationFrame(draw);
+})();
+</script>
+{% include 'ppc_chat_widget.html' %}
+</body>
+</html>
