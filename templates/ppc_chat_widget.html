@@ -129,11 +129,11 @@
   background:linear-gradient(180deg,var(--t1),#9a9fce); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-size:22px; }
 .k-sub{ text-align:center; font-size:12px; color:var(--t2); line-height:1.55; max-width:290px; margin:0 auto 16px; }
 .k-cards{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:16px; }
-.k-card{ position:relative; display:grid; grid-template-columns:32px 1fr; column-gap:10px; align-items:center; text-align:left; padding:10px 11px; border-radius:13px; cursor:pointer; overflow:hidden;
-  background:var(--s1); border:1px solid var(--st1); transition:transform .25s var(--ease), border-color .2s, box-shadow .25s, background .2s; }
-.k-card::after{ content:''; position:absolute; inset:0; border-radius:inherit; opacity:0; transition:.28s;
-  background:radial-gradient(120px 80px at 80% -10%,rgba(124,92,255,.22),transparent 70%); }
-.k-card:hover{ transform:translateY(-3px); background:var(--s2); border-color:rgba(124,92,255,.45); box-shadow:0 10px 24px rgba(70,50,160,.26); }
+.k-card{ position:relative; display:grid; grid-template-columns:32px 1fr; column-gap:10px; align-items:center; text-align:left; padding:11px 12px; border-radius:13px; cursor:pointer; overflow:hidden;
+  background:linear-gradient(160deg,var(--s2),var(--s1)); border:1px solid var(--st1); box-shadow:0 2px 10px rgba(0,0,0,.16); transition:transform .25s var(--ease), border-color .2s, box-shadow .25s, background .2s; }
+.k-card::after{ content:''; position:absolute; inset:0; border-radius:inherit; opacity:.4; transition:.28s; pointer-events:none;
+  background:radial-gradient(78px 52px at 86% -18%, var(--cardglow,rgba(124,92,255,.2)), transparent 70%); }
+.k-card:hover{ transform:translateY(-3px); border-color:rgba(124,92,255,.5); box-shadow:0 12px 26px rgba(70,50,160,.32); }
 .k-card:hover::after{ opacity:1; }
 .k-card:active{ transform:translateY(-1px) scale(.99); }
 .k-card-ic{ grid-row:1 / span 2; align-self:center; width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:15px; box-shadow:inset 0 1px 0 rgba(255,255,255,.2); }
@@ -145,6 +145,20 @@
 .k-card-d{ align-self:start; font-size:10px; color:var(--t3); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .k-card-go{ position:absolute; top:50%; right:10px; margin-top:-8px; color:var(--brand2); opacity:0; transform:translateX(-5px); transition:.22s var(--ease); font-size:14px; }
 .k-card:hover .k-card-go{ opacity:1; transform:translateX(0); }
+.k-ac-leads{ --cardglow:rgba(255,159,67,.28); } .k-ac-ads{ --cardglow:rgba(155,109,255,.32); } .k-ac-sig{ --cardglow:rgba(55,229,192,.28); } .k-ac-mail{ --cardglow:rgba(52,211,153,.28); }
+.k-seclabel{ font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--t3); margin:0 2px 10px; }
+.k-hero{ position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; padding:15px 15px; margin-bottom:16px; border-radius:16px;
+  background:linear-gradient(135deg,#5b5bf0 0%,#7c5cff 52%,#b257ff 100%); box-shadow:0 16px 36px rgba(124,92,255,.42), inset 0 1px 0 rgba(255,255,255,.32); }
+.k-hero::before{ content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(150px 90px at 16% -25%,rgba(255,255,255,.35),transparent 70%),radial-gradient(170px 130px at 112% 130%,rgba(55,229,192,.32),transparent 70%); }
+.k-hero::after{ content:''; position:absolute; right:-26px; top:-26px; width:130px; height:130px; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.16),transparent 70%); pointer-events:none; }
+.k-hero-txt{ position:relative; z-index:1; flex:1; min-width:0; }
+.k-hero-hi{ font-family:'Sora',sans-serif; font-size:21px; font-weight:700; color:#fff; letter-spacing:-.02em; line-height:1.1; margin-bottom:5px; }
+.k-hero-sub{ font-size:11.5px; color:rgba(255,255,255,.88); line-height:1.5; max-width:215px; }
+.k-hero-art{ position:relative; z-index:1; flex-shrink:0; }
+.k-hero-tile{ position:relative; width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:23px; color:#fff;
+  background:rgba(255,255,255,.16); backdrop-filter:blur(6px); box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 8px 20px rgba(0,0,0,.25); animation:k-float 5s var(--easeio) infinite; }
+.k-hero-tile::before{ content:'✦'; position:absolute; top:-7px; right:-5px; font-size:12px; color:rgba(255,255,255,.85); }
+.k-hero-tile::after{ content:''; position:absolute; bottom:-4px; left:-5px; width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); }
 .k-sugt{ display:flex; align-items:center; justify-content:space-between; font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--t3); margin:0 2px 11px; }
 .k-chips{ display:flex; flex-direction:column; gap:7px; }
 .k-chip{ display:flex; align-items:center; gap:10px; font-size:12px; font-weight:500; color:var(--t2); padding:9px 12px; border-radius:11px; cursor:pointer;
@@ -521,8 +535,12 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function welcome(){
     var name = window.KAIRO_NAME || 'there';
     body.innerHTML =
-      '<div class="k-greet">Hi '+esc(name)+'</div>'+
-      '<div class="k-sub">Pick a starting point, or ask me anything.</div>'+
+      '<div class="k-hero">'+
+        '<div class="k-hero-txt"><div class="k-hero-hi">Hi '+esc(name)+'</div>'+
+          '<div class="k-hero-sub">Your assistant for leads, signals, visitors and outreach — ask me anything.</div></div>'+
+        '<div class="k-hero-art"><div class="k-hero-tile">✦</div></div>'+
+      '</div>'+
+      '<div class="k-seclabel">Quick actions</div>'+
       '<div class="k-cards">'+
         card('k-ic-leads','🔥','Hot leads','Top scored this week','Show me this week’s hottest leads')+
         card('k-ic-ads','🎯','Competitor ads','Who’s advertising now','What competitor ads are running now?')+
@@ -531,7 +549,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
       '</div>';
   }
   function orbSvg(s){ return '<svg width="'+s+'" height="'+s+'" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse><ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="rgba(255,255,255,.8)" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse><circle cx="12" cy="12" r="2.4" fill="#fff"/></svg>'; }
-  function card(cls,ic,t,d,q){ return '<div class="k-card" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><div class="k-card-ic '+cls+'">'+ic+'</div><div class="k-card-t">'+t+'</div><div class="k-card-d">'+d+'</div><span class="k-card-go">→</span></div>'; }
+  function card(cls,ic,t,d,q){ var ac=cls.replace('k-ic-','k-ac-'); return '<div class="k-card '+ac+'" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><div class="k-card-ic '+cls+'">'+ic+'</div><div class="k-card-t">'+t+'</div><div class="k-card-d">'+d+'</div><span class="k-card-go">→</span></div>'; }
   function chip(e,q){ return '<div class="k-chip" data-q="'+esc(q)+'" onclick="ppcSugg(this)"><span class="ke">'+e+'</span>'+q+'<span class="kg">→</span></div>'; }
   window.ppcSugg = function(el){ input.value=el.getAttribute('data-q'); ppcSend(); };
 
@@ -617,7 +635,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     var msg=(input.value||'').trim();
     if(!msg && !_file){ return; }
     hidePops();
-    var wlc=body.querySelector('.k-greet'); if(wlc){ body.innerHTML=''; }
+    var wlc=body.querySelector('.k-hero'); if(wlc){ body.innerHTML=''; }
     if(!_curId){ newSession(); }
     /* slash command expansion */
     msg = expandSlash(msg);
