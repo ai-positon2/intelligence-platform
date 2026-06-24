@@ -46,7 +46,7 @@ a{color:inherit;text-decoration:none}
 /* heading */
 .head{position:fixed;top:64px;left:0;right:0;z-index:20;text-align:center;pointer-events:none;padding:0 20px}
 .head h1{margin:0;font-family:'Sora';font-weight:700;font-size:clamp(20px,3.2vw,34px);letter-spacing:-.02em;
-  background:linear-gradient(180deg,#fff,#aeb6e6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  background:linear-gradient(180deg,#fff,#aeb6e6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 3px 22px rgba(124,92,255,.28))}
 .head p{margin:7px 0 0;font-size:13.5px;color:var(--ink2)}
 .head .accent{color:#b9c0ff}
 
@@ -74,11 +74,11 @@ a{color:inherit;text-decoration:none}
 .core .cpulse{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);opacity:.5;animation:cpulse 2.8s ease-out infinite;pointer-events:none}
 @keyframes cpulse{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.35);opacity:0}}
 
-.box{position:relative;min-width:172px;padding:11px 13px;border-radius:12px;background:var(--glass);border:1px solid var(--line);
-  border-left:3px solid var(--c);backdrop-filter:blur(8px);box-shadow:0 8px 26px rgba(0,0,0,.35);transition:transform .2s, box-shadow .2s, border-color .2s}
-.box:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.5);border-color:var(--c)}
-.box .bt{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--c);letter-spacing:.04em;text-transform:uppercase}
-.box .bs{font-size:10.5px;color:var(--ink2);margin-top:4px;letter-spacing:.01em}
+.box{position:relative;min-width:190px;padding:13px 16px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid var(--line);
+  border-left:3px solid var(--c);backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05);transition:transform .22s cubic-bezier(.34,1.4,.5,1), box-shadow .22s, border-color .22s}
+.box:hover{transform:translateY(-4px);box-shadow:0 20px 44px rgba(0,0,0,.55),0 0 0 1px var(--c);border-color:var(--c)}
+.box .bt{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--c);letter-spacing:.05em;text-transform:uppercase}
+.box .bs{font-size:11px;color:var(--ink2);margin-top:5px;letter-spacing:.01em}
 .box .bdot{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);animation:bdot 2.4s ease-in-out infinite}
 @keyframes bdot{0%,100%{opacity:1;box-shadow:0 0 0 0 var(--c)}55%{opacity:.55;box-shadow:0 0 10px 2px var(--c)}}
 
@@ -201,43 +201,43 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       flows:['Ranks hottest accounts','Explains why an account is hot','Triggers outreach'],
       intel:'This is the layer we add. Raw signals are just data — Vimi reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
 
-    pages:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.18, side:'L',
+    pages:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.14, side:'L',
       tag:'Person signal', lead:'Which pages the buyer browsed — the clearest first-party intent signal.',
       points:['Pricing','Case studies','Product pages','Blog'], source:['Anonymous visitor de-anonymisation'],
       flows:['Attaches to the Person','Raises the Intent Score'],
       intel:'Repeat visits to pricing or a specific product page push the person toward HOT in Vimi’s scoring.'},
-    email:{cta:{l:'Ask Vimi to draft a follow-up ✦',h:'ask'}, label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.34, side:'L',
+    email:{cta:{l:'Ask Vimi to draft a follow-up ✦',h:'ask'}, label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.38, side:'L',
       tag:'Person signal', lead:'How the buyer engaged with email — opens, clicks and replies.',
       points:['Opens','Clicks','Replies','Sequence step'], source:['Email / sequencing tool','CRM'],
       flows:['Attaches to the Person','Informs outreach timing'],
       intel:'A reply or repeated clicks tell Vimi the thread is warm and worth a fast, personalised follow-up.'},
-    linkedin:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.52, side:'L',
+    linkedin:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.62, side:'L',
       tag:'Person signal', lead:'Public LinkedIn engagement from the buyer and their org.',
       points:['Likes','Comments','Reactions','Post topics'], source:['LinkedIn scraper'],
       flows:['Attaches to the Person','Adds context for outreach'],
       intel:'Vimi uses what someone engages with publicly to make outreach relevant, not generic.'},
-    intent:{label:'Intent Score', sub:'HOT · WARM · COLD', cat:'intel', nx:.085, ny:.70, side:'L',
+    intent:{label:'Intent Score', sub:'HOT · WARM · COLD', cat:'intel', nx:.085, ny:.86, side:'L',
       tag:'Intelligence layer', lead:'A computed score — not a raw signal — that ranks how ready a person is.',
       points:['HOT / WARM / COLD','Score 0–100','Trend over time'], source:['Computed by Vimi from all person signals'],
       flows:['Prioritises the Person','Surfaces in Hot Leads'],
       intel:'This is intelligence, not input. Vimi blends every person signal — weighted by type, severity and recency — into one number reps can act on.'},
 
-    crm:{cta:{l:'Open Accounts →',h:'/accounts'}, label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.18, side:'R',
+    crm:{cta:{l:'Open Accounts →',h:'/accounts'}, label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.14, side:'R',
       tag:'Account signal', lead:'The system-of-record state for the account in HubSpot.',
       points:['HubSpot company','Deal stage','Owner','Lifecycle'], source:['HubSpot CRM'],
       flows:['Attaches to the Account','Keeps the graph in sync'],
       intel:'Vimi reads and (with confirmation) writes back to HubSpot, so the graph and CRM never drift apart.'},
-    market:{cta:{l:'Open the Signal Tracker →',h:'/signal-tracker/healthcare'}, label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.34, side:'R',
+    market:{cta:{l:'Open the Signal Tracker →',h:'/signal-tracker/healthcare'}, label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.38, side:'R',
       tag:'Account signal', lead:'External buying triggers happening at the company.',
       points:['Funding rounds','Leadership change','M&A','Product launch','Creative hiring'], source:['Signal Tracker'],
       flows:['Attaches to the Account','Boosts account intent'],
       intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Vimi flags these as outreach windows.'},
-    committee:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.52, side:'R',
+    committee:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.62, side:'R',
       tag:'Account signal', lead:'The set of people who actually decide — mapped to roles.',
       points:['Champion','Decision-maker','Approver','Blocker'], source:['Enrichment','Apollo','Engagement mapping'],
       flows:['Links people to the Account','Shapes multi-thread outreach'],
       intel:'Vimi shows whether you are engaging the people who can actually sign — or just a champion.'},
-    readiness:{label:'Readiness State', sub:'state-machine position', cat:'intel', nx:.915, ny:.70, side:'R',
+    readiness:{label:'Readiness State', sub:'state-machine position', cat:'intel', nx:.915, ny:.86, side:'R',
       tag:'Intelligence layer', lead:'Where the account sits in its buying journey — a computed state.',
       points:['New','Engaged','Evaluating','In motion'], source:['Computed by Vimi from account signals'],
       flows:['Prioritises the Account','Picks the right play'],
