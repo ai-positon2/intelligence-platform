@@ -378,11 +378,11 @@
   function animateCount(el,target){var start=0,dur=800,step=14;var t=setInterval(function(){start+=Math.ceil(target/(dur/step));if(start>=target){el.textContent=target;clearInterval(t);}else el.textContent=start;},step);}
 
   /* LOAD DATA */
-  function loadData(){
+  function loadData(force){
     var icon=document.getElementById('refreshIcon');
     icon.style.transition='transform .6s ease';icon.style.transform='rotate(360deg)';
     setTimeout(function(){icon.style.transition='none';icon.style.transform='rotate(0)';},700);
-    fetch('/gtm/anonymous-visitors/data')
+    fetch('/gtm/anonymous-visitors/data'+(force?'?fresh=1':''))
       .then(function(r){return r.json();})
       .then(function(d){
         _allPeople=d.people_table||[];
