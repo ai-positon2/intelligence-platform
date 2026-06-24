@@ -1,4 +1,4 @@
-<!-- ── Kairo AI Chat Widget v5 — ground-up redesign (Kairo Studio) ──────────── -->
+<!-- ── Vimi AI Chat Widget v5 — ground-up redesign (Vimi Studio) ──────────── -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -378,7 +378,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
 <div id="k-root">
   <!-- launcher -->
   <div id="k-wrap">
-    <button id="k-fab" onclick="ppcOpen()" aria-label="Open Kairo">
+    <button id="k-fab" onclick="ppcOpen()" aria-label="Open Vimi">
       <span id="k-badge"></span>
       <span class="k-fab-on"></span>
       <svg width="31" height="31" fill="none" viewBox="0 0 24 24">
@@ -387,7 +387,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
         <circle cx="12" cy="12" r="2.6" fill="#fff"/>
       </svg>
     </button>
-    <div id="k-tip">Ask Kairo · <b style="opacity:.7">⌘K</b></div>
+    <div id="k-tip">Ask Vimi · <b style="opacity:.7">⌘K</b></div>
   </div>
 
   <!-- shell -->
@@ -408,7 +408,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
             <span class="k-av-dot"></span>
           </div>
           <div class="k-hinfo">
-            <div class="k-hname">Kairo <span class="k-spark">✦</span></div>
+            <div class="k-hname">Vimi <span class="k-spark">✦</span></div>
             <div class="k-hstatus"><span class="k-live"></span><span id="k-status-txt">AI Assistant · Online</span></div>
           </div>
           <div class="k-hbtns">
@@ -439,7 +439,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
           <button id="k-stop" onclick="kStop()" title="Stop" aria-label="Stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button>
           <button id="k-send" onclick="ppcSend()" aria-label="Send"><svg width="17" height="17" fill="none" viewBox="0 0 24 24"><path stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/></svg></button>
         </div>
-        <div id="k-foot">Kairo can make mistakes · verify important details</div>
+        <div id="k-foot">Vimi can make mistakes · verify important details</div>
       </div>
 
       <!-- toasts + overlays -->
@@ -474,7 +474,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   var input = document.getElementById('k-input');
 
   /* ---------- persistence ---------- */
-  var LS = {sess:'kairo_sessions_v2', mem:'kairo_mem_v2', set:'kairo_settings_v2', pin:'kairo_pins_v2', aud:'kairo_audit_v2', onb:'kairo_onb_v2', nud:'kairo_nudge_v2'};
+  var LS = {sess:'vimi_sessions_v2', mem:'vimi_mem_v2', set:'vimi_settings_v2', pin:'vimi_pins_v2', aud:'vimi_audit_v2', onb:'vimi_onb_v2', nud:'vimi_nudge_v2'};
   function load(k,d){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
   function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 
@@ -593,7 +593,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     loop();
   }
   function welcome(){
-    var name = window.KAIRO_NAME || 'there';
+    var name = window.VIMI_NAME || 'there';
     body.innerHTML =
       '<div class="k-hello">'+
         '<div class="k-orb3d"><canvas id="k-orb" width="152" height="152"></canvas></div>'+
@@ -676,7 +676,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
       acts.appendChild(act('⬆ Push to HubSpot','k-act-hub',function(){ confirmWrite('HubSpot','Log this outreach email as a task/note on the contact in HubSpot.',text,'hubspot'); }));
     }
     if(co){
-      acts.appendChild(act('🗂 Dossier: '+co,'',function(){ ask('Build a full account dossier for '+co+' — score, key signals, recent visits, fit. Return a fenced block ```kairo-card {json}``` with keys company, score, signals (array of {icon,label}), meta.'); }));
+      acts.appendChild(act('🗂 Dossier: '+co,'',function(){ ask('Build a full account dossier for '+co+' — score, key signals, recent visits, fit. Return a fenced block ```vimi-card {json}``` with keys company, score, signals (array of {icon,label}), meta.'); }));
       acts.appendChild(act('👤 Decision-makers','',function(){ ask('List likely decision-makers at '+co+' (name, title, email guess) as a markdown table.'); }));
       acts.appendChild(act('🔎 Why hot?','',function(){ ask('Explain why '+co+' is a hot lead — break the intent score into its components (signal types, severity, recency, multi-intent).'); }));
     }
@@ -782,9 +782,9 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
       var ths=tw.querySelectorAll('th'); for(var i=0;i<ths.length;i++){ ths[i].onclick=function(){ var ci=+this.getAttribute('data-i'); if(sortCol===ci){ sortDir=-sortDir; } else { sortCol=ci; sortDir=1; } draw(); }; }
     }
     draw();
-    bar.appendChild(exb('CSV',function(){ dl(toCSV(rows),'kairo_export.csv','text/csv'); }));
+    bar.appendChild(exb('CSV',function(){ dl(toCSV(rows),'vimi_export.csv','text/csv'); }));
     bar.appendChild(exb('Excel',function(){ toXLSX(rows); }));
-    bar.appendChild(exb('JSON',function(){ dl(JSON.stringify(rowsToObj(rows),null,2),'kairo_export.json','application/json'); }));
+    bar.appendChild(exb('JSON',function(){ dl(JSON.stringify(rowsToObj(rows),null,2),'vimi_export.json','application/json'); }));
     bar.appendChild(exb('PDF',function(){ toPDF(rows); }));
     bar.appendChild(exb('📊 Chart',function(){ chartFrom(bub,rows); }));
     bar.appendChild(exb('Sheets',function(){ confirmWrite('Google Sheets','Append this table to a Google Sheet.',toCSV(rows),'sheets'); }));
@@ -793,17 +793,17 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function exb(label,fn){ var b=document.createElement('button'); b.className='k-act'; b.textContent=label; b.onclick=fn; return b; }
   function rowsToObj(rows){ var h=rows[0]; return rows.slice(1).map(function(r){ var o={}; h.forEach(function(k,i){o[k]=r[i];}); return o; }); }
   function toCSV(rows){ return rows.map(function(r){ return r.map(function(c){ return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c; }).join(','); }).join('\n'); }
-  function toXLSX(rows){ try{ var ws=XLSX.utils.aoa_to_sheet(rows); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Kairo'); XLSX.writeFile(wb,'kairo_export.xlsx'); audit('export','xlsx'); }catch(e){ toast('err','Excel export unavailable'); } }
-  function toPDF(rows){ try{ var jsPDF=window.jspdf.jsPDF; var doc=new jsPDF(); doc.setFontSize(12); doc.text('Kairo export',14,16); var y=26; rows.slice(0,40).forEach(function(r){ doc.setFontSize(9); doc.text(r.join('  |  ').slice(0,180),14,y); y+=7; if(y>280){doc.addPage();y=16;} }); doc.save('kairo_export.pdf'); audit('export','pdf'); }catch(e){ toast('err','PDF export unavailable'); } }
+  function toXLSX(rows){ try{ var ws=XLSX.utils.aoa_to_sheet(rows); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Vimi'); XLSX.writeFile(wb,'vimi_export.xlsx'); audit('export','xlsx'); }catch(e){ toast('err','Excel export unavailable'); } }
+  function toPDF(rows){ try{ var jsPDF=window.jspdf.jsPDF; var doc=new jsPDF(); doc.setFontSize(12); doc.text('Vimi export',14,16); var y=26; rows.slice(0,40).forEach(function(r){ doc.setFontSize(9); doc.text(r.join('  |  ').slice(0,180),14,y); y+=7; if(y>280){doc.addPage();y=16;} }); doc.save('vimi_export.pdf'); audit('export','pdf'); }catch(e){ toast('err','PDF export unavailable'); } }
   function chartFrom(bub,rows){ var holder=document.createElement('div'); holder.className='k-chart'; var cv=document.createElement('canvas'); holder.appendChild(cv); bub.appendChild(holder);
     var labels=rows.slice(1).map(function(r){return r[0];}); var numCol=-1; for(var c=1;c<rows[0].length;c++){ if(!isNaN(parseFloat((rows[1][c]||'').replace(/[^0-9.\-]/g,'')))){ numCol=c; break; } }
     if(numCol<0){ toast('err','No numeric column to chart'); holder.remove(); return; }
     var vals=rows.slice(1).map(function(r){ return parseFloat((r[numCol]||'0').replace(/[^0-9.\-]/g,''))||0; });
     try{ new Chart(cv,{type:'bar',data:{labels:labels,datasets:[{label:rows[0][numCol],data:vals,backgroundColor:'rgba(139,92,246,.6)',borderColor:'#a855f7',borderWidth:1,borderRadius:5}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#a5adcf',font:{size:9}}},y:{ticks:{color:'#a5adcf',font:{size:9}}}}}}); audit('chart','bar'); }catch(e){ toast('err','Chart unavailable'); } }
 
-  /* ---------- kairo-card (dossier) parsing ---------- */
+  /* ---------- vimi-card (dossier) parsing ---------- */
   function renderCards(bub, text){
-    var m=text.match(/```kairo-card\s*([\s\S]*?)```/);
+    var m=text.match(/```vimi-card\s*([\s\S]*?)```/);
     if(!m){ return false; }
     try{ var data=JSON.parse(m[1].trim()); bub.innerHTML=fmt(citeify(text.replace(m[0],'').trim()));
       var d=document.createElement('div'); d.className='k-doss';
@@ -937,7 +937,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     b.innerHTML='<div class="k-confirm-ic">'+(kind==='slack'?'💬':kind==='hubspot'?'🟠':kind==='deck'?'🖼':'📤')+'</div><div class="k-confirm-t">Send to '+esc(name)+'?</div><div class="k-confirm-d">'+esc(desc)+'</div><div class="k-confirm-card">'+esc(stripText(payload).slice(0,400))+'…</div><div class="k-confirm-row"><button class="k-cancel" onclick="kCloseAll()">Cancel</button><button class="k-go" onclick="kDoWrite()">Confirm</button></div>';
     openOv('k-confirm'); }
   window.kDoWrite=function(){ var p=_kPending; kCloseAll(); if(!p){return;}
-    var ep={hubspot:'/api/kairo/hubspot',slack:'/api/kairo/slack',sheets:'/api/kairo/sheets',deck:'/api/kairo/deck'}[p.kind];
+    var ep={hubspot:'/api/vimi/hubspot',slack:'/api/vimi/slack',sheets:'/api/vimi/sheets',deck:'/api/vimi/deck'}[p.kind];
     audit(p.kind,'sent: '+stripText(p.payload).slice(0,50));
     toast('ok','Sending to '+p.name+'…');
     fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:p.payload,account:_acct})})
@@ -956,9 +956,9 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   var _onbStep=0;
   function onboarding(){ _onbStep=0; renderOnb(); openOv('k-onb'); }
   function renderOnb(){ var steps=[
-      {h:'Meet Kairo',p:'Ask about leads, visitors, competitor ads and buying signals in plain English.'},
+      {h:'Meet Vimi',p:'Ask about leads, visitors, competitor ads and buying signals in plain English.'},
       {h:'Act in one click',p:'Draft outreach, pull decision-makers, push to HubSpot or Slack, and export to Excel, Sheets, PDF or a slide — right from a reply.'},
-      {h:'It remembers',p:'Tell Kairo your focus vertical, target CPA and tone in Settings & Memory. Use / for commands and @ to mention an account.'}
+      {h:'It remembers',p:'Tell Vimi your focus vertical, target CPA and tone in Settings & Memory. Use / for commands and @ to mention an account.'}
     ]; var s=steps[_onbStep]; var b=document.getElementById('k-onb-body');
     b.innerHTML='<div class="k-onb"><div class="k-onb-orb">'+orbSvg(34)+'</div><h3>'+s.h+'</h3><p>'+s.p+'</p><div class="k-onb-dots">'+steps.map(function(_,i){return '<span class="'+(i===_onbStep?'on':'')+'"></span>';}).join('')+'</div><div class="k-confirm-row"><button class="k-cancel" onclick="kOnbSkip()">Skip</button><button class="k-go" onclick="kOnbNext()">'+(_onbStep<steps.length-1?'Next':'Get started')+'</button></div></div>'; }
   window.kOnbNext=function(){ if(_onbStep<2){ _onbStep++; renderOnb(); } else { kOnbSkip(); } };
@@ -986,11 +986,11 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function ago(ts){ var s=(Date.now()-ts)/1000; if(s<60){return 'just now';} if(s<3600){return Math.floor(s/60)+'m ago';} if(s<86400){return Math.floor(s/3600)+'h ago';} return Math.floor(s/86400)+'d ago'; }
   function esc(s){ return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function stripHtml(el){ return (el.innerText||el.textContent||'').trim(); }
-  function stripText(t){ return (''+t).replace(/```kairo-card[\s\S]*?```/g,'').replace(/[*_`#>]/g,'').trim(); }
+  function stripText(t){ return (''+t).replace(/```vimi-card[\s\S]*?```/g,'').replace(/[*_`#>]/g,'').trim(); }
   function detectExport(m){ m=(m||'').toLowerCase(); if(/excel|xlsx/.test(m)){return 'excel';} if(/\bcsv\b/.test(m)){return 'csv';} if(/\bjson\b/.test(m)){return 'json';} if(/\btable\b|spreadsheet/.test(m)){return 'table';} return null; }
   function citeify(t){ return t.replace(/\[(Signal Tracker|Visitors|Ad Intelligence|HubSpot|Apollo|Insights|Funding|Search Console)\]/g, function(_,s){ return '<span class="k-cite" title="Source: '+s+'">◆ '+s+'</span>'; }); }
-  function fmt(t){ if(/```kairo-card/.test(t)){ /* handled after insert */ }
-    t=t.replace(/```kairo-card[\s\S]*?```/g,'');
+  function fmt(t){ if(/```vimi-card/.test(t)){ /* handled after insert */ }
+    t=t.replace(/```vimi-card[\s\S]*?```/g,'');
     t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
     var lines=t.split('\n'),out=[],list=false;
     for(var i=0;i<lines.length;i++){ var l=lines[i],bul=/^[\-\*•]\s+/.test(l.trim());
@@ -1001,7 +1001,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
 
   /* dossier post-process hook: after finishStream we already called decorate; render cards */
   var _origDecorate=decorate;
-  decorate=function(row,bub,role,text){ if(role==='assistant' && /```kairo-card/.test(text)){ if(renderCards(bub,text)){ /* still add tools */ } } _origDecorate(row,bub,role,text); };
+  decorate=function(row,bub,role,text){ if(role==='assistant' && /```vimi-card/.test(text)){ if(renderCards(bub,text)){ /* still add tools */ } } _origDecorate(row,bub,role,text); };
 
   /* ---------- global events ---------- */
   input.addEventListener('keydown', function(e){
@@ -1045,4 +1045,4 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   setTimeout(checkNudge, 1500);
 })();
 </script>
-<!-- ── End Kairo Chat Widget v5 ── -->
+<!-- ── End Vimi Chat Widget v5 ── -->

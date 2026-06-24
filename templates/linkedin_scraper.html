@@ -190,7 +190,7 @@ document.addEventListener('click',function(e){
   function go(x){
     if(!x)return;
     close();
-    if(x.u==='!kairo'){if(window.irChat)window.irChat();return;}
+    if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
     if(x.u.charAt(0)==='#'){location.hash=x.u;return;}
     if(location.pathname===x.u)return;
     window.location.href=x.u;
@@ -469,27 +469,27 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 </script>
 
 <script>
-function keOpen(){if(window.KairoEngage&&window._kePerson)window.KairoEngage.open(window._kePerson);}
+function keOpen(){if(window.VimiEngage&&window._kePerson)window.VimiEngage.open(window._kePerson);}
 function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div class="ke-drw-spark">\u2726</div>'
-  +'<div class="ke-drw-tx"><div class="ke-drw-h">Kairo found a CRM match</div>'
+  +'<div class="ke-drw-tx"><div class="ke-drw-h">Vimi found a CRM match</div>'
   +'<div class="ke-drw-s">In your HubSpot \u00b7 prospective client \u00b7 tap to engage</div></div>'
   +'<div class="ke-drw-go">Engage \u2192</div></div>';}
 </script>
 
 <!-- ════════════════════════════════════════════════════════════════
-     KAIRO ENGAGE  ·  CRM-match outreach popup (HubSpot + Slack demo)
-     Self-contained. Namespaced .ke-*  ·  window.KairoEngage.open(payload)
+     VIMI ENGAGE  ·  CRM-match outreach popup (HubSpot + Slack demo)
+     Self-contained. Namespaced .ke-*  ·  window.VimiEngage.open(payload)
      ════════════════════════════════════════════════════════════════ -->
-<div class="ke-ov" id="ke-ov" role="dialog" aria-modal="true" aria-label="Kairo Outreach">
+<div class="ke-ov" id="ke-ov" role="dialog" aria-modal="true" aria-label="Vimi Outreach">
   <div class="ke-card" id="ke-card">
     <div class="ke-glow"></div>
     <div class="ke-hd">
       <div class="ke-mark">✦</div>
       <div class="ke-hd-t">
-        <h3>Kairo Outreach <span class="ke-spark">· CRM match found</span></h3>
+        <h3>Vimi Outreach <span class="ke-spark">· CRM match found</span></h3>
         <p id="ke-sub">Synced from HubSpot &amp; ready to engage</p>
       </div>
-      <button class="ke-x" onclick="KairoEngage.close()" aria-label="Close">✕</button>
+      <button class="ke-x" onclick="VimiEngage.close()" aria-label="Close">✕</button>
     </div>
     <div class="ke-bd" id="ke-bd"><!-- injected --></div>
   </div>
@@ -498,7 +498,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
 
 <script id="ke-script">
 (function(){
-  if(window.KairoEngage)return;
+  if(window.VimiEngage)return;
   var GRAD=[['#7c83f5','#9b87fd'],['#2dd4aa','#34d399'],['#f5a623','#fbbf24'],['#22d3ee','#38bdf8'],['#fb7185','#f472b6'],['#a78bfa','#818cf8']];
   function esc(s){s=(s==null?'':''+s);return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function ini(n){n=(n||'?').trim();var p=n.split(/\s+/);return((p[0]||'')[0]||'?').toUpperCase()+((p[1]||'')[0]||'').toUpperCase();}
@@ -610,14 +610,14 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
   function topActivity(p){
     if(p.source==='linkedin'){
       var post=liPost(p);
-      return '<div class="ke-act ke-clk" style="background:rgba(10,102,194,.09);border-color:rgba(10,102,194,.3)" onclick="KairoEngage.toggleDetail()">'
+      return '<div class="ke-act ke-clk" style="background:rgba(10,102,194,.09);border-color:rgba(10,102,194,.3)" onclick="VimiEngage.toggleDetail()">'
         +'<div class="ke-act-ic" style="background:#0a66c2;font-size:11px">in</div>'
         +'<div class="ke-act-t"><div class="h">'+(post.commented?'Commented on':'Engaged with')+' your <b style="color:#5fa8e6">LinkedIn post</b></div>'
           +'<div class="s">“'+esc(shortTxt(post.title,50))+'” · '+esc(post.when)+' · tap to open post</div></div>'
         +'<div class="ke-chev" id="ke-chev">⌄</div></div>';
     }
     var pages=Math.max(2,parseInt(p.act&&p.act.pages)||5);
-    return '<div class="ke-act ke-clk" onclick="KairoEngage.toggleDetail()">'
+    return '<div class="ke-act ke-clk" onclick="VimiEngage.toggleDetail()">'
       +'<div class="ke-act-ic">🌐</div>'
       +'<div class="ke-act-t"><div class="h">Visited your <b>website</b></div>'
         +'<div class="s">'+pages+' page'+(pages!=1?'s':'')+' viewed'+((p.act&&p.act.when)?' · '+esc(p.act.when):'')+' · tap for details</div></div>'
@@ -656,7 +656,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
 
   function crmCardAnon(p,c,seed){
     var g=pick(GRAD,seed);
-    return '<div class="ke-lbl">CRM Match <span class="ke-ai">via Kairo</span></div>'
+    return '<div class="ke-lbl">CRM Match <span class="ke-ai">via Vimi</span></div>'
     +'<div class="ke-match"><div class="ke-m-top">'
       +'<div class="ke-av" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')">'+esc(ini(p.name))+'</div>'
       +'<div class="ke-m-id"><div class="ke-nm">'+esc(p.name)+'</div><div class="ke-rl">'+esc(p.title||'-')+(p.company?' · '+esc(p.company):'')+'</div></div>'
@@ -684,13 +684,13 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
   }
 
   function emailPane(p,c,d,em){
-    return '<div class="ke-lbl" style="margin-top:2px">Reach out <span class="ke-ai">drafted by Kairo</span></div>'
+    return '<div class="ke-lbl" style="margin-top:2px">Reach out <span class="ke-ai">drafted by Vimi</span></div>'
     +'<div class="ke-field"><label>To</label><input class="ke-inp" id="ke-to" value="'+esc(em)+'"></div>'
     +'<div class="ke-lbl" style="margin-bottom:7px">Tone</div>'
-    +'<div class="ke-chips">'+['Warm','Direct','Consultative'].map(function(t){return '<div class="ke-chip'+(ST.tone===t?' on':'')+'" onclick="KairoEngage.setTone(\''+t+'\')">'+t+'</div>';}).join('')+'</div>'
+    +'<div class="ke-chips">'+['Warm','Direct','Consultative'].map(function(t){return '<div class="ke-chip'+(ST.tone===t?' on':'')+'" onclick="VimiEngage.setTone(\''+t+'\')">'+t+'</div>';}).join('')+'</div>'
     +'<div class="ke-field"><label>Subject</label><input class="ke-inp" id="ke-subj" value="'+esc(d.subject)+'"></div>'
-    +'<div class="ke-field"><label>Message <span style="color:#7c83f5;text-transform:none;letter-spacing:0;font-weight:600">· personalised by Kairo</span></label><textarea class="ke-ta" id="ke-body">'+esc(d.body)+'</textarea></div>'
-    +'<div class="ke-foot"><button class="ke-btn ke-btn-gh" onclick="KairoEngage.regen()">↻ Regenerate</button><button class="ke-btn ke-btn-pri" onclick="KairoEngage.sendEmail()">✉ Send Email</button></div>';
+    +'<div class="ke-field"><label>Message <span style="color:#7c83f5;text-transform:none;letter-spacing:0;font-weight:600">· personalised by Vimi</span></label><textarea class="ke-ta" id="ke-body">'+esc(d.body)+'</textarea></div>'
+    +'<div class="ke-foot"><button class="ke-btn ke-btn-gh" onclick="VimiEngage.regen()">↻ Regenerate</button><button class="ke-btn ke-btn-pri" onclick="VimiEngage.sendEmail()">✉ Send Email</button></div>';
   }
 
   function render(){
@@ -703,7 +703,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
   function slackPreview(){
     var s=slackMsg(ST.p,ST.c);
     return '<div class="ke-slk"><div class="ke-slk-h"><div class="ke-slk-bot">✦</div>'
-      +'<div class="ke-slk-bn">Kairo <span class="ke-slk-app">APP</span></div><div class="ke-slk-tm">just now</div></div>'
+      +'<div class="ke-slk-bn">Vimi <span class="ke-slk-app">APP</span></div><div class="ke-slk-tm">just now</div></div>'
       +'<div class="ke-slk-msg">'+s.lead+'</div>'
       +'<div class="ke-slk-att"><div class="t">'+esc(s.name)+'</div><div class="r">'+esc(s.role)+'</div>'
       +'<div class="ke-slk-fields"><div>Why it matters<b>'+esc(s.reason)+'</b></div></div></div></div>';
@@ -711,16 +711,16 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
 
   function toast(msg){var t=document.getElementById('ke-toast');t.innerHTML='✅ '+esc(msg);t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show');},3200);}
 
-  window.KairoEngage={
+  window.VimiEngage={
     open:function(payload){ST.p=payload||{};ST.c=crm(ST.p);ST.tone='Warm';render();document.getElementById('ke-ov').classList.add('open');document.body.style.overflow='hidden';},
     close:function(){document.getElementById('ke-ov').classList.remove('open');document.body.style.overflow='';},
     toggleDetail:function(){var d=document.getElementById('ke-detail'),ch=document.getElementById('ke-chev');if(!d)return;var hid=d.classList.contains('ke-hidden');d.classList.toggle('ke-hidden');if(ch)ch.classList.toggle('open',hid);},
     setTone:function(t){ST.tone=t;var d=draft(ST.p,ST.c,t),b=document.getElementById('ke-body'),s=document.getElementById('ke-subj');if(b)b.value=d.body;if(s)s.value=d.subject;document.querySelectorAll('.ke-chip').forEach(function(c){c.classList.toggle('on',c.textContent===t);});},
-    regen:function(){var b=document.getElementById('ke-body');if(!b)return;var box=b.parentNode,foot=box.nextElementSibling;b.style.display='none';if(foot)foot.style.display='none';var ld=document.createElement('div');ld.className='ke-drafting';ld.innerHTML='<div class="ke-spin"></div> Kairo is re-drafting from the latest signals…';box.appendChild(ld);setTimeout(function(){ld.remove();var d=draft(ST.p,ST.c,ST.tone);b.value=d.body;b.style.display='';if(foot)foot.style.display='';},1100);},
-    sendEmail:function(){var to=document.getElementById('ke-to').value,bd=document.getElementById('ke-bd');bd.innerHTML='<div class="ke-drafting" style="padding:48px"><div class="ke-spin"></div> Sending via your connected mailbox…</div>';setTimeout(function(){bd.innerHTML='<div class="ke-done"><div class="ke-check">✉</div><h4>Email sent to '+esc(first(ST.p.name))+'</h4><p>Your message is on its way. Kairo logged this touch back to the contact in HubSpot.</p><div class="ke-recap"><div>Recipient<b>'+esc(to)+'</b></div><div>Logged to<b>HubSpot · '+esc(ST.c.stage)+'</b></div></div><div class="ke-foot" style="max-width:240px;margin:20px auto 0"><button class="ke-btn ke-btn-pri" onclick="KairoEngage.close()">Done</button></div></div>';toast('Email sent to '+to);},1400);}
+    regen:function(){var b=document.getElementById('ke-body');if(!b)return;var box=b.parentNode,foot=box.nextElementSibling;b.style.display='none';if(foot)foot.style.display='none';var ld=document.createElement('div');ld.className='ke-drafting';ld.innerHTML='<div class="ke-spin"></div> Vimi is re-drafting from the latest signals…';box.appendChild(ld);setTimeout(function(){ld.remove();var d=draft(ST.p,ST.c,ST.tone);b.value=d.body;b.style.display='';if(foot)foot.style.display='';},1100);},
+    sendEmail:function(){var to=document.getElementById('ke-to').value,bd=document.getElementById('ke-bd');bd.innerHTML='<div class="ke-drafting" style="padding:48px"><div class="ke-spin"></div> Sending via your connected mailbox…</div>';setTimeout(function(){bd.innerHTML='<div class="ke-done"><div class="ke-check">✉</div><h4>Email sent to '+esc(first(ST.p.name))+'</h4><p>Your message is on its way. Vimi logged this touch back to the contact in HubSpot.</p><div class="ke-recap"><div>Recipient<b>'+esc(to)+'</b></div><div>Logged to<b>HubSpot · '+esc(ST.c.stage)+'</b></div></div><div class="ke-foot" style="max-width:240px;margin:20px auto 0"><button class="ke-btn ke-btn-pri" onclick="VimiEngage.close()">Done</button></div></div>';toast('Email sent to '+to);},1400);}
   };
-    document.addEventListener('keydown',function(e){if(e.key==='Escape'){var o=document.getElementById('ke-ov');if(o&&o.classList.contains('open'))KairoEngage.close();}});
-  document.getElementById('ke-ov').addEventListener('click',function(e){if(e.target===this)KairoEngage.close();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'){var o=document.getElementById('ke-ov');if(o&&o.classList.contains('open'))VimiEngage.close();}});
+  document.getElementById('ke-ov').addEventListener('click',function(e){if(e.target===this)VimiEngage.close();});
 })();
 </script>
 

@@ -136,7 +136,7 @@ a{color:inherit;text-decoration:none}
 
 <div class="head">
   <h1>The Context Graph</h1>
-  <p>One connected record per buyer — every signal, action and outcome unified, then scored by the <span class="accent">Kairo intelligence layer</span>.</p>
+  <p>One connected record per buyer — every signal, action and outcome unified, then scored by the <span class="accent">Vimi intelligence layer</span>.</p>
 </div>
 
 <div id="stage">
@@ -159,7 +159,7 @@ a{color:inherit;text-decoration:none}
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
-window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if user else None) or 'there') | tojson }};
+window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user else None) or 'there') | tojson }};
 </script>
 <script>
 (function(){
@@ -177,78 +177,78 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
       points:['Name','Title / seniority','LinkedIn profile','Engagement timeline'],
       source:['Visitor de-anonymisation','LinkedIn scraper','Form fills & email'],
       flows:['Rolls up to the Account','Joins the Deal record','Feeds the intelligence layer'],
-      intel:'Kairo links every person-level signal to one identity, so a pricing-page visit, an email reply and a LinkedIn comment all land on the same record.'},
+      intel:'Vimi links every person-level signal to one identity, so a pricing-page visit, an email reply and a LinkedIn comment all land on the same record.'},
     account:{label:'Account', sub:'company · ICP tier · tech stack', cat:'account', core:1, r:74, nx:.70, ny:.45,
       tag:'Core entity', lead:'The company the person belongs to — the unit you actually sell to.',
       points:['Company & domain','ICP tier / fit','Tech stack','Employee count'],
       source:['Firmographic enrichment','Signal Tracker','CRM sync'],
       flows:['Groups all its people','Anchors the Deal','Feeds the intelligence layer'],
-      intel:'Kairo aggregates every person and account signal into a single account-level intent picture, so committee-wide activity is visible at a glance.'},
+      intel:'Vimi aggregates every person and account signal into a single account-level intent picture, so committee-wide activity is visible at a glance.'},
     deal:{label:'Deal', sub:'stage · owner · history', cat:'deal', core:1, r:66, nx:.50, ny:.70,
       tag:'Core entity', lead:'The opportunity — where Person and Account meet a revenue motion.',
       points:['Pipeline stage','Owner','Activity history','Forecast'],
       source:['HubSpot','Outreach activity','Meeting outcomes'],
       flows:['Drives outreach','Produces outcomes','Feeds the intelligence layer'],
-      intel:'Kairo ties signals to deal stage, surfacing which open opportunities are heating up and which need a nudge.'},
-    intel:{label:'Kairo', sub:'intelligence layer', cat:'intel', core:1, r:60, nx:.50, ny:.18,
+      intel:'Vimi ties signals to deal stage, surfacing which open opportunities are heating up and which need a nudge.'},
+    intel:{label:'Vimi', sub:'intelligence layer', cat:'intel', core:1, r:60, nx:.50, ny:.18,
       tag:'Intelligence layer', lead:'The brain on top of the graph — it scores, prioritises and acts.',
       points:['Intent scoring','Account prioritisation','Next-best-action','Drafted outreach'],
       source:['Every node in the graph'],
       flows:['Ranks hottest accounts','Explains why an account is hot','Triggers outreach'],
-      intel:'This is the layer we add. Raw signals are just data — Kairo reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
+      intel:'This is the layer we add. Raw signals are just data — Vimi reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
 
     pages:{label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.18, side:'L',
       tag:'Person signal', lead:'Which pages the buyer browsed — the clearest first-party intent signal.',
       points:['Pricing','Case studies','Product pages','Blog'], source:['Anonymous visitor de-anonymisation'],
       flows:['Attaches to the Person','Raises the Intent Score'],
-      intel:'Repeat visits to pricing or a specific product page push the person toward HOT in Kairo’s scoring.'},
+      intel:'Repeat visits to pricing or a specific product page push the person toward HOT in Vimi’s scoring.'},
     email:{label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.34, side:'L',
       tag:'Person signal', lead:'How the buyer engaged with email — opens, clicks and replies.',
       points:['Opens','Clicks','Replies','Sequence step'], source:['Email / sequencing tool','CRM'],
       flows:['Attaches to the Person','Informs outreach timing'],
-      intel:'A reply or repeated clicks tell Kairo the thread is warm and worth a fast, personalised follow-up.'},
+      intel:'A reply or repeated clicks tell Vimi the thread is warm and worth a fast, personalised follow-up.'},
     linkedin:{label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.52, side:'L',
       tag:'Person signal', lead:'Public LinkedIn engagement from the buyer and their org.',
       points:['Likes','Comments','Reactions','Post topics'], source:['LinkedIn scraper'],
       flows:['Attaches to the Person','Adds context for outreach'],
-      intel:'Kairo uses what someone engages with publicly to make outreach relevant, not generic.'},
+      intel:'Vimi uses what someone engages with publicly to make outreach relevant, not generic.'},
     intent:{label:'Intent Score', sub:'HOT · WARM · COLD', cat:'intel', nx:.085, ny:.70, side:'L',
       tag:'Intelligence layer', lead:'A computed score — not a raw signal — that ranks how ready a person is.',
-      points:['HOT / WARM / COLD','Score 0–100','Trend over time'], source:['Computed by Kairo from all person signals'],
+      points:['HOT / WARM / COLD','Score 0–100','Trend over time'], source:['Computed by Vimi from all person signals'],
       flows:['Prioritises the Person','Surfaces in Hot Leads'],
-      intel:'This is intelligence, not input. Kairo blends every person signal — weighted by type, severity and recency — into one number reps can act on.'},
+      intel:'This is intelligence, not input. Vimi blends every person signal — weighted by type, severity and recency — into one number reps can act on.'},
 
     crm:{label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.18, side:'R',
       tag:'Account signal', lead:'The system-of-record state for the account in HubSpot.',
       points:['HubSpot company','Deal stage','Owner','Lifecycle'], source:['HubSpot CRM'],
       flows:['Attaches to the Account','Keeps the graph in sync'],
-      intel:'Kairo reads and (with confirmation) writes back to HubSpot, so the graph and CRM never drift apart.'},
+      intel:'Vimi reads and (with confirmation) writes back to HubSpot, so the graph and CRM never drift apart.'},
     market:{label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.34, side:'R',
       tag:'Account signal', lead:'External buying triggers happening at the company.',
       points:['Funding rounds','Leadership change','M&A','Product launch','Creative hiring'], source:['Signal Tracker'],
       flows:['Attaches to the Account','Boosts account intent'],
-      intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Kairo flags these as outreach windows.'},
+      intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Vimi flags these as outreach windows.'},
     committee:{label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.52, side:'R',
       tag:'Account signal', lead:'The set of people who actually decide — mapped to roles.',
       points:['Champion','Decision-maker','Approver','Blocker'], source:['Enrichment','Apollo','Engagement mapping'],
       flows:['Links people to the Account','Shapes multi-thread outreach'],
-      intel:'Kairo shows whether you are engaging the people who can actually sign — or just a champion.'},
+      intel:'Vimi shows whether you are engaging the people who can actually sign — or just a champion.'},
     readiness:{label:'Readiness State', sub:'state-machine position', cat:'intel', nx:.915, ny:.70, side:'R',
       tag:'Intelligence layer', lead:'Where the account sits in its buying journey — a computed state.',
-      points:['New','Engaged','Evaluating','In motion'], source:['Computed by Kairo from account signals'],
+      points:['New','Engaged','Evaluating','In motion'], source:['Computed by Vimi from account signals'],
       flows:['Prioritises the Account','Picks the right play'],
-      intel:'Like Intent Score, this is derived. Kairo moves an account through states automatically as signals accumulate.'},
+      intel:'Like Intent Score, this is derived. Vimi moves an account through states automatically as signals accumulate.'},
 
-    outreach:{label:'Outreach Sent', sub:'kairo · slack · email · crm', cat:'deal', nx:.30, ny:.90,
+    outreach:{label:'Outreach Sent', sub:'vimi · slack · email · crm', cat:'deal', nx:.30, ny:.90,
       tag:'Action', lead:'The action taken on the buyer — informed by the whole graph.',
-      points:['Kairo-drafted email','Slack alert to rep','Sequence enrolment','CRM task'], source:['Kairo','Email','Slack','HubSpot'],
+      points:['Vimi-drafted email','Slack alert to rep','Sequence enrolment','CRM task'], source:['Vimi','Email','Slack','HubSpot'],
       flows:['Acts on the Deal','Produces an Outcome'],
-      intel:'Because Kairo sees the full record, outreach references the exact signal that triggered it — not a generic blast.'},
+      intel:'Because Vimi sees the full record, outreach references the exact signal that triggered it — not a generic blast.'},
     outcome:{label:'Outcome', sub:'reply · meeting · pipeline', cat:'deal', nx:.70, ny:.90,
       tag:'Outcome', lead:'What the outreach produced — the loop that trains prioritisation.',
       points:['Reply','Meeting booked','Pipeline created','Closed-won'], source:['Email','Calendar','HubSpot'],
       flows:['Updates the Deal','Feeds back into the intelligence layer'],
-      intel:'Outcomes close the loop: Kairo learns which signals actually convert and sharpens future scoring.'}
+      intel:'Outcomes close the loop: Vimi learns which signals actually convert and sharpens future scoring.'}
   };
   var EDGES = [
     ['pages','person'],['email','person'],['linkedin','person'],['intent','person'],
@@ -418,7 +418,7 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
     var pts=(n.points||[]).map(function(p){return '<span class="chip">'+p+'</span>';}).join('');
     var src=(n.source||[]).map(function(s){return '<div class="flow"><span class="fi">⇲</span><div><b>'+s+'</b></div></div>';}).join('');
     var fl=(n.flows||[]).map(function(s){return '<div class="flow"><span class="fi" style="color:'+cat.c+'">→</span><div><b>'+s+'</b></div></div>';}).join('');
-    var cta = (n.cat==='intel') ? '<a class="pcta" href="javascript:void(0)" onclick="askKairo(\''+id+'\')">Ask Kairo about this ✦</a>'
+    var cta = (n.cat==='intel') ? '<a class="pcta" href="javascript:void(0)" onclick="askVimi(\''+id+'\')">Ask Vimi about this ✦</a>'
             : '<a class="pcta" href="/signal-tracker/healthcare">Open the Signal Tracker →</a>';
     body.innerHTML =
       '<div class="sec"><h4>What it holds</h4><div class="chips">'+pts+'</div></div>'+
@@ -430,7 +430,7 @@ window.KAIRO_NAME = {{ ((user.given_name if user else None) or (user.name if use
     document.getElementById('panel').classList.add('on');
   }
   window.closePanel=function(){ SELECT=null; applyDim(); document.getElementById('scrim').classList.remove('on'); document.getElementById('panel').classList.remove('on'); };
-  window.askKairo=function(id){ var n=NODES[id]; try{ if(window.ppcOpen){ window.ppcOpen(); var inp=document.getElementById('k-input'); if(inp){ inp.value='Explain the '+n.label+' and how the intelligence layer uses it.'; if(window.ppcSend) setTimeout(window.ppcSend,400); } } }catch(e){} closePanel(); };
+  window.askVimi=function(id){ var n=NODES[id]; try{ if(window.ppcOpen){ window.ppcOpen(); var inp=document.getElementById('k-input'); if(inp){ inp.value='Explain the '+n.label+' and how the intelligence layer uses it.'; if(window.ppcSend) setTimeout(window.ppcSend,400); } } }catch(e){} closePanel(); };
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closePanel(); });
 
   /* ---------------- legend ---------------- */

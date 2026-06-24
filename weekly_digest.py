@@ -63,7 +63,7 @@ def _ai_brief(account, ranked):
                 "top_signal":(i["top"] or {}).get("signal_detail","")[:140]} for co,i in ranked[:15]]
         oai = OpenAI(api_key=key, timeout=60)
         r = oai.chat.completions.create(model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
-            messages=[{"role":"system","content":"You are Kairo, Position2's revenue-intelligence AI. Write a crisp weekly brief (markdown): a 1-line headline, 2-sentence summary, then the top 5 opportunities as bullets — each naming the company, why-now from its signal, and the single best Position2 service to pitch (SEO/PPC/Content/Brand/RevOps). No dollar figures, no fluff."},
+            messages=[{"role":"system","content":"You are Vimi, Position2's revenue-intelligence AI. Write a crisp weekly brief (markdown): a 1-line headline, 2-sentence summary, then the top 5 opportunities as bullets — each naming the company, why-now from its signal, and the single best Position2 service to pitch (SEO/PPC/Content/Brand/RevOps). No dollar figures, no fluff."},
                       {"role":"user","content":f"Account: {account}\nTop scored opportunities:\n{json.dumps(top,indent=1)}"}],
             max_completion_tokens=700)
         md = r.choices[0].message.content.strip()

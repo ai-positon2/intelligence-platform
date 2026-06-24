@@ -6,7 +6,7 @@ Paste this entire file at the start of a new chat to give Claude full context on
 
 ## WHAT THIS IS
 
-**Intelligence by Position²** is a B2B sales-intelligence web app for the Position2 agency team. It surfaces buying signals (funding, leadership changes, M&A, hiring), de-anonymises website visitors, scrapes LinkedIn post engagement, ranks prospects by intent, and helps reps write personalised outreach via an embedded AI assistant called **Kairo**.
+**Intelligence by Position²** is a B2B sales-intelligence web app for the Position2 agency team. It surfaces buying signals (funding, leadership changes, M&A, hiring), de-anonymises website visitors, scrapes LinkedIn post engagement, ranks prospects by intent, and helps reps write personalised outreach via an embedded AI assistant called **Vimi**.
 
 - **Live URL:** `https://intelligence.position2.com`
 - **GitHub:** `https://github.com/ai-positon2/intelligence-platform` (public)
@@ -102,8 +102,8 @@ Theme is **dark**. Scrollbars are hidden site-wide (`scrollbar-width:none` + `::
 | `GET /admin/usage` (+`/data`) | admin usage dashboard |
 | `GET /api/whoami` | logged-in user |
 
-### Kairo AI API endpoints (OpenAI-backed)
-`/api/generate-email/<account_id>`, `/api/company-analysis/<account_id>`, `/api/research-company/<account_id>`, `/api/decision-makers/<account_id>`, `/api/kairo-chat/<account_id>` (POST), `/api/kairo-export` (POST), `/api/ppc-chat` (POST), `/api/insights`, `/api/weekly-stats`.
+### Vimi AI API endpoints (OpenAI-backed)
+`/api/generate-email/<account_id>`, `/api/company-analysis/<account_id>`, `/api/research-company/<account_id>`, `/api/decision-makers/<account_id>`, `/api/vimi-chat/<account_id>` (POST), `/api/vimi-export` (POST), `/api/ppc-chat` (POST), `/api/insights`, `/api/weekly-stats`.
 **Model chain:** `OPENAI_INSIGHTS_MODEL` env → `gpt-5.4` → `OPENAI_MODEL` env → `gpt-4o-mini`. Web search via `_responses_web_search()` (OpenAI Responses API `web_search_preview`).
 
 ---
@@ -130,26 +130,26 @@ Current dataset: 99 people, 8 posts, 73 companies, 37 decision makers, 25 C-suit
 
 ---
 
-## KAIRO ENGAGE — outreach popup (demo of HubSpot + Slack)
+## VIMI ENGAGE — outreach popup (demo of HubSpot + Slack)
 
-Shared, self-contained component (`.ke-*` CSS, `window.KairoEngage.open(payload)`), embedded inline on the LinkedIn Scraper and Anonymous Visitors pages. **HubSpot + Slack are NOT really connected — all of this is mocked for demo.**
+Shared, self-contained component (`.ke-*` CSS, `window.VimiEngage.open(payload)`), embedded inline on the LinkedIn Scraper and Anonymous Visitors pages. **HubSpot + Slack are NOT really connected — all of this is mocked for demo.**
 
 Trigger: clicking a person (anon visitor, or a LinkedIn engager / Hot Lead) opens a centered popup. Flow:
 1. Activity card at top (clickable, expands): website-visit detail (pages on position2.com) for anon, or the LinkedIn post (snippet, reactions, "View on LinkedIn") for LinkedIn.
 2. CRM match card — "We checked your HubSpot CRM and found {first} is a known contact… prospective client…" with a mock chat snippet + deal stage / owner (always **Krishna Ladha** or **Sudheer D.**) / open-deal.
-3. Email composer ONLY (no Slack tab/integration strip — removed): To, Tone presets (Warm/Direct/Consultative — genuinely different copy), Subject, Kairo-drafted body, Regenerate, Send (simulated → success + "logged to HubSpot"). The email is **personalised to the post/page** the person engaged with. Copy is send-ready quality, no em-dashes, full signature using the owner's name.
+3. Email composer ONLY (no Slack tab/integration strip — removed): To, Tone presets (Warm/Direct/Consultative — genuinely different copy), Subject, Vimi-drafted body, Regenerate, Send (simulated → success + "logged to HubSpot"). The email is **personalised to the post/page** the person engaged with. Copy is send-ready quality, no em-dashes, full signature using the owner's name.
 
 Anon vs LinkedIn popups are visually distinct (purple CRM-led vs blue engagement-led). All sends/integrations simulated.
 
 ---
 
 ## ANONYMOUS VISITORS (`/ppc/anonymous-visitors`)
-De-anonymised website visitors. Data via `GET /ppc/anonymous-visitors/data`. People/Companies tabs, filters (industry/seniority/engagement/location/size/date), drawers. A **"🔥 Hot Signals"** panel ("● In your HubSpot list" indicator) lists matched contacts; clicking a person opens the Kairo popup (HubSpot-match + email). Logic in `static/js/anonymous_visitors.js`.
+De-anonymised website visitors. Data via `GET /ppc/anonymous-visitors/data`. People/Companies tabs, filters (industry/seniority/engagement/location/size/date), drawers. A **"🔥 Hot Signals"** panel ("● In your HubSpot list" indicator) lists matched contacts; clicking a person opens the Vimi popup (HubSpot-match + email). Logic in `static/js/anonymous_visitors.js`.
 
 ---
 
 ## SIGNAL TRACKER DASHBOARDS (generated)
-Two accounts — Healthcare (`/signal-tracker/healthcare`, `reports/dashboard.html`, `data/tracker.db`) and CSG (`/signal-tracker/csg`, `reports/dashboard_csg.html`, `data/tracker_csg_v2.db`). Single-line generated HTML with embedded `D` JSON. Sections: Signal Tracker (company cards by intent score), Market Radar, Actions (kanban), Trends. Company card → centered dossier modal with Kairo email / research / decision-makers actions. **Patch via generators, not by hand.** SQLite schema: `companies, snapshots, alerts_sent, weekly_runs`. Signal types: Funding Round, C-Suite Change, M&A Signal, IPO Signal, News Mention, Subsidiary Change.
+Two accounts — Healthcare (`/signal-tracker/healthcare`, `reports/dashboard.html`, `data/tracker.db`) and CSG (`/signal-tracker/csg`, `reports/dashboard_csg.html`, `data/tracker_csg_v2.db`). Single-line generated HTML with embedded `D` JSON. Sections: Signal Tracker (company cards by intent score), Market Radar, Actions (kanban), Trends. Company card → centered dossier modal with Vimi email / research / decision-makers actions. **Patch via generators, not by hand.** SQLite schema: `companies, snapshots, alerts_sent, weekly_runs`. Signal types: Funding Round, C-Suite Change, M&A Signal, IPO Signal, News Mention, Subsidiary Change.
 
 ---
 
@@ -184,7 +184,7 @@ Two accounts — Healthcare (`/signal-tracker/healthcare`, `reports/dashboard.ht
 2. 🔜 **Design system adoption** — swap each page's bespoke components onto shared `ds-*`. In progress page-by-page (LinkedIn done; Anonymous Visitors next). Verify each visually (Claude in Chrome when available, else a presented HTML preview) before pushing.
 3. Real HubSpot/Slack/email integrations (currently mocked).
 4. Live data + identity resolution / enrichment (fix messy location/title/country fields).
-5. Kairo as a real agent (grounded personalisation, sequences, A/B, learning from replies).
+5. Vimi as a real agent (grounded personalisation, sequences, A/B, learning from replies).
 6. Outcome analytics (signal → outreach → reply → meeting → deal).
 7. Accessibility, performance (virtualise big tables), automated tests (Playwright), security/permissions.
 

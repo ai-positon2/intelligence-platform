@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inject the Kairo PPC chat widget into the built Ad Intelligence index.html."""
+"""Inject the Vimi PPC chat widget into the built Ad Intelligence index.html."""
 import sys, io
 idx, snip = sys.argv[1], sys.argv[2]
 s = io.open(idx, encoding="utf-8").read()

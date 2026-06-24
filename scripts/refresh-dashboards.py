@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""One-command dashboard refresh for BOTH accounts, preserving all Kairo work.
+"""One-command dashboard refresh for BOTH accounts, preserving all Vimi work.
 
 For each account it:
   1. prunes irrelevant News Mention rows from the SQLite DB (relevance filter),
   2. rebuilds a *plain* dashboard from the DB into a temp file,
-  3. splices that fresh `const DATA = {...}` blob into the committed Kairo
+  3. splices that fresh `const DATA = {...}` blob into the committed Vimi
      dashboard (keeping every Insights / chat / header / perf customization),
-  4. verifies the result (valid JSON, Kairo markers intact).
+  4. verifies the result (valid JSON, Vimi markers intact).
 
 It does NOT fetch new signals (that needs Google credentials — run the fetch
 first, or use the GitHub Action which does fetch + refresh + publish).
@@ -110,17 +110,17 @@ def fresh_data_line(plain_html):
         raise SystemExit("ERROR: no `const DATA` line in freshly built dashboard: " + plain_html)
     return m.group(0)
 
-def splice(kairo_path, data_line):
-    s = io.open(kairo_path, encoding="utf-8").read()
-    for marker in ('INSIGHTS v10 JS', 'id="kairo-plat"'):
+def splice(vimi_path, data_line):
+    s = io.open(vimi_path, encoding="utf-8").read()
+    for marker in ('INSIGHTS v10 JS', 'id="vimi-plat"'):
         if marker not in s:
-            raise SystemExit("ERROR: Kairo marker missing (%s) in %s — refusing to splice" % (marker, kairo_path))
+            raise SystemExit("ERROR: Vimi marker missing (%s) in %s — refusing to splice" % (marker, vimi_path))
     if not _DATA_RE.search(s):
-        raise SystemExit("ERROR: no `const DATA` line in " + kairo_path)
+        raise SystemExit("ERROR: no `const DATA` line in " + vimi_path)
     s2 = _DATA_RE.sub(lambda _m: data_line, s, count=1)
     json.loads(_DATA_RE.search(s2).group(0)[len("const DATA = "):-1])  # validate JSON
     b = s2.encode("utf-8")
-    with open(kairo_path, "wb") as f:
+    with open(vimi_path, "wb") as f:
         for i in range(0, len(b), 262144):
             f.write(b[i:i+262144])
 
@@ -140,7 +140,7 @@ ACCOUNTS = [
 ]
 
 def main():
-    for name, db, kairo, builder in ACCOUNTS:
+    for name, db, vimi, builder in ACCOUNTS:
         pruned_old, _tot = prune_old(str(ROOT / db))
         reclassed = reclassify(str(ROOT / db))
         dropped, total = prune_news(str(ROOT / db))
@@ -148,12 +148,12 @@ def main():
         fd, tmp = tempfile.mkstemp(suffix=".html"); os.close(fd)
         try:
             builder(tmp)
-            splice(str(ROOT / kairo), fresh_data_line(tmp))
+            splice(str(ROOT / vimi), fresh_data_line(tmp))
         finally:
             try: os.remove(tmp)
             except OSError: pass
         # report signal count now embedded
-        sigs = len(json.loads(_DATA_RE.search(io.open(ROOT/kairo,encoding="utf-8").read()).group(0)[len("const DATA = "):-1]).get("signals", []))
+        sigs = len(json.loads(_DATA_RE.search(io.open(ROOT/vimi,encoding="utf-8").read()).group(0)[len("const DATA = "):-1]).get("signals", []))
         print("[refresh] %-11s dashboard refreshed | %d signals embedded | pruned %d/%d news mentions"
               % (name, sigs, dropped, total))
     print("[refresh] done. Review, then commit data/ + reports/ and push (the GitHub Action does this automatically).")
