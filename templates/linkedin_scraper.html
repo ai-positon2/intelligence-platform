@@ -593,18 +593,22 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
 
   function pagesViewed(p){
     var seed=hashN(p.name+(p.company||''));
-    var POOL=[['/pricing','Pricing'],['/solutions/paid-media','Paid Media'],['/case-studies','Case Studies'],['/reporting','Reporting'],['/seo-services','SEO Services'],['/about','About'],['/contact','Contact']];
-    var n=Math.max(2,Math.min(6,parseInt(p.act&&p.act.pages)||4));
-    var rows=[],hh=10,mm=(seed%6),seen={};
+    var POOL=[['/pricing','Pricing'],['/solutions/paid-media','Paid Media'],['/case-studies','Case Studies'],['/reporting','Reporting'],['/seo-services','SEO Services'],['/about','About'],['/contact','Contact'],['/blog','Blog'],['/integrations','Integrations']];
+    var n=3+(seed%5);                                   // 3-7 pages — realistic for a single session
+    var rows=[],seen={},hh=10,mm=2+(seed%9),total=0;
     for(var i=0;i<n;i++){
       var idx=((seed>>i)%POOL.length+POOL.length)%POOL.length;
       while(seen[idx]){idx=(idx+1)%POOL.length;}
       seen[idx]=1;var pg=POOL[idx];
-      mm+=1+(((seed>>(i+2))%4)+4)%4;if(mm>=60){mm-=60;hh++;}
-      rows.push({path:pg[0],t:(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm});
+      var sec=22+(((((seed>>(i*4))^(i*53))%200)+200)%200);   // ~22-221s, different on every page
+      var dur=(sec>=60?Math.floor(sec/60)+'m '+(sec%60)+'s':sec+'s');
+      var at=(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
+      rows.push({path:pg[0],t:at,dur:dur});
+      total+=sec; mm+=Math.max(1,Math.ceil(sec/60)); while(mm>=60){mm-=60;hh++;}
     }
+    var mins=Math.max(1,Math.round(total/60));
     var srcs=['LinkedIn','Google Organic','Direct','Email'],devs=['Desktop · Chrome','Mobile · Safari','Desktop · Edge'];
-    return {rows:rows, mins:(3+seed%14), src:srcs[((seed%srcs.length)+srcs.length)%srcs.length], dev:devs[(((seed>>3)%devs.length)+devs.length)%devs.length]};
+    return {rows:rows, mins:mins, src:srcs[((seed%srcs.length)+srcs.length)%srcs.length], dev:devs[(((seed>>3)%devs.length)+devs.length)%devs.length]};
   }
 
   function topActivity(p){
@@ -616,7 +620,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
           +'<div class="s">“'+esc(shortTxt(post.title,50))+'” · '+esc(post.when)+' · tap to open post</div></div>'
         +'<div class="ke-chev" id="ke-chev">⌄</div></div>';
     }
-    var pages=Math.max(2,parseInt(p.act&&p.act.pages)||5);
+    var pages=pagesViewed(p).rows.length;   // keep the headline count in sync with the detail
     return '<div class="ke-act ke-clk" onclick="VimiEngage.toggleDetail()">'
       +'<div class="ke-act-ic">🌐</div>'
       +'<div class="ke-act-t"><div class="h">Visited your <b>website</b></div>'
@@ -647,7 +651,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
         +'<div>Pages<b>'+pv.rows.length+'</b></div>'
       +'</div>'
       +'<div class="ke-lbl" style="margin:2px 0 6px">Pages viewed</div>'
-      +pv.rows.map(function(r){return '<div class="ke-dt-row"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9fb8d8">position2.com'+esc(r.path)+'</span><span class="t">'+esc(r.t)+'</span></div>';}).join('')
+      +pv.rows.map(function(r){return '<div class="ke-dt-row"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9fb8d8">position2.com'+esc(r.path)+'</span><span class="t" style="font-variant-numeric:tabular-nums">'+esc(r.dur)+'<span style="color:var(--ke-mut);font-weight:400;margin-left:9px">'+esc(r.t)+'</span></span></div>';}).join('')
       +'<div class="ke-lbl" style="margin:13px 0 6px">Cross-channel signal</div>'
       +'<div class="ke-dt-post"><div class="pt">👍 Also '+(post.commented?'commented on':'liked')+' your LinkedIn post: <b style="color:#fff">“'+esc(post.title)+'”</b></div>'
         +'<div style="font-size:10.5px;color:var(--ke-mut);margin-top:5px">'+post.reactions+' reactions · '+post.comments+' comments · '+esc(post.when)+'</div>'
@@ -662,7 +666,7 @@ function keBanner(){return '<div class="ke-drw-banner" onclick="keOpen()"><div c
       +'<div class="ke-m-id"><div class="ke-nm">'+esc(p.name)+'</div><div class="ke-rl">'+esc(p.title||'-')+(p.company?' · '+esc(p.company):'')+'</div></div>'
       +'<div class="ke-tag">★ Prospective Client</div>'
     +'</div>'
-    +'<p class="ke-narr">We checked your <b>HubSpot CRM</b> and found <b>'+esc(first(p.name))+'</b> is already a known contact. Your team chatted with them about <b>'+esc(c.topic)+'</b>, and they’re flagged as a <b>prospective client</b>. Worth reaching out while they’re active.</p>'
+    +'<p class="ke-narr">I checked your <b>HubSpot CRM</b> and found <b>'+esc(first(p.name))+'</b> is already a known contact. I can see your team spoke with them about <b>'+esc(c.topic)+'</b>, and they’re flagged as a <b>prospective client</b> — I’d reach out while they’re still active.</p>'
     +'<div class="ke-chat">“Thanks for the breakdown on '+esc(c.topic)+', let me take this back to the team and circle back.”<span>'+esc(p.name)+' · HubSpot conversation · '+esc(c.last)+'</span></div>'
     +'<div class="ke-meta"><div class="ke-mb"><div class="k">Deal Stage</div><div class="v">'+esc(c.stage)+'</div></div>'
       +'<div class="ke-mb"><div class="k">Owner</div><div class="v">'+esc(c.owner)+'</div></div>'
