@@ -674,6 +674,22 @@ def _clean_industry(raw: str) -> str:
     return raw
 
 
+# === DEMO PROXY PEOPLE (temporary — pinned to top of Anonymous Visitors for demo; remove this block to restore originals) ===
+_DEMO_PROXY_PEOPLE = [
+    {"name":"Michael Brennan",   "title":"Chief Marketing Officer",            "email":"m.brennan@brightwave.com",   "location":"San Francisco, California, United States", "pages":"7", "industry":"computer software",                  "website":"brightwave.com",  "date":"2026-06-24", "time_raw":"2026-06-24T10:42:00"},
+    {"name":"Sarah Whitfield",   "title":"VP of Demand Generation",            "email":"sarah.whitfield@northpeak.io","location":"Austin, Texas, United States",            "pages":"5", "industry":"marketing & advertising",            "website":"northpeak.io",    "date":"2026-06-24", "time_raw":"2026-06-24T10:39:00"},
+    {"name":"David Caldwell",    "title":"Director of Growth Marketing",       "email":"d.caldwell@summitlabs.com",  "location":"Denver, Colorado, United States",          "pages":"6", "industry":"information technology & services",   "website":"summitlabs.com",  "date":"2026-06-24", "time_raw":"2026-06-24T10:35:00"},
+    {"name":"Jennifer Hollis",   "title":"Senior Director, Digital Strategy",  "email":"j.hollis@meridianhealth.com","location":"Boston, Massachusetts, United States",     "pages":"4", "industry":"hospital & health care",             "website":"meridianhealth.com","date":"2026-06-24","time_raw":"2026-06-24T10:31:00"},
+    {"name":"Robert Sanders",    "title":"Founder & CEO",                      "email":"rsanders@claymore.co",       "location":"Chicago, Illinois, United States",         "pages":"8", "industry":"financial services",                 "website":"claymore.co",     "date":"2026-06-24", "time_raw":"2026-06-24T10:27:00"},
+    {"name":"Emily Carpenter",   "title":"Head of Marketing",                  "email":"emily.c@vistapoint.com",     "location":"Seattle, Washington, United States",       "pages":"5", "industry":"computer software",                  "website":"vistapoint.com",  "date":"2026-06-24", "time_raw":"2026-06-24T10:22:00"},
+    {"name":"James Patterson",   "title":"VP, Marketing Operations",           "email":"james.patterson@ironwood.io","location":"Atlanta, Georgia, United States",          "pages":"6", "industry":"marketing & advertising",            "website":"ironwood.io",     "date":"2026-06-24", "time_raw":"2026-06-24T10:18:00"},
+    {"name":"Ashley Morgan",     "title":"Director of Paid Media",             "email":"ashley.morgan@lakeshore.com","location":"Minneapolis, Minnesota, United States",    "pages":"3", "industry":"retail",                             "website":"lakeshore.com",   "date":"2026-06-24", "time_raw":"2026-06-24T10:13:00"},
+    {"name":"Christopher Reed",  "title":"Chief Revenue Officer",              "email":"c.reed@beacontech.com",      "location":"New York, New York, United States",        "pages":"9", "industry":"information technology & services",   "website":"beacontech.com",  "date":"2026-06-24", "time_raw":"2026-06-24T10:08:00"},
+    {"name":"Lauren Mitchell",   "title":"Senior Marketing Manager",           "email":"lauren.mitchell@cedarworks.com","location":"Portland, Oregon, United States",        "pages":"4", "industry":"consumer goods",                     "website":"cedarworks.com",  "date":"2026-06-24", "time_raw":"2026-06-24T10:02:00"},
+]
+# === END DEMO PROXY PEOPLE ===
+
+
 def _fetch_anon_visitors_data() -> dict:
     """Fetch people + company data from the Anonymous Visitors Google Sheet."""
     def _fetch(tab_range):
@@ -750,6 +766,9 @@ def _fetch_anon_visitors_data() -> dict:
             "time_raw": time_str,
         })
     people_table.sort(key=lambda x: x.get("time_raw", ""), reverse=True)
+
+    # DEMO: pin proxy people to the very top (remove this line + _DEMO_PROXY_PEOPLE to restore originals)
+    people_table = [dict(x) for x in _DEMO_PROXY_PEOPLE] + people_table
 
     return dict(
         total_people=len(people_table),
