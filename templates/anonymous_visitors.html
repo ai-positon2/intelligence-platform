@@ -844,7 +844,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
         +'<div>Pages<b>'+pv.rows.length+'</b></div>'
       +'</div>'
       +'<div class="ke-lbl" style="margin:2px 0 6px">Pages viewed</div>'
-      +pv.rows.map(function(r){return '<div class="ke-dt-row"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9fb8d8">position2.com'+esc(r.path)+'</span><span class="t" style="font-variant-numeric:tabular-nums">'+esc(r.dur)+'<span style="color:var(--ke-mut);font-weight:400;margin-left:9px">'+esc(r.t)+'</span></span></div>';}).join('')
+      +pv.rows.map(function(r){return '<div class="ke-dt-row"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#9fb8d8">position2.com'+esc(r.path)+'</span><span class="t" style="font-variant-numeric:tabular-nums">'+esc(r.dur)+'</span></div>';}).join('')
       +'<div class="ke-lbl" style="margin:13px 0 6px">Cross-channel signal</div>'
       +'<div class="ke-dt-post"><div class="pt">👍 Also '+(post.commented?'commented on':'liked')+' your LinkedIn post: <b style="color:#fff">“'+esc(post.title)+'”</b></div>'
         +'<div style="font-size:10.5px;color:var(--ke-mut);margin-top:5px">'+post.reactions+' reactions · '+post.comments+' comments · '+esc(post.when)+'</div>'
