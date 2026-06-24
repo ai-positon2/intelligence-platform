@@ -36,7 +36,7 @@ def forbidden(e):
 def server_error(e):
     """Always answer API routes with JSON so the frontend never chokes on an HTML error page."""
     if request.path.startswith("/api/"):
-        return jsonify({"error": "Kairo is taking longer than usual - please try again."}), 500
+        return jsonify({"error": "Vimi is taking longer than usual - please try again."}), 500
     return ("Internal Server Error", 500)
 
 # ── Google OAuth ────────────────────────────────────────────────────────────────
@@ -1510,7 +1510,7 @@ def ppc_chat():
             {"role": "user", "content": f"{instruction}\n\nDATA TO REFORMAT:\n{source_text}"},
         ]
         try:
-            formatted, _m = _kairo_completion(oai, reformat_messages, 2000, temperature=0)
+            formatted, _m = _vimi_completion(oai, reformat_messages, 2000, temperature=0)
             is_csv = export_fmt in ("csv", "excel")
             return jsonify({"answer": formatted, "is_export": True,
                             "export_format": export_fmt, "is_csv": is_csv})
@@ -1599,7 +1599,7 @@ CSV/EXCEL EXPORT RULES:
         messages.append({"role": "user", "content": user_message})
 
     try:
-        answer, _m = _kairo_completion(oai, messages, 2000, temperature=0.1)
+        answer, _m = _vimi_completion(oai, messages, 2000, temperature=0.1)
         return jsonify({
             "answer":          answer,
             "detected_format": export_fmt or "",
@@ -1761,7 +1761,7 @@ def _responses_web_search(oai, model, input_msgs, max_tokens):
     return None, False
 
 
-def _kairo_model_chain():
+def _vimi_model_chain():
     """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > gpt-5.4 (ChatGPT 5.4) > OPENAI_MODEL/gpt-4o-mini."""
     chain = []
     for m in (os.environ.get("OPENAI_INSIGHTS_MODEL"), "gpt-5.4",
@@ -1771,12 +1771,12 @@ def _kairo_model_chain():
     return chain
 
 
-def _kairo_completion(oai, messages, max_tokens, temperature=None):
-    """Plain-text chat completion on the primary Kairo model (GPT-5.4) with graceful
+def _vimi_completion(oai, messages, max_tokens, temperature=None):
+    """Plain-text chat completion on the primary Vimi model (GPT-5.4) with graceful
     fallback down the model chain; retries without temperature if a model rejects it.
     Returns (text, model_used)."""
     last_err = None
-    for model in _kairo_model_chain():
+    for model in _vimi_model_chain():
         attempts = [{"temperature": temperature}] if temperature is not None else []
         attempts.append({})
         for kw in attempts:
@@ -1789,15 +1789,15 @@ def _kairo_completion(oai, messages, max_tokens, temperature=None):
                     return txt, model
             except Exception as e:
                 last_err = e
-                log.warning("kairo: completion on '%s' (%s) failed: %s", model, kw, e)
+                log.warning("vimi: completion on '%s' (%s) failed: %s", model, kw, e)
     raise last_err if last_err else RuntimeError("no usable OpenAI model")
 
 
-def _kairo_chat_json(oai, messages, max_tokens):
+def _vimi_chat_json(oai, messages, max_tokens):
     """Chat completion in strict JSON mode, trying the strongest model first.
     Returns (raw_text, model_used)."""
     last_err = None
-    for model in _kairo_model_chain():
+    for model in _vimi_model_chain():
         try:
             resp = oai.chat.completions.create(
                 model=model, messages=messages,
@@ -1808,7 +1808,7 @@ def _kairo_chat_json(oai, messages, max_tokens):
                 return txt, model
         except Exception as e:
             last_err = e
-            log.warning("kairo: model '%s' failed, trying next: %s", model, e)
+            log.warning("vimi: model '%s' failed, trying next: %s", model, e)
     raise last_err if last_err else RuntimeError("no usable OpenAI model")
 
 
@@ -1973,7 +1973,7 @@ def insights_generate(account_id):
         schema = (
             '{"headline":"one punchy 8-12 word headline capturing this week in the market",'
             +'  "brief":"3-sentence leadership brief naming hottest companies, dominant signal pattern, ONE sales action.",'
-            +'  "kairo_take":"one bold, non-obvious strategic observation from the data that a human analyst would likely miss",'
+            +'  "vimi_take":"one bold, non-obvious strategic observation from the data that a human analyst would likely miss",'
             +'  "week_priority":[{"rank":1,"company":"","domain":"","signal":"specific signal","pitch":"exact service+why","service":"SEO|PPC|Content|Brand|RevOps","call_timing":"Call today|Call this week|Warm email first","hook":"one-line conversation opener citing the signal"}],'
             +'  "market_pulse":["specific data-backed observation citing companies"],'
             +'  "strategic_moves":[{"move":"title","rationale":"signal-backed reason","impact":"qualitative business impact, no dollar figures","owner":"BDR|Account Exec|Marketing|Leadership"}],'
@@ -1985,7 +1985,7 @@ def insights_generate(account_id):
         )
 
         system_prompt = (
-            "You are Kairo, Position2's elite revenue-intelligence AI. Position2 is a B2B digital "
+            "You are Vimi, Position2's elite revenue-intelligence AI. Position2 is a B2B digital "
             "marketing agency. Services: SEO & Organic Growth | Performance Marketing "
             "(Google/Meta/LinkedIn Ads) | Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
             "You brief the CEO and Head of Sales on THIS WEEK's pipeline priorities. "
@@ -1996,7 +1996,7 @@ def insights_generate(account_id):
             "for multi-intent + HIGH + fresh. Momentum flags in the data (RISING/ACTIVE/COOLING) must drive the "
             "pipeline momentum field. "
             "(3) Hunt cross-company patterns: sector waves, leadership migrations between tracked companies, funding "
-            "clusters in one niche, timing coincidences. These power market_pulse, themes and kairo_take. "
+            "clusters in one niche, timing coincidences. These power market_pulse, themes and vimi_take. "
             "(4) For each company, reason WHY the signal opens a marketing-services window NOW: new CMO/CEO = vendor "
             "review window (~90 days); funding = growth mandate and paid-media budget unlock; M&A = brand and website "
             "consolidation work; IPO = scrutiny on organic visibility and analyst-facing content; expansion/news = "
@@ -2014,7 +2014,7 @@ def insights_generate(account_id):
             "RULES: week_priority=top 6 by urgency; pipeline=top 14 scored 0-100 with honest momentum — include mid "
             "and lower-score watchlist companies too, not only the hot ones; actions=6 ranked; outreach=8 "
             "personalised with <55-char human, curiosity-driven subjects (no spammy caps); themes=4 each with a "
-            "usable campaign_angle; risks=2-3 only if real. kairo_take must be a genuinely non-obvious pattern, "
+            "usable campaign_angle; risks=2-3 only if real. vimi_take must be a genuinely non-obvious pattern, "
             "never a summary."
         )
 
@@ -2025,7 +2025,7 @@ def insights_generate(account_id):
             "COMPANY SIGNAL DATA (format: [name | domain | industry] n sigs, MOMENTUM FLAGS — "
             "type(severity,date): detail):\n\n%s\n\nBrief the CEO. Respond with the JSON object only."
             % (n_sig, n_co, acct, stats_lines, "\n".join(ctx_lines)))
-        raw, _used_model = _kairo_chat_json(oai, [
+        raw, _used_model = _vimi_chat_json(oai, [
             {"role":"system","content":system_prompt},
             {"role":"user","content":user_msg}
         ], 6000)
@@ -2215,7 +2215,7 @@ def company_analysis(account_id):
         co_domain = signals[0].get("domain","") if signals else ""
         co_loc = ", ".join(x for x in [signals[0].get("city") or "", signals[0].get("state") or ""] if x) if signals else ""
         system = (
-            "You are Kairo, senior B2B sales strategist at Position2 (SEO & Organic Growth, PPC/Performance "
+            "You are Vimi, senior B2B sales strategist at Position2 (SEO & Organic Growth, PPC/Performance "
             "Marketing, Content Strategy, Brand & Website, RevOps & HubSpot). Build a rigorous, signal-grounded "
             "prospect analysis. Reason first: what do the signals (their types, severity, dates, and sequence) "
             "imply about budget timing, internal change, and marketing gaps? Score honestly — most prospects are "
@@ -2240,7 +2240,7 @@ def company_analysis(account_id):
         )
         from openai import OpenAI
         oai = OpenAI(api_key=api_key, timeout=90.0, max_retries=1)
-        raw, _used_model = _kairo_chat_json(oai, [
+        raw, _used_model = _vimi_chat_json(oai, [
             {"role": "system", "content": system},
             {"role": "user", "content": "Company: %s\nDomain: %s\nIndustry: %s\nLocation: %s\nSignals (newest first):\n%s"
                 % (company_name, co_domain, industry, co_loc, sig_str)}
@@ -2306,7 +2306,7 @@ def generate_email(account_id):
         }.get(tone, "TONE: confident and direct, zero fluff.")
 
         system = (
-            "You are Kairo, writing outreach for Position2, a B2B digital marketing agency "
+            "You are Vimi, writing outreach for Position2, a B2B digital marketing agency "
             "(SEO | Performance Marketing/PPC | Content Strategy | Brand & Website | Revenue Operations). "
             "Write an email a thoughtful senior consultant would actually send - never anything that smells of "
             "AI or mail-merge.\n\n"
@@ -2345,7 +2345,7 @@ def generate_email(account_id):
 
         from openai import OpenAI
         oai = OpenAI(api_key=api_key)
-        raw, _m = _kairo_completion(
+        raw, _m = _vimi_completion(
             oai, [{"role":"system","content":system},{"role":"user","content":user_msg}], 800)
         if "```" in raw:
             m = _re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
@@ -2399,7 +2399,7 @@ def research_company(account_id):
             pass
 
         system = (
-            "You are Kairo, Position2’s sales-intelligence research AI. Position2 is a digital marketing agency. "
+            "You are Vimi, Position2’s sales-intelligence research AI. Position2 is a digital marketing agency. "
             "Services: SEO & Organic Growth | Performance Marketing (Google/Meta/LinkedIn Ads) | "
             "Content Strategy | Brand & Website | Revenue Operations & HubSpot. "
             "Research the given company using web search. Find what they do, recent news, "
@@ -2504,10 +2504,10 @@ def decision_makers(account_id):
         import traceback; log.error("decision_makers: %s", traceback.format_exc())
         return jsonify({"error": str(exc)})
 
-@app.route("/api/kairo-chat/<account_id>", methods=["POST"])
+@app.route("/api/vimi-chat/<account_id>", methods=["POST"])
 @login_required
-def kairo_chat(account_id):
-    """Conversational Kairo: grounded on the account signal DB, web-search for the rest."""
+def vimi_chat(account_id):
+    """Conversational Vimi: grounded on the account signal DB, web-search for the rest."""
     import sqlite3, re as _re
     from pathlib import Path
     db_map = {"healthcare": Path(__file__).parent/"data"/"tracker.db",
@@ -2587,7 +2587,7 @@ def kairo_chat(account_id):
             ", ".join("%s %d" % (k, v) for k, v in sorted(counts.items(), key=lambda x: -x[1])))
         ctx_str = "\n".join(ctx) or "(no specific company matched - use the overview and web search)"
         system = (
-            "You are Kairo, Position2's signal-intelligence assistant. Position2 is a B2B digital marketing "
+            "You are Vimi, Position2's signal-intelligence assistant. Position2 is a B2B digital marketing "
             "agency (SEO, PPC, Content, Brand & Website, RevOps). Answer the user accurately and concisely. "
             "Use the ACCOUNT SIGNAL DATA below for questions about tracked companies and signals; use web search "
             "for company research, recent news, people, contacts, or anything not in the data. If asked to draft an "
@@ -2624,7 +2624,7 @@ def kairo_chat(account_id):
                 parts.append({"type": "image_url",
                               "image_url": {"url": "data:%s;base64,%s" % (mime, b64)}})
             msgs[-1] = {"role": "user", "content": parts}
-            answer, _m = _kairo_completion(oai, msgs, _max_out)
+            answer, _m = _vimi_completion(oai, msgs, _max_out)
             web = False
         else:
             model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
@@ -2632,15 +2632,15 @@ def kairo_chat(account_id):
             if not answer:
                 answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, _max_out)
             if not answer:
-                answer, _m = _kairo_completion(oai, msgs, _max_out)
+                answer, _m = _vimi_completion(oai, msgs, _max_out)
         return jsonify({"ok": True, "answer": answer, "web_search_used": web,
                         "export_format": export_format})
     except Exception as e:
-        import traceback; log.error("kairo_chat: %s", traceback.format_exc())
+        import traceback; log.error("vimi_chat: %s", traceback.format_exc())
         return jsonify({"error": str(e)})
 
 
-# ── Kairo export: convert a markdown answer into a downloadable file ─────────
+# ── Vimi export: convert a markdown answer into a downloadable file ─────────
 
 def _md_blocks(content):
     """Parse markdown-lite into (kind, payload) blocks: h1/h2/h3/li/p (str) and tr (list of cells)."""
@@ -2683,21 +2683,21 @@ def _strip_md(t):
     return t.strip()
 
 
-@app.route("/api/kairo-export", methods=["POST"])
+@app.route("/api/vimi-export", methods=["POST"])
 @login_required
-def kairo_export():
-    """Convert Kairo markdown output into CSV / XLSX / DOCX / PDF / PPTX and stream it back."""
+def vimi_export():
+    """Convert Vimi markdown output into CSV / XLSX / DOCX / PDF / PPTX and stream it back."""
     import io
     from flask import send_file
     body = request.get_json(silent=True) or {}
     fmt = (body.get("format") or "").lower().strip()
     content = str(body.get("content") or "").strip()
-    title = (body.get("title") or "Kairo Insights").strip()[:80] or "Kairo Insights"
+    title = (body.get("title") or "Vimi Insights").strip()[:80] or "Vimi Insights"
     if not content:
         return jsonify({"error": "no content"}), 400
     if fmt not in ("csv", "xlsx", "docx", "pdf", "pptx"):
         return jsonify({"error": "unsupported format"}), 400
-    fname = "kairo-insights." + fmt
+    fname = "vimi-insights." + fmt
     try:
         if fmt == "csv":
             import csv as _csv
@@ -2716,7 +2716,7 @@ def kairo_export():
         if fmt == "xlsx":
             import openpyxl
             from openpyxl.styles import Font
-            wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Kairo"
+            wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Vimi"
             rows = _md_table_rows(content)
             if rows:
                 for ri, r in enumerate(rows, 1):
@@ -2835,7 +2835,7 @@ def kairo_export():
         data.seek(0)
         return send_file(data, mimetype="application/pdf", as_attachment=True, download_name=fname)
     except Exception as e:
-        import traceback; log.error("kairo_export: %s", traceback.format_exc())
+        import traceback; log.error("vimi_export: %s", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -2844,7 +2844,7 @@ def kairo_export():
 def refresh_dashboard():
     """Trigger the GitHub Action that fetches the latest signals (HIGH from
     Sheets, LOW from Google News with filters) for both accounts, rebuilds the
-    dashboards (preserving Kairo), prunes news, and publishes."""
+    dashboards (preserving Vimi), prunes news, and publishes."""
     token    = os.environ.get("GH_DISPATCH_TOKEN", "")
     repo     = os.environ.get("GH_REPO", "ai-positon2/intelligence-platform")
     workflow = os.environ.get("GH_WORKFLOW", "refresh-dashboards.yml")
@@ -2861,7 +2861,7 @@ def refresh_dashboard():
         })
         if r.status_code in (201, 204):
             return jsonify({"ok": True,
-                "message": "Refresh started. Kairo is fetching the latest HIGH signals (Sheets) and "
+                "message": "Refresh started. Vimi is fetching the latest HIGH signals (Sheets) and "
                            "LOW signals (Google News, filtered) for both accounts, rebuilding, and "
                            "publishing. Your dashboard updates automatically in a few minutes — reload then.",
                 "actions_url": "https://github.com/%s/actions/workflows/%s" % (repo, workflow)})

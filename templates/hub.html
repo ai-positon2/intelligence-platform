@@ -129,7 +129,7 @@
         <div><b data-lxn="1200" data-lxs="+">0</b><span>companies tracked</span></div>
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
         <div><b data-lxn="14">0</b><span>dashboards</span></div>
-        <div><b class="grad-k">Kairo</b><span>ai on every page</span></div>
+        <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>
     <p class="footer-note">Position2 · Internal use only</p>
@@ -235,7 +235,7 @@
   function go(x){
     if(!x)return;
     close();
-    if(x.u==='!kairo'){if(window.irChat)window.irChat();return;}
+    if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
     if(x.u.charAt(0)==='#'){location.hash=x.u;return;}
     if(location.pathname===x.u)return;
     window.location.href=x.u;
@@ -271,7 +271,7 @@
 <script>(function(){document.querySelectorAll('.hub-card').forEach(function(c){c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');});});})();</script>
 <script>
 window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
-  marquee:'SIGNAL INTELLIGENCE ✦ KAIRO AI ✦ PAID MEDIA ✦ ORGANIC GROWTH ✦ VISITOR IDENTITY ✦',
+  marquee:'SIGNAL INTELLIGENCE ✦ VIMI AI ✦ PAID MEDIA ✦ ORGANIC GROWTH ✦ VISITOR IDENTITY ✦',
   marqueeHost:'.main',tilt:'.hub-card',tiltDeg:3.5,
   reveal:[],status:1,statusHost:'.topbar-right'};
 </script>
@@ -657,35 +657,35 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 
 
 
-  <script>window.KAIRO_NAME = {{ (user.given_name or user.name or 'there')|tojson|safe }};</script>
+  <script>window.VIMI_NAME = {{ (user.given_name or user.name or 'there')|tojson|safe }};</script>
   {% include 'ppc_chat_widget.html' %}
 
-  <!-- Kairo — transient greeting bubble (opens the Kairo chatbot) -->
+  <!-- Vimi — transient greeting bubble (opens the Vimi chatbot) -->
   <style>
-    #kairo{position:fixed;right:100px;bottom:33px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
-    .kairo-pill{display:flex;align-items:center;gap:11px;max-width:360px;
+    #vimi{position:fixed;right:100px;bottom:33px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
+    .vimi-pill{display:flex;align-items:center;gap:11px;max-width:360px;
       background:linear-gradient(120deg,rgba(20,23,42,.97),rgba(13,16,32,.97));
       border:1px solid rgba(129,140,248,.34);border-radius:999px;padding:8px 14px 8px 9px;
       box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 26px rgba(99,102,241,.16);backdrop-filter:blur(10px);
       cursor:pointer;transform:translateY(14px) scale(.96);opacity:0;transition:transform .4s cubic-bezier(.2,1.2,.3,1),opacity .35s,box-shadow .25s}
-    #kairo.show .kairo-pill{transform:translateY(0) scale(1);opacity:1}
-    #kairo.gone{display:none}
-    .kairo-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.3);border-color:rgba(129,140,248,.55)}
-    .kairo-pill::after{content:"";position:absolute;right:-6px;top:50%;margin-top:-7px;width:14px;height:14px;
+    #vimi.show .vimi-pill{transform:translateY(0) scale(1);opacity:1}
+    #vimi.gone{display:none}
+    .vimi-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.3);border-color:rgba(129,140,248,.55)}
+    .vimi-pill::after{content:"";position:absolute;right:-6px;top:50%;margin-top:-7px;width:14px;height:14px;
       background:linear-gradient(135deg,rgba(20,23,42,.97),rgba(13,16,32,.97));border-top:1px solid rgba(129,140,248,.34);border-right:1px solid rgba(129,140,248,.34);transform:rotate(45deg)}
-    .kairo-ic{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    .vimi-ic{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
       background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.45)}
-    .kairo-tx{min-width:0;line-height:1.25}
-    .kairo-tx .h{font-size:13px;font-weight:700;color:#fff;white-space:nowrap}
-    .kairo-tx .q{font-size:12px;color:#aab2d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .kairo-x{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:#8b94be;
+    .vimi-tx{min-width:0;line-height:1.25}
+    .vimi-tx .h{font-size:13px;font-weight:700;color:#fff;white-space:nowrap}
+    .vimi-tx .q{font-size:12px;color:#aab2d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .vimi-x{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:#8b94be;
       font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;margin-left:2px}
-    .kairo-x:hover{background:rgba(255,255,255,.14);color:#fff}
-    @media (max-width:560px){ #kairo{right:84px;bottom:30px}.kairo-pill{max-width:calc(100vw - 110px)}.kairo-tx .h,.kairo-tx .q{white-space:normal}}
+    .vimi-x:hover{background:rgba(255,255,255,.14);color:#fff}
+    @media (max-width:560px){ #vimi{right:84px;bottom:30px}.vimi-pill{max-width:calc(100vw - 110px)}.vimi-tx .h,.vimi-tx .q{white-space:normal}}
   </style>
-  <div id="kairo">
-    <div class="kairo-pill" id="kairoPill" title="Chat with Kairo">
-      <span class="kairo-ic">
+  <div id="vimi">
+    <div class="vimi-pill" id="vimiPill" title="Chat with Vimi">
+      <span class="vimi-ic">
         <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
           <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
           <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse>
@@ -693,17 +693,17 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
           <circle cx="12" cy="12" r="2.4" fill="#fff"><animate attributeName="r" values="2.4;2.9;2.4" dur="3s" repeatCount="indefinite"/></circle>
         </svg>
       </span>
-      <span class="kairo-tx">
+      <span class="vimi-tx">
         <span class="h">Hi {{ user.given_name or user.name or 'there' }} <span style="font-weight:400">👋</span></span>
-        <span class="q" id="kairoQ">How are you today?</span>
+        <span class="q" id="vimiQ">How are you today?</span>
       </span>
-      <button class="kairo-x" id="kairoX" aria-label="Dismiss">✕</button>
+      <button class="vimi-x" id="vimiX" aria-label="Dismiss">✕</button>
     </div>
   </div>
   <script>
   (function(){
-    var box=document.getElementById('kairo'),pill=document.getElementById('kairoPill'),
-        x=document.getElementById('kairoX'),q=document.getElementById('kairoQ');
+    var box=document.getElementById('vimi'),pill=document.getElementById('vimiPill'),
+        x=document.getElementById('vimiX'),q=document.getElementById('vimiQ');
     var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
     q.textContent=lines[Math.floor(Math.random()*lines.length)];
     setTimeout(function(){box.classList.add('show');},700);

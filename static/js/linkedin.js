@@ -188,7 +188,7 @@ function keHotLead(i){
   var dom=(p.email||'').split('@')[1]||'';
   window._kePerson={name:p.name,title:p.title,company:p.company,domain:dom,email:p.email,source:'linkedin',
     act:{post:p.post,postUrl:'',commented:!!p.commented,when:p.when,reactions:(p.reactions||0)}};
-  if(window.KairoEngage)window.KairoEngage.open(window._kePerson);
+  if(window.VimiEngage)window.VimiEngage.open(window._kePerson);
 }
 function buildPeopleTab(){
   const {people,companies,company_lb,stats}=D;
@@ -458,7 +458,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 function openEngDrawer(pi,ei){
   const p=D.posts[pi],e=p?.engagers[ei];if(!e)return;
   window._kePerson={name:e.name,title:e.title||e.headline||'',company:e.company||'',domain:'',email:'',source:'linkedin',act:{post:p.snippet||'',postUrl:(p.url||''),postDate:(p.date||''),author:(p.author||'Position²'),reactions:(p.engagers?p.engagers.length:0),reaction:(e.reaction||''),commented:(e.commented?true:false),when:p.date||''}};
-  if(window.KairoEngage&&window._kePerson){window.KairoEngage.open(window._kePerson);return;}
+  if(window.VimiEngage&&window._kePerson){window.VimiEngage.open(window._kePerson);return;}
   const isDM=e.dm?.toLowerCase()==='yes';
   document.getElementById('dhdr').innerHTML=`
     ${av(e.name,e.pic,58,'dav')}
@@ -493,7 +493,7 @@ function openEngDrawer(pi,ei){
 function openPersonDrawer(idx){
   const p=D.people[idx];if(!p)return;
   window._kePerson={name:p.name,title:p.title||p.headline||'',company:p.company||'',domain:'',email:'',source:'linkedin',act:{post:'',commented:false,when:(p.posts_engaged?p.posts_engaged+' post'+(p.posts_engaged!=1?'s':'')+' engaged':'')}};
-  if(window.KairoEngage&&window._kePerson){window.KairoEngage.open(window._kePerson);return;}
+  if(window.VimiEngage&&window._kePerson){window.VimiEngage.open(window._kePerson);return;}
   const pct=Math.round(p.posts_engaged/maxP*100);
   document.getElementById('dhdr').innerHTML=`
     ${av(p.name,'',58,'dav')}

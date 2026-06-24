@@ -72,7 +72,7 @@ apps/ad-intelligence/  Ad Intelligence React/Vite SOURCE (build target of the ab
 reports/               Prebuilt Signal Tracker dashboards
 data/                  SQLite signal databases
 tracker/               Signal ingestion pipeline
-scripts/build-frontend.sh   Builds apps/ad-intelligence -> ad_intelligence/ (+ re-injects Kairo chat widget)
+scripts/build-frontend.sh   Builds apps/ad-intelligence -> ad_intelligence/ (+ re-injects Vimi chat widget)
 ```
 
 ### Deploy (single Railway service)
@@ -81,7 +81,7 @@ committed `ad_intelligence/` build directly — fast and reliable, no Node build
 
 ### Frontend auto-build (GitHub Actions)
 When `apps/ad-intelligence/**` changes on `main`, `.github/workflows/build-frontend.yml` builds the
-React app on a clean Node 22 runner, copies it into `ad_intelligence/`, re-injects the Kairo chat
+React app on a clean Node 22 runner, copies it into `ad_intelligence/`, re-injects the Vimi chat
 widget, and commits the result back — which Railway then deploys. No manual build-and-copy.
 
 ### Rebuild the Ad Intelligence app locally

@@ -14,7 +14,7 @@ Two layers, applied in order:
 
 2. AI gate (optional, batched — one OpenAI call per company)
    When an OpenAI key is supplied, the heuristic survivors are sent in a single
-   call and Kairo confirms which ones actually matter for B2B buying intent.
+   call and Vimi confirms which ones actually matter for B2B buying intent.
    Fail-open: if anything goes wrong, the heuristic survivors are kept.
 
 The public entry point is :func:`filter_relevant_articles`.
@@ -250,7 +250,7 @@ def _ai_keep_indices(company_name: str, candidates: list[dict], ai_key: str,
         "%d. %s" % (i, (a.get("title", "") or "")[:140]) for i, a in enumerate(candidates)
     )
     system = (
-        "You are Kairo, a B2B sales-intelligence filter for Position2 (a digital "
+        "You are Vimi, a B2B sales-intelligence filter for Position2 (a digital "
         "marketing agency). From a list of news headlines about a company, return "
         "ONLY the ones that signal a real business event a sales team would act on "
         "— funding, M&A, leadership change, expansion, product launch, partnership, "
