@@ -543,8 +543,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
-    {t:'GTM Tools',d:'Paid media intelligence',u:'/gtm',i:'◎'},
+    {t:'GTM Tools',d:'Go-to-market intelligence',u:'/gtm',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
+    {t:'Context Graph',d:'How your data connects',u:'/context-graph',i:'✦'},
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
     {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/gtm/linkedin-scraper',i:'⦿'},
@@ -574,7 +575,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:12.5px}'
     +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4763;display:flex;gap:14px}'
     +'#kpal-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99998;background:rgba(11,14,28,.95);border:1px solid rgba(129,140,248,.35);color:#a9b4d8;border-radius:99px;font-size:12px;padding:9px 18px;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:kpalF .3s ease}'
-    +'#kpal-toast b{color:#c7d2fe}';
+    +'#kpal-toast b{color:#c7d2fe}'+'#kpal-fab{position:fixed;left:20px;bottom:22px;z-index:99980;display:inline-flex;align-items:center;gap:9px;padding:9px 14px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;color:#c7cdf5;background:linear-gradient(120deg,rgba(20,23,42,.92),rgba(13,16,32,.92));border:1px solid rgba(129,140,248,.34);box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 22px rgba(99,102,241,.14);backdrop-filter:blur(10px);transition:transform .18s,box-shadow .18s,border-color .18s}'+'#kpal-fab:hover{transform:translateY(-2px);border-color:rgba(129,140,248,.6);box-shadow:0 18px 44px rgba(0,0,0,.6),0 0 30px rgba(99,102,241,.28)}'+'#kpal-fab kbd{font-family:inherit;font-size:9.5px;font-weight:700;color:#8b94be;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:5px;padding:2px 6px}'+'@media (max-width:560px){ #kpal-fab .kfab-tx,#kpal-fab kbd{display:none} #kpal-fab{padding:11px} }';
   document.head.appendChild(css);
   var ov=document.createElement('div');ov.id='kpal';
   ov.innerHTML='<div class="kpal-box">'
@@ -607,6 +608,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   }
   function open(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
   function close(){ov.classList.remove('on');}
+  window.openPalette=open;
+  (function(){var b=document.createElement('button');b.id='kpal-fab';b.type='button';b.title='Jump to any tool \u00b7 Ctrl K';b.setAttribute('aria-label','Jump to any tool');b.innerHTML='<span aria-hidden="true">\u2318</span><span class="kfab-tx">Jump to\u2026</span><kbd>Ctrl K</kbd>';b.addEventListener('click',function(){open();});document.body.appendChild(b);})();
   inp.addEventListener('input',function(){filter(inp.value);});
   inp.addEventListener('keydown',function(e){
     if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
