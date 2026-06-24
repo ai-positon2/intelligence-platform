@@ -690,8 +690,14 @@ _DEMO_PROXY_PEOPLE = [
 # === END DEMO PROXY PEOPLE ===
 
 
-def _fetch_anon_visitors_data() -> dict:
-    """Fetch people + company data from the Anonymous Visitors Google Sheet."""
+_ANON_CACHE = {"data": None, "ts": 0.0}
+_ANON_CACHE_TTL = 300  # seconds — Sheets reads are slow; serve cached data between refreshes
+
+def _fetch_anon_visitors_data(force: bool = False) -> dict:
+    """Fetch people + company data from the Anonymous Visitors Google Sheet (TTL-cached)."""
+    now = time.time()
+    if not force and _ANON_CACHE["data"] is not None and (now - _ANON_CACHE["ts"]) < _ANON_CACHE_TTL:
+        return _ANON_CACHE["data"]
     def _fetch(tab_range):
         try:
             import json as _j
@@ -770,13 +776,16 @@ def _fetch_anon_visitors_data() -> dict:
     # DEMO: pin proxy people to the very top (remove this line + _DEMO_PROXY_PEOPLE to restore originals)
     people_table = [dict(x) for x in _DEMO_PROXY_PEOPLE] + people_table
 
-    return dict(
+    _result = dict(
         total_people=len(people_table),
         unique_companies=len(company_table),
         top_industries=top_industries,
         people_table=people_table,
         company_table=company_table,
     )
+    _ANON_CACHE["data"] = _result
+    _ANON_CACHE["ts"] = now
+    return _result
 
 
 @app.route("/gtm/anonymous-visitors")
@@ -792,7 +801,10 @@ def anonymous_visitors():
 @login_required
 def anonymous_visitors_data():
     """JSON data endpoint for the Anonymous Visitors dashboard."""
-    return jsonify(_fetch_anon_visitors_data())
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    resp = make_response(jsonify(_fetch_anon_visitors_data(force=force)))
+    resp.headers["Cache-Control"] = "private, max-age=60"
+    return resp
 
 
 
