@@ -507,6 +507,15 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function persistSession(){ var s=curSession(); if(!s){return;} s.hist=_hist.slice(-60); s.ts=Date.now();
     if((s.title==='New chat'||!s.title) && _hist.length){ var f=_hist.filter(function(m){return m.role==='user';})[0]; if(f){ s.title=f.content.slice(0,46); } }
     save(LS.sess,_sessions); }
+  /* Always-fresh chat: save current, open a brand-new chat, keep real history, drop empty sessions */
+  function freshChat(){
+    persistSession();
+    newSession();
+    _sessions=_sessions.filter(function(s){ return s.id===_curId || (s.hist && s.hist.length>0); });
+    save(LS.sess,_sessions);
+    _hist=[]; var m=document.getElementById('k-body'); if(m){ m.innerHTML=''; }
+    welcome();
+  }
 
   /* ---------- open/close ---------- */
   window.ppcOpen = function(){
@@ -514,12 +523,9 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
     var open=border.classList.contains('open');
     fab.classList.toggle('open',!open); border.classList.toggle('open',!open);
     if(!open){
-      _justOpened=Date.now();
-      clearNudge();
-      if(_fresh){ _fresh=false; updateMemBadge();
-        if(!load(LS.onb,false)){ onboarding(); }
-        else if(!_curId){ if(_sessions.length && _sessions[0].hist.length){ _curId=_sessions[0].id; _hist=_sessions[0].hist.slice(); restore(); } else { newSession(); welcome(); } }
-      }
+      _justOpened=Date.now(); clearNudge(); updateMemBadge(); _fresh=false;
+      if(!load(LS.onb,false)){ onboarding(); }      /* first time ever: onboarding, then a fresh chat */
+      else { freshChat(); }                          /* every open starts a new chat (history kept) */
       setTimeout(function(){ input.focus(); },380);
     } else { kCloseAll(true); }
   };
@@ -616,7 +622,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:12px; }
   function restore(){ body.innerHTML=''; var notice=document.createElement('div'); notice.style.cssText='text-align:center;padding:6px;font-size:10.5px;color:var(--k-ink3)'; notice.textContent='— Resuming conversation —'; body.appendChild(notice);
     _hist.slice(-12).forEach(function(m){ addMsg(m.role,m.content,{restore:true}); }); }
 
-  window.ppcNewChat = function(){ persistSession(); newSession(); body.innerHTML=''; welcome(); };
+  window.ppcNewChat = function(){ freshChat(); };
 
   /* ---------- message rendering ---------- */
   function addMsg(role,text,opt){
