@@ -258,31 +258,47 @@
   }
 
   /* RENDER — PEOPLE TABLE */
-  function renderPeople(rows){
-    if(!rows||!rows.length)return'<div class="empty">No matching visitors found.</div>';
+  function _personRow(p,i){
+    var sen=getSeniority(p.title);
+    return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openPersonDrawer('+i+')" title="Click to view full profile">'+
+      '<td style="overflow:hidden"><div class="person-cell">'+
+        '<div class="person-av" style="flex-shrink:0">'+esc(initials(p.name))+'</div>'+
+        '<div style="min-width:0;overflow:hidden">'+
+          '<div class="person-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</div>'+
+          '<div class="person-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.title)+'</div>'+
+        '</div></div></td>'+
+      '<td><span class="seniority-badge '+senClass(sen)+'">'+esc(sen)+'</span></td>'+
+      '<td>'+(p.website?'<span class="domain-pill">'+esc(p.website)+'</span>':'\u2014')+'</td>'+
+      '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.location)+'</td>'+
+      '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbd5e1">'+esc(p.industry)+'</td>'+
+      '<td style="color:#64748b;white-space:nowrap">'+esc(p.date)+'</td>'+
+    '</tr>';
+  }
+  function _peopleRows(rows,start,end){var o='';for(var i=start;i<end;i++)o+=_personRow(rows[i],i);return o;}
+  var _pplJob=0;
+  // Render the first 200 people instantly, then fill the rest in background batches.
+  // A job token cancels any in-flight fill when the list is re-rendered (search/filter),
+  // so re-filtering stays snappy and never waits on a stale background pass.
+  function renderPeopleProgressive(rows){
+    _pplJob++; var job=_pplJob;
+    var pane=document.getElementById('pane-people'); if(!pane)return;
+    if(!rows||!rows.length){pane.innerHTML='<div class="empty">No matching visitors found.</div>';return;}
     var cols='<colgroup>'+
       '<col class="c-person"><col class="c-sen"><col class="c-company">'+
       '<col class="c-location"><col class="c-industry"><col class="c-date">'+
       '</colgroup>';
     var h='<thead><tr><th>Person</th><th>Seniority</th><th>Company</th><th>Location</th><th>Industry</th><th>Date</th></tr></thead>';
-    var b='<tbody>'+rows.map(function(p,i){
-      var sen=getSeniority(p.title);
-      return'<tr style="animation:row-in .22s ease '+(Math.min(i,40)*9)+'ms both" onclick="openPersonDrawer('+i+')" title="Click to view full profile">'+
-        '<td style="overflow:hidden"><div class="person-cell">'+
-          '<div class="person-av" style="flex-shrink:0">'+esc(initials(p.name))+'</div>'+
-          '<div style="min-width:0;overflow:hidden">'+
-            '<div class="person-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</div>'+
-            '<div class="person-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.title)+'</div>'+
-          '</div></div></td>'+
-        '<td><span class="seniority-badge '+senClass(sen)+'">'+esc(sen)+'</span></td>'+
-        '<td>'+(p.website?'<span class="domain-pill">'+esc(p.website)+'</span>':'—')+'</td>'+
-        '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.location)+'</td>'+
-        '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbd5e1">'+esc(p.industry)+'</td>'+
-        
-        '<td style="color:#64748b;white-space:nowrap">'+esc(p.date)+'</td>'+
-      '</tr>';
-    }).join('')+'</tbody>';
-    return'<div class="tbl-wrap"><table>'+cols+h+b+'</table></div>';
+    var FIRST=200, n=rows.length, e0=Math.min(FIRST,n);
+    pane.innerHTML='<div class="tbl-wrap"><table>'+cols+h+'<tbody id="ppl-tbody">'+_peopleRows(rows,0,e0)+'</tbody></table></div>';
+    if(n<=FIRST)return;
+    var tb=document.getElementById('ppl-tbody'), idx=e0, CHUNK=300;
+    (function step(){
+      if(job!==_pplJob||!tb||!tb.isConnected)return;   // newer render started — abandon this pass
+      var e=Math.min(idx+CHUNK,n);
+      tb.insertAdjacentHTML('beforeend',_peopleRows(rows,idx,e));
+      idx=e;
+      if(idx<n)requestAnimationFrame(step);
+    })();
   }
 
   /* RENDER — COMPANIES TABLE */
@@ -333,7 +349,7 @@
         if(dt&&p.date&&p.date>dt)return false;
         return true;
       });
-      document.getElementById('pane-people').innerHTML=renderPeople(_filteredPeople);
+      renderPeopleProgressive(_filteredPeople);
       document.getElementById('resultCount').textContent=_filteredPeople.length+' of '+_allPeople.length;
     }else{
       _filteredCompanies=_allCompanies.filter(function(c){

@@ -3,6 +3,7 @@
 import os
 import time
 import json
+import gzip
 import uuid
 import logging
 import re
@@ -691,6 +692,7 @@ _DEMO_PROXY_PEOPLE = [
 
 
 _ANON_CACHE = {"data": None, "ts": 0.0}
+_ANON_GZ = {"ts": None, "raw": b"", "gz": b""}
 _ANON_CACHE_TTL = 300  # seconds — Sheets reads are slow; serve cached data between refreshes
 
 def _fetch_anon_visitors_data(force: bool = False) -> dict:
@@ -800,10 +802,21 @@ def anonymous_visitors():
 @app.route("/ppc/anonymous-visitors/data")
 @login_required
 def anonymous_visitors_data():
-    """JSON data endpoint for the Anonymous Visitors dashboard."""
+    """JSON data endpoint for the Anonymous Visitors dashboard (gzipped, cached)."""
     force = request.args.get("fresh") in ("1", "true", "yes")
-    resp = make_response(jsonify(_fetch_anon_visitors_data(force=force)))
+    data = _fetch_anon_visitors_data(force=force)
+    # Serialize + compress once per data refresh (keyed to the cache timestamp).
+    if _ANON_GZ["ts"] != _ANON_CACHE["ts"]:
+        _ANON_GZ["raw"] = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        _ANON_GZ["gz"] = gzip.compress(_ANON_GZ["raw"], 6)
+        _ANON_GZ["ts"] = _ANON_CACHE["ts"]
+    use_gz = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    resp = make_response(_ANON_GZ["gz"] if use_gz else _ANON_GZ["raw"])
+    resp.headers["Content-Type"] = "application/json"
     resp.headers["Cache-Control"] = "private, max-age=60"
+    resp.headers["Vary"] = "Accept-Encoding"
+    if use_gz:
+        resp.headers["Content-Encoding"] = "gzip"
     return resp
 
 
