@@ -22,7 +22,7 @@ html,body{margin:0;height:100%;background:
   color:#eef1fb;font-family:'Inter',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 
-#bg{position:fixed;inset:0;z-index:0;opacity:.5;pointer-events:none}
+#bg{position:fixed;inset:0;z-index:0;opacity:.42;pointer-events:none}
 .blobs{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
 .blob{position:absolute;border-radius:50%;filter:blur(72px);mix-blend-mode:screen;will-change:transform;opacity:.55}
 .b1{width:460px;height:460px;top:-8%;left:6%;background:radial-gradient(circle,rgba(79,142,247,.6),transparent 70%);animation:bf1 24s ease-in-out infinite}
@@ -457,20 +457,34 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
     if(!window.THREE){ return; }
     var T=window.THREE, c=document.getElementById('bg'); var rnd;
     try{ rnd=new T.WebGLRenderer({canvas:c,antialias:true,alpha:true}); }catch(e){ return; }
+    var MOB=matchMedia('(pointer:coarse)').matches;
     rnd.setPixelRatio(Math.min(devicePixelRatio,2)); rnd.setSize(innerWidth,innerHeight);
-    var sc=new T.Scene(), cam=new T.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); cam.position.z=60;
-    var N=420, pos=new Float32Array(N*3), col=new Float32Array(N*3), sz=new Float32Array(N);
-    var cA=new T.Color(0x4f8ef7), cB=new T.Color(0x9b8bf5), cC=new T.Color(0x23c08a), tmp=new T.Color();
-    for(var i=0;i<N;i++){ pos[i*3]=(Math.random()-.5)*120; pos[i*3+1]=(Math.random()-.5)*80; pos[i*3+2]=(Math.random()-.5)*60;
-      var m=Math.random(); tmp.copy(m<.4?cA:(m<.7?cB:cC)); col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b; sz[i]=Math.random()*Math.random()*2+0.5; }
+    var sc=new T.Scene(), cam=new T.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); cam.position.z=13;
+    var grp=new T.Group(); sc.add(grp);
+    var cA=new T.Color(0x22d3ee),cB=new T.Color(0x8b5cf6),cC=new T.Color(0xa5b4fc),tm=new T.Color();
+    var VS=['attribute vec3 aColor;attribute float aSize;uniform float uSize;uniform float uTime;varying vec3 vC;varying float vT;','void main(){vC=aColor;vT=0.6+0.4*sin(uTime*1.3+aSize*9.0);vec4 mv=modelViewMatrix*vec4(position,1.0);gl_PointSize=aSize*uSize*(300.0/-mv.z);gl_Position=projectionMatrix*mv;}'].join(String.fromCharCode(10));
+    var FS=['varying vec3 vC;varying float vT;','void main(){float d=length(gl_PointCoord-0.5);float cc=smoothstep(0.46,0.33,d);float gg=smoothstep(0.5,0.0,d);float a=pow(cc,1.15)+pow(gg,4.2)*0.13;gl_FragColor=vec4(vC*vT,a);}'].join(String.fromCharCode(10));
+    function mkMat(sgn){return new T.ShaderMaterial({uniforms:{uSize:{value:sgn},uTime:{value:0}},transparent:true,depthWrite:false,blending:T.AdditiveBlending,vertexShader:VS,fragmentShader:FS});}
+    var N=MOB?460:1000;
+    var pos=new Float32Array(N*3),base=new Float32Array(N*3),col=new Float32Array(N*3),sz=new Float32Array(N),rr=new Float32Array(N*2);
+    for(var i=0;i<N;i++){ var u=Math.random(),v=Math.random(),th=u*6.2832,ph=Math.acos(2*v-1),r=8+Math.random()*6;
+      base[i*3]=r*Math.sin(ph)*Math.cos(th);base[i*3+1]=r*Math.sin(ph)*Math.sin(th)*0.92;base[i*3+2]=r*Math.cos(ph);
+      pos[i*3]=base[i*3];pos[i*3+1]=base[i*3+1];pos[i*3+2]=base[i*3+2];
+      var m=Math.random();tm.copy(m<.5?cA:cB).lerp(cC,Math.random()*.5);col[i*3]=tm.r;col[i*3+1]=tm.g;col[i*3+2]=tm.b;
+      sz[i]=(Math.random()*Math.random())*0.85+0.45;rr[i*2]=Math.random()*6.28;rr[i*2+1]=0.22+Math.random()*0.45; }
     var g=new T.BufferGeometry(); g.setAttribute('position',new T.BufferAttribute(pos,3)); g.setAttribute('aColor',new T.BufferAttribute(col,3)); g.setAttribute('aSize',new T.BufferAttribute(sz,1));
-    var u={uTime:{value:0}};
-    var vs=['attribute vec3 aColor; attribute float aSize; uniform float uTime; varying vec3 vC; varying float vT;','void main(){','vC=aColor; vT=0.5+0.5*sin(uTime*1.2+aSize*7.0);','vec4 mv=modelViewMatrix*vec4(position,1.0);','gl_PointSize=aSize*(260.0/-mv.z);','gl_Position=projectionMatrix*mv;','}'].join(String.fromCharCode(10));
-    var fs=['varying vec3 vC; varying float vT;','void main(){','float d=length(gl_PointCoord-0.5);','float core=smoothstep(0.5,0.0,d);','gl_FragColor=vec4(vC*vT, pow(core,2.0));','}'].join(String.fromCharCode(10));
-    var m=new T.ShaderMaterial({uniforms:u,transparent:true,depthWrite:false,blending:T.AdditiveBlending,vertexShader:vs,fragmentShader:fs});
-    var pts=new T.Points(g,m); sc.add(pts);
+    var mat=mkMat(MOB?0.6:0.5); var pts=new T.Points(g,mat); grp.add(pts); var fU=mat.uniforms.uTime;
+    var lines=null,ed=[],lp=null;
+    if(!MOB){ var CN=150,K=2; for(var a=0;a<CN;a++){ var ai=(a*6+1)%N,bs=[]; for(var b=0;b<N;b+=5){ if(b===ai)continue; var dx=base[ai*3]-base[b*3],dy=base[ai*3+1]-base[b*3+1],dz=base[ai*3+2]-base[b*3+2]; bs.push([dx*dx+dy*dy+dz*dz,b]); } bs.sort(function(p,q){return p[0]-q[0];}); for(var k=0;k<K;k++)ed.push([ai,bs[k][1]]); }
+      lp=new Float32Array(ed.length*6); var lg=new T.BufferGeometry(); lg.setAttribute('position',new T.BufferAttribute(lp,3)); var lm=new T.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.03,blending:T.AdditiveBlending,depthWrite:false}); lines=new T.LineSegments(lg,lm); grp.add(lines); }
     var clk=new T.Clock();
-    function loop(){ if(document.hidden){ requestAnimationFrame(loop); return; } var t=clk.getElapsedTime(); u.uTime.value=t; pts.rotation.y=t*0.04+PT.x*0.22; pts.rotation.x=Math.sin(t*0.1)*0.1 - PT.y*0.14; cam.position.x+=((PT.x*10)-cam.position.x)*0.05; cam.position.y+=((-PT.y*7)-cam.position.y)*0.05; cam.lookAt(0,0,0); rnd.render(sc,cam); requestAnimationFrame(loop); }
+    function loop(){ if(document.hidden){ requestAnimationFrame(loop); return; } var t=clk.getElapsedTime(); fU.value=t;
+      for(var i=0;i<N;i++){ var ph=rr[i*2]+t*rr[i*2+1]; pos[i*3]=base[i*3]+Math.sin(ph)*0.2; pos[i*3+1]=base[i*3+1]+Math.cos(ph*0.9)*0.2; pos[i*3+2]=base[i*3+2]+Math.sin(ph*0.7)*0.2; }
+      g.attributes.position.needsUpdate=true;
+      if(lines){ for(var e=0;e<ed.length;e++){ var i0=ed[e][0],i1=ed[e][1],o=e*6; lp[o]=pos[i0*3];lp[o+1]=pos[i0*3+1];lp[o+2]=pos[i0*3+2];lp[o+3]=pos[i1*3];lp[o+4]=pos[i1*3+1];lp[o+5]=pos[i1*3+2]; } lines.geometry.attributes.position.needsUpdate=true; }
+      grp.rotation.y=t*0.02+PT.x*0.32; grp.rotation.x=PT.y*0.2;
+      cam.position.x+=((PT.x*0.9)-cam.position.x)*0.03; cam.position.y+=((-PT.y*0.6)-cam.position.y)*0.03; cam.lookAt(0,0,0);
+      rnd.render(sc,cam); requestAnimationFrame(loop); }
     loop();
     window.addEventListener('resize',function(){ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); rnd.setSize(innerWidth,innerHeight); });
   }
