@@ -108,10 +108,10 @@
       background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 2px;
     }
     .page-title {
-      font-size: 30px; font-weight: 700; color: #f1f5f9;
-      letter-spacing: -0.025em; margin-bottom: 6px;
+      font-size: 44px; font-weight: 700; color: #f1f5f9;
+      letter-spacing: -0.025em; margin-bottom: 10px;
     }
-    .page-sub { font-size: 14px; color: #4b5470; }
+    .page-sub { font-size: 17px; color: #4b5470; }
 
     /* ── Dashboard Grid ── */
     .dash-grid {
