@@ -209,11 +209,31 @@ def _get_user():
     """Return current user dict or None."""
     return session.get("google_user")
 
+def _login_redirect():
+    """Send an unauthenticated visitor to the login page, remembering where they
+    were headed (so they land there after sign-in) and using accurate messaging."""
+    try:
+        nxt = request.path
+        if request.query_string:
+            nxt += "?" + request.query_string.decode("utf-8", "ignore")
+        if (nxt.startswith("/") and not nxt.startswith("//")
+                and not nxt.startswith("/api") and not nxt.startswith("/auth")
+                and nxt not in ("/login", "/logout", "/")):
+            session["next_url"] = nxt
+    except Exception:
+        pass
+    had_session = bool(request.cookies.get(app.config.get("SESSION_COOKIE_NAME", "session")))
+    msg = ("Your session expired. Please sign in again."
+           if had_session else "Please sign in to continue.")
+    from urllib.parse import quote
+    return redirect(url_for("login_page") + "?error=" + quote(msg))
+
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not _get_user():
-            return redirect(url_for("login_page") + "?error=Your+session+expired.+Please+sign+in+again.")
+            return _login_redirect()
         return f(*args, **kwargs)
     return decorated
 
@@ -222,7 +242,7 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         user = _get_user()
         if not user:
-            return redirect(url_for("login_page") + "?error=Your+session+expired.+Please+sign+in+again.")
+            return _login_redirect()
         if user.get("email", "").lower() not in ADMIN_EMAILS:
             abort(403)
         return f(*args, **kwargs)
@@ -264,7 +284,10 @@ def auth_google():
     }
     session.permanent = True
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
-    return jsonify({"success": True, "redirect": "/hub"})
+    nxt = session.pop("next_url", None)
+    if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
+        nxt = "/hub"
+    return jsonify({"success": True, "redirect": nxt})
 
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
