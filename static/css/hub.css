@@ -213,7 +213,7 @@
     .hub-card:hover .card-arrow { transform: translateX(4px); }
 
     /* PPC card */
-    .card-ppc {
+    .card-gtm {
       --card-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
       --card-accent: #818cf8;
       --card-glow: rgba(99,102,241,0.25);

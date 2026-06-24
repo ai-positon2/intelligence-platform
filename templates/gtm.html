@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PPC — Platform</title>
+  <title>GTM — Platform</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/ppc.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -25,7 +25,7 @@
       <div class="breadcrumb">
         <a href="/hub" class="bc-link">Hub</a>
         <span class="bc-sep">›</span>
-        <span class="bc-cur">PPC</span>
+        <span class="bc-cur">GTM</span>
       </div>
     </div>
     <div class="topbar-right">
@@ -59,7 +59,7 @@
   <div class="main">
     <div class="page-header">
       <div class="section-label">Paid Acquisition</div>
-      <h1 class="page-title">PPC Dashboards</h1>
+      <h1 class="page-title">GTM Dashboards</h1>
       <p class="page-sub">Select a dashboard to open it.</p>
       <div class="hb-cue"><span></span></div>
     </div>
@@ -92,7 +92,7 @@
       </a>
 
       <!-- 2. Ad Intelligence -->
-      <a href="/ppc/ad-intelligence" class="dash-card active c-adint">
+      <a href="/gtm/ad-intelligence" class="dash-card active c-adint">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">🎯</div>
@@ -118,7 +118,7 @@
       </a>
 
       <!-- 3. Anonymous Website Visitors -->
-      <a href="/ppc/anonymous-visitors" class="dash-card active c-visitors">
+      <a href="/gtm/anonymous-visitors" class="dash-card active c-visitors">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">👁</div>
@@ -143,7 +143,7 @@
       </a>
 
             <!-- 4. LinkedIn Scraper -->
-      <a href="/ppc/linkedin-scraper" class="dash-card active c-linkedin">
+      <a href="/gtm/linkedin-scraper" class="dash-card active c-linkedin">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">🔗</div>
@@ -211,7 +211,7 @@
       function _send(){
         if(_sent) return; _sent = true;
         fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({page: window.location.pathname, title: 'PPC Dashboards',
+          body: JSON.stringify({page: window.location.pathname, title: 'GTM Dashboards',
           seconds: Math.round((Date.now()-_start)/1000),
           email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
       }
@@ -225,13 +225,13 @@
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
-    {t:'PPC Tools',d:'Paid media intelligence',u:'/ppc',i:'◎'},
+    {t:'GTM Tools',d:'Paid media intelligence',u:'/gtm',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/ppc/linkedin-scraper',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/ppc/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/ppc/anonymous-visitors',i:'◌'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/gtm/linkedin-scraper',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/gtm/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/gtm/anonymous-visitors',i:'◌'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
@@ -602,7 +602,7 @@ var uni={uSize:MOB?0.6:0.5};var mat=mkMat(uni.uSize);var pts=new THREE.Points(ge
 var lines=null,ed=[],lp=null;
 if(!MOB){var CN=150,K=2;for(var a=0;a<CN;a++){var ai=(a*6+1)%N,bs=[];for(var b=0;b<N;b+=5){if(b===ai)continue;var dx=base[ai*3]-base[b*3],dy=base[ai*3+1]-base[b*3+1],dz=base[ai*3+2]-base[b*3+2];bs.push([dx*dx+dy*dy+dz*dz,b]);}bs.sort(function(p,q){return p[0]-q[0];});for(var k=0;k<K;k++)ed.push([ai,bs[k][1]]);}
 lp=new Float32Array(ed.length*6);var lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(lp,3));var lm=new THREE.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.03,blending:THREE.AdditiveBlending,depthWrite:false});lines=new THREE.LineSegments(lg,lm);grp.add(lines);}
-// focal cursor-reactive orb (hub/ppc/seo)
+// focal cursor-reactive orb (hub/gtm/seo)
 var orb=null,oN=0,opos=null,obase=null,orr=null,oU=null;
 if(ORB){oN=MOB?360:680;opos=new Float32Array(oN*3);obase=new Float32Array(oN*3);var ocol=new Float32Array(oN*3);var osz=new Float32Array(oN);orr=new Float32Array(oN*2);
 for(var j=0;j<oN;j++){var ju=Math.random(),jv=Math.random(),jt=ju*6.2832,jp=Math.acos(2*jv-1),jr=1.7+Math.pow(Math.random(),0.7)*1.9;

@@ -176,7 +176,7 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
     intel:{c:'#9b8bf5', rgb:[155,139,245], name:'Intelligence layer'}
   };
   var NODES = {
-    person:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Person', sub:'name · title · linkedin', cat:'person', core:1, r:74, nx:.30, ny:.45,
+    person:{cta:{l:'Open Anonymous Visitors →',h:'/gtm/anonymous-visitors'}, label:'Person', sub:'name · title · linkedin', cat:'person', core:1, r:74, nx:.30, ny:.45,
       tag:'Core entity', lead:'The individual buyer — who they are and everything they have done with us.',
       points:['Name','Title / seniority','LinkedIn profile','Engagement timeline'],
       source:['Visitor de-anonymisation','LinkedIn scraper','Form fills & email'],
@@ -201,7 +201,7 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       flows:['Ranks hottest accounts','Explains why an account is hot','Triggers outreach'],
       intel:'This is the layer we add. Raw signals are just data — Vimi reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
 
-    pages:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.14, side:'L',
+    pages:{cta:{l:'Open Anonymous Visitors →',h:'/gtm/anonymous-visitors'}, label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.14, side:'L',
       tag:'Person signal', lead:'Which pages the buyer browsed — the clearest first-party intent signal.',
       points:['Pricing','Case studies','Product pages','Blog'], source:['Anonymous visitor de-anonymisation'],
       flows:['Attaches to the Person','Raises the Intent Score'],
@@ -211,7 +211,7 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       points:['Opens','Clicks','Replies','Sequence step'], source:['Email / sequencing tool','CRM'],
       flows:['Attaches to the Person','Informs outreach timing'],
       intel:'A reply or repeated clicks tell Vimi the thread is warm and worth a fast, personalised follow-up.'},
-    linkedin:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.62, side:'L',
+    linkedin:{cta:{l:'Open the LinkedIn Scraper →',h:'/gtm/linkedin-scraper'}, label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.62, side:'L',
       tag:'Person signal', lead:'Public LinkedIn engagement from the buyer and their org.',
       points:['Likes','Comments','Reactions','Post topics'], source:['LinkedIn scraper'],
       flows:['Attaches to the Person','Adds context for outreach'],
@@ -232,7 +232,7 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       points:['Funding rounds','Leadership change','M&A','Product launch','Creative hiring'], source:['Signal Tracker'],
       flows:['Attaches to the Account','Boosts account intent'],
       intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Vimi flags these as outreach windows.'},
-    committee:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.62, side:'R',
+    committee:{cta:{l:'Open the LinkedIn Scraper →',h:'/gtm/linkedin-scraper'}, label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.62, side:'R',
       tag:'Account signal', lead:'The set of people who actually decide — mapped to roles.',
       points:['Champion','Decision-maker','Approver','Blocker'], source:['Enrichment','Apollo','Engagement mapping'],
       flows:['Links people to the Account','Shapes multi-thread outreach'],
