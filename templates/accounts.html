@@ -131,7 +131,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       </a>
       <div class="bc">
         <a href="/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/ppc">PPC</a><span class="bc-sep">›</span>
+        <a href="/gtm">GTM</a><span class="bc-sep">›</span>
         <span class="bc-cur">Signal Tracker</span>
       </div>
     </div>
@@ -185,13 +185,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
     {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
-    {t:'PPC Tools',d:'Paid media intelligence',u:'/ppc',i:'◎'},
+    {t:'GTM Tools',d:'Paid media intelligence',u:'/gtm',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/ppc/linkedin-scraper',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/ppc/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/ppc/anonymous-visitors',i:'◌'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/gtm/linkedin-scraper',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/gtm/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/gtm/anonymous-visitors',i:'◌'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
@@ -691,7 +691,7 @@ var uni={uSize:MOB?0.6:0.5};var mat=mkMat(uni.uSize);var pts=new THREE.Points(ge
 var lines=null,ed=[],lp=null;
 if(!MOB){var CN=150,K=2;for(var a=0;a<CN;a++){var ai=(a*6+1)%N,bs=[];for(var b=0;b<N;b+=5){if(b===ai)continue;var dx=base[ai*3]-base[b*3],dy=base[ai*3+1]-base[b*3+1],dz=base[ai*3+2]-base[b*3+2];bs.push([dx*dx+dy*dy+dz*dz,b]);}bs.sort(function(p,q){return p[0]-q[0];});for(var k=0;k<K;k++)ed.push([ai,bs[k][1]]);}
 lp=new Float32Array(ed.length*6);var lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(lp,3));var lm=new THREE.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.03,blending:THREE.AdditiveBlending,depthWrite:false});lines=new THREE.LineSegments(lg,lm);grp.add(lines);}
-// focal cursor-reactive orb (hub/ppc/seo)
+// focal cursor-reactive orb (hub/gtm/seo)
 var orb=null,oN=0,opos=null,obase=null,orr=null,oU=null;
 if(ORB){oN=MOB?360:680;opos=new Float32Array(oN*3);obase=new Float32Array(oN*3);var ocol=new Float32Array(oN*3);var osz=new Float32Array(oN);orr=new Float32Array(oN*2);
 for(var j=0;j<oN;j++){var ju=Math.random(),jv=Math.random(),jt=ju*6.2832,jp=Math.acos(2*jv-1),jr=1.7+Math.pow(Math.random(),0.7)*1.9;

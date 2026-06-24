@@ -382,7 +382,7 @@
     var icon=document.getElementById('refreshIcon');
     icon.style.transition='transform .6s ease';icon.style.transform='rotate(360deg)';
     setTimeout(function(){icon.style.transition='none';icon.style.transform='rotate(0)';},700);
-    fetch('/ppc/anonymous-visitors/data')
+    fetch('/gtm/anonymous-visitors/data')
       .then(function(r){return r.json();})
       .then(function(d){
         _allPeople=d.people_table||[];

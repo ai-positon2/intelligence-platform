@@ -300,10 +300,11 @@ def logout():
 def hub():
     return render_template("hub.html", user=_get_user())
 
-@app.route("/ppc")
+@app.route("/gtm")
+@app.route("/ppc")          # legacy alias
 @login_required
-def ppc():
-    return render_template("ppc.html", user=_get_user())
+def gtm():
+    return render_template("gtm.html", user=_get_user())
 
 @app.route("/seo")
 @login_required
@@ -322,20 +323,25 @@ _SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
 # ── Ad Intelligence (built React app served directly — no iframe) ────────────
 AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
+@app.route("/gtm/ad-intelligence")
+@app.route("/gtm/ad-intelligence/")
 @app.route("/ppc/ad-intelligence")
 @app.route("/ppc/ad-intelligence/")
 @login_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
 
+@app.route("/gtm/ad-intelligence/assets/<path:filename>")
 @app.route("/ppc/ad-intelligence/assets/<path:filename>")
 def ad_intelligence_assets(filename):
     return send_from_directory("ad_intelligence/assets", filename)
 
+@app.route("/gtm/ad-intelligence/favicon.svg")
 @app.route("/ppc/ad-intelligence/favicon.svg")
 def ad_intelligence_favicon():
     return send_from_directory("ad_intelligence", "favicon.svg")
 
+@app.route("/gtm/ad-intelligence/icons.svg")
 @app.route("/ppc/ad-intelligence/icons.svg")
 def ad_intelligence_icons():
     return send_from_directory("ad_intelligence", "icons.svg")
@@ -754,6 +760,7 @@ def _fetch_anon_visitors_data() -> dict:
     )
 
 
+@app.route("/gtm/anonymous-visitors")
 @app.route("/ppc/anonymous-visitors")
 @login_required
 def anonymous_visitors():
@@ -761,6 +768,7 @@ def anonymous_visitors():
     return render_template("anonymous_visitors.html", user=_get_user())
 
 
+@app.route("/gtm/anonymous-visitors/data")
 @app.route("/ppc/anonymous-visitors/data")
 @login_required
 def anonymous_visitors_data():
@@ -770,6 +778,7 @@ def anonymous_visitors_data():
 
 
 
+@app.route("/gtm/linkedin-scraper")
 @app.route("/ppc/linkedin-scraper")
 @login_required
 def linkedin_scraper():
@@ -900,7 +909,7 @@ _ACCOUNTS_HTML_UNUSED = """
       </a>
       <div class="bc">
         <a href="/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/ppc">PPC</a><span class="bc-sep">›</span>
+        <a href="/gtm">GTM</a><span class="bc-sep">›</span>
         <span class="bc-cur">Signal Tracker</span>
       </div>
     </div>
