@@ -706,6 +706,7 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
         x=document.getElementById('vimiX'),q=document.getElementById('vimiQ');
     var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
     q.textContent=lines[Math.floor(Math.random()*lines.length)];
+    try{ localStorage.setItem('vimi_login_name',(window.VIMI_NAME||'').toString()); }catch(e){}
     setTimeout(function(){box.classList.add('show');},700);
     function openChat(e){
       if(e&&e.stopPropagation)e.stopPropagation();          // don't let the click reach the widget's close-on-outside handler
