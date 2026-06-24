@@ -176,19 +176,19 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
     intel:{c:'#9b8bf5', rgb:[155,139,245], name:'Intelligence layer'}
   };
   var NODES = {
-    person:{label:'Person', sub:'name · title · linkedin', cat:'person', core:1, r:74, nx:.30, ny:.45,
+    person:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Person', sub:'name · title · linkedin', cat:'person', core:1, r:74, nx:.30, ny:.45,
       tag:'Core entity', lead:'The individual buyer — who they are and everything they have done with us.',
       points:['Name','Title / seniority','LinkedIn profile','Engagement timeline'],
       source:['Visitor de-anonymisation','LinkedIn scraper','Form fills & email'],
       flows:['Rolls up to the Account','Joins the Deal record','Feeds the intelligence layer'],
       intel:'Vimi links every person-level signal to one identity, so a pricing-page visit, an email reply and a LinkedIn comment all land on the same record.'},
-    account:{label:'Account', sub:'company · ICP tier · tech stack', cat:'account', core:1, r:74, nx:.70, ny:.45,
+    account:{cta:{l:'Open the Signal Tracker →',h:'/signal-tracker/healthcare'}, label:'Account', sub:'company · ICP tier · tech stack', cat:'account', core:1, r:74, nx:.70, ny:.45,
       tag:'Core entity', lead:'The company the person belongs to — the unit you actually sell to.',
       points:['Company & domain','ICP tier / fit','Tech stack','Employee count'],
       source:['Firmographic enrichment','Signal Tracker','CRM sync'],
       flows:['Groups all its people','Anchors the Deal','Feeds the intelligence layer'],
       intel:'Vimi aggregates every person and account signal into a single account-level intent picture, so committee-wide activity is visible at a glance.'},
-    deal:{label:'Deal', sub:'stage · owner · history', cat:'deal', core:1, r:66, nx:.50, ny:.70,
+    deal:{cta:{l:'Open Accounts →',h:'/accounts'}, label:'Deal', sub:'stage · owner · history', cat:'deal', core:1, r:66, nx:.50, ny:.70,
       tag:'Core entity', lead:'The opportunity — where Person and Account meet a revenue motion.',
       points:['Pipeline stage','Owner','Activity history','Forecast'],
       source:['HubSpot','Outreach activity','Meeting outcomes'],
@@ -201,17 +201,17 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       flows:['Ranks hottest accounts','Explains why an account is hot','Triggers outreach'],
       intel:'This is the layer we add. Raw signals are just data — Vimi reads the whole connected record, scores intent (recency × severity × type), and tells a rep exactly who to contact and what to say.'},
 
-    pages:{label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.18, side:'L',
+    pages:{cta:{l:'Open Anonymous Visitors →',h:'/ppc/anonymous-visitors'}, label:'Pages Visited', sub:'pricing · case studies · blog', cat:'person', nx:.085, ny:.18, side:'L',
       tag:'Person signal', lead:'Which pages the buyer browsed — the clearest first-party intent signal.',
       points:['Pricing','Case studies','Product pages','Blog'], source:['Anonymous visitor de-anonymisation'],
       flows:['Attaches to the Person','Raises the Intent Score'],
       intel:'Repeat visits to pricing or a specific product page push the person toward HOT in Vimi’s scoring.'},
-    email:{label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.34, side:'L',
+    email:{cta:{l:'Ask Vimi to draft a follow-up ✦',h:'ask'}, label:'Email History', sub:'opens · clicks · replies', cat:'person', nx:.085, ny:.34, side:'L',
       tag:'Person signal', lead:'How the buyer engaged with email — opens, clicks and replies.',
       points:['Opens','Clicks','Replies','Sequence step'], source:['Email / sequencing tool','CRM'],
       flows:['Attaches to the Person','Informs outreach timing'],
       intel:'A reply or repeated clicks tell Vimi the thread is warm and worth a fast, personalised follow-up.'},
-    linkedin:{label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.52, side:'L',
+    linkedin:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'LinkedIn Signals', sub:'likes · comments · reactions', cat:'person', nx:.085, ny:.52, side:'L',
       tag:'Person signal', lead:'Public LinkedIn engagement from the buyer and their org.',
       points:['Likes','Comments','Reactions','Post topics'], source:['LinkedIn scraper'],
       flows:['Attaches to the Person','Adds context for outreach'],
@@ -222,17 +222,17 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       flows:['Prioritises the Person','Surfaces in Hot Leads'],
       intel:'This is intelligence, not input. Vimi blends every person signal — weighted by type, severity and recency — into one number reps can act on.'},
 
-    crm:{label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.18, side:'R',
+    crm:{cta:{l:'Open Accounts →',h:'/accounts'}, label:'CRM Record', sub:'hubspot · deal stage · owner', cat:'account', nx:.915, ny:.18, side:'R',
       tag:'Account signal', lead:'The system-of-record state for the account in HubSpot.',
       points:['HubSpot company','Deal stage','Owner','Lifecycle'], source:['HubSpot CRM'],
       flows:['Attaches to the Account','Keeps the graph in sync'],
       intel:'Vimi reads and (with confirmation) writes back to HubSpot, so the graph and CRM never drift apart.'},
-    market:{label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.34, side:'R',
+    market:{cta:{l:'Open the Signal Tracker →',h:'/signal-tracker/healthcare'}, label:'Market Signals', sub:'funding · hiring · M&A', cat:'account', nx:.915, ny:.34, side:'R',
       tag:'Account signal', lead:'External buying triggers happening at the company.',
       points:['Funding rounds','Leadership change','M&A','Product launch','Creative hiring'], source:['Signal Tracker'],
       flows:['Attaches to the Account','Boosts account intent'],
       intel:'A fresh funding round or a new VP of Marketing is a top-weighted trigger — Vimi flags these as outreach windows.'},
-    committee:{label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.52, side:'R',
+    committee:{cta:{l:'Open the LinkedIn Scraper →',h:'/ppc/linkedin-scraper'}, label:'Buying Committee', sub:'champion · DM · approver', cat:'account', nx:.915, ny:.52, side:'R',
       tag:'Account signal', lead:'The set of people who actually decide — mapped to roles.',
       points:['Champion','Decision-maker','Approver','Blocker'], source:['Enrichment','Apollo','Engagement mapping'],
       flows:['Links people to the Account','Shapes multi-thread outreach'],
@@ -243,12 +243,12 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
       flows:['Prioritises the Account','Picks the right play'],
       intel:'Like Intent Score, this is derived. Vimi moves an account through states automatically as signals accumulate.'},
 
-    outreach:{label:'Outreach Sent', sub:'vimi · slack · email · crm', cat:'deal', nx:.30, ny:.90,
+    outreach:{cta:{l:'Ask Vimi to draft outreach ✦',h:'ask'}, label:'Outreach Sent', sub:'vimi · slack · email · crm', cat:'deal', nx:.30, ny:.90,
       tag:'Action', lead:'The action taken on the buyer — informed by the whole graph.',
       points:['Vimi-drafted email','Slack alert to rep','Sequence enrolment','CRM task'], source:['Vimi','Email','Slack','HubSpot'],
       flows:['Acts on the Deal','Produces an Outcome'],
       intel:'Because Vimi sees the full record, outreach references the exact signal that triggered it — not a generic blast.'},
-    outcome:{label:'Outcome', sub:'reply · meeting · pipeline', cat:'deal', nx:.70, ny:.90,
+    outcome:{cta:{l:'Open the Signal Tracker →',h:'/signal-tracker/healthcare'}, label:'Outcome', sub:'reply · meeting · pipeline', cat:'deal', nx:.70, ny:.90,
       tag:'Outcome', lead:'What the outreach produced — the loop that trains prioritisation.',
       points:['Reply','Meeting booked','Pipeline created','Closed-won'], source:['Email','Calendar','HubSpot'],
       flows:['Updates the Deal','Feeds back into the intelligence layer'],
@@ -422,8 +422,11 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
     var pts=(n.points||[]).map(function(p){return '<span class="chip">'+p+'</span>';}).join('');
     var src=(n.source||[]).map(function(s){return '<div class="flow"><span class="fi">⇲</span><div><b>'+s+'</b></div></div>';}).join('');
     var fl=(n.flows||[]).map(function(s){return '<div class="flow"><span class="fi" style="color:'+cat.c+'">→</span><div><b>'+s+'</b></div></div>';}).join('');
-    var cta = (n.cat==='intel') ? '<a class="pcta" href="javascript:void(0)" onclick="askVimi(\''+id+'\')">Ask Vimi about this ✦</a>'
-            : '<a class="pcta" href="/signal-tracker/healthcare">Open the Signal Tracker →</a>';
+    var cta;
+    if(n.cta && n.cta.h==='ask'){ cta='<a class="pcta" href="javascript:void(0)" onclick="askVimi(\''+id+'\')">'+n.cta.l+'</a>'; }
+    else if(n.cta){ cta='<a class="pcta" href="'+n.cta.h+'">'+n.cta.l+'</a>'; }
+    else if(n.cat==='intel'){ cta='<a class="pcta" href="javascript:void(0)" onclick="askVimi(\''+id+'\')">Ask Vimi about this ✦</a>'; }
+    else { cta='<a class="pcta" href="/signal-tracker/healthcare">Open the Signal Tracker →</a>'; }
     body.innerHTML =
       '<div class="sec"><h4>What it holds</h4><div class="chips">'+pts+'</div></div>'+
       '<div class="sec"><h4>Where the data comes from</h4>'+src+'</div>'+
