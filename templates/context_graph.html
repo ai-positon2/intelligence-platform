@@ -274,13 +274,20 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
   function px(n){ return {x: n.nx*W, y: n.ny*H}; }
 
   function rgba(a,al){ return 'rgba('+a[0]+','+a[1]+','+a[2]+','+al+')'; }
-  function setT(el,x,y){ el.style.transform='translate3d('+x.toFixed(1)+'px,'+y.toFixed(1)+'px,0) translate(-50%,-50%)'; }
+  function setT(el,x,y,s){ el.style.transform='translate3d('+x.toFixed(1)+'px,'+y.toFixed(1)+'px,0) translate(-50%,-50%)'+(s?(' scale('+s.toFixed(3)+')'):''); }
 
+  // Per-node Z depth — left column floats toward the viewer, right column recedes,
+  // the intelligence core sits forward. Drives the 3D projection in draw().
+  var ZMAP={ intel:0.16, person:0.0, account:0.0, deal:-0.05,
+             pages:0.18, email:0.22, linkedin:0.16, intent:0.10,
+             crm:-0.18, market:-0.22, committee:-0.16, readiness:-0.10,
+             outreach:0.07, outcome:-0.07 };
   function buildNodes(){
     Object.keys(NODES).forEach(function(id){
       var n=NODES[id]; var cat=CAT[n.cat];
       n.id=id; n.ph1=Math.random()*6.2832; n.ph2=Math.random()*6.2832; n.ds=0.45+Math.random()*0.45;
       n.amp=n.core?4:7; n.depth=n.core?(id==='intel'?0.45:0.5):1.05; n.ox=0; n.oy=0; n.drag=false; n._x=0; n._y=0;
+      n.bx3=n.nx-0.5; n.by3=n.ny-0.5; n.bz3=(ZMAP[id]!==undefined?ZMAP[id]:0); n._s=1;
       var el=document.createElement('div');
       el.className='node '+(n.core?'core-w':'box-w');
       el.setAttribute('tabindex','0'); el.setAttribute('role','button'); el.setAttribute('aria-label',n.label);
@@ -346,24 +353,33 @@ window.VIMI_NAME = {{ ((user.given_name if user else None) or (user.name if user
   function draw(now){
     var dt=Math.min(0.05,(now-last)/1000); last=now; var t=now/1000;
     PT.x+=(PT.tx-PT.x)*0.06; PT.y+=(PT.ty-PT.y)*0.06;
-    var cxr=LX+LW/2, cyr=LY+LH/2, rot=Math.sin(t*0.08)*0.018 + PT.x*0.025, cosR=Math.cos(rot), sinR=Math.sin(rot);
+    // ---- 3D projection: rotate the whole constellation (yaw/pitch) + perspective ----
+    var cxr=LX+LW/2, cyr=LY+LH/2, DEPTH=LW*0.42, FOC=1300;
+    var yaw=Math.sin(t*0.07)*0.05 + PT.x*0.30;     // slow auto-spin + cursor yaw
+    var pit=PT.y*0.22 - 0.04;                       // cursor pitch + slight downward tilt
+    var cY=Math.cos(yaw), sY=Math.sin(yaw), cX=Math.cos(pit), sX=Math.sin(pit);
 
     Object.keys(NODES).forEach(function(id){
-      var n=NODES[id]; var bx=LX+n.nx*LW, by=LY+n.ny*LH, ox=bx-cxr, oy=by-cyr;
-      var rx=cxr+ox*cosR-oy*sinR, ry=cyr+ox*sinR+oy*cosR;
+      var n=NODES[id];
+      var x=n.bx3*LW, y=n.by3*LH, z=n.bz3*DEPTH;
+      var x1= x*cY + z*sY, z1= -x*sY + z*cY;        // rotate around Y (yaw)
+      var y1= y*cX - z1*sX, z2= y*sX + z1*cX;        // rotate around X (pitch)
+      var persp=FOC/(FOC - z2); if(persp<0.5){ persp=0.5; } if(persp>1.7){ persp=1.7; }
       var dx=Math.sin(t*n.ds+n.ph1)*n.amp, dy=Math.cos(t*n.ds*0.92+n.ph2)*n.amp;
-      var natx=rx+dx+PT.x*n.depth*18, naty=ry+dy+PT.y*n.depth*13;
+      var natx=cxr + x1*persp + dx, naty=cyr + y1*persp + dy;
       if(n.drag && DRAG===n){ n.ox=MOUSE.x-natx; n.oy=MOUSE.y-naty; }
       else { n.ox*=0.86; n.oy*=0.86; if(Math.abs(n.ox)<0.4){ n.ox=0; } if(Math.abs(n.oy)<0.4){ n.oy=0; } }
-      n._x=natx+n.ox; n._y=naty+n.oy; setT(n._el, n._x, n._y);
+      n._x=natx+n.ox; n._y=naty+n.oy; n._s=persp;
+      setT(n._el, n._x, n._y, persp);
+      n._el.style.zIndex = n.drag ? 30 : (8 + Math.round(persp*9));
     });
 
     ctx.clearRect(0,0,W,H);
     ['intel','person','account','deal'].forEach(function(id){
       var n=NODES[id], cat=CAT[n.cat];
-      var g=ctx.createRadialGradient(n._x,n._y,0,n._x,n._y,n.r*2.0);
+      var g=ctx.createRadialGradient(n._x,n._y,0,n._x,n._y,n.r*2.0*(n._s||1));
       g.addColorStop(0, rgba(cat.rgb,.20)); g.addColorStop(1, rgba(cat.rgb,0));
-      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(n._x,n._y,n.r*2.0,0,6.2832); ctx.fill();
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(n._x,n._y,n.r*2.0*(n._s||1),0,6.2832); ctx.fill();
     });
 
     ctx.globalCompositeOperation='lighter';
