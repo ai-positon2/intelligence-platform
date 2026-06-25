@@ -118,7 +118,7 @@ def fetch_csg_jobs(
     print(f"Pre-fetching job postings for {total} companies (parallel)…")
     _t0 = time.time()
     postings_by_id: dict = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as _ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as _ex:
         for aid, posts in _ex.map(_prefetch, all_companies):
             if aid:
                 postings_by_id[aid] = posts
