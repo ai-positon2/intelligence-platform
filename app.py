@@ -325,10 +325,28 @@ def hub():
     return render_template("hub.html", user=_get_user())
 
 @app.route("/gtm")
-@app.route("/ppc")          # legacy alias
 @login_required
 def gtm():
     return render_template("gtm.html", user=_get_user())
+
+# ── Legacy /ppc* page URLs → 301 redirect to canonical /gtm* (links still resolve) ──
+@app.route("/ppc")
+@app.route("/ppc/")
+def ppc_redirect():
+    return redirect("/gtm", code=301)
+
+@app.route("/ppc/ad-intelligence")
+@app.route("/ppc/ad-intelligence/")
+def ppc_ad_intelligence_redirect():
+    return redirect("/gtm/ad-intelligence", code=301)
+
+@app.route("/ppc/anonymous-visitors")
+def ppc_anonymous_visitors_redirect():
+    return redirect("/gtm/anonymous-visitors", code=301)
+
+@app.route("/ppc/linkedin-scraper")
+def ppc_linkedin_scraper_redirect():
+    return redirect("/gtm/linkedin-scraper", code=301)
 
 @app.route("/seo")
 @login_required
@@ -349,8 +367,6 @@ AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
 @app.route("/gtm/ad-intelligence")
 @app.route("/gtm/ad-intelligence/")
-@app.route("/ppc/ad-intelligence")
-@app.route("/ppc/ad-intelligence/")
 @login_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
@@ -814,7 +830,6 @@ def _fetch_anon_visitors_data(force: bool = False) -> dict:
 
 
 @app.route("/gtm/anonymous-visitors")
-@app.route("/ppc/anonymous-visitors")
 @login_required
 def anonymous_visitors():
     """Anonymous Visitors dashboard shell — loads data async."""
@@ -846,7 +861,6 @@ def anonymous_visitors_data():
 
 
 @app.route("/gtm/linkedin-scraper")
-@app.route("/ppc/linkedin-scraper")
 @login_required
 def linkedin_scraper():
     """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""
