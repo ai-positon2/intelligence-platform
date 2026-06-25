@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT))
 
 from tracker.news_relevance import classify_signal_type, is_important_news
 
-from tracker.news_client import get_news_articles, _parse_article_date
+from tracker.news_client import get_news_articles, warm_news_cache, _parse_article_date
 from tracker.snapshot_store import SnapshotStore
 
 DB_PATH = ROOT / "data" / "tracker_csg_v2.db"
@@ -161,6 +161,16 @@ def fetch_csg_news(
     skipped_total = 0   # duplicates / irrelevant
     companies_with_news = 0
 
+    # ── Parallel news prefetch (bounded threads + per-call timeout) ──────────
+    print(f"  Pre-fetching news for {total} companies (parallel)…")
+    _t0 = time.time()
+    warm_news_cache(
+        [c.get("name", "") for c in all_companies],
+        max_articles=max_articles, max_age_days=max_age_days,
+        max_workers=16,
+    )
+    print(f"  Prefetch done in {time.time() - _t0:.0f}s.")
+
     for idx, company in enumerate(all_companies, start=1):
         name      = company.get("name", "")
         apollo_id = company.get("apollo_id", "")
@@ -175,7 +185,6 @@ def fetch_csg_news(
 
         if not articles:
             print("  — no results")
-            time.sleep(RATE_LIMIT_SLEEP)
             continue
 
         company_added = 0
@@ -233,8 +242,6 @@ def fetch_csg_news(
             print(f"  ✓  {company_added} article(s) {'(would add)' if dry_run else 'added'}")
         else:
             print("  — all duplicates / irrelevant")
-
-        time.sleep(RATE_LIMIT_SLEEP)
 
     # ── Summary ──────────────────────────────────────────────────────────────
     print(f"\n{'─' * 55}")

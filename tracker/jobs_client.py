@@ -19,7 +19,7 @@ import logging
 import re
 import urllib.parse
 
-from .news_client import _decode_google_news_url, _is_article_fresh
+from .news_client import _decode_google_news_url, _is_article_fresh, _fetch_feed
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +304,7 @@ def get_job_postings(
     seen_titles: set[str] = set()
     for url in feeds:
         try:
-            feed = feedparser.parse(url)
+            feed = _fetch_feed(url)  # bounded timeout (was untimed)
         except Exception as exc:
             logger.warning("Jobs RSS fetch failed for '%s': %s", company_name, exc)
             continue
