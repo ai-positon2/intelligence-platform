@@ -7,9 +7,38 @@ import email.utils
 import logging
 import re
 import urllib.parse
+import urllib.request
+import concurrent.futures
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+# Hard cap on every Google News RSS request so a single slow/throttled
+# response can never stall the whole run (this was causing multi-hour runs).
+_FEED_TIMEOUT = 8  # seconds
+_FEED_UA = "Mozilla/5.0 (compatible; SignalTracker/1.0; +https://intelligence.position2.com)"
+
+# Module-level cache so news can be pre-fetched in parallel (see warm_news_cache)
+# and then read instantly by get_news_articles during the sequential company loop.
+_NEWS_CACHE: dict[str, list[dict]] = {}
+
+
+def _fetch_feed(url: str):
+    """Download an RSS URL with a hard timeout, then hand the bytes to feedparser.
+
+    feedparser.parse(url) does its own network fetch with NO timeout, so a
+    throttled endpoint can hang indefinitely. We fetch ourselves (bounded) and
+    parse the bytes instead. Returns a parsed feed (possibly with no entries).
+    """
+    import feedparser  # type: ignore
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
+        with urllib.request.urlopen(req, timeout=_FEED_TIMEOUT) as resp:
+            data = resp.read()
+        return feedparser.parse(data)
+    except Exception as exc:
+        logger.warning("[NEWS] feed fetch timed out/failed for %s: %s", url, exc)
+        return feedparser.parse(b"")
 
 
 def _decode_google_news_url(google_url: str) -> str:
@@ -117,6 +146,7 @@ def get_news_articles(
     ai_filter: bool = False,
     ai_model: str = "gpt-4o-mini",
     min_score: int = 2,
+    _use_cache: bool = True,
 ) -> list[dict]:
     """Return business-relevant article dicts for a company.
 
@@ -124,6 +154,9 @@ def get_news_articles(
     (heuristic always; AI gate when ai_filter and ai_key are set) so only news
     about real business events is stored. Returns at most ``max_articles``.
     """
+    if _use_cache and company_name in _NEWS_CACHE:
+        return _NEWS_CACHE[company_name]
+
     pool = max(max_articles * 3, 12)
     if serpapi_key:
         articles = _serpapi_articles(company_name, serpapi_key, pool, max_age_days)
@@ -158,7 +191,7 @@ def _rss_articles(
     query = urllib.parse.quote_plus(f'"{company_name}"')
     url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
     try:
-        feed = feedparser.parse(url)
+        feed = _fetch_feed(url)
         results = []
         discarded = 0
         for entry in feed.entries:
@@ -205,7 +238,7 @@ def get_leadership_from_news(
     )
     url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
     try:
-        feed = feedparser.parse(url)
+        feed = _fetch_feed(url)
         results = []
         discarded = 0
         for entry in feed.entries:
@@ -268,3 +301,39 @@ def _serpapi_articles(
     except Exception as exc:
         logger.warning("SerpAPI fetch failed for '%s': %s", company_name, exc)
         return []
+
+
+def warm_news_cache(
+    company_names,
+    serpapi_key: str = "",
+    ai_key: str = "",
+    ai_filter: bool = False,
+    ai_model: str = "gpt-4o-mini",
+    min_score: int = 2,
+    max_workers: int = 16,
+) -> None:
+    """Pre-fetch news for many companies in parallel into _NEWS_CACHE.
+
+    Turns the previously sequential ~1,200 Google News RSS calls into a bounded
+    thread pool. Each call is already hard-capped by _FEED_TIMEOUT, so the whole
+    warm-up finishes in minutes instead of hours. Results are read instantly by
+    get_news_articles() during the main company loop.
+    """
+    names = [n for n in dict.fromkeys(company_names) if n]  # dedupe, keep order
+    if not names:
+        return
+
+    def _work(nm: str):
+        try:
+            arts = get_news_articles(
+                nm, serpapi_key, ai_key=ai_key, ai_filter=ai_filter,
+                ai_model=ai_model, min_score=min_score, _use_cache=False,
+            )
+        except Exception as exc:
+            logger.warning("[NEWS] warm fetch failed for %s: %s", nm, exc)
+            arts = []
+        return nm, arts
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for nm, arts in ex.map(_work, names):
+            _NEWS_CACHE[nm] = arts

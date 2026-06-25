@@ -566,6 +566,27 @@ def run(
             f"[bold]{len(companies)}[/bold] companies — no alerts on first run."
         )
 
+    # ── Pre-fetch news in parallel (bounded threads + per-call timeout) ───────
+    # Previously each company's Google News RSS call ran sequentially with no
+    # timeout, stretching runs to hours. Warm a cache concurrently first.
+    if (not is_global_first_run) and (not sheets_only) and behaviour.get("enrich_news", True):
+        _sig_cfg   = config.get("signals", {})
+        _ai_filter = bool(_sig_cfg.get("news_ai_filter", False))
+        _ai_key    = os.environ.get("OPENAI_API_KEY", "") if _ai_filter else ""
+        _ai_model  = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        _min_score = int(_sig_cfg.get("news_relevance_min_score", 2))
+        _serpapi   = creds.get("serpapi_key", "")
+        _news_names = [c.get("name", "Unknown") for c in companies
+                       if store.has_any_snapshot(c["apollo_id"])]
+        if _news_names:
+            console.print(f"[cyan]Pre-fetching news for {len(_news_names):,} companies (parallel)…[/cyan]")
+            _t0 = time.time()
+            news_client.warm_news_cache(
+                _news_names, serpapi_key=_serpapi, ai_key=_ai_key,
+                ai_filter=_ai_filter, ai_model=_ai_model, min_score=_min_score,
+            )
+            console.print(f"[green]News pre-fetch done in {time.time() - _t0:.0f}s.[/green]")
+
     # ── Main company loop ─────────────────────────────────────────────────────
     with Progress(
         SpinnerColumn(),
