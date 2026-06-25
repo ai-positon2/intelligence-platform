@@ -7,6 +7,7 @@ import email.utils
 import logging
 import re
 import urllib.parse
+import json
 import time
 import random
 import threading
@@ -206,12 +207,15 @@ def get_news_articles(
         return _NEWS_CACHE[company_name]
 
     pool = max(max_articles * 3, 12)
+    # Source priority: SerpAPI (if key) -> GDELT. GDELT is free and works from
+    # CI/datacenter IPs; Google News RSS is blocked there, so it is NOT used in
+    # this path anymore (kept only for local/dev callers of _rss_articles).
     if serpapi_key:
         articles = _serpapi_articles(company_name, serpapi_key, pool, max_age_days)
         if not articles:
-            articles = _rss_articles(company_name, pool, max_age_days)
+            articles = _gdelt_articles(company_name, pool, max_age_days)
     else:
-        articles = _rss_articles(company_name, pool, max_age_days)
+        articles = _gdelt_articles(company_name, pool, max_age_days)
 
     try:
         from .news_relevance import filter_relevant_articles
@@ -223,6 +227,76 @@ def get_news_articles(
         logger.warning("[NEWS] relevance filter unavailable for %s: %s", company_name, exc)
 
     return articles[:max_articles]
+
+
+_GDELT_DOC = "https://api.gdeltproject.org/api/v2/doc/doc"
+
+
+def _fetch_json(url: str, timeout: int = 12, retries: int = 2):
+    """GET a JSON URL with a hard timeout + light retry. Returns dict or None.
+
+    Independent of the RSS circuit breaker: GDELT is reachable from CI even when
+    Google News RSS is IP-blocked, so RSS failures must not disable GDELT.
+    """
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+            return json.loads(raw.decode("utf-8", "ignore"))
+        except Exception as exc:
+            last = exc
+            if attempt < retries - 1:
+                time.sleep(1.0 + random.uniform(0, 0.5))
+    logger.warning("[NEWS] GDELT fetch failed for %s: %s", url, last)
+    return None
+
+
+def _gdelt_seendate_to_iso(seendate: str) -> str:
+    """GDELT 'YYYYMMDDTHHMMSSZ' -> ISO 8601 'YYYY-MM-DDTHH:MM:SSZ' (parser-friendly)."""
+    s = (seendate or "").strip()
+    if len(s) >= 15 and s[8] == "T":
+        return f"{s[0:4]}-{s[4:6]}-{s[6:8]}T{s[9:11]}:{s[11:13]}:{s[13:15]}Z"
+    return ""
+
+
+def _gdelt_articles(
+    company_name: str,
+    max_articles: int = 5,
+    max_age_days: int = MAX_NEWS_AGE_DAYS,
+) -> list[dict]:
+    """Fetch recent news for a company via the free GDELT DOC API (CI-friendly)."""
+    days = min(max(int(max_age_days), 1), 365)
+    q = urllib.parse.quote(f'"{company_name}"')
+    url = (f"{_GDELT_DOC}?query={q}&mode=ArtList"
+           f"&maxrecords={max(max_articles * 3, 10)}&sort=DateDesc"
+           f"&format=json&timespan={days}days")
+    data = _fetch_json(url)
+    arts = data.get("articles", []) if isinstance(data, dict) else []
+    results: list[dict] = []
+    seen: set[str] = set()
+    for a in arts:
+        title = (a.get("title", "") or "").strip()
+        if not title:
+            continue
+        key = title.lower()
+        if key in seen:
+            continue
+        pub = _gdelt_seendate_to_iso(a.get("seendate", ""))
+        if not _is_article_fresh(pub, max_age_days):
+            continue
+        seen.add(key)
+        results.append({
+            "title": title,
+            "url": a.get("url", ""),
+            "summary": "",
+            "source": a.get("domain", ""),
+            "published": pub,
+        })
+        if len(results) >= max_articles:
+            break
+    return results
 
 
 def _rss_articles(
