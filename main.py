@@ -90,7 +90,7 @@ def _detect_sheet_events(
     apollo_id = company["apollo_id"]
     name = company.get("name", "")
     domain = company.get("domain", "")
-    max_age_days = int(config.get("signals", {}).get("max_signal_age_days", 90))
+    max_age_days = int((config.get("signals") or {}).get("max_signal_age_days", 90))
     events: list[ChangeEvent] = []
 
     def ev(signal_type, severity, headline, detail="", prev="", new_val="", source_url="", signal_date=""):
@@ -366,8 +366,8 @@ def _process_company_sheets(
     apollo_id  = company["apollo_id"]
     domain     = company.get("domain", "")
     name       = company.get("name", "Unknown")
-    creds      = config.get("credentials", {})
-    behaviour  = config.get("behaviour", {})
+    creds      = (config.get("credentials") or {})
+    behaviour  = (config.get("behaviour") or {})
     dedup_days = behaviour.get("dedup_window_days", 7)
 
     store.upsert_company({
@@ -394,7 +394,7 @@ def _process_company_sheets(
     # ── LOW signals from Google News RSS ──────────────────────────────────────
     if not skip_news and behaviour.get("enrich_news", True):
         serpapi_key = creds.get("serpapi_key", "")
-        _sig_cfg   = config.get("signals", {})
+        _sig_cfg   = (config.get("signals") or {})
         _ai_filter = bool(_sig_cfg.get("news_ai_filter", False))
         _ai_key    = os.environ.get("OPENAI_API_KEY", "") if _ai_filter else ""
         _ai_model  = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
@@ -476,14 +476,14 @@ def run(
     if news_only:
         console.print("[cyan]--news-only: Refreshing Google News RSS, skipping Sheets.[/cyan]")
 
-    if config.get("behaviour", {}).get("dry_run") and not dry_run:
+    if (config.get("behaviour") or {}).get("dry_run") and not dry_run:
         dry_run = True
 
     if dry_run:
         console.print("[yellow]DRY RUN — no Slack messages will be sent.[/yellow]")
 
     store = SnapshotStore(_DEFAULT_DB)
-    creds = config.get("credentials", {})
+    creds = (config.get("credentials") or {})
 
     if reset_alerts:
         store.reset_alerts()
@@ -495,14 +495,14 @@ def run(
     total_loaded = len(companies)
     console.print(f"[cyan]Loaded {total_loaded} companies from CSV.[/cyan]")
 
-    top_n = config.get("behaviour", {}).get("top_n")
+    top_n = (config.get("behaviour") or {}).get("top_n")
     if top_n and isinstance(top_n, int) and top_n > 0 and not company:
         companies = companies[:top_n]
         console.print(
             f"[bold yellow][TOP N MODE][/bold yellow] Processing only top {top_n} of {total_loaded} companies"
         )
 
-    max_signal_age_days: int = int(config.get("signals", {}).get("max_signal_age_days", 90))
+    max_signal_age_days: int = int((config.get("signals") or {}).get("max_signal_age_days", 90))
 
     if dashboard_only:
         console.print("[cyan]Dashboard-only mode — regenerating from DB…[/cyan]")
@@ -555,7 +555,7 @@ def run(
     failed = 0
     first_run_count = 0
 
-    behaviour = config.get("behaviour", {})
+    behaviour = (config.get("behaviour") or {})
     is_global_first_run = (
         behaviour.get("force_csv_baseline", False)
         or not store.has_any_snapshots_at_all()
@@ -570,7 +570,7 @@ def run(
     # Previously each company's Google News RSS call ran sequentially with no
     # timeout, stretching runs to hours. Warm a cache concurrently first.
     if (not is_global_first_run) and (not sheets_only) and behaviour.get("enrich_news", True):
-        _sig_cfg   = config.get("signals", {})
+        _sig_cfg   = (config.get("signals") or {})
         _ai_filter = bool(_sig_cfg.get("news_ai_filter", False))
         _ai_key    = os.environ.get("OPENAI_API_KEY", "") if _ai_filter else ""
         _ai_model  = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
