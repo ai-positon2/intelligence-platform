@@ -38,6 +38,7 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
 import time
+import concurrent.futures
 
 from tracker.jobs_client import get_job_postings
 from tracker.news_client import _parse_article_date
@@ -99,22 +100,40 @@ def fetch_csg_jobs(
     skipped_total = 0
     companies_with_hits = 0
 
+    # ── Parallel network prefetch (bounded threads; DB writes stay sequential) ──
+    # get_job_postings only does network I/O, so fetch all companies concurrently
+    # first, then the loop below just reads results + writes to SQLite single-threaded.
+    def _prefetch(c):
+        nm = (c.get("name", "") or "").strip()
+        aid = c.get("apollo_id", "")
+        if not nm or not aid:
+            return aid, []
+        try:
+            return aid, get_job_postings(nm, max_results=max_postings,
+                                         max_age_days=max_age_days, domain=c.get("domain", ""))
+        except Exception as exc:
+            print(f"  ! prefetch error for {nm}: {exc}")
+            return aid, []
+
+    print(f"Pre-fetching job postings for {total} companies (parallel)…")
+    _t0 = time.time()
+    postings_by_id: dict = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as _ex:
+        for aid, posts in _ex.map(_prefetch, all_companies):
+            if aid:
+                postings_by_id[aid] = posts
+    print(f"Prefetch done in {time.time() - _t0:.0f}s.\n")
+
     for i, company in enumerate(all_companies, 1):
         name = company.get("name", "").strip()
         apollo_id = company.get("apollo_id", "")
         if not name or not apollo_id:
             continue
         print(f"[{i}/{total}] {name}")
-        try:
-            postings = get_job_postings(name, max_results=max_postings, max_age_days=max_age_days, domain=company.get("domain",""))
-        except Exception as exc:
-            print(f"  ! error: {exc}")
-            time.sleep(RATE_LIMIT_SLEEP)
-            continue
+        postings = postings_by_id.get(apollo_id, [])
 
         if not postings:
             print("  — no creative roles found")
-            time.sleep(RATE_LIMIT_SLEEP)
             continue
 
         company_added = 0
@@ -145,7 +164,6 @@ def fetch_csg_jobs(
         if company_added:
             companies_with_hits += 1
             print(f"  ✓ {company_added} posting(s) {'(would add)' if dry_run else 'added'}")
-        time.sleep(RATE_LIMIT_SLEEP)
 
     print(f"\nDone. {'(dry run) ' if dry_run else ''}"
           f"{added_total} signals across {companies_with_hits} companies; "

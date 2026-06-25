@@ -310,6 +310,8 @@ def warm_news_cache(
     ai_filter: bool = False,
     ai_model: str = "gpt-4o-mini",
     min_score: int = 2,
+    max_articles: int = 5,
+    max_age_days: int = MAX_NEWS_AGE_DAYS,
     max_workers: int = 16,
 ) -> None:
     """Pre-fetch news for many companies in parallel into _NEWS_CACHE.
@@ -326,7 +328,8 @@ def warm_news_cache(
     def _work(nm: str):
         try:
             arts = get_news_articles(
-                nm, serpapi_key, ai_key=ai_key, ai_filter=ai_filter,
+                nm, serpapi_key, max_articles=max_articles, max_age_days=max_age_days,
+                ai_key=ai_key, ai_filter=ai_filter,
                 ai_model=ai_model, min_score=min_score, _use_cache=False,
             )
         except Exception as exc:
