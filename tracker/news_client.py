@@ -9,6 +9,7 @@ import re
 import urllib.parse
 import time
 import random
+import threading
 import urllib.request
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,30 @@ _NEWS_CACHE: dict[str, list[dict]] = {}
 _FEED_RETRIES = 2        # attempts per URL on transient failures (503/429/timeout)
 _FEED_BACKOFF = 1.5      # base seconds; grows exponentially with jitter
 
+# ── Circuit breaker ─────────────────────────────────────────────────────────
+# Google blocks CI/datacenter IPs outright (every request 503s/times out). When
+# that happens, retrying 1,200+ companies wastes an hour for zero data. After
+# this many failures with no intervening success, we "open" the circuit and
+# every further fetch returns instantly-empty so the step finishes in seconds.
+_CIRCUIT_THRESHOLD = 30
+_circuit_lock = threading.Lock()
+_circuit_fails = 0
+_circuit_open = False
+
+
+def _circuit_record(success: bool) -> None:
+    global _circuit_fails, _circuit_open
+    with _circuit_lock:
+        if success:
+            _circuit_fails = 0
+        else:
+            _circuit_fails += 1
+            if _circuit_fails >= _CIRCUIT_THRESHOLD and not _circuit_open:
+                _circuit_open = True
+                logger.error("[NEWS] circuit OPEN after %d consecutive failures — "
+                             "endpoint is blocking us (likely IP block). Skipping "
+                             "remaining fetches this run.", _circuit_fails)
+
 
 def _fetch_feed(url: str):
     """Download an RSS URL with a hard timeout + retry/backoff, then parse bytes.
@@ -39,6 +64,10 @@ def _fetch_feed(url: str):
     Returns a parsed feed (possibly with no entries).
     """
     import feedparser  # type: ignore
+    # If the endpoint has already proven to be blocking us this run, don't waste
+    # time — return empty immediately.
+    if _circuit_open:
+        return feedparser.parse(b"")
     # Small upfront jitter de-synchronises concurrent workers so we don't hit
     # the endpoint in tight lockstep (a common 503 trigger).
     time.sleep(random.uniform(0, 0.5))
@@ -48,11 +77,13 @@ def _fetch_feed(url: str):
             req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
             with urllib.request.urlopen(req, timeout=_FEED_TIMEOUT) as resp:
                 data = resp.read()
+            _circuit_record(True)
             return feedparser.parse(data)
         except Exception as exc:
             last_exc = exc
-            if attempt < _FEED_RETRIES - 1:
+            if attempt < _FEED_RETRIES - 1 and not _circuit_open:
                 time.sleep(_FEED_BACKOFF * (2 ** attempt) + random.uniform(0, 0.75))
+    _circuit_record(False)
     logger.warning("[NEWS] feed fetch failed after %d tries for %s: %s",
                    _FEED_RETRIES, url, last_exc)
     return feedparser.parse(b"")
