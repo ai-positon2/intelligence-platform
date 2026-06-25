@@ -7,6 +7,8 @@ import email.utils
 import logging
 import re
 import urllib.parse
+import time
+import random
 import urllib.request
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
@@ -23,22 +25,37 @@ _FEED_UA = "Mozilla/5.0 (compatible; SignalTracker/1.0; +https://intelligence.po
 _NEWS_CACHE: dict[str, list[dict]] = {}
 
 
+_FEED_RETRIES = 2        # attempts per URL on transient failures (503/429/timeout)
+_FEED_BACKOFF = 1.5      # base seconds; grows exponentially with jitter
+
+
 def _fetch_feed(url: str):
-    """Download an RSS URL with a hard timeout, then hand the bytes to feedparser.
+    """Download an RSS URL with a hard timeout + retry/backoff, then parse bytes.
 
     feedparser.parse(url) does its own network fetch with NO timeout, so a
     throttled endpoint can hang indefinitely. We fetch ourselves (bounded) and
-    parse the bytes instead. Returns a parsed feed (possibly with no entries).
+    parse the bytes. Google News rate-limits bursts (HTTP 503/429), so we retry
+    transient failures with exponential backoff + jitter before giving up.
+    Returns a parsed feed (possibly with no entries).
     """
     import feedparser  # type: ignore
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
-        with urllib.request.urlopen(req, timeout=_FEED_TIMEOUT) as resp:
-            data = resp.read()
-        return feedparser.parse(data)
-    except Exception as exc:
-        logger.warning("[NEWS] feed fetch timed out/failed for %s: %s", url, exc)
-        return feedparser.parse(b"")
+    # Small upfront jitter de-synchronises concurrent workers so we don't hit
+    # the endpoint in tight lockstep (a common 503 trigger).
+    time.sleep(random.uniform(0, 0.5))
+    last_exc = None
+    for attempt in range(_FEED_RETRIES):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
+            with urllib.request.urlopen(req, timeout=_FEED_TIMEOUT) as resp:
+                data = resp.read()
+            return feedparser.parse(data)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < _FEED_RETRIES - 1:
+                time.sleep(_FEED_BACKOFF * (2 ** attempt) + random.uniform(0, 0.75))
+    logger.warning("[NEWS] feed fetch failed after %d tries for %s: %s",
+                   _FEED_RETRIES, url, last_exc)
+    return feedparser.parse(b"")
 
 
 def _decode_google_news_url(google_url: str) -> str:
@@ -312,7 +329,7 @@ def warm_news_cache(
     min_score: int = 2,
     max_articles: int = 5,
     max_age_days: int = MAX_NEWS_AGE_DAYS,
-    max_workers: int = 16,
+    max_workers: int = 6,
 ) -> None:
     """Pre-fetch news for many companies in parallel into _NEWS_CACHE.
 

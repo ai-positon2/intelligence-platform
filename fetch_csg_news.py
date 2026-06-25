@@ -167,7 +167,7 @@ def fetch_csg_news(
     warm_news_cache(
         [c.get("name", "") for c in all_companies],
         max_articles=max_articles, max_age_days=max_age_days,
-        max_workers=16,
+        max_workers=6,
     )
     print(f"  Prefetch done in {time.time() - _t0:.0f}s.")
 
