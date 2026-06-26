@@ -354,6 +354,72 @@ AGENTS = [
 ]
 AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
 
+# ── Cumulative signal catalog (across every agent / dashboard) ───────────────────
+SIGNAL_GROUPS = [
+    {
+        "key": "tracker", "source": "Signal Tracker", "accent": "#a78bfa",
+        "icon": _svg('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>'),
+        "tagline": "Company-level buying signals detected across curated sources and the open web.",
+        "signals": [
+            {"name": "Funding Round", "desc": "New capital raised - fresh budget and a mandate to grow."},
+            {"name": "C-Suite Join", "desc": "A new executive arrives with a fresh agenda and new vendors."},
+            {"name": "C-Suite Exit", "desc": "Leadership departs - strategy and priorities are in flux."},
+            {"name": "Acquisition / M&A", "desc": "A deal reshapes the org chart, stack and spending."},
+            {"name": "IPO Signal", "desc": "Going public - scrutiny, scale and new investment."},
+            {"name": "Subsidiary Change", "desc": "A new entity or restructure opens fresh territory."},
+            {"name": "Product Launch", "desc": "A new product means new go-to-market motion to support."},
+            {"name": "Partnership", "desc": "A new alliance signals expansion and shifting needs."},
+            {"name": "Creative Hiring", "desc": "Hiring marketers and creatives - investment in growth."},
+            {"name": "News Mention", "desc": "General coverage that keeps an account warm and in view."},
+        ],
+    },
+    {
+        "key": "web", "source": "Website De-anonymization", "accent": "#34d399",
+        "icon": _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+        "tagline": "Intent signals from the companies - and people - browsing your site.",
+        "signals": [
+            {"name": "Company Visit", "desc": "An anonymous visitor resolved to a named company account."},
+            {"name": "High-Intent Page View", "desc": "Pricing, demo or product pages viewed - a strong buying cue."},
+            {"name": "Return Visit", "desc": "A company comes back across multiple sessions - rising interest."},
+            {"name": "Known Contact Visit", "desc": "A mapped contact from a target account lands on your site."},
+            {"name": "Deep Session", "desc": "Many pages and long dwell time in a single visit."},
+        ],
+    },
+    {
+        "key": "linkedin", "source": "LinkedIn Intelligence", "accent": "#38bdf8",
+        "icon": _svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17v-5M12 17V8M17 17v-3"/>'),
+        "tagline": "Engagement signals that reveal who on the buying committee is paying attention.",
+        "signals": [
+            {"name": "Post Engagement", "desc": "Likes, comments or shares on relevant posts from target accounts."},
+            {"name": "Profile View", "desc": "Someone from a target account views your team's profiles."},
+            {"name": "Buying-Committee Activity", "desc": "Several stakeholders at one account engage in a short window."},
+            {"name": "Content Interaction", "desc": "Saves, clicks and follows that signal active research."},
+        ],
+    },
+    {
+        "key": "ads", "source": "Competitor Ad Intelligence", "accent": "#f472b6",
+        "icon": _svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+        "tagline": "Competitive signals from the ads your rivals are actively running.",
+        "signals": [
+            {"name": "New Competitor Ad", "desc": "A rival launches fresh creative - a cue to counter-position."},
+            {"name": "Messaging Shift", "desc": "A competitor changes value props or positioning."},
+            {"name": "New Campaign", "desc": "A new competitor campaign goes live across a platform."},
+            {"name": "Format / Channel Change", "desc": "A shift in ad formats or channels worth matching."},
+        ],
+    },
+    {
+        "key": "intent", "source": "Target Accounts · Intent", "accent": "#fbbf24",
+        "icon": _svg('<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 17l-5.5 2.8 1-6.3L3 8.9 9 8z"/>'),
+        "tagline": "Composite signals that fold everything above into one readiness score.",
+        "signals": [
+            {"name": "Intent Score Spike", "desc": "An account's composite score jumps - act now."},
+            {"name": "Multi-Signal Stack", "desc": "Several signals fire on one account in a short window."},
+            {"name": "Readiness Change", "desc": "An account crosses into a higher buying-readiness tier."},
+        ],
+    },
+]
+
+
 
 @app.route("/agents")
 def agents_dir():
@@ -376,7 +442,7 @@ def platform_page():
 
 @app.route("/signals")
 def signals_page():
-    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[])
+    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[], signal_groups=SIGNAL_GROUPS)
 
 
 @app.route("/solutions")
