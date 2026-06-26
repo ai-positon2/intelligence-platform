@@ -455,7 +455,13 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .live-in input::placeholder{color:#5b648c}
 .live-in input:focus{border-color:rgba(129,140,248,.7);box-shadow:0 0 0 4px rgba(99,102,241,.16),0 0 34px rgba(99,102,241,.2)}
 .live-in .btn-grad{flex:0 0 auto;padding:15px 24px;font-size:15px}
-.live-hint{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim3);margin:13px 0 24px}
+.live-hint{text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim3);margin:13px 0 12px}
+.live-sugg{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:0 0 24px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--dim3)}
+.lchip-s{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line2);border-radius:999px;padding:6px 13px;cursor:pointer;transition:.2s}
+.lchip-s:hover{color:#fff;border-color:rgba(129,140,248,.6);background:rgba(124,140,220,.12);transform:translateY(-1px)}
+.live-exnote{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:var(--dim2);line-height:1.5;padding:2px 2px 10px}
+.live-exnote b{color:#cbd5e1}
+.ex-pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#fbbf24;background:rgba(251,191,36,.13);border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:4px 9px;flex:0 0 auto}
 .live-score{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:#a5b4fc;background:rgba(129,140,248,.15);border:1px solid rgba(129,140,248,.36);border-radius:999px;padding:5px 11px;margin-left:auto}
 .mock-head .mock-live{margin-left:14px}
 #liveRows{display:flex;flex-direction:column;gap:10px;min-height:64px}
@@ -828,6 +834,7 @@ a.lrow[href]:hover{background:rgba(255,255,255,.06);transform:translateX(3px)}
         <button class="btn-grad" id="liveGo" type="submit" data-cursor>Reveal signals</button>
       </form>
       <div class="live-hint reveal in">Live from the open web · no signup needed</div>
+      <div class="live-sugg reveal in"><span>Try:</span><button type="button" class="lchip-s" data-co="Stripe">Stripe</button><button type="button" class="lchip-s" data-co="Databricks">Databricks</button><button type="button" class="lchip-s" data-co="Notion">Notion</button><button type="button" class="lchip-s" data-co="OpenAI">OpenAI</button></div>
       <div class="mock glass reveal in" id="liveCard" style="transition-delay:120ms">
         <div class="mock-head"><span class="md r"></span><span class="md y"></span><span class="md g"></span><span class="mock-t" id="liveTitle">Acme Cloud · live signals</span><span class="live-score" id="liveScore">intent 9.1</span><span class="mock-live"><i></i><span id="liveCount">4 signals</span></span></div>
         <div class="mock-body">
@@ -1207,17 +1214,23 @@ a.lrow[href]:hover{background:rgba(255,255,255,.06);transform:translateX(3px)}
     function esc(x){ var d=document.createElement('div'); d.textContent=(x==null?'':x); return d.innerHTML; }
     function skeleton(){ rows.innerHTML=''; for(var i=0;i<4;i++){ var d=document.createElement('div'); d.className='lskel'; d.style.opacity=(1-i*0.18).toFixed(2); rows.appendChild(d); } }
     function render(d){
-      title.textContent=d.company+' · live signals';
+      var subject = d.example ? d.example_for : d.company;
+      title.textContent = subject + ' · live signals';
       if(scoreEl){ if(d.score){ scoreEl.style.display=''; scoreEl.textContent='intent '+d.score; } else { scoreEl.style.display='none'; } }
       countEl.textContent=(d.count||0)+' signal'+(d.count===1?'':'s');
       rows.innerHTML='';
       if(!d.signals || !d.signals.length){
         if(vimi) vimi.style.display='none';
         var n=document.createElement('div'); n.className='live-note';
-        n.innerHTML='No fresh signals for <b style="color:#cbd5e1">'+esc(d.company)+'</b> in the last few months.<br>On a connected account, this is where they’d stream in — funding, leadership moves, intent and more.';
+        n.innerHTML='No fresh public signals for <b style="color:#cbd5e1">'+esc(d.company)+'</b> right now.<br>Try a company in the news lately — or a suggestion above.';
         rows.appendChild(n);
-        if(cap) cap.textContent='Try another company — or one in the news lately';
+        if(cap) cap.textContent='Try another company above';
         return;
+      }
+      if(d.example){
+        var note=document.createElement('div'); note.className='live-exnote';
+        note.innerHTML='<span class="ex-pill">Live example</span><span>No fresh public news for <b>'+esc(d.company)+'</b> yet — here is a real, live report for <b>'+esc(d.example_for)+'</b>.</span>';
+        rows.appendChild(note);
       }
       if(vimi) vimi.style.display='';
       d.signals.forEach(function(s,i){
@@ -1228,23 +1241,22 @@ a.lrow[href]:hover{background:rgba(255,255,255,.06);transform:translateX(3px)}
         a.innerHTML='<span class="lchip">'+esc(s.type)+'</span><span class="lh">'+esc(s.headline)+'</span><span class="lw">'+esc(s.date||'')+'</span>';
         rows.appendChild(a);
       });
-      if(vimiTx) vimiTx.textContent=d.vimi||('Here’s what’s moving at '+d.company+' right now.');
+      if(vimiTx) vimiTx.textContent=d.vimi||('Here is what is moving at '+subject+' right now.');
       if(cap) cap.textContent='Live from the open web · powered by Intelligence';
     }
     var busy=false;
-    form.addEventListener('submit',function(e){
-      e.preventDefault(); if(busy) return;
-      var q=(inp.value||'').trim(); if(q.length<2){ inp.focus(); return; }
+    function run(q){
+      if(busy) return; q=(q||'').trim(); if(q.length<2){ inp.focus(); return; }
       busy=true; go.disabled=true; go.textContent='Scanning…'; skeleton();
       var t0=Date.now();
       fetch('/api/live-signals?company='+encodeURIComponent(q))
         .then(function(r){ return r.json(); })
-        .then(function(d){
-          var wait=Math.max(0,700-(Date.now()-t0));
-          setTimeout(function(){ render((d&&d.ok)?d:{company:q,signals:[],count:0,score:0}); busy=false; go.disabled=false; go.textContent='Reveal signals'; }, wait);
-        })
+        .then(function(d){ var wait=Math.max(0,800-(Date.now()-t0));
+          setTimeout(function(){ render((d&&d.ok)?d:{company:q,signals:[],count:0,score:0}); busy=false; go.disabled=false; go.textContent='Reveal signals'; }, wait); })
         .catch(function(){ render({company:q,signals:[],count:0,score:0}); busy=false; go.disabled=false; go.textContent='Reveal signals'; });
-    });
+    }
+    form.addEventListener('submit',function(e){ e.preventDefault(); run(inp.value); });
+    document.querySelectorAll('.lchip-s').forEach(function(b){ b.addEventListener('click',function(){ inp.value=b.getAttribute('data-co'); run(inp.value); }); });
   })();
 
   // ===== demo form =====
