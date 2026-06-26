@@ -418,28 +418,55 @@ def _live_rate_ok(ip: str) -> bool:
     return True
 
 
-def _live_company_signals(query: str) -> list:
-    """Pull recent real signals for a company via the platform's news engine (GDELT)."""
-    out = []
-    try:
-        from tracker.news_client import get_news_articles
-        arts = get_news_articles(query, max_articles=6, max_age_days=180, _use_cache=False) or []
-        for a in arts[:6]:
-            title = (a.get("title") or "").strip()
-            if not title:
-                continue
-            label, acc = _classify_signal(title + " " + (a.get("summary") or ""))
-            out.append({"type": label, "accent": acc, "headline": title[:150],
-                        "source": (a.get("source") or "")[:60], "date": _fmt_when(a.get("published")),
-                        "url": a.get("url") or ""})
-    except Exception as e:
-        log.warning("live-signals fetch failed for %s: %s", query, e)
+_LIVE_FALLBACKS = ["Stripe", "Databricks", "Notion", "Snowflake", "OpenAI", "Salesforce", "Figma"]
+
+
+def _signals_from_articles(arts: list) -> list:
+    out, seen = [], set()
+    for a in (arts or []):
+        title = (a.get("title") or "").strip()
+        if not title:
+            continue
+        k = title.lower()[:80]
+        if k in seen:
+            continue
+        seen.add(k)
+        label, acc = _classify_signal(title + " " + (a.get("summary") or ""))
+        out.append({"type": label, "accent": acc, "headline": title[:150],
+                    "source": (a.get("source") or "")[:60], "date": _fmt_when(a.get("published")),
+                    "url": a.get("url") or ""})
+        if len(out) >= 6:
+            break
     return out
+
+
+def _fetch_company_articles(query: str) -> list:
+    """Maximise real hits: raw GDELT (broad, unfiltered) first, then the filtered path."""
+    try:
+        from tracker import news_client as nc
+    except Exception as e:
+        log.warning("news_client import failed: %s", e)
+        return []
+    arts = []
+    try:
+        arts = nc._gdelt_articles(query, 14, 365) or []
+    except Exception as e:
+        log.warning("gdelt fetch failed for %s: %s", query, e)
+    if not arts:
+        try:
+            arts = nc.get_news_articles(query, max_articles=8, max_age_days=365, _use_cache=False) or []
+        except Exception as e:
+            log.warning("news fetch failed for %s: %s", query, e)
+    return arts
 
 
 @app.route("/api/live-signals")
 def api_live_signals():
-    """Public demo: surface live signals for a typed company. Cached + rate-limited."""
+    """Public demo: surface live signals for a typed company. Never returns empty.
+
+    Real signals when the company has public news; otherwise a clearly-labelled
+    live example for a news-rich company so the demo always lands.
+    """
     company = (request.args.get("company") or "").strip()[:80]
     company = re.sub(r"[^A-Za-z0-9 .,&'\-]", "", company).strip()
     if len(company) < 2:
@@ -451,15 +478,28 @@ def api_live_signals():
     cached = _LIVE_CACHE.get(key)
     if cached and (time.time() - cached[0]) < _LIVE_TTL:
         return jsonify(cached[1])
-    # derive a clean query from a domain (acme.com / www.acme.io -> acme)
+
     q = company
     if "." in q and " " not in q:
         q = q.split("//")[-1].split("/")[0]
         parts = [p for p in q.split(".") if p and p != "www"]
         q = parts[0] if parts else company
-    signals = _live_company_signals(q)
+
+    signals = _signals_from_articles(_fetch_company_articles(q))
+    example, example_for = False, ""
+    if not signals:
+        import random as _rnd
+        for cand in _rnd.sample(_LIVE_FALLBACKS, min(3, len(_LIVE_FALLBACKS))):
+            fa = _signals_from_articles(_fetch_company_articles(cand))
+            if fa:
+                signals, example, example_for = fa, True, cand
+                break
+
+    vimi_subject = example_for if example else company
     resp = {"ok": True, "company": company, "query": q, "count": len(signals),
-            "score": _live_score(signals), "signals": signals, "vimi": _vimi_line(company, signals)}
+            "score": _live_score(signals), "signals": signals,
+            "example": example, "example_for": example_for,
+            "vimi": _vimi_line(vimi_subject, signals)}
     _LIVE_CACHE[key] = (time.time(), resp)
     return jsonify(resp)
 
