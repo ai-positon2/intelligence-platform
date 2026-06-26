@@ -391,6 +391,65 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .legal-body p{font-size:15px;line-height:1.75;color:var(--dim)}
 .legal-body a{color:#a5b4fc;font-weight:600}
 
+/* ===== fast login ===== */
+.login-wrap{min-height:calc(100vh - 66px);display:flex;align-items:center;justify-content:center;padding:90px 0 60px}
+.login-card{width:min(440px,100%);padding:40px 34px 30px;border-radius:24px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.login-orb{width:56px;height:56px;filter:drop-shadow(0 0 16px rgba(99,102,241,.8))}
+.login-orb .spin{transform-origin:50% 50%;animation:spin 14s linear infinite}
+.login-card h1{font-size:clamp(28px,4vw,38px)}
+.login-sub{font-size:14.5px;color:var(--dim);line-height:1.6;max-width:340px;margin:0 auto}
+.gbtn{margin:24px 0 6px;display:flex;justify-content:center;min-height:44px}
+.gerr{align-items:center;justify-content:center;gap:8px;margin:16px 0 0;padding:10px 14px;border-radius:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#fca5a5;font-size:13px}
+.login-foot{margin-top:18px;font-size:13px;color:var(--dim2)}
+.login-foot a{color:#a5b4fc;font-weight:600}
+/* ===== scroll story ===== */
+.story{position:relative;--ring:0}
+.story-pin{display:flex;flex-direction:column;justify-content:center}
+.story-grid{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.story-text .h-sec{margin:14px 0 26px}
+.story-steps{display:flex;flex-direction:column;gap:12px}
+.sstep{display:flex;gap:15px;align-items:flex-start;padding:14px 16px;border-radius:14px;border:1px solid transparent;transition:opacity .4s,background .4s,border-color .4s,transform .4s}
+.sstep .sn{font-family:var(--mono);font-size:12px;color:var(--dim3);padding-top:2px;transition:color .4s}
+.sstep b{font-family:var(--display);font-size:16px;color:#fff;font-weight:700}
+.sstep p{font-size:13.5px;color:var(--dim);line-height:1.55;margin-top:3px}
+.story-vis{display:flex;justify-content:center}
+.svis-card{width:min(380px,100%);padding:24px;border-radius:22px;position:relative;transition:box-shadow .5s,border-color .5s}
+.svc-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.svc-co{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:19px;font-weight:700;color:#fff}
+.svc-dot{width:10px;height:10px;border-radius:50%;background:#a78bfa;box-shadow:0 0 12px #a78bfa;flex:0 0 auto}
+.svc-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;color:#c4b5fd;background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.4);border-radius:999px;padding:6px 12px;white-space:nowrap;transition:.5s}
+.svc-score{position:relative;height:150px;display:flex;align-items:center;justify-content:center;margin:18px 0 6px;transition:opacity .5s}
+.svc-score svg{position:absolute;width:150px;height:150px;transform:rotate(-90deg)}
+.svc-score .sr-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:8}
+.svc-score .sr-fg{fill:none;stroke:url(#sg);stroke-width:8;stroke-linecap:round;stroke-dasharray:327;stroke-dashoffset:calc(327px * (1 - var(--ring,0)))}
+.svc-num{position:relative;text-align:center}
+.svc-num b{display:block;font-family:var(--display);font-size:40px;font-weight:800;line-height:1;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.svc-num span{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--dim3);text-transform:uppercase}
+.svc-badge{margin-top:10px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:#5eead4;transition:.5s}
+.svc-vimi{display:flex;align-items:center;gap:12px;margin-top:16px;padding:13px 15px;border-radius:14px;background:linear-gradient(120deg,rgba(34,211,238,.1),rgba(139,92,246,.12));border:1px solid rgba(129,140,248,.28);transition:.5s}
+.story-rail{display:none}
+/* desktop pinned scrollytelling */
+@media (min-width:821px){
+  .story{height:340vh;margin-top:30px}
+  .story-pin{position:sticky;top:0;height:100vh}
+  .story-rail{display:flex;position:absolute;left:50%;bottom:34px;transform:translateX(-50%);gap:9px}
+  .story-rail span{width:26px;height:3px;border-radius:3px;background:rgba(255,255,255,.14);transition:.3s}
+  .story-rail span.on{background:linear-gradient(90deg,var(--cyan),var(--violet))}
+  .story.anim .sstep{opacity:.38}
+  .story.anim .sstep.on{opacity:1;background:rgba(255,255,255,.05);border-color:var(--line2);transform:translateX(4px)}
+  .story.anim .sstep.on .sn{color:var(--cyan)}
+  .story.anim .svc-tag{opacity:0;transform:translateY(-4px)}
+  .story.anim[data-step] .svc-tag{opacity:1;transform:none}
+  .story.anim .svc-score{opacity:0}
+  .story.anim[data-step="1"] .svc-score,.story.anim[data-step="2"] .svc-score,.story.anim[data-step="3"] .svc-score{opacity:1}
+  .story.anim .svc-badge{opacity:0;transform:translateY(6px)}
+  .story.anim[data-step="2"] .svc-badge,.story.anim[data-step="3"] .svc-badge{opacity:1;transform:none}
+  .story.anim .svc-vimi{opacity:0;transform:translateY(10px)}
+  .story.anim[data-step="3"] .svc-vimi{opacity:1;transform:none}
+  .story.anim[data-step="2"] .svis-card,.story.anim[data-step="3"] .svis-card{box-shadow:0 0 54px rgba(99,102,241,.3);border-color:rgba(129,140,248,.5)}
+}
+@media (max-width:820px){.story-grid{grid-template-columns:1fr;gap:28px}.story{margin-top:10px}.story-pin{padding:20px 0}}
+
 /* ===== demo form ===== */
 .nv-fov{position:fixed;inset:0;z-index:9600;display:none;align-items:center;justify-content:center;padding:24px}
 .nv-fov.on{display:flex}
@@ -743,12 +802,32 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <div class="intg-row"><span class="intg-i">HubSpot</span><span class="intg-i">Salesforce</span><span class="intg-i">Slack</span><span class="intg-i">LinkedIn</span><span class="intg-i">Google Ads</span><span class="intg-i">Gmail</span><span class="intg-i">Sheets</span></div>
     </div>
 
-    <section id="how" class="home-sec">
-      <div class="sec-head reveal"><span class="pill-eye"><span class="dt"></span> How it works</span><h2 class="h-sec">From signal to <span class="ital grad">conversation,</span> in three steps.</h2></div>
-      <div class="steps">
-        <div class="step glass reveal"><span class="step-n">01</span><h4>Connect your world</h4><p>Point us at your target accounts, your website and your CRM. Setup takes days, not months.</p></div>
-        <div class="step glass reveal" style="transition-delay:90ms"><span class="step-n">02</span><h4>We watch, 24/7</h4><p>Four always-on agents track 26 buying signals across the open web, your site and social — and score every account in real time.</p></div>
-        <div class="step glass reveal" style="transition-delay:180ms"><span class="step-n">03</span><h4>Your team acts first</h4><p>The right account surfaces at the right moment, with the reason why — and Vimi drafts the outreach. You reach out before competitors even notice.</p></div>
+    <section id="how" class="story js-pin">
+      <div class="story-pin">
+        <div class="story-grid">
+          <div class="story-text">
+            <span class="pill-eye"><span class="dt"></span> How it works</span>
+            <h2 class="h-sec">Watch a signal become<br><span class="ital grad">a conversation.</span></h2>
+            <div class="story-steps">
+              <div class="sstep" data-i="0"><span class="sn">01</span><div><b>A signal fires</b><p>Acme Cloud closes a funding round — we catch it the moment it hits the open web.</p></div></div>
+              <div class="sstep" data-i="1"><span class="sn">02</span><div><b>It’s scored</b><p>Type, severity and recency combine into a live intent score, instantly.</p></div></div>
+              <div class="sstep" data-i="2"><span class="sn">03</span><div><b>The account rises</b><p>It jumps to the top of your worklist, with the reason why in plain language.</p></div></div>
+              <div class="sstep" data-i="3"><span class="sn">04</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer — you reach out first.</p></div></div>
+            </div>
+          </div>
+          <div class="story-vis">
+            <div class="svis-card glass">
+              <div class="svc-top"><span class="svc-co"><span class="svc-dot"></span>Acme Cloud</span><span class="svc-tag">Funding Round</span></div>
+              <div class="svc-score">
+                <svg viewBox="0 0 120 120"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><circle class="sr-bg" cx="60" cy="60" r="52"/><circle class="sr-fg" cx="60" cy="60" r="52"/></svg>
+                <div class="svc-num"><b id="svScore">6.0</b><span>intent score</span></div>
+              </div>
+              <div class="svc-badge">▲ Top account today</div>
+              <div class="svc-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>“Acme just raised a Series B — here’s a 3-line intro to their new VP Marketing.”</p></div><span class="mv-cta">Open draft</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="story-rail"><span data-i="0"></span><span data-i="1"></span><span data-i="2"></span><span data-i="3"></span></div>
       </div>
     </section>
 
@@ -820,6 +899,32 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     </div>
     <div class="band reveal"><h3>Questions about terms?</h3><p>Our team is happy to walk through the specifics with you.</p><button class="btn-grad mag" data-demo data-cursor>Get in touch</button></div>
   </div>
+
+{% elif page == 'login' %}
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <div class="wrap login-wrap">
+    <div class="login-card glass reveal in">
+      <svg class="login-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
+      <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Position2 team sign-in</span>
+      <h1 class="h-sec" style="margin:16px 0 8px">Welcome back.</h1>
+      <p class="login-sub">Sign in with your Position2 Google account to open your live intelligence dashboard.</p>
+      <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
+      <div class="gbtn">
+        <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+        <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
+      </div>
+      <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Book a demo →</a></div>
+    </div>
+  </div>
+  <script>
+  function handleCredentialResponse(response){
+    var c=document.getElementById('gerr');
+    fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})})
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d.success){ window.location.href=d.redirect||'/hub'; } else { if(c){ c.textContent='⚠ '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
+    .catch(function(){ if(c){ c.textContent='⚠ Network error. Please try again.'; c.style.display='flex'; } });
+  }
+  </script>
 {% endif %}
 </main>
 
@@ -1007,6 +1112,25 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       sigNull.style.display=shown?'none':'block'; });
   }
 
+
+  // scroll story (pinned scrollytelling, desktop only)
+  var story=document.querySelector('.story');
+  if(story && window.matchMedia('(min-width:821px)').matches && !RM){
+    story.classList.add('anim');
+    var ssteps=story.querySelectorAll('.sstep'), srail=story.querySelectorAll('.story-rail span'), sScore=document.getElementById('svScore');
+    function sUpd(){
+      var r=story.getBoundingClientRect(), total=story.offsetHeight-innerHeight;
+      var p=Math.min(1,Math.max(0,(-r.top)/(total||1)));
+      var step=Math.min(3,Math.floor(p*4));
+      story.setAttribute('data-step',step);
+      ssteps.forEach(function(x){ x.classList.toggle('on', +x.getAttribute('data-i')===step); });
+      srail.forEach(function(x){ x.classList.toggle('on', +x.getAttribute('data-i')<=step); });
+      var ring=Math.min(1,Math.max(0,(p-0.16)/0.5));
+      story.style.setProperty('--ring',ring.toFixed(3));
+      if(sScore) sScore.textContent=(6.0+ring*3.4).toFixed(1);
+    }
+    window.addEventListener('scroll',sUpd,{passive:true}); sUpd();
+  }
 
   // ===== demo form =====
   var fov=document.getElementById('nvfov'), interest='Book a demo';
