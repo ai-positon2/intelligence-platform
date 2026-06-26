@@ -26,9 +26,10 @@ a{color:inherit;text-decoration:none}
 @media (pointer:fine){ body{cursor:none} a,button,.chip,.tilt,.onode,[data-cursor]{cursor:none} .nv-field input,.nv-field textarea{cursor:text} }
 
 /* ===== background ===== */
-#cnv{position:fixed;inset:0;z-index:0;pointer-events:none}
+#cnv{position:fixed;inset:0;z-index:0;pointer-events:none;display:none}
+#scene{position:fixed;inset:0;z-index:0;pointer-events:none;display:block}
 .mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;will-change:transform}
-.mesh i{position:absolute;border-radius:50%;filter:blur(110px);opacity:.46;mix-blend-mode:screen;animation:drift 26s ease-in-out infinite}
+.mesh i{position:absolute;border-radius:50%;filter:blur(110px);opacity:.2;mix-blend-mode:screen;animation:drift 26s ease-in-out infinite}
 .mesh .m1{width:640px;height:640px;background:radial-gradient(circle,#4f46e5,transparent 67%);top:-170px;left:-120px}
 .mesh .m2{width:540px;height:540px;background:radial-gradient(circle,#06b6d4,transparent 67%);top:6%;right:-150px;animation-delay:-9s}
 .mesh .m3{width:580px;height:580px;background:radial-gradient(circle,#a855f7,transparent 67%);bottom:-240px;left:22%;animation-delay:-16s}
@@ -292,28 +293,25 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .foot-links a{font-size:13.5px;color:var(--dim2);transition:.2s}.foot-links a:hover{color:#fff}
 .foot-c{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--dim3)}
 
-/* ===== signals catalog ===== */
-.sg-group{margin-top:48px}
-.sg-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
-.sg-ic{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;
-  background:linear-gradient(140deg,var(--ac),rgba(99,102,241,.7));box-shadow:0 10px 26px -8px var(--ac),inset 0 1px 0 rgba(255,255,255,.25)}
-.sg-ic svg{width:23px;height:23px;stroke:#0a0d1e;stroke-width:2.2}
-.sg-title{font-family:var(--display);font-size:23px;font-weight:700;color:#fff;letter-spacing:-.01em}
-.sg-count{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ac);border:1px solid var(--ac);border-radius:999px;padding:5px 11px;opacity:.92}
-.sg-line{flex:1;min-width:40px;height:1px;background:linear-gradient(90deg,var(--ac),transparent);opacity:.55}
-.sg-tag{color:var(--dim);font-size:14.5px;margin:0 0 18px;max-width:720px}
-.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
-@media (max-width:900px){.sgrid{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.sgrid{grid-template-columns:1fr}}
-.scard{position:relative;border:1px solid var(--line);border-left:3px solid var(--ac);border-radius:15px;padding:18px 20px;overflow:hidden;--mx:50%;--my:0%;
-  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018));transition:transform .16s ease-out,box-shadow .28s,border-color .28s;transform-style:preserve-3d;will-change:transform}
-.scard::after{content:'';position:absolute;inset:0;border-radius:15px;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(220px circle at var(--mx) var(--my),var(--ac),transparent 60%)}
-.scard:hover{box-shadow:0 20px 46px -24px var(--ac);transform:translateY(-4px)}
-.scard:hover::after{opacity:.13}
-.scard>*{position:relative;z-index:1}
-.scard h5{font-family:var(--display);font-size:16px;font-weight:700;color:#fff;margin-bottom:7px;display:flex;align-items:center;gap:10px}
-.scard .sdot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--ac);box-shadow:0 0 10px var(--ac)}
-.scard p{font-size:13px;line-height:1.6;color:var(--dim2)}
+/* ===== signals list ===== */
+.slist{margin-top:36px;border-top:1px solid var(--line)}
+.srow{position:relative;display:grid;grid-template-columns:74px 1fr;gap:24px;padding:28px 24px;border-bottom:1px solid var(--line);--ac:#a78bfa;overflow:hidden;opacity:0;transform:translateY(22px);
+  transition:background .3s,padding .35s,box-shadow .3s,opacity .7s cubic-bezier(.2,.9,.25,1),transform .7s cubic-bezier(.2,.9,.25,1)}
+.srow.in{opacity:1;transform:none}
+.srow::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ac);transform:scaleY(0);transform-origin:top;transition:transform .4s cubic-bezier(.2,.9,.25,1);box-shadow:0 0 18px var(--ac)}
+.srow::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;background:radial-gradient(440px circle at 6% 50%,var(--ac),transparent 55%)}
+.srow:hover{background:linear-gradient(90deg,rgba(255,255,255,.045),transparent 70%);padding-left:32px}
+.srow:hover::before{transform:scaleY(1)}
+.srow:hover::after{opacity:.07}
+.srow .num{font-family:var(--mono);font-size:15px;color:var(--ac);letter-spacing:.04em;padding-top:10px;display:flex;align-items:flex-start;gap:11px;position:relative;z-index:1}
+.srow .num .nd{width:8px;height:8px;border-radius:50%;background:var(--ac);box-shadow:0 0 12px var(--ac);margin-top:6px;flex:0 0 auto}
+.srow .sbody{position:relative;z-index:1}
+.srow h3{font-family:var(--display);font-size:clamp(22px,2.5vw,32px);font-weight:700;color:#fff;letter-spacing:-.015em;line-height:1.08;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.srow h3 .tl{font-family:var(--serif);font-style:italic;font-weight:400;font-size:.6em;color:var(--ac);letter-spacing:0;opacity:.96}
+.srow p{margin-top:11px;font-size:15px;line-height:1.72;color:var(--dim);max-width:780px}
+.srow.hide{display:none}
+.snull{display:none;text-align:center;color:var(--dim2);padding:44px 0;font-size:15px}
+@media (max-width:620px){.srow{grid-template-columns:1fr;gap:8px;padding:22px 16px}.srow .num{padding-top:0}}
 
 /* ===== demo form ===== */
 .nv-fov{position:fixed;inset:0;z-index:9600;display:none;align-items:center;justify-content:center;padding:24px}
@@ -398,6 +396,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 <canvas id="cnv"></canvas>
 <div class="mesh" id="mesh"><i class="m1"></i><i class="m2"></i><i class="m3"></i><i class="m4"></i></div>
 <div class="grid-bg"></div>
+<canvas id="scene"></canvas>
 <div class="spot"></div>
 <div class="grain"></div>
 <div class="vig"></div>
@@ -562,40 +561,29 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 
 {% elif page == 'signals' %}
   <div class="wrap sectionpad">
-    <div class="reveal in"><span class="pill-eye"><span class="dt"></span> What we capture</span>
-      <h1 class="h-hero">Every signal,<br>in <span class="ital grad">one feed.</span></h1>
-      <p class="lead">Across every agent and dashboard, the platform watches for dozens of buying signals — company moves, website intent, social engagement and competitor activity — and folds them all into one prioritized view.</p>
+    <div class="reveal in"><span class="pill-eye"><span class="dt"></span> What we track</span>
+      <h1 class="h-hero">The signals<br>that <span class="ital grad">move pipeline.</span></h1>
+      <p class="lead">A live catalog of every buying signal the platform watches for — from company moves and website intent to social engagement and competitor activity. Each one is a reason to reach out at exactly the right moment.</p>
     </div>
-    {% set ns = namespace(t=0) %}{% for g in signal_groups %}{% set ns.t = ns.t + g.signals|length %}{% endfor %}
     <div class="stats reveal" style="grid-template-columns:repeat(3,1fr);max-width:660px">
-      <div class="stat glass"><b data-count="{{ ns.t }}">0</b><span>Signals tracked</span></div>
-      <div class="stat glass"><b data-count="{{ signal_groups|length }}">0</b><span>Capture sources</span></div>
-      <div class="stat glass"><b>24/7</b><span>Always-on</span></div>
+      <div class="stat glass"><b data-count="{{ signals_list|length }}">0</b><span>Signals tracked</span></div>
+      <div class="stat glass"><b>24/7</b><span>Detected in real time</span></div>
+      <div class="stat glass"><b>1</b><span>Unified intent score</span></div>
     </div>
-    <div class="chips" id="sgChips" style="margin-top:30px">
-      <button class="chip on" data-key="all" data-cursor>All signals</button>
-      {% for g in signal_groups %}<button class="chip" data-key="{{ g.key }}" data-cursor>{{ g.source }}</button>{% endfor %}
-    </div>
-    <div id="sgWrap">
-    {% for g in signal_groups %}
-      <section class="sg-group reveal" data-key="{{ g.key }}" style="--ac:{{ g.accent }}">
-        <div class="sg-head">
-          <span class="sg-ic">{{ g.icon|safe }}</span>
-          <span class="sg-title">{{ g.source }}</span>
-          <span class="sg-count">{{ g.signals|length }} signals</span>
-          <span class="sg-line"></span>
+    <div class="search reveal" style="max-width:360px;margin-top:30px"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="sigSearch" type="text" placeholder="Search signals…" aria-label="Search signals" data-cursor></div>
+    <div class="slist" id="sigList">
+      {% for s in signals_list %}
+      <div class="srow reveal" data-name="{{ s.name|lower }} {{ s.tagline|lower }} {{ s.blurb|lower }}" style="--ac:{{ s.accent }};transition-delay:{{ (loop.index0 % 6) * 40 }}ms">
+        <div class="num"><span class="nd"></span>{{ '%02d'|format(loop.index) }}</div>
+        <div class="sbody">
+          <h3>{{ s.name }}<span class="tl">{{ s.tagline }}</span></h3>
+          <p>{{ s.blurb }}</p>
         </div>
-        <p class="sg-tag">{{ g.tagline }}</p>
-        <div class="sgrid">
-          {% for s in g.signals %}
-          <div class="scard tilt" style="transition-delay:{{ loop.index0 * 40 }}ms"><h5><span class="sdot"></span>{{ s.name }}</h5><p>{{ s.desc }}</p></div>
-          {% endfor %}
-        </div>
-      </section>
-    {% endfor %}
+      </div>
+      {% endfor %}
     </div>
-    <div class="note reveal" style="margin-top:36px">Every signal feeds a single intent score — <code>type_weight × severity × recency</code>, with a bonus when several signals stack on one account — so the most urgent opportunities rise to the top automatically.</div>
-    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these sources to your target list and surface who’s moving — all in one view.</p><button class="btn-grad mag" data-demo data-cursor>Book a demo</button></div>
+    <div class="snull" id="sigNull">No signals match that search.</div>
+    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these into your target list and surface who’s moving — all in one prioritized view.</p><button class="btn-grad mag" data-demo data-cursor>Book a demo</button></div>
   </div>
 
 {% elif page == 'solutions' %}
@@ -657,6 +645,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -718,9 +707,8 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     });
   }
 
-  // particle constellation
-  var cv=document.getElementById('cnv');
-  if(cv && !RM){
+  // ===== background: Three.js particle nebula (matches login) + 2D fallback =====
+  function run2D(cv){
     var ctx=cv.getContext('2d'), w,h,pts=[],DPR=Math.min(2,window.devicePixelRatio||1),mo={x:-9999,y:-9999};
     function resize(){ w=cv.width=Math.floor(innerWidth*DPR); h=cv.height=Math.floor(innerHeight*DPR); cv.style.width=innerWidth+'px'; cv.style.height=innerHeight+'px'; }
     resize(); addEventListener('resize',resize);
@@ -738,17 +726,69 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       requestAnimationFrame(frame); }
     frame();
   }
-
-  // signals source filter
-  var sgWrap=document.getElementById('sgWrap');
-  if(sgWrap){
-    var sgChips=document.getElementById('sgChips');
-    sgChips.querySelectorAll('.chip').forEach(function(ch){ ch.addEventListener('click',function(){
-      sgChips.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('on'); }); ch.classList.add('on');
-      var k=ch.getAttribute('data-key');
-      sgWrap.querySelectorAll('.sg-group').forEach(function(g){ g.style.display=(k==='all'||g.getAttribute('data-key')===k)?'':'none'; });
-    }); });
+  function initNebula(canvas){
+    var renderer; try{ renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,alpha:true}); }catch(e){ return false; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+    var scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); camera.position.set(0,0,13.5);
+    var group=new THREE.Group(); scene.add(group); var clock=new THREE.Clock();
+    var MOB=window.matchMedia&&window.matchMedia('(max-width:760px)').matches;
+    var N=MOB?1100:2400, BASE=MOB?0.7:0.56;
+    var R=new Float32Array(N*5); for(var q=0;q<N*5;q++) R[q]=Math.random();
+    var bp=new Float32Array(N*3), cur=new Float32Array(N*3), colors=new Float32Array(N*3), sizes=new Float32Array(N);
+    var cA=new THREE.Color(0x22d3ee), cB=new THREE.Color(0x8b5cf6), cC=new THREE.Color(0xa5b4fc), tmp=new THREE.Color();
+    for(var i=0;i<N;i++){ var a=R[i*5],b=R[i*5+1],c=R[i*5+2];
+      var th=a*6.2832, ph=Math.acos(2*b-1), rr=7.5+c*3.2;
+      var x=rr*Math.sin(ph)*Math.cos(th), y=rr*Math.sin(ph)*Math.sin(th)*0.8, z=rr*Math.cos(ph);
+      bp[i*3]=x; bp[i*3+1]=y; bp[i*3+2]=z; cur[i*3]=x; cur[i*3+1]=y; cur[i*3+2]=z;
+      var mvv=Math.random(); tmp.copy(mvv<0.5?cA:cB).lerp(cC,Math.random()*0.5); colors[i*3]=tmp.r; colors[i*3+1]=tmp.g; colors[i*3+2]=tmp.b;
+      sizes[i]=(Math.random()*Math.random())*1.05+0.55; }
+    var geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(cur,3));
+    geo.setAttribute('aColor',new THREE.BufferAttribute(colors,3));
+    geo.setAttribute('aSize',new THREE.BufferAttribute(sizes,1));
+    var uniforms={uSize:{value:BASE},uPulse:{value:0},uTime:{value:0}};
+    var mat=new THREE.ShaderMaterial({uniforms:uniforms,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      vertexShader:['attribute vec3 aColor; attribute float aSize;','uniform float uSize; uniform float uPulse; uniform float uTime;','varying vec3 vColor; varying float vTw;','void main(){','vColor=aColor;','vTw=0.6+0.4*sin(uTime*1.4+aSize*9.0);','vec4 mv=modelViewMatrix*vec4(position,1.0);','float sz=aSize*uSize*(1.0+uPulse*0.9);','gl_PointSize=sz*(300.0/-mv.z);','gl_Position=projectionMatrix*mv;','}'].join('\n'),
+      fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float core=smoothstep(0.40,0.35,dd);','float glow=smoothstep(0.43,0.0,dd);','float aa=pow(core,1.4)+pow(glow,5.5)*0.06;','vec3 col=vColor*(0.6+0.85*uPulse)*vTw;','gl_FragColor=vec4(col,aa);','}'].join('\n') });
+    var points=new THREE.Points(geo,mat); group.add(points);
+    var lines=null,linePos=null,edges=[];
+    if(!MOB){ var CONN=420,K=3,aa,bb,kk;
+      for(aa=0;aa<CONN;aa++){ var ai=(aa*5+1)%N, best=[];
+        for(bb=0;bb<N;bb+=6){ if(bb===ai) continue; var dx=bp[ai*3]-bp[bb*3],dy=bp[ai*3+1]-bp[bb*3+1],dz=bp[ai*3+2]-bp[bb*3+2]; best.push([dx*dx+dy*dy+dz*dz,bb]); }
+        best.sort(function(p,q){return p[0]-q[0];}); for(kk=0;kk<K;kk++) edges.push([ai,best[kk][1]]); }
+      linePos=new Float32Array(edges.length*6); var lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.BufferAttribute(linePos,3));
+      var lm=new THREE.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.06,blending:THREE.AdditiveBlending,depthWrite:false}); lines=new THREE.LineSegments(lg,lm); group.add(lines); }
+    var ptr={x:0,y:0,tx:0,ty:0};
+    if(FINE) window.addEventListener('mousemove',function(e){ ptr.tx=(e.clientX/innerWidth-0.5)*2; ptr.ty=(e.clientY/innerHeight-0.5)*2; },{passive:true});
+    window.addEventListener('resize',function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+    function frame(){ var time=clock.getElapsedTime(); uniforms.uTime.value=time; uniforms.uPulse.value=0.15+0.1*Math.sin(time*0.55);
+      var dk=0.4,i; for(i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
+        cur[i*3]=bp[i*3]+Math.sin(ph)*dk; cur[i*3+1]=bp[i*3+1]+Math.cos(ph*0.9)*dk; cur[i*3+2]=bp[i*3+2]+Math.sin(ph*0.7)*dk; }
+      geo.attributes.position.needsUpdate=true;
+      if(lines){ for(i=0;i<edges.length;i++){ var i0=edges[i][0],i1=edges[i][1],o=i*6;
+        linePos[o]=cur[i0*3];linePos[o+1]=cur[i0*3+1];linePos[o+2]=cur[i0*3+2];linePos[o+3]=cur[i1*3];linePos[o+4]=cur[i1*3+1];linePos[o+5]=cur[i1*3+2]; }
+        lines.geometry.attributes.position.needsUpdate=true; lines.material.opacity=0.05+0.16*uniforms.uPulse.value; }
+      ptr.x+=(ptr.tx-ptr.x)*0.04; ptr.y+=(ptr.ty-ptr.y)*0.04;
+      group.rotation.y=time*0.022+ptr.x*0.35; group.rotation.x=ptr.y*0.2;
+      camera.position.x+=(ptr.tx*1.2-camera.position.x)*0.035; camera.position.y+=(-ptr.ty*0.8-camera.position.y)*0.035; camera.lookAt(0,0,0);
+      renderer.render(scene,camera); requestAnimationFrame(frame); }
+    frame(); return true;
   }
+  var _scene=document.getElementById('scene'), _cnv=document.getElementById('cnv');
+  var _glok=false;
+  if(!RM && window.THREE && _scene){ try{ _glok=initNebula(_scene); }catch(e){ _glok=false; } }
+  if(_glok){ if(_cnv) _cnv.style.display='none'; }
+  else { if(_scene) _scene.style.display='none'; if(_cnv){ _cnv.style.display='block'; if(!RM) run2D(_cnv); } }
+
+  // signals search
+  var sigList=document.getElementById('sigList');
+  if(sigList){
+    var sigSearch=document.getElementById('sigSearch'), sigNull=document.getElementById('sigNull');
+    sigSearch.addEventListener('input',function(){ var q=(sigSearch.value||'').toLowerCase().trim(), shown=0;
+      sigList.querySelectorAll('.srow').forEach(function(r){ var ok=!q||(r.getAttribute('data-name')||'').indexOf(q)>=0; r.classList.toggle('hide',!ok); if(ok) shown++; });
+      sigNull.style.display=shown?'none':'block'; });
+  }
+
 
   // ===== demo form =====
   var fov=document.getElementById('nvfov'), interest='Book a demo';
