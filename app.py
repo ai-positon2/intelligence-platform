@@ -184,6 +184,107 @@ def _log_login_to_sheet(user: dict) -> None:
         log.warning("Login sheet log failed: %s", e)
 
 
+# ── Demo / custom-agent request intake (login-page form) ─────────────────────────
+DEMO_REQUEST_SHEET_ID = os.environ.get("DEMO_REQUEST_SHEET_ID", "") or LOGIN_LOG_SHEET_ID
+SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _demo_request_to_sheet(row: list) -> bool:
+    """Append one demo-request row to a 'Demo Requests' tab. Returns True on success."""
+    if not DEMO_REQUEST_SHEET_ID:
+        return False
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        import json as _json
+        sa_json_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if sa_json_str:
+            creds = service_account.Credentials.from_service_account_info(
+                _json.loads(sa_json_str),
+                scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        elif Path(_SA_JSON).exists():
+            creds = service_account.Credentials.from_service_account_file(
+                _SA_JSON, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        else:
+            log.warning("Demo request: no Google credentials (set GOOGLE_SA_JSON)")
+            return False
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        tab = "Demo Requests"
+        # Make sure the tab exists (values.append errors on an unknown range).
+        try:
+            meta = svc.spreadsheets().get(spreadsheetId=DEMO_REQUEST_SHEET_ID).execute()
+            titles = [s["properties"]["title"] for s in meta.get("sheets", [])]
+            if tab not in titles:
+                svc.spreadsheets().batchUpdate(
+                    spreadsheetId=DEMO_REQUEST_SHEET_ID,
+                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]},
+                ).execute()
+        except Exception as e:
+            log.warning("Demo request: could not ensure tab: %s", e)
+        # Header row on first write.
+        got = svc.spreadsheets().values().get(
+            spreadsheetId=DEMO_REQUEST_SHEET_ID, range=f"{tab}!A1:A1").execute()
+        if not got.get("values"):
+            header = [["Timestamp (IST)", "Name", "Work Email", "Company",
+                       "Interest", "Message", "IP Address", "User Agent", "Source"]]
+            svc.spreadsheets().values().append(
+                spreadsheetId=DEMO_REQUEST_SHEET_ID, range=f"{tab}!A1",
+                valueInputOption="RAW", body={"values": header}).execute()
+        svc.spreadsheets().values().append(
+            spreadsheetId=DEMO_REQUEST_SHEET_ID, range=f"{tab}!A1",
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS",
+            body={"values": [row]}).execute()
+        return True
+    except Exception as e:
+        log.warning("Demo request sheet append failed: %s", e)
+        return False
+
+
+def _demo_request_to_slack(d: dict) -> bool:
+    """Post a demo request to Slack via incoming webhook. Returns True on success."""
+    if not SLACK_WEBHOOK_URL or SLACK_WEBHOOK_URL == "YOUR_SLACK_WEBHOOK_URL":
+        return False
+    try:
+        text = (":sparkles: *New demo / custom-agent request*\n"
+                f"*Name:* {d.get('name','')}\n"
+                f"*Work email:* {d.get('email','')}\n"
+                f"*Company:* {d.get('company') or '—'}\n"
+                f"*Interest:* {d.get('interest') or '—'}\n"
+                f"*Message:* {d.get('message') or '—'}")
+        requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=8)
+        return True
+    except Exception as e:
+        log.warning("Demo request Slack post failed: %s", e)
+        return False
+
+
+@app.route("/api/demo-request", methods=["POST"])
+def api_demo_request():
+    """Public intake for the login-page 'Book a demo / build a custom agent' form."""
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    name     = (data.get("name") or "").strip()[:120]
+    email    = (data.get("email") or "").strip()[:160]
+    company  = (data.get("company") or "").strip()[:160]
+    interest = (data.get("interest") or "").strip()[:80]
+    message  = (data.get("message") or "").strip()[:2000]
+    if not name or not _EMAIL_RE.match(email):
+        return jsonify({"ok": False,
+                        "error": "Please enter your name and a valid work email."}), 400
+    ip = (request.headers.get("X-Forwarded-For", "") or
+          request.headers.get("X-Real-IP", "") or
+          request.remote_addr or "").split(",")[0].strip()
+    ua = request.headers.get("User-Agent", "")[:200]
+    now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
+    row = [now, name, email, company, interest, message, ip, ua, "login page"]
+    payload = {"name": name, "email": email, "company": company,
+               "interest": interest, "message": message}
+    sheet_ok = _demo_request_to_sheet(row)
+    slack_ok = _demo_request_to_slack(payload)
+    log.info("Demo request: %s <%s> [%s] (sheet=%s slack=%s)",
+             name, email, interest, sheet_ok, slack_ok)
+    return jsonify({"ok": True, "delivered": bool(sheet_ok or slack_ok)})
+
 # ── Account registry ────────────────────────────────────────────────────────────
 ACCOUNTS = {
     "healthcare": {
