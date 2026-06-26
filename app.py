@@ -554,7 +554,8 @@ def terms_page():
 def login_page():
     if _get_user():
         return redirect(url_for("hub"))
-    return render_template("login.html", google_client_id=GOOGLE_CLIENT_ID,
+    return render_template("agents.html", page="login", agents=AGENTS, agent=None,
+                           related=[], google_client_id=GOOGLE_CLIENT_ID,
                            error=request.args.get("error", ""))
 
 @app.route("/login-preview")
