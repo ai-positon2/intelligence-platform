@@ -334,6 +334,136 @@ AGENTS = [
 ]
 AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
 
+# ── Live signal demo (public homepage "type your company" lookup) ────────────────
+_SIG_RULES = [
+    ("Funding Round", "#a78bfa", ["raise", "raised", "raises", "funding", "series a", "series b",
+        "series c", "seed round", "venture", "investment round", "valuation", "round of", "secures $"]),
+    ("Leadership Move", "#38bdf8", ["appoint", "named ", "names ", "hires", "joins as", "new ceo",
+        "new cmo", "new cfo", "new cro", "chief executive", "chief marketing", "promot",
+        "steps down", "departs", "resign", "new president", "new head of"]),
+    ("Acquisition / M&A", "#f472b6", ["acqui", "merger", "merges", "buyout", "takeover", "to buy ",
+        "acquires", "acquired by", "to acquire"]),
+    ("IPO Signal", "#c4b5fd", ["ipo", "public offering", "goes public", "files to go public",
+        "s-1 filing", "direct listing", "nasdaq debut"]),
+    ("Product Launch", "#22d3ee", ["launch", "launches", "unveils", "introduces", "releases ",
+        "rolls out", "new product", "debuts", "announces new"]),
+    ("Partnership", "#34d399", ["partner", "partnership", "integration", "alliance", "teams up",
+        "collaborat", "joins forces"]),
+    ("Expansion", "#fbbf24", ["expand", "opens office", "new office", "enters the", "expansion",
+        "is hiring", "opens its"]),
+]
+
+
+def _classify_signal(text: str):
+    t = (text or "").lower()
+    for label, acc, kws in _SIG_RULES:
+        for kw in kws:
+            if kw in t:
+                return label, acc
+    return "News Mention", "#7c89b0"
+
+
+def _live_score(signals: list) -> float:
+    if not signals:
+        return 0.0
+    base = 5.2 + min(len(signals), 5) * 0.45
+    hv = {"Funding Round", "Acquisition / M&A", "IPO Signal", "Leadership Move"}
+    base += min(sum(0.5 for s in signals if s["type"] in hv), 1.8)
+    return round(min(9.8, base), 1)
+
+
+def _vimi_line(company: str, signals: list) -> str:
+    if not signals:
+        return ""
+    tmap = {"Funding Round": "just raised fresh capital", "Leadership Move": "just changed up its leadership",
+            "Acquisition / M&A": "is in the middle of an M&A move", "IPO Signal": "is signaling an IPO",
+            "Product Launch": "just launched something new", "Partnership": "announced a new partnership",
+            "Expansion": "is expanding", "News Mention": "is back in the news"}
+    top = signals[0]
+    return (f"{company} {tmap.get(top['type'], 'is showing activity')} — a strong moment to reach "
+            f"their decision-makers. Want me to draft the intro?")
+
+
+def _fmt_when(iso: str) -> str:
+    if not iso:
+        return ""
+    try:
+        s = str(iso)[:19].replace("Z", "")
+        dt = datetime.fromisoformat(s if "T" in s else s + "T00:00:00")
+        days = (datetime.utcnow() - dt.replace(tzinfo=None)).days
+        if days <= 0:
+            return "today"
+        if days == 1:
+            return "yesterday"
+        if days < 30:
+            return f"{days}d ago"
+        return dt.strftime("%b %d")
+    except Exception:
+        return str(iso)[:10]
+
+
+_LIVE_CACHE: dict = {}
+_LIVE_TTL = 1800
+_LIVE_HITS: dict = {}
+
+
+def _live_rate_ok(ip: str) -> bool:
+    now = time.time()
+    arr = [t for t in _LIVE_HITS.get(ip, []) if now - t < 60]
+    if len(arr) >= 20:
+        _LIVE_HITS[ip] = arr
+        return False
+    arr.append(now)
+    _LIVE_HITS[ip] = arr
+    return True
+
+
+def _live_company_signals(query: str) -> list:
+    """Pull recent real signals for a company via the platform's news engine (GDELT)."""
+    out = []
+    try:
+        from tracker.news_client import get_news_articles
+        arts = get_news_articles(query, max_articles=6, max_age_days=180, _use_cache=False) or []
+        for a in arts[:6]:
+            title = (a.get("title") or "").strip()
+            if not title:
+                continue
+            label, acc = _classify_signal(title + " " + (a.get("summary") or ""))
+            out.append({"type": label, "accent": acc, "headline": title[:150],
+                        "source": (a.get("source") or "")[:60], "date": _fmt_when(a.get("published")),
+                        "url": a.get("url") or ""})
+    except Exception as e:
+        log.warning("live-signals fetch failed for %s: %s", query, e)
+    return out
+
+
+@app.route("/api/live-signals")
+def api_live_signals():
+    """Public demo: surface live signals for a typed company. Cached + rate-limited."""
+    company = (request.args.get("company") or "").strip()[:80]
+    company = re.sub(r"[^A-Za-z0-9 .,&'\-]", "", company).strip()
+    if len(company) < 2:
+        return jsonify({"ok": False, "error": "Enter a company name or domain."}), 400
+    ip = (request.headers.get("X-Forwarded-For", "") or request.remote_addr or "").split(",")[0].strip()
+    if not _live_rate_ok(ip):
+        return jsonify({"ok": False, "error": "A few too many lookups — give it a moment."}), 429
+    key = company.lower()
+    cached = _LIVE_CACHE.get(key)
+    if cached and (time.time() - cached[0]) < _LIVE_TTL:
+        return jsonify(cached[1])
+    # derive a clean query from a domain (acme.com / www.acme.io -> acme)
+    q = company
+    if "." in q and " " not in q:
+        q = q.split("//")[-1].split("/")[0]
+        parts = [p for p in q.split(".") if p and p != "www"]
+        q = parts[0] if parts else company
+    signals = _live_company_signals(q)
+    resp = {"ok": True, "company": company, "query": q, "count": len(signals),
+            "score": _live_score(signals), "signals": signals, "vimi": _vimi_line(company, signals)}
+    _LIVE_CACHE[key] = (time.time(), resp)
+    return jsonify(resp)
+
+
 # ── Signal catalog (flat list of everything we track) ────────────────────────────
 _SIG_PAL = ["#a78bfa", "#22d3ee", "#818cf8", "#f472b6", "#34d399", "#fbbf24", "#38bdf8"]
 _SIGNALS_RAW = [
