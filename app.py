@@ -934,6 +934,33 @@ def _fetch_usage_data() -> dict:
                 views_per_user=views_per_user)
 
 
+
+def _read_access_requests(limit=300):
+    """Read submitted access requests from the 'Demo Requests' sheet tab (newest first)."""
+    try:
+        import json as _j
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if not sa_str or not DEMO_REQUEST_SHEET_ID:
+            return []
+        creds = service_account.Credentials.from_service_account_info(
+            _j.loads(sa_str), scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        r = svc.spreadsheets().values().get(
+            spreadsheetId=DEMO_REQUEST_SHEET_ID, range="Demo Requests!A1:I2000").execute()
+        rows = r.get("values", [])
+        data = rows[1:] if len(rows) > 1 else []
+        def c(row, i): return (row[i] if len(row) > i else "")
+        out = [{"ts": c(x,0), "name": c(x,1), "email": c(x,2), "company": c(x,3),
+                "interest": c(x,4), "message": c(x,5), "ip": c(x,6), "source": c(x,8)} for x in data]
+        out.reverse()
+        return out[:limit]
+    except Exception as e:
+        log.warning("access requests read failed: %s", e)
+        return []
+
+
 @app.route("/admin/usage")
 @admin_required
 def admin_usage():
@@ -947,6 +974,15 @@ def admin_usage_data():
     """JSON data endpoint called by the admin usage shell page."""
     data = _fetch_usage_data()
     return jsonify(data)
+
+@app.route("/admin/requests")
+@admin_required
+def admin_requests():
+    """Admin view of everyone who submitted the Request Access form."""
+    reqs = _read_access_requests()
+    return render_template("admin_requests.html", user=_get_user(),
+                           requests=reqs, count=len(reqs))
+
 
 
 def _clean_industry(raw: str) -> str:
