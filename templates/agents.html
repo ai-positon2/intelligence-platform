@@ -1214,7 +1214,7 @@ a.lrow[href]:hover{background:rgba(255,255,255,.06);transform:translateX(3px)}
     function esc(x){ var d=document.createElement('div'); d.textContent=(x==null?'':x); return d.innerHTML; }
     function skeleton(){ rows.innerHTML=''; for(var i=0;i<4;i++){ var d=document.createElement('div'); d.className='lskel'; d.style.opacity=(1-i*0.18).toFixed(2); rows.appendChild(d); } }
     function render(d){
-      var subject = d.example ? d.example_for : d.company;
+      var subject = d.company;
       title.textContent = subject + ' · live signals';
       if(scoreEl){ if(d.score){ scoreEl.style.display=''; scoreEl.textContent='intent '+d.score; } else { scoreEl.style.display='none'; } }
       countEl.textContent=(d.count||0)+' signal'+(d.count===1?'':'s');
@@ -1222,15 +1222,10 @@ a.lrow[href]:hover{background:rgba(255,255,255,.06);transform:translateX(3px)}
       if(!d.signals || !d.signals.length){
         if(vimi) vimi.style.display='none';
         var n=document.createElement('div'); n.className='live-note';
-        n.innerHTML='No fresh public signals for <b style="color:#cbd5e1">'+esc(d.company)+'</b> right now.<br>Try a company in the news lately — or a suggestion above.';
+        n.innerHTML='No recent public signals found for <b style="color:#cbd5e1">'+esc(d.company)+'</b>.<br>Try a company that has been in the news lately — or a suggestion above.';
         rows.appendChild(n);
         if(cap) cap.textContent='Try another company above';
         return;
-      }
-      if(d.example){
-        var note=document.createElement('div'); note.className='live-exnote';
-        note.innerHTML='<span class="ex-pill">Live example</span><span>No fresh public news for <b>'+esc(d.company)+'</b> yet — here is a real, live report for <b>'+esc(d.example_for)+'</b>.</span>';
-        rows.appendChild(note);
       }
       if(vimi) vimi.style.display='';
       d.signals.forEach(function(s,i){
