@@ -27,7 +27,7 @@ a{color:inherit;text-decoration:none}
 
 /* ===== background ===== */
 #cnv{position:fixed;inset:0;z-index:0;pointer-events:none;display:none}
-#scene{position:fixed;inset:0;z-index:0;pointer-events:none;display:block}
+#scene{position:fixed;inset:0;z-index:0;pointer-events:none;display:block;opacity:.5}
 .mesh{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;will-change:transform}
 .mesh i{position:absolute;border-radius:50%;filter:blur(110px);opacity:.2;mix-blend-mode:screen;animation:drift 26s ease-in-out infinite}
 .mesh .m1{width:640px;height:640px;background:radial-gradient(circle,#4f46e5,transparent 67%);top:-170px;left:-120px}
@@ -38,11 +38,12 @@ a{color:inherit;text-decoration:none}
 .grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55;
   background-image:linear-gradient(rgba(124,140,220,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(124,140,220,.05) 1px,transparent 1px);
   background-size:60px 60px;mask-image:radial-gradient(125% 80% at 50% 0%,#000,transparent 72%);-webkit-mask-image:radial-gradient(125% 80% at 50% 0%,#000,transparent 72%)}
-.spot{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(620px circle at var(--mx,50%) var(--my,-10%),rgba(99,102,241,.11),transparent 45%)}
+.spot{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(620px circle at var(--mx,50%) var(--my,-10%),rgba(99,102,241,.08),transparent 45%)}
 .grain{position:fixed;inset:-50%;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 1.4s steps(3) infinite}
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-2%)}100%{transform:translate(0,0)}}
-.vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(135% 100% at 50% 32%,transparent 56%,rgba(2,3,9,.55) 88%,rgba(2,3,9,.94) 100%)}
+.vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 100% at 50% 30%,transparent 42%,rgba(2,3,9,.6) 84%,rgba(2,3,9,.96) 100%)}
+.scrim{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(120% 110% at 50% 42%,rgba(4,5,16,.5),rgba(4,5,16,.4) 58%,rgba(4,5,16,.72))}
 .wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:0 26px}
 
 /* custom cursor */
@@ -105,6 +106,7 @@ main{position:relative;z-index:3;padding-top:68px}
 .grad{background:linear-gradient(100deg,#67e8f9,#a5b4fc 28%,#c4b5fd 52%,#f0abfc 78%,#67e8f9);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 9s linear infinite}
 @keyframes shimmer{to{background-position:220% 0}}
 .lead{font-size:clamp(16px,1.7vw,19px);line-height:1.7;color:var(--dim);max-width:600px}
+.h-hero,.h-sec,.lead,.pill-eye,.srow h3,.srow p,.stat b,.stat span,.band h3,.band p,.fcard h4,.fcard p,.acard h3,.acard p,.shead h2,.note,.crumb,.detail-head h1,.panel .summary,.trip h4,.trip p{text-shadow:0 2px 16px rgba(2,4,12,.72)}
 .reveal{opacity:0;transform:translateY(30px);transition:opacity .85s cubic-bezier(.2,.9,.25,1),transform .85s cubic-bezier(.2,.9,.25,1)}
 .reveal.in{opacity:1;transform:none}
 .ic{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;position:relative;flex:0 0 auto;
@@ -400,6 +402,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 <div class="spot"></div>
 <div class="grain"></div>
 <div class="vig"></div>
+<div class="scrim"></div>
 <div id="cring"></div><div id="cdot"></div>
 
 <nav id="nv" aria-label="Primary navigation">
@@ -732,7 +735,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     var scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,200); camera.position.set(0,0,13.5);
     var group=new THREE.Group(); scene.add(group); var clock=new THREE.Clock();
     var MOB=window.matchMedia&&window.matchMedia('(max-width:760px)').matches;
-    var N=MOB?1100:2400, BASE=MOB?0.7:0.56;
+    var N=MOB?900:1700, BASE=MOB?0.62:0.48;
     var R=new Float32Array(N*5); for(var q=0;q<N*5;q++) R[q]=Math.random();
     var bp=new Float32Array(N*3), cur=new Float32Array(N*3), colors=new Float32Array(N*3), sizes=new Float32Array(N);
     var cA=new THREE.Color(0x22d3ee), cB=new THREE.Color(0x8b5cf6), cC=new THREE.Color(0xa5b4fc), tmp=new THREE.Color();
@@ -749,7 +752,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     var uniforms={uSize:{value:BASE},uPulse:{value:0},uTime:{value:0}};
     var mat=new THREE.ShaderMaterial({uniforms:uniforms,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
       vertexShader:['attribute vec3 aColor; attribute float aSize;','uniform float uSize; uniform float uPulse; uniform float uTime;','varying vec3 vColor; varying float vTw;','void main(){','vColor=aColor;','vTw=0.6+0.4*sin(uTime*1.4+aSize*9.0);','vec4 mv=modelViewMatrix*vec4(position,1.0);','float sz=aSize*uSize*(1.0+uPulse*0.9);','gl_PointSize=sz*(300.0/-mv.z);','gl_Position=projectionMatrix*mv;','}'].join('\n'),
-      fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float core=smoothstep(0.40,0.35,dd);','float glow=smoothstep(0.43,0.0,dd);','float aa=pow(core,1.4)+pow(glow,5.5)*0.06;','vec3 col=vColor*(0.6+0.85*uPulse)*vTw;','gl_FragColor=vec4(col,aa);','}'].join('\n') });
+      fragmentShader:['varying vec3 vColor; varying float vTw; uniform float uPulse;','void main(){','float dd=length(gl_PointCoord-0.5);','float core=smoothstep(0.40,0.35,dd);','float glow=smoothstep(0.43,0.0,dd);','float aa=pow(core,1.4)+pow(glow,5.5)*0.06;','vec3 col=vColor*(0.42+0.5*uPulse)*vTw;','gl_FragColor=vec4(col,aa);','}'].join('\n') });
     var points=new THREE.Points(geo,mat); group.add(points);
     var lines=null,linePos=null,edges=[];
     if(!MOB){ var CONN=420,K=3,aa,bb,kk;
@@ -757,17 +760,17 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
         for(bb=0;bb<N;bb+=6){ if(bb===ai) continue; var dx=bp[ai*3]-bp[bb*3],dy=bp[ai*3+1]-bp[bb*3+1],dz=bp[ai*3+2]-bp[bb*3+2]; best.push([dx*dx+dy*dy+dz*dz,bb]); }
         best.sort(function(p,q){return p[0]-q[0];}); for(kk=0;kk<K;kk++) edges.push([ai,best[kk][1]]); }
       linePos=new Float32Array(edges.length*6); var lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.BufferAttribute(linePos,3));
-      var lm=new THREE.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.06,blending:THREE.AdditiveBlending,depthWrite:false}); lines=new THREE.LineSegments(lg,lm); group.add(lines); }
+      var lm=new THREE.LineBasicMaterial({color:0x3bc9e6,transparent:true,opacity:0.05,blending:THREE.AdditiveBlending,depthWrite:false}); lines=new THREE.LineSegments(lg,lm); group.add(lines); }
     var ptr={x:0,y:0,tx:0,ty:0};
     if(FINE) window.addEventListener('mousemove',function(e){ ptr.tx=(e.clientX/innerWidth-0.5)*2; ptr.ty=(e.clientY/innerHeight-0.5)*2; },{passive:true});
     window.addEventListener('resize',function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
-    function frame(){ var time=clock.getElapsedTime(); uniforms.uTime.value=time; uniforms.uPulse.value=0.15+0.1*Math.sin(time*0.55);
+    function frame(){ var time=clock.getElapsedTime(); uniforms.uTime.value=time; uniforms.uPulse.value=0.12+0.06*Math.sin(time*0.55);
       var dk=0.4,i; for(i=0;i<N;i++){ var ph=R[i*5+4]*6.2832+time*(0.25+R[i*5]*0.45);
         cur[i*3]=bp[i*3]+Math.sin(ph)*dk; cur[i*3+1]=bp[i*3+1]+Math.cos(ph*0.9)*dk; cur[i*3+2]=bp[i*3+2]+Math.sin(ph*0.7)*dk; }
       geo.attributes.position.needsUpdate=true;
       if(lines){ for(i=0;i<edges.length;i++){ var i0=edges[i][0],i1=edges[i][1],o=i*6;
         linePos[o]=cur[i0*3];linePos[o+1]=cur[i0*3+1];linePos[o+2]=cur[i0*3+2];linePos[o+3]=cur[i1*3];linePos[o+4]=cur[i1*3+1];linePos[o+5]=cur[i1*3+2]; }
-        lines.geometry.attributes.position.needsUpdate=true; lines.material.opacity=0.05+0.16*uniforms.uPulse.value; }
+        lines.geometry.attributes.position.needsUpdate=true; lines.material.opacity=0.04+0.1*uniforms.uPulse.value; }
       ptr.x+=(ptr.tx-ptr.x)*0.04; ptr.y+=(ptr.ty-ptr.y)*0.04;
       group.rotation.y=time*0.022+ptr.x*0.35; group.rotation.x=ptr.y*0.2;
       camera.position.x+=(ptr.tx*1.2-camera.position.x)*0.035; camera.position.y+=(-ptr.ty*0.8-camera.position.y)*0.035; camera.lookAt(0,0,0);
