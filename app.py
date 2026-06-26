@@ -418,7 +418,10 @@ def _live_rate_ok(ip: str) -> bool:
     return True
 
 
-_LIVE_FALLBACKS = ["Stripe", "Databricks", "Notion", "Snowflake", "OpenAI", "Salesforce", "Figma"]
+_SIG_ACCENT = {"Funding Round": "#a78bfa", "Leadership Move": "#38bdf8",
+               "Acquisition / M&A": "#f472b6", "IPO Signal": "#c4b5fd",
+               "Product Launch": "#22d3ee", "Partnership": "#34d399",
+               "Expansion": "#fbbf24", "News Mention": "#7c89b0"}
 
 
 def _signals_from_articles(arts: list) -> list:
@@ -441,7 +444,6 @@ def _signals_from_articles(arts: list) -> list:
 
 
 def _fetch_company_articles(query: str) -> list:
-    """Maximise real hits: raw GDELT (broad, unfiltered) first, then the filtered path."""
     try:
         from tracker import news_client as nc
     except Exception as e:
@@ -460,12 +462,77 @@ def _fetch_company_articles(query: str) -> list:
     return arts
 
 
+def _live_signals_via_ai(company: str):
+    """Research the EXACT company with an LLM + live web search. Grounded, relevant,
+    sourced signals — or [] if nothing real is found. None on hard failure."""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key, timeout=45.0, max_retries=1)
+    except Exception as e:
+        log.warning("live ai init failed: %s", e)
+        return None
+    allowed = ("Funding Round, Leadership Move, Acquisition / M&A, IPO Signal, "
+               "Product Launch, Partnership, Expansion, News Mention")
+    prompt = (
+        "You are a B2B buying-signal researcher. Using web search, find up to 6 REAL, recent "
+        "(prefer the last 12 months) notable developments about the specific company \"" + company + "\". "
+        "Examples of signals: funding rounds, leadership changes, M&A, IPO moves, product launches, "
+        "partnerships, expansion/hiring, or notable press. ONLY include items you can verify from a real "
+        "web source with a working URL. Each item must have: type (exactly one of: " + allowed + "), "
+        "headline (a short, factual description of the actual event), date (e.g. '2025-03' or 'Mar 2025'), "
+        "url (the source link), source (the publication). If you cannot find genuine recent information "
+        "about THIS exact company, return an empty list. Never invent events, dates, or sources. "
+        "Respond with ONLY minified JSON of the form "
+        "{\"signals\":[{\"type\":\"\",\"headline\":\"\",\"date\":\"\",\"url\":\"\",\"source\":\"\"}]}."
+    )
+    msgs = [{"role": "user", "content": prompt}]
+    txt = None
+    for m in _vimi_model_chain():
+        try:
+            t, ok = _responses_web_search(oai, m, msgs, 1000)
+            if ok and t:
+                txt = t
+                break
+        except Exception as e:
+            log.warning("live ai model %s failed: %s", m, e)
+    if not txt:
+        return None
+    import json as _j
+    raw = txt.strip()
+    mobj = re.search(r"\{.*\}", raw, re.S)
+    if mobj:
+        raw = mobj.group(0)
+    try:
+        data = _j.loads(raw)
+    except Exception:
+        log.warning("live ai parse failed: %s", txt[:160])
+        return None
+    items = data.get("signals", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    out = []
+    for it in (items or [])[:6]:
+        if not isinstance(it, dict):
+            continue
+        typ = (it.get("type") or "").strip()
+        if typ not in _SIG_ACCENT:
+            typ = "News Mention"
+        head = (it.get("headline") or "").strip()
+        if not head:
+            continue
+        out.append({"type": typ, "accent": _SIG_ACCENT[typ], "headline": head[:170],
+                    "source": (it.get("source") or "")[:60], "date": (it.get("date") or "")[:24],
+                    "url": (it.get("url") or "").strip()})
+    return out
+
+
 @app.route("/api/live-signals")
 def api_live_signals():
-    """Public demo: surface live signals for a typed company. Never returns empty.
+    """Public demo: real, grounded signals for the EXACT company typed.
 
-    Real signals when the company has public news; otherwise a clearly-labelled
-    live example for a news-rich company so the demo always lands.
+    AI + live web search first; falls back to the company's own news (GDELT) only.
+    Never substitutes a different company. Cached + rate-limited.
     """
     company = (request.args.get("company") or "").strip()[:80]
     company = re.sub(r"[^A-Za-z0-9 .,&'\-]", "", company).strip()
@@ -485,21 +552,12 @@ def api_live_signals():
         parts = [p for p in q.split(".") if p and p != "www"]
         q = parts[0] if parts else company
 
-    signals = _signals_from_articles(_fetch_company_articles(q))
-    example, example_for = False, ""
+    signals = _live_signals_via_ai(company)        # exact company, web-grounded
     if not signals:
-        import random as _rnd
-        for cand in _rnd.sample(_LIVE_FALLBACKS, min(3, len(_LIVE_FALLBACKS))):
-            fa = _signals_from_articles(_fetch_company_articles(cand))
-            if fa:
-                signals, example, example_for = fa, True, cand
-                break
-
-    vimi_subject = example_for if example else company
+        signals = _signals_from_articles(_fetch_company_articles(q))  # same company only
     resp = {"ok": True, "company": company, "query": q, "count": len(signals),
             "score": _live_score(signals), "signals": signals,
-            "example": example, "example_for": example_for,
-            "vimi": _vimi_line(vimi_subject, signals)}
+            "vimi": _vimi_line(company, signals)}
     _LIVE_CACHE[key] = (time.time(), resp)
     return jsonify(resp)
 
