@@ -494,23 +494,19 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   </script>
 
 
-<!-- ===== Marketing top nav + info overlays + demo form (login page) ===== -->
+<!-- ===== Marketing top nav + demo form (login page) ===== -->
 <style>
-  /* hide the duplicate HUD brand + top corners; the nav owns the top now */
   .hud-row.top{display:none!important}
   .corner.tl,.corner.tr{display:none!important}
 
   #nv{position:fixed;top:0;left:0;right:0;height:62px;z-index:9000;cursor:auto;
-    display:flex;align-items:center;gap:22px;padding:0 26px;
-    font-family:var(--sans);color:var(--ink);
+    display:flex;align-items:center;gap:22px;padding:0 26px;font-family:var(--sans);color:var(--ink);
     background:linear-gradient(180deg,rgba(6,8,18,.86),rgba(6,8,18,.30) 70%,transparent);
     border-bottom:1px solid transparent;backdrop-filter:blur(2px);
     transform:translateY(-110%);opacity:0;animation:nvDown .8s cubic-bezier(.2,.9,.25,1) .25s forwards;
     transition:background .35s,border-color .35s,backdrop-filter .35s}
-  #nv.scrolled{background:rgba(7,9,20,.82);border-bottom-color:rgba(120,140,210,.16);backdrop-filter:blur(14px) saturate(1.2);
-    box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  #nv.scrolled{background:rgba(7,9,20,.82);border-bottom-color:rgba(120,140,210,.16);backdrop-filter:blur(14px) saturate(1.2);box-shadow:0 10px 40px rgba(0,0,0,.4)}
   @keyframes nvDown{to{transform:translateY(0);opacity:1}}
-
   #nv button,#nv a{cursor:pointer}
   .nv-brand{display:flex;align-items:center;gap:11px;text-decoration:none;flex:0 0 auto;margin-right:6px}
   .nv-orb{width:30px;height:30px;display:block;flex:0 0 auto;filter:drop-shadow(0 0 8px rgba(99,102,241,.7))}
@@ -518,176 +514,71 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   .nv-wm{line-height:1}
   .nv-wm b{display:block;font-size:13px;font-weight:700;letter-spacing:.18em;color:#fff}
   .nv-wm i{display:block;font-style:normal;font-family:var(--mono);font-size:8.5px;letter-spacing:.30em;color:var(--dim3);margin-top:3px}
-
   .nv-links{display:flex;align-items:center;gap:4px;margin-left:8px}
-  .nv-link{position:relative;background:none;border:0;color:var(--dim);font-family:var(--sans);
-    font-size:14px;font-weight:500;letter-spacing:.01em;padding:9px 14px;border-radius:9px;transition:color .2s,background .2s}
-  .nv-link::after{content:'';position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;
-    background:linear-gradient(90deg,var(--cyan),var(--violet));transform:scaleX(0);transform-origin:left;
-    transition:transform .3s cubic-bezier(.2,.9,.25,1)}
+  .nv-link{position:relative;text-decoration:none;display:inline-block;color:var(--dim);font-family:var(--sans);font-size:14px;font-weight:500;padding:9px 14px;border-radius:9px;transition:color .2s,background .2s}
+  .nv-link::after{content:'';position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--cyan),var(--violet));transform:scaleX(0);transform-origin:left;transition:transform .3s cubic-bezier(.2,.9,.25,1)}
   .nv-link:hover{color:#fff;background:rgba(255,255,255,.04)}
-  .nv-link:hover::after,.nv-link.active::after{transform:scaleX(1)}
-  .nv-link.active{color:#fff}
-
+  .nv-link:hover::after{transform:scaleX(1)}
   .nv-cta{margin-left:auto;display:flex;align-items:center;gap:12px}
-  .nv-signin{background:none;border:0;color:var(--ink);font-family:var(--sans);font-size:14px;font-weight:600;
-    padding:9px 12px;border-radius:9px;transition:.2s;opacity:.92}
+  .nv-signin{background:none;border:0;color:var(--ink);font-family:var(--sans);font-size:14px;font-weight:600;padding:9px 12px;border-radius:9px;transition:.2s;opacity:.92;text-decoration:none}
   .nv-signin:hover{opacity:1;background:rgba(255,255,255,.05)}
-  .nv-demo{position:relative;border:0;color:#fff;font-family:var(--sans);font-size:14px;font-weight:700;
-    padding:10px 20px;border-radius:999px;overflow:hidden;
-    background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#8b5cf6);
-    background-size:200% 100%;background-position:0% 50%;
-    box-shadow:0 6px 22px rgba(99,102,241,.42),inset 0 0 0 1px rgba(255,255,255,.16);
-    transition:background-position .5s,transform .2s,box-shadow .25s}
+  .nv-demo{position:relative;border:0;color:#fff;font-family:var(--sans);font-size:14px;font-weight:700;padding:10px 20px;border-radius:999px;overflow:hidden;
+    background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#8b5cf6);background-size:200% 100%;background-position:0% 50%;
+    box-shadow:0 6px 22px rgba(99,102,241,.42),inset 0 0 0 1px rgba(255,255,255,.16);transition:background-position .5s,transform .2s,box-shadow .25s}
   .nv-demo:hover{background-position:100% 50%;transform:translateY(-1px);box-shadow:0 10px 30px rgba(139,92,246,.55),inset 0 0 0 1px rgba(255,255,255,.28)}
-  .nv-demo::before{content:'';position:absolute;inset:0;border-radius:999px;
-    background:radial-gradient(60px 30px at var(--mx,50%) 50%,rgba(255,255,255,.35),transparent 70%);opacity:0;transition:opacity .3s}
+  .nv-demo::before{content:'';position:absolute;inset:0;border-radius:999px;background:radial-gradient(60px 30px at var(--mx,50%) 50%,rgba(255,255,255,.35),transparent 70%);opacity:0;transition:opacity .3s}
   .nv-demo:hover::before{opacity:1}
-
   .nv-burger{display:none;flex-direction:column;gap:4px;background:none;border:0;padding:8px}
   .nv-burger span{width:20px;height:2px;background:var(--ink);border-radius:2px;transition:.25s}
-
   @media (max-width:880px){
     #nv{gap:10px;padding:0 16px}
-    .nv-links{display:none}
-    .nv-wm i{display:none}
-    .nv-burger{display:flex}
+    .nv-links{position:absolute;top:62px;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;
+      background:rgba(7,9,20,.97);backdrop-filter:blur(16px);border-bottom:1px solid rgba(120,140,210,.16);padding:8px;margin:0;
+      transform:translateY(-8px);opacity:0;pointer-events:none;transition:.25s}
+    .nv-links.open{transform:none;opacity:1;pointer-events:auto}
+    .nv-link{padding:13px 16px;border-radius:10px}.nv-link::after{display:none}
+    .nv-wm i{display:none}.nv-burger{display:flex}
   }
   @media (max-width:520px){ .nv-signin{display:none} .nv-demo{padding:9px 15px;font-size:13px} }
 
-  /* ===== overlay ===== */
-  .nv-ov{position:fixed;inset:0;z-index:9500;cursor:auto;display:none;align-items:center;justify-content:center;padding:28px}
-  .nv-ov.on{display:flex}
-  .nv-ov-bg{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,rgba(20,24,48,.62),rgba(3,4,10,.82));
-    backdrop-filter:blur(10px);opacity:0;animation:nvFade .4s ease forwards}
-  @keyframes nvFade{to{opacity:1}}
-
-  .nv-panel{position:relative;width:min(1120px,100%);max-height:88vh;display:flex;flex-direction:column;
-    background:linear-gradient(180deg,rgba(15,18,34,.96),rgba(9,11,23,.97));
-    border:1px solid rgba(129,140,248,.24);border-radius:22px;overflow:hidden;
-    box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 60px rgba(99,102,241,.12);
-    transform:translateY(24px) scale(.97);opacity:0;animation:nvPop .5s cubic-bezier(.2,1,.3,1) .05s forwards}
-  @keyframes nvPop{to{transform:translateY(0) scale(1);opacity:1}}
-  .nv-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(34,211,238,.7),rgba(139,92,246,.7),transparent)}
-
-  .nv-close{position:absolute;top:16px;right:16px;z-index:5;width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
-    background:rgba(255,255,255,.05);color:#aeb6dd;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.2s}
-  .nv-close:hover{background:rgba(255,255,255,.13);color:#fff;transform:rotate(90deg)}
-
-  .nv-tabs{display:flex;gap:6px;padding:18px 22px 0;flex-wrap:wrap}
-  .nv-tabs button{background:none;border:0;color:var(--dim2);font-family:var(--sans);font-size:13.5px;font-weight:600;
-    padding:9px 15px;border-radius:10px 10px 0 0;position:relative;transition:.2s}
-  .nv-tabs button:hover{color:#fff}
-  .nv-tabs button.active{color:#fff;background:rgba(255,255,255,.045)}
-  .nv-tabs button.active::after{content:'';position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;
-    background:linear-gradient(90deg,var(--cyan),var(--violet))}
-
-  .nv-stage{position:relative;overflow-y:auto;padding:26px 30px 30px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
-  .nv-stage::-webkit-scrollbar{width:8px}.nv-stage::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:8px}
-  .nv-s{display:none}
-  .nv-s.show{display:block;animation:nvSwap .45s ease}
-  @keyframes nvSwap{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-
-  .nv-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--cyan);text-transform:uppercase}
-  .nv-h{font-size:30px;line-height:1.1;font-weight:700;margin:10px 0 8px;letter-spacing:-.01em}
-  .nv-h .g{background:linear-gradient(100deg,#67e8f9,#a5b4fc 50%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .nv-sub{font-size:15px;line-height:1.6;color:var(--dim);max-width:680px}
-
-  .nv-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0 6px}
-  .nv-stat{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px 14px;text-align:center}
-  .nv-stat b{display:block;font-size:26px;font-weight:700;color:#fff;letter-spacing:-.02em}
-  .nv-stat span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim3);margin-top:6px;text-transform:uppercase}
-
-  .nv-grid{display:grid;gap:14px;margin-top:22px}
-  .nv-grid.c3{grid-template-columns:repeat(3,1fr)}
-  .nv-grid.c2{grid-template-columns:repeat(2,1fr)}
-  .nv-card{position:relative;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);border-radius:16px;
-    padding:18px;overflow:hidden;opacity:0;transform:translateY(14px);animation:nvRise .55s cubic-bezier(.2,.9,.25,1) forwards;transition:transform .25s,border-color .25s,box-shadow .25s,background .25s}
-  .nv-card:hover{transform:translateY(-4px);border-color:rgba(129,140,248,.4);background:rgba(255,255,255,.055);box-shadow:0 16px 40px rgba(0,0,0,.4)}
-  @keyframes nvRise{to{opacity:1;transform:none}}
-  .nv-ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;
-    background:linear-gradient(135deg,rgba(99,102,241,.9),rgba(139,92,246,.9));box-shadow:0 8px 20px rgba(99,102,241,.35)}
-  .nv-ic svg{width:22px;height:22px}
-  .nv-card h4{font-size:15.5px;font-weight:700;color:#fff;margin-bottom:6px}
-  .nv-card p{font-size:13px;line-height:1.55;color:var(--dim)}
-
-  /* signals tiers */
-  .nv-tier{display:flex;align-items:center;gap:10px;margin:22px 0 12px}
-  .nv-tier b{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
-  .nv-tier .ln{flex:1;height:1px;background:linear-gradient(90deg,currentColor,transparent);opacity:.4}
-  .t-high{color:#c4b5fd}.t-med{color:#67e8f9}.t-low{color:#7c89b0}
-  .nv-sig{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .nv-chip{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-left-width:3px;border-radius:12px;padding:13px 15px;
-    opacity:0;transform:translateY(12px);animation:nvRise .5s cubic-bezier(.2,.9,.25,1) forwards;transition:transform .2s,box-shadow .25s,background .2s}
-  .nv-chip:hover{transform:translateY(-3px);background:rgba(255,255,255,.06)}
-  .nv-chip h5{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px}
-  .nv-chip p{font-size:12px;line-height:1.5;color:var(--dim2)}
-  .nv-chip.high{border-left-color:#a78bfa}.nv-chip.high:hover{box-shadow:0 10px 26px rgba(167,139,250,.22)}
-  .nv-chip.med{border-left-color:#22d3ee}.nv-chip.med:hover{box-shadow:0 10px 26px rgba(34,211,238,.2)}
-  .nv-chip.low{border-left-color:#566089}
-  .nv-note{margin-top:20px;background:rgba(99,102,241,.08);border:1px solid rgba(129,140,248,.22);border-radius:14px;padding:15px 17px;
-    font-size:13px;line-height:1.6;color:var(--dim)}
-  .nv-note code{font-family:var(--mono);font-size:12px;color:#a5b4fc;background:rgba(255,255,255,.06);padding:2px 7px;border-radius:6px}
-
-  .nv-foot{display:flex;align-items:center;gap:18px;padding:16px 26px;border-top:1px solid rgba(255,255,255,.07);
-    background:linear-gradient(180deg,transparent,rgba(99,102,241,.06))}
-  .nv-foot div{font-size:13.5px;color:var(--dim)}
-  .nv-foot b{color:#fff;font-weight:700}
-  .nv-foot-cta{margin-left:auto;flex:0 0 auto;border:0;color:#fff;font-family:var(--sans);font-size:14px;font-weight:700;
-    padding:11px 22px;border-radius:999px;background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#8b5cf6);background-size:200% 100%;
-    box-shadow:0 6px 22px rgba(99,102,241,.42);transition:background-position .5s,transform .2s,box-shadow .25s}
-  .nv-foot-cta:hover{background-position:100% 50%;transform:translateY(-1px);box-shadow:0 10px 30px rgba(139,92,246,.5)}
-
-  @media (max-width:780px){
-    .nv-stats{grid-template-columns:repeat(2,1fr)}
-    .nv-grid.c3,.nv-grid.c2,.nv-sig{grid-template-columns:1fr}
-    .nv-h{font-size:24px}
-    .nv-foot{flex-direction:column;align-items:flex-start;gap:12px}
-    .nv-foot-cta{margin-left:0;width:100%;text-align:center}
-  }
-
-  /* ===== demo form ===== */
+  /* demo form */
   .nv-fov{position:fixed;inset:0;z-index:9600;cursor:auto;display:none;align-items:center;justify-content:center;padding:24px}
   .nv-fov.on{display:flex}
-  .nv-form{position:relative;width:min(520px,100%);max-height:92vh;overflow-y:auto;
-    background:linear-gradient(180deg,rgba(16,19,36,.98),rgba(9,11,23,.99));
-    border:1px solid rgba(129,140,248,.28);border-radius:22px;padding:30px 30px 26px;
-    box-shadow:0 40px 120px rgba(0,0,0,.7),0 0 60px rgba(99,102,241,.16);
+  .nv-fbg{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,rgba(20,24,48,.6),rgba(3,4,10,.84));backdrop-filter:blur(10px);opacity:0;animation:nvFade .4s ease forwards}
+  @keyframes nvFade{to{opacity:1}}
+  .nv-form{position:relative;width:min(520px,100%);max-height:92vh;overflow-y:auto;background:linear-gradient(180deg,rgba(16,19,36,.98),rgba(9,11,23,.99));
+    border:1px solid rgba(129,140,248,.28);border-radius:22px;padding:30px;box-shadow:0 40px 120px rgba(0,0,0,.7),0 0 60px rgba(99,102,241,.16);
     transform:translateY(22px) scale(.97);opacity:0;animation:nvPop .5s cubic-bezier(.2,1,.3,1) forwards}
-  .nv-form::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;border-radius:22px 22px 0 0;
-    background:linear-gradient(90deg,transparent,rgba(34,211,238,.7),rgba(139,92,246,.7),transparent)}
-  .nv-fhead{display:flex;align-items:center;gap:13px;margin-bottom:6px}
+  .nv-form::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;border-radius:22px 22px 0 0;background:linear-gradient(90deg,transparent,rgba(34,211,238,.7),rgba(139,92,246,.7),transparent)}
+  @keyframes nvPop{to{transform:none;opacity:1}}
+  .nv-close{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#aeb6dd;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s}
+  .nv-close:hover{background:rgba(255,255,255,.13);color:#fff;transform:rotate(90deg)}
+  .nv-fhead{display:flex;align-items:center;gap:13px;margin-bottom:4px}
   .nv-fhead .nv-orb{width:38px;height:38px}
-  .nv-fhead h3{font-size:20px;font-weight:700;color:#fff;letter-spacing:-.01em}
+  .nv-fhead h3{font-size:20px;font-weight:700;color:#fff}
   .nv-fhead p{font-size:12.5px;color:var(--dim2);margin-top:2px}
   .nv-pills{display:flex;gap:8px;margin:18px 0 4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:5px}
-  .nv-pill{flex:1;border:0;background:none;color:var(--dim);font-family:var(--sans);font-size:13px;font-weight:600;padding:10px;border-radius:9px;transition:.25s}
+  .nv-pill{flex:1;border:0;background:none;color:var(--dim);font-family:var(--sans);font-size:13px;font-weight:600;padding:10px;border-radius:9px;cursor:pointer;transition:.25s}
   .nv-pill.on{color:#fff;background:linear-gradient(110deg,rgba(34,211,238,.9),rgba(139,92,246,.9));box-shadow:0 6px 18px rgba(99,102,241,.35)}
   .nv-field{margin-top:14px}
   .nv-field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim3);text-transform:uppercase;margin-bottom:7px}
-  .nv-field input,.nv-field textarea{width:100%;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.11);border-radius:12px;
-    padding:12px 14px;color:#fff;font-size:14px;font-family:var(--sans);outline:none;cursor:text;transition:border-color .2s,box-shadow .2s;resize:vertical}
+  .nv-field input,.nv-field textarea{width:100%;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.11);border-radius:12px;padding:12px 14px;color:#fff;font-size:14px;font-family:var(--sans);outline:none;cursor:text;transition:border-color .2s,box-shadow .2s;resize:vertical}
   .nv-field input::placeholder,.nv-field textarea::placeholder{color:#5b648c}
   .nv-field input:focus,.nv-field textarea:focus{border-color:rgba(129,140,248,.65);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
   .nv-field.bad input{border-color:rgba(248,113,113,.7);box-shadow:0 0 0 3px rgba(248,113,113,.16)}
-  .nv-submit{width:100%;margin-top:20px;border:0;color:#fff;font-family:var(--sans);font-size:15px;font-weight:700;
-    padding:14px;border-radius:13px;background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#8b5cf6);background-size:200% 100%;
-    box-shadow:0 10px 30px rgba(99,102,241,.42);transition:background-position .5s,transform .15s,opacity .2s;display:flex;align-items:center;justify-content:center;gap:9px}
+  .nv-submit{width:100%;margin-top:20px;border:0;color:#fff;font-family:var(--sans);font-size:15px;font-weight:700;padding:14px;border-radius:13px;cursor:pointer;
+    background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#8b5cf6);background-size:200% 100%;box-shadow:0 10px 30px rgba(99,102,241,.42);transition:background-position .5s,transform .15s,opacity .2s;display:flex;align-items:center;justify-content:center;gap:9px}
   .nv-submit:hover{background-position:100% 50%;transform:translateY(-1px)}
   .nv-submit[disabled]{opacity:.65}
   .nv-spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
   .nv-submit.loading .nv-spin{display:block}
   .nv-formerr{margin-top:12px;font-size:12.5px;color:#fca5a5;text-align:center;min-height:16px}
   .nv-priv{margin-top:13px;font-size:11px;color:var(--dim3);text-align:center;line-height:1.5}
-
   .nv-success{display:none;text-align:center;padding:18px 6px 6px}
-  .nv-success.on{display:block;animation:nvSwap .5s ease}
-  .nv-check{width:74px;height:74px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 50% 40%,rgba(52,211,153,.25),rgba(52,211,153,.05));border:1px solid rgba(52,211,153,.45)}
+  .nv-success.on{display:block;animation:nvFade .5s ease}
+  .nv-check{width:74px;height:74px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,rgba(52,211,153,.25),rgba(52,211,153,.05));border:1px solid rgba(52,211,153,.45)}
   .nv-check svg{width:38px;height:38px}
-  .nv-check path{stroke:#34d399;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;
-    stroke-dasharray:40;stroke-dashoffset:40;animation:nvDraw .6s cubic-bezier(.2,.9,.25,1) .15s forwards}
+  .nv-check path{stroke:#34d399;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:nvDraw .6s cubic-bezier(.2,.9,.25,1) .15s forwards}
   @keyframes nvDraw{to{stroke-dashoffset:0}}
   .nv-success h3{font-size:21px;color:#fff;font-weight:700;margin-bottom:8px}
   .nv-success p{font-size:14px;color:var(--dim);line-height:1.6;max-width:360px;margin:0 auto}
@@ -700,10 +591,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     <span class="nv-wm"><b>INTELLIGENCE</b><i>by Position2</i></span>
   </a>
   <div class="nv-links" id="nvLinks">
-    <button class="nv-link" data-sec="platform">Platform</button>
-    <button class="nv-link" data-sec="signals">Signals</button>
-    <button class="nv-link" data-sec="agents">Agents</button>
-    <button class="nv-link" data-sec="solutions">Solutions</button>
+    <a class="nv-link" href="/platform">Platform</a>
+    <a class="nv-link" href="/signals">Signals</a>
+    <a class="nv-link" href="/agents">Agents</a>
+    <a class="nv-link" href="/solutions">Solutions</a>
   </div>
   <div class="nv-cta">
     <button class="nv-signin" id="nvSignin">Sign in</button>
@@ -712,112 +603,17 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   </div>
 </nav>
 
-<div class="nv-ov" id="nvov" role="dialog" aria-modal="true" aria-label="Explore Intelligence by Position2">
-  <div class="nv-ov-bg" data-close></div>
-  <div class="nv-panel">
-    <button class="nv-close" id="nvClose" aria-label="Close">&#10005;</button>
-    <div class="nv-tabs" id="nvTabs">
-      <button data-sec="platform">Platform</button>
-      <button data-sec="signals">Signals</button>
-      <button data-sec="agents">Agents</button>
-      <button data-sec="solutions">Solutions</button>
-    </div>
-    <div class="nv-stage" id="nvStage">
-
-      <section class="nv-s" data-sec="platform">
-        <div class="nv-eyebrow">The intelligence layer</div>
-        <h1 class="nv-h">Two disciplines.<br><span class="g">One intelligence layer.</span></h1>
-        <p class="nv-sub">Intelligence by Position2 reads your market in real time &mdash; surfacing the accounts showing genuine momentum, scoring and explaining each one in plain language, then pointing your team to the conversations most likely to convert. It spans both go-to-market and SEO, so paid, organic and sales all act on the same live signal.</p>
-        <div class="nv-stats">
-          <div class="nv-stat"><b data-count="1545" data-suffix="">0</b><span>Accounts monitored</span></div>
-          <div class="nv-stat"><b data-count="3" data-suffix="">0</b><span>Signal tiers</span></div>
-          <div class="nv-stat"><b data-count="2" data-suffix="">0</b><span>Disciplines</span></div>
-          <div class="nv-stat"><b data-plain="24/7">24/7</b><span>Always-on</span></div>
-        </div>
-        <div class="nv-grid c3">
-          <div class="nv-card" style="animation-delay:.05s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Real-time signals</h4><p>Funding, leadership moves, M&amp;A, launches and more &mdash; detected across the open web as they happen, not weeks later.</p></div>
-          <div class="nv-card" style="animation-delay:.12s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance &mdash; severity, recency and multi-intent stacking decide who your reps should call first.</p></div>
-          <div class="nv-card" style="animation-delay:.19s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach, builds dossiers and explains why each one is hot.</p></div>
-        </div>
-      </section>
-
-      <section class="nv-s" data-sec="signals">
-        <div class="nv-eyebrow">What we listen for</div>
-        <h1 class="nv-h">Buying signals,<br><span class="g">ranked by what matters.</span></h1>
-        <p class="nv-sub">We track distinct signal types across three priority tiers. High-tier signals come from curated, authenticated sources; medium and low tiers are mined continuously from the open web and news.</p>
-
-        <div class="nv-tier t-high"><b>High priority</b><span class="ln"></span></div>
-        <div class="nv-sig">
-          <div class="nv-chip high" style="animation-delay:.04s"><h5>Funding Round</h5><p>New capital raised &mdash; fresh budget and a mandate to grow.</p></div>
-          <div class="nv-chip high" style="animation-delay:.08s"><h5>C-Suite Join</h5><p>A new executive arrives with a fresh agenda and new vendors.</p></div>
-          <div class="nv-chip high" style="animation-delay:.12s"><h5>C-Suite Exit</h5><p>Leadership departs &mdash; strategy and priorities are in flux.</p></div>
-          <div class="nv-chip high" style="animation-delay:.16s"><h5>Acquisition / M&amp;A</h5><p>A deal reshapes the org chart, stack and spending.</p></div>
-          <div class="nv-chip high" style="animation-delay:.20s"><h5>IPO Signal</h5><p>Going public &mdash; scrutiny, scale and new investment.</p></div>
-          <div class="nv-chip high" style="animation-delay:.24s"><h5>Subsidiary Change</h5><p>A new entity or restructure opens fresh territory.</p></div>
-        </div>
-
-        <div class="nv-tier t-med"><b>Medium priority</b><span class="ln"></span></div>
-        <div class="nv-sig">
-          <div class="nv-chip med" style="animation-delay:.06s"><h5>Product Launch</h5><p>A new product means new go-to-market motion to support.</p></div>
-          <div class="nv-chip med" style="animation-delay:.10s"><h5>Partnership</h5><p>A new alliance signals expansion and shifting needs.</p></div>
-          <div class="nv-chip med" style="animation-delay:.14s"><h5>Creative Hiring</h5><p>Hiring marketers and creatives &mdash; investment in growth.</p></div>
-        </div>
-
-        <div class="nv-tier t-low"><b>Low priority</b><span class="ln"></span></div>
-        <div class="nv-sig">
-          <div class="nv-chip low" style="animation-delay:.08s"><h5>News Mention</h5><p>General coverage that keeps an account warm and in view.</p></div>
-        </div>
-
-        <div class="nv-note">Every signal is scored as <code>type_weight &times; severity &times; recency</code>, with a bonus when several signals stack on one account &mdash; so the most urgent opportunities rise to the top automatically.</div>
-      </section>
-
-      <section class="nv-s" data-sec="agents">
-        <div class="nv-eyebrow">The agents we built</div>
-        <h1 class="nv-h">A team of agents,<br><span class="g">working your pipeline.</span></h1>
-        <p class="nv-sub">Each agent owns a slice of the buying journey &mdash; from spotting the signal, to identifying who is interested, to drafting the message that lands.</p>
-        <div class="nv-grid c2">
-          <div class="nv-card" style="animation-delay:.05s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></svg></div><h4>Vimi &mdash; AI assistant</h4><p>Researches companies, drafts outreach emails, builds decision-maker dossiers, answers &ldquo;why is this account hot,&rdquo; and exports it all to CSV, Sheets or a Gmail draft.</p></div>
-          <div class="nv-card" style="animation-delay:.11s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><h4>Signal Tracker</h4><p>Continuously monitors your target accounts for every signal type, scores them, and resurfaces the highest-intent companies each week.</p></div>
-          <div class="nv-card" style="animation-delay:.17s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></div><h4>Anonymous Visitor ID</h4><p>De-anonymizes the companies &mdash; and people &mdash; browsing your site, turning silent traffic into named, actionable accounts.</p></div>
-          <div class="nv-card" style="animation-delay:.23s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17v-5M12 17V8M17 17v-3"/></svg></div><h4>LinkedIn Intelligence</h4><p>Captures engagement signals from LinkedIn so you know which buying-committee members are already paying attention.</p></div>
-          <div class="nv-card" style="animation-delay:.29s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>Competitor Ad Intelligence</h4><p>Tracks the ads your competitors are actually running, so your creative and messaging stay a step ahead.</p></div>
-          <div class="nv-card" style="animation-delay:.35s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 17l-5.5 2.8 1-6.3L3 8.9 9 8z"/></svg></div><h4>Target Accounts</h4><p>An always-ranked list of your best-fit accounts by live intent &mdash; the single view of who to work next.</p></div>
-        </div>
-      </section>
-
-      <section class="nv-s" data-sec="solutions">
-        <div class="nv-eyebrow">From signal to pipeline</div>
-        <h1 class="nv-h">We don&rsquo;t just find the moment.<br><span class="g">We help you win it.</span></h1>
-        <p class="nv-sub">Position2 is a full-service B2B growth agency. The intelligence layer tells you who is ready &mdash; and our teams run the plays that turn that intent into pipeline and revenue.</p>
-        <div class="nv-grid c3">
-          <div class="nv-card" style="animation-delay:.05s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h4>SEO &amp; organic growth</h4><p>Win the searches your buyers run when a signal fires &mdash; and the AI answers they read.</p></div>
-          <div class="nv-card" style="animation-delay:.11s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></div><h4>Performance &amp; paid social</h4><p>Spin up campaigns aimed at in-market accounts the instant intent peaks.</p></div>
-          <div class="nv-card" style="animation-delay:.17s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg></div><h4>Content &amp; brand</h4><p>Messaging and creative that speaks to the exact moment an account is in.</p></div>
-          <div class="nv-card" style="animation-delay:.23s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div><h4>RevOps &amp; HubSpot</h4><p>Route, score and action signals inside the CRM your team already lives in.</p></div>
-          <div class="nv-card" style="animation-delay:.29s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>Always-on programs</h4><p>A continuous motion &mdash; not a one-off burst &mdash; tuned to live market signal.</p></div>
-          <div class="nv-card" style="animation-delay:.35s"><div class="nv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><h4>Custom agents</h4><p>Need a signal or workflow we don&rsquo;t have yet? We build bespoke agents around your exact motion.</p></div>
-        </div>
-      </section>
-
-    </div>
-    <div class="nv-foot">
-      <div><b>Want this for your team?</b> &nbsp;Book a live demo or have us build a custom agent for you.</div>
-      <button class="nv-foot-cta" id="nvFootCta">Book a demo &middot; build a custom agent</button>
-    </div>
-  </div>
-</div>
-
 <div class="nv-fov" id="nvfov" role="dialog" aria-modal="true" aria-label="Request a demo">
-  <div class="nv-ov-bg" data-close></div>
+  <div class="nv-fbg" data-close></div>
   <div class="nv-form">
     <button class="nv-close" id="nvFormClose" aria-label="Close">&#10005;</button>
-    <div class="nv-form-body" id="nvFormBody">
+    <div id="nvFormBody">
       <div class="nv-fhead">
         <svg class="nv-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/></svg>
         <div><h3>Let&rsquo;s build your edge</h3><p>Tell us a little &mdash; we&rsquo;ll be in touch within one business day.</p></div>
       </div>
       <form id="nvDemoForm" autocomplete="on" novalidate>
-        <div class="nv-pills" role="tablist">
+        <div class="nv-pills">
           <button type="button" class="nv-pill on" data-interest="Book a demo">Book a demo</button>
           <button type="button" class="nv-pill" data-interest="Build a custom agent">Build a custom agent</button>
         </div>
@@ -833,7 +629,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     <div class="nv-success" id="nvSuccess">
       <div class="nv-check"><svg viewBox="0 0 36 36"><path d="M9 19l6 6 12-14"/></svg></div>
       <h3>Request received &#127881;</h3>
-      <p id="nvSuccessMsg">Thanks &mdash; our team will reach out within one business day to set things up.</p>
+      <p id="nvSuccessMsg">Thanks &mdash; our team will reach out within one business day.</p>
       <button type="button" class="nv-submit" id="nvSuccessClose"><span>Done</span></button>
     </div>
   </div>
@@ -842,117 +638,66 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
 <script>
 (function(){
   "use strict";
-  var nv=document.getElementById('nv');
-  var ov=document.getElementById('nvov'), fov=document.getElementById('nvfov');
-  var stage=document.getElementById('nvStage'), tabs=document.getElementById('nvTabs');
-  var countersDone=false;
-
-  // navbar background on scroll (Lenis dispatches native scroll)
+  var nv=document.getElementById('nv'), fov=document.getElementById('nvfov');
   function onScroll(){ if(window.scrollY>24) nv.classList.add('scrolled'); else nv.classList.remove('scrolled'); }
   window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
 
-  // pointer glow on the demo pill
-  var demoBtns=document.querySelectorAll('.nv-demo');
-  demoBtns.forEach(function(b){ b.addEventListener('mousemove',function(e){ var r=b.getBoundingClientRect(); b.style.setProperty('--mx',(e.clientX-r.left)+'px'); }); });
+  var demo=document.getElementById('nvDemo');
+  demo.addEventListener('mousemove',function(e){ var r=demo.getBoundingClientRect(); demo.style.setProperty('--mx',(e.clientX-r.left)+'px'); });
 
-  function showSection(sec){
-    var secs=stage.querySelectorAll('.nv-s');
-    secs.forEach(function(s){ s.classList.toggle('show', s.getAttribute('data-sec')===sec); });
-    tabs.querySelectorAll('button').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-sec')===sec); });
-    document.querySelectorAll('.nv-link').forEach(function(l){ l.classList.toggle('active', l.getAttribute('data-sec')===sec); });
-    stage.scrollTop=0;
-    // restart staggered card animations
-    var active=stage.querySelector('.nv-s.show');
-    if(active){ active.querySelectorAll('.nv-card,.nv-chip').forEach(function(el){ el.style.animation='none'; void el.offsetWidth; el.style.animation=''; }); }
-    if(sec==='platform') runCounters();
-  }
+  var burger=document.getElementById('nvBurger'), links=document.getElementById('nvLinks');
+  burger.addEventListener('click',function(){ links.classList.toggle('open'); });
 
-  function runCounters(){
-    if(countersDone) return; countersDone=true;
-    stage.querySelectorAll('[data-count]').forEach(function(el){
-      var target=parseInt(el.getAttribute('data-count'),10)||0, suffix=el.getAttribute('data-suffix')||'';
-      var start=performance.now(), dur=1100;
-      function step(t){ var p=Math.min(1,(t-start)/dur); var eased=1-Math.pow(1-p,3);
-        var val=Math.round(target*eased); el.textContent=val.toLocaleString()+suffix; if(p<1) requestAnimationFrame(step); else el.textContent=target.toLocaleString()+suffix; }
-      requestAnimationFrame(step);
-    });
-  }
-
-  function openOverlay(sec){ showSection(sec||'platform'); ov.classList.add('on'); document.documentElement.style.overflow='hidden'; }
-  function closeOverlay(){ ov.classList.remove('on'); if(!fov.classList.contains('on')) document.documentElement.style.overflow=''; }
-
-  document.querySelectorAll('.nv-link').forEach(function(l){ l.addEventListener('click',function(){ openOverlay(l.getAttribute('data-sec')); }); });
-  tabs.querySelectorAll('button').forEach(function(t){ t.addEventListener('click',function(){ showSection(t.getAttribute('data-sec')); }); });
-  document.getElementById('nvBurger').addEventListener('click',function(){ openOverlay('platform'); });
-  document.getElementById('nvClose').addEventListener('click',closeOverlay);
-  ov.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click',closeOverlay); });
-
-  // sign in -> scroll to the Google card
   document.getElementById('nvSignin').addEventListener('click',function(){
-    closeOverlay();
     var target=document.querySelector('[data-form="8"]')||document.getElementById('card');
     if(window.__lenis && window.__lenis.scrollTo){ window.__lenis.scrollTo(target,{duration:1.4}); }
     else if(target){ target.scrollIntoView({behavior:'smooth',block:'center'}); }
   });
 
-  // ===== demo form =====
   var interest='Book a demo';
   document.querySelectorAll('.nv-pill').forEach(function(p){ p.addEventListener('click',function(){
-    document.querySelectorAll('.nv-pill').forEach(function(x){ x.classList.remove('on'); });
-    p.classList.add('on'); interest=p.getAttribute('data-interest');
+    document.querySelectorAll('.nv-pill').forEach(function(x){ x.classList.remove('on'); }); p.classList.add('on'); interest=p.getAttribute('data-interest');
   }); });
-
   function openForm(){
     document.getElementById('nvFormBody').style.display='';
     document.getElementById('nvSuccess').classList.remove('on');
     fov.classList.add('on'); document.documentElement.style.overflow='hidden';
     setTimeout(function(){ var n=document.getElementById('nvN'); if(n) n.focus(); },360);
   }
-  function closeForm(){ fov.classList.remove('on'); if(!ov.classList.contains('on')) document.documentElement.style.overflow=''; }
-
-  document.getElementById('nvDemo').addEventListener('click',openForm);
-  document.getElementById('nvFootCta').addEventListener('click',function(){ openForm(); });
+  function closeForm(){ fov.classList.remove('on'); document.documentElement.style.overflow=''; }
+  demo.addEventListener('click',openForm);
   document.getElementById('nvFormClose').addEventListener('click',closeForm);
   document.getElementById('nvSuccessClose').addEventListener('click',closeForm);
   fov.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click',closeForm); });
-
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ if(fov.classList.contains('on')) closeForm(); else if(ov.classList.contains('on')) closeOverlay(); } });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&fov.classList.contains('on')) closeForm(); });
 
   var EMAIL=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
   var form=document.getElementById('nvDemoForm');
   var submit=document.getElementById('nvSubmit'), submitTx=document.getElementById('nvSubmitTx'), errEl=document.getElementById('nvFormErr');
-
   form.addEventListener('submit',function(e){
-    e.preventDefault();
-    errEl.textContent='';
+    e.preventDefault(); errEl.textContent='';
     var name=document.getElementById('nvN').value.trim();
     var email=document.getElementById('nvE').value.trim();
     var company=document.getElementById('nvC').value.trim();
     var message=document.getElementById('nvM').value.trim();
     document.getElementById('f-name').classList.toggle('bad',!name);
     document.getElementById('f-email').classList.toggle('bad',!EMAIL.test(email));
-    if(!name || !EMAIL.test(email)){ errEl.textContent='Please enter your name and a valid work email.'; return; }
+    if(!name||!EMAIL.test(email)){ errEl.textContent='Please enter your name and a valid work email.'; return; }
     submit.classList.add('loading'); submit.disabled=true; submitTx.textContent='Sending';
     fetch('/api/demo-request',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:name,email:email,company:company,interest:interest,message:message})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
       .then(function(res){
         submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Send request';
-        if(res.ok && res.d && res.d.ok){
-          var msg=document.getElementById('nvSuccessMsg');
-          msg.textContent = interest==='Build a custom agent'
+        if(res.ok&&res.d&&res.d.ok){
+          document.getElementById('nvSuccessMsg').textContent = interest==='Build a custom agent'
             ? 'Thanks — our team will reach out within one business day to scope your custom agent.'
             : 'Thanks — our team will reach out within one business day to set up your demo.';
           document.getElementById('nvFormBody').style.display='none';
           document.getElementById('nvSuccess').classList.add('on');
-        } else {
-          errEl.textContent=(res.d && res.d.error) ? res.d.error : 'Something went wrong. Please try again.';
-        }
+        } else { errEl.textContent=(res.d&&res.d.error)?res.d.error:'Something went wrong. Please try again.'; }
       })
-      .catch(function(){
-        submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Send request';
-        errEl.textContent='Network error. Please try again.';
-      });
+      .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Send request'; errEl.textContent='Network error. Please try again.'; });
   });
 })();
 </script>

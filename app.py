@@ -285,6 +285,104 @@ def api_demo_request():
              name, email, interest, sheet_ok, slack_ok)
     return jsonify({"ok": True, "delivered": bool(sheet_ok or slack_ok)})
 
+# ── Marketing site (public): agent directory, detail pages, overview pages ───────
+def _svg(inner: str) -> str:
+    return ('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" '
+            'stroke-linecap="round" stroke-linejoin="round">' + inner + "</svg>")
+
+AGENTS = [
+    {
+        "slug": "vimi", "name": "Vimi", "role": "AI Assistant",
+        "badge": "FLAGSHIP", "cat": "AI",
+        "icon": _svg('<circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>'),
+        "summary": "An embedded AI analyst inside every dashboard. Vimi researches accounts, drafts outreach, builds decision-maker dossiers, and explains in plain language why each account is worth a call right now.",
+        "benefit": "Every rep gets an analyst on demand. Raw signals become ready-to-send emails, briefings and answers in seconds - no tab-switching, no waiting on ops.",
+        "how": "Vimi reads the live signal feed and your CRM context, runs research across the open web, and generates emails, dossiers, why-hot explanations, charts and exports (CSV, Excel, Sheets or a Gmail draft) - all from a single chat box.",
+        "who": "SDRs, AEs and marketers who need fast, contextual account intelligence without leaving the workflow.",
+        "connects": ["GTM", "SEO", "Signal Tracker", "Gmail", "Sheets"],
+    },
+    {
+        "slug": "signal-tracker", "name": "Signal Tracker", "role": "Account Monitoring",
+        "badge": "CORE", "cat": "Signals",
+        "icon": _svg('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>'),
+        "summary": "Always-on monitoring for your target-account universe. Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week.",
+        "benefit": "You never miss the moment an account becomes ready. The most urgent opportunities rise to the top automatically - no manual list-scrubbing.",
+        "how": "It ingests curated, authenticated high-tier sources plus open-web news, scores each event as type_weight x severity x recency (with a bonus when signals stack), keeps a rolling 90-day window, and ships a weekly digest.",
+        "who": "Demand-gen and sales teams running account-based programs.",
+        "connects": ["Curated sources", "News", "Slack", "Sheets"],
+    },
+    {
+        "slug": "anonymous-visitors", "name": "Anonymous Visitor ID", "role": "Visitor De-anonymization",
+        "badge": "NEW", "cat": "Web",
+        "icon": _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+        "summary": "Turn silent website traffic into named accounts. Anonymous Visitor ID reveals the companies - and the people - browsing your site, and hands reps a ready-to-act narrative.",
+        "benefit": "Recover the 95%+ of visitors who never fill out a form, and reach them while the intent is still warm.",
+        "how": "Visit data is matched to firmographic and person-level identity, the session journey is reconstructed page-by-page, and each visitor becomes a first-person CRM narrative with suggested outreach.",
+        "who": "Website, demand-gen and SDR teams who want to act on anonymous intent.",
+        "connects": ["GTM", "Sheets", "CRM"],
+    },
+    {
+        "slug": "linkedin-intelligence", "name": "LinkedIn Intelligence", "role": "Engagement Signals",
+        "badge": "", "cat": "Social",
+        "icon": _svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17v-5M12 17V8M17 17v-3"/>'),
+        "summary": "Know which members of the buying committee are already paying attention. LinkedIn Intelligence captures engagement signals and maps them to your target accounts.",
+        "benefit": "Prioritize the people actually engaging - not just the logo - so outreach lands with the right person at the right time.",
+        "how": "It tracks engagement on relevant posts and profiles, attributes it to your accounts, and scores buying-committee interest for ABM plays.",
+        "who": "ABM and social-selling teams.",
+        "connects": ["LinkedIn", "GTM", "Target Accounts"],
+    },
+    {
+        "slug": "ad-intelligence", "name": "Competitor Ad Intelligence", "role": "Competitive Creative",
+        "badge": "NEW", "cat": "Paid",
+        "icon": _svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+        "summary": "See exactly what your competitors are running. Competitor Ad Intelligence tracks live competitor creative so your messaging stays a step ahead.",
+        "benefit": "Stop guessing competitor strategy - watch their real ads, formats and shifts over time.",
+        "how": "It continuously collects competitor ads across platforms and surfaces messaging themes, creative formats, and changes as they happen.",
+        "who": "Paid media, brand and competitive-intelligence teams.",
+        "connects": ["Paid social", "Search", "Brand"],
+    },
+    {
+        "slug": "target-accounts", "name": "Target Accounts", "role": "Intent-Ranked Worklist",
+        "badge": "CORE", "cat": "Signals",
+        "icon": _svg('<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 17l-5.5 2.8 1-6.3L3 8.9 9 8z"/>'),
+        "summary": "The single view of who to work next. Target Accounts keeps an always-ranked list of your best-fit accounts by live intent, each with a plain-language reason.",
+        "benefit": "One prioritized worklist that updates itself as the market moves - your team always knows the next best call.",
+        "how": "It blends account fit with live signal scoring into a ranked list, complete with the why behind every ranking.",
+        "who": "Sales and SDR leaders who need a daily who-to-call list.",
+        "connects": ["Signal Tracker", "CRM", "Vimi"],
+    },
+]
+AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
+
+
+@app.route("/agents")
+def agents_dir():
+    return render_template("agents.html", page="agents", agents=AGENTS, agent=None, related=[])
+
+
+@app.route("/agents/<slug>")
+def agent_detail(slug):
+    a = AGENTS_BY_SLUG.get(slug)
+    if not a:
+        return redirect(url_for("agents_dir"))
+    related = [x for x in AGENTS if x["slug"] != slug][:3]
+    return render_template("agents.html", page="agent", agents=AGENTS, agent=a, related=related)
+
+
+@app.route("/platform")
+def platform_page():
+    return render_template("agents.html", page="platform", agents=AGENTS, agent=None, related=[])
+
+
+@app.route("/signals")
+def signals_page():
+    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[])
+
+
+@app.route("/solutions")
+def solutions_page():
+    return render_template("agents.html", page="solutions", agents=AGENTS, agent=None, related=[])
+
 # ── Account registry ────────────────────────────────────────────────────────────
 ACCOUNTS = {
     "healthcare": {
