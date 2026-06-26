@@ -354,71 +354,64 @@ AGENTS = [
 ]
 AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
 
-# ── Cumulative signal catalog (across every agent / dashboard) ───────────────────
-SIGNAL_GROUPS = [
-    {
-        "key": "tracker", "source": "Signal Tracker", "accent": "#a78bfa",
-        "icon": _svg('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>'),
-        "tagline": "Company-level buying signals detected across curated sources and the open web.",
-        "signals": [
-            {"name": "Funding Round", "desc": "New capital raised - fresh budget and a mandate to grow."},
-            {"name": "C-Suite Join", "desc": "A new executive arrives with a fresh agenda and new vendors."},
-            {"name": "C-Suite Exit", "desc": "Leadership departs - strategy and priorities are in flux."},
-            {"name": "Acquisition / M&A", "desc": "A deal reshapes the org chart, stack and spending."},
-            {"name": "IPO Signal", "desc": "Going public - scrutiny, scale and new investment."},
-            {"name": "Subsidiary Change", "desc": "A new entity or restructure opens fresh territory."},
-            {"name": "Product Launch", "desc": "A new product means new go-to-market motion to support."},
-            {"name": "Partnership", "desc": "A new alliance signals expansion and shifting needs."},
-            {"name": "Creative Hiring", "desc": "Hiring marketers and creatives - investment in growth."},
-            {"name": "News Mention", "desc": "General coverage that keeps an account warm and in view."},
-        ],
-    },
-    {
-        "key": "web", "source": "Website De-anonymization", "accent": "#34d399",
-        "icon": _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
-        "tagline": "Intent signals from the companies - and people - browsing your site.",
-        "signals": [
-            {"name": "Company Visit", "desc": "An anonymous visitor resolved to a named company account."},
-            {"name": "High-Intent Page View", "desc": "Pricing, demo or product pages viewed - a strong buying cue."},
-            {"name": "Return Visit", "desc": "A company comes back across multiple sessions - rising interest."},
-            {"name": "Known Contact Visit", "desc": "A mapped contact from a target account lands on your site."},
-            {"name": "Deep Session", "desc": "Many pages and long dwell time in a single visit."},
-        ],
-    },
-    {
-        "key": "linkedin", "source": "LinkedIn Intelligence", "accent": "#38bdf8",
-        "icon": _svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17v-5M12 17V8M17 17v-3"/>'),
-        "tagline": "Engagement signals that reveal who on the buying committee is paying attention.",
-        "signals": [
-            {"name": "Post Engagement", "desc": "Likes, comments or shares on relevant posts from target accounts."},
-            {"name": "Profile View", "desc": "Someone from a target account views your team's profiles."},
-            {"name": "Buying-Committee Activity", "desc": "Several stakeholders at one account engage in a short window."},
-            {"name": "Content Interaction", "desc": "Saves, clicks and follows that signal active research."},
-        ],
-    },
-    {
-        "key": "ads", "source": "Competitor Ad Intelligence", "accent": "#f472b6",
-        "icon": _svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
-        "tagline": "Competitive signals from the ads your rivals are actively running.",
-        "signals": [
-            {"name": "New Competitor Ad", "desc": "A rival launches fresh creative - a cue to counter-position."},
-            {"name": "Messaging Shift", "desc": "A competitor changes value props or positioning."},
-            {"name": "New Campaign", "desc": "A new competitor campaign goes live across a platform."},
-            {"name": "Format / Channel Change", "desc": "A shift in ad formats or channels worth matching."},
-        ],
-    },
-    {
-        "key": "intent", "source": "Target Accounts · Intent", "accent": "#fbbf24",
-        "icon": _svg('<path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 17l-5.5 2.8 1-6.3L3 8.9 9 8z"/>'),
-        "tagline": "Composite signals that fold everything above into one readiness score.",
-        "signals": [
-            {"name": "Intent Score Spike", "desc": "An account's composite score jumps - act now."},
-            {"name": "Multi-Signal Stack", "desc": "Several signals fire on one account in a short window."},
-            {"name": "Readiness Change", "desc": "An account crosses into a higher buying-readiness tier."},
-        ],
-    },
+# ── Signal catalog (flat list of everything we track) ────────────────────────────
+_SIG_PAL = ["#a78bfa", "#22d3ee", "#818cf8", "#f472b6", "#34d399", "#fbbf24", "#38bdf8"]
+_SIGNALS_RAW = [
+    ("Funding Round", "Fresh capital, fresh budget.",
+     "A company closes a new round of funding. That means new budget, ambitious targets and a leadership team under pressure to deploy capital fast — one of the strongest moments to start a conversation."),
+    ("C-Suite Join", "A new leader, a new agenda.",
+     "A new executive steps in, often a CMO, CRO or CFO. New leaders rebuild teams, re-evaluate vendors and hunt for quick wins in their first 90 days — making them unusually open to fresh ideas."),
+    ("C-Suite Exit", "Leadership in transition.",
+     "A senior leader departs. Strategy, budgets and vendor relationships all fall into flux, opening a window before a replacement locks in new priorities."),
+    ("Acquisition / M&A", "A deal that reshapes everything.",
+     "The company acquires, merges or gets acquired. Org charts, tech stacks and spending are redrawn — and integration work creates urgent, well-funded needs almost overnight."),
+    ("IPO Signal", "Going public, scaling up.",
+     "A company files to go public or signals IPO intent. Expect new scrutiny, rapid scaling and fresh investment in brand, demand generation and infrastructure."),
+    ("Subsidiary Change", "New entity, new territory.",
+     "A new subsidiary, division or restructure appears. Each new entity behaves like a brand-new account, with its own budget and its own buying motion to win."),
+    ("Product Launch", "A new product to take to market.",
+     "The company ships a new product or enters a new category. Launches demand go-to-market firepower — exactly when marketing and sales support is most valued."),
+    ("Partnership", "A new alliance forms.",
+     "The company announces a partnership, integration or channel deal. Alliances signal expansion, shifting priorities and fresh co-marketing needs."),
+    ("Creative Hiring", "Investing in growth talent.",
+     "The company is hiring marketers, designers and growth roles. Hiring in these functions is a direct signal of budget and ambition behind their growth engine."),
+    ("News Mention", "Staying on the radar.",
+     "The company surfaces in the news. Even routine coverage keeps an account warm, hints at momentum and gives reps a timely, relevant reason to reach out."),
+    ("Company Visit", "Someone is on your site.",
+     "An anonymous visitor is resolved to a named company. Silent web traffic becomes a real account you can route, research and pursue — no form required."),
+    ("High-Intent Page View", "They are eyeing the good stuff.",
+     "A visitor lands on pricing, demo or product pages. These are the pages buyers read when they are seriously evaluating — among the clearest intent cues on the open web."),
+    ("Return Visit", "They keep coming back.",
+     "A company returns across multiple sessions. Repeat visits signal rising, sustained interest worth acting on long before a form is ever filled."),
+    ("Known Contact Visit", "A real buyer, identified.",
+     "A mapped contact from a target account lands on your site. You know exactly who is interested — and exactly who to follow up with."),
+    ("Deep Session", "Deep engagement in one visit.",
+     "A visitor moves through many pages with long dwell time. Depth of engagement in a single session is a strong proxy for genuine, active evaluation."),
+    ("Post Engagement", "They are engaging in public.",
+     "Someone from a target account likes, comments on or shares relevant content. Public engagement quietly reveals who is paying attention right now."),
+    ("Profile View", "They are checking you out.",
+     "A person from a target account views your team's profiles. Quiet research that very often precedes an inbound conversation."),
+    ("Buying-Committee Activity", "The whole committee is moving.",
+     "Multiple stakeholders at one account engage within a short window. When several people lean in together, a buying cycle is usually already underway."),
+    ("Content Interaction", "Active research in progress.",
+     "Saves, follows and repeat clicks that go well beyond a passing glance — the fingerprints of an account actively building a shortlist."),
+    ("New Competitor Ad", "A rival makes a move.",
+     "A competitor launches new ad creative. A timely cue to counter-position your message while their spend is live and in-market."),
+    ("Messaging Shift", "The competition repositions.",
+     "A competitor changes its value propositions or positioning. Early warning to adjust your own narrative and defend your differentiation."),
+    ("New Campaign", "A fresh competitive push.",
+     "A competitor spins up a new campaign across a channel. Visibility into where rivals are investing — and, just as usefully, where the whitespace is."),
+    ("Format / Channel Change", "They are testing new ground.",
+     "A competitor shifts ad formats or channels. A signal of strategy change worth matching, countering or out-maneuvering."),
+    ("Intent Score Spike", "Heat, rising fast.",
+     "An account's composite intent score jumps. Everything we track rolls into one number — and a sharp spike means the moment to act is now."),
+    ("Multi-Signal Stack", "Signals stacking up.",
+     "Several signals fire on a single account in a short window. Stacked signals are the highest-confidence buying indicator the platform produces."),
+    ("Readiness Change", "Crossing into ready.",
+     "An account moves into a higher readiness tier. A clear, plain-language cue that an account has just become a priority worth a call."),
 ]
-
+SIGNALS = [{"name": n, "tagline": t, "blurb": b, "accent": _SIG_PAL[i % len(_SIG_PAL)]}
+           for i, (n, t, b) in enumerate(_SIGNALS_RAW)]
 
 
 @app.route("/agents")
@@ -442,7 +435,7 @@ def platform_page():
 
 @app.route("/signals")
 def signals_page():
-    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[], signal_groups=SIGNAL_GROUPS)
+    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[], signals_list=SIGNALS)
 
 
 @app.route("/solutions")
