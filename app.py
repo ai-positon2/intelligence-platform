@@ -537,7 +537,18 @@ def robots_txt():
 
 @app.route("/")
 def index():
-    return redirect(url_for("hub") if _get_user() else url_for("login_page"))
+    if _get_user():
+        return redirect(url_for("hub"))
+    return render_template("agents.html", page="home", agents=AGENTS, agent=None,
+                           related=[], signals_list=SIGNALS)
+
+@app.route("/privacy")
+def privacy_page():
+    return render_template("agents.html", page="privacy", agents=AGENTS, agent=None, related=[])
+
+@app.route("/terms")
+def terms_page():
+    return render_template("agents.html", page="terms", agents=AGENTS, agent=None, related=[])
 
 @app.route("/login")
 def login_page():
