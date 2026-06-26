@@ -368,16 +368,40 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 <body>
 <!-- page transition -->
 <style>
-#pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 30%,#0a0d1e,#04050d);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .8s cubic-bezier(.4,0,.2,1) .05s forwards}
+#pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 28%,#0b0f22,#04050d 72%);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .85s cubic-bezier(.4,0,.2,1) .05s forwards}
 @keyframes ptReveal{to{opacity:0;visibility:hidden}}
 #pt.show{animation:none;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .42s ease}
-#pt .ptl{width:66px;height:66px;filter:drop-shadow(0 0 18px rgba(99,102,241,.85));animation:ptPulse 1.5s ease-in-out infinite}
-@keyframes ptPulse{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.12);opacity:1}}
-#pt .ptl .ptspin{transform-origin:50% 50%;animation:spin 9s linear infinite}
-@media (prefers-reduced-motion:reduce){ #pt{animation-duration:.001s}#pt .ptl{animation:none}}
+#pt .ptbox{display:flex;flex-direction:column;align-items:center;gap:22px}
+#pt .ptorb{position:relative;width:98px;height:98px}
+#pt .pring{position:absolute;border-radius:50%;border:1.5px solid rgba(124,140,220,.16)}
+#pt .pring.r1{inset:7px}
+#pt .pring.r2{inset:26px;border-color:rgba(165,180,252,.22)}
+#pt .pspin{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:#22d3ee;border-right-color:#8b5cf6;filter:drop-shadow(0 0 7px rgba(99,102,241,.6));animation:ptSpin 1s linear infinite}
+#pt .porbit{position:absolute;inset:0;animation:ptSpin 2.6s linear infinite}
+#pt .porbit i{position:absolute;top:-4px;left:50%;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:#f0abfc;box-shadow:0 0 12px #e879f9}
+#pt .pcore{position:absolute;top:50%;left:50%;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#a5f3fc,#6366f1);box-shadow:0 0 28px rgba(99,102,241,.9),inset 0 0 10px rgba(255,255,255,.45);animation:ptCore 1.7s ease-in-out infinite}
+#pt .ptword{font-family:var(--display),sans-serif;font-size:13px;font-weight:700;letter-spacing:.42em;text-indent:.42em;background:linear-gradient(100deg,#67e8f9,#c4b5fd 45%,#f0abfc 70%,#67e8f9);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ptShine 2.6s linear infinite}
+#pt .ptsub{font-family:var(--mono),monospace;font-size:8.5px;letter-spacing:.34em;color:#6b75a3;text-transform:uppercase;margin-top:-15px}
+#pt .ptbar{width:150px;height:2px;border-radius:2px;background:rgba(124,140,220,.14);overflow:hidden;position:relative;margin-top:2px}
+#pt .ptbar span{position:absolute;left:0;top:0;height:100%;width:40%;border-radius:2px;background:linear-gradient(90deg,transparent,#22d3ee,#8b5cf6,transparent);animation:ptBar 1.15s ease-in-out infinite}
+@keyframes ptSpin{to{transform:rotate(360deg)}}
+@keyframes ptCore{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.16);opacity:1}}
+@keyframes ptShine{to{background-position:220% 0}}
+@keyframes ptBar{0%{transform:translateX(-120%)}100%{transform:translateX(375%)}}
+@media (prefers-reduced-motion:reduce){ #pt{animation-duration:.001s} #pt .pspin,#pt .porbit,#pt .pcore,#pt .ptword,#pt .ptbar span{animation:none} }
 </style>
 <div id="pt" aria-hidden="true">
-  <svg class="ptl" viewBox="0 0 40 40" fill="none"><g class="ptspin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".55"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".75"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
+  <div class="ptbox">
+    <div class="ptorb">
+      <span class="pring r1"></span><span class="pring r2"></span>
+      <span class="pspin"></span>
+      <span class="pcore"></span>
+      <span class="porbit"><i></i></span>
+    </div>
+    <div class="ptword">INTELLIGENCE</div>
+    <div class="ptsub">by Position2</div>
+    <div class="ptbar"><span></span></div>
+  </div>
 </div>
 <script>
 (function(){
