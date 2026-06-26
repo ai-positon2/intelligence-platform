@@ -477,7 +477,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <button class="chip" data-cat="Social" data-cursor>Social</button>
       <button class="chip" data-cat="Paid" data-cursor>Paid</button>
     </div>
-    {% set spans = ['b-feat','b-wide','b-wide','b-third','b-third','b-third'] %}
+    {% set spans = ['b-wide','b-wide','b-wide','b-wide','b-wide','b-wide'] %}
     <div class="bento" id="dirCards">
       {% for a in agents %}
       <a class="acard tilt reveal {{ spans[loop.index0] if loop.index0 < 6 else '' }}" href="/agents/{{ a.slug }}" data-cursor data-cat="{{ a.cat }}" data-name="{{ a.name|lower }} {{ a.role|lower }} {{ a.summary|lower }}" style="transition-delay:{{ loop.index0 * 55 }}ms">
@@ -485,7 +485,6 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
         <h3>{{ a.name }}</h3>
         <div class="role">{{ a.role }}</div>
         <p>{{ a.summary }}</p>
-        {% if loop.first %}<div class="ftags">{% for c in a.connects %}<span class="tag">{{ c }}</span>{% endfor %}</div>{% endif %}
         <div class="foot"><span class="by"><span class="dot">P</span> By Position2</span><span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
       </a>
       {% endfor %}
@@ -562,7 +561,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     <div class="feat">
       <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Real-time signals</h4><p>Funding, leadership moves, M&amp;A, launches and more — detected across the open web as they happen.</p><span class="more">See signals →</span></a>
       <a class="fcard glass tilt reveal" href="/signals" data-cursor style="transition-delay:90ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance — severity, recency and multi-intent stacking decide who to call first.</p><span class="more">How it scores →</span></a>
-      <a class="fcard glass tilt reveal" href="/agents/vimi" data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">Meet Vimi →</span></a>
+      <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">Meet Vimi →</span></a>
     </div>
     <div class="band reveal"><h3>See your market, live.</h3><p>Book a walkthrough on your own target accounts and watch the signal layer light up.</p><button class="btn-grad mag" data-demo data-cursor>Book a demo</button></div>
   </div>
