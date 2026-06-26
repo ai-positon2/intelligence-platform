@@ -509,6 +509,66 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .nv-success p{font-size:14px;color:var(--dim);line-height:1.6;max-width:360px;margin:0 auto}
 .nv-success .nv-submit{max-width:200px;margin:22px auto 0}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}.acard,.fcard{transform:none!important}}
+
+/* ===== proof: logos + testimonials (item 1 — placeholder-safe) ===== */
+.trust{margin-top:30px}
+.trust-l{display:block;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim3);margin-bottom:20px}
+.logos{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+@media (max-width:900px){ .logos{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:520px){ .logos{grid-template-columns:repeat(2,1fr)} }
+.logo-i{display:flex;align-items:center;justify-content:center;height:62px;border:1px dashed var(--line2);border-radius:13px;background:rgba(255,255,255,.022);font-family:var(--display);font-weight:700;font-size:13.5px;color:var(--dim2);opacity:.8;transition:.25s;text-align:center;padding:0 8px}
+.logo-i:hover{opacity:1;color:#fff;transform:translateY(-2px)}
+.tw{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+@media (max-width:900px){ .tw{grid-template-columns:1fr} }
+.tcard{padding:26px;border-radius:18px;display:flex;flex-direction:column;gap:16px}
+.tcard .q{font-family:var(--serif);font-style:italic;font-size:18.5px;line-height:1.5;color:var(--ink)}
+.tcard .who{display:flex;align-items:center;gap:12px;margin-top:auto}
+.tcard .av{width:40px;height:40px;border-radius:50%;flex:0 0 auto;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 14px rgba(139,92,246,.5)}
+.tcard .who b{display:block;font-size:14px;color:#fff;font-weight:700}
+.tcard .who span{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim2);text-transform:uppercase;margin-top:2px}
+.ph-note{margin:20px auto 0;max-width:700px;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--dim3);line-height:1.8}
+.ph-tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#fbbf24;border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);border-radius:999px;padding:3px 9px;margin-bottom:9px}
+
+/* ===== product showcase (item 2) ===== */
+.showcase{display:grid;grid-template-columns:1.12fr .88fr;gap:34px;align-items:center;padding:40px}
+@media (max-width:920px){ .showcase{grid-template-columns:1fr;gap:26px;padding:26px} }
+.sc-shot{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:rgba(255,255,255,.025);min-height:300px;display:flex;align-items:center;justify-content:center}
+.sc-shot img{display:block;width:100%;height:auto}
+.sc-ph{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:40px 24px}
+.sc-ph svg{width:38px;height:38px;stroke:var(--dim2);fill:none}
+.sc-ph b{font-family:var(--display);font-size:15px;color:var(--dim)}
+.sc-ph span{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim3);max-width:250px;line-height:1.7}
+.sc-cap{text-align:center;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim3);margin-top:12px}
+.sc-points{display:flex;flex-direction:column;gap:18px}
+.sc-pt{display:flex;gap:14px;align-items:flex-start}
+.sc-pt .scn{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;color:#06121f;background:linear-gradient(135deg,var(--cyan),var(--violet))}
+.sc-pt b{font-size:15.5px;color:#fff;font-weight:700;font-family:var(--display)}
+.sc-pt p{font-size:13.5px;color:var(--dim);line-height:1.6;margin-top:3px}
+
+/* ===== ICP / use-cases (item 5) ===== */
+.icp{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:28px}
+@media (max-width:900px){ .icp{grid-template-columns:1fr} }
+.icard{padding:24px;border-radius:18px}
+.icard .ir{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px}
+.icard h4{font-family:var(--display);font-size:18px;font-weight:700;color:#fff;margin-bottom:8px}
+.icard p{font-size:13.5px;color:var(--dim);line-height:1.6}
+.icard ul{margin:13px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.icard li{position:relative;padding-left:18px;font-size:13px;color:var(--dim);line-height:1.5}
+.icard li::before{content:'';position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--violet))}
+
+/* ===== competitor differentiation table (item 5) ===== */
+.cmp-wrap{margin-top:28px;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+.cmp{width:100%;border-collapse:collapse;font-size:13px}
+.cmp th,.cmp td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.cmp thead th{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim2);background:rgba(255,255,255,.03)}
+.cmp thead th.us{color:#fff;background:linear-gradient(180deg,rgba(34,211,238,.18),rgba(139,92,246,.18))}
+.cmp td.cap{font-weight:700;color:#fff;font-family:var(--display);width:24%;font-size:13.5px}
+.cmp td.us{color:var(--ink);background:rgba(124,140,220,.06)}
+.cmp td{color:var(--dim);line-height:1.55}
+.cmp tbody tr:hover{background:rgba(255,255,255,.02)}
+.cmp-foot{font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;color:var(--dim3);padding:14px 16px;line-height:1.8;background:rgba(255,255,255,.02)}
+@media (max-width:760px){ .cmp,.cmp thead,.cmp tbody,.cmp th,.cmp td,.cmp tr{display:block} .cmp thead{display:none} .cmp td{border:0;padding:5px 16px} .cmp td.cap{padding-top:15px;border-top:1px solid var(--line)} }
+
 </style>
 </head>
 <body>
@@ -742,6 +802,23 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <a class="fcard glass tilt reveal" href="/signals" data-cursor style="transition-delay:90ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance — severity, recency and multi-intent stacking decide who to call first.</p><span class="more">How it scores →</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">See Vimi in a demo →</span></a>
     </div>
+    <div class="sec-head reveal" style="margin-top:66px"><span class="pill-eye"><span class="dt"></span> How we're different</span><h2 class="h-sec">Where Intelligence <span class="ital grad">fits the landscape.</span></h2></div>
+    <p class="lead reveal" style="text-align:center;margin:0 auto">Most tools do one part of this well. We combine a live intent layer with a team that runs the plays &mdash; here is an honest read of the category.</p>
+    <div class="cmp-wrap reveal">
+      <table class="cmp">
+        <thead><tr><th>Capability</th><th class="us">Intelligence by Position2</th><th>6sense / Demandbase</th><th>ZoomInfo</th><th>RB2B / Koala</th></tr></thead>
+        <tbody>
+          <tr><td class="cap">Primary job</td><td class="us">A live intent layer plus a team that executes on it</td><td>Enterprise ABM suite (intent + B2B advertising)</td><td>B2B contact &amp; company database</td><td>Website visitor de-anonymization</td></tr>
+          <tr><td class="cap">Intent signals</td><td class="us">26 signals across the open web, your site, social &amp; competitor ads &mdash; one score</td><td>Predictive account intent from a large web data co-op</td><td>Contact-level intent plus firmographics</td><td>On-site visit intent only</td></tr>
+          <tr><td class="cap">Website de-anonymization</td><td class="us">Yes, consent-aware where enabled</td><td>Account-level reveal</td><td>Account-level (WebSights)</td><td>Person-level, mostly US traffic</td></tr>
+          <tr><td class="cap">AI that drafts outreach</td><td class="us">Vimi drafts the intro and explains the why</td><td>AI / agent features (often add-ons)</td><td>Copilot (add-on)</td><td>Not a core focus; routes alerts to Slack</td></tr>
+          <tr><td class="cap">Done-for-you execution</td><td class="us">Position2 runs SEO, paid, content &amp; RevOps on the signal</td><td>Software only</td><td>Software only</td><td>Software only</td></tr>
+          <tr><td class="cap">Best for</td><td class="us">Teams who want intent and execution without stitching a stack together</td><td>Large enterprises with in-house ABM operations</td><td>Teams needing broad contact data &amp; dialing</td><td>Lean teams wanting fast, low-cost visitor IDs</td></tr>
+        </tbody>
+      </table>
+      <div class="cmp-foot">Category positioning as of June 2026, based on publicly available materials. Competitor capabilities overlap and evolve, and many offer comparable features via add-ons &mdash; compare against current vendor documentation for your specific use case.</div>
+    </div>
+
     <div class="band reveal"><h3>See your market, live.</h3><p>Book a walkthrough on your own target accounts and watch the signal layer light up.</p><button class="btn-grad mag" data-demo data-cursor>Request access</button></div>
   </div>
 
@@ -786,6 +863,19 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>Always-on programs</h4><p>A continuous motion — not a one-off burst — tuned to live market signal.</p><span class="more">Explore →</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-interest="Build a custom agent" data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><h4>Custom agents</h4><p>Need a signal or workflow we don’t have yet? We build bespoke agents around your exact motion.</p><span class="more">Request one →</span></a>
     </div>
+    <div class="sec-head reveal" style="margin-top:66px"><span class="pill-eye"><span class="dt"></span> Who it's for</span><h2 class="h-sec">Built for the people who <span class="ital grad">own the number.</span></h2></div>
+    <p class="lead reveal" style="text-align:center;margin:0 auto">Different teams act on the same live signal in different ways. Here is where the intelligence layer earns its place &mdash; by role, and by industry.</p>
+    <div class="icp">
+      <div class="icard glass reveal"><div class="ir">By role &middot; Sales leadership</div><h4>VP Sales &amp; SDR leaders</h4><p>Point reps at accounts that are actually in-market &mdash; not a cold, alphabetical list.</p><ul><li>A daily worklist ranked by intent score</li><li>The reason to reach out, ready for the rep</li><li>Fewer dials, more real conversations</li></ul></div>
+      <div class="icard glass reveal" style="transition-delay:70ms"><div class="ir">By role &middot; Marketing</div><h4>Demand gen &amp; ABM</h4><p>Trigger campaigns the moment an account shows intent, and prove which signals drove pipeline.</p><ul><li>Signal-triggered audiences and creative</li><li>Account-level intent for ABM plays</li><li>Spend aimed at accounts in-market now</li></ul></div>
+      <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">By role &middot; RevOps</div><h4>RevOps &amp; enablement</h4><p>Route and score signals inside the CRM your team already runs on.</p><ul><li>Signals scored and synced to HubSpot / Salesforce</li><li>Clean routing rules, no manual triage</li><li>One source of intent truth</li></ul></div>
+    </div>
+    <div class="icp" style="margin-top:18px">
+      <div class="icard glass reveal"><div class="ir">By industry &middot; SaaS &amp; Tech</div><h4>B2B SaaS</h4><p>Catch funding, hiring and tech-change signals that precede a software buying cycle.</p></div>
+      <div class="icard glass reveal" style="transition-delay:70ms"><div class="ir">By industry &middot; Healthcare</div><h4>Healthcare &amp; life sciences</h4><p>Track leadership moves, expansions and program launches across providers and payers.</p></div>
+      <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">By industry &middot; Financial &amp; Pro services</div><h4>Financial &amp; professional services</h4><p>Spot M&amp;A, leadership change and growth signals that open a high-value conversation.</p></div>
+    </div>
+
     <div class="band reveal"><h3>Let’s turn signal into pipeline.</h3><p>Tell us your goals and we’ll show you the plays — and the agents — to get there.</p><button class="btn-grad mag" data-demo data-cursor>Request access</button></div>
   </div>
 {% elif page == 'home' %}
@@ -817,6 +907,31 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <span class="intg-l">Works inside the tools your team already uses</span>
       <div class="intg-row"><span class="intg-i">HubSpot</span><span class="intg-i">Salesforce</span><span class="intg-i">Slack</span><span class="intg-i">LinkedIn</span><span class="intg-i">Google Ads</span><span class="intg-i">Gmail</span><span class="intg-i">Sheets</span></div>
     </div>
+
+    <section class="home-sec">
+      <div class="sec-head reveal"><span class="pill-eye"><span class="dt"></span> Inside the product</span><h2 class="h-sec">See the intelligence layer <span class="ital grad">at work.</span></h2></div>
+      <div class="showcase glass reveal">
+        <div>
+          <div class="sc-shot">
+            <!-- DROP-IN SLOT (item 2): replace the .sc-ph block below with a real screenshot or video, e.g.
+                 <img src="/static/img/signal-tracker.png" alt="Signal Tracker dashboard">
+                 or an embedded <video> / loom iframe of the live dashboard + Vimi. -->
+            <div class="sc-ph">
+              <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M9 18v3M15 18v3M7 21h10"/></svg>
+              <b>Product screenshot slot</b>
+              <span>Drop a real Signal Tracker / Vimi screenshot or short demo video here</span>
+            </div>
+          </div>
+          <div class="sc-cap">Representative product view &middot; replace with a live screenshot</div>
+        </div>
+        <div class="sc-points">
+          <div class="sc-pt"><span class="scn">1</span><div><b>A prioritized worklist</b><p>Every in-market account ranked by one intent score, with the newest signals surfaced on top.</p></div></div>
+          <div class="sc-pt"><span class="scn">2</span><div><b>The reason, in plain language</b><p>Each row shows the signal that fired and why it matters &mdash; no dashboards to decode.</p></div></div>
+          <div class="sc-pt"><span class="scn">3</span><div><b>Vimi drafts the next step</b><p>An embedded analyst researches the account and writes the outreach for you to review and send.</p></div></div>
+          <div class="sc-pt"><span class="scn">4</span><div><b>It acts inside your stack</b><p>Routes to HubSpot, Salesforce, Slack and Gmail, so the work happens where your team already is.</p></div></div>
+        </div>
+      </div>
+    </section>
 
     <section id="how" class="story js-pin">
       <div class="story-pin">
@@ -855,6 +970,27 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
         <div class="pf"><b>24/7</b><span>Real-time detection</span></div>
       </div>
       <p class="proof-by reveal">Built by <b>Position2</b> — a B2B digital-growth agency running demand generation, paid media, SEO, content and RevOps for global brands.</p>
+    </section>
+
+    <section class="home-sec">
+      <div class="trust reveal">
+        <span class="trust-l">Trusted by revenue teams at</span>
+        <div class="logos">
+          <div class="logo-i">Your logo</div>
+          <div class="logo-i">Your logo</div>
+          <div class="logo-i">Your logo</div>
+          <div class="logo-i">Your logo</div>
+          <div class="logo-i">Your logo</div>
+          <div class="logo-i">Your logo</div>
+        </div>
+      </div>
+      <div class="sec-head reveal" style="margin-top:56px"><span class="pill-eye"><span class="dt"></span> Proof</span><h2 class="h-sec">What teams say <span class="ital grad">about the signal.</span></h2></div>
+      <div class="tw">
+        <div class="tcard glass reveal"><p class="q">Customer quote goes here &mdash; the specific outcome they saw and why acting on the signal first made the difference.</p><div class="who"><span class="av"></span><div><b>Name, Title</b><span>Company</span></div></div></div>
+        <div class="tcard glass reveal" style="transition-delay:80ms"><p class="q">A second approved quote &mdash; ideally a number: pipeline created, response rate, or hours saved per week.</p><div class="who"><span class="av"></span><div><b>Name, Title</b><span>Company</span></div></div></div>
+        <div class="tcard glass reveal" style="transition-delay:160ms"><p class="q">A third quote &mdash; the moment they realized they were reaching out before competitors even noticed the signal.</p><div class="who"><span class="av"></span><div><b>Name, Title</b><span>Company</span></div></div></div>
+      </div>
+      <p class="ph-note"><span class="ph-tag">Placeholder &middot; not yet real</span><br>The logos, quotes and names above are drop-in placeholders. Replace each with real, approved customer proof before this goes public &mdash; we do not publish invented testimonials or results.</p>
     </section>
 
     <section class="home-sec">
