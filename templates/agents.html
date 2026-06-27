@@ -188,15 +188,15 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .b-feat{grid-column:span 3;grid-row:span 2}.b-wide{grid-column:span 3}.b-third{grid-column:span 2}
 @media (max-width:980px){.bento{grid-template-columns:repeat(2,1fr)}.b-feat,.b-wide,.b-third{grid-column:span 1;grid-row:auto}}
 @media (max-width:560px){.bento{grid-template-columns:1fr}}
-.acard{position:relative;display:flex;flex-direction:column;padding:26px;border-radius:22px;overflow:hidden;--mx:50%;--my:0%;
+.acard{position:relative;display:flex;flex-direction:column;padding:26px;border-radius:22px;overflow:hidden;--mx:50%;--my:0%;--cat:#818cf8;
   background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.018));border:1px solid var(--line);
   box-shadow:0 24px 60px -34px rgba(0,0,0,.9);transition:transform .15s ease-out,box-shadow .3s,border-color .3s;transform-style:preserve-3d;will-change:transform}
 .acard::before{content:'';position:absolute;inset:0;border-radius:22px;padding:1px;pointer-events:none;
-  background:conic-gradient(from var(--ang,0deg),rgba(34,211,238,.7),rgba(168,85,247,.7),rgba(99,102,241,.7),rgba(34,211,238,.7));
+  background:linear-gradient(140deg,var(--cat),rgba(124,140,220,.16) 55%,transparent);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .35s}
-.acard::after{content:'';position:absolute;inset:0;border-radius:22px;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(300px circle at var(--mx) var(--my),rgba(124,131,255,.22),transparent 60%)}
-.acard:hover{border-color:transparent;box-shadow:0 36px 80px -30px rgba(0,0,0,.95),0 0 50px rgba(99,102,241,.2)}
-.acard:hover::before{opacity:1;animation:angspin 4s linear infinite}
+.acard::after{content:'';position:absolute;inset:0;border-radius:22px;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(320px circle at var(--mx) var(--my),color-mix(in srgb,var(--cat) 26%,transparent),transparent 62%)}
+.acard:hover{border-color:transparent;box-shadow:0 36px 80px -30px rgba(0,0,0,.95),0 0 60px -8px var(--cat)}
+.acard:hover::before{opacity:1}
 .acard:hover::after{opacity:1}
 @keyframes angspin{to{--ang:360deg}}
 @property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
@@ -207,14 +207,17 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .badge.core{color:#a5b4fc;background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.42)}
 .badge.flagship{color:#f0abfc;background:rgba(232,121,249,.14);border:1px solid rgba(232,121,249,.42)}
 .acard h3{font-family:var(--display);font-size:22px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:-.01em}
-.acard .role{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase;margin-bottom:14px}
+.acard .role{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--cat);text-transform:uppercase;margin-bottom:14px}
 .acard p{font-size:14px;line-height:1.62;color:var(--dim);flex:1}
 .acard .foot{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
 .acard .by{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--dim2)}
 .acard .by .dot{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
 .acard .arrow{width:36px;height:36px;border-radius:50%;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;transition:.28s}
-.acard:hover .arrow{background:linear-gradient(135deg,#6366f1,#a855f7);border-color:transparent;transform:translateX(4px) scale(1.05)}
+.acard:hover .arrow{background:linear-gradient(135deg,var(--cat),#a855f7);border-color:transparent;transform:translateX(4px) scale(1.05)}
 .acard .arrow svg{width:16px;height:16px;stroke:#fff}
+.acard .ic{background:linear-gradient(145deg,var(--cat),rgba(99,102,241,.85));box-shadow:0 12px 30px -8px var(--cat),inset 0 1px 0 rgba(255,255,255,.32)}
+.acard .ac-top{position:absolute;top:0;left:26px;right:26px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--cat),transparent);opacity:.42;z-index:1;transition:opacity .3s}
+.acard:hover .ac-top{opacity:1}
 .b-feat .ic{width:62px;height:62px;border-radius:18px}.b-feat .ic svg{width:30px;height:30px}
 .b-feat h3{font-size:30px;margin-top:4px}
 .b-feat p{font-size:15.5px;max-width:90%}
@@ -820,9 +823,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <button class="chip" data-cat="Paid" data-cursor>Paid</button>
     </div>
     {% set spans = ['b-wide','b-wide','b-wide','b-wide','b-wide','b-wide'] %}
+    {% set catcol = {'Signals':'#a78bfa','Web':'#34d399','Social':'#38bdf8','Paid':'#f472b6','AI':'#818cf8'} %}
     <div class="bento" id="dirCards">
       {% for a in agents %}
-      <a class="acard tilt reveal {{ spans[loop.index0] if loop.index0 < 6 else '' }}" href="/agents/{{ a.slug }}" data-cursor data-cat="{{ a.cat }}" data-name="{{ a.name|lower }} {{ a.role|lower }} {{ a.summary|lower }}" style="transition-delay:{{ loop.index0 * 55 }}ms">
+      <a class="acard tilt reveal {{ spans[loop.index0] if loop.index0 < 6 else '' }}" href="/agents/{{ a.slug }}" data-cursor data-cat="{{ a.cat }}" data-name="{{ a.name|lower }} {{ a.role|lower }} {{ a.summary|lower }}" style="--cat:{{ catcol.get(a.cat, '#818cf8') }};transition-delay:{{ loop.index0 * 55 }}ms">
+        <span class="ac-top" aria-hidden="true"></span>
         <div class="top"><div class="ic">{{ a.icon|safe }}</div>{% if a.badge %}<span class="badge {{ a.badge|lower }}">{{ a.badge }}</span>{% endif %}</div>
         <h3>{{ a.name }}</h3>
         <div class="role">{{ a.role }}</div>
