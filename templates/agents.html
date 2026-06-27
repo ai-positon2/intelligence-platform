@@ -54,8 +54,8 @@ a{color:inherit;text-decoration:none}
 .wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:0 26px}
 
 /* custom cursor */
-#cdot{position:fixed;top:0;left:0;width:7px;height:7px;border-radius:50%;background:#bcd0ff;z-index:99998;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:screen}
-#cring{position:fixed;top:0;left:0;width:34px;height:34px;border:1.5px solid rgba(165,180,252,.55);border-radius:50%;z-index:99998;pointer-events:none;transform:translate(-50%,-50%);transition:width .22s,height .22s,border-color .22s,background .22s}
+#cdot{position:fixed;top:0;left:0;width:7px;height:7px;border-radius:50%;background:#bcd0ff;z-index:99998;pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:screen;will-change:transform}
+#cring{position:fixed;top:0;left:0;width:34px;height:34px;border:1.5px solid rgba(165,180,252,.55);border-radius:50%;z-index:99998;pointer-events:none;transform:translate(-50%,-50%);transition:width .18s,height .18s,border-color .18s,background .18s;will-change:transform}
 #cring.hot{width:58px;height:58px;border-color:rgba(34,211,238,.9);background:rgba(34,211,238,.07)}
 
 /* scroll progress */
@@ -1274,11 +1274,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   if(FINE && !RM){
     var dot=document.getElementById('cdot'), ring=document.getElementById('cring');
     var mx=innerWidth/2,my=innerHeight/2,rx=mx,ry=my;
-    window.addEventListener('mousemove',function(e){ mx=e.clientX; my=e.clientY;
-      dot.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';
+    // store only on move (cheap); batch all DOM writes in one rAF for buttery motion
+    window.addEventListener('mousemove',function(e){ mx=e.clientX; my=e.clientY; },{passive:true});
+    (function loop(){
+      rx+=(mx-rx)*0.4; ry+=(my-ry)*0.4;                 // ring: fast, snappy follow
+      dot.style.transform='translate3d('+mx+'px,'+my+'px,0) translate(-50%,-50%)';   // dot: 1:1 with pointer
+      ring.style.transform='translate3d('+rx+'px,'+ry+'px,0) translate(-50%,-50%)';
       document.documentElement.style.setProperty('--mx',mx+'px'); document.documentElement.style.setProperty('--my',my+'px');
-    },{passive:true});
-    (function loop(){ rx+=(mx-rx)*.18; ry+=(my-ry)*.18; ring.style.transform='translate('+rx+'px,'+ry+'px) translate(-50%,-50%)'; requestAnimationFrame(loop); })();
+      requestAnimationFrame(loop);
+    })();
     document.addEventListener('mouseover',function(e){ if(e.target.closest('a,button,input,textarea,.chip,.tilt,.onode,[data-cursor]')) ring.classList.add('hot'); });
     document.addEventListener('mouseout',function(e){ if(e.target.closest('a,button,input,textarea,.chip,.tilt,.onode,[data-cursor]')) ring.classList.remove('hot'); });
   }
