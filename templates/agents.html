@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#040510; --ink:#eef1fb; --dim:#a6b0d6; --dim2:#828fb8; --dim3:#5b6492;
+  --bg:#040510; --ink:#eef1fb; --dim:#a6b0d6; --dim2:#99a4cc; --dim3:#7e89b8;
   --cyan:#22d3ee; --violet:#8b5cf6; --indigo:#6366f1; --pink:#e879f9; --lime:#a3e635;
   --line:rgba(124,140,220,.16); --line2:rgba(124,140,220,.30);
   --display:'Bricolage Grotesque',system-ui,sans-serif; --serif:'Instrument Serif',Georgia,serif;
@@ -628,6 +628,49 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 @media (max-width:520px){ .dash-grid{grid-template-columns:1fr} .frow{grid-template-columns:1fr auto auto} .fwhen{display:none} }
 @media (prefers-reduced-motion: reduce){ .dash-scan,.bars span,.dash-ttl .dd,.dash-live i{animation:none} }
 
+
+/* ===== a11y: visible focus + reduced-motion opt-outs (WCAG AA pass) ===== */
+:focus{outline:none}
+:focus-visible{outline:2px solid #67e8f9;outline-offset:3px;border-radius:5px}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid #67e8f9;outline-offset:3px}
+@media (prefers-reduced-motion:reduce){
+  #cdot,#cring{display:none!important}
+  body,a,button,.chip,.tilt,.onode,[data-cursor]{cursor:auto!important}
+  .nv-field input,.nv-field textarea{cursor:text!important}
+}
+/* play icon for low-friction CTA */
+.ic-play{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;vertical-align:-4px;margin-right:6px}
+.ic-play path{fill:currentColor;stroke:none}
+.band-cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;align-items:center}
+
+/* ===== signals: grouped + scannable ===== */
+.sgroup{margin-top:36px}
+.sgroup:first-child{margin-top:14px}
+.sgroup-h{display:flex;align-items:center;gap:13px;margin-bottom:2px;padding:0 4px 0 2px}
+.sgroup-t{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#cdd6f6;white-space:nowrap}
+.sgroup-c{font-family:var(--mono);font-size:10px;color:var(--dim2);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+.sgroup-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
+
+/* ===== 2-min demo modal ===== */
+.vmodal{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:24px}
+.vmodal[hidden]{display:none}
+.vmodal-ov{position:absolute;inset:0;background:rgba(4,5,13,.74);backdrop-filter:blur(6px)}
+.vmodal-card{position:relative;z-index:1;width:min(760px,100%);padding:26px;border-radius:22px;animation:vmIn .3s cubic-bezier(.2,.9,.25,1)}
+@keyframes vmIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){ .vmodal-card{animation:none} }
+.vmodal-x{position:absolute;top:14px;right:16px;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim);font-size:22px;line-height:1;cursor:pointer;transition:.2s}
+.vmodal-x:hover{color:#fff;border-color:var(--line2)}
+.vmodal-h h3{font-family:var(--display);font-size:22px;font-weight:700;color:#fff;margin-top:10px}
+.vframe{position:relative;aspect-ratio:16/9;margin-top:16px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.vframe iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:30px}
+.vph-play{width:60px;height:60px;color:#a5b4fc}
+.vph-play svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.3}
+.vph-play path{fill:currentColor;stroke:none}
+.vph b{font-family:var(--display);font-size:17px;color:#fff}
+.vph-note{font-size:12.5px;color:var(--dim2);max-width:430px;line-height:1.6}
+.vmodal-f{margin-top:18px;text-align:center}
+
 </style>
 </head>
 <body>
@@ -671,6 +714,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 <script>
 (function(){
   var pt=document.getElementById('pt'); if(!pt) return;
+  var RMpt=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches; if(RMpt) return;
   function go(href){ pt.classList.add('show'); setTimeout(function(){ window.location.href=href; },470); }
   document.addEventListener('click',function(e){
     if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return;
@@ -893,15 +937,22 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <div class="stat glass"><b>1</b><span>Unified intent score</span></div>
     </div>
     <div class="search reveal" style="max-width:360px;margin-top:30px"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="sigSearch" type="text" placeholder="Search signals…" aria-label="Search signals" data-cursor></div>
-    <div class="slist" id="sigList">
-      {% for s in signals_list %}
-      <div class="srow reveal" data-name="{{ s.name|lower }} {{ s.tagline|lower }} {{ s.blurb|lower }}" style="--ac:{{ s.accent }};transition-delay:{{ (loop.index0 % 6) * 40 }}ms">
-        <div class="num"><span class="nd"></span>{{ '%02d'|format(loop.index) }}</div>
-        <div class="sbody">
-          <h3>{{ s.name }}<span class="tl">{{ s.tagline }}</span></h3>
-          <p>{{ s.blurb }}</p>
+    <div id="sigList">
+      {% for g in signal_groups %}
+      <section class="sgroup" data-sgroup>
+        <div class="sgroup-h"><span class="sgroup-t">{{ g['name'] }}</span><span class="sgroup-c">{{ g['items']|count }}</span></div>
+        <div class="slist">
+          {% for s in g['items'] %}
+          <div class="srow reveal" data-name="{{ s.name|lower }} {{ s.tagline|lower }} {{ s.blurb|lower }}" style="--ac:{{ s.accent }};transition-delay:{{ (loop.index0 % 6) * 40 }}ms">
+            <div class="num"><span class="nd"></span>{{ '%02d'|format(loop.index) }}</div>
+            <div class="sbody">
+              <h3>{{ s.name }}<span class="tl">{{ s.tagline }}</span></h3>
+              <p>{{ s.blurb }}</p>
+            </div>
+          </div>
+          {% endfor %}
         </div>
-      </div>
+      </section>
       {% endfor %}
     </div>
     <div class="snull" id="sigNull">No signals match that search.</div>
@@ -945,7 +996,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <p class="lead reveal in" style="transition-delay:160ms;margin:0 auto;text-align:center">We watch the open web, your site and social for the moments that signal intent — then hand your team the exact account to reach, and why.</p>
       <div class="hero-cta reveal in" style="transition-delay:240ms;justify-content:center">
         <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
-        <a class="btn-ghost" href="#how" data-cursor>See how it works ↓</a>
+        <button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button>
       </div>
     </header>
 
@@ -1099,7 +1150,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       </div>
     </section>
 
-    <div class="band reveal"><h3>See it on your accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><button class="btn-grad mag" data-demo data-cursor>Request access</button></div>
+    <div class="band reveal"><h3>See it on your accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button></div></div>
   </div>
 
 {% elif page == 'privacy' %}
@@ -1220,7 +1271,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
   window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
 
   // custom cursor
-  if(FINE){
+  if(FINE && !RM){
     var dot=document.getElementById('cdot'), ring=document.getElementById('cring');
     var mx=innerWidth/2,my=innerHeight/2,rx=mx,ry=my;
     window.addEventListener('mousemove',function(e){ mx=e.clientX; my=e.clientY;
@@ -1344,6 +1395,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     var sigSearch=document.getElementById('sigSearch'), sigNull=document.getElementById('sigNull');
     sigSearch.addEventListener('input',function(){ var q=(sigSearch.value||'').toLowerCase().trim(), shown=0;
       sigList.querySelectorAll('.srow').forEach(function(r){ var ok=!q||(r.getAttribute('data-name')||'').indexOf(q)>=0; r.classList.toggle('hide',!ok); if(ok) shown++; });
+      sigList.querySelectorAll('[data-sgroup]').forEach(function(gg){ gg.style.display=gg.querySelector('.srow:not(.hide)')?'':'none'; });
       sigNull.style.display=shown?'none':'block'; });
   }
 
@@ -1525,6 +1577,119 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
     io.observe(root);
   } else { start(); }
   document.addEventListener('visibilitychange',function(){ if(document.hidden){ stop(); } else { start(); } });
+})();
+</script>
+
+<!-- 2-minute demo modal (low-friction CTA target) -->
+<div class="vmodal" id="vmodal" hidden aria-hidden="true">
+  <div class="vmodal-ov" data-vclose></div>
+  <div class="vmodal-card glass" role="dialog" aria-modal="true" aria-labelledby="vmodal-t">
+    <button class="vmodal-x" type="button" data-vclose aria-label="Close demo">&times;</button>
+    <div class="vmodal-h"><span class="pill-eye"><span class="dt"></span> 2-minute tour</span><h3 id="vmodal-t">See the intelligence layer in action</h3></div>
+    <div class="vframe" id="vframe">
+      <div class="vph">
+        <span class="vph-play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg></span>
+        <b>2-minute product tour</b>
+        <span class="vph-note">Walkthrough video coming soon. To enable it, drop a YouTube/Loom embed URL into <code>DEMO_VIDEO_URL</code> in the script. Until then, the live animated preview on the homepage shows the product in motion.</span>
+      </div>
+    </div>
+    <div class="vmodal-f"><button class="btn-grad mag" type="button" data-demo data-interest="Request access" data-cursor>Request access</button></div>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+  // ============ Analytics / experimentation loop (vendor-neutral; add keys to activate) ============
+  var CFG = window.__P2A__ = window.__P2A__ || {
+    ga4: '',                 /* 'G-XXXXXXX'  Google Analytics 4 */
+    plausible: '',           /* 'intelligence.position2.com'  Plausible domain */
+    posthogKey: '',          /* 'phc_xxx'  PostHog: analytics + A/B flags + session replay */
+    posthogHost: 'https://us.i.posthog.com',
+    sessionReplay: false     /* requires posthogKey */
+  };
+  window.dataLayer = window.dataLayer || [];
+  function track(ev, props){
+    props = props || {};
+    try { window.dataLayer.push(Object.assign({event: ev}, props)); } catch(e){}
+    try { if (typeof window.gtag === 'function') window.gtag('event', ev, props); } catch(e){}
+    try { if (window.posthog && window.posthog.capture) window.posthog.capture(ev, props); } catch(e){}
+    try { if (window.plausible) window.plausible(ev, {props: props}); } catch(e){}
+  }
+  window.track = track;
+
+  if (CFG.ga4){
+    var g = document.createElement('script'); g.async = true;
+    g.src = 'https://www.googletagmanager.com/gtag/js?id=' + CFG.ga4; document.head.appendChild(g);
+    window.gtag = function(){ window.dataLayer.push(arguments); };
+    window.gtag('js', new Date()); window.gtag('config', CFG.ga4);
+  }
+  if (CFG.plausible){
+    var p = document.createElement('script'); p.defer = true;
+    p.setAttribute('data-domain', CFG.plausible); p.src = 'https://plausible.io/js/script.manual.js';
+    document.head.appendChild(p);
+    window.plausible = window.plausible || function(){ (window.plausible.q = window.plausible.q || []).push(arguments); };
+  }
+  if (CFG.posthogKey){
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    window.posthog.init(CFG.posthogKey, {api_host: CFG.posthogHost, capture_pageview: false, disable_session_recording: !CFG.sessionReplay});
+  }
+
+  // funnel instrumentation
+  track('page_view', {path: location.pathname});
+  document.addEventListener('click', function(e){
+    if (e.target.closest('[data-video]')) { track('cta_watch_demo', {path: location.pathname}); return; }
+    var a = e.target.closest('[data-demo]');
+    if (a) { track('lead_form_open', {interest: a.getAttribute('data-interest') || 'Request access', path: location.pathname}); return; }
+    var nav = e.target.closest('nav a');
+    if (nav) { track('nav_click', {to: nav.getAttribute('href') || ''}); }
+  }, true);
+  // the lead form can fire a success event: document.dispatchEvent(new CustomEvent('p2:lead_submit',{detail:{...}}))
+  document.addEventListener('p2:lead_submit', function(ev){ track('lead_submit', (ev && ev.detail) || {}); });
+
+  // minimal A/B helper: buckets the visitor, fires an exposure event, returns the variant
+  window.experiment = function(name, variants){
+    try {
+      var k = 'p2_exp_' + name, v = localStorage.getItem(k);
+      if (!v) { v = variants[Math.floor(Math.random() * variants.length)]; localStorage.setItem(k, v); }
+      track('experiment_exposure', {experiment: name, variant: v});
+      return v;
+    } catch(e){ return variants[0]; }
+  };
+  /* Example (left disabled so copy doesn't change without intent):
+     var v = window.experiment('hero_cta', ['Request access','Get early access']); */
+
+  // ============ 2-minute demo modal control (accessible) ============
+  var vm = document.getElementById('vmodal');
+  if (vm){
+    var DEMO_VIDEO_URL = '';  /* <-- paste a YouTube/Loom EMBED url to enable the real video */
+    var lastFocus = null;
+    function vopen(){
+      lastFocus = document.activeElement;
+      if (DEMO_VIDEO_URL){
+        document.getElementById('vframe').innerHTML =
+          '<iframe src="' + DEMO_VIDEO_URL + '" title="2-minute product tour" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+      }
+      vm.hidden = false; vm.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
+      var x = vm.querySelector('.vmodal-x'); if (x) x.focus();
+    }
+    function vclose(){
+      vm.hidden = true; vm.setAttribute('aria-hidden', 'true'); document.body.style.overflow = '';
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+    document.addEventListener('click', function(e){
+      if (e.target.closest('[data-video]')) { e.preventDefault(); vopen(); return; }
+      if (e.target.closest('[data-vclose]')) { vclose(); return; }
+      if (!vm.hidden && e.target.closest('[data-demo]')) { vclose(); }
+    });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !vm.hidden) vclose(); });
+    vm.addEventListener('keydown', function(e){
+      if (e.key !== 'Tab') return;
+      var f = vm.querySelectorAll('button, [href], iframe, input, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return; var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
 })();
 </script>
 
