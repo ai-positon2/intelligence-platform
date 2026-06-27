@@ -371,10 +371,16 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .step-n{font-family:var(--display);font-weight:800;font-size:42px;line-height:1;background:linear-gradient(120deg,#67e8f9,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:.92}
 .step h4{font-family:var(--display);font-size:19px;font-weight:700;color:#fff;margin:14px 0 8px}
 .step p{font-size:14.5px;line-height:1.65;color:var(--dim)}
-.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:44px 30px;text-align:center}
-@media (max-width:720px){.proof{grid-template-columns:repeat(2,1fr)}}
-.pf b{display:block;font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:-.02em;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
-.pf span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--dim3);margin-top:8px;text-transform:uppercase}
+.proof{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;text-align:center;position:relative;overflow:hidden}
+.proof::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(640px 200px at 50% -12%,rgba(124,131,255,.14),transparent 70%)}
+.pf{position:relative;padding:48px 24px 40px;display:flex;flex-direction:column;align-items:center;transition:background .3s}
+.pf:hover{background:rgba(255,255,255,.028)}
+.pf + .pf::before{content:'';position:absolute;left:0;top:30px;bottom:30px;width:1px;background:linear-gradient(180deg,transparent,var(--line2),transparent)}
+.pfi{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;background:linear-gradient(135deg,rgba(34,211,238,.16),rgba(139,92,246,.20));border:1px solid var(--line2);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 12px 28px -16px rgba(99,102,241,.8)}
+.pfi svg{width:22px;height:22px;stroke:#a5b4fc;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:720px){ .proof{grid-template-columns:1fr} .pf{padding:34px 24px} .pf + .pf::before{left:30px;right:30px;top:0;bottom:auto;width:auto;height:1px;background:linear-gradient(90deg,transparent,var(--line2),transparent)} }
+.pf b{display:block;font-family:var(--display);font-size:48px;font-weight:800;letter-spacing:-.03em;line-height:1;background:linear-gradient(120deg,#fff 28%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pf span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim2);margin-top:14px;text-transform:uppercase}
 .proof-by{text-align:center;color:var(--dim);font-size:14.5px;margin:22px auto 0;max-width:680px}
 .proof-by b{color:#fff;font-weight:700}
 .priv{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:52px;align-items:center}
@@ -510,14 +516,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .nv-success .nv-submit{max-width:200px;margin:22px auto 0}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}.acard,.fcard{transform:none!important}}
 
-/* ===== proof: logos + testimonials (item 1 — placeholder-safe) ===== */
-.trust{margin-top:30px}
-.trust-l{display:block;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim3);margin-bottom:20px}
-.logos{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
-@media (max-width:900px){ .logos{grid-template-columns:repeat(3,1fr)} }
-@media (max-width:520px){ .logos{grid-template-columns:repeat(2,1fr)} }
-.logo-i{display:flex;align-items:center;justify-content:center;height:62px;border:1px dashed var(--line2);border-radius:13px;background:rgba(255,255,255,.022);font-family:var(--display);font-weight:700;font-size:13.5px;color:var(--dim2);opacity:.8;transition:.25s;text-align:center;padding:0 8px}
-.logo-i:hover{opacity:1;color:#fff;transform:translateY(-2px)}
+/* ===== testimonials (item 1 — placeholder-safe) ===== */
 .tw{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:28px}
 @media (max-width:900px){ .tw{grid-template-columns:1fr} }
 .tcard{padding:32px;border-radius:18px;display:flex;flex-direction:column;gap:18px}
@@ -1043,27 +1042,25 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 
     <section class="home-sec">
       <div class="proof glass reveal">
-        <div class="pf"><b data-count="26">0</b><span>Buying signals tracked</span></div>
-        <div class="pf"><b data-count="4">0</b><span>Always-on agents</span></div>
-        <div class="pf"><b>2</b><span>Disciplines · GTM + SEO</span></div>
-        <div class="pf"><b>24/7</b><span>Real-time detection</span></div>
+        <div class="glow-line"></div>
+        <div class="pf">
+          <span class="pfi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span>
+          <b data-count="26">0</b><span>Buying signals tracked</span>
+        </div>
+        <div class="pf">
+          <span class="pfi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></span>
+          <b data-count="4">0</b><span>Always-on agents</span>
+        </div>
+        <div class="pf">
+          <span class="pfi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <b>24/7</b><span>Real-time detection</span>
+        </div>
       </div>
       <p class="proof-by reveal">Built by <b>Position2</b> — a B2B digital-growth agency running demand generation, paid media, SEO, content and RevOps for global brands.</p>
     </section>
 
     <section class="home-sec">
-      <div class="trust reveal" style="margin-top:8px">
-        <span class="trust-l">Trusted by revenue teams at</span>
-        <div class="logos">
-          <div class="logo-i">Your logo</div>
-          <div class="logo-i">Your logo</div>
-          <div class="logo-i">Your logo</div>
-          <div class="logo-i">Your logo</div>
-          <div class="logo-i">Your logo</div>
-          <div class="logo-i">Your logo</div>
-        </div>
-      </div>
-      <div class="sec-head reveal" style="margin-top:84px"><span class="pill-eye"><span class="dt"></span> Proof</span><h2 class="h-sec">What teams say <span class="ital grad">about the signal.</span></h2></div>
+      <div class="sec-head reveal"><span class="pill-eye"><span class="dt"></span> Proof</span><h2 class="h-sec">What teams say <span class="ital grad">about the signal.</span></h2></div>
       <div class="tw">
         <div class="tcard glass reveal"><p class="q">Customer quote here &mdash; the outcome they saw, and why acting first mattered.</p><div class="who"><span class="av"></span><div><b>Name, Title</b><span>Company</span></div></div></div>
         <div class="tcard glass reveal" style="transition-delay:80ms"><p class="q">A second quote &mdash; ideally a number: pipeline created or hours saved.</p><div class="who"><span class="av"></span><div><b>Name, Title</b><span>Company</span></div></div></div>
