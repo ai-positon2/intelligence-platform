@@ -218,6 +218,15 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .acard .ic{background:linear-gradient(145deg,var(--cat),rgba(99,102,241,.85));box-shadow:0 12px 30px -8px var(--cat),inset 0 1px 0 rgba(255,255,255,.32)}
 .acard .ac-top{position:absolute;top:0;left:26px;right:26px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--cat),transparent);opacity:.42;z-index:1;transition:opacity .3s}
 .acard:hover .ac-top{opacity:1}
+.acard .ac-metric{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;margin-top:16px;font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;color:var(--cat);background:color-mix(in srgb,var(--cat) 13%,transparent);border:1px solid color-mix(in srgb,var(--cat) 32%,transparent);padding:6px 12px;border-radius:999px}
+.acard .ac-metric::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--cat);box-shadow:0 0 9px var(--cat);flex:0 0 auto}
+.acard.b-feat{padding:30px}
+.acard.b-feat h3{font-size:27px}
+.acard.b-feat p{font-size:15px}
+.acard.b-feat .ac-metric{font-size:11.5px;margin-top:20px;padding:8px 14px}
+.shead-sub{margin-top:12px;max-width:580px;font-size:14.5px;line-height:1.62;color:var(--dim)}
+.detail-metric{display:inline-flex;align-items:center;gap:8px;margin-left:12px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#7dd3fc;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.34);padding:6px 12px;border-radius:999px}
+.detail-metric::before{content:'';width:5px;height:5px;border-radius:50%;background:#38bdf8;box-shadow:0 0 9px #38bdf8}
 .b-feat .ic{width:62px;height:62px;border-radius:18px}.b-feat .ic svg{width:30px;height:30px}
 .b-feat h3{font-size:30px;margin-top:4px}
 .b-feat p{font-size:15.5px;max-width:90%}
@@ -785,13 +794,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="hero-l">
         <span class="pill-eye reveal in"><span class="dt"></span> Agent directory · Position2</span>
         <h1 class="h-hero reveal in" style="transition-delay:80ms">Meet the agents<br>that <span class="ital grad">never sleep.</span></h1>
-        <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents that find the moment, name the buyer, and hand your reps the next move. Browse what we’ve built — or have us build one just for you.</p>
+        <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents spanning intent, SEO, content, GEO and paid — they find the moment, name the buyer, and hand your team the next move. Browse what we’ve built — or have us build one just for you.</p>
         <div class="hero-cta reveal in" style="transition-delay:240ms">
           <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
           <a class="btn-ghost" href="#dir" data-cursor>Explore agents ↓</a>
         </div>
         <div class="hero-stats reveal in" style="transition-delay:320ms">
-          <a class="hs" href="#dir" data-cursor><b data-count="4">0</b><span>Always-on agents</span></a>
+          <a class="hs" href="#dir" data-cursor><b data-count="{{ agents|length }}">0</b><span>Always-on agents</span></a>
           <a class="hs" href="/signals" data-cursor><b data-count="26">0</b><span>Signal types</span></a>
           <a class="hs" href="/signals" data-cursor><b>24/7</b><span>Real-time</span></a>
         </div>
@@ -825,27 +834,29 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
   <div class="wrap" id="dir">
     <div class="shead">
-      <div><span class="pill-eye"><span class="dt"></span> The directory</span><h2 style="margin-top:14px">Browse the lineup</h2></div>
+      <div><span class="pill-eye"><span class="dt"></span> The directory</span><h2 style="margin-top:14px">Your always-on growth team</h2><p class="shead-sub">{{ agents|length }} specialized agents across intent, SEO, content, GEO and paid &mdash; each one ships work, not dashboards.</p></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="dirSearch" type="text" placeholder="Search agents…" aria-label="Search agents" data-cursor></div>
     </div>
     <div class="chips" id="dirChips">
       <button class="chip on" data-cat="all" data-cursor>All</button>
-      <button class="chip" data-cat="AI" data-cursor>AI</button>
       <button class="chip" data-cat="Signals" data-cursor>Signals</button>
-      <button class="chip" data-cat="Web" data-cursor>Web</button>
-      <button class="chip" data-cat="Social" data-cursor>Social</button>
+      <button class="chip" data-cat="GEO" data-cursor>AI Search / GEO</button>
+      <button class="chip" data-cat="SEO" data-cursor>SEO</button>
+      <button class="chip" data-cat="Content" data-cursor>Content</button>
       <button class="chip" data-cat="Paid" data-cursor>Paid</button>
+      <button class="chip" data-cat="Social" data-cursor>Social</button>
+      <button class="chip" data-cat="Web" data-cursor>Web</button>
+      <button class="chip" data-cat="Analytics" data-cursor>Analytics</button>
     </div>
-    {% set spans = ['b-wide','b-wide','b-wide','b-wide','b-wide','b-wide'] %}
-    {% set catcol = {'Signals':'#a78bfa','Web':'#34d399','Social':'#38bdf8','Paid':'#f472b6','AI':'#818cf8'} %}
     <div class="bento" id="dirCards">
       {% for a in agents %}
-      <a class="acard tilt reveal {{ spans[loop.index0] if loop.index0 < 6 else '' }}" href="/agents/{{ a.slug }}" data-cursor data-cat="{{ a.cat }}" data-name="{{ a.name|lower }} {{ a.role|lower }} {{ a.summary|lower }}" style="--cat:{{ catcol.get(a.cat, '#818cf8') }};transition-delay:{{ loop.index0 * 55 }}ms">
+      <a class="acard tilt reveal {{ 'b-feat' if loop.index0 < 2 else 'b-third' }}" href="/agents/{{ a.slug }}" data-cursor data-cat="{{ a.cat }}" data-name="{{ a.name|lower }} {{ a.role|lower }} {{ a.summary|lower }} {{ a.cat|lower }}" style="--cat:{{ a.accent }};transition-delay:{{ loop.index0 * 45 }}ms">
         <span class="ac-top" aria-hidden="true"></span>
         <div class="top"><div class="ic">{{ a.icon|safe }}</div>{% if a.badge %}<span class="badge {{ a.badge|lower }}">{{ a.badge }}</span>{% endif %}</div>
         <h3>{{ a.name }}</h3>
         <div class="role">{{ a.role }}</div>
         <p>{{ a.summary }}</p>
+        {% if a.metric %}<div class="ac-metric">{{ a.metric }}</div>{% endif %}
         <div class="foot"><span class="by"><span class="dot">P</span> By Position2</span><span class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
       </a>
       {% endfor %}
@@ -865,7 +876,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="halo"><div class="ic">{{ agent.icon|safe }}</div></div>
       <div>
         <h1 class="h-hero" style="font-size:clamp(38px,5.4vw,68px);margin:0 0 10px">{{ agent.name }}</h1>
-        <span class="pill-eye"><span class="dt"></span> {{ agent.role }}</span>
+        <span class="pill-eye"><span class="dt"></span> {{ agent.role }}</span>{% if agent.metric %}<span class="detail-metric">{{ agent.metric }}</span>{% endif %}
       </div>
     </div>
     <div class="detail-grid">
@@ -915,7 +926,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     </div>
     <div class="stats reveal">
       <a class="stat glass" href="/signals" data-cursor><b data-count="26">0</b><span>Signal types</span></a>
-      <a class="stat glass" href="/agents" data-cursor><b data-count="4">0</b><span>Always-on agents</span></a>
+      <a class="stat glass" href="/agents" data-cursor><b data-count="{{ agents|length }}">0</b><span>Always-on agents</span></a>
       <a class="stat glass" href="/solutions" data-cursor><b data-count="2">0</b><span>Disciplines</span></a>
       <a class="stat glass" href="/signals" data-cursor><b>24/7</b><span>Always-on</span></a>
     </div>
@@ -1125,7 +1136,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         </div>
         <div class="pf">
           <span class="pfi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="4.6" r="1.9"/><circle cx="12" cy="19.4" r="1.9"/><circle cx="4.6" cy="12" r="1.9"/><circle cx="19.4" cy="12" r="1.9"/><path d="M12 6.6v2.8M12 14.6v2.8M6.6 12h2.8M14.6 12h2.8"/></svg></span>
-          <b data-count="4">0</b><i class="pfu"></i><span>Always-on agents</span>
+          <b data-count="{{ agents|length }}">0</b><i class="pfu"></i><span>Always-on agents</span>
         </div>
         <div class="pf">
           <span class="pfi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.4V12l3.2 1.9"/></svg></span>
@@ -1708,5 +1719,35 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 })();
 </script>
 
+<script>
+(function(){
+  var grid=document.getElementById('dirCards'); if(!grid) return;
+  var cards=Array.prototype.slice.call(grid.querySelectorAll('.acard'));
+  var chips=Array.prototype.slice.call(document.querySelectorAll('#dirChips .chip'));
+  var search=document.getElementById('dirSearch');
+  var none=document.getElementById('dirNo');
+  var cat='all', q='';
+  function apply(){
+    var shown=0;
+    cards.forEach(function(c){
+      var okc = cat==='all' || (c.getAttribute('data-cat')||'')===cat;
+      var okq = !q || (c.getAttribute('data-name')||'').indexOf(q)>=0;
+      var ok = okc && okq;
+      c.style.display = ok ? '' : 'none';
+      if(ok) shown++;
+    });
+    if(none) none.style.display = shown ? 'none' : 'block';
+  }
+  chips.forEach(function(ch){
+    ch.addEventListener('click',function(){
+      chips.forEach(function(x){ x.classList.remove('on'); });
+      ch.classList.add('on');
+      cat = ch.getAttribute('data-cat') || 'all';
+      apply();
+    });
+  });
+  if(search){ search.addEventListener('input',function(){ q=(search.value||'').toLowerCase().trim(); apply(); }); }
+})();
+</script>
 </body>
 </html>
