@@ -665,6 +665,22 @@ def privacy_page():
 def terms_page():
     return render_template("agents.html", page="terms", agents=AGENTS, agent=None, related=[])
 
+@app.route("/integrations")
+def integrations_page():
+    return render_template("agents.html", page="integrations", agents=AGENTS, agent=None, related=[])
+
+@app.route("/resources")
+def resources_page():
+    return render_template("agents.html", page="resources", agents=AGENTS, agent=None, related=[])
+
+@app.route("/customers")
+def customers_page():
+    return render_template("agents.html", page="customers", agents=AGENTS, agent=None, related=[])
+
+@app.route("/security")
+def security_page():
+    return render_template("agents.html", page="security", agents=AGENTS, agent=None, related=[])
+
 @app.route("/login")
 def login_page():
     if _get_user():
