@@ -1284,7 +1284,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   // custom cursor
   if(FINE && !RM){
     var dot=document.getElementById('cdot'), ring=document.getElementById('cring');
-    var mx=innerWidth/2,my=innerHeight/2,rx=mx,ry=my;
+    var mx=-120,my=-120,rx=-120,ry=-120;
     // store only on move (cheap); batch all DOM writes in one rAF for buttery motion
     window.addEventListener('mousemove',function(e){ mx=e.clientX; my=e.clientY; },{passive:true});
     (function loop(){
