@@ -673,10 +673,6 @@ def integrations_page():
 def resources_page():
     return render_template("agents.html", page="resources", agents=AGENTS, agent=None, related=[])
 
-@app.route("/customers")
-def customers_page():
-    return render_template("agents.html", page="customers", agents=AGENTS, agent=None, related=[])
-
 @app.route("/security")
 def security_page():
     return render_template("agents.html", page="security", agents=AGENTS, agent=None, related=[])
