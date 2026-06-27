@@ -371,16 +371,27 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .step-n{font-family:var(--display);font-weight:800;font-size:42px;line-height:1;background:linear-gradient(120deg,#67e8f9,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:.92}
 .step h4{font-family:var(--display);font-size:19px;font-weight:700;color:#fff;margin:14px 0 8px}
 .step p{font-size:14.5px;line-height:1.65;color:var(--dim)}
-.proof{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;text-align:center;position:relative;overflow:hidden}
-.proof::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(640px 200px at 50% -12%,rgba(124,131,255,.14),transparent 70%)}
-.pf{position:relative;padding:48px 24px 40px;display:flex;flex-direction:column;align-items:center;transition:background .3s}
-.pf:hover{background:rgba(255,255,255,.028)}
-.pf + .pf::before{content:'';position:absolute;left:0;top:30px;bottom:30px;width:1px;background:linear-gradient(180deg,transparent,var(--line2),transparent)}
-.pfi{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;background:linear-gradient(135deg,rgba(34,211,238,.16),rgba(139,92,246,.20));border:1px solid var(--line2);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 12px 28px -16px rgba(99,102,241,.8)}
-.pfi svg{width:22px;height:22px;stroke:#a5b4fc;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.proof{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:6px;text-align:center;position:relative;overflow:hidden;isolation:isolate}
+.proof::before{content:'';position:absolute;inset:0;border-radius:20px;padding:1px;pointer-events:none;z-index:0;background:conic-gradient(from 0deg,#22d3ee,#a855f7,#6366f1,#e879f9,#22d3ee);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.5;animation:spin 9s linear infinite}
+.proof::after{content:'';position:absolute;inset:-40%;pointer-events:none;z-index:0;background:radial-gradient(38% 56% at 20% 30%,rgba(34,211,238,.16),transparent 60%),radial-gradient(44% 54% at 80% 22%,rgba(139,92,246,.20),transparent 60%),radial-gradient(40% 50% at 60% 92%,rgba(232,121,249,.13),transparent 60%);filter:blur(10px);animation:pf-drift 15s ease-in-out infinite alternate}
+.pf{position:relative;z-index:1;padding:46px 24px 38px;display:flex;flex-direction:column;align-items:center;border-radius:16px;transition:background .3s,transform .3s}
+.pf:hover{background:rgba(255,255,255,.03)}
+.pf:hover .pfi{transform:translateY(-4px) scale(1.06)}
+.pf:hover .pfi::before{opacity:1}
+.pf:hover .pfu{transform:scaleX(1.35);opacity:1}
+.pf + .pf::before{content:'';position:absolute;left:0;top:30px;bottom:30px;width:1px;z-index:1;background:linear-gradient(180deg,transparent,var(--line2),transparent)}
+.pfi{position:relative;width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;background:linear-gradient(135deg,rgba(34,211,238,.18),rgba(139,92,246,.24));border:1px solid var(--line2);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 14px 30px -14px rgba(99,102,241,.9);transition:transform .3s}
+.pfi::before{content:'';position:absolute;inset:-7px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity .35s;background:conic-gradient(from 0deg,transparent,rgba(34,211,238,.6),transparent 40%,rgba(168,85,247,.6),transparent 75%);animation:spin 6s linear infinite}
+.pfi::after{content:'';position:absolute;inset:0;border-radius:16px;pointer-events:none;animation:pf-pulse 3.4s ease-out infinite}
+.pfi svg{position:relative;z-index:1;width:24px;height:24px;stroke:#c7d2fe;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 6px rgba(124,131,255,.65))}
 @media (max-width:720px){ .proof{grid-template-columns:1fr} .pf{padding:34px 24px} .pf + .pf::before{left:30px;right:30px;top:0;bottom:auto;width:auto;height:1px;background:linear-gradient(90deg,transparent,var(--line2),transparent)} }
-.pf b{display:block;font-family:var(--display);font-size:48px;font-weight:800;letter-spacing:-.03em;line-height:1;background:linear-gradient(120deg,#fff 28%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
-.pf span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim2);margin-top:14px;text-transform:uppercase}
+.pf b{display:block;font-family:var(--display);font-size:clamp(46px,5vw,60px);font-weight:800;letter-spacing:-.035em;line-height:1;background:linear-gradient(110deg,#ffffff 0%,#c4b5fd 42%,#67e8f9 72%,#ffffff 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 6px 22px rgba(124,131,255,.35));animation:pf-sheen 7s linear infinite}
+.pf .pfu{display:block;width:34px;height:3px;margin:16px auto 0;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--violet));box-shadow:0 0 12px rgba(139,92,246,.7);transform:scaleX(.5);opacity:.65;transition:transform .4s,opacity .4s}
+.pf span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--dim2);margin-top:12px;text-transform:uppercase}
+@keyframes pf-drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(3%,-2%) scale(1.08)}100%{transform:translate(-3%,2%) scale(1)}}
+@keyframes pf-pulse{0%{box-shadow:0 0 0 0 rgba(139,92,246,.5)}70%{box-shadow:0 0 0 16px rgba(139,92,246,0)}100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}}
+@keyframes pf-sheen{0%{background-position:0% 0}100%{background-position:220% 0}}
+@media (prefers-reduced-motion: reduce){ .proof::before,.proof::after,.pfi::before,.pfi::after,.pf b{animation:none} }
 .proof-by{text-align:center;color:var(--dim);font-size:14.5px;margin:22px auto 0;max-width:680px}
 .proof-by b{color:#fff;font-weight:700}
 .priv{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding:52px;align-items:center}
@@ -1042,18 +1053,17 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 
     <section class="home-sec">
       <div class="proof glass reveal">
-        <div class="glow-line"></div>
         <div class="pf">
           <span class="pfi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span>
-          <b data-count="26">0</b><span>Buying signals tracked</span>
+          <b data-count="26">0</b><i class="pfu"></i><span>Buying signals tracked</span>
         </div>
         <div class="pf">
           <span class="pfi"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></span>
-          <b data-count="4">0</b><span>Always-on agents</span>
+          <b data-count="4">0</b><i class="pfu"></i><span>Always-on agents</span>
         </div>
         <div class="pf">
           <span class="pfi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-          <b>24/7</b><span>Real-time detection</span>
+          <b>24/7</b><i class="pfu"></i><span>Real-time detection</span>
         </div>
       </div>
       <p class="proof-by reveal">Built by <b>Position2</b> — a B2B digital-growth agency running demand generation, paid media, SEO, content and RevOps for global brands.</p>
