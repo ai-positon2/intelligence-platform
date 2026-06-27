@@ -45,11 +45,38 @@ a{color:inherit;text-decoration:none}
 .grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55;
   background-image:linear-gradient(rgba(124,140,220,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(124,140,220,.05) 1px,transparent 1px);
   background-size:60px 60px;mask-image:radial-gradient(125% 80% at 50% 0%,#000,transparent 72%);-webkit-mask-image:radial-gradient(125% 80% at 50% 0%,#000,transparent 72%)}
-.spot{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(620px circle at var(--mx,50%) var(--my,-10%),rgba(99,102,241,.08),transparent 45%)}
+.spot{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(620px circle at var(--mx,50%) var(--my,-10%),color-mix(in srgb,var(--page,#6366f1) 14%,transparent),transparent 45%)}
 .grain{position:fixed;inset:-50%;z-index:1;pointer-events:none;opacity:.045;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 1.4s steps(3) infinite}
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-2%)}100%{transform:translate(0,0)}}
 .vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 100% at 50% 30%,transparent 42%,rgba(2,3,9,.6) 84%,rgba(2,3,9,.96) 100%)}
+/* ===== per-page ambient (unified engine, distinct hue) ===== */
+body[data-page="platform"] .mesh .m1{background:radial-gradient(circle,#4f46e5,transparent 67%)}
+body[data-page="platform"] .mesh .m2{background:radial-gradient(circle,#6366f1,transparent 67%)}
+body[data-page="platform"] .mesh .m3{background:radial-gradient(circle,#818cf8,transparent 67%)}
+body[data-page="platform"] .mesh .m4{background:radial-gradient(circle,#22d3ee,transparent 70%)}
+body[data-page="platform"] #scene{opacity:.45}
+body[data-page="signals"] .mesh .m1{background:radial-gradient(circle,#7c3aed,transparent 67%)}
+body[data-page="signals"] .mesh .m2{background:radial-gradient(circle,#a855f7,transparent 67%)}
+body[data-page="signals"] .mesh .m3{background:radial-gradient(circle,#8b5cf6,transparent 67%)}
+body[data-page="signals"] .mesh .m4{background:radial-gradient(circle,#6366f1,transparent 70%)}
+body[data-page="signals"] #scene{opacity:.62}
+body[data-page="integrations"] .mesh .m1{background:radial-gradient(circle,#0891b2,transparent 67%)}
+body[data-page="integrations"] .mesh .m2{background:radial-gradient(circle,#06b6d4,transparent 67%)}
+body[data-page="integrations"] .mesh .m3{background:radial-gradient(circle,#22d3ee,transparent 67%)}
+body[data-page="integrations"] .mesh .m4{background:radial-gradient(circle,#6366f1,transparent 70%)}
+body[data-page="integrations"] #scene{opacity:.52}
+body[data-page="resources"] .mesh .m1{background:radial-gradient(circle,#b45309,transparent 67%)}
+body[data-page="resources"] .mesh .m2{background:radial-gradient(circle,#f59e0b,transparent 67%)}
+body[data-page="resources"] .mesh .m3{background:radial-gradient(circle,#6366f1,transparent 67%)}
+body[data-page="resources"] .mesh .m4{background:radial-gradient(circle,#fbbf24,transparent 70%);opacity:.22}
+body[data-page="resources"] #scene{opacity:.34}
+body[data-page="security"] .mesh .m1{background:radial-gradient(circle,#047857,transparent 67%)}
+body[data-page="security"] .mesh .m2{background:radial-gradient(circle,#10b981,transparent 67%)}
+body[data-page="security"] .mesh .m3{background:radial-gradient(circle,#0ea5e9,transparent 67%)}
+body[data-page="security"] .mesh .m4{background:radial-gradient(circle,#34d399,transparent 70%);opacity:.2}
+body[data-page="security"] #scene{opacity:.3}
+body[data-page="security"] .grid-bg{opacity:.34}
 .scrim{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(120% 110% at 50% 42%,rgba(4,5,16,.5),rgba(4,5,16,.4) 58%,rgba(4,5,16,.72))}
 .wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:0 26px}
 
@@ -107,7 +134,7 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .sectionpad{padding:108px 0 40px}
 .pill-eye{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:#c7d0f0;text-transform:uppercase;
   background:rgba(124,140,220,.08);border:1px solid var(--line2);border-radius:999px;padding:8px 15px}
-.pill-eye .dt{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:pulse 2.4s infinite}
+.pill-eye .dt{width:7px;height:7px;border-radius:50%;background:var(--page,var(--cyan));box-shadow:0 0 10px var(--page,var(--cyan));animation:pulse 2.4s infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.5)}50%{box-shadow:0 0 0 7px rgba(34,211,238,0)}}
 .h-hero{font-family:var(--display);font-weight:800;letter-spacing:-.035em;line-height:.92;font-size:clamp(48px,8.6vw,108px);margin:22px 0 20px}
 .h-sec{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.02;font-size:clamp(30px,4vw,50px)}
@@ -314,7 +341,7 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .fcard:hover::after{opacity:1}
 .fcard h4{font-family:var(--display);font-size:19px;font-weight:700;color:#fff;margin:16px 0 8px;position:relative;z-index:1}
 .fcard p{font-size:14px;line-height:1.65;color:var(--dim);position:relative;z-index:1}
-.fcard .more{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;margin-top:15px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+.fcard .more{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;margin-top:15px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--page,var(--cyan))}
 .tier{display:flex;align-items:center;gap:13px;margin:34px 0 15px}
 .tier b{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase}
 .tier .ln{flex:1;height:1px;background:linear-gradient(90deg,currentColor,transparent);opacity:.4}
@@ -465,6 +492,21 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .gerr{align-items:center;justify-content:center;gap:8px;margin:16px 0 0;padding:10px 14px;border-radius:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#fca5a5;font-size:13px}
 .login-foot{margin-top:18px;font-size:13px;color:var(--dim2)}
 .login-foot a{color:#a5b4fc;font-weight:600}
+.login2{display:grid;grid-template-columns:1.04fr .96fr;min-height:calc(100vh - 66px)}
+.login2-brand{position:relative;display:flex;flex-direction:column;justify-content:space-between;padding:54px 60px;overflow:hidden;background:linear-gradient(150deg,rgba(34,211,238,.14),rgba(139,92,246,.17) 55%,rgba(99,102,241,.10));border-right:1px solid var(--line)}
+.login2-brand::before{content:'';position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(124,131,255,.55),transparent 64%);filter:blur(70px);top:-130px;left:-90px;opacity:.55;animation:drift 24s ease-in-out infinite}
+.login2-brand::after{content:'';position:absolute;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.4),transparent 66%);filter:blur(70px);bottom:-120px;right:-60px;opacity:.4}
+.login2-rot{position:relative;max-width:460px;margin:auto 0}
+.login2-h{font-family:var(--display);font-weight:700;font-size:clamp(30px,3.4vw,46px);line-height:1.06;letter-spacing:-.02em;color:#fff;margin:18px 0 28px}
+.login2-vals{position:relative;height:28px}
+.login2-vals .lv{position:absolute;inset:0;font-size:15.5px;color:var(--dim);opacity:0;transform:translateY(9px);transition:opacity .6s,transform .6s}
+.login2-vals .lv.on{opacity:1;transform:none}
+.login2-foot-mini{position:relative;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim3)}
+.login2-auth{display:flex;align-items:center;justify-content:center;padding:40px 24px}
+.login-card-2{width:min(420px,100%);text-align:center;display:flex;flex-direction:column;align-items:center}
+@media (max-width:860px){ .login2{grid-template-columns:1fr} .login2-brand{display:none} }
+body[data-page="login"] #scene{display:none}
+body[data-page="login"] .mesh i{opacity:.12}
 /* ===== scroll story ===== */
 .story{position:relative;--ring:1;--tag:1;--sc:1;--bg:1;--vm:1;--glow:0}
 .story.anim{--ring:0;--tag:0;--sc:0;--bg:0;--vm:0}
@@ -748,7 +790,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 </style>
 </head>
-<body>
+<body data-page="{{ page }}" style="--page:{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9'}.get(page,'#22d3ee') }}">
 <!-- page transition -->
 <style>
 #pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 28%,#0b0f22,#04050d 72%);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .85s cubic-bezier(.4,0,.2,1) .05s forwards}
@@ -1357,18 +1399,32 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 {% elif page == 'login' %}
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <div class="wrap login-wrap">
-    <div class="login-card glass reveal in">
-      <svg class="login-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
-      <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Position2 team sign-in</span>
-      <h1 class="h-sec" style="margin:16px 0 8px">Welcome back.</h1>
-      <p class="login-sub">Sign in with your Position2 Google account to open your live intelligence dashboard.</p>
-      <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
-      <div class="gbtn">
-        <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
-        <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
+  <div class="login2">
+    <div class="login2-brand">
+      <div class="login2-rot">
+        <span class="pill-eye"><span class="dt"></span> Position2 team</span>
+        <h2 class="login2-h">Know who&rsquo;s ready to buy <span class="ital grad">before they raise a hand.</span></h2>
+        <div class="login2-vals" id="loginVals">
+          <span class="lv on">26 buying signals, scored in real time.</span>
+          <span class="lv">14 always-on agents working your pipeline.</span>
+          <span class="lv">From signal to outreach &mdash; drafted by Vimi.</span>
+        </div>
       </div>
-      <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Request access →</a></div>
+      <div class="login2-foot-mini">Consent-aware &middot; built around GDPR &amp; CCPA</div>
+    </div>
+    <div class="login2-auth">
+      <div class="login-card-2 reveal in">
+        <svg class="login-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
+        <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Team sign-in</span>
+        <h1 class="h-sec" style="margin:16px 0 8px">Welcome back.</h1>
+        <p class="login-sub">Sign in with your Position2 Google account to open your live intelligence dashboard.</p>
+        <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
+        <div class="gbtn">
+          <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+          <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
+        </div>
+        <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Request access &rarr;</a></div>
+      </div>
     </div>
   </div>
   <script>
@@ -1380,6 +1436,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     .catch(function(){ if(c){ c.textContent='⚠ Network error. Please try again.'; c.style.display='flex'; } });
   }
   </script>
+  <script>(function(){var RM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;var v=document.querySelectorAll('#loginVals .lv');if(v.length<2||RM)return;var i=0;setInterval(function(){v[i].classList.remove('on');i=(i+1)%v.length;v[i].classList.add('on');},3400);})();</script>
 {% endif %}
 </main>
 
