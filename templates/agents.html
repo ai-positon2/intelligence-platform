@@ -571,6 +571,55 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 
 
 @media (max-width:760px){ .home-sec{padding:76px 0 0} .band{margin:88px 0 0;padding:40px 22px} .priv{padding:30px} .showcase{padding:28px} .tcard{padding:26px} }
+
+/* ===== animated live dashboard (item 2 representative mock) ===== */
+.sc-shot:has(.dash){padding:0;align-items:stretch}
+.dash{position:relative;width:100%;padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden;font-family:var(--sans);
+  background:radial-gradient(120% 90% at 0% 0%,rgba(34,211,238,.08),transparent 55%),radial-gradient(120% 90% at 100% 0%,rgba(139,92,246,.11),transparent 55%)}
+.dash-scan{position:absolute;left:0;right:0;top:0;height:30%;pointer-events:none;z-index:3;background:linear-gradient(180deg,rgba(124,140,220,.12),transparent);animation:d-scan 6s ease-in-out infinite}
+@keyframes d-scan{0%{transform:translateY(-40%);opacity:0}12%{opacity:1}55%{transform:translateY(240%);opacity:.5}72%{opacity:0}100%{transform:translateY(240%);opacity:0}}
+.dash-top{display:flex;align-items:center;gap:10px;position:relative;z-index:2}
+.dash-ttl{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#cdd6f6}
+.dash-ttl .dd{width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#a5f3fc,#8b5cf6);box-shadow:0 0 10px #8b5cf6;animation:d-pulse 2.4s infinite}
+.dash-seg{margin-left:4px;display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.03)}
+.dash-seg b,.dash-seg i{font-family:var(--mono);font-size:9px;font-style:normal;letter-spacing:.05em;color:var(--dim2);padding:3px 8px;border-radius:6px}
+.dash-seg b{color:#06121f;background:linear-gradient(120deg,#22d3ee,#8b5cf6)}
+.dash-live{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4}
+.dash-live i{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 9px #34d399;animation:d-pulse 1.8s infinite}
+.dash-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;position:relative;z-index:2}
+.kpi{padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.kpi-l{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim3)}
+.kpi-v{display:block;font-family:var(--display);font-weight:700;font-size:22px;color:#fff;letter-spacing:-.02em;margin-top:4px;line-height:1}
+.kpi-d{font-family:var(--mono);font-size:8.5px;letter-spacing:.03em}
+.kpi-d.up{color:#34d399}
+.dash-grid{display:grid;grid-template-columns:1.3fr .9fr;gap:10px;position:relative;z-index:2}
+.dash-panel{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025);padding:13px}
+.dp-h{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim3);margin-bottom:11px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:80px}
+.bars span{flex:1;border-radius:4px 4px 0 0;height:var(--h,40%);transform-origin:bottom;background:linear-gradient(180deg,var(--c,#22d3ee),rgba(34,211,238,.16));box-shadow:0 0 12px -3px var(--c,#22d3ee);animation:d-bar 3.6s ease-in-out infinite}
+@keyframes d-bar{0%,100%{transform:scaleY(.78)}50%{transform:scaleY(1)}}
+.dash-score{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring{position:relative;width:106px;height:106px;margin-top:2px}
+.ring svg{width:106px;height:106px;transform:rotate(-90deg)}
+.ring .rbg{fill:none;stroke:rgba(124,140,220,.16);stroke-width:9}
+.ring .rfg{fill:none;stroke:url(#dgrad);stroke-width:9;stroke-linecap:round;stroke-dasharray:327;stroke-dashoffset:82;transition:stroke-dashoffset 1.1s cubic-bezier(.2,.9,.25,1);filter:drop-shadow(0 0 6px rgba(139,92,246,.55))}
+.ring-n{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-n b{font-family:var(--display);font-weight:700;font-size:28px;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ring-n span{font-family:var(--mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim3);margin-top:2px}
+.ring-co{margin-top:10px;font-family:var(--display);font-weight:700;font-size:13.5px;color:#fff;text-align:center}
+.dash-feed{display:flex;flex-direction:column;gap:7px;min-height:120px;position:relative;z-index:2}
+.frow{display:grid;grid-template-columns:1.25fr 1.3fr .48fr .4fr;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid var(--line);opacity:0;transform:translateY(-9px);transition:opacity .5s,transform .5s}
+.frow.in{opacity:1;transform:none}
+.frow.out{opacity:0;transform:translateY(7px)}
+.fco{font-weight:600;color:#fff;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fchip{justify-self:start;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.02em;color:var(--c);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:4px 9px;white-space:nowrap;overflow:hidden;max-width:100%}
+.fchip::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--c);box-shadow:0 0 7px var(--c);flex:0 0 auto}
+.fwhen{font-family:var(--mono);font-size:9.5px;color:var(--dim3);justify-self:end}
+.fsc{justify-self:end;font-family:var(--display);font-weight:700;font-size:15px;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+@keyframes d-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (max-width:520px){ .dash-grid{grid-template-columns:1fr} .frow{grid-template-columns:1fr auto auto} .fwhen{display:none} }
+@media (prefers-reduced-motion: reduce){ .dash-scan,.bars span,.dash-ttl .dd,.dash-live i{animation:none} }
+
 </style>
 </head>
 <body>
@@ -931,16 +980,52 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
       <div class="showcase glass reveal">
         <div>
           <div class="sc-shot">
-            <!-- DROP-IN SLOT (item 2): replace the .sc-ph block below with a real screenshot or video, e.g.
-                 <img src="/static/img/signal-tracker.png" alt="Signal Tracker dashboard">
-                 or an embedded <video> / loom iframe of the live dashboard + Vimi. -->
-            <div class="sc-ph">
-              <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M9 18v3M15 18v3M7 21h10"/></svg>
-              <b>Product screenshot slot</b>
-              <span>Drop a real Signal Tracker / Vimi screenshot or short demo video here</span>
+            <!-- DROP-IN SLOT (item 2): this is an animated representative mock. To show the real product,
+                 replace the entire .dash block below with a screenshot/video, e.g.
+                 <img src="/static/img/signal-tracker.png" alt="Signal Tracker dashboard"> -->
+            <div class="dash" id="liveDash" role="img" aria-label="Animated preview of the Signal Tracker dashboard surfacing live buying signals">
+              <div class="dash-scan"></div>
+              <div class="dash-top">
+                <span class="dash-ttl"><span class="dd"></span>Signal Tracker</span>
+                <span class="dash-seg"><b>Today</b><i>7d</i><i>30d</i></span>
+                <span class="dash-live"><i></i>Live</span>
+              </div>
+              <div class="dash-kpis">
+                <div class="kpi"><span class="kpi-l">In-market accounts</span><b class="kpi-v" id="kAcc">128</b><span class="kpi-d up">&#9650; 12 today</span></div>
+                <div class="kpi"><span class="kpi-l">Signals tracked</span><b class="kpi-v" id="kSig">341</b><span class="kpi-d up">&#9650; live</span></div>
+                <div class="kpi"><span class="kpi-l">Avg intent</span><b class="kpi-v" id="kInt">7.8</b><span class="kpi-d up">&#9650; 0.4</span></div>
+              </div>
+              <div class="dash-grid">
+                <div class="dash-panel">
+                  <div class="dp-h">Signal volume &middot; 26 types tracked</div>
+                  <div class="bars">
+                    <span style="--h:54%;--c:#22d3ee;animation-delay:0s"></span>
+                    <span style="--h:70%;--c:#8b5cf6;animation-delay:.12s"></span>
+                    <span style="--h:42%;--c:#38bdf8;animation-delay:.24s"></span>
+                    <span style="--h:84%;--c:#a78bfa;animation-delay:.36s"></span>
+                    <span style="--h:58%;--c:#34d399;animation-delay:.48s"></span>
+                    <span style="--h:76%;--c:#e879f9;animation-delay:.6s"></span>
+                    <span style="--h:48%;--c:#6366f1;animation-delay:.72s"></span>
+                    <span style="--h:92%;--c:#fbbf24;animation-delay:.84s"></span>
+                    <span style="--h:64%;--c:#22d3ee;animation-delay:.96s"></span>
+                    <span style="--h:80%;--c:#8b5cf6;animation-delay:1.08s"></span>
+                    <span style="--h:50%;--c:#38bdf8;animation-delay:1.2s"></span>
+                    <span style="--h:72%;--c:#34d399;animation-delay:1.32s"></span>
+                  </div>
+                </div>
+                <div class="dash-panel dash-score">
+                  <div class="dp-h">Top account now</div>
+                  <div class="ring">
+                    <svg viewBox="0 0 120 120"><defs><linearGradient id="dgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><circle class="rbg" cx="60" cy="60" r="52"/><circle class="rfg" id="dashRing" cx="60" cy="60" r="52"/></svg>
+                    <div class="ring-n"><b id="dashScore">9.4</b><span>intent</span></div>
+                  </div>
+                  <div class="ring-co" id="dashCo">Acme Cloud</div>
+                </div>
+              </div>
+              <div class="dash-feed" id="dashFeed"></div>
             </div>
           </div>
-          <div class="sc-cap">Representative product view &middot; replace with a live screenshot</div>
+          <div class="sc-cap">Representative product view &middot; animated preview</div>
         </div>
         <div class="sc-points">
           <div class="sc-pt"><span class="scn">1</span><div><b>A prioritized worklist</b><p>Every in-market account ranked by one intent score — newest signals on top.</p></div></div>
@@ -1347,5 +1432,95 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
   });
 })();
 </script>
+<script>
+(function(){
+  var root=document.getElementById('liveDash');
+  if(!root) return;
+  var feed=document.getElementById('dashFeed');
+  var ring=document.getElementById('dashRing');
+  var scoreEl=document.getElementById('dashScore');
+  var coEl=document.getElementById('dashCo');
+  var kAcc=document.getElementById('kAcc'), kSig=document.getElementById('kSig'), kInt=document.getElementById('kInt');
+  var C=327;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SIG=[
+    {co:'Acme Cloud',t:'Funding Round',c:'#a78bfa',s:9.4},
+    {co:'Northwind',t:'High-Intent Visit',c:'#34d399',s:8.7},
+    {co:'Vertex Labs',t:'New CMO Joined',c:'#38bdf8',s:8.1},
+    {co:'Beacon AI',t:'Competitor Ad Spike',c:'#f472b6',s:7.5},
+    {co:'Orbit Health',t:'Product Launch',c:'#22d3ee',s:8.9},
+    {co:'Cedar Finance',t:'M&A Activity',c:'#fbbf24',s:9.1},
+    {co:'Lumen Systems',t:'Hiring Surge',c:'#818cf8',s:7.2},
+    {co:'Atlas Robotics',t:'Leadership Change',c:'#a78bfa',s:8.3},
+    {co:'Nimbus Data',t:'Pricing Page Visit',c:'#34d399',s:7.9},
+    {co:'Polaris Bio',t:'New Partnership',c:'#38bdf8',s:8.0},
+    {co:'Forge Labs',t:'Tech Stack Install',c:'#e879f9',s:7.4},
+    {co:'Quanta Retail',t:'IPO Filing',c:'#fbbf24',s:9.6}
+  ];
+  var TIMES=['now','2m','6m','14m'];
+  var MAX=4, i=0, acc=128, sig=341;
+
+  function row(d){
+    var el=document.createElement('div');
+    el.className='frow';
+    el.innerHTML='<span class="fco">'+d.co+'</span>'+
+      '<span class="fchip" style="--c:'+d.c+'">'+d.t+'</span>'+
+      '<span class="fwhen">now</span>'+
+      '<span class="fsc">'+d.s.toFixed(1)+'</span>';
+    return el;
+  }
+  function relabel(){
+    var rows=feed.querySelectorAll('.frow');
+    for(var r=0;r<rows.length;r++){
+      var w=rows[r].querySelector('.fwhen'); if(w){ w.textContent=TIMES[r]||''; }
+    }
+  }
+  function setTop(d){
+    if(scoreEl){ scoreEl.textContent=d.s.toFixed(1); }
+    if(coEl){ coEl.textContent=d.co; }
+    if(ring){ ring.style.strokeDashoffset=(C*(1-d.s/10)).toFixed(1); }
+  }
+  function tick(){
+    var d=SIG[i%SIG.length]; i++;
+    var el=row(d);
+    feed.insertBefore(el, feed.firstChild);
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ el.classList.add('in'); }); });
+    var rows=feed.querySelectorAll('.frow');
+    if(rows.length>MAX){
+      var last=rows[rows.length-1];
+      last.classList.add('out');
+      setTimeout(function(){ if(last.parentNode){ last.parentNode.removeChild(last); } },520);
+    }
+    relabel();
+    setTop(d);
+    acc += (Math.random()<0.5?0:1);
+    sig += 1 + ((Math.random()*2)|0);
+    if(kAcc){ kAcc.textContent=acc; }
+    if(kSig){ kSig.textContent=sig; }
+    if(kInt){ kInt.textContent=(7.4+Math.random()*1.0).toFixed(1); }
+  }
+
+  for(var k=0;k<MAX;k++){
+    var sd=SIG[k%SIG.length];
+    var se=row(sd); se.classList.add('in');
+    feed.appendChild(se);
+  }
+  relabel();
+  setTop(SIG[0]);
+  i=MAX;
+
+  if(reduce) return;
+
+  var timer=null;
+  function start(){ if(!timer){ timer=setInterval(tick,2400); } }
+  function stop(){ if(timer){ clearInterval(timer); timer=null; } }
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(en){ en.forEach(function(e){ if(e.isIntersecting){ start(); } else { stop(); } }); },{threshold:0.15});
+    io.observe(root);
+  } else { start(); }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ stop(); } else { start(); } });
+})();
+</script>
+
 </body>
 </html>
