@@ -319,7 +319,7 @@ AGENTS = [
         "benefit": "Prioritize the people actually engaging - not just the logo - so outreach lands with the right person at the right time.",
         "how": "It tracks engagement on relevant posts and profiles, attributes it to your accounts, and scores buying-committee interest for ABM plays.",
         "who": "ABM and social-selling teams.",
-        "connects": ["LinkedIn", "GTM", "Target Accounts"],
+        "connects": ["LinkedIn", "GTM", "CRM"],
     },
     {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence", "role": "Competitive Creative",
@@ -390,8 +390,23 @@ _SIGNALS_RAW = [
     ("Readiness Change", "Crossing into ready.",
      "An account moves into a higher readiness tier. A clear, plain-language cue that an account has just become a priority worth a call."),
 ]
-SIGNALS = [{"name": n, "tagline": t, "blurb": b, "accent": _SIG_PAL[i % len(_SIG_PAL)]}
+_SIG_GROUPS = [
+    ("Company & market moves", 0, 10),
+    ("Website intent", 10, 15),
+    ("Social engagement", 15, 19),
+    ("Competitor & paid", 19, 23),
+    ("Scoring & readiness", 23, 26),
+]
+def _sig_group(i):
+    for _name, _a, _b in _SIG_GROUPS:
+        if _a <= i < _b:
+            return _name
+    return "Other"
+SIGNALS = [{"name": n, "tagline": t, "blurb": b, "accent": _SIG_PAL[i % len(_SIG_PAL)],
+            "group": _sig_group(i)}
            for i, (n, t, b) in enumerate(_SIGNALS_RAW)]
+SIGNAL_GROUPS = [{"name": _gname, "items": [s for s in SIGNALS if s["group"] == _gname]}
+                 for _gname, _ga, _gb in _SIG_GROUPS]
 
 
 @app.route("/agents")
@@ -415,7 +430,7 @@ def platform_page():
 
 @app.route("/signals")
 def signals_page():
-    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[], signals_list=SIGNALS)
+    return render_template("agents.html", page="signals", agents=AGENTS, agent=None, related=[], signals_list=SIGNALS, signal_groups=SIGNAL_GROUPS)
 
 
 @app.route("/solutions")
