@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'customers' %}Customers · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% else %}Intelligence by Position2 — Know who's ready to buy{% endif %}</title>
+<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% else %}Intelligence by Position2 — Know who's ready to buy{% endif %}</title>
 <meta name="description" content="Intelligence by Position2 surfaces the buying signals that show intent — across the web, your site and social — then tells your team who to reach, and why. B2B revenue intelligence across GTM and SEO.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Intelligence by Position2">
@@ -828,7 +828,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <a class="nv-link {% if page=='signals' %}active{% endif %}" href="/signals" data-cursor>Signals</a>
     <a class="nv-link {% if page=='agents' or page=='agent' %}active{% endif %}" href="/agents" data-cursor>Agents</a>
     <a class="nv-link {% if page=='solutions' %}active{% endif %}" href="/solutions" data-cursor>Solutions</a>
-    <a class="nv-link {% if page=='customers' %}active{% endif %}" href="/customers" data-cursor>Customers</a>
     <a class="nv-link {% if page=='resources' %}active{% endif %}" href="/resources" data-cursor>Resources</a>
   </div>{% endif %}
   <div class="nv-cta">
@@ -1335,34 +1334,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO &mdash; no spam, just the good stuff.</p><button class="btn-grad mag" data-demo data-interest="Request access" data-cursor>Request access</button></div>
   </div>
 
-{% elif page == 'customers' %}
-  <div class="wrap sectionpad">
-    <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Why teams choose us</span>
-      <h1 class="h-hero">Intent you can act on.<br>A team that <span class="ital grad">runs the play.</span></h1>
-      <p class="lead">Intelligence is built and run by Position2 &mdash; a full-service B2B growth agency. You don&rsquo;t just see who&rsquo;s in-market; you get the team that turns that signal into pipeline. Software and execution, under one roof.</p>
-    </div>
-    <div class="stats reveal" style="grid-template-columns:repeat(4,1fr)">
-      <a class="stat glass" href="/agents" data-cursor><b data-count="{{ agents|length }}">0</b><span>Always-on agents</span></a>
-      <a class="stat glass" href="/signals" data-cursor><b data-count="26">0</b><span>Signal types</span></a>
-      <a class="stat glass" href="/solutions" data-cursor><b data-count="5">0</b><span>Growth disciplines</span></a>
-      <div class="stat glass"><b>1</b><span>Unified intent score</span></div>
-    </div>
-    <div class="sec-head reveal" style="margin-top:60px"><span class="pill-eye"><span class="dt"></span> The difference</span><h2 class="h-sec">Most tools stop at the signal. <span class="ital grad">We don&rsquo;t.</span></h2></div>
-    <div class="icp">
-      <div class="icard glass reveal"><div class="ir">Intent + execution</div><h4>One roof, not a stack</h4><p>The intent layer finds the moment; Position2&rsquo;s teams run the SEO, paid, content and RevOps plays that win it &mdash; no stitching tools together.</p></div>
-      <div class="icard glass reveal" style="transition-delay:70ms"><div class="ir">Clarity</div><h4>One score, in plain language</h4><p>Every account ranked by a single intent score, with the reason it&rsquo;s hot written out &mdash; so reps act, not decode dashboards.</p></div>
-      <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">Trust</div><h4>Consent-aware by design</h4><p>De-anonymization and intent data handled around GDPR and CCPA, with your data staying yours. Built to pass a security review.</p></div>
-    </div>
-    <div class="sec-head reveal" style="margin-top:60px"><span class="pill-eye"><span class="dt"></span> Who it&rsquo;s for</span><h2 class="h-sec">Built for the people who <span class="ital grad">own the number.</span></h2></div>
-    <div class="icp">
-      <div class="icard glass reveal"><div class="ir">Sales leadership</div><h4>VP Sales &amp; SDR leaders</h4><p>Point reps at accounts actually in-market &mdash; a daily worklist ranked by intent, with the reason to reach out ready to go.</p></div>
-      <div class="icard glass reveal" style="transition-delay:70ms"><div class="ir">Marketing</div><h4>Demand gen &amp; ABM</h4><p>Trigger campaigns the moment an account shows intent, and prove which signals drove pipeline.</p></div>
-      <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">RevOps</div><h4>RevOps &amp; enablement</h4><p>Signals scored and synced into the CRM your team already runs on, with clean routing and one source of truth.</p></div>
-    </div>
-    <div class="cust-quote reveal">Case studies are in the works. <b>Want to be one of the first?</b> Run Intelligence on your accounts and we&rsquo;ll build the story together. &nbsp;<a href="/platform" data-cursor style="color:#a5b4fc;font-weight:600">See how we compare &rarr;</a></div>
-    <div class="band reveal"><h3>See it on your own accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button></div></div>
-  </div>
-
 {% elif page == 'security' %}
   <div class="wrap sectionpad">
     <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Security &amp; trust</span>
@@ -1422,7 +1393,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     {% if page!='login' %}
     <div class="foot-cols">
       <div class="foot-col"><h5>Product</h5><a href="/platform" data-cursor>Platform</a><a href="/agents" data-cursor>Agents</a><a href="/signals" data-cursor>Signals</a><a href="/integrations" data-cursor>Integrations</a></div>
-      <div class="foot-col"><h5>Company</h5><a href="/solutions" data-cursor>Solutions</a><a href="/customers" data-cursor>Customers</a><a href="/security" data-cursor>Security</a></div>
+      <div class="foot-col"><h5>Company</h5><a href="/solutions" data-cursor>Solutions</a><a href="/security" data-cursor>Security</a></div>
       <div class="foot-col"><h5>Resources</h5><a href="/resources" data-cursor>Insights</a><a href="/privacy" data-cursor>Privacy</a><a href="/terms" data-cursor>Terms</a><a href="/login" data-cursor>Sign in</a></div>
     </div>
     {% else %}
