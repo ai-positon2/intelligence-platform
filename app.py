@@ -425,7 +425,7 @@ AGENTS = [
         "slug": "pipeline-command-center", "name": "Pipeline Command Center", "role": "Program Analytics",
         "badge": "NEW", "cat": "Analytics", "accent": "#a3e635", "metric": "Every account & task, live",
         "icon": _svg('<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/>'),
-        "summary": "One live command center for your whole GTM and SEO program - every account, signal, ranking and deliverable in a single prioritized view.",
+        "summary": "One live command center for your whole go-to-market program - every account, signal, ranking and deliverable in a single prioritized view.",
         "benefit": "Replace scattered spreadsheets and dashboards with one source of truth your whole team works from.",
         "how": "It unifies signals, rankings, tasks and account data from your connected sources into a live, filterable dashboard.",
         "who": "Marketing ops, SEO PMs and team leads.",
