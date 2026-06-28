@@ -1514,7 +1514,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div id="nvFormBody">
       <div class="nv-fhead">
         <svg class="nv-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/></svg>
-        <div><h3>Request access</h3><p>Tell us where to send it — we’ll be in touch within one business day.</p></div>
+        <div><h3>Request access</h3><p>Tell us where to send it — we’ll get in touch.</p></div>
       </div>
       <form id="nvDemoForm" autocomplete="on" novalidate>
         <div class="nv-pills">
@@ -1536,7 +1536,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="nv-confetti" id="nvConfetti"></div>
       <div class="nv-check"><svg viewBox="0 0 36 36"><path d="M9 19l6 6 12-14"/></svg></div>
       <h3>You’re on the list 🎉</h3>
-      <p id="nvSuccessMsg">Thanks — our team will reach out within one business day to get you set up.</p>
+      <p id="nvSuccessMsg">Thanks — our team will get in touch to get you set up.</p>
       <button type="button" class="nv-submit" id="nvSuccessClose" data-cursor><span>Done</span></button>
     </div>
   </div>
@@ -1774,8 +1774,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
       .then(function(res){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access';
         if(res.ok&&res.d&&res.d.ok){ document.getElementById('nvSuccessMsg').textContent = interest==='Build a custom agent'
-            ? 'Thanks — our team will reach out within one business day to scope your custom agent.'
-            : 'Thanks — our team will reach out within one business day to get you set up with access.';
+            ? 'Thanks — our team will get in touch to scope your custom agent.'
+            : 'Thanks — our team will get in touch to get you set up with access.';
           document.getElementById('nvFormBody').style.display='none'; document.getElementById('nvSuccess').classList.add('on'); confetti();
         } else { errEl.textContent=(res.d&&res.d.error)?res.d.error:'Something went wrong. Please try again.'; } })
       .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access'; errEl.textContent='Network error. Please try again.'; });
