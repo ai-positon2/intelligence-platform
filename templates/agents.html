@@ -423,10 +423,8 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .note code{font-family:var(--mono);font-size:12.5px;color:#c4b5fd;background:rgba(255,255,255,.07);padding:3px 9px;border-radius:7px}
 
 /* ===== CTA band + footer ===== */
-.band{position:relative;margin:120px 0 0;padding:56px;border-radius:28px;overflow:hidden;text-align:center;
+.band{position:relative;margin:120px 0 0;padding:56px;border-radius:28px;overflow:hidden;text-align:center;border:1px solid rgba(124,140,220,.20);
   background:linear-gradient(135deg,rgba(34,211,238,.13),rgba(99,102,241,.13) 50%,rgba(168,85,247,.16))}
-.band::before{content:'';position:absolute;inset:0;border-radius:28px;padding:1px;background:conic-gradient(from 0deg,#22d3ee,#a855f7,#6366f1,#e879f9,#22d3ee);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;animation:spin 7s linear infinite}
 .band::after{content:'';position:absolute;inset:0;background:radial-gradient(640px 200px at 50% 0%,rgba(255,255,255,.1),transparent 70%);pointer-events:none}
 .band h3{position:relative;font-family:var(--display);font-size:clamp(28px,3.4vw,44px);font-weight:700;color:#fff;letter-spacing:-.02em;margin-bottom:12px}
 .band p{position:relative;font-size:15.5px;color:var(--dim);max-width:560px;margin:0 auto 26px}
