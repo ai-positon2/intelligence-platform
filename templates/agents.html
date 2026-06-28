@@ -962,13 +962,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents spanning intent, SEO, content, GEO and paid — they find the moment, name the buyer, and hand your team the next move. Browse what we’ve built — or have us build one just for you.</p>
         <div class="hero-cta reveal in" style="transition-delay:240ms">
           <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
-          <button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button>
           <a class="btn-ghost" href="#dir" data-cursor>Explore agents &darr;</a>
-        </div>
-        <div class="hero-stats reveal in" style="transition-delay:320ms">
-          <a class="hs" href="#dir" data-cursor><b data-count="{{ agents|length }}">0</b><span>Always-on agents</span></a>
-          <a class="hs" href="/signals" data-cursor><b data-count="26">0</b><span>Signal types</span></a>
-          <a class="hs" href="/signals" data-cursor><b>24/7</b><span>Real-time</span></a>
         </div>
       </div>
       <div class="hero-r reveal in" style="transition-delay:200ms">
@@ -999,18 +993,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   </div></div>
 
   <div class="wrap">
-    <div class="shead"><div><span class="pill-eye"><span class="dt"></span> Start here</span><h2 style="margin-top:14px">Featured agents</h2></div></div>
-    <div class="feat" style="margin-top:8px">
-      {% for a in agents[:3] %}
-      <a class="fcard glass tilt reveal" href="/agents/{{ a.slug }}" data-cursor style="--cat:{{ a.accent }};transition-delay:{{ loop.index0 * 80 }}ms">
-        <div class="ic" style="background:linear-gradient(145deg,{{ a.accent }},rgba(99,102,241,.85))">{{ a.icon|safe }}</div>
-        <h4>{{ a.name }}</h4><p>{{ a.summary }}</p>
-        {% if a.metric %}<div class="ac-metric" style="--cat:{{ a.accent }}">{{ a.metric }}</div>{% endif %}
-        <span class="more">Explore &rarr;</span>
-      </a>
-      {% endfor %}
-    </div>
-
     <section class="orch reveal">
       <div class="sec-head" style="margin-top:64px"><span class="pill-eye"><span class="dt"></span> Better together</span><h2 class="h-sec">Agents that work as <span class="ital grad">one team.</span></h2></div>
       <p class="lead" style="text-align:center;margin:0 auto 34px">No agent works alone. A signal fires, the right agents pick it up, Vimi drafts the move, and the work lands in your stack &mdash; automatically.</p>
