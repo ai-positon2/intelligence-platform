@@ -146,7 +146,7 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .reveal{opacity:0;transform:translateY(30px);transition:opacity .85s cubic-bezier(.2,.9,.25,1),transform .85s cubic-bezier(.2,.9,.25,1)}
 .reveal.in{opacity:1;transform:none}
 .ic{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;position:relative;flex:0 0 auto;
-  background:linear-gradient(135deg,rgba(99,102,241,.95),rgba(168,85,247,.95));box-shadow:0 10px 26px rgba(99,102,241,.4),inset 0 1px 0 rgba(255,255,255,.25)}
+  background:linear-gradient(135deg,var(--page,#6366f1),#8b5cf6);box-shadow:0 12px 28px -6px color-mix(in srgb,var(--page,#6366f1) 60%,transparent),inset 0 1px 0 rgba(255,255,255,.28)}
 .ic::after{content:'';position:absolute;inset:0;border-radius:15px;background:radial-gradient(60% 60% at 30% 20%,rgba(255,255,255,.35),transparent 70%)}
 .ic svg{width:25px;height:25px;position:relative;z-index:1}
 .glass{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:20px;box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 20px 50px -30px rgba(0,0,0,.8)}
@@ -393,16 +393,27 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 /* ===== overview ===== */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:42px 0 8px}
 @media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
-.stat{display:block;padding:26px 18px;border-radius:18px;text-align:center;transition:transform .2s,border-color .25s,box-shadow .3s}
-.stat:hover{transform:translateY(-5px);border-color:var(--line2);box-shadow:0 24px 50px -30px rgba(0,0,0,.9)}
-.stat b{display:block;font-family:var(--display);font-size:38px;font-weight:700;letter-spacing:-.02em;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
-.stat span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim3);margin-top:9px;text-transform:uppercase}
+.stat{position:relative;display:block;padding:32px 22px;border-radius:18px;text-align:center;overflow:hidden;transition:transform .28s cubic-bezier(.2,.9,.25,1),border-color .25s,box-shadow .35s}
+.stat::before{content:'';position:absolute;top:0;left:24px;right:24px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--page,#6366f1),transparent);opacity:.5;transition:opacity .3s}
+.stat::after{content:'';position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;transition:opacity .35s;background:radial-gradient(240px circle at 50% -10%,color-mix(in srgb,var(--page,#6366f1) 24%,transparent),transparent 66%)}
+.stat:hover{transform:translateY(-6px);border-color:var(--line2);box-shadow:0 32px 64px -32px rgba(0,0,0,.92),0 0 52px -16px var(--page,#6366f1)}
+.stat:hover::before{opacity:1}
+.stat:hover::after{opacity:1}
+.stat b{position:relative;display:block;font-family:var(--display);font-size:44px;font-weight:800;letter-spacing:-.025em;line-height:1;background:linear-gradient(120deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{position:relative;display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim2);margin-top:14px;text-transform:uppercase}
+.stat span::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--page,#6366f1);box-shadow:0 0 8px var(--page,#6366f1)}
 .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
 @media (max-width:880px){.feat{grid-template-columns:1fr}}
 .fcard{position:relative;display:block;padding:28px;border-radius:20px;overflow:hidden;--mx:50%;--my:0%;transition:transform .15s ease-out,border-color .25s,box-shadow .3s;transform-style:preserve-3d;will-change:transform}
 .fcard::after{content:'';position:absolute;inset:0;border-radius:20px;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(280px circle at var(--mx) var(--my),rgba(124,131,255,.18),transparent 60%)}
-.fcard:hover{border-color:var(--line2);box-shadow:0 30px 70px -34px rgba(0,0,0,.95),0 0 44px rgba(99,102,241,.16)}
+.fcard::before{content:'';position:absolute;top:0;left:28px;right:28px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--page,#6366f1),transparent);opacity:.38;transition:opacity .3s;z-index:1}
+.fcard:hover{border-color:var(--line2);transform:translateY(-4px);box-shadow:0 38px 80px -34px rgba(0,0,0,.95),0 0 54px -14px color-mix(in srgb,var(--page,#6366f1) 70%,transparent)}
 .fcard:hover::after{opacity:1}
+.fcard:hover::before{opacity:1}
+.fcard .ic{transition:transform .3s,box-shadow .3s}
+.fcard:hover .ic{transform:translateY(-3px) scale(1.05);box-shadow:0 18px 40px -10px color-mix(in srgb,var(--page,#6366f1) 75%,transparent),inset 0 1px 0 rgba(255,255,255,.32)}
+.fcard .more{transition:gap .25s,filter .25s}
+.fcard:hover .more{gap:11px;filter:brightness(1.25)}
 .fcard h4{font-family:var(--display);font-size:19px;font-weight:700;color:#fff;margin:16px 0 8px;position:relative;z-index:1}
 .fcard p{font-size:14px;line-height:1.65;color:var(--dim);position:relative;z-index:1}
 .fcard .more{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;margin-top:15px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--page,var(--cyan))}
@@ -1119,10 +1130,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       </div>
       <div class="hero-art reveal in"><div class="art-dial"><svg viewBox="0 0 220 220"><defs><linearGradient id="pdial" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><circle cx="110" cy="110" r="92" fill="none" stroke="rgba(124,140,220,.16)" stroke-width="14"/><circle class="art-dial-fg" cx="110" cy="110" r="92" fill="none" stroke="url(#pdial)" stroke-width="14" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 110 110)"/></svg><div class="art-dial-c"><b>9.4</b><span>intent score</span></div><div class="art-chip art-chip-1"><span class="acd"></span>Funding round</div><div class="art-chip art-chip-2">&#9650; Top account today</div></div></div>
     </div>
-    <div class="stats reveal">
+    <div class="stats reveal" style="grid-template-columns:repeat(3,1fr)">
       <a class="stat glass" href="/signals" data-cursor><b data-count="26">0</b><span>Signal types</span></a>
       <a class="stat glass" href="/agents" data-cursor><b data-count="{{ agents|length }}">0</b><span>Always-on agents</span></a>
-      <a class="stat glass" href="/signals" data-cursor><b data-count="1">0</b><span>Unified score</span></a>
       <a class="stat glass" href="/signals" data-cursor><b>24/7</b><span>Always-on</span></a>
     </div>
     <div class="feat">
