@@ -414,6 +414,26 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .fcard:hover .ic{transform:translateY(-3px) scale(1.05);box-shadow:0 18px 40px -10px color-mix(in srgb,var(--page,#6366f1) 75%,transparent),inset 0 1px 0 rgba(255,255,255,.32)}
 .fcard .more{transition:gap .25s,filter .25s}
 .fcard:hover .more{gap:11px;filter:brightness(1.25)}
+/* ===== tile color washes ===== */
+.stats .stat:nth-child(1),.feat .fcard:nth-child(1){--tc:#22d3ee}
+.stats .stat:nth-child(2),.feat .fcard:nth-child(2){--tc:#8b5cf6}
+.stats .stat:nth-child(3),.feat .fcard:nth-child(3){--tc:#fbbf24}
+.stats .stat:nth-child(4),.feat .fcard:nth-child(4){--tc:#34d399}
+.feat .fcard:nth-child(5){--tc:#e879f9}
+.feat .fcard:nth-child(6){--tc:#38bdf8}
+.stat{background:linear-gradient(180deg,color-mix(in srgb,var(--tc,var(--page,#6366f1)) 13%,rgba(255,255,255,.035)),rgba(255,255,255,.012));border:1px solid color-mix(in srgb,var(--tc,var(--page,#6366f1)) 28%,var(--line))}
+.stat::before{background:linear-gradient(90deg,transparent,var(--tc,var(--page,#6366f1)),transparent)}
+.stat::after{background:radial-gradient(240px circle at 50% -10%,color-mix(in srgb,var(--tc,var(--page,#6366f1)) 32%,transparent),transparent 66%)}
+.stat:hover{box-shadow:0 32px 64px -32px rgba(0,0,0,.92),0 0 56px -16px var(--tc,var(--page,#6366f1))}
+.stat b{background:linear-gradient(120deg,#fff,color-mix(in srgb,var(--tc,var(--page,#6366f1)) 55%,#fff));-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span::before{background:var(--tc,var(--page,#6366f1));box-shadow:0 0 8px var(--tc,var(--page,#6366f1))}
+.feat .fcard{background:linear-gradient(180deg,color-mix(in srgb,var(--tc,var(--page,#6366f1)) 11%,rgba(255,255,255,.038)),rgba(255,255,255,.014));border:1px solid color-mix(in srgb,var(--tc,var(--page,#6366f1)) 24%,var(--line))}
+.feat .fcard::before{background:linear-gradient(90deg,transparent,var(--tc,var(--page,#6366f1)),transparent)}
+.feat .fcard .ic{background:linear-gradient(135deg,var(--tc,var(--page,#6366f1)),#8b5cf6)}
+.feat .fcard .more{color:var(--tc,var(--page,#6366f1))}
+.feat .fcard:hover{box-shadow:0 38px 80px -34px rgba(0,0,0,.95),0 0 54px -14px color-mix(in srgb,var(--tc,var(--page,#6366f1)) 78%,transparent)}
+.feat .fcard:hover .ic{box-shadow:0 18px 40px -10px color-mix(in srgb,var(--tc,var(--page,#6366f1)) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.32)}
+.icard,.ig-cat,.flow-step{background:linear-gradient(180deg,color-mix(in srgb,var(--page,#6366f1) 10%,rgba(255,255,255,.038)),rgba(255,255,255,.014));border:1px solid color-mix(in srgb,var(--page,#6366f1) 22%,var(--line))}
 .fcard h4{font-family:var(--display);font-size:19px;font-weight:700;color:#fff;margin:16px 0 8px;position:relative;z-index:1}
 .fcard p{font-size:14px;line-height:1.65;color:var(--dim);position:relative;z-index:1}
 .fcard .more{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;margin-top:15px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--page,var(--cyan))}
