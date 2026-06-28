@@ -62,13 +62,13 @@
     <section class="hb-hero">
       <div class="eyebrow">Position2 Intelligence Platform</div>
       <h1 class="main-heading">What are you<br/>working on today?</h1>
-      <p class="main-sub">Choose a discipline to access your dashboards.</p>
+      <p class="main-sub">Choose a workspace to access your dashboards.</p>
       <div class="hb-cue"><span></span></div>
     </section>
     </div>
 
     <section class="hb-disc">
-      <div class="hb-eyebrow">Two disciplines &middot; one intelligence layer</div>
+      <div class="hb-eyebrow">One intelligence layer</div>
     <div class="hub-grid" data-cz-reveal>
 
       <!-- GTM -->
@@ -575,7 +575,7 @@ function start(){
   var wrap=document.querySelector('.hub-pin');if(!wrap){return setTimeout(start,80);}
   var hero=wrap.querySelector('.hb-hero');
   var head=hero.querySelector('.main-heading'),eye=hero.querySelector('.eyebrow'),sub=hero.querySelector('.main-sub'),cue=hero.querySelector('.hb-cue');
-  var tag=document.createElement('div');tag.className='hb-pintag';tag.textContent='Two disciplines, one intelligence layer';hero.appendChild(tag);
+  var tag=document.createElement('div');tag.className='hb-pintag';tag.textContent='One intelligence layer';hero.appendChild(tag);
   var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   if(reduce||window.innerHeight<600)return;
   function cl(v){return v<0?0:v>1?1:v;}
