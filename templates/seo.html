@@ -61,7 +61,7 @@
     <div class="page-header">
       <div class="section-label">Organic Growth</div>
       <h1 class="page-title">SEO Dashboards</h1>
-      <p class="page-sub">{{ seo_tools|length }} SEO and content intelligence tools — powered by SERP Researcher.</p>
+      <p class="page-sub">{{ seo_tools|length }} SEO and content intelligence tools — powered by SEO Studio.</p>
       <div class="hb-cue"><span></span></div>
     </div>
 
@@ -69,7 +69,7 @@
       {% set _themes = {'seo-geo-audit':'c-seo-geo','article-recommendation':'c-article','content-enhancement':'c-enhancement','content-research':'c-research','keyword-research':'c-keyword','agent-readiness-audit':'c-agent','image-alt-audit':'c-image','knowledge-base':'c-knowledge','team-insights':'c-team','location-page-builder':'c-location'} %}
       {% set _cycle = ['c-seo-geo','c-article','c-enhancement','c-research','c-keyword','c-agent','c-image','c-knowledge','c-team','c-location'] %}
       {% for t in seo_tools %}
-      <a href="/seo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
+      <a href="{% if t.url %}{{ t.url }}{% else %}/seo/{{ t.slug }}{% endif %}"{% if t.url %} target="_blank" rel="noopener"{% endif %} class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">{{ t.icon or "🌿" }}</div>
