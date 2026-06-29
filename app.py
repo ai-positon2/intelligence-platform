@@ -275,6 +275,25 @@ def _demo_request_to_slack(d: dict) -> bool:
     return False
 
 
+import socket as _socket
+from contextlib import contextmanager as _contextmanager
+
+@_contextmanager
+def _force_ipv4():
+    """Force outbound sockets to use IPv4 for the duration of the block.
+    Railway containers have no IPv6 route, so getaddrinfo's IPv6 result makes
+    SMTP fail with OSError(101, 'Network is unreachable'). Scoped + restored."""
+    _orig = _socket.getaddrinfo
+    def _v4(host, port, family=0, type=0, proto=0, flags=0):
+        res = _orig(host, port, _socket.AF_INET, type, proto, flags)
+        return res if res else _orig(host, port, family, type, proto, flags)
+    _socket.getaddrinfo = _v4
+    try:
+        yield
+    finally:
+        _socket.getaddrinfo = _orig
+
+
 def _demo_request_to_email(d: dict) -> bool:
     """Email a 'Request access' submission to the team. Returns True on success.
     Configure via SMTP_HOST, SMTP_PORT (587/465), SMTP_USER, SMTP_PASS,
@@ -313,15 +332,16 @@ def _demo_request_to_email(d: dict) -> bool:
         ]
         msg.set_content("\n".join(lines))
         ctx = ssl.create_default_context()
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=12, context=ctx) as srv:
-                srv.login(user, pwd)
-                srv.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=12) as srv:
-                srv.starttls(context=ctx)
-                srv.login(user, pwd)
-                srv.send_message(msg)
+        with _force_ipv4():
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=15, context=ctx) as srv:
+                    srv.login(user, pwd)
+                    srv.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as srv:
+                    srv.starttls(context=ctx)
+                    srv.login(user, pwd)
+                    srv.send_message(msg)
         return True
     except Exception as e:
         log.warning("Demo request email failed: %s", e)
@@ -1262,12 +1282,13 @@ def admin_email_test():
         msg["To"] = to
         msg.set_content("Test Mail - SMTP diagnostic from the Intelligence platform. If you received this, email notifications work.")
         ctx = ssl.create_default_context()
-        if p == 465:
-            with smtplib.SMTP_SSL(host, p, timeout=15, context=ctx) as s:
-                s.login(user, pwd); s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, p, timeout=15) as s:
-                s.starttls(context=ctx); s.login(user, pwd); s.send_message(msg)
+        with _force_ipv4():
+            if p == 465:
+                with smtplib.SMTP_SSL(host, p, timeout=15, context=ctx) as s:
+                    s.login(user, pwd); s.send_message(msg)
+            else:
+                with smtplib.SMTP(host, p, timeout=15) as s:
+                    s.starttls(context=ctx); s.login(user, pwd); s.send_message(msg)
         info["result"] = "SENT OK"
     except Exception as e:
         info["result"] = "FAILED"
