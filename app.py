@@ -431,6 +431,16 @@ AGENTS = [
         "who": "Marketing ops, SEO PMs and team leads.",
         "connects": ["Sheets", "GSC", "CRM"],
     },
+    {
+        "slug": "gbp-qc-agent", "name": "GBP QC Agent", "role": "Google Business Profile QC",
+        "badge": "NEW", "cat": "SEO", "accent": "#f97316", "metric": "3-stage QC \u00b7 brand-checked",
+        "icon": _svg('<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><path d="M9 10l2 2 4-4"/>'),
+        "summary": "A quality-control and content-generation tool for Google Business Profile posts. Run base content through a 3-stage workflow - base review, location-specific QC, and automated location content generation - all checked against your brand guidelines.",
+        "benefit": "Ship on-brand GBP posts at multi-location scale without manual review - every post scored and checked against the client's exact rules, with the fixes written for you.",
+        "how": "Pick a client and a stage. It runs base-content review, location-specific QC against the approved base, and automated location content generation - scoring each post 0-100, flagging only real violations by severity, and returning recommended fixes plus a corrected version, all against client brand guidelines.",
+        "who": "Local and multi-location SEO and content teams managing Google Business Profile posts across many locations and clients.",
+        "connects": ["Google Business Profile", "Brand guidelines", "Sheets"],
+    },
 ]
 AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
 
