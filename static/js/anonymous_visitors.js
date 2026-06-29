@@ -36,8 +36,6 @@
   function openPersonDrawer(idx, fromAll){
     var src=fromAll?_allPeople:_filteredPeople;
     var p=src[idx]; if(!p)return;
-    (function(){var comp=(p.website||'').replace(/^www\./,'').split('.')[0];comp=comp?comp.charAt(0).toUpperCase()+comp.slice(1):(p.industry||'this company');var tdisp=(p.time_raw||'').replace('T',' ').substring(11,16);window._kePerson={name:p.name,title:p.title||'',company:comp,domain:p.website||'',email:p.email||'',source:'anonymous',act:{pages:parseInt(p.pages)||0,when:[p.date,tdisp].filter(Boolean).join(' ')}};})();
-    if(window.VimiEngage&&window._kePerson){window.VimiEngage.open(window._kePerson);return;}
     var sen=getSeniority(p.title);
     var col=engColor(p.pages);
     var pct=engPct(p.pages);
@@ -54,7 +52,6 @@
       '</div>'+
       '<button class="drw-close" onclick="closeDrawer()">✕</button>';
     var h='';
-    h+='<div class="ke-drw-banner" onclick="keOpen()"><div class="ke-drw-spark">✦</div><div class="ke-drw-tx"><div class="ke-drw-h">Vimi found a CRM match</div><div class="ke-drw-s">In your HubSpot · flagged as prospective client · tap to engage</div></div><div class="ke-drw-go">Engage →</div></div>';
     h+='<div class="drw-section"><div class="drw-chips">';
     h+='<span class="seniority-badge '+senClass(sen)+'">'+esc(sen)+'</span>';
     if(p.industry)h+='<span class="drw-chip purple">'+esc(p.industry)+'</span>';
@@ -92,7 +89,6 @@
       h+='</div></div>';
     }
     h+='<div class="drw-section"><div class="drw-section-label">Quick Actions</div><div class="drw-actions">';
-    h+='<button class="drw-btn ke-drw-btn" onclick="keOpen()">✦ Engage with Vimi</button>';
     h+='<a class="drw-btn drw-btn-secondary" href="'+liUrl(p.name)+'" target="_blank">🔗 Search LinkedIn</a>';
     if(p.email)h+='<a class="drw-btn drw-btn-secondary" href="mailto:'+esc(p.email)+'">✉ Send Email</a>';
     if(p.website)h+='<a class="drw-btn drw-btn-ghost" href="https://'+esc(p.website)+'" target="_blank">🌐 Website</a>';
