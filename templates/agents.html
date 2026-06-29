@@ -1351,11 +1351,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <section class="home-sec">
       <div class="sec-head reveal"><span class="pill-eye"><span class="dt"></span> The agents</span><h2 class="h-sec">A team of agents, <span class="ital grad">working your pipeline.</span></h2></div>
       <div class="feat" style="margin-top:6px">
-        {% for a in agents[:4] %}
+        {% for a in agents[:3] %}
         <a class="fcard glass tilt reveal" href="/agents/{{ a.slug }}" data-cursor style="transition-delay:{{ loop.index0 * 70 }}ms"><div class="ic">{{ a.icon|safe }}</div><h4>{{ a.name }}</h4><p>{{ a.summary }}</p><span class="more">Explore →</span></a>
         {% endfor %}
       </div>
-      <div style="text-align:center;margin-top:28px"><a class="btn-ghost" href="/agents" data-cursor>See all agents →</a></div>
+      <div style="text-align:center;margin-top:34px"><a class="btn-grad mag" href="/agents" data-cursor style="display:inline-flex;align-items:center;gap:9px;padding:15px 32px;font-size:15.5px;font-weight:700">See all agents &rarr;</a></div>
     </section>
 
     <section class="home-sec">
