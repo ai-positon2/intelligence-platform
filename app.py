@@ -817,7 +817,7 @@ def context_graph():
     return render_template("context_graph.html", user=_get_user())
 
 # ── Embedded dashboards ─────────────────────────────────────────────────────────
-_SERP_BASE = "https://serp-content-researcher-production-a947.up.railway.app"
+_SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 
 # ── Ad Intelligence (built React app served directly — no iframe) ────────────
 AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
@@ -844,17 +844,21 @@ def ad_intelligence_icons():
     return send_from_directory("ad_intelligence", "icons.svg")
 
 _SEO_TOOLS_FALLBACK = [
-    {"slug": "seo-geo-audit",          "path": "/seo-geo-audit",          "name": "SEO & GEO Audit",                 "desc": "200+ checks · scored · AI recommendations", "icon": "✅", "tags": ["SEO", "GEO", "AI"]},
-    {"slug": "article-recommendation", "path": "/article-recommendation", "name": "Article Recommendation",          "desc": "Structured content briefs from SERP data",  "icon": "📋", "tags": ["Briefs", "SERP"]},
-    {"slug": "content-enhancement",    "path": "/content-enhancement",    "name": "Content Enhancement",             "desc": "Structure & authority recommendations",     "icon": "⚡", "tags": ["AEO", "E-E-A-T"]},
-    {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",                "desc": "Competitor-based content briefs",           "icon": "🔎", "tags": ["Content", "SERP"]},
-    {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",                "desc": "AI-powered keyword shortlisting",           "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
-    {"slug": "agent-readiness-audit",  "path": "/agent-readiness-audit",  "name": "Agent Readiness Audit",           "desc": "Score any site's AI agent readiness in 15s", "icon": "🤖", "tags": ["AI Audit"]},
-    {"slug": "image-alt-audit",        "path": "/image-alt-audit",        "name": "Image Alt Tag Audit",             "desc": "Bulk alt tag generation for location pages", "icon": "🖼️", "tags": ["Images"]},
-    {"slug": "location-page-builder",  "path": "/location-page-builder",  "name": "Location + Service Page Builder", "desc": "Composed, approved, dev-ready location pages", "icon": "📍", "tags": ["Local SEO", "Pages"]},
-    {"slug": "gbp-qc-agent",           "path": "/gbp-qc-agent",           "name": "GBP QC Agent",                    "desc": "3-stage QC + content generation for Google Business Profile posts, checked against brand guidelines", "icon": "🏪", "tags": ["Local SEO", "GBP", "QC"]},
-    {"slug": "team-insights",          "path": "/team-insights",          "name": "Team Insights",                   "desc": "Live SEO PM dashboard from Google Sheets",  "icon": "📊", "tags": ["PM", "Sheets"]},
-    {"slug": "knowledge-base",         "path": "/kb",                     "name": "Knowledge Base",                  "desc": "Client & industry context management",      "icon": "📚", "tags": ["Knowledge", "Context"]},
+    {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",         "desc": "AI-powered keyword shortlisting",              "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
+    {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",         "desc": "Competitor-based content briefs",              "icon": "🔎", "tags": ["Content", "SERP"]},
+    {"slug": "article-recommendation", "path": "/article-recommendation", "name": "Article Recommendation",   "desc": "Structured content briefs from SERP data",     "icon": "📋", "tags": ["Briefs", "SERP"]},
+    {"slug": "content-enhancement",    "path": "/content-enhancement",    "name": "Content Enhancement",      "desc": "Structure & authority recommendations",        "icon": "⚡", "tags": ["AEO", "E-E-A-T"]},
+    {"slug": "article-enhancement",    "path": "/article-enhancement",    "name": "Enhance Existing Article", "desc": "Multi-LLM + SERP competitor enhancement",      "icon": "✨", "tags": ["Enhance", "LLM"]},
+    {"slug": "on-page-audit",          "path": "/on-page-audit",          "name": "On-Page SEO Audit",        "desc": "23 sections · live data · PageSpeed + CWV",   "icon": "🔬", "tags": ["On-Page", "CWV"]},
+    {"slug": "seo-geo-audit",          "path": "/seo-geo-audit",          "name": "SEO & GEO Audit",          "desc": "200+ checks · scored · AI recommendations",   "icon": "✅", "tags": ["SEO", "GEO", "AI"]},
+    {"slug": "agent-readiness-audit",  "path": "/agent-readiness-audit",  "name": "Agent Readiness Audit",    "desc": "Score AI agent readiness, 0–100",             "icon": "🤖", "tags": ["AI Audit"]},
+    {"slug": "image-alt-audit",        "path": "/image-alt-audit",        "name": "Image Alt Tag Audit",      "desc": "Bulk alt tag generation for location pages",   "icon": "🖼️", "tags": ["Images"]},
+    {"slug": "location-page-builder",  "path": "/location-page-builder",  "name": "Location + Service Pages", "desc": "Composed, approved, dev-ready location pages", "icon": "📍", "tags": ["Local SEO", "Pages"]},
+    {"slug": "hub-spoke",              "path": "/hub-spoke",              "name": "Hub & Spoke",              "desc": "AI internal-linking strategy & recommendations","icon": "🕸️", "tags": ["Internal Linking"]},
+    {"slug": "knowledge-base",         "path": "/kb",                     "name": "Knowledge Base",           "desc": "Client & industry context management",         "icon": "📚", "tags": ["Knowledge", "Context"]},
+    {"slug": "robots-monitor",         "path": "/robots-monitor",         "name": "Robots Monitor",           "desc": "Daily noindex health checks across domains",   "icon": "🛰️", "tags": ["Technical SEO"]},
+    {"slug": "team-insights",          "path": "/team-insights",          "name": "Team Insights",            "desc": "Live SEO PM dashboard from Google Sheets",     "icon": "📊", "tags": ["PM", "Sheets"]},
+    {"slug": "gbp-qc-agent",           "path": "", "url": "https://gbp-qc-agent-production.up.railway.app", "name": "GBP QC Agent", "desc": "Quality control & content generation for GBP posts", "icon": "🏪", "tags": ["Local SEO", "GBP"]},
 ]
 
 # Live SEO tool list is fetched from the SERP app's /tools.json manifest (cached).
@@ -889,6 +893,9 @@ def seo_tool(tool_slug: str):
     tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
     if not tool:
         abort(404)
+    ext = tool.get("url")
+    if ext:
+        return redirect(ext)
     pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
     path = tool["path"]
     sep = "?" if "?" not in path else "&"
