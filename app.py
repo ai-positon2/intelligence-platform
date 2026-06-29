@@ -1239,6 +1239,42 @@ def admin_requests():
     return render_template("admin_requests.html", user=_get_user(),
                            requests=reqs, count=len(reqs))
 
+@app.route("/admin/email-test")
+@admin_required
+def admin_email_test():
+    """Admin-only SMTP diagnostic. Attempts a real send with subject 'Test Mail'
+    and returns the exact result/error (password is never returned)."""
+    host = os.environ.get("SMTP_HOST", "")
+    user = os.environ.get("SMTP_USER", "")
+    pwd  = os.environ.get("SMTP_PASS", "")
+    port = os.environ.get("SMTP_PORT", "587")
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
+    info = {"host": host or "(unset)", "port": port or "(unset)",
+            "user": user or "(unset)", "pass_set": bool(pwd),
+            "from": os.environ.get("SMTP_FROM", "") or user or "(unset)", "to": to}
+    try:
+        import smtplib, ssl
+        from email.message import EmailMessage
+        p = int(port or 587)
+        msg = EmailMessage()
+        msg["Subject"] = "Test Mail"
+        msg["From"] = os.environ.get("SMTP_FROM", "") or user
+        msg["To"] = to
+        msg.set_content("Test Mail - SMTP diagnostic from the Intelligence platform. If you received this, email notifications work.")
+        ctx = ssl.create_default_context()
+        if p == 465:
+            with smtplib.SMTP_SSL(host, p, timeout=15, context=ctx) as s:
+                s.login(user, pwd); s.send_message(msg)
+        else:
+            with smtplib.SMTP(host, p, timeout=15) as s:
+                s.starttls(context=ctx); s.login(user, pwd); s.send_message(msg)
+        info["result"] = "SENT OK"
+    except Exception as e:
+        info["result"] = "FAILED"
+        info["error"] = repr(e)
+    return jsonify(info)
+
+
 
 
 def _clean_industry(raw: str) -> str:
