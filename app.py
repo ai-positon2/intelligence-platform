@@ -284,7 +284,7 @@ def _demo_request_to_email(d: dict) -> bool:
     pwd  = os.environ.get("SMTP_PASS", "")
     if not (host and user and pwd):
         return False
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com"
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
     sender = os.environ.get("SMTP_FROM", "") or user
     try:
         port = int(os.environ.get("SMTP_PORT", "587") or 587)
