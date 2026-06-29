@@ -893,13 +893,14 @@ def seo_tool(tool_slug: str):
     tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
     if not tool:
         abort(404)
+    pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
     ext = tool.get("url")
     if ext:
-        return redirect(ext)
-    pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
-    path = tool["path"]
-    sep = "?" if "?" not in path else "&"
-    embed_url = f"{_SERP_BASE}{path}{sep + 'pt=' + pt if pt else ''}"
+        embed_url = ext
+    else:
+        path = tool["path"]
+        sep = "?" if "?" not in path else "&"
+        embed_url = f"{_SERP_BASE}{path}{sep + 'pt=' + pt if pt else ''}"
     return render_template("embed.html",
         user=_get_user(),
         title=tool["name"],
