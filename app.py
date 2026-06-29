@@ -782,6 +782,7 @@ _SEO_TOOLS_FALLBACK = [
     {"slug": "agent-readiness-audit",  "path": "/agent-readiness-audit",  "name": "Agent Readiness Audit",           "desc": "Score any site's AI agent readiness in 15s", "icon": "🤖", "tags": ["AI Audit"]},
     {"slug": "image-alt-audit",        "path": "/image-alt-audit",        "name": "Image Alt Tag Audit",             "desc": "Bulk alt tag generation for location pages", "icon": "🖼️", "tags": ["Images"]},
     {"slug": "location-page-builder",  "path": "/location-page-builder",  "name": "Location + Service Page Builder", "desc": "Composed, approved, dev-ready location pages", "icon": "📍", "tags": ["Local SEO", "Pages"]},
+    {"slug": "gbp-qc-agent",           "path": "/gbp-qc-agent",           "name": "GBP QC Agent",                    "desc": "3-stage QC + content generation for Google Business Profile posts, checked against brand guidelines", "icon": "🏪", "tags": ["Local SEO", "GBP", "QC"]},
     {"slug": "team-insights",          "path": "/team-insights",          "name": "Team Insights",                   "desc": "Live SEO PM dashboard from Google Sheets",  "icon": "📊", "tags": ["PM", "Sheets"]},
     {"slug": "knowledge-base",         "path": "/kb",                     "name": "Knowledge Base",                  "desc": "Client & industry context management",      "icon": "📚", "tags": ["Knowledge", "Context"]},
 ]
