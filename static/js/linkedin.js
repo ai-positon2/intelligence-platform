@@ -161,35 +161,6 @@ const BKT=[
 ];
 const maxP=Math.max(...D.people.map(p=>p.posts_engaged),1);
 
-window.KE_HOTLEADS=[
-  {name:'Mary Whitfield',title:'VP of Demand Generation',company:'Trivium Corporate Solutions',email:'mary.whitfield@triviumcorp.com',location:'Boston, MA',industry:'B2B SaaS',post:'How we cut CAC 38% with signal-based selling',commented:true,when:'2 days ago',reactions:142},
-  {name:'Daniel Osei',title:'Chief Marketing Officer',company:'Northwind Analytics',email:'d.osei@northwind.io',location:'Austin, TX',industry:'Data & Analytics',post:'The AI automation stack reshaping B2B marketing',commented:false,when:'4 days ago',reactions:208},
-  {name:'Priya Raman',title:'Head of Performance Marketing',company:'Lumio Retail Group',email:'priya.raman@lumioretail.com',location:'Chicago, IL',industry:'Retail / eCommerce',post:'Why GEO is the new SEO (and what to do about it)',commented:true,when:'last week',reactions:175},
-  {name:'Marcus Bell',title:'Director of Growth',company:'Vanta Logistics',email:'marcus.bell@vantalogistics.com',location:'Atlanta, GA',industry:'Logistics & Supply Chain',post:'Full-funnel attribution without the spreadsheets',commented:false,when:'6 days ago',reactions:96},
-  {name:'Sofia Castellano',title:'SVP Marketing',company:'Helio Health',email:'s.castellano@heliohealth.com',location:'New York, NY',industry:'Healthcare',post:'Turning website + LinkedIn signals into pipeline',commented:true,when:'yesterday',reactions:231}
-];
-function keHotLeadRows(){
-  var L=window.KE_HOTLEADS||[];
-  return L.map(function(p,i){
-    var g=(typeof gradFor==='function')?gradFor(p.name):['#7c83f5','#9b87fd'];
-    return '<div class="hl-row" onclick="keHotLead('+i+')">'
-      +'<div class="hl-av" style="background:linear-gradient(135deg,'+g[0]+','+g[1]+')">'+ini(p.name)+'</div>'
-      +'<div class="hl-info"><div class="hl-nm">'+esc(p.name)+'</div>'
-        +'<div class="hl-rl">'+esc(p.title)+' · '+esc(p.company)+'</div>'
-        +'<div class="hl-meta">📍 '+esc(p.location)+' · '+esc(p.industry)+' · '+(p.commented?'💬 commented on':'👍 liked')+' “'+esc(p.post)+'”</div></div>'
-      +'<div class="hl-tags"><span class="hl-hs">● HubSpot list</span><span class="hl-eng">'+(p.commented?'Commented':'Reacted')+'</span></div>'
-      +'<div class="hl-go">Engage →</div></div>';
-  }).join('');
-}
-function openHotLeads(){var el=document.getElementById('hlm-list');if(el)el.innerHTML=keHotLeadRows();var ov=document.getElementById('hlm-ov');if(ov){ov.classList.add('open');document.body.style.overflow='hidden';}}
-function closeHotLeads(){var ov=document.getElementById('hlm-ov');if(ov){ov.classList.remove('open');document.body.style.overflow='';}}
-function keHotLead(i){
-  var p=(window.KE_HOTLEADS||[])[i];if(!p)return;
-  var dom=(p.email||'').split('@')[1]||'';
-  window._kePerson={name:p.name,title:p.title,company:p.company,domain:dom,email:p.email,source:'linkedin',
-    act:{post:p.post,postUrl:'',commented:!!p.commented,when:p.when,reactions:(p.reactions||0)}};
-  if(window.VimiEngage)window.VimiEngage.open(window._kePerson);
-}
 function buildPeopleTab(){
   const {people,companies,company_lb,stats}=D;
   const maxLb=company_lb[0]?company_lb[0][1]:1;
@@ -457,8 +428,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 
 function openEngDrawer(pi,ei){
   const p=D.posts[pi],e=p?.engagers[ei];if(!e)return;
-  window._kePerson={name:e.name,title:e.title||e.headline||'',company:e.company||'',domain:'',email:'',source:'linkedin',act:{post:p.snippet||'',postUrl:(p.url||''),postDate:(p.date||''),author:(p.author||'Position²'),reactions:(p.engagers?p.engagers.length:0),reaction:(e.reaction||''),commented:(e.commented?true:false),when:p.date||''}};
-  if(window.VimiEngage&&window._kePerson){window.VimiEngage.open(window._kePerson);return;}
   const isDM=e.dm?.toLowerCase()==='yes';
   document.getElementById('dhdr').innerHTML=`
     ${av(e.name,e.pic,58,'dav')}
@@ -471,7 +440,6 @@ function openEngDrawer(pi,ei){
     e.reaction?`<span class="b ${RCLS[e.reaction]||'bic'}" style="font-size:12px;padding:4px 11px">${RICO[e.reaction]||''} ${e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()}</span>`:'',
   ].filter(Boolean);
   document.getElementById('dbody').innerHTML=`
-    ${keBanner()}
     <div class="dsec"><div class="tagrow">${badges.join('')}</div></div>
     <div class="dsec"><div class="dslbl">Company & Location</div>
       <div class="igrid">
@@ -492,8 +460,6 @@ function openEngDrawer(pi,ei){
 
 function openPersonDrawer(idx){
   const p=D.people[idx];if(!p)return;
-  window._kePerson={name:p.name,title:p.title||p.headline||'',company:p.company||'',domain:'',email:'',source:'linkedin',act:{post:'',commented:false,when:(p.posts_engaged?p.posts_engaged+' post'+(p.posts_engaged!=1?'s':'')+' engaged':'')}};
-  if(window.VimiEngage&&window._kePerson){window.VimiEngage.open(window._kePerson);return;}
   const pct=Math.round(p.posts_engaged/maxP*100);
   document.getElementById('dhdr').innerHTML=`
     ${av(p.name,'',58,'dav')}
@@ -506,7 +472,6 @@ function openPersonDrawer(idx){
     p.posts_engaged>0?`<span class="b bmg" style="font-size:12px;padding:4px 11px">⚡ ${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</span>`:'',
   ].filter(Boolean);
   document.getElementById('dbody').innerHTML=`
-    ${keBanner()}
     <div class="dsec"><div class="tagrow">${badges.join('')}</div></div>
     ${p.posts_engaged>0?`<div class="dsec"><div class="dslbl">Engagement Activity</div>
       <div style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,.03);border:1px solid var(--card-b);border-radius:10px">
