@@ -862,7 +862,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .vmodal{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:24px}
 .vmodal[hidden]{display:none}
 .vmodal-ov{position:absolute;inset:0;background:rgba(4,5,13,.74);backdrop-filter:blur(6px)}
-.vmodal-card{position:relative;z-index:1;width:min(760px,100%);padding:26px;border-radius:22px;animation:vmIn .3s cubic-bezier(.2,.9,.25,1)}
+.vmodal-card{position:relative;z-index:1;width:min(1000px,94vw);padding:26px;border-radius:22px;animation:vmIn .3s cubic-bezier(.2,.9,.25,1)}
 @keyframes vmIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){ .vmodal-card{animation:none} }
 .vmodal-x{position:absolute;top:14px;right:16px;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim);font-size:22px;line-height:1;cursor:pointer;transition:.2s}
@@ -1227,7 +1227,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <p class="lead reveal in" style="transition-delay:160ms;margin:0 auto;text-align:center">We watch the open web, your site and social for the moments that signal intent — then hand your team the exact account to reach, and why.</p>
       <div class="hero-cta reveal in" style="transition-delay:240ms;justify-content:center">
         <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
-        <button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button>
+        <button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the walkthrough</button>
       </div>
     </header>
 
@@ -1374,7 +1374,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       </div>
     </section>
 
-    <div class="band reveal"><h3>See it on your accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the 2-min demo</button></div></div>
+    <div class="band reveal"><h3>See it on your accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-ghost" type="button" data-video data-cursor><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/></svg>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'privacy' %}
@@ -1900,7 +1900,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="vmodal-ov" data-vclose></div>
   <div class="vmodal-card glass" role="dialog" aria-modal="true" aria-labelledby="vmodal-t">
     <button class="vmodal-x" type="button" data-vclose aria-label="Close demo">&times;</button>
-    <div class="vmodal-h"><span class="pill-eye"><span class="dt"></span> 2-minute tour</span><h3 id="vmodal-t">See the intelligence layer in action</h3></div>
+    <div class="vmodal-h"><span class="pill-eye"><span class="dt"></span> Platform walkthrough</span><h3 id="vmodal-t">Inside the platform &mdash; how it works &amp; how it&rsquo;s built</h3></div>
     <div class="vframe" id="vframe">
       <div class="vph">
         <span class="vph-play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg></span>
@@ -1976,18 +1976,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   // ============ 2-minute demo modal control (accessible) ============
   var vm = document.getElementById('vmodal');
   if (vm){
-    var DEMO_VIDEO_URL = '';  /* <-- paste a YouTube/Loom EMBED url to enable the real video */
+    var DEMO_VIDEO_URL = 'https://www.youtube.com/embed/WqLzs2cFrhg?autoplay=1&rel=0&modestbranding=1&playsinline=1&vq=hd1080';
     var lastFocus = null;
     function vopen(){
       lastFocus = document.activeElement;
       if (DEMO_VIDEO_URL){
         document.getElementById('vframe').innerHTML =
-          '<iframe src="' + DEMO_VIDEO_URL + '" title="2-minute product tour" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+          '<iframe src="' + DEMO_VIDEO_URL + '" title="Platform walkthrough" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
       }
       vm.hidden = false; vm.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
       var x = vm.querySelector('.vmodal-x'); if (x) x.focus();
     }
     function vclose(){
+      var vf = document.getElementById('vframe'); if (vf) vf.innerHTML = '';
       vm.hidden = true; vm.setAttribute('aria-hidden', 'true'); document.body.style.overflow = '';
       if (lastFocus && lastFocus.focus) lastFocus.focus();
     }
