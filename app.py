@@ -294,16 +294,64 @@ def _force_ipv4():
         _socket.getaddrinfo = _orig
 
 
+def _gmail_api_send(subject: str, body: str, to_csv: str, reply_to: str, sender: str) -> None:
+    """Send mail via the Gmail API over HTTPS (443) using the service account in
+    GOOGLE_SA_JSON with domain-wide delegation, impersonating `sender`. Works on
+    hosts (e.g. Railway) that block outbound SMTP. Raises on failure."""
+    import json as _json, base64
+    from email.message import EmailMessage
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+    if not sa_str:
+        raise RuntimeError("GOOGLE_SA_JSON not set")
+    creds = service_account.Credentials.from_service_account_info(
+        _json.loads(sa_str),
+        scopes=["https://www.googleapis.com/auth/gmail.send"],
+    ).with_subject(sender)
+    svc = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to_csv
+    if reply_to:
+        msg["Reply-To"] = reply_to
+    msg.set_content(body)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+
 def _demo_request_to_email(d: dict) -> bool:
     """Email a 'Request access' submission to the team. Returns True on success.
-    Configure via SMTP_HOST, SMTP_PORT (587/465), SMTP_USER, SMTP_PASS,
-    optional SMTP_FROM, and DEMO_NOTIFY_EMAIL (comma-separated recipients)."""
+    Prefers the Gmail API (HTTPS) when GMAIL_SENDER is set (Railway blocks outbound
+    SMTP); otherwise falls back to SMTP (SMTP_HOST/PORT/USER/PASS)."""
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
+    subject = "New Request access: %s (%s)" % (d.get("name", ""), d.get("company") or "no company")
+    reply_to = d.get("email", "") if _EMAIL_RE.match(d.get("email", "")) else ""
+    body = "\n".join([
+        "New 'Request access' submission",
+        "",
+        "Name:     " + (d.get("name", "") or "-"),
+        "Email:    " + (d.get("email", "") or "-"),
+        "Company:  " + (d.get("company") or "-"),
+        "Interest: " + (d.get("interest") or "-"),
+        "Message:  " + (d.get("message") or "-"),
+        "",
+        "Submitted: " + (d.get("ts", "") or ""),
+        "IP:        " + (d.get("ip", "") or ""),
+    ])
+    gmail_sender = os.environ.get("GMAIL_SENDER", "")
+    if gmail_sender and os.environ.get("GOOGLE_SA_JSON", ""):
+        try:
+            _gmail_api_send(subject, body, to, reply_to, gmail_sender)
+            return True
+        except Exception as e:
+            log.warning("Demo request email (Gmail API) failed: %s", e)
     host = os.environ.get("SMTP_HOST", "")
     user = os.environ.get("SMTP_USER", "")
     pwd  = os.environ.get("SMTP_PASS", "")
     if not (host and user and pwd):
         return False
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
     sender = os.environ.get("SMTP_FROM", "") or user
     try:
         port = int(os.environ.get("SMTP_PORT", "587") or 587)
@@ -313,24 +361,12 @@ def _demo_request_to_email(d: dict) -> bool:
         import smtplib, ssl
         from email.message import EmailMessage
         msg = EmailMessage()
-        msg["Subject"] = "New Request access: %s (%s)" % (d.get("name", ""), d.get("company") or "no company")
+        msg["Subject"] = subject
         msg["From"] = sender
         msg["To"] = to
-        if _EMAIL_RE.match(d.get("email", "")):
-            msg["Reply-To"] = d["email"]
-        lines = [
-            "New 'Request access' submission",
-            "",
-            "Name:     " + (d.get("name", "") or "-"),
-            "Email:    " + (d.get("email", "") or "-"),
-            "Company:  " + (d.get("company") or "-"),
-            "Interest: " + (d.get("interest") or "-"),
-            "Message:  " + (d.get("message") or "-"),
-            "",
-            "Submitted: " + (d.get("ts", "") or ""),
-            "IP:        " + (d.get("ip", "") or ""),
-        ]
-        msg.set_content("\n".join(lines))
+        if reply_to:
+            msg["Reply-To"] = reply_to
+        msg.set_content(body)
         ctx = ssl.create_default_context()
         with _force_ipv4():
             if port == 465:
@@ -344,7 +380,7 @@ def _demo_request_to_email(d: dict) -> bool:
                     srv.send_message(msg)
         return True
     except Exception as e:
-        log.warning("Demo request email failed: %s", e)
+        log.warning("Demo request email (SMTP) failed: %s", e)
         return False
 
 
@@ -1269,9 +1305,20 @@ def admin_email_test():
     pwd  = os.environ.get("SMTP_PASS", "")
     port = os.environ.get("SMTP_PORT", "587")
     to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
+    gmail_sender = os.environ.get("GMAIL_SENDER", "")
     info = {"host": host or "(unset)", "port": port or "(unset)",
             "user": user or "(unset)", "pass_set": bool(pwd),
-            "from": os.environ.get("SMTP_FROM", "") or user or "(unset)", "to": to}
+            "from": os.environ.get("SMTP_FROM", "") or user or "(unset)", "to": to,
+            "gmail_sender": gmail_sender or "(unset)",
+            "sa_json_set": bool(os.environ.get("GOOGLE_SA_JSON", "")),
+            "method": "gmail_api" if (gmail_sender and os.environ.get("GOOGLE_SA_JSON", "")) else "smtp"}
+    if info["method"] == "gmail_api":
+        try:
+            _gmail_api_send("Test Mail", "Test Mail - Gmail API diagnostic from the Intelligence platform. If you received this, email notifications work.", to, "", gmail_sender)
+            info["result"] = "SENT OK"
+        except Exception as e:
+            info["result"] = "FAILED"; info["error"] = repr(e)
+        return jsonify(info)
     try:
         import smtplib, ssl
         from email.message import EmailMessage
