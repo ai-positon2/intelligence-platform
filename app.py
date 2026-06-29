@@ -241,22 +241,38 @@ def _demo_request_to_sheet(row: list) -> bool:
         return False
 
 
+# Notifications target ONLY the #intelligence-platform-request-access channel (C0BE016E2E8).
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
+SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "") or "C0BE016E2E8"
+
+
 def _demo_request_to_slack(d: dict) -> bool:
-    """Post a demo request to Slack via incoming webhook. Returns True on success."""
-    if not SLACK_WEBHOOK_URL or SLACK_WEBHOOK_URL == "YOUR_SLACK_WEBHOOK_URL":
-        return False
-    try:
-        text = (":sparkles: *New demo / custom-agent request*\n"
-                f"*Name:* {d.get('name','')}\n"
-                f"*Work email:* {d.get('email','')}\n"
-                f"*Company:* {d.get('company') or '—'}\n"
-                f"*Interest:* {d.get('interest') or '—'}\n"
-                f"*Message:* {d.get('message') or '—'}")
-        requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=8)
-        return True
-    except Exception as e:
-        log.warning("Demo request Slack post failed: %s", e)
-        return False
+    """Post a 'Request access' submission to the #intelligence-platform-request-access
+    channel. Prefers the Slack Web API (SLACK_BOT_TOKEN -> chat.postMessage to
+    SLACK_CHANNEL_ID); falls back to an incoming webhook (SLACK_WEBHOOK_URL)."""
+    text = (":sparkles: *New 'Request access' submission*\n"
+            f"*Name:* {d.get('name','')}\n"
+            f"*Work email:* {d.get('email','')}\n"
+            f"*Company:* {d.get('company') or '—'}\n"
+            f"*Interest:* {d.get('interest') or '—'}\n"
+            f"*Message:* {d.get('message') or '—'}")
+    if SLACK_BOT_TOKEN:
+        try:
+            r = requests.post("https://slack.com/api/chat.postMessage",
+                              headers={"Authorization": "Bearer " + SLACK_BOT_TOKEN},
+                              json={"channel": SLACK_CHANNEL_ID, "text": text}, timeout=8)
+            if r.ok and r.json().get("ok"):
+                return True
+            log.warning("Slack chat.postMessage failed: %s", r.text[:200])
+        except Exception as e:
+            log.warning("Slack chat.postMessage error: %s", e)
+    if SLACK_WEBHOOK_URL and SLACK_WEBHOOK_URL != "YOUR_SLACK_WEBHOOK_URL":
+        try:
+            requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=8)
+            return True
+        except Exception as e:
+            log.warning("Demo request Slack webhook post failed: %s", e)
+    return False
 
 
 def _demo_request_to_email(d: dict) -> bool:
@@ -268,7 +284,7 @@ def _demo_request_to_email(d: dict) -> bool:
     pwd  = os.environ.get("SMTP_PASS", "")
     if not (host and user and pwd):
         return False
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, sudheer.d@position2.com"
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com"
     sender = os.environ.get("SMTP_FROM", "") or user
     try:
         port = int(os.environ.get("SMTP_PORT", "587") or 587)
