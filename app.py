@@ -259,6 +259,59 @@ def _demo_request_to_slack(d: dict) -> bool:
         return False
 
 
+def _demo_request_to_email(d: dict) -> bool:
+    """Email a 'Request access' submission to the team. Returns True on success.
+    Configure via SMTP_HOST, SMTP_PORT (587/465), SMTP_USER, SMTP_PASS,
+    optional SMTP_FROM, and DEMO_NOTIFY_EMAIL (comma-separated recipients)."""
+    host = os.environ.get("SMTP_HOST", "")
+    user = os.environ.get("SMTP_USER", "")
+    pwd  = os.environ.get("SMTP_PASS", "")
+    if not (host and user and pwd):
+        return False
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, sudheer.d@position2.com"
+    sender = os.environ.get("SMTP_FROM", "") or user
+    try:
+        port = int(os.environ.get("SMTP_PORT", "587") or 587)
+    except Exception:
+        port = 587
+    try:
+        import smtplib, ssl
+        from email.message import EmailMessage
+        msg = EmailMessage()
+        msg["Subject"] = "New Request access: %s (%s)" % (d.get("name", ""), d.get("company") or "no company")
+        msg["From"] = sender
+        msg["To"] = to
+        if _EMAIL_RE.match(d.get("email", "")):
+            msg["Reply-To"] = d["email"]
+        lines = [
+            "New 'Request access' submission",
+            "",
+            "Name:     " + (d.get("name", "") or "-"),
+            "Email:    " + (d.get("email", "") or "-"),
+            "Company:  " + (d.get("company") or "-"),
+            "Interest: " + (d.get("interest") or "-"),
+            "Message:  " + (d.get("message") or "-"),
+            "",
+            "Submitted: " + (d.get("ts", "") or ""),
+            "IP:        " + (d.get("ip", "") or ""),
+        ]
+        msg.set_content("\n".join(lines))
+        ctx = ssl.create_default_context()
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=12, context=ctx) as srv:
+                srv.login(user, pwd)
+                srv.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=12) as srv:
+                srv.starttls(context=ctx)
+                srv.login(user, pwd)
+                srv.send_message(msg)
+        return True
+    except Exception as e:
+        log.warning("Demo request email failed: %s", e)
+        return False
+
+
 @app.route("/api/demo-request", methods=["POST"])
 def api_demo_request():
     """Public intake for the login-page 'Book a demo / build a custom agent' form."""
@@ -278,12 +331,13 @@ def api_demo_request():
     now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
     row = [now, name, email, company, interest, message, ip, ua, "login page"]
     payload = {"name": name, "email": email, "company": company,
-               "interest": interest, "message": message}
+               "interest": interest, "message": message, "ts": now, "ip": ip}
     sheet_ok = _demo_request_to_sheet(row)
     slack_ok = _demo_request_to_slack(payload)
-    log.info("Demo request: %s <%s> [%s] (sheet=%s slack=%s)",
-             name, email, interest, sheet_ok, slack_ok)
-    return jsonify({"ok": True, "delivered": bool(sheet_ok or slack_ok)})
+    email_ok = _demo_request_to_email(payload)
+    log.info("Demo request: %s <%s> [%s] (sheet=%s slack=%s email=%s)",
+             name, email, interest, sheet_ok, slack_ok, email_ok)
+    return jsonify({"ok": True, "delivered": bool(sheet_ok or slack_ok or email_ok)})
 
 # ── Marketing site (public): agent directory, detail pages, overview pages ───────
 def _svg(inner: str) -> str:
