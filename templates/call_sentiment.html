@@ -14,6 +14,14 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
 <style>
 :root{--pos:#2dd4aa;--neu:#f5a623;--neg:#fb7185;--mono:'JetBrains Mono',ui-monospace,monospace}
+.main{max-width:1320px!important}
+.page-header,.cs-kpis{position:relative;z-index:1}
+.cs-glow{position:absolute;top:-70px;left:50%;transform:translateX(-50%);width:min(960px,92%);height:380px;pointer-events:none;z-index:0;
+  background:radial-gradient(58% 60% at 50% 0%,rgba(45,212,170,.11),transparent 70%),radial-gradient(46% 64% at 16% 8%,rgba(124,131,245,.12),transparent 72%),radial-gradient(46% 64% at 86% 8%,rgba(34,211,238,.09),transparent 72%);filter:blur(26px)}
+.cs-seclabel{display:flex;align-items:center;gap:14px;margin:34px 0 16px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--tx3)}
+.cs-seclabel::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--b2),transparent)}
+.cs-seclabel span{white-space:nowrap;display:inline-flex;align-items:center;gap:9px;color:var(--tx2)}
+.cs-seclabel .sd{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 9px var(--accent)}
 .cs-wrap{max-width:1340px;margin:0 auto;padding:0 26px 90px}
 .cs-sub-icons{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
 .cs-srcpill{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2);padding:6px 12px;border-radius:var(--rpill);border:1px solid var(--b1);background:var(--s1)}
@@ -21,9 +29,9 @@
 .cs-srcpill .d{width:7px;height:7px;border-radius:50%}
 
 /* ── filter bar ── */
-.cs-filters{position:sticky;top:12px;z-index:30;margin:22px 0 26px;padding:14px 16px;border-radius:var(--rxl);
-  background:linear-gradient(180deg,rgba(13,17,34,.92),rgba(9,12,24,.92));backdrop-filter:blur(14px);
-  border:1px solid var(--b2);box-shadow:var(--shadow-md);display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.cs-filters{position:relative;z-index:5;margin:22px 0 4px;padding:18px 22px;border-radius:var(--rxl);
+  background:linear-gradient(180deg,rgba(18,23,44,.66),rgba(11,14,28,.66));backdrop-filter:blur(16px);
+  border:1px solid var(--b1);box-shadow:0 18px 50px -34px rgba(0,0,0,.9);display:flex;flex-wrap:wrap;gap:20px 24px;align-items:flex-end}
 .cs-fgroup{display:flex;flex-direction:column;gap:6px}
 .cs-flabel{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono)}
 .cs-seg{display:inline-flex;padding:3px;border-radius:var(--rpill);border:1px solid var(--b2);background:var(--s1);gap:2px}
@@ -53,26 +61,30 @@
 @keyframes csPulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ── layout grid ── */
-.cs-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
+.cs-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-bottom:8px}
 @media(max-width:1180px){.cs-kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.cs-kpis{grid-template-columns:repeat(2,1fr)}}
-.cs-row{display:grid;gap:18px;margin-bottom:22px}
+.cs-row{display:grid;gap:20px;margin-bottom:26px}
 .cs-row.r-2{grid-template-columns:1.55fr 1fr}
 .cs-row.r-2b{grid-template-columns:1fr 1fr}
 @media(max-width:980px){.cs-row.r-2,.cs-row.r-2b{grid-template-columns:1fr}}
 
 /* ── panels ── */
-.cs-panel{position:relative;border-radius:var(--rxl);border:1px solid var(--b1);background:linear-gradient(180deg,var(--s2),var(--s1));
-  padding:20px;overflow:hidden;box-shadow:var(--shadow-sm)}
-.cs-panel::before{content:'';position:absolute;top:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,var(--b3),transparent)}
-.cs-ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
-.cs-ph h3{font-size:14.5px;font-weight:600;color:var(--tx);letter-spacing:-.01em}
+.cs-panel{position:relative;border-radius:18px;border:1px solid var(--b1);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.011));
+  padding:24px;overflow:hidden;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 26px 64px -38px rgba(0,0,0,.92);transition:border-color var(--dur)}
+.cs-panel:hover{border-color:var(--b2)}
+.cs-panel::before{content:'';position:absolute;top:0;left:24px;right:24px;height:1px;background:linear-gradient(90deg,transparent,var(--b3),transparent)}
+.cs-ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}
+.cs-ph h3{font-size:15px;font-weight:600;color:var(--tx);letter-spacing:-.01em;position:relative;padding-left:14px}
+.cs-ph h3::before{content:'';position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--pos),var(--cyan))}
+.cs-ph .sub{padding-left:14px}
 .cs-ph .sub{font-size:11.5px;color:var(--tx3);margin-top:3px}
 .cs-ph .hint{font-size:10px;font-family:var(--mono);color:var(--tx3);letter-spacing:.08em;text-transform:uppercase}
 
 /* ── KPI card ── */
-.cs-kpi{position:relative;border-radius:var(--rl);border:1px solid var(--b1);background:linear-gradient(180deg,var(--s2),var(--s1));padding:16px;overflow:hidden;transition:transform var(--dur) var(--ease),border-color var(--dur)}
-.cs-kpi:hover{transform:translateY(-3px);border-color:var(--b3)}
+.cs-kpi{position:relative;border-radius:15px;border:1px solid var(--b1);background:linear-gradient(180deg,rgba(255,255,255,.052),rgba(255,255,255,.013));padding:18px 18px 20px;overflow:hidden;transition:transform var(--dur) var(--ease),border-color var(--dur),box-shadow var(--dur)}
+.cs-kpi:hover{transform:translateY(-4px);border-color:var(--b3);box-shadow:0 22px 48px -26px rgba(0,0,0,.95)}
+.cs-kpi::after{border-radius:0 0 4px 4px;opacity:.92}
 .cs-kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--accent))}
 .cs-kpi .kl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono);display:flex;align-items:center;gap:7px}
 .cs-kpi .kv{font-size:30px;font-weight:600;color:var(--tx);margin-top:10px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -237,6 +249,7 @@
   <!-- Main -->
   <div class="main">
     <div class="cs-wrap">
+      <div class="cs-glow"></div>
       <div class="page-header">
         <h1 class="page-title">Call &amp; Sentiment Intelligence</h1>
         <p class="page-sub">Voice-of-patient sentiment unified across calls, reviews and surveys — scored for every location.</p>
@@ -244,7 +257,6 @@
           <span class="cs-srcpill"><span class="d" style="background:var(--cyan)"></span>Network: <b>Cedar Valley Health</b></span>
           <span class="cs-srcpill"><span class="d" style="background:var(--accent)"></span><b id="csPillLoc">10</b> locations · 3 states</span>
           <span class="cs-srcpill"><span class="d" style="background:var(--pos)"></span>Sources: <b>Calls · Reviews · Surveys</b></span>
-          <span class="cs-srcpill" style="border-style:dashed"><span class="d" style="background:var(--neu)"></span>Demo data</span>
         </div>
       </div>
 
@@ -305,7 +317,7 @@
         <span class="cs-updated"><span class="lv"></span>Synced <span id="csUpdated">just now</span></span>
       </div>
 
-      <!-- KPIs -->
+      <div class="cs-seclabel"><span><span class="sd"></span>Overview</span></div>
       <div class="cs-kpis" id="csKpis"></div>
 
       <!-- Row A: trend + gauge -->
@@ -343,6 +355,7 @@
         </div>
       </div>
 
+      <div class="cs-seclabel"><span><span class="sd"></span>By location</span></div>
       <!-- Row C: location table -->
       <div class="cs-panel" style="margin-bottom:22px">
         <div class="cs-ph">
@@ -369,6 +382,7 @@
         </div>
       </div>
 
+      <div class="cs-seclabel"><span><span class="sd"></span>Drivers &amp; verbatims</span></div>
       <!-- Row D: theme drivers + call reasons -->
       <div class="cs-row r-2b">
         <div class="cs-panel">
