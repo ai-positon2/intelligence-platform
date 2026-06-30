@@ -34,6 +34,8 @@
 
   var vid = ls("p2_vid"), isNew = false;
   if (!vid) { vid = uuid(); ls("p2_vid", vid); isNew = true; }
+  // mirror into a first-party cookie so the server can stitch identity on form submit / login
+  try { document.cookie = "p2_vid=" + vid + "; max-age=31536000; path=/; SameSite=Lax"; } catch (e) {}
 
   var sid = ss("p2_sid");
   var qp = new URLSearchParams(location.search);

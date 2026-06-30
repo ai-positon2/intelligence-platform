@@ -97,6 +97,14 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 
   <div class="grid kpis" id="kpis"></div>
 
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">Identified visitors &amp; companies</h2>
+      <div class="tbl-wrap" style="max-height:380px"><table id="identified">
+        <thead><tr><th>Visitor</th><th>Name</th><th>Company</th><th>Source</th><th>Pages</th></tr></thead>
+        <tbody></tbody></table></div></div>
+    <div class="card"><h2 style="margin-top:0">Top companies <span class="muted" style="font-weight:400;font-size:12px">· reverse-IP / form</span></h2><div class="bars" id="companies"></div></div>
+  </div>
+
   <div class="sect"><h2>Visits over time</h2><div class="card"><div class="spark" id="series"></div><div class="xlab" id="seriesX"></div></div></div>
 
   <div class="sect grid two">
@@ -134,7 +142,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 
   <div class="sect"><h2>Recent visitor activity</h2>
     <div class="card" style="padding:6px"><div class="tbl-wrap"><table id="recent">
-      <thead><tr><th>Time (IST)</th><th>Visitor</th><th>Page</th><th>Landing</th><th>Referrer</th><th>Device</th><th>Engaged</th><th>Scroll</th><th>Pages</th><th>Flags</th></tr></thead>
+      <thead><tr><th>Time (IST)</th><th>Visitor</th><th>Who</th><th>Page</th><th>Landing</th><th>Referrer</th><th>Device</th><th>Engaged</th><th>Scroll</th><th>Pages</th><th>Flags</th></tr></thead>
       <tbody></tbody></table></div></div>
   </div>
 </div>
@@ -171,6 +179,8 @@ function load(force){
       kcard(k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
       kcard((k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
       kcard(k.video_sessions||0,'Watched walkthrough')+
+      kcard(k.identified||0,'Identified visitors')+
+      kcard(k.companies||0,'Companies seen')+
       kcard(k.total_rage||0,'Rage clicks');
     // time series
     var s=d.series||[],sx=document.getElementById('seriesX');
@@ -185,7 +195,9 @@ function load(force){
     bars('utmSource',d.utm_source);bars('utmCampaign',d.utm_campaign);
     bars('devices',d.devices);bars('oses',d.oses);bars('browsers',d.browsers);
     bars('scroll',d.scroll);bars('cta',d.cta);bars('search',d.search);
-    bars('landing',d.top_landing);bars('rage',d.rage);
+    bars('landing',d.top_landing);bars('rage',d.rage);bars('companies',d.top_companies);
+    var idb=document.querySelector('#identified tbody');var idr=d.identified||[];
+    idb.innerHTML=idr.length?idr.map(function(x){return '<tr><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Request access'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+esc(x.pages)+'</td></tr>';}).join(''):'<tr><td colspan="5" class="empty">No identified visitors yet — they appear when reverse-IP is enabled, someone submits the access form, or a provider posts to /api/identify.</td></tr>';
     // funnel
     var f=d.form_funnel||{};
     document.getElementById('funnel').innerHTML=
@@ -212,10 +224,11 @@ function load(force){
       if(x.form==='submitted')flags.push('<span class="pill sub">converted</span>');
       else if(x.form)flags.push('<span class="pill">'+esc(x.form)+'</span>');
       return '<tr><td class="muted">'+esc(x.ts)+'</td><td class="muted">'+esc(x.vid)+'</td>'+
+        '<td>'+esc(x.who||x.company||'—')+'</td>'+
         '<td title="'+esc(x.page)+'">'+esc(x.page)+'</td><td class="muted">'+esc(x.landing)+'</td>'+
         '<td>'+esc(x.ref)+'</td><td>'+esc(x.device)+'</td><td>'+esc(x.engaged)+'</td>'+
         '<td>'+esc(x.scroll)+'%</td><td>'+esc(x.pages)+'</td><td>'+flags.join(' ')+'</td></tr>';
-    }).join(''):'<tr><td colspan="10" class="empty">No activity yet</td></tr>';
+    }).join(''):'<tr><td colspan="11" class="empty">No activity yet</td></tr>';
   }).catch(function(){if(btn)btn.textContent='↻ Refresh';
     document.getElementById('emptyNote').style.display='block';
     document.getElementById('emptyNote').textContent='Failed to load analytics data.';});

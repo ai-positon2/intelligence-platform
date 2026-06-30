@@ -1797,13 +1797,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     if(!name||!EMAIL.test(email)){ errEl.textContent='Please enter your name and a valid work email.'; return; }
     submit.classList.add('loading'); submit.disabled=true; submitTx.textContent='Sending';
     fetch('/api/demo-request',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:name,email:email,company:company,interest:interest,message:message})})
+      body:JSON.stringify({name:name,email:email,company:company,interest:interest,message:message,vid:(function(){try{return localStorage.getItem('p2_vid')||''}catch(e){return ''}})()})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
       .then(function(res){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access';
         if(res.ok&&res.d&&res.d.ok){ document.getElementById('nvSuccessMsg').textContent = interest==='Build a custom agent'
             ? 'Thanks — our team will get in touch to scope your custom agent.'
             : 'Thanks — our team will get in touch to get you set up with access.';
-          document.getElementById('nvFormBody').style.display='none'; document.getElementById('nvSuccess').classList.add('on'); confetti();
+          document.getElementById('nvFormBody').style.display='none'; document.getElementById('nvSuccess').classList.add('on'); confetti(); try{document.dispatchEvent(new CustomEvent('p2:lead_submit',{detail:{interest:interest}}));}catch(e){}
         } else { errEl.textContent=(res.d&&res.d.error)?res.d.error:'Something went wrong. Please try again.'; } })
       .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access'; errEl.textContent='Network error. Please try again.'; });
   });
