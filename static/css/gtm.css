@@ -248,6 +248,14 @@
       --card-glow: 0 0 40px rgba(16,185,129,0.10);
       --arrow-color: #34d399;
     }
+    .c-sentiment {
+      --band: linear-gradient(90deg,#22d3ee,#2dd4aa,#34d399);
+      --thumb: linear-gradient(135deg,#04201f 0%,#062a2f 100%);
+      --icon-glow: rgba(45,212,170,0.5);
+      --card-border: rgba(45,212,170,0.4);
+      --card-glow: 0 0 40px rgba(45,212,170,0.12);
+      --arrow-color: #2dd4aa;
+    }
 
     .footer-note { margin-top: 52px; font-size: 12px; color: #1a1d2e; text-align: center; }
   

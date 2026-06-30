@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Call &amp; Sentiment Intelligence — GTM</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232dd4aa'/%3E%3Cpath d='M9 11h14v8H15l-4 3v-3H9z' fill='%23042a26'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gtm.css') }}">
+<style>
+:root{--pos:#2dd4aa;--neu:#f5a623;--neg:#fb7185;--mono:'JetBrains Mono',ui-monospace,monospace}
+.cs-wrap{max-width:1340px;margin:0 auto;padding:0 26px 90px}
+.cs-sub-icons{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+.cs-srcpill{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2);padding:6px 12px;border-radius:var(--rpill);border:1px solid var(--b1);background:var(--s1)}
+.cs-srcpill b{color:var(--tx);font-weight:600}
+.cs-srcpill .d{width:7px;height:7px;border-radius:50%}
+
+/* ── filter bar ── */
+.cs-filters{position:sticky;top:12px;z-index:30;margin:22px 0 26px;padding:14px 16px;border-radius:var(--rxl);
+  background:linear-gradient(180deg,rgba(13,17,34,.92),rgba(9,12,24,.92));backdrop-filter:blur(14px);
+  border:1px solid var(--b2);box-shadow:var(--shadow-md);display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.cs-fgroup{display:flex;flex-direction:column;gap:6px}
+.cs-flabel{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono)}
+.cs-seg{display:inline-flex;padding:3px;border-radius:var(--rpill);border:1px solid var(--b2);background:var(--s1);gap:2px}
+.cs-seg button{appearance:none;border:0;background:transparent;color:var(--tx2);font:inherit;font-size:12px;font-weight:500;
+  padding:6px 13px;border-radius:var(--rpill);cursor:pointer;transition:all var(--dur) var(--ease);white-space:nowrap}
+.cs-seg button:hover{color:var(--tx)}
+.cs-seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 6px 16px -6px var(--accent-g)}
+.cs-chip{appearance:none;border:1px solid var(--b2);background:var(--s1);color:var(--tx2);font:inherit;font-size:12px;
+  padding:7px 13px;border-radius:var(--rpill);cursor:pointer;transition:all var(--dur) var(--ease);display:inline-flex;align-items:center;gap:7px}
+.cs-chip:hover{color:var(--tx);border-color:var(--b3)}
+.cs-chip.on{color:#fff;border-color:transparent}
+.cs-chip .cd{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.85}
+.cs-chip.on.pos{background:var(--pos);color:#04241f}.cs-chip.on.neu{background:var(--neu);color:#2a1c00}.cs-chip.on.neg{background:var(--neg);color:#2a0a10}
+.cs-chip.on.all{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.cs-select{appearance:none;border:1px solid var(--b2);background:var(--s1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b94be' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color:var(--tx);font:inherit;font-size:12.5px;padding:8px 30px 8px 12px;border-radius:var(--r);cursor:pointer;min-width:150px}
+.cs-select:focus{outline:none;border-color:var(--accent)}
+.cs-search{display:flex;align-items:center;gap:8px;border:1px solid var(--b2);background:var(--s1);border-radius:var(--r);padding:8px 12px;min-width:190px}
+.cs-search input{appearance:none;border:0;background:transparent;color:var(--tx);font:inherit;font-size:12.5px;width:100%}
+.cs-search input:focus{outline:none}
+.cs-search svg{width:14px;height:14px;stroke:var(--tx3);flex:0 0 auto}
+.cs-reset{margin-left:auto;appearance:none;border:1px solid var(--b2);background:transparent;color:var(--tx2);font:inherit;font-size:12px;
+  padding:8px 14px;border-radius:var(--r);cursor:pointer;transition:all var(--dur)}
+.cs-reset:hover{color:var(--tx);border-color:var(--b3);background:var(--s1)}
+.cs-updated{font-size:11px;color:var(--tx3);font-family:var(--mono);display:flex;align-items:center;gap:7px}
+.cs-updated .lv{width:7px;height:7px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px var(--pos);animation:csPulse 2.4s infinite}
+@keyframes csPulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── layout grid ── */
+.cs-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:1180px){.cs-kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.cs-kpis{grid-template-columns:repeat(2,1fr)}}
+.cs-row{display:grid;gap:18px;margin-bottom:22px}
+.cs-row.r-2{grid-template-columns:1.55fr 1fr}
+.cs-row.r-2b{grid-template-columns:1fr 1fr}
+@media(max-width:980px){.cs-row.r-2,.cs-row.r-2b{grid-template-columns:1fr}}
+
+/* ── panels ── */
+.cs-panel{position:relative;border-radius:var(--rxl);border:1px solid var(--b1);background:linear-gradient(180deg,var(--s2),var(--s1));
+  padding:20px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.cs-panel::before{content:'';position:absolute;top:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,var(--b3),transparent)}
+.cs-ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.cs-ph h3{font-size:14.5px;font-weight:600;color:var(--tx);letter-spacing:-.01em}
+.cs-ph .sub{font-size:11.5px;color:var(--tx3);margin-top:3px}
+.cs-ph .hint{font-size:10px;font-family:var(--mono);color:var(--tx3);letter-spacing:.08em;text-transform:uppercase}
+
+/* ── KPI card ── */
+.cs-kpi{position:relative;border-radius:var(--rl);border:1px solid var(--b1);background:linear-gradient(180deg,var(--s2),var(--s1));padding:16px;overflow:hidden;transition:transform var(--dur) var(--ease),border-color var(--dur)}
+.cs-kpi:hover{transform:translateY(-3px);border-color:var(--b3)}
+.cs-kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--accent))}
+.cs-kpi .kl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono);display:flex;align-items:center;gap:7px}
+.cs-kpi .kv{font-size:30px;font-weight:600;color:var(--tx);margin-top:10px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cs-kpi .kv small{font-size:14px;color:var(--tx3);font-weight:500}
+.cs-kpi .kd{margin-top:9px;font-size:11.5px;font-family:var(--mono);display:inline-flex;align-items:center;gap:5px}
+.cs-kpi .kd.up{color:var(--pos)}.cs-kpi .kd.dn{color:var(--neg)}.cs-kpi .kd.fl{color:var(--tx3)}
+.cs-kpi .kspark{position:absolute;right:14px;bottom:14px;width:74px;height:30px;opacity:.9}
+
+/* sentiment score gauge */
+.cs-gauge{display:flex;align-items:center;gap:18px}
+.cs-gauge .ring{position:relative;width:118px;height:118px;flex:0 0 auto}
+.cs-gauge .ring b{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:34px;font-weight:600;color:var(--tx);font-variant-numeric:tabular-nums}
+.cs-gauge .ring b i{font-style:normal;font-size:10px;font-family:var(--mono);letter-spacing:.12em;color:var(--tx3);text-transform:uppercase;margin-top:3px}
+.cs-gauge .gmeta{display:flex;flex-direction:column;gap:10px}
+.cs-gauge .gmeta .gd{font-size:12.5px;color:var(--tx2)}
+.cs-gauge .gmeta .gd b{color:var(--tx);font-weight:600}
+.cs-distro{display:flex;flex-direction:column;gap:11px;margin-top:6px}
+.cs-distro .dr{display:flex;align-items:center;gap:10px;font-size:12px}
+.cs-distro .dr .dn{width:62px;color:var(--tx2)}
+.cs-distro .dr .db{flex:1;height:9px;border-radius:5px;background:var(--s3);overflow:hidden}
+.cs-distro .dr .db i{display:block;height:100%;border-radius:5px;transition:width .6s var(--ease)}
+.cs-distro .dr .dv{width:46px;text-align:right;font-family:var(--mono);color:var(--tx);font-size:11.5px}
+
+/* charts */
+.cs-chart{width:100%;display:block}
+.cs-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px}
+.cs-legend span{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx2)}
+.cs-legend span i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cs-donut-wrap{display:flex;align-items:center;gap:22px}
+.cs-donut-legend{display:flex;flex-direction:column;gap:12px;flex:1}
+.cs-donut-legend .dl{display:flex;align-items:center;gap:10px;font-size:12.5px}
+.cs-donut-legend .dl .ds{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+.cs-donut-legend .dl .dlt{color:var(--tx2)}
+.cs-donut-legend .dl .dlv{margin-left:auto;font-family:var(--mono);color:var(--tx);font-weight:600}
+
+/* location table */
+.cs-loc-tbl{width:100%;border-collapse:collapse}
+.cs-loc-tbl th{text-align:left;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono);
+  font-weight:500;padding:0 12px 12px;border-bottom:1px solid var(--b1);cursor:pointer;user-select:none;white-space:nowrap}
+.cs-loc-tbl th:hover{color:var(--tx2)}
+.cs-loc-tbl th .ar{opacity:0;margin-left:4px}
+.cs-loc-tbl th.sort .ar{opacity:1;color:var(--accent)}
+.cs-loc-tbl td{padding:13px 12px;border-bottom:1px solid var(--b1);font-size:13px;vertical-align:middle}
+.cs-loc-tbl tr{cursor:pointer;transition:background var(--dur)}
+.cs-loc-tbl tbody tr:hover{background:var(--s2)}
+.cs-loc-name{display:flex;flex-direction:column}
+.cs-loc-name b{color:var(--tx);font-weight:600;font-size:13px}
+.cs-loc-name span{color:var(--tx3);font-size:11px;font-family:var(--mono)}
+.cs-scorebadge{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:5px 9px;border-radius:var(--r);font-family:var(--mono);font-weight:600;font-size:12.5px}
+.cs-mini-bar{width:110px;height:7px;border-radius:4px;background:var(--s3);overflow:hidden;display:inline-block;vertical-align:middle}
+.cs-mini-bar i{display:block;height:100%;border-radius:4px}
+.cs-delta{font-family:var(--mono);font-size:11.5px}
+.cs-delta.up{color:var(--pos)}.cs-delta.dn{color:var(--neg)}.cs-delta.fl{color:var(--tx3)}
+.cs-tch{display:inline-block;font-size:11px;padding:3px 8px;border-radius:var(--rpill);background:var(--s3);color:var(--tx2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* theme drivers */
+.cs-themes{display:flex;flex-direction:column;gap:11px}
+.cs-theme{display:grid;grid-template-columns:160px 1fr 54px;gap:12px;align-items:center}
+.cs-theme .tn{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-theme .tbar{height:22px;border-radius:6px;background:var(--s3);position:relative;overflow:hidden;display:flex}
+.cs-theme .tbar i{height:100%;transition:width .6s var(--ease)}
+.cs-theme .tv{font-family:var(--mono);font-size:11.5px;color:var(--tx);text-align:right}
+.cs-theme .tbar .tpos{background:linear-gradient(90deg,rgba(45,212,170,.35),var(--pos))}
+.cs-theme .tbar .tneg{background:linear-gradient(90deg,var(--neg),rgba(251,113,133,.35))}
+
+/* emotion */
+.cs-emos{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.cs-emo{padding:13px;border-radius:var(--rl);border:1px solid var(--b1);background:var(--s1)}
+.cs-emo .en{font-size:11.5px;color:var(--tx2);display:flex;justify-content:space-between}
+.cs-emo .en b{color:var(--tx);font-family:var(--mono)}
+.cs-emo .eb{height:7px;border-radius:4px;background:var(--s3);margin-top:9px;overflow:hidden}
+.cs-emo .eb i{display:block;height:100%;border-radius:4px}
+
+/* feed */
+.cs-feed{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow-y:auto;padding-right:4px}
+.cs-fi{display:grid;grid-template-columns:40px 1fr auto;gap:13px;padding:14px;border-radius:var(--rl);border:1px solid var(--b1);background:var(--s1);transition:border-color var(--dur),transform var(--dur)}
+.cs-fi:hover{border-color:var(--b3);transform:translateX(2px)}
+.cs-fi.flag{border-color:rgba(251,113,133,.4);background:linear-gradient(180deg,rgba(251,113,133,.06),var(--s1))}
+.cs-fi .fic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--s3)}
+.cs-fi .ft{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cs-fi .frow1{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cs-fi .floc{font-size:12.5px;color:var(--tx);font-weight:600}
+.cs-fi .ftopic{font-size:10.5px;font-family:var(--mono);color:var(--tx3);text-transform:uppercase;letter-spacing:.06em}
+.cs-fi .fsnip{font-size:13px;color:var(--tx2);line-height:1.5}
+.cs-fi .fmeta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;white-space:nowrap}
+.cs-fi .fdate{font-size:10.5px;color:var(--tx3);font-family:var(--mono)}
+.cs-sentchip{font-size:10px;font-weight:600;padding:4px 9px;border-radius:var(--rpill);font-family:var(--mono);letter-spacing:.04em}
+.cs-sentchip.pos{background:var(--green-d);color:var(--pos)}.cs-sentchip.neu{background:var(--amber-d);color:var(--neu)}.cs-sentchip.neg{background:var(--rose-d);color:var(--neg)}
+.cs-feed-empty{padding:40px;text-align:center;color:var(--tx3);font-size:13px}
+.cs-feed-foot{margin-top:12px;font-size:11px;color:var(--tx3);font-family:var(--mono);text-align:center}
+
+/* drawer */
+.cs-drawer-bd{position:fixed;inset:0;background:rgba(2,4,12,.62);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity var(--dur);z-index:80}
+.cs-drawer-bd.open{opacity:1;pointer-events:auto}
+.cs-drawer{position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:linear-gradient(180deg,#0a0e1d,#070a16);
+  border-left:1px solid var(--b2);box-shadow:-30px 0 80px -20px rgba(0,0,0,.8);transform:translateX(100%);transition:transform var(--dur-slow) var(--ease);z-index:81;
+  display:flex;flex-direction:column;overflow:hidden}
+.cs-drawer.open{transform:none}
+.cs-dh{padding:22px;border-bottom:1px solid var(--b1);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.cs-dh h2{font-size:19px;font-weight:600;color:var(--tx)}
+.cs-dh .dsub{font-size:12px;color:var(--tx3);font-family:var(--mono);margin-top:4px}
+.cs-dclose{appearance:none;border:1px solid var(--b2);background:var(--s1);color:var(--tx2);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;flex:0 0 auto;transition:all var(--dur)}
+.cs-dclose:hover{color:var(--tx);border-color:var(--b3)}
+.cs-db{padding:22px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:20px}
+.cs-dkpis{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.cs-dkpi{padding:13px;border-radius:var(--rl);border:1px solid var(--b1);background:var(--s1)}
+.cs-dkpi .l{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);font-family:var(--mono)}
+.cs-dkpi .v{font-size:21px;font-weight:600;color:var(--tx);margin-top:7px;font-variant-numeric:tabular-nums}
+.cs-dsec h4{font-size:12px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px}
+.cs-print{font-size:11px}
+@media print{.cs-filters,.topbar,.bg-grid{display:none}}
+</style>
+</head>
+<body data-email="{{ user.email if user else '' }}">
+  <div class="bg-grid"></div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/hub" class="brand">
+        <div class="brand-icon">📡</div>
+        <span class="brand-name">Intelligence</span>
+      </a>
+      <div class="breadcrumb">
+        <a href="/hub" class="bc-link">Hub</a>
+        <span class="bc-sep">›</span>
+        <a href="/gtm" class="bc-link">GTM</a>
+        <span class="bc-sep">›</span>
+        <span class="bc-cur">Call &amp; Sentiment</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="user-avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">
+            {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
+            <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
+            <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
+            <a href="/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+            <div class="dd-divider"></div>
+            {% endif %}
+            <a href="/gtm" class="dd-item"><span class="dd-item-icon">◎</span> GTM Dashboards</a>
+            <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="cs-wrap">
+      <div class="page-header">
+        <h1 class="page-title">Call &amp; Sentiment Intelligence</h1>
+        <p class="page-sub">Voice-of-patient sentiment unified across calls, reviews and surveys — scored for every location.</p>
+        <div class="cs-sub-icons">
+          <span class="cs-srcpill"><span class="d" style="background:var(--cyan)"></span>Network: <b>Cedar Valley Health</b></span>
+          <span class="cs-srcpill"><span class="d" style="background:var(--accent)"></span><b id="csPillLoc">10</b> locations · 3 states</span>
+          <span class="cs-srcpill"><span class="d" style="background:var(--pos)"></span>Sources: <b>Calls · Reviews · Surveys</b></span>
+          <span class="cs-srcpill" style="border-style:dashed"><span class="d" style="background:var(--neu)"></span>Demo data</span>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="cs-filters">
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Period</span>
+          <div class="cs-seg" id="csRange">
+            <button data-range="7">7d</button>
+            <button data-range="30" class="on">30d</button>
+            <button data-range="90">90d</button>
+            <button data-range="all">All</button>
+          </div>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Region</span>
+          <select class="cs-select" id="csRegion" style="min-width:130px">
+            <option value="all">All regions</option>
+            <option value="North Carolina">North Carolina</option>
+            <option value="South Carolina">South Carolina</option>
+            <option value="Virginia">Virginia</option>
+          </select>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Location</span>
+          <select class="cs-select" id="csLoc"><option value="all">All locations</option></select>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Source</span>
+          <div style="display:flex;gap:7px">
+            <button class="cs-chip on all" data-src="all">All</button>
+            <button class="cs-chip" data-src="call">📞 Calls</button>
+            <button class="cs-chip" data-src="review">★ Reviews</button>
+            <button class="cs-chip" data-src="survey">📋 Surveys</button>
+          </div>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Sentiment</span>
+          <div style="display:flex;gap:7px">
+            <button class="cs-chip on all" data-sent="all">All</button>
+            <button class="cs-chip pos" data-sent="pos"><span class="cd"></span>Positive</button>
+            <button class="cs-chip neu" data-sent="neu"><span class="cd"></span>Neutral</button>
+            <button class="cs-chip neg" data-sent="neg"><span class="cd"></span>Negative</button>
+          </div>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Topic</span>
+          <select class="cs-select" id="csTopic"><option value="all">All topics</option></select>
+        </div>
+        <div class="cs-fgroup">
+          <span class="cs-flabel">Search</span>
+          <div class="cs-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
+            <input id="csSearch" type="text" placeholder="Search quotes, callers…" autocomplete="off">
+          </div>
+        </div>
+        <button class="cs-reset" id="csReset">Reset</button>
+        <span class="cs-updated"><span class="lv"></span>Synced <span id="csUpdated">just now</span></span>
+      </div>
+
+      <!-- KPIs -->
+      <div class="cs-kpis" id="csKpis"></div>
+
+      <!-- Row A: trend + gauge -->
+      <div class="cs-row r-2">
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>Sentiment over time</h3><div class="sub">Weighted sentiment score (0–100), by <span id="csTrendUnit">day</span></div></div><span class="hint" id="csTrendRange"></span></div>
+          <div id="csTrend"></div>
+          <div class="cs-legend">
+            <span><i style="background:linear-gradient(90deg,var(--cyan),var(--pos))"></i> Sentiment score</span>
+            <span><i style="background:var(--accent)"></i> Volume</span>
+          </div>
+        </div>
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>Overall sentiment</h3><div class="sub">Across all selected sources</div></div></div>
+          <div class="cs-gauge">
+            <div class="ring" id="csGauge"></div>
+            <div class="gmeta" id="csGaugeMeta"></div>
+          </div>
+          <div class="cs-distro" id="csDistro" style="margin-top:18px"></div>
+        </div>
+      </div>
+
+      <!-- Row B: source mix + emotion -->
+      <div class="cs-row r-2b">
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>Where sentiment comes from</h3><div class="sub">Volume & sentiment by source</div></div></div>
+          <div class="cs-donut-wrap">
+            <div id="csDonut"></div>
+            <div class="cs-donut-legend" id="csDonutLegend"></div>
+          </div>
+        </div>
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>Emotion breakdown</h3><div class="sub">Detected in calls & verbatims</div></div></div>
+          <div class="cs-emos" id="csEmos"></div>
+        </div>
+      </div>
+
+      <!-- Row C: location table -->
+      <div class="cs-panel" style="margin-bottom:22px">
+        <div class="cs-ph">
+          <div><h3>Sentiment by location</h3><div class="sub">Click any location for a full breakdown · sortable columns</div></div>
+          <span class="hint">Ranked</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="cs-loc-tbl">
+            <thead>
+              <tr>
+                <th data-k="name">Location</th>
+                <th data-k="region">Region</th>
+                <th data-k="score" class="sort">Sentiment <span class="ar">▼</span></th>
+                <th data-k="delta">Δ vs prev</th>
+                <th data-k="calls">Calls</th>
+                <th data-k="reviews">Reviews</th>
+                <th data-k="rating">GBP rating</th>
+                <th data-k="pos">Top positive</th>
+                <th data-k="neg">Top concern</th>
+              </tr>
+            </thead>
+            <tbody id="csLocBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Row D: theme drivers + call reasons -->
+      <div class="cs-row r-2b">
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>What's driving sentiment</h3><div class="sub">Net sentiment by theme · positive vs negative mentions</div></div></div>
+          <div class="cs-themes" id="csThemes"></div>
+        </div>
+        <div class="cs-panel">
+          <div class="cs-ph"><div><h3>Why patients call</h3><div class="sub">Call reasons by volume & sentiment</div></div></div>
+          <div class="cs-themes" id="csReasons"></div>
+        </div>
+      </div>
+
+      <!-- Row E: feed -->
+      <div class="cs-panel">
+        <div class="cs-ph">
+          <div><h3>Recent interactions</h3><div class="sub"><span id="csFeedCount">0</span> matching · newest first</div></div>
+          <span class="hint">Live stream</span>
+        </div>
+        <div class="cs-feed" id="csFeed"></div>
+        <div class="cs-feed-foot" id="csFeedFoot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location drawer -->
+  <div class="cs-drawer-bd" id="csDrawerBd" onclick="csCloseDrawer()"></div>
+  <aside class="cs-drawer" id="csDrawer" aria-hidden="true">
+    <div class="cs-dh">
+      <div><h2 id="csDName">Location</h2><div class="dsub" id="csDSub"></div></div>
+      <button class="cs-dclose" onclick="csCloseDrawer()" aria-label="Close">✕</button>
+    </div>
+    <div class="cs-db" id="csDBody"></div>
+  </aside>
+  <script>
+  function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
+  document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');}});
+  </script>
+  <script>
+  (function(){
+  "use strict";
+  /* ════ seeded PRNG (stable demo data) ════ */
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var rnd=mulberry32(20260701);
+  function ri(a,b){return Math.floor(rnd()*(b-a+1))+a;}
+  function pick(arr){return arr[Math.floor(rnd()*arr.length)];}
+  function chance(p){return rnd()<p;}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+  /* ════ dimensions ════ */
+  var LOCATIONS=[
+    {id:'ral',name:'Raleigh — Midtown',city:'Raleigh, NC',region:'North Carolina',base:83,vol:118},
+    {id:'car',name:'Cary — Crossroads',city:'Cary, NC',region:'North Carolina',base:87,vol:96},
+    {id:'dur',name:'Durham — Ninth St',city:'Durham, NC',region:'North Carolina',base:79,vol:104},
+    {id:'cha',name:'Charlotte — Uptown',city:'Charlotte, NC',region:'North Carolina',base:73,vol:131},
+    {id:'gre',name:'Greensboro',city:'Greensboro, NC',region:'North Carolina',base:66,vol:88},
+    {id:'wil',name:'Wilmington',city:'Wilmington, NC',region:'North Carolina',base:71,vol:79},
+    {id:'frt',name:'Fort Mill',city:'Fort Mill, SC',region:'South Carolina',base:81,vol:84},
+    {id:'rkh',name:'Rock Hill',city:'Rock Hill, SC',region:'South Carolina',base:61,vol:92},
+    {id:'col',name:'Columbia',city:'Columbia, SC',region:'South Carolina',base:76,vol:90},
+    {id:'ric',name:'Richmond',city:'Richmond, VA',region:'Virginia',base:70,vol:97}
+  ];
+  var TOPICS=[
+    {id:'sched', name:'Scheduling & wait times', bias:0.42, reason:true},
+    {id:'bill',  name:'Billing & insurance',     bias:0.30, reason:true},
+    {id:'front', name:'Front-desk friendliness', bias:0.79, reason:false},
+    {id:'care',  name:'Clinical care quality',   bias:0.84, reason:false},
+    {id:'hold',  name:'Phone hold time',         bias:0.27, reason:true},
+    {id:'clean', name:'Facility & cleanliness',  bias:0.75, reason:false},
+    {id:'avail', name:'Appointment availability',bias:0.40, reason:true},
+    {id:'comm',  name:'Provider communication',  bias:0.81, reason:false},
+    {id:'park',  name:'Parking & access',        bias:0.47, reason:false},
+    {id:'follow',name:'Follow-up & results',     bias:0.50, reason:true}
+  ];
+  var SNIP={
+    sched:{pos:['Front desk got me in same-day — so easy.','Barely waited, called my name right on time.','Loved how quick check-in was.'],
+           neu:['Wanted to confirm my appointment time for Thursday.','Calling to move my visit to next week.','Just checking what time you open Saturday.'],
+           neg:['Waited 45 minutes past my appointment time.','Took three calls just to book a cleaning.','Sat in the waiting room forever, no update.']},
+    bill: {pos:['Billing team explained my coverage clearly.','They sorted my insurance question in one call.'],
+           neu:['Question about my statement balance.','Do you take my new insurance plan?'],
+           neg:['Got a surprise bill months later — frustrating.','Nobody could explain the charges to me.','Insurance was filed wrong and I had to fight it.']},
+    front:{pos:['The receptionist was so warm and welcoming.','Front desk staff went above and beyond.','Friendliest team I have dealt with.'],
+           neu:['Asked the front desk to update my address.','Checking if you received my forms.'],
+           neg:['Front desk was short and dismissive.','Felt ignored when I walked in.']},
+    care: {pos:['The doctor was thorough and really listened.','Best care I have had in years.','Provider explained everything patiently.'],
+           neu:['Following up on what the doctor recommended.','Had a routine check, all fine.'],
+           neg:['Felt rushed through my appointment.','Doctor barely looked at my chart.']},
+    hold: {pos:['Phone was answered almost immediately.','Quick to pick up, no hold at all.'],
+           neu:['Called during lunch, line was busy.','Left a voicemail about my refill.'],
+           neg:['On hold for 20 minutes then got cut off.','Could never get a human on the phone.','Hold music then disconnected — twice.']},
+    clean:{pos:['Office was spotless and modern.','Everything felt clean and calming.'],
+           neu:['Asked about parking near the building.','Wondering where the new suite is.'],
+           neg:['Waiting room felt cramped and dated.','Restroom was not clean.']},
+    avail:{pos:['Got an appointment within two days.','Plenty of evening slots, very convenient.'],
+           neu:['Looking for the next available new-patient slot.','Any openings this month?'],
+           neg:['Next opening is six weeks out — too long.','No weekend availability at all.']},
+    comm: {pos:['They called with my results right away.','Great communication before and after my visit.','Provider followed up personally.'],
+           neu:['Checking whether my results are in yet.','Asked for a copy of my visit summary.'],
+           neg:['Never heard back about my lab results.','Had to chase them for a callback.']},
+    park: {pos:['Easy parking right out front.','Garage validation made it painless.'],
+           neu:['Where do I park for the Cary office?','Is there street parking nearby?'],
+           neg:['Parking is a nightmare at this location.','Circled for 15 minutes to find a spot.']},
+    follow:{pos:['Loved the follow-up text after my visit.','They checked in to see how I was doing.'],
+           neu:['Asked when my next follow-up should be.','Confirming my referral was sent.'],
+           neg:['No follow-up on my referral at all.','Still waiting on paperwork they promised.']}
+  };
+  var NAMES=['Jordan M.','Alyssa R.','Marcus T.','Priya S.','Devon W.','Hannah L.','Cole B.','Renee P.','Ibrahim K.','Sofia G.','Trent A.','Maya D.','Logan F.','Camila V.','Eli N.','Brooke H.','Andre J.','Nadia Q.','Wyatt C.','Tara O.'];
+  function emoFor(l){ if(l==='pos')return pick(['Satisfaction','Gratitude','Trust','Relief']); if(l==='neu')return pick(['Neutral','Curiosity','Patience']); return pick(['Frustration','Anxiety','Confusion','Disappointment']); }
+  function pickTopic(src){ var pool; if(src==='call'){pool=chance(0.7)?TOPICS.filter(function(t){return t.reason;}):TOPICS;} else {pool=chance(0.62)?TOPICS.filter(function(t){return !t.reason;}):TOPICS;} return pick(pool); }
+
+  /* ════ generate proxy interactions ════ */
+  var NOW=Date.now(), DAY=86400000, SPAN=120;
+  var INTER=[]; var uid=1;
+  LOCATIONS.forEach(function(loc){
+    for(var i=0;i<loc.vol;i++){
+      var r=rnd();
+      var src = r<0.55?'call':(r<0.80?'review':'survey');
+      var t=pickTopic(src);
+      var pPos=clamp(((loc.base-50)/100)+(t.bias-0.5)+(rnd()-0.5)*0.5,0.05,0.95);
+      var rr=rnd(), label, score;
+      if(rr<pPos){label='pos';score=ri(72,97);}
+      else if(rr<pPos+0.30){label='neu';score=ri(46,68);}
+      else {label='neg';score=ri(8,44);}
+      var daysAgo=Math.floor(Math.pow(rnd(),1.5)*SPAN);
+      var ts=NOW-daysAgo*DAY-Math.floor(rnd()*DAY);
+      var rating = label==='pos'?pick([5,5,4]):(label==='neu'?pick([3,4,3]):pick([1,2,2]));
+      INTER.push({
+        id:uid++, locId:loc.id, locName:loc.name, region:loc.region,
+        source:src, topic:t.id, topicName:t.name, label:label, score:score,
+        emotion:emoFor(label), ts:ts,
+        rating: src==='review'?rating:null,
+        dur: src==='call'?ri(48,640):null,
+        channel: src==='call'?'Inbound call':(src==='review'?'Google review':'Post-visit survey'),
+        author: pick(NAMES),
+        snip: pick(SNIP[t.id][label]),
+        flag: (label==='neg'&&score<=22)
+      });
+    }
+  });
+  INTER.sort(function(a,b){return b.ts-a.ts;});
+
+  /* ════ state + matching ════ */
+  var STATE={range:30, region:'all', loc:'all', src:'all', sent:'all', topic:'all', q:''};
+  var SORT={k:'score', dir:-1};
+  function matchNT(it){
+    var f=STATE;
+    if(f.region!=='all'&&it.region!==f.region)return false;
+    if(f.loc!=='all'&&it.locId!==f.loc)return false;
+    if(f.src!=='all'&&it.source!==f.src)return false;
+    if(f.sent!=='all'&&it.label!==f.sent)return false;
+    if(f.topic!=='all'&&it.topic!==f.topic)return false;
+    if(f.q){var q=f.q.toLowerCase();if((it.snip+' '+it.author+' '+it.locName+' '+it.topicName).toLowerCase().indexOf(q)<0)return false;}
+    return true;
+  }
+  function curSet(){var cut=STATE.range==='all'?0:NOW-STATE.range*DAY;return INTER.filter(function(it){return it.ts>=cut&&matchNT(it);});}
+  function prevSet(){var R=STATE.range==='all'?120:STATE.range;var end=NOW-R*DAY,start=end-R*DAY;return INTER.filter(function(it){return it.ts>=start&&it.ts<end&&matchNT(it);});}
+
+  function stats(set){
+    var s={count:set.length,pos:0,neu:0,neg:0,sum:0,call:0,review:0,survey:0,cSum:0,cN:0,rSum:0,rN:0,prom:0,det:0,sN:0,flags:0};
+    set.forEach(function(it){
+      s[it.label]++; s.sum+=it.score; s[it.source]++;
+      if(it.source==='call'){s.cSum+=it.score;s.cN++;}
+      if(it.source==='review'){s.rSum+=it.rating;s.rN++;}
+      if(it.source==='survey'){s.sN++; if(it.score>=80)s.prom++; else if(it.score<=55)s.det++;}
+      if(it.flag)s.flags++;
+    });
+    s.score=s.count?Math.round(s.sum/s.count):0;
+    s.avgCall=s.cN?Math.round(s.cSum/s.cN):0;
+    s.rating=s.rN?(s.rSum/s.rN):0;
+    s.nps=s.sN?Math.round((s.prom-s.det)/s.sN*100):0;
+    return s;
+  }
+  function scoreColor(v){return v>=70?'var(--pos)':(v>=50?'var(--neu)':'var(--neg)');}
+  function fmtDate(ts){var d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+  function ago(ts){var m=(NOW-ts)/60000;if(m<60)return Math.round(m)+'m ago';var h=m/60;if(h<24)return Math.round(h)+'h ago';return Math.round(h/24)+'d ago';}
+
+  /* ════ KPI render ════ */
+  function spark(vals,w,h,col){
+    if(!vals.length)return '';
+    var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),rg=(mx-mn)||1;
+    var pts=vals.map(function(v,i){return (i/(vals.length-1)*w).toFixed(1)+','+(h-((v-mn)/rg)*h).toFixed(1);}).join(' ');
+    return '<svg class="kspark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/></svg>';
+  }
+  function deltaHtml(d,suffix){ if(d===null||isNaN(d))return '<span class="kd fl">— no prior data</span>'; var cls=d>0?'up':(d<0?'dn':'fl'); var ar=d>0?'▲':(d<0?'▼':'■'); return '<span class="kd '+cls+'">'+ar+' '+(d>0?'+':'')+d+(suffix||'')+' vs prev</span>'; }
+  function renderKpis(cur,prev,bk){
+    var sc=stats(cur), sp=stats(prev);
+    var scoreVals=bk.map(function(b){return b.score;}).filter(function(v){return v!==null;});
+    var volVals=bk.map(function(b){return b.vol;});
+    var dCount = sp.count? Math.round((sc.count-sp.count)/sp.count*100):null;
+    var cards=[
+      {l:'Interactions',ic:'🗂',v:sc.count,small:'',d:deltaHtml(dCount,'%'),kc:'var(--accent)',sp:spark(volVals,74,30,'var(--accent)')},
+      {l:'Calls analyzed',ic:'📞',v:sc.call,small:'',d:'<span class="kd fl">'+(sc.count?Math.round(sc.call/sc.count*100):0)+'% of volume</span>',kc:'var(--cyan)',sp:''},
+      {l:'Avg call sentiment',ic:'🎧',v:sc.avgCall,small:'/100',d:deltaHtml(sp.avgCall?sc.avgCall-sp.avgCall:null,''),kc:'var(--purple)',sp:spark(scoreVals,74,30,'var(--purple)')},
+      {l:'GBP review rating',ic:'★',v:sc.rating?sc.rating.toFixed(2):'—',small:'/5',d:'<span class="kd fl">'+sc.review+' reviews</span>',kc:'var(--amber)',sp:''},
+      {l:'Survey NPS',ic:'📋',v:(sc.nps>0?'+':'')+sc.nps,small:'',d:'<span class="kd fl">'+sc.survey+' surveys</span>',kc:'var(--green)',sp:''},
+      {l:'Negative alerts',ic:'⚠',v:sc.flags,small:'',d:'<span class="kd '+(sc.flags>0?'dn':'fl')+'">severe-negative flags</span>',kc:'var(--rose)',sp:''}
+    ];
+    document.getElementById('csKpis').innerHTML=cards.map(function(c){
+      return '<div class="cs-kpi" style="--kc:'+c.kc+'"><div class="kl">'+c.ic+' '+c.l+'</div><div class="kv">'+c.v+(c.small?'<small>'+c.small+'</small>':'')+'</div>'+c.d+c.sp+'</div>';
+    }).join('');
+  }
+
+  /* ════ trend chart ════ */
+  function bucketize(set){
+    var R=STATE.range==='all'?120:STATE.range; var step=R>30?7:1; var n=Math.ceil(R/step);
+    var arr=[]; for(var i=0;i<n;i++)arr.push({sum:0,c:0,end:NOW-(n-1-i)*step*DAY});
+    set.forEach(function(it){var idx=Math.floor((NOW-it.ts)/(step*DAY));var pos=n-1-idx;if(pos>=0&&pos<n){arr[pos].sum+=it.score;arr[pos].c++;}});
+    return arr.map(function(b){return {score:b.c?Math.round(b.sum/b.c):null,vol:b.c,end:b.end};});
+  }
+  function renderTrend(set){
+    var bk=bucketize(set);
+    document.getElementById('csTrendUnit').textContent=(STATE.range==='all'||STATE.range===90)?'week':'day';
+    document.getElementById('csTrendRange').textContent=bk.length+' points';
+    var W=760,H=232,L=40,R=14,T=14,B=40,pw=W-L-R,ph=H-T-B;
+    var maxVol=Math.max(1,Math.max.apply(null,bk.map(function(b){return b.vol;})));
+    var n=bk.length, bw=pw/n;
+    var g='';
+    [0,25,50,75,100].forEach(function(v){var y=T+ph-(v/100)*ph;g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="rgba(255,255,255,.06)"/><text x="'+(L-8)+'" y="'+(y+3).toFixed(1)+'" fill="#58607e" font-size="9" text-anchor="end" font-family="JetBrains Mono">'+v+'</text>';});
+    var bars='';
+    bk.forEach(function(b,i){var bh=(b.vol/maxVol)*ph;var x=L+i*bw+bw*0.28;var w=bw*0.44;var y=T+ph-bh;bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="2" fill="var(--accent)" opacity=".18"/>';});
+    var pts=[],dots='';
+    bk.forEach(function(b,i){if(b.score===null)return;var x=L+i*bw+bw/2;var y=T+ph-(b.score/100)*ph;pts.push([x,y]);});
+    var line='',area='';
+    if(pts.length){
+      line='M'+pts.map(function(p){return p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' L');
+      area=line+' L'+pts[pts.length-1][0].toFixed(1)+' '+(T+ph)+' L'+pts[0][0].toFixed(1)+' '+(T+ph)+' Z';
+      var last=pts[pts.length-1];
+      dots='<circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="4.5" fill="var(--pos)" stroke="#0a0e1d" stroke-width="2"/>';
+    }
+    var xlab='';var lblEvery=Math.ceil(n/6);
+    bk.forEach(function(b,i){if(i%lblEvery!==0&&i!==n-1)return;var x=L+i*bw+bw/2;xlab+='<text x="'+x.toFixed(1)+'" y="'+(H-14)+'" fill="#58607e" font-size="9" text-anchor="middle" font-family="JetBrains Mono">'+fmtDate(b.end)+'</text>';});
+    var svg='<svg class="cs-chart" viewBox="0 0 '+W+' '+H+'"><defs><linearGradient id="trA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pos)" stop-opacity=".34"/><stop offset="1" stop-color="var(--pos)" stop-opacity="0"/></linearGradient><linearGradient id="trL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--cyan)"/><stop offset="1" stop-color="var(--pos)"/></linearGradient></defs>'+g+bars+(area?'<path d="'+area+'" fill="url(#trA)"/>':'')+(line?'<path d="'+line+'" fill="none" stroke="url(#trL)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>':'')+dots+xlab+'</svg>';
+    document.getElementById('csTrend').innerHTML=svg;
+  }
+
+  /* ════ gauge + distro ════ */
+  function renderGauge(set){
+    var s=stats(set), v=s.score, c=326.7, off=c*(1-v/100), col=scoreColor(v);
+    var grad = v>=70?['var(--cyan)','var(--pos)']:(v>=50?['var(--amber)','#fbbf24']:['var(--neg)','#f43f5e']);
+    var svg='<svg viewBox="0 0 118 118"><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+grad[0]+'"/><stop offset="1" stop-color="'+grad[1]+'"/></linearGradient></defs><circle cx="59" cy="59" r="52" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="11"/><circle cx="59" cy="59" r="52" fill="none" stroke="url(#gg)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 59 59)"/></svg>';
+    var label=v>=70?'Healthy':(v>=50?'Watch':'At risk');
+    document.getElementById('csGauge').innerHTML=svg+'<b>'+v+'<i>'+label+'</i></b>';
+    document.getElementById('csGaugeMeta').innerHTML=
+      '<div class="gd">Based on <b>'+s.count.toLocaleString()+'</b> interactions</div>'+
+      '<div class="gd"><b style="color:'+col+'">'+(s.count?Math.round(s.pos/s.count*100):0)+'%</b> positive · <b style="color:var(--neg)">'+(s.count?Math.round(s.neg/s.count*100):0)+'%</b> negative</div>'+
+      '<div class="gd">Avg call <b>'+s.avgCall+'</b> · Rating <b>'+(s.rating?s.rating.toFixed(2):'—')+'</b></div>';
+    var rows=[['Positive',s.pos,'var(--pos)'],['Neutral',s.neu,'var(--neu)'],['Negative',s.neg,'var(--neg)']];
+    document.getElementById('csDistro').innerHTML=rows.map(function(r){var pct=s.count?Math.round(r[1]/s.count*100):0;return '<div class="dr"><span class="dn">'+r[0]+'</span><span class="db"><i style="width:'+pct+'%;background:'+r[2]+'"></i></span><span class="dv">'+pct+'%</span></div>';}).join('');
+  }
+
+  /* ════ donut ════ */
+  function renderDonut(set){
+    var s=stats(set), total=s.count||1, c=2*Math.PI*46;
+    var segs=[['Calls',s.call,'var(--cyan)','call'],['Reviews',s.review,'var(--amber)','review'],['Surveys',s.survey,'var(--purple)','survey']];
+    var acc=0, circles='';
+    segs.forEach(function(g){var len=g[1]/total*c;circles+='<circle cx="60" cy="60" r="46" fill="none" stroke="'+g[2]+'" stroke-width="15" stroke-dasharray="'+len.toFixed(2)+' '+(c-len).toFixed(2)+'" stroke-dashoffset="'+(-acc).toFixed(2)+'" transform="rotate(-90 60 60)"/>';acc+=len;});
+    document.getElementById('csDonut').innerHTML='<svg width="138" height="138" viewBox="0 0 120 120">'+circles+'<text x="60" y="56" text-anchor="middle" fill="#e8ecf8" font-size="22" font-weight="600" font-family="Space Grotesk">'+s.count+'</text><text x="60" y="72" text-anchor="middle" fill="#58607e" font-size="9" font-family="JetBrains Mono">TOTAL</text></svg>';
+    document.getElementById('csDonutLegend').innerHTML=segs.map(function(g){
+      var sub=set.filter(function(it){return it.source===g[3];});var ss=stats(sub);
+      return '<div class="dl"><span class="ds" style="background:'+g[2]+'"></span><span class="dlt">'+g[0]+' · <span style="color:'+scoreColor(ss.score)+'">'+ss.score+'</span> avg</span><span class="dlv">'+g[1]+'</span></div>';
+    }).join('');
+  }
+
+  /* ════ emotions ════ */
+  function renderEmos(set){
+    var counts={}; set.forEach(function(it){counts[it.emotion]=(counts[it.emotion]||0)+1;});
+    var order=['Satisfaction','Trust','Gratitude','Relief','Frustration','Anxiety','Confusion','Disappointment'];
+    var col={Satisfaction:'var(--pos)',Trust:'var(--cyan)',Gratitude:'var(--green)',Relief:'#7dd3fc',Curiosity:'var(--neu)',Patience:'var(--neu)',Neutral:'var(--tx3)',Frustration:'var(--neg)',Anxiety:'#f43f5e',Confusion:'var(--amber)',Disappointment:'var(--rose)'};
+    var max=1; order.forEach(function(e){if((counts[e]||0)>max)max=counts[e];});
+    var top=order.filter(function(e){return counts[e];}).slice(0,6);
+    if(!top.length){document.getElementById('csEmos').innerHTML='<div class="cs-feed-empty" style="grid-column:1/-1">No emotion data for this view.</div>';return;}
+    document.getElementById('csEmos').innerHTML=top.map(function(e){var v=counts[e]||0;return '<div class="cs-emo"><div class="en">'+e+'<b>'+v+'</b></div><div class="eb"><i style="width:'+Math.round(v/max*100)+'%;background:'+(col[e]||'var(--accent)')+'"></i></div></div>';}).join('');
+  }
+
+  /* ════ location table ════ */
+  function locTopThemes(set){
+    var pos={},neg={};
+    set.forEach(function(it){if(it.label==='pos')pos[it.topicName]=(pos[it.topicName]||0)+1;if(it.label==='neg')neg[it.topicName]=(neg[it.topicName]||0)+1;});
+    function top(o){var k=null,m=0;for(var x in o){if(o[x]>m){m=o[x];k=x;}}return k;}
+    return {pos:top(pos),neg:top(neg)};
+  }
+  function renderLocations(set){
+    var f=STATE;
+    var locs=LOCATIONS.filter(function(l){return (f.region==='all'||l.region===f.region)&&(f.loc==='all'||l.id===f.loc);});
+    var R=STATE.range==='all'?120:STATE.range; var pend=NOW-R*DAY, pstart=pend-R*DAY;
+    var rows=locs.map(function(l){
+      var cur=set.filter(function(it){return it.locId===l.id;});
+      var prev=INTER.filter(function(it){return it.locId===l.id&&it.ts>=pstart&&it.ts<pend;});
+      var sc=stats(cur), sp=stats(prev);
+      var th=locTopThemes(cur);
+      return {l:l,sc:sc,delta:(sp.count>=4?sc.score-sp.score:null),pos:th.pos,neg:th.neg};
+    });
+    rows.sort(function(a,b){
+      var k=SORT.k,va,vb;
+      if(k==='name'){va=a.l.name;vb=b.l.name;return SORT.dir*va.localeCompare(vb);}
+      if(k==='region'){va=a.l.region;vb=b.l.region;return SORT.dir*va.localeCompare(vb);}
+      if(k==='delta'){va=a.delta===null?-999:a.delta;vb=b.delta===null?-999:b.delta;}
+      else if(k==='calls'){va=a.sc.call;vb=b.sc.call;}
+      else if(k==='reviews'){va=a.sc.review;vb=b.sc.review;}
+      else if(k==='rating'){va=a.sc.rating;vb=b.sc.rating;}
+      else if(k==='pos'){va=(a.pos||'');vb=(b.pos||'');return SORT.dir*va.localeCompare(vb);}
+      else if(k==='neg'){va=(a.neg||'');vb=(b.neg||'');return SORT.dir*va.localeCompare(vb);}
+      else {va=a.sc.score;vb=b.sc.score;}
+      return SORT.dir*(va-vb);
+    });
+    var body=rows.map(function(r){
+      var col=scoreColor(r.sc.score);
+      var dcls=r.delta===null?'fl':(r.delta>0?'up':(r.delta<0?'dn':'fl'));
+      var dtxt=r.delta===null?'—':((r.delta>0?'▲ +':(r.delta<0?'▼ ':'■ '))+r.delta);
+      return '<tr onclick="csOpenDrawer(\''+r.l.id+'\')">'+
+        '<td><div class="cs-loc-name"><b>'+r.l.name+'</b><span>'+r.l.city+'</span></div></td>'+
+        '<td style="color:var(--tx2);font-size:12px">'+r.l.region+'</td>'+
+        '<td><span class="cs-scorebadge" style="background:'+(r.sc.score>=70?'var(--green-d)':(r.sc.score>=50?'var(--amber-d)':'var(--rose-d)'))+';color:'+col+'">'+r.sc.score+'</span> <span class="cs-mini-bar"><i style="width:'+r.sc.score+'%;background:'+col+'"></i></span></td>'+
+        '<td><span class="cs-delta '+dcls+'">'+dtxt+'</span></td>'+
+        '<td style="font-family:var(--mono);color:var(--tx2)">'+r.sc.call+'</td>'+
+        '<td style="font-family:var(--mono);color:var(--tx2)">'+r.sc.review+'</td>'+
+        '<td style="font-family:var(--mono);color:var(--tx)">'+(r.sc.rating?r.sc.rating.toFixed(2):'—')+' <span style="color:var(--amber)">★</span></td>'+
+        '<td><span class="cs-tch" style="color:var(--pos)">'+(r.pos||'—')+'</span></td>'+
+        '<td><span class="cs-tch" style="color:var(--neg)">'+(r.neg||'—')+'</span></td>'+
+      '</tr>';
+    }).join('');
+    document.getElementById('csLocBody').innerHTML=body||'<tr><td colspan="9" class="cs-feed-empty">No locations match these filters.</td></tr>';
+    document.querySelectorAll('.cs-loc-tbl th').forEach(function(th){th.classList.toggle('sort',th.getAttribute('data-k')===SORT.k);var ar=th.querySelector('.ar');if(ar)ar.textContent=SORT.dir<0?'▼':'▲';});
+  }
+
+  /* ════ theme drivers + reasons ════ */
+  function renderThemes(set){
+    var map={}; TOPICS.forEach(function(t){map[t.id]={name:t.name,pos:0,neg:0,neu:0,tot:0};});
+    set.forEach(function(it){var m=map[it.topic];m[it.label]++;m.tot++;});
+    var arr=Object.keys(map).map(function(k){return map[k];}).filter(function(m){return m.tot>0;});
+    arr.sort(function(a,b){return b.tot-a.tot;});
+    document.getElementById('csThemes').innerHTML=arr.map(function(m){
+      var pp=Math.round(m.pos/m.tot*100), np=Math.round(m.neg/m.tot*100);
+      var net=m.pos-m.neg;
+      return '<div class="cs-theme"><span class="tn" title="'+m.name+'">'+m.name+'</span><span class="tbar"><i class="tpos" style="width:'+pp+'%"></i><i class="tneg" style="width:'+np+'%"></i></span><span class="tv" style="color:'+(net>=0?'var(--pos)':'var(--neg)')+'">'+(net>0?'+':'')+net+'</span></div>';
+    }).join('')||'<div class="cs-feed-empty">No theme data.</div>';
+  }
+  function renderReasons(set){
+    var calls=set.filter(function(it){return it.source==='call';});
+    var map={}; TOPICS.filter(function(t){return t.reason;}).forEach(function(t){map[t.id]={name:t.name,c:0,sum:0};});
+    calls.forEach(function(it){if(map[it.topic]){map[it.topic].c++;map[it.topic].sum+=it.score;}});
+    var arr=Object.keys(map).map(function(k){return map[k];}).filter(function(m){return m.c>0;});
+    var max=Math.max.apply(null,arr.map(function(m){return m.c;}).concat([1]));
+    arr.sort(function(a,b){return b.c-a.c;});
+    document.getElementById('csReasons').innerHTML=arr.map(function(m){
+      var avg=Math.round(m.sum/m.c),col=scoreColor(avg);
+      return '<div class="cs-theme"><span class="tn" title="'+m.name+'">'+m.name+'</span><span class="tbar"><i style="width:'+Math.round(m.c/max*100)+'%;background:linear-gradient(90deg,'+col+',rgba(255,255,255,.06))"></i></span><span class="tv">'+m.c+'</span></div>';
+    }).join('')||'<div class="cs-feed-empty">No call-reason data for this view.</div>';
+  }
+
+  /* ════ feed ════ */
+  var SRCICON={call:'📞',review:'★',survey:'📋'};
+  function renderFeed(set){
+    var show=set.slice(0,60);
+    document.getElementById('csFeedCount').textContent=set.length;
+    if(!show.length){document.getElementById('csFeed').innerHTML='<div class="cs-feed-empty">No interactions match these filters. Try widening the period or clearing filters.</div>';document.getElementById('csFeedFoot').textContent='';return;}
+    document.getElementById('csFeed').innerHTML=show.map(function(it){
+      var sc=it.label;
+      var meta = it.source==='review'?(it.rating+'★'):(it.source==='call'?(Math.floor(it.dur/60)+'m '+(it.dur%60)+'s'):'survey');
+      return '<div class="cs-fi'+(it.flag?' flag':'')+'"><div class="fic">'+SRCICON[it.source]+'</div>'+
+        '<div class="ft"><div class="frow1"><span class="floc">'+it.locName+'</span><span class="ftopic">'+it.topicName+'</span>'+(it.flag?'<span class="cs-sentchip neg">⚠ flag</span>':'')+'</div><div class="fsnip">“'+it.snip+'”</div><div class="ftopic">'+it.author+' · '+it.channel+' · '+meta+'</div></div>'+
+        '<div class="fmeta"><span class="cs-sentchip '+sc+'">'+(sc==='pos'?'Positive':sc==='neu'?'Neutral':'Negative')+' '+it.score+'</span><span class="fdate">'+ago(it.ts)+'</span></div></div>';
+    }).join('');
+    document.getElementById('csFeedFoot').textContent='Showing '+show.length+' of '+set.length+' matching interactions';
+  }
+
+  /* ════ drawer ════ */
+  window.csOpenDrawer=function(id){
+    var loc=LOCATIONS.filter(function(l){return l.id===id;})[0]; if(!loc)return;
+    var cut=STATE.range==='all'?0:NOW-STATE.range*DAY;
+    var set=INTER.filter(function(it){return it.locId===id&&it.ts>=cut;});
+    var s=stats(set), th=locTopThemes(set);
+    document.getElementById('csDName').textContent=loc.name;
+    document.getElementById('csDSub').textContent=loc.city+' · '+loc.region+' · '+s.count+' interactions';
+    var map={}; TOPICS.forEach(function(t){map[t.id]={name:t.name,pos:0,neg:0,tot:0};});
+    set.forEach(function(it){map[it.topic][it.label==='pos'?'pos':(it.label==='neg'?'neg':'pos')]; if(it.label==='pos')map[it.topic].pos++; if(it.label==='neg')map[it.topic].neg++; map[it.topic].tot++;});
+    var themes=Object.keys(map).map(function(k){return map[k];}).filter(function(m){return m.tot>0;}).sort(function(a,b){return (b.pos-b.neg)-(a.pos-a.neg);});
+    var themeHtml=themes.slice(0,6).map(function(m){var net=m.pos-m.neg;return '<div class="cs-theme" style="grid-template-columns:150px 1fr 40px"><span class="tn">'+m.name+'</span><span class="tbar"><i class="tpos" style="width:'+Math.round(m.pos/m.tot*100)+'%"></i><i class="tneg" style="width:'+Math.round(m.neg/m.tot*100)+'%"></i></span><span class="tv" style="color:'+(net>=0?'var(--pos)':'var(--neg)')+'">'+(net>0?'+':'')+net+'</span></div>';}).join('');
+    var recent=set.slice(0,8).map(function(it){return '<div class="cs-fi" style="grid-template-columns:34px 1fr auto"><div class="fic" style="width:34px;height:34px;font-size:15px">'+SRCICON[it.source]+'</div><div class="ft"><div class="frow1"><span class="ftopic">'+it.topicName+'</span></div><div class="fsnip" style="font-size:12.5px">“'+it.snip+'”</div></div><div class="fmeta"><span class="cs-sentchip '+it.label+'">'+it.score+'</span><span class="fdate">'+fmtDate(it.ts)+'</span></div></div>';}).join('');
+    document.getElementById('csDBody').innerHTML=
+      '<div class="cs-dkpis"><div class="cs-dkpi"><div class="l">Sentiment</div><div class="v" style="color:'+scoreColor(s.score)+'">'+s.score+'</div></div><div class="cs-dkpi"><div class="l">Calls</div><div class="v">'+s.call+'</div></div><div class="cs-dkpi"><div class="l">Rating</div><div class="v">'+(s.rating?s.rating.toFixed(1):'—')+'</div></div><div class="cs-dkpi"><div class="l">Positive</div><div class="v" style="color:var(--pos)">'+(s.count?Math.round(s.pos/s.count*100):0)+'%</div></div><div class="cs-dkpi"><div class="l">Negative</div><div class="v" style="color:var(--neg)">'+(s.count?Math.round(s.neg/s.count*100):0)+'%</div></div><div class="cs-dkpi"><div class="l">NPS</div><div class="v">'+(s.nps>0?'+':'')+s.nps+'</div></div></div>'+
+      '<div class="cs-dsec"><h4>Top concern</h4><div class="cs-tch" style="color:var(--neg);max-width:none">'+(th.neg||'No notable concerns')+'</div></div>'+
+      '<div class="cs-dsec"><h4>Theme breakdown</h4><div class="cs-themes">'+(themeHtml||'<div class="cs-feed-empty">No themes.</div>')+'</div></div>'+
+      '<div class="cs-dsec"><h4>Recent interactions</h4><div class="cs-feed" style="max-height:none">'+(recent||'<div class="cs-feed-empty">None.</div>')+'</div></div>';
+    document.getElementById('csDrawer').classList.add('open');
+    document.getElementById('csDrawerBd').classList.add('open');
+    document.getElementById('csDrawer').setAttribute('aria-hidden','false');
+  };
+  window.csCloseDrawer=function(){document.getElementById('csDrawer').classList.remove('open');document.getElementById('csDrawerBd').classList.remove('open');document.getElementById('csDrawer').setAttribute('aria-hidden','true');};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')window.csCloseDrawer();});
+
+  /* ════ master render ════ */
+  function renderAll(){
+    var cur=curSet(), prev=prevSet(), bk=bucketize(cur);
+    renderKpis(cur,prev,bk);
+    renderTrend(cur);
+    renderGauge(cur);
+    renderDonut(cur);
+    renderEmos(cur);
+    renderLocations(cur);
+    renderThemes(cur);
+    renderReasons(cur);
+    renderFeed(cur);
+  }
+
+  /* ════ populate selects + wire filters ════ */
+  function initControls(){
+    var locSel=document.getElementById('csLoc');
+    LOCATIONS.forEach(function(l){var o=document.createElement('option');o.value=l.id;o.textContent=l.name;locSel.appendChild(o);});
+    var topSel=document.getElementById('csTopic');
+    TOPICS.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.name;topSel.appendChild(o);});
+    document.getElementById('csRange').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;STATE.range=b.getAttribute('data-range')==='all'?'all':parseInt(b.getAttribute('data-range'),10);[].forEach.call(this.children,function(x){x.classList.toggle('on',x===b);});renderAll();});
+    document.querySelectorAll('[data-src]').forEach(function(b){b.addEventListener('click',function(){STATE.src=b.getAttribute('data-src');document.querySelectorAll('[data-src]').forEach(function(x){x.classList.remove('on','all');});b.classList.add('on');if(STATE.src==='all')b.classList.add('all');renderAll();});});
+    document.querySelectorAll('[data-sent]').forEach(function(b){b.addEventListener('click',function(){STATE.sent=b.getAttribute('data-sent');document.querySelectorAll('[data-sent]').forEach(function(x){x.classList.remove('on');});b.classList.add('on');renderAll();});});
+    document.getElementById('csRegion').addEventListener('change',function(){STATE.region=this.value;renderAll();});
+    document.getElementById('csLoc').addEventListener('change',function(){STATE.loc=this.value;renderAll();});
+    document.getElementById('csTopic').addEventListener('change',function(){STATE.topic=this.value;renderAll();});
+    var qt;document.getElementById('csSearch').addEventListener('input',function(){var v=this.value;clearTimeout(qt);qt=setTimeout(function(){STATE.q=v;renderFeed(curSet());},180);});
+    document.querySelectorAll('.cs-loc-tbl th').forEach(function(th){th.addEventListener('click',function(){var k=th.getAttribute('data-k');if(SORT.k===k){SORT.dir*=-1;}else{SORT.k=k;SORT.dir=(k==='name'||k==='region'||k==='pos'||k==='neg')?1:-1;}renderLocations(curSet());});});
+    document.getElementById('csReset').addEventListener('click',function(){
+      STATE={range:30,region:'all',loc:'all',src:'all',sent:'all',topic:'all',q:''};SORT={k:'score',dir:-1};
+      document.getElementById('csRegion').value='all';document.getElementById('csLoc').value='all';document.getElementById('csTopic').value='all';document.getElementById('csSearch').value='';
+      [].forEach.call(document.getElementById('csRange').children,function(x){x.classList.toggle('on',x.getAttribute('data-range')==='30');});
+      document.querySelectorAll('[data-src]').forEach(function(x){x.classList.remove('on','all');if(x.getAttribute('data-src')==='all')x.classList.add('on','all');});
+      document.querySelectorAll('[data-sent]').forEach(function(x){x.classList.remove('on');if(x.getAttribute('data-sent')==='all')x.classList.add('on');});
+      renderAll();
+    });
+    document.getElementById('csPillLoc').textContent=LOCATIONS.length;
+    document.getElementById('csUpdated').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  }
+  initControls();
+  renderAll();
+  })();
+  </script>
+  <script>
+  (function(){var s=Date.now(),sent=false;function send(){if(sent)return;sent=true;try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Call & Sentiment Intelligence',seconds:Math.round((Date.now()-s)/1000),email:document.body.dataset.email||''}),keepalive:true}).catch(function(){});}catch(e){}}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')send();});window.addEventListener('beforeunload',send);})();
+  </script>
+</body>
+</html>
