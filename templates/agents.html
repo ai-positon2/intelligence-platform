@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% else %}Intelligence by Position2 — Know who's ready to buy{% endif %}</title>
+<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% elif page == 'industries' %}Industries · Intelligence by Position2{% elif page == 'industry' %}{{ industry.name }} · Industries · Intelligence by Position2{% else %}Intelligence by Position2 — Know who's ready to buy{% endif %}</title>
 <meta name="description" content="Intelligence by Position2 surfaces the buying signals that show intent — across the web, your site and social — then tells your team who to reach, and why. B2B revenue intelligence across your entire go-to-market.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Intelligence by Position2">
@@ -77,6 +77,16 @@ body[data-page="security"] .mesh .m3{background:radial-gradient(circle,#0ea5e9,t
 body[data-page="security"] .mesh .m4{background:radial-gradient(circle,#34d399,transparent 70%);opacity:.2}
 body[data-page="security"] #scene{opacity:.3}
 body[data-page="security"] .grid-bg{opacity:.34}
+body[data-page="industries"] .mesh .m1{background:radial-gradient(circle,#0891b2,transparent 67%)}
+body[data-page="industries"] .mesh .m2{background:radial-gradient(circle,#22d3ee,transparent 67%)}
+body[data-page="industries"] .mesh .m3{background:radial-gradient(circle,#6366f1,transparent 67%)}
+body[data-page="industries"] .mesh .m4{background:radial-gradient(circle,#34d399,transparent 70%);opacity:.22}
+body[data-page="industries"] #scene{opacity:.5}
+body[data-page="industry"] .mesh .m1{background:radial-gradient(circle,var(--page),transparent 67%)}
+body[data-page="industry"] .mesh .m2{background:radial-gradient(circle,var(--page2),transparent 67%)}
+body[data-page="industry"] .mesh .m3{background:radial-gradient(circle,#6366f1,transparent 67%)}
+body[data-page="industry"] .mesh .m4{background:radial-gradient(circle,var(--page),transparent 70%);opacity:.2}
+body[data-page="industry"] #scene{opacity:.42}
 .scrim{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(120% 110% at 50% 42%,rgba(4,5,16,.5),rgba(4,5,16,.4) 58%,rgba(4,5,16,.72))}
 .wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:0 26px}
 
@@ -882,9 +892,129 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .vph-note{font-size:12.5px;color:var(--dim2);max-width:430px;line-height:1.6}
 .vmodal-f{margin-top:18px;text-align:center}
 
+
+/* ===== Industries (list + detail) ===== */
+.ind-lead{max-width:780px}
+.ind-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-top:48px}
+@media(max-width:880px){.ind-grid{grid-template-columns:1fr}}
+.ind-card{position:relative;display:flex;flex-direction:column;gap:14px;padding:30px;border-radius:22px;overflow:hidden;text-decoration:none;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--ia,#22d3ee) 13%,rgba(255,255,255,.04)),rgba(255,255,255,.012));
+  border:1px solid color-mix(in srgb,var(--ia,#22d3ee) 26%,var(--line));
+  transition:transform .25s ease-out,border-color .25s,box-shadow .3s}
+.ind-card::before{content:'';position:absolute;top:0;left:30px;right:30px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--ia,#22d3ee),transparent);opacity:.55}
+.ind-card::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;background:radial-gradient(440px circle at 82% -10%,color-mix(in srgb,var(--ia,#22d3ee) 24%,transparent),transparent 62%)}
+.ind-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ia,#22d3ee) 50%,var(--line2));box-shadow:0 44px 96px -42px #000,0 0 64px -18px color-mix(in srgb,var(--ia,#22d3ee) 72%,transparent)}
+.ind-card:hover::after{opacity:1}
+.ind-ic{width:54px;height:54px;border-radius:15px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,var(--ia,#22d3ee),var(--ia2,#8b5cf6));box-shadow:0 14px 34px -12px var(--ia,#22d3ee),inset 0 1px 0 rgba(255,255,255,.34);transition:transform .3s}
+.ind-card:hover .ind-ic{transform:translateY(-3px) scale(1.05)}
+.ind-ic svg{width:26px;height:26px;stroke:#06121f;fill:none;stroke-width:2}
+.ind-card h3{font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:-.02em;color:#fff;margin-top:2px;position:relative;z-index:1}
+.ind-card>p{font-size:14px;line-height:1.66;color:var(--dim);position:relative;z-index:1}
+.ind-tags{display:flex;flex-wrap:wrap;gap:7px;position:relative;z-index:1}
+.ind-tag{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#cdd6f7;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.ind-card .more{margin-top:auto;display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ia,#22d3ee);position:relative;z-index:1;transition:gap .25s,filter .25s}
+.ind-card:hover .more{gap:11px;filter:brightness(1.2)}
+.ind-eye{position:absolute;top:24px;right:24px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#06121f;font-weight:700;padding:5px 10px;border-radius:999px;background:linear-gradient(120deg,var(--ia,#22d3ee),var(--ia2,#8b5cf6));box-shadow:0 8px 20px -8px var(--ia,#22d3ee);z-index:2}
+.ind-card.feat{grid-column:1 / -1;flex-direction:row;align-items:center;gap:38px;padding:40px}
+.ind-card.feat .ind-fl{flex:1.15;display:flex;flex-direction:column;gap:15px}
+.ind-card.feat .ind-fr{flex:.85;display:flex;align-items:center;justify-content:center;min-height:230px}
+@media(max-width:760px){.ind-card.feat{flex-direction:column;align-items:flex-start;gap:22px}.ind-card.feat .ind-fr{display:none}}
+
+/* detail: hero art */
+.ind-hero-art{position:relative;min-height:340px;display:flex;align-items:center;justify-content:center}
+.ind-orb{position:relative;width:236px;height:236px;display:flex;align-items:center;justify-content:center}
+.ind-orb .ring{position:absolute;border-radius:50%;border:1px solid color-mix(in srgb,var(--page) 42%,transparent)}
+.ind-orb .r1{inset:0;animation:indspin 28s linear infinite}
+.ind-orb .r2{inset:36px;border-color:color-mix(in srgb,var(--page2) 44%,transparent);animation:indspin 19s linear infinite reverse}
+.ind-orb .r3{inset:72px;border-style:dashed;border-color:color-mix(in srgb,var(--page) 32%,transparent)}
+.ind-core{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 34% 28%,var(--page),var(--page2));box-shadow:0 0 62px -4px var(--page),inset 0 2px 0 rgba(255,255,255,.42)}
+.ind-core svg{width:48px;height:48px;stroke:#06121f;fill:none;stroke-width:2}
+.ind-orb .odot{position:absolute;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 12px var(--page),0 0 22px var(--page)}
+.ind-orb .od1{top:-5px;left:50%}.ind-orb .od2{top:50%;right:-5px}.ind-orb .od3{bottom:-5px;left:50%}.ind-orb .od4{top:50%;left:-5px}
+.ind-fchip{position:absolute;font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;color:#eef2ff;padding:9px 13px;border-radius:12px;display:inline-flex;align-items:center;gap:8px;border:1px solid color-mix(in srgb,var(--page) 36%,var(--line));background:rgba(8,12,28,.72);backdrop-filter:blur(7px);box-shadow:0 16px 38px -18px #000}
+.ind-fchip .acd{width:7px;height:7px;border-radius:50%;background:var(--page);box-shadow:0 0 9px var(--page)}
+.ind-fchip-1{top:6%;left:-6%;animation:indfloat 6s ease-in-out infinite}
+.ind-fchip-2{bottom:12%;right:-8%;animation:indfloat 7.2s ease-in-out infinite .7s}
+.ind-fchip-3{bottom:40%;left:-12%;animation:indfloat 6.6s ease-in-out infinite 1.3s}
+
+/* detail: segments */
+.ind-seg{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:30px}
+.ind-seg span{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:#dde4ff;padding:9px 15px;border-radius:999px;border:1px solid color-mix(in srgb,var(--page) 30%,var(--line));background:color-mix(in srgb,var(--page) 8%,rgba(255,255,255,.02))}
+
+/* detail: reframed agents */
+.ind-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px}
+@media(max-width:980px){.ind-agents{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.ind-agents{grid-template-columns:1fr}}
+.ind-agent{position:relative;padding:26px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--page) 9%,rgba(255,255,255,.035)),rgba(255,255,255,.012));
+  border:1px solid color-mix(in srgb,var(--page) 20%,var(--line));transition:transform .22s ease-out,border-color .25s,box-shadow .3s}
+.ind-agent::before{content:'';position:absolute;top:0;left:26px;right:26px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,transparent,var(--page),transparent);opacity:.42}
+.ind-agent:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--page) 42%,var(--line2));box-shadow:0 38px 82px -38px #000,0 0 54px -16px color-mix(in srgb,var(--page) 60%,transparent)}
+.ia-ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,var(--page),var(--page2));box-shadow:0 12px 30px -12px var(--page),inset 0 1px 0 rgba(255,255,255,.32);transition:transform .3s}
+.ind-agent:hover .ia-ic{transform:translateY(-3px) scale(1.05)}
+.ia-ic svg{width:23px;height:23px;stroke:#06121f;fill:none;stroke-width:2}
+.ia-badge{position:absolute;top:22px;right:22px;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#06121f;padding:4px 8px;border-radius:999px;background:linear-gradient(120deg,var(--page),var(--page2))}
+.ind-agent h4{font-family:var(--display);font-size:17.5px;font-weight:700;color:#fff;margin:16px 0 4px;letter-spacing:-.01em}
+.ia-base{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim3);display:flex;align-items:center;gap:6px;margin-bottom:11px}
+.ia-base i{font-style:normal;color:var(--page);opacity:.9}
+.ind-agent p{font-size:13.5px;line-height:1.62;color:var(--dim)}
+
+/* detail: signals */
+.ind-sigs{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.ind-sig{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-size:13.5px;color:#e7ebfb;padding:11px 16px;border-radius:13px;border:1px solid color-mix(in srgb,var(--page) 22%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--page) 8%,rgba(255,255,255,.03)),rgba(255,255,255,.01));transition:transform .2s,border-color .2s}
+.ind-sig:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--page) 42%,var(--line2))}
+.ind-sig::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--page);box-shadow:0 0 10px var(--page)}
+
+/* detail: challenges + plays reuse .icp/.icard; small extras */
+.ind-chal h4,.ind-play h4{font-family:var(--display);font-size:17px;color:#fff;font-weight:700;margin-bottom:7px}
+.ind-chal p,.ind-play p{font-size:13.5px;line-height:1.6;color:var(--dim)}
+.ind-num{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;font-family:var(--display);font-weight:800;font-size:13px;color:#06121f;background:linear-gradient(135deg,var(--page),var(--page2));margin-bottom:13px;box-shadow:0 8px 20px -8px var(--page)}
+
+/* detail: featured journey card (healthcare) */
+.ind-journey{display:grid;grid-template-columns:1.02fr .98fr;gap:32px;align-items:center;margin-top:34px}
+@media(max-width:900px){.ind-journey{grid-template-columns:1fr;gap:24px}}
+.ij-steps{display:flex;flex-direction:column;gap:12px}
+.ij-step{display:flex;gap:14px;align-items:flex-start;padding:15px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);transition:transform .2s,border-color .2s}
+.ij-step:hover{transform:translateX(4px);border-color:color-mix(in srgb,var(--page) 36%,var(--line2))}
+.ij-step .ijn{flex:0 0 auto;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:12px;color:#06121f;background:linear-gradient(135deg,var(--page),var(--page2))}
+.ij-step b{color:#fff;font-size:14px;font-family:var(--display);letter-spacing:-.01em}
+.ij-step p{color:var(--dim);font-size:12.8px;line-height:1.5;margin-top:3px}
+.ij-card{position:relative;padding:26px;border-radius:22px;overflow:hidden}
+.ij-card::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(380px circle at 78% 0%,color-mix(in srgb,var(--page) 18%,transparent),transparent 60%)}
+.ij-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;position:relative;z-index:1}
+.ij-co{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;color:#fff;font-size:16px}
+.ij-co .dd{width:9px;height:9px;border-radius:50%;background:var(--page);box-shadow:0 0 10px var(--page)}
+.ij-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--page);padding:5px 11px;border-radius:999px;border:1px solid color-mix(in srgb,var(--page) 36%,var(--line))}
+.ij-score{display:flex;align-items:center;gap:18px;position:relative;z-index:1;padding:6px 2px 16px}
+.ij-ring{position:relative;width:96px;height:96px;flex:0 0 auto}
+.ij-ring svg{transform:rotate(-90deg)}
+.ij-ring .ij-bg{fill:none;stroke:rgba(124,140,220,.18);stroke-width:9}
+.ij-ring .ij-fg{fill:none;stroke:url(#ijg);stroke-width:9;stroke-linecap:round;stroke-dasharray:289;stroke-dashoffset:26}
+.ij-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:26px;color:#fff}
+.ij-sc-txt b{display:block;font-family:var(--display);color:#fff;font-size:15px}
+.ij-sc-txt span{font-size:12.5px;color:var(--dim);line-height:1.5;display:block;margin-top:3px}
+.ij-comm{display:flex;flex-wrap:wrap;gap:7px;position:relative;z-index:1;margin:4px 0 16px}
+.ij-comm span{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;color:#dde4ff;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.ij-vimi{display:flex;gap:11px;align-items:flex-start;padding:14px;border-radius:14px;position:relative;z-index:1;border:1px solid color-mix(in srgb,var(--page) 28%,var(--line));background:color-mix(in srgb,var(--page) 7%,rgba(255,255,255,.02))}
+.ij-vimi .mv-orb{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 34% 30%,var(--page),var(--page2));box-shadow:0 0 16px -2px var(--page)}
+.ij-vimi b{color:#fff;font-size:12px;font-family:var(--display)}
+.ij-vimi p{color:var(--dim);font-size:12.5px;line-height:1.55;margin-top:3px}
+.ind-others{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:30px}
+.ind-other{display:inline-flex;align-items:center;gap:9px;text-decoration:none;font-family:var(--sans);font-size:13.5px;color:#e7ebfb;padding:11px 18px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.025);transition:transform .2s,border-color .2s,box-shadow .3s}
+.ind-other:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:0 18px 40px -22px #000}
+.ind-other .od{width:9px;height:9px;border-radius:50%;background:var(--oa,#22d3ee);box-shadow:0 0 9px var(--oa,#22d3ee)}
+.ind-flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));gap:22px;margin-top:34px}
+.ind-crumb{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-bottom:22px}
+.ind-crumb a{color:var(--dim2);text-decoration:none;transition:color .2s}
+.ind-crumb a:hover{color:#fff}
+.ind-crumb .sep{opacity:.5}
+@keyframes indspin{to{transform:rotate(360deg)}}
+@keyframes indfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@media (prefers-reduced-motion:reduce){.ind-orb .ring,.ind-fchip{animation:none!important}}
+
 </style>
 </head>
-<body data-page="{{ page }}" style="--page:{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9'}.get(page,'#22d3ee') }}">
+<body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% else %}#8b5cf6{% endif %}">
 <!-- page transition -->
 <style>
 #pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 28%,#0b0f22,#04050d 72%);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .85s cubic-bezier(.4,0,.2,1) .05s forwards}
@@ -964,6 +1094,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <a class="nv-link {% if page=='signals' %}active{% endif %}" href="/signals" data-cursor>Signals</a>
     <a class="nv-link {% if page=='agents' or page=='agent' %}active{% endif %}" href="/agents" data-cursor>Agents</a>
     <a class="nv-link {% if page=='solutions' %}active{% endif %}" href="/solutions" data-cursor>Solutions</a>
+    <a class="nv-link {% if page=='industries' or page=='industry' %}active{% endif %}" href="/industries" data-cursor>Industries</a>
     <a class="nv-link {% if page=='resources' %}active{% endif %}" href="/resources" data-cursor>Resources</a>
   </div>{% endif %}
   <div class="nv-cta">
@@ -1479,6 +1610,134 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <h3>Request a DPA</h3><p>Need our Data Processing Agreement or a security overview for your review? We&rsquo;ll share them on request &mdash; <a href="mailto:privacy@position2.com">privacy@position2.com</a>.</p>
     </div>
     <div class="band reveal"><h3>Need our security overview or a DPA?</h3><p>We&rsquo;ll walk your team through how data is handled, and provide the documents your security review needs.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+  </div>
+
+{% elif page == 'industries' %}
+  <div class="wrap sectionpad">
+    <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Industries</span>
+      <h1 class="h-hero">Built for your<br><span class="ital grad">industry&rsquo;s motion.</span></h1>
+      <p class="lead ind-lead">One signal engine, tuned to the way your market actually buys. Pick an industry to see the buying signals we watch, the agents reframed in your vocabulary, and how Position2 turns intent into pipeline &mdash; with healthcare as our deepest build.</p>
+    </div>
+    <div class="ind-grid">
+      {% for ind in industries %}
+        {% if ind.featured %}
+        <a class="ind-card feat reveal" href="/industries/{{ ind.slug }}" data-cursor style="--ia:{{ ind.accent }};--ia2:{{ ind.accent2 }}">
+          <span class="ind-eye">Flagship industry</span>
+          <div class="ind-fl">
+            <div class="ind-ic">{{ ind.icon|safe }}</div>
+            <h3>{{ ind.name }}</h3>
+            <p>{{ ind.lead }}</p>
+            <div class="ind-tags">{% for s in ind.segments %}<span class="ind-tag">{{ s }}</span>{% endfor %}</div>
+            <span class="more">Explore healthcare &rarr;</span>
+          </div>
+          <div class="ind-fr">
+            <div class="ind-orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="odot od1"></span><span class="odot od2"></span><span class="odot od3"></span><span class="odot od4"></span><span class="ind-core">{{ ind.icon|safe }}</span></div>
+          </div>
+        </a>
+        {% else %}
+        <a class="ind-card reveal" href="/industries/{{ ind.slug }}" data-cursor style="--ia:{{ ind.accent }};--ia2:{{ ind.accent2 }};transition-delay:{{ loop.index0 * 60 }}ms">
+          <div class="ind-ic">{{ ind.icon|safe }}</div>
+          <h3>{{ ind.name }}</h3>
+          <p>{{ ind.lead }}</p>
+          <div class="ind-tags">{% for s in ind.segments[:4] %}<span class="ind-tag">{{ s }}</span>{% endfor %}</div>
+          <span class="more">Explore &rarr;</span>
+        </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="band reveal"><h3>Don&rsquo;t see your industry?</h3><p>Tell us how your market buys and we&rsquo;ll tune the signal engine and the agents to your exact motion.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Industry build" data-prefill="We're in the following industry and would like Intelligence tuned to it: " data-cursor>Talk to us</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+  </div>
+
+{% elif page == 'industry' %}
+  <div class="wrap sectionpad">
+    <div class="ind-crumb reveal in"><a href="/industries" data-cursor>Industries</a><span class="sep">&rsaquo;</span><span>{{ industry.name }}</span></div>
+    <div class="hero2">
+      <div class="reveal in">
+        <span class="pill-eye"><span class="dt"></span> {{ industry.eyebrow }}</span>
+        <h1 class="h-hero">{{ industry.headline }}<br><span class="ital grad">{{ industry.headline_ital }}</span></h1>
+        <p class="lead">{{ industry.lead }}</p>
+        <div class="hero-cta reveal in" style="transition-delay:200ms">
+          <button class="btn-grad mag" data-demo data-interest="{{ industry.name }}" data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
+          <button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button>
+        </div>
+      </div>
+      <div class="hero-art reveal in">
+        <div class="ind-hero-art">
+          <div class="ind-orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="odot od1"></span><span class="odot od2"></span><span class="odot od3"></span><span class="odot od4"></span><span class="ind-core">{{ industry.icon|safe }}</span></div>
+          <div class="ind-fchip ind-fchip-1"><span class="acd"></span>Signal fired</div>
+          <div class="ind-fchip ind-fchip-2"><span class="acd"></span>Intent score 9.4</div>
+          <div class="ind-fchip ind-fchip-3"><span class="acd"></span>Committee mapped</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats reveal" style="grid-template-columns:repeat({{ industry.stats|length }},1fr)">
+      {% for st in industry.stats %}<div class="stat glass"><b>{{ st.v }}</b><span>{{ st.l }}</span></div>{% endfor %}
+    </div>
+
+    <div class="ind-seg reveal">{% for s in industry.segments %}<span>{{ s }}</span>{% endfor %}</div>
+
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> The challenge</span><h2 class="h-sec">What makes {{ industry.short|lower }} <span class="ital grad">different.</span></h2></div>
+    <div class="ind-flow">
+      {% for p in industry.pains %}
+      <div class="icard glass reveal ind-chal" style="transition-delay:{{ loop.index0 * 60 }}ms"><span class="ind-num">{{ loop.index }}</span><h4>{{ p.t }}</h4><p>{{ p.d }}</p></div>
+      {% endfor %}
+    </div>
+
+    {% if industry.featured %}
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signal to action</span><h2 class="h-sec">Watch a healthcare signal<br><span class="ital grad">become a conversation.</span></h2></div>
+    <div class="ind-journey">
+      <div class="ij-steps reveal">
+        <div class="ij-step"><span class="ijn">1</span><div><b>A signal fires</b><p>Orbit Health closes a Series C and opens two new cardiology centers &mdash; we catch both the moment they hit the open web.</p></div></div>
+        <div class="ij-step"><span class="ijn">2</span><div><b>It&rsquo;s scored</b><p>Funding plus a service-line launch stack into one live intent score &mdash; instantly.</p></div></div>
+        <div class="ij-step"><span class="ijn">3</span><div><b>The committee is mapped</b><p>The CMIO, VP of Revenue Cycle and service-line director surface, with their recent moves.</p></div></div>
+        <div class="ij-step"><span class="ijn">4</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer, grounded in the exact signal &mdash; you reach out first.</p></div></div>
+      </div>
+      <div class="ij-card glass reveal">
+        <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs><linearGradient id="ijg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#34d399"/></linearGradient></defs></svg>
+        <div class="ij-top"><span class="ij-co"><span class="dd"></span>Orbit Health</span><span class="ij-tag">Funding + Service line</span></div>
+        <div class="ij-score">
+          <div class="ij-ring"><svg viewBox="0 0 100 100"><circle class="ij-bg" cx="50" cy="50" r="46"/><circle class="ij-fg" cx="50" cy="50" r="46" style="stroke-dashoffset:17"/></svg><b>9.4</b></div>
+          <div class="ij-sc-txt"><b>Top account today</b><span>Series C close &bull; 2 new cardiology centers &bull; new CMIO &mdash; three signals stacked in 11 days.</span></div>
+        </div>
+        <div class="ij-comm"><span>CMIO</span><span>VP Revenue Cycle</span><span>Service-line Director</span><span>CFO</span></div>
+        <div class="ij-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>&ldquo;Orbit Health just raised a Series C and is expanding cardiology &mdash; here&rsquo;s a 3-line intro to their new CMIO.&rdquo;</p></div></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> The agents</span><h2 class="h-sec">{{ industry.agents|length }} agents, <span class="ital grad">reframed for {{ industry.short|lower }}.</span></h2></div>
+    <p class="lead reveal" style="text-align:center;margin:0 auto">Same engine, your vocabulary. Each agent below is one of our core agents, tuned to the signals and language of {{ industry.short|lower }}.</p>
+    <div class="ind-agents">
+      {% for a in industry.agents %}
+      <div class="ind-agent reveal" style="transition-delay:{{ loop.index0 * 45 }}ms">
+        {% if a.badge %}<span class="ia-badge">{{ a.badge }}</span>{% endif %}
+        <div class="ia-ic">{{ a.icon|safe }}</div>
+        <h4>{{ a.name }}</h4>
+        <div class="ia-base"><i>&#8635;</i> from {{ a.base }}</div>
+        <p>{{ a.use }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signals we watch</span><h2 class="h-sec">The buying signals that matter<br>in <span class="ital grad">{{ industry.short|lower }}.</span></h2></div>
+    <div class="ind-sigs reveal" style="justify-content:center">{% for s in industry.signals %}<span class="ind-sig">{{ s }}</span>{% endfor %}</div>
+
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> From signal to pipeline</span><h2 class="h-sec">How Position2 <span class="ital grad">acts on it.</span></h2></div>
+    <div class="ind-flow">
+      {% for pl in industry.plays %}
+      <div class="icard glass reveal ind-play" style="transition-delay:{{ loop.index0 * 60 }}ms"><div class="ir">Play 0{{ loop.index }}</div><h4>{{ pl.t }}</h4><p>{{ pl.d }}</p></div>
+      {% endfor %}
+    </div>
+
+    {% if other_industries %}
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> More industries</span><h2 class="h-sec">Explore <span class="ital grad">another market.</span></h2></div>
+    <div class="ind-others reveal">
+      {% for o in other_industries %}<a class="ind-other" href="/industries/{{ o.slug }}" data-cursor style="--oa:{{ o.accent }}"><span class="od"></span>{{ o.name }} &rarr;</a>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="band reveal"><h3>See it on your {{ industry.short|lower }} accounts.</h3><p>Request access and watch the signal layer light up on the {{ industry.short|lower }} organizations you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="{{ industry.name }}" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'login' %}

@@ -611,6 +611,246 @@ AGENTS = [
 ]
 AGENTS_BY_SLUG = {a["slug"]: a for a in AGENTS}
 
+# ── Industries registry (public marketing) ──────────────────────────────────────
+def _isvg(inner: str) -> str:
+    return ('<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" '
+            'stroke-linecap="round" stroke-linejoin="round">' + inner + "</svg>")
+
+INDUSTRIES = [
+    {
+        "slug": "healthcare",
+        "name": "Healthcare & Life Sciences",
+        "short": "Healthcare",
+        "featured": True,
+        "accent": "#22d3ee", "accent2": "#34d399",
+        "icon": _isvg('<path d="M3 12h3.5l2 5 4-12 2.2 7H21"/>'),
+        "eyebrow": "Industry · Healthcare & Life Sciences",
+        "headline": "Reach the health system",
+        "headline_ital": "the moment it’s ready.",
+        "lead": "Healthcare buying is slow, committee-driven and built on trust. Intelligence watches every provider, payer and life-sciences org for the signals that precede a budget — funding, mergers, new facilities, service-line launches and leadership moves — then hands your team the account, the committee and the next move.",
+        "stats": [
+            {"v": "1,251", "l": "healthcare orgs tracked"},
+            {"v": "26",    "l": "buying-signal types"},
+            {"v": "24/7",  "l": "real-time detection"},
+            {"v": "9",     "l": "agents tuned for healthcare"},
+        ],
+        "segments": [
+            "Health systems & hospitals", "Payers & health plans",
+            "Digital health & telehealth", "Medtech & devices",
+            "Pharma & biotech", "Pharmacy & retail health",
+        ],
+        "pains": [
+            {"t": "Long, committee-driven cycles", "d": "A single deal touches the CMIO, CNIO, CFO, service-line leaders and procurement. You need to know which system is in-market — and who sits on the committee — before a competitor does."},
+            {"t": "Trust decides visibility (YMYL)", "d": "Patients and AI answer engines only surface sources they trust. Clinical accuracy, author credentials and E-E-A-T are what get your pages cited — or buried."},
+            {"t": "Hundreds of locations", "d": "Every clinic, hospital and pharmacy is its own local-search entity. One stale address or wrong hour quietly loses patients to the practice down the road."},
+            {"t": "Signals hidden in noise", "d": "Funding, M&A, new facility openings, CMS rule changes and C-suite moves all precede budget — but they’re scattered across filings, news and job boards."},
+        ],
+        "signals": [
+            "Funding round", "Health-system merger / M&A", "New facility or clinic opening",
+            "Service-line launch", "CMIO / CNIO / C-suite change", "FDA clearance or approval",
+            "Clinical-trial milestone", "Clinical & tech hiring surge", "Payer / provider partnership",
+            "Earnings & regulatory filings",
+        ],
+        "agents": [
+            {"icon": _isvg('<path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 3 5-6"/>'),
+             "name": "Provider & Payer Signal Tracker", "base": "ABM Signal Tracker", "badge": "CORE",
+             "use": "Monitors your entire universe of health systems, payers, digital-health and medtech accounts for funding, mergers, facility openings and leadership moves — scored and resurfaced weekly so the systems entering a buying cycle rise to the top."},
+            {"icon": _isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/><path d="M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>'),
+             "name": "Patient-Answer Visibility", "base": "Generative Search Visibility", "badge": "FLAGSHIP",
+             "use": "Tracks how your brand, locations and treatments show up when patients and clinicians ask ChatGPT, Gemini, Perplexity and Google AI Overviews — “best cardiologist near me,” symptom and treatment questions — and flags the answers a competitor is winning."},
+            {"icon": _isvg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+             "name": "Patient & Referrer De-anonymization", "base": "Anonymous Website Visitors", "badge": "NEW",
+             "use": "Reveals the health systems, referring clinics and employer groups browsing your site — even when they never fill out a form — and reconstructs the pages they read so outreach lands while intent is warm."},
+            {"icon": _isvg('<path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+             "name": "HIPAA-Aware Site & GEO Auditor", "base": "Technical SEO & GEO Auditor", "badge": "NEW",
+             "use": "Runs 200+ technical, on-page, structured-data and answer-engine checks — plus ADA / WCAG accessibility and YMYL trust signals — and returns a scored, prioritized fix-list your web team can ship immediately."},
+            {"icon": _isvg('<path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+             "name": "Clinical Authority Optimizer", "base": "Content Authority Optimizer",
+             "use": "Strengthens E-E-A-T on every clinical page — medical-reviewer bylines, credentials, citations and freshness — so patients and AI engines treat your content as a trustworthy source worth citing."},
+            {"icon": _isvg('<path d="M4 4h16v12H7l-3 3z"/><path d="M8 9h8M8 12h5"/>'),
+             "name": "Condition & Treatment Brief Architect", "base": "Content Brief Architect",
+             "use": "Builds research-backed briefs for condition, symptom, treatment and “near me” pages — the questions real patients ask — mapped to the searches and AI prompts driving demand in your service lines."},
+            {"icon": _isvg('<path d="M12 21s-7-4.5-7-10a7 7 0 0 1 14 0c0 5.5-7 10-7 10z"/><circle cx="12" cy="11" r="2.4"/>'),
+             "name": "Location & Facility Visibility", "base": "Local Visibility Builder + GBP QC",
+             "use": "Keeps every clinic, hospital and pharmacy location accurate and discoverable — Google Business Profiles, hours, NAP consistency and multi-location QC — so each facility wins its local map and “near me” searches."},
+            {"icon": _isvg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8h4M19 6v4"/>'),
+             "name": "Buying-Committee Tracker", "base": "LinkedIn Intelligence",
+             "use": "Maps the committee inside a target health system — CMIO, CNIO, VP of Revenue Cycle, procurement — tracks job changes and engagement, and surfaces a champion the moment they move or signal interest."},
+            {"icon": _isvg('<path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8"/><path d="M9 12h6M9 16h4"/>'),
+             "name": "Referral & Pipeline Command Center", "base": "Pipeline Command Center",
+             "use": "Ranks every in-market system by one intent score, explains why in plain language, and routes the account — with suggested outreach — straight into HubSpot, Salesforce and Slack where your team already works."},
+        ],
+        "plays": [
+            {"t": "SEO & organic growth", "d": "Win the condition, treatment and “near me” searches patients run — and the AI answers clinicians read — the moment a service line matters."},
+            {"t": "Performance & paid media", "d": "Stand up campaigns aimed at in-market systems and patient segments the instant a signal peaks, within healthcare ad policy."},
+            {"t": "Content & clinical authority", "d": "Reviewer-backed, E-E-A-T-strong content that earns patient trust and AI citations across every service line."},
+            {"t": "RevOps & HubSpot", "d": "Score and route provider/payer signals inside your CRM, with clean handoffs from marketing to the field team."},
+        ],
+    },
+    {
+        "slug": "technology-saas",
+        "name": "Technology & SaaS",
+        "short": "Technology & SaaS",
+        "featured": False,
+        "accent": "#818cf8", "accent2": "#22d3ee",
+        "icon": _isvg('<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M8 9l2.2 2L8 13M14 9h2.5"/>'),
+        "eyebrow": "Industry · Technology & SaaS",
+        "headline": "Catch the buying cycle",
+        "headline_ital": "before the RFP.",
+        "lead": "B2B software buying starts long before a form fill — in funding rounds, tech-stack changes, hiring surges and product launches. Intelligence watches all of it across your target accounts and tells your team who’s entering a cycle, and why.",
+        "stats": [
+            {"v": "26",   "l": "buying-signal types"},
+            {"v": "24/7", "l": "real-time detection"},
+            {"v": "95%+", "l": "of lost visitors recovered"},
+        ],
+        "segments": [
+            "B2B SaaS", "Cloud & infrastructure", "Dev tools & APIs",
+            "Cybersecurity", "Data & AI", "Fintech software",
+        ],
+        "pains": [
+            {"t": "Intent hides until it’s too late", "d": "By the time an account fills out a demo form, they’re often three vendors deep. The real signal fired weeks earlier."},
+            {"t": "Crowded, AI-mediated search", "d": "Buyers increasingly ask ChatGPT and Perplexity for shortlists. If you’re not the cited answer, you’re not on the list."},
+            {"t": "Champions change jobs", "d": "Your best champion leaves — and takes the deal’s momentum with them. Their move to a new account is your warmest new lead."},
+        ],
+        "signals": [
+            "Funding round", "Tech-stack / technographic change", "Engineering & GTM hiring surge",
+            "Product launch", "Leadership change", "M&A", "Partnership", "Earnings & filings",
+        ],
+        "agents": [
+            {"icon": _isvg('<path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 3 5-6"/>'),
+             "name": "Tech-Stack Signal Tracker", "base": "ABM Signal Tracker", "badge": "CORE",
+             "use": "Watches funding, technographic change, hiring surges and product launches across your target accounts — scored weekly so the accounts entering a software cycle surface first."},
+            {"icon": _isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/><path d="M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>'),
+             "name": "AI Answer Visibility", "base": "Generative Search Visibility", "badge": "FLAGSHIP",
+             "use": "Tracks whether your product is the answer when buyers ask AI engines for category shortlists — and flags the comparison prompts you’re losing to competitors."},
+            {"icon": _isvg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+             "name": "Anonymous Account De-anonymization", "base": "Anonymous Website Visitors", "badge": "NEW",
+             "use": "Turns silent pricing- and docs-page traffic into named accounts so SDRs reach in-market buyers while the evaluation is live."},
+            {"icon": _isvg('<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="3"/>'),
+             "name": "Competitor SEO Intelligence", "base": "Competitor SEO Intelligence",
+             "use": "Maps where rivals win organic and AI share of voice across your category and surfaces the keyword and content gaps to close first."},
+            {"icon": _isvg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8h4M19 6v4"/>'),
+             "name": "Champion & Committee Tracker", "base": "LinkedIn Intelligence",
+             "use": "Follows your champions when they change jobs and maps the buying committee at each target account so you re-engage warm relationships fast."},
+        ],
+        "plays": [
+            {"t": "SEO & GEO", "d": "Own the category searches and AI answers buyers use to build their shortlist."},
+            {"t": "Performance media", "d": "Target in-market accounts the moment intent peaks, not on a static list."},
+            {"t": "Content & demand", "d": "Ship comparison, integration and use-case content tuned to live demand."},
+            {"t": "RevOps & HubSpot", "d": "Score and route signals into the CRM with clean SDR handoffs."},
+        ],
+    },
+    {
+        "slug": "financial-services",
+        "name": "Financial Services",
+        "short": "Financial Services",
+        "featured": False,
+        "accent": "#34d399", "accent2": "#0ea5e9",
+        "icon": _isvg('<path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/>'),
+        "eyebrow": "Industry · Financial Services",
+        "headline": "Open the high-value conversation",
+        "headline_ital": "at the right moment.",
+        "lead": "In banking, fintech, insurance and wealth management, the deals are large, the cycles are regulated, and trust is non-negotiable. Intelligence spots the M&A, leadership and growth signals that open a conversation — and keeps your visibility compliant and credible.",
+        "stats": [
+            {"v": "26",   "l": "buying-signal types"},
+            {"v": "24/7", "l": "real-time detection"},
+            {"v": "YMYL", "l": "trust-first visibility"},
+        ],
+        "segments": [
+            "Banking", "Fintech & payments", "Insurance",
+            "Wealth & asset management", "Lending", "InsurTech",
+        ],
+        "pains": [
+            {"t": "Trust & compliance are the product", "d": "Finance is YMYL — patients of money. Search engines and AI answers heavily weight authority, accuracy and credentials before surfacing you."},
+            {"t": "Large, multi-stakeholder deals", "d": "Risk, compliance, finance and the line of business all weigh in. You need to know which institution is in-market and who to engage."},
+            {"t": "M&A reshuffles the map", "d": "Mergers, new leadership and funding constantly change who buys what — and create a narrow window to be first in."},
+        ],
+        "signals": [
+            "M&A / consolidation", "Funding round", "Leadership / C-suite change",
+            "New product or market launch", "Regulatory filing", "Hiring surge",
+            "Partnership", "Earnings & filings",
+        ],
+        "agents": [
+            {"icon": _isvg('<path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 3 5-6"/>'),
+             "name": "Institution Signal Tracker", "base": "ABM Signal Tracker", "badge": "CORE",
+             "use": "Tracks M&A, leadership change, funding and expansion across banks, insurers and fintechs — scored weekly so in-market institutions rise to the top."},
+            {"icon": _isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/><path d="M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>'),
+             "name": "Trusted-Answer Visibility", "base": "Generative Search Visibility", "badge": "FLAGSHIP",
+             "use": "Monitors how your brand appears in AI answers to high-stakes financial questions, where authority and accuracy decide whether you’re cited."},
+            {"icon": _isvg('<path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+             "name": "Authority & Trust Optimizer", "base": "Content Authority Optimizer",
+             "use": "Builds the E-E-A-T signals — credentials, citations, disclosures — that YMYL finance content needs to rank and be trusted by AI engines."},
+            {"icon": _isvg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+             "name": "Anonymous Account De-anonymization", "base": "Anonymous Website Visitors", "badge": "NEW",
+             "use": "Identifies the institutions researching your solutions on-site so relationship teams reach decision-makers while interest is high."},
+            {"icon": _isvg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8h4M19 6v4"/>'),
+             "name": "Buying-Committee Tracker", "base": "LinkedIn Intelligence",
+             "use": "Maps risk, compliance and line-of-business stakeholders, and tracks the leadership moves that open a new relationship."},
+        ],
+        "plays": [
+            {"t": "SEO & GEO", "d": "Win trusted-answer visibility for the high-intent, high-stakes queries buyers and AI engines run."},
+            {"t": "Performance media", "d": "Reach in-market institutions and segments within financial advertising policy."},
+            {"t": "Content & authority", "d": "Credential-backed content that earns trust, citations and compliance sign-off."},
+            {"t": "RevOps & HubSpot", "d": "Route signals to relationship managers with full context and clean handoffs."},
+        ],
+    },
+    {
+        "slug": "professional-services",
+        "name": "Professional Services",
+        "short": "Professional Services",
+        "featured": False,
+        "accent": "#fbbf24", "accent2": "#e879f9",
+        "icon": _isvg('<path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18"/>'),
+        "eyebrow": "Industry · Professional Services",
+        "headline": "Land the engagement",
+        "headline_ital": "when the need appears.",
+        "lead": "Consulting, legal, accounting and agencies sell expertise into moments of change — growth, M&A, new leadership, expansion. Intelligence detects those moments across your target accounts and hands your partners a reason to reach out first.",
+        "stats": [
+            {"v": "26",   "l": "buying-signal types"},
+            {"v": "24/7", "l": "real-time detection"},
+            {"v": "95%+", "l": "of lost visitors recovered"},
+        ],
+        "segments": [
+            "Management consulting", "Legal", "Accounting & advisory",
+            "Marketing & creative agencies", "Staffing & recruiting", "IT services",
+        ],
+        "pains": [
+            {"t": "Relationships, not forms", "d": "Your pipeline runs on partners reaching the right person at the right moment — not inbound leads. You need the trigger and the name."},
+            {"t": "Expertise is hard to surface", "d": "Buyers and AI engines reward demonstrated authority. Your firm’s thought leadership has to be findable and citable."},
+            {"t": "Windows are narrow", "d": "A funding round, merger or new GC creates a short window where the need is acute — and the first credible firm in usually wins."},
+        ],
+        "signals": [
+            "Funding round", "M&A", "Leadership / C-suite change",
+            "Expansion / new office", "Hiring surge", "Regulatory or legal event",
+            "Partnership", "Earnings & filings",
+        ],
+        "agents": [
+            {"icon": _isvg('<path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 3 5-6"/>'),
+             "name": "Opportunity Signal Tracker", "base": "ABM Signal Tracker", "badge": "CORE",
+             "use": "Detects growth, M&A, leadership and expansion signals across your target accounts — scored weekly so partners see who needs help now."},
+            {"icon": _isvg('<circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/><path d="M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>'),
+             "name": "Expertise Answer Visibility", "base": "Generative Search Visibility", "badge": "FLAGSHIP",
+             "use": "Tracks whether your firm is the cited authority when prospects ask AI engines for help in your practice areas."},
+            {"icon": _isvg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
+             "name": "Anonymous Visitor De-anonymization", "base": "Anonymous Website Visitors", "badge": "NEW",
+             "use": "Reveals the companies reading your service and insight pages so partners follow up while the need is fresh."},
+            {"icon": _isvg('<path d="M4 4h16v12H7l-3 3z"/><path d="M8 9h8M8 12h5"/>'),
+             "name": "Thought-Leadership Brief Architect", "base": "Content Brief Architect",
+             "use": "Builds briefs for the questions buyers and AI engines ask in your practice areas, so your insight content earns visibility and citations."},
+            {"icon": _isvg('<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 8h4M19 6v4"/>'),
+             "name": "Relationship & Mover Tracker", "base": "LinkedIn Intelligence",
+             "use": "Tracks when key contacts change roles and maps the decision-makers at target accounts so partners re-engage at the perfect moment."},
+        ],
+        "plays": [
+            {"t": "SEO & GEO", "d": "Make your practice-area expertise the answer buyers and AI engines find first."},
+            {"t": "Performance media", "d": "Reach accounts showing change signals with precise, partner-led targeting."},
+            {"t": "Content & authority", "d": "Turn partner expertise into findable, citable thought leadership."},
+            {"t": "RevOps & HubSpot", "d": "Route signals to the right partner with the context to act fast."},
+        ],
+    },
+]
+INDUSTRIES_BY_SLUG = {i["slug"]: i for i in INDUSTRIES}
+
 # ── Signal catalog (flat list of everything we track) ────────────────────────────
 _SIG_PAL = ["#a78bfa", "#22d3ee", "#818cf8", "#f472b6", "#34d399", "#fbbf24", "#38bdf8"]
 _SIGNALS_RAW = [
@@ -713,6 +953,22 @@ def signals_page():
 @app.route("/solutions")
 def solutions_page():
     return render_template("agents.html", page="solutions", agents=AGENTS, agent=None, related=[])
+
+
+@app.route("/industries")
+def industries_page():
+    return render_template("agents.html", page="industries", agents=AGENTS, agent=None,
+                           related=[], industries=INDUSTRIES)
+
+
+@app.route("/industries/<slug>")
+def industry_detail(slug):
+    ind = INDUSTRIES_BY_SLUG.get(slug)
+    if not ind:
+        return redirect(url_for("industries_page"))
+    others = [x for x in INDUSTRIES if x["slug"] != slug]
+    return render_template("agents.html", page="industry", agents=AGENTS, agent=None,
+                           related=[], industry=ind, industries=INDUSTRIES, other_industries=others)
 
 # ── Account registry ────────────────────────────────────────────────────────────
 ACCOUNTS = {
