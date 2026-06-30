@@ -261,5 +261,6 @@ document.addEventListener('click',function(e){var m=document.getElementById('use
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');if(p)p.classList.remove('open');if(d)d.classList.remove('open');}});
 (function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');}});}catch(e){}})();
 </script>
+<script src="{{ url_for('static', filename='js/pfx_bg.js') }}"></script>
 </body>
 </html>
