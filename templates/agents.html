@@ -2043,5 +2043,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   if(search){ search.addEventListener('input',function(){ q=(search.value||'').toLowerCase().trim(); apply(); }); }
 })();
 </script>
+
+<!-- First-party visitor analytics — anonymous/public visitors only (admins/users excluded) -->
+{% if not user %}
+<script src="{{ url_for('static', filename='js/visitor_track.js') }}"></script>
+{% endif %}
 </body>
 </html>
