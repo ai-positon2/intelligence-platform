@@ -1145,6 +1145,13 @@ def hub():
 def gtm():
     return render_template("gtm.html", user=_get_user())
 
+
+@app.route("/gtm/call-sentiment")
+@app.route("/gtm/call-sentiment/")
+@login_required
+def call_sentiment():
+    return render_template("call_sentiment.html", user=_get_user())
+
 # ── Legacy /ppc* page URLs → 301 redirect to canonical /gtm* (links still resolve) ──
 @app.route("/ppc")
 @app.route("/ppc/")
