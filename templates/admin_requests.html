@@ -105,6 +105,7 @@
     }
     @media (prefers-reduced-motion:reduce){.bg .m,.brand .orb .spin,.eyebrow .dt{animation:none}}
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
 </head>
 <body>
   <div class="bg"><span class="m m1"></span><span class="m m2"></span><span class="m m3"></span><div class="grid"></div><div class="vig"></div></div>
@@ -114,11 +115,25 @@
       <a href="/hub" class="brand"><svg class="orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg><b>INTELLIGENCE</b></a>
       <div class="bc"><a href="/hub">Hub</a><span class="sep">&rsaquo;</span><a href="/admin/usage">Admin</a><span class="sep">&rsaquo;</span><span class="cur">Access Requests</span></div>
     </div>
-    <nav style="display:flex;gap:8px;align-items:center">
-      <a href="/admin/usage" class="top-link">Usage Dashboard</a>
-      <a href="/admin/visitors" class="top-link">Visitor Analytics</a>
-      <a href="/admin/requests" class="top-link" style="color:#fff;border-color:rgba(124,92,255,.55)">Access Requests</a>
-    </nav>
+    <div class="tr">
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="avatar">{% if user and user.picture %}<img src="{{ user.picture }}" alt="" />{% else %}{{ ((user.name or 'A')[:2]|upper) if user else 'A' }}{% endif %}</div>
+        <span class="uname">{{ (user.given_name or user.name or 'Admin') if user else 'Admin' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
+        <div class="dd-items">
+          <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
+          <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
+          <a href="/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+          <div class="dd-divider"></div>
+          <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
+        </div>
+      </div>
+    </div>
+    </div>
   </div>
 
   <div class="wrap">
@@ -184,5 +199,11 @@
     }); }
   })();
   </script>
+<script>
+function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
+document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');if(p)p.classList.remove('open');if(d)d.classList.remove('open');}});
+(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');}});}catch(e){}})();
+</script>
 </body>
 </html>
