@@ -632,7 +632,7 @@ INDUSTRIES = [
             {"v": "1,251", "l": "healthcare orgs tracked"},
             {"v": "26",    "l": "buying-signal types"},
             {"v": "24/7",  "l": "real-time detection"},
-            {"v": "9",     "l": "agents tuned for healthcare"},
+            {"v": "11",    "l": "agents tuned for healthcare"},
         ],
         "segments": [
             "Health systems & hospitals", "Payers & health plans",
@@ -679,6 +679,12 @@ INDUSTRIES = [
             {"icon": _isvg('<path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8"/><path d="M9 12h6M9 16h4"/>'),
              "name": "Referral & Pipeline Command Center", "base": "Pipeline Command Center",
              "use": "Ranks every in-market system by one intent score, explains why in plain language, and routes the account — with suggested outreach — straight into HubSpot, Salesforce and Slack where your team already works."},
+            {"icon": _isvg('<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M9 11h.01M15 11h.01M8.8 14.2s1.3 1.3 3.2 1.3 3.2-1.3 3.2-1.3"/>'),
+             "name": "Geo Sentiment Analyzer", "base": "Voice-of-Patient Analytics", "badge": "NEW",
+             "use": "Unifies call transcripts, Google Business Profile reviews, ratings and survey feedback into a sentiment score for every location — so you can see which clinics patients love, where reputation is slipping, and exactly what’s driving it, market by market and facility by facility."},
+            {"icon": _isvg('<path d="M3 21h18"/><path d="M6 21V6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v15"/><path d="M12 8v4M10 10h4"/><path d="M10 21v-4h4v4"/>'),
+             "name": "Healthcare Account Tracker", "base": "ABM Signal Tracker", "badge": "LIVE",
+             "use": "Your healthcare universe, already live: 1,251 provider, payer, digital-health and medtech companies tracked for funding, C-suite moves, M&A and news — scored weekly and ready on day one inside Signal Tracker, no setup required."},
         ],
         "plays": [
             {"t": "SEO & organic growth", "d": "Win the condition, treatment and “near me” searches patients run — and the AI answers clinicians read — the moment a service line matters."},
