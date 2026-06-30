@@ -227,7 +227,7 @@ def _demo_request_to_sheet(row: list) -> bool:
             spreadsheetId=DEMO_REQUEST_SHEET_ID, range=f"{tab}!A1:A1").execute()
         if not got.get("values"):
             header = [["Timestamp (IST)", "Name", "Work Email", "Company",
-                       "Interest", "Message", "IP Address", "User Agent", "Source"]]
+                       "Interest", "Message", "IP Address", "User Agent", "Source", "Visitor ID"]]
             svc.spreadsheets().values().append(
                 spreadsheetId=DEMO_REQUEST_SHEET_ID, range=f"{tab}!A1",
                 valueInputOption="RAW", body={"values": header}).execute()
@@ -401,7 +401,8 @@ def api_demo_request():
           request.remote_addr or "").split(",")[0].strip()
     ua = request.headers.get("User-Agent", "")[:200]
     now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
-    row = [now, name, email, company, interest, message, ip, ua, "login page"]
+    vid = (request.cookies.get("p2_vid") or data.get("vid") or "").strip()[:64]
+    row = [now, name, email, company, interest, message, ip, ua, "login page", vid]
     payload = {"name": name, "email": email, "company": company,
                "interest": interest, "message": message, "ts": now, "ip": ip}
     sheet_ok = _demo_request_to_sheet(row)
@@ -1161,6 +1162,100 @@ def _va_sheets_service():
         sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
     return build("sheets","v4",credentials=creds,cache_discovery=False)
 
+_IP_CACHE = {}
+def _ip_company(ip: str) -> str:
+    """Best-effort reverse-IP -> organization. Requires IPINFO_TOKEN; '' otherwise. Cached per IP."""
+    if not ip or ip in ("127.0.0.1", "::1", "localhost"):
+        return ""
+    if ip in _IP_CACHE:
+        return _IP_CACHE[ip]
+    out = ""
+    token = os.environ.get("IPINFO_TOKEN", "")
+    if token:
+        try:
+            import urllib.request, json as _j
+            url = "https://ipinfo.io/%s/json?token=%s" % (ip, token)
+            with urllib.request.urlopen(url, timeout=2.5) as resp:
+                d = _j.loads(resp.read().decode("utf-8"))
+            org = (d.get("org") or "").strip()
+            out = re.sub(r"^AS\d+\s+", "", org)   # drop ASN prefix
+        except Exception as e:
+            log.warning("ip_company lookup failed: %s", e)
+            out = ""
+    _IP_CACHE[ip] = out
+    return out
+
+def _va_identity_map() -> dict:
+    """visitor_id -> {name,email,company,source}. Merges access-form conversions + provider identifies."""
+    m = {}
+    try:
+        for req in _read_access_requests(limit=2000):
+            v = (req.get("vid") or "").strip()
+            if v:
+                m[v] = {"name": req.get("name", ""), "email": req.get("email", ""),
+                        "company": req.get("company", ""), "source": "Request access"}
+    except Exception:
+        pass
+    svc = _va_sheets_service()
+    if svc:
+        try:
+            r = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute()
+            for x in (r.get("values", [])[1:] or []):
+                def cc(i): return x[i] if len(x) > i else ""
+                v = (cc(1) or "").strip()
+                if v:
+                    m[v] = {"name": cc(2), "email": cc(3), "company": cc(4),
+                            "source": cc(6) or "provider"}
+        except Exception:
+            pass
+    return m
+
+@app.route("/api/identify", methods=["POST"])
+def api_identify():
+    """Ingest a person-level identification keyed by visitor_id (provider webhook / your own logic).
+    Disabled unless IDENTIFY_TOKEN is set, and the caller must present it
+    (X-Identify-Token header or ?token=). Stores to the 'Visitor Identities' tab."""
+    secret = os.environ.get("IDENTIFY_TOKEN", "")
+    if not secret:
+        return jsonify({"ok": False, "error": "identify disabled"}), 404
+    given = request.headers.get("X-Identify-Token", "") or request.args.get("token", "")
+    if given != secret:
+        return abort(403)
+    data = request.get_json(silent=True) or {}
+    vid = (data.get("vid") or data.get("visitor_id") or "").strip()
+    if not vid:
+        return jsonify({"ok": False, "error": "vid required"}), 400
+    now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
+    row = [now, vid[:64], str(data.get("name", ""))[:160], str(data.get("email", ""))[:200],
+           str(data.get("company", ""))[:200], str(data.get("title", ""))[:160],
+           str(data.get("source", "provider"))[:80]]
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return jsonify({"ok": False, "error": "sheets not configured"}), 500
+        tab = "Visitor Identities"
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            try:
+                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
+            except Exception:
+                pass
+            hdr = [["Timestamp (IST)", "Visitor ID", "Name", "Email", "Company", "Title", "Source"]]
+            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+                valueInputOption="RAW", body={"values": hdr}).execute()
+        svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+    except Exception as e:
+        log.warning("identify failed: %s", e)
+        return jsonify({"ok": False}), 500
+    return jsonify({"ok": True})
+
 @app.route("/api/atrack", methods=["POST"])
 def atrack():
     """Ingest one anonymous visitor page-view (sendBeacon text or JSON). Public."""
@@ -1359,6 +1454,37 @@ def _fetch_visitor_analytics() -> dict:
         conversions = 0
     conv_rate = round(conversions/unique_visitors*100,1) if unique_visitors else 0
 
+    # ---- identity + reverse-IP company enrichment ----
+    idmap = _va_identity_map()
+    vid_ip = {}
+    for r in human:
+        v = c(r,"Visitor ID"); ipv = c(r,"IP")
+        if v and ipv and v not in vid_ip: vid_ip[v] = ipv
+    vid_company = {}; _ipc = {}
+    for v, ipv in list(vid_ip.items())[:150]:
+        co = _ipc.get(ipv)
+        if co is None:
+            co = _ip_company(ipv); _ipc[ipv] = co
+        if co: vid_company[v] = co
+    vid_pages = defaultdict(int)
+    for r in human:
+        v = c(r,"Visitor ID")
+        if v: vid_pages[v] += 1
+    companies = Counter()
+    for v in visitors:
+        co = ((idmap.get(v,{}) or {}).get("company") or vid_company.get(v) or "").strip()
+        if co: companies[co] += 1
+    top_companies = companies.most_common(15)
+    identified = []
+    for v in visitors:
+        idn = idmap.get(v) or {}
+        co = idn.get("company") or vid_company.get(v) or ""
+        if idn or co:
+            identified.append({"vid": v[:8], "name": idn.get("name",""), "email": idn.get("email",""),
+                "company": co, "source": idn.get("source") or ("reverse-IP" if co else ""),
+                "pages": vid_pages.get(v,0)})
+    identified.sort(key=lambda x: -x["pages"]); identified = identified[:60]
+
     recent = []
     for r in reversed(data[-200:]):
         recent.append({
@@ -1368,6 +1494,8 @@ def _fetch_visitor_analytics() -> dict:
             "engaged": fmt(to_int(c(r,"Engaged Time (s)"))), "scroll": c(r,"Max Scroll %"),
             "pages": c(r,"Pages In Session"), "new": c(r,"New Visitor"),
             "form": c(r,"Form Stage"), "bot": c(r,"Bot"),
+            "who": (idmap.get(c(r,"Visitor ID")) or {}).get("name",""),
+            "company": ((idmap.get(c(r,"Visitor ID")) or {}).get("company","") or vid_company.get(c(r,"Visitor ID"),"")),
         })
         if len(recent) >= 60: break
 
@@ -1379,12 +1507,14 @@ def _fetch_visitor_analytics() -> dict:
             "avg_engaged": fmt(avg_engaged), "avg_time": fmt(avg_time),
             "conversions": conversions, "conv_rate": conv_rate,
             "video_sessions": video_sessions, "total_rage": total_rage,
+            "identified": len(identified), "companies": len(companies),
         },
         "series": series, "top_pages": top_pages, "top_landing": top_landing,
         "referrers": referrers, "utm_source": utm_source, "utm_campaign": utm_campaign,
         "devices": devices, "oses": oses, "browsers": browsers, "langs": langs,
         "scroll": sb, "cta": cta_top, "form_funnel": form_funnel,
         "search": search_top, "rage": rage_top, "cwv": cwv, "recent": recent,
+        "top_companies": top_companies, "identified": identified,
     }
 
 @app.route("/admin/visitors")
@@ -1517,12 +1647,13 @@ def _read_access_requests(limit=300):
             _j.loads(sa_str), scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
         svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
         r = svc.spreadsheets().values().get(
-            spreadsheetId=DEMO_REQUEST_SHEET_ID, range="Demo Requests!A1:I2000").execute()
+            spreadsheetId=DEMO_REQUEST_SHEET_ID, range="Demo Requests!A1:J2000").execute()
         rows = r.get("values", [])
         data = rows[1:] if len(rows) > 1 else []
         def c(row, i): return (row[i] if len(row) > i else "")
         out = [{"ts": c(x,0), "name": c(x,1), "email": c(x,2), "company": c(x,3),
-                "interest": c(x,4), "message": c(x,5), "ip": c(x,6), "source": c(x,8)} for x in data]
+                "interest": c(x,4), "message": c(x,5), "ip": c(x,6), "source": c(x,8),
+                "vid": c(x,9)} for x in data]
         out.reverse()
         return out[:limit]
     except Exception as e:
