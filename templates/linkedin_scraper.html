@@ -45,6 +45,8 @@
         <div class="tb-dd-items">
           {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
           <a href="/admin/usage" class="tb-dd-item"><span>⚙</span> Usage Dashboard</a>
+          <a href="/admin/visitors" class="tb-dd-item"><span>🌐</span> Visitor Analytics</a>
+          <a href="/admin/requests" class="tb-dd-item"><span>📥</span> Access Requests</a>
           <div class="tb-dd-divider"></div>
           {% endif %}
           <a href="/logout" class="tb-dd-item danger"><span>→</span> Sign out</a>
@@ -456,5 +458,6 @@ if(document.readyState!=='loading')ens(start);else addEventListener('DOMContentL
 })();
 </script>
 
+<script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
 </body>
 </html>
