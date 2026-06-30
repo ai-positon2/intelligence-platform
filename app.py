@@ -1137,6 +1137,269 @@ def track_page():
     return jsonify({"ok": True})
 
 
+# ── Visitor Analytics (anonymous, pre-login web analytics) ──────────────────────
+_VA_HEADER = ["Timestamp (IST)","Date","Time (IST)","Day","Visitor ID","Session ID",
+    "New Visitor","Page URL","Page Title","Referrer","Referrer Host","UTM Source",
+    "UTM Medium","UTM Campaign","UTM Term","UTM Content","Landing Page","Pages In Session",
+    "Time On Page (s)","Engaged Time (s)","Max Scroll %","Total Clicks","CTA Clicks",
+    "Video","Form Stage","Search Terms","Rage Clicks","LCP (ms)","CLS","INP (ms)",
+    "Viewport","Screen","Language","Browser","OS","Device","Bot","IP","Events (JSON)"]
+
+_BOT_RE = re.compile(r"bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|"
+                     r"monitor|headless|lighthouse|gtmetrix|preview|curl|wget|"
+                     r"python-requests|axios|http-client", re.I)
+
+def _va_sheets_service():
+    import json as _j
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    sa_str = os.environ.get("GOOGLE_SA_JSON","")
+    if not sa_str or not LOGIN_LOG_SHEET_ID:
+        return None
+    sa_info = _j.loads(sa_str)
+    creds = service_account.Credentials.from_service_account_info(
+        sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+    return build("sheets","v4",credentials=creds,cache_discovery=False)
+
+@app.route("/api/atrack", methods=["POST"])
+def atrack():
+    """Ingest one anonymous visitor page-view (sendBeacon text or JSON). Public."""
+    try:
+        from urllib.parse import urlparse
+        data = request.get_json(silent=True)
+        if data is None:
+            try:
+                data = json.loads(request.get_data(as_text=True))
+            except Exception:
+                data = {}
+        data = data or {}
+
+        ua = request.headers.get("User-Agent","")
+        br, _bv, osn, dev = _parse_ua(ua)
+        ip = (request.headers.get("X-Forwarded-For","") or request.remote_addr or "").split(",")[0].strip()
+        is_bot = "Yes" if _BOT_RE.search(ua) else "No"
+
+        def g(k, d=""):
+            v = data.get(k, d)
+            return v if v is not None else d
+        utm = data.get("utm") or {}
+        cta = data.get("cta") or {}
+        try:
+            cta_str = " · ".join("%s×%s" % (k, v) for k, v in cta.items())
+        except Exception:
+            cta_str = ""
+        ref = g("ref")
+        try:
+            ref_host = (urlparse(ref).hostname or "").replace("www.","") if ref else "direct"
+        except Exception:
+            ref_host = "direct"
+
+        now = datetime.now(IST)
+        row = [
+            now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
+            now.strftime("%H:%M:%S"), now.strftime("%A"),
+            str(g("vid")), str(g("sid")), "Yes" if g("isNew") else "No",
+            str(g("page")), str(g("title")), str(ref), ref_host or "direct",
+            str(utm.get("source","")), str(utm.get("medium","")), str(utm.get("campaign","")),
+            str(utm.get("term","")), str(utm.get("content","")),
+            str(g("landing")), int(g("pagesInSession",0) or 0),
+            int(g("tOnPage",0) or 0), int(g("engaged",0) or 0), int(g("scroll",0) or 0),
+            int(g("clicks",0) or 0), cta_str, str(g("video")), str(g("form")),
+            str(g("search")), int(g("rage",0) or 0),
+            int(g("lcp",0) or 0), float(g("cls",0) or 0), int(g("inp",0) or 0),
+            "%sx%s" % (g("vw",""), g("vh","")), "%sx%s" % (g("sw",""), g("sh","")),
+            str(g("lang")), br, osn, dev, is_bot, ip,
+            json.dumps(data.get("events") or [], separators=(",",":"))[:9000],
+        ]
+
+        svc = _va_sheets_service()
+        if not svc:
+            return jsonify({"ok": True})
+        tab = "Visitor Analytics"
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            try:
+                svc.spreadsheets().batchUpdate(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests":[{"addSheet":{"properties":{"title":tab}}}]}).execute()
+            except Exception:
+                pass
+            svc.spreadsheets().values().append(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+                valueInputOption="RAW", body={"values":[_VA_HEADER]}).execute()
+        svc.spreadsheets().values().append(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS",
+            body={"values":[row]}).execute()
+    except Exception as e:
+        log.warning("atrack failed: %s", e)
+    return jsonify({"ok": True})
+
+def _fetch_visitor_analytics() -> dict:
+    """Aggregate the 'Visitor Analytics' tab for the admin dashboard."""
+    from collections import Counter, defaultdict
+    rows = []
+    svc = _va_sheets_service()
+    if svc:
+        try:
+            r = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Analytics!A1:AM8000").execute()
+            rows = r.get("values", [])
+        except Exception as e:
+            log.warning("visitor analytics read failed: %s", e)
+    idx = {name:i for i,name in enumerate(_VA_HEADER)}
+    def c(row,name,d=""):
+        i = idx.get(name, -1)
+        return row[i] if (0 <= i < len(row)) else d
+    data = rows[1:] if len(rows) > 1 else []
+    human = [r for r in data if c(r,"Bot","No") != "Yes"]
+
+    def to_int(v):
+        try: return int(float(v))
+        except Exception: return 0
+    def to_float(v):
+        try: return float(v)
+        except Exception: return 0.0
+    def fmt(s):
+        m, sec = divmod(int(s),60)
+        return (("%dm %ds" % (m,sec)) if m else ("%ds" % sec)) if s else "—"
+
+    total_pageviews = len(human)
+    visitors = set(c(r,"Visitor ID") for r in human if c(r,"Visitor ID"))
+    sessions = set(c(r,"Session ID") for r in human if c(r,"Session ID"))
+    unique_visitors = len(visitors)
+    total_sessions = len(sessions)
+    new_visitors = len(set(c(r,"Visitor ID") for r in human if c(r,"New Visitor")=="Yes" and c(r,"Visitor ID")))
+    returning = max(unique_visitors - new_visitors, 0)
+
+    sid_pages = defaultdict(int)
+    for r in human:
+        sid = c(r,"Session ID")
+        if sid: sid_pages[sid] = max(sid_pages[sid], to_int(c(r,"Pages In Session")))
+    bounce_sessions = sum(1 for p in sid_pages.values() if p <= 1)
+    bounce_rate = round(bounce_sessions/total_sessions*100) if total_sessions else 0
+
+    eng = [to_int(c(r,"Engaged Time (s)")) for r in human]
+    avg_engaged = round(sum(eng)/len(eng)) if eng else 0
+    tops = [to_int(c(r,"Time On Page (s)")) for r in human]
+    avg_time = round(sum(tops)/len(tops)) if tops else 0
+
+    by_day = Counter(c(r,"Date") for r in human if c(r,"Date"))
+    series = sorted(by_day.items())[-30:]
+
+    top_pages = Counter(c(r,"Page Title") or c(r,"Page URL") for r in human).most_common(15)
+    top_landing = Counter(c(r,"Landing Page") for r in human if c(r,"Landing Page")).most_common(10)
+    referrers = Counter((c(r,"Referrer Host") or "direct") for r in human).most_common(12)
+    utm_source = Counter(c(r,"UTM Source") for r in human if c(r,"UTM Source")).most_common(10)
+    utm_campaign = Counter(c(r,"UTM Campaign") for r in human if c(r,"UTM Campaign")).most_common(10)
+    devices = Counter(c(r,"Device") for r in human if c(r,"Device")).most_common()
+    oses = Counter(c(r,"OS") for r in human if c(r,"OS")).most_common()
+    browsers = Counter(c(r,"Browser") for r in human if c(r,"Browser")).most_common(8)
+    langs = Counter(c(r,"Language") for r in human if c(r,"Language")).most_common(8)
+
+    sb = [["0–25%",0],["25–50%",0],["50–75%",0],["75–100%",0]]
+    for r in human:
+        v = to_int(c(r,"Max Scroll %"))
+        if v < 25: sb[0][1]+=1
+        elif v < 50: sb[1][1]+=1
+        elif v < 75: sb[2][1]+=1
+        else: sb[3][1]+=1
+
+    cta_counts = Counter()
+    for r in human:
+        for part in (c(r,"CTA Clicks") or "").split(" · "):
+            part = part.strip()
+            if "×" in part:
+                lbl, _, n = part.rpartition("×")
+                cta_counts[lbl] += to_int(n)
+    cta_top = cta_counts.most_common(15)
+
+    order = {"":0,"open":1,"started":2,"submitted":3}
+    sid_form = {}
+    for r in human:
+        sid = c(r,"Session ID"); st = c(r,"Form Stage")
+        if sid and order.get(st,0) > order.get(sid_form.get(sid,""),0):
+            sid_form[sid] = st
+    form_funnel = {
+        "opened": sum(1 for v in sid_form.values() if order.get(v,0)>=1),
+        "started": sum(1 for v in sid_form.values() if order.get(v,0)>=2),
+        "submitted": sum(1 for v in sid_form.values() if order.get(v,0)>=3),
+    }
+    video_sessions = len(set(c(r,"Session ID") for r in human if c(r,"Video")))
+
+    search = Counter()
+    for r in human:
+        for term in (c(r,"Search Terms") or "").split(" | "):
+            term = term.strip()
+            if term: search[term]+=1
+    search_top = search.most_common(15)
+
+    rage_pages = Counter(); total_rage = 0
+    for r in human:
+        rg = to_int(c(r,"Rage Clicks"))
+        if rg:
+            rage_pages[c(r,"Page Title") or c(r,"Page URL")] += rg; total_rage += rg
+    rage_top = rage_pages.most_common(10)
+
+    def avg_nonzero(name, flt=False):
+        vals = [(to_float(c(r,name)) if flt else to_int(c(r,name))) for r in human]
+        vals = [v for v in vals if v]
+        if not vals: return 0
+        a = sum(vals)/len(vals)
+        return round(a,3) if flt else round(a)
+    cwv = {"lcp": avg_nonzero("LCP (ms)"), "cls": avg_nonzero("CLS",True), "inp": avg_nonzero("INP (ms)")}
+
+    try:
+        conversions = len(_read_access_requests())
+    except Exception:
+        conversions = 0
+    conv_rate = round(conversions/unique_visitors*100,1) if unique_visitors else 0
+
+    recent = []
+    for r in reversed(data[-200:]):
+        recent.append({
+            "ts": c(r,"Timestamp (IST)"), "vid": (c(r,"Visitor ID") or "")[:8],
+            "page": c(r,"Page Title") or c(r,"Page URL"), "landing": c(r,"Landing Page"),
+            "ref": c(r,"Referrer Host") or "direct", "device": c(r,"Device"),
+            "engaged": fmt(to_int(c(r,"Engaged Time (s)"))), "scroll": c(r,"Max Scroll %"),
+            "pages": c(r,"Pages In Session"), "new": c(r,"New Visitor"),
+            "form": c(r,"Form Stage"), "bot": c(r,"Bot"),
+        })
+        if len(recent) >= 60: break
+
+    return {
+        "configured": bool(svc),
+        "kpis": {
+            "pageviews": total_pageviews, "visitors": unique_visitors, "sessions": total_sessions,
+            "new": new_visitors, "returning": returning, "bounce_rate": bounce_rate,
+            "avg_engaged": fmt(avg_engaged), "avg_time": fmt(avg_time),
+            "conversions": conversions, "conv_rate": conv_rate,
+            "video_sessions": video_sessions, "total_rage": total_rage,
+        },
+        "series": series, "top_pages": top_pages, "top_landing": top_landing,
+        "referrers": referrers, "utm_source": utm_source, "utm_campaign": utm_campaign,
+        "devices": devices, "oses": oses, "browsers": browsers, "langs": langs,
+        "scroll": sb, "cta": cta_top, "form_funnel": form_funnel,
+        "search": search_top, "rage": rage_top, "cwv": cwv, "recent": recent,
+    }
+
+@app.route("/admin/visitors")
+@admin_required
+def admin_visitors():
+    """Admin-only anonymous visitor analytics dashboard."""
+    return render_template("admin_visitors.html", user=_get_user())
+
+@app.route("/admin/visitors/data")
+@admin_required
+def admin_visitors_data():
+    """JSON aggregates for the visitor analytics dashboard."""
+    return jsonify(_fetch_visitor_analytics())
+
+
 def _fetch_usage_data() -> dict:
     """Fetch login + page view data from Sheets. Shared by shell and data endpoints."""
     def _fetch(tab_range):
