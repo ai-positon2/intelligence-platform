@@ -819,5 +819,7 @@
   <script>
   (function(){var s=Date.now(),sent=false;function send(){if(sent)return;sent=true;try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Call & Sentiment Intelligence',seconds:Math.round((Date.now()-s)/1000),email:document.body.dataset.email||''}),keepalive:true}).catch(function(){});}catch(e){}}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')send();});window.addEventListener('beforeunload',send);})();
   </script>
+  <!-- shared WebGL particle background (same as LinkedIn Intelligence / admin dashboards) -->
+  <script src="{{ url_for('static', filename='js/pfx_bg.js') }}"></script>
 </body>
 </html>
