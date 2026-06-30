@@ -229,3 +229,46 @@ td.dim{color:#5a6488}
 @keyframes skel-slide{from{background-position:200% 0}to{background-position:-200% 0}}
 .resn{font-size:10.5px;letter-spacing:.06em;color:#7e89b8;margin:14px 4px 0}
 .meta{font-size:10px;color:#7e89b8;margin-top:5px}.ts{font-size:11.5px;color:#99a4cc}
+
+/* ════════════════════════════════════════════════════════════════
+   Multi-accent palette — echo the Usage dashboard's colourful cards
+   across Visitor Analytics (.kpis .kpi) and Access Requests (.stats .stat)
+   ════════════════════════════════════════════════════════════════ */
+.kpis .kpi, .stats .stat{ overflow:hidden }
+/* corner glow */
+.kpis .kpi::after, .stats .stat::after{
+  content:''; position:absolute; top:-32px; right:-22px; width:120px; height:120px;
+  border-radius:50%; filter:blur(44px); opacity:.16; pointer-events:none; z-index:0 }
+.kpis .kpi > *, .stats .stat > *{ position:relative; z-index:1 }
+
+/* 1 · indigo */
+.kpis .kpi:nth-child(6n+1)::before,.stats .stat:nth-child(6n+1)::before{background:linear-gradient(90deg,#6366f1,#818cf8)!important}
+.kpis .kpi:nth-child(6n+1)::after,.stats .stat:nth-child(6n+1)::after{background:#6366f1}
+.kpis .kpi:nth-child(6n+1) b,.stats .stat:nth-child(6n+1) b{background:linear-gradient(120deg,#fff,#a5b4fc)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 2 · violet */
+.kpis .kpi:nth-child(6n+2)::before,.stats .stat:nth-child(6n+2)::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)!important}
+.kpis .kpi:nth-child(6n+2)::after,.stats .stat:nth-child(6n+2)::after{background:#8b5cf6}
+.kpis .kpi:nth-child(6n+2) b,.stats .stat:nth-child(6n+2) b{background:linear-gradient(120deg,#fff,#c4b5fd)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 3 · green */
+.kpis .kpi:nth-child(6n+3)::before,.stats .stat:nth-child(6n+3)::before{background:linear-gradient(90deg,#34d399,#6ee7b7)!important}
+.kpis .kpi:nth-child(6n+3)::after,.stats .stat:nth-child(6n+3)::after{background:#34d399}
+.kpis .kpi:nth-child(6n+3) b,.stats .stat:nth-child(6n+3) b{background:linear-gradient(120deg,#fff,#6ee7b7)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 4 · amber */
+.kpis .kpi:nth-child(6n+4)::before,.stats .stat:nth-child(6n+4)::before{background:linear-gradient(90deg,#f59e0b,#fcd34d)!important}
+.kpis .kpi:nth-child(6n+4)::after,.stats .stat:nth-child(6n+4)::after{background:#f59e0b}
+.kpis .kpi:nth-child(6n+4) b,.stats .stat:nth-child(6n+4) b{background:linear-gradient(120deg,#fff,#fcd34d)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 5 · cyan */
+.kpis .kpi:nth-child(6n+5)::before,.stats .stat:nth-child(6n+5)::before{background:linear-gradient(90deg,#22d3ee,#67e8f9)!important}
+.kpis .kpi:nth-child(6n+5)::after,.stats .stat:nth-child(6n+5)::after{background:#22d3ee}
+.kpis .kpi:nth-child(6n+5) b,.stats .stat:nth-child(6n+5) b{background:linear-gradient(120deg,#fff,#67e8f9)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+/* 6 · pink */
+.kpis .kpi:nth-child(6n+6)::before,.stats .stat:nth-child(6n+6)::before{background:linear-gradient(90deg,#e879f9,#f0abfc)!important}
+.kpis .kpi:nth-child(6n+6)::after,.stats .stat:nth-child(6n+6)::after{background:#e879f9}
+.kpis .kpi:nth-child(6n+6) b,.stats .stat:nth-child(6n+6) b{background:linear-gradient(120deg,#fff,#f5b8fd)!important;-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* colourful bar fills + sparkline to match the lively palette */
+.bars .bar:nth-child(5n+1) .fill,.bar-row:nth-child(5n+1) .bar-fill{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
+.bars .bar:nth-child(5n+2) .fill,.bar-row:nth-child(5n+2) .bar-fill{background:linear-gradient(90deg,#22d3ee,#6366f1)}
+.bars .bar:nth-child(5n+3) .fill,.bar-row:nth-child(5n+3) .bar-fill{background:linear-gradient(90deg,#34d399,#6ee7b7)}
+.bars .bar:nth-child(5n+4) .fill,.bar-row:nth-child(5n+4) .bar-fill{background:linear-gradient(90deg,#f59e0b,#fcd34d)}
+.bars .bar:nth-child(5n+5) .fill,.bar-row:nth-child(5n+5) .bar-fill{background:linear-gradient(90deg,#e879f9,#a855f7)}
