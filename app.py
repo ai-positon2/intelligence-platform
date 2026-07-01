@@ -1230,6 +1230,10 @@ def robots_txt():
     return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
 
 @app.route("/favicon.ico")
+def favicon_ico():
+    return send_from_directory("static", "favicon.ico", mimetype="image/x-icon")
+
+
 @app.route("/favicon.svg")
 def favicon():
     return send_from_directory("static", "favicon.svg", mimetype="image/svg+xml")
