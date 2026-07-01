@@ -4,11 +4,11 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% elif page == 'industries' %}Industries · Intelligence by Position2{% elif page == 'industry' %}{{ industry.name }} · Industries · Intelligence by Position2{% else %}Intelligence by Position2 — Know who's ready to buy{% endif %}</title>
-<meta name="description" content="Intelligence by Position2 surfaces the buying signals that show intent — across the web, your site and social — then tells your team who to reach, and why. B2B revenue intelligence across your entire go-to-market.">
+<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% elif page == 'industries' %}Industries · Intelligence by Position2{% elif page == 'industry' %}{{ industry.name }} · Industries · Intelligence by Position2{% elif page == 'iagent' %}{{ agent.name }} · {{ industry.name }} · Intelligence by Position2{% else %}Intelligence by Position2, Know who's ready to buy{% endif %}</title>
+<meta name="description" content="Intelligence by Position2 surfaces the buying signals that show intent, across the web, your site and social, then tells your team who to reach, and why. B2B revenue intelligence across your entire go-to-market.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Intelligence by Position2">
-<meta property="og:title" content="Intelligence by Position2 — Know who’s ready to buy">
+<meta property="og:title" content="Intelligence by Position2, Know who’s ready to buy">
 <meta property="og:description" content="The buying signals that show intent, turned into the next best account for your team to reach.">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
@@ -87,6 +87,11 @@ body[data-page="industry"] .mesh .m2{background:radial-gradient(circle,var(--pag
 body[data-page="industry"] .mesh .m3{background:radial-gradient(circle,#6366f1,transparent 67%)}
 body[data-page="industry"] .mesh .m4{background:radial-gradient(circle,var(--page),transparent 70%);opacity:.2}
 body[data-page="industry"] #scene{opacity:.42}
+body[data-page="iagent"] .mesh .m1{background:radial-gradient(circle,var(--page),transparent 67%)}
+body[data-page="iagent"] .mesh .m2{background:radial-gradient(circle,var(--page2),transparent 67%)}
+body[data-page="iagent"] .mesh .m3{background:radial-gradient(circle,#6366f1,transparent 67%)}
+body[data-page="iagent"] .mesh .m4{background:radial-gradient(circle,var(--page),transparent 70%);opacity:.2}
+body[data-page="iagent"] #scene{opacity:.42}
 .scrim{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(120% 110% at 50% 42%,rgba(4,5,16,.5),rgba(4,5,16,.4) 58%,rgba(4,5,16,.72))}
 .wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:0 26px}
 
@@ -715,7 +720,7 @@ body[data-page="login"] .mesh i{opacity:.16}
 .nv-success .nv-submit{max-width:200px;margin:22px auto 0}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}.acard,.fcard{transform:none!important}}
 
-/* ===== testimonials (item 1 — placeholder-safe) ===== */
+/* ===== testimonials (item 1, placeholder-safe) ===== */
 .tw{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:28px}
 @media (max-width:900px){ .tw{grid-template-columns:1fr} }
 .tcard{padding:32px;border-radius:18px;display:flex;flex-direction:column;gap:18px}
@@ -945,7 +950,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .ind-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:40px}
 @media(max-width:980px){.ind-agents{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.ind-agents{grid-template-columns:1fr}}
-.ind-agent{position:relative;padding:28px 26px;border-radius:20px;overflow:hidden;--mx:50%;--my:0%;
+.ind-agent{position:relative;display:flex;flex-direction:column;padding:28px 26px;border-radius:20px;overflow:hidden;text-decoration:none;--mx:50%;--my:0%;
   background:radial-gradient(440px circle at 100% 0%,color-mix(in srgb,var(--page) 13%,transparent),transparent 58%),linear-gradient(180deg,color-mix(in srgb,var(--page) 9%,rgba(255,255,255,.04)),rgba(255,255,255,.012));
   border:1px solid color-mix(in srgb,var(--page) 22%,var(--line));transition:transform .32s cubic-bezier(.16,1,.3,1),border-color .25s,box-shadow .35s}
 .ind-agent::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--page) 35%,var(--page2) 65%,transparent);opacity:.5;transition:opacity .35s}
@@ -963,15 +968,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .ia-base{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:13px;padding:5px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--page) 24%,var(--line));background:color-mix(in srgb,var(--page) 8%,rgba(255,255,255,.02))}
 .ia-base i{font-style:normal;color:var(--page);opacity:1;font-size:11px;line-height:1}
 .ind-agent p{position:relative;z-index:1;font-size:13.5px;line-height:1.64;color:var(--dim)}
-/* per-card accent palette (a little color) */
-.ind-agents .ind-agent:nth-child(8n+1){--page:#22d3ee;--page2:#2dd4aa}
-.ind-agents .ind-agent:nth-child(8n+2){--page:#8b5cf6;--page2:#a78bfa}
-.ind-agents .ind-agent:nth-child(8n+3){--page:#2dd4aa;--page2:#34d399}
-.ind-agents .ind-agent:nth-child(8n+4){--page:#f5a623;--page2:#fbbf24}
-.ind-agents .ind-agent:nth-child(8n+5){--page:#38bdf8;--page2:#22d3ee}
-.ind-agents .ind-agent:nth-child(8n+6){--page:#e879f9;--page2:#c084fc}
-.ind-agents .ind-agent:nth-child(8n+7){--page:#818cf8;--page2:#6366f1}
-.ind-agents .ind-agent:nth-child(8n+8){--page:#fb7185;--page2:#f43f5e}
+.ia-more{position:relative;z-index:1;margin-top:auto;padding-top:18px;display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--page);transition:gap .25s,filter .25s}
+.ind-agent:hover .ia-more{gap:11px;filter:brightness(1.22)}
 
 
 /* detail: signals */
@@ -1029,7 +1027,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 </style>
 </head>
-<body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% else %}#8b5cf6{% endif %}">
+<body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% elif page=='iagent' %}{{ agent.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% elif page=='iagent' %}{{ agent.accent2 }}{% else %}#8b5cf6{% endif %}">
 <!-- page transition -->
 <style>
 #pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 28%,#0b0f22,#04050d 72%);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .85s cubic-bezier(.4,0,.2,1) .05s forwards}
@@ -1109,7 +1107,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <a class="nv-link {% if page=='signals' %}active{% endif %}" href="/signals" data-cursor>Signals</a>
     <a class="nv-link {% if page=='agents' or page=='agent' %}active{% endif %}" href="/agents" data-cursor>Agents</a>
     <a class="nv-link {% if page=='solutions' %}active{% endif %}" href="/solutions" data-cursor>Solutions</a>
-    <a class="nv-link {% if page=='industries' or page=='industry' %}active{% endif %}" href="/industries" data-cursor>Industries</a>
+    <a class="nv-link {% if page=='industries' or page=='industry' or page=='iagent' %}active{% endif %}" href="/industries" data-cursor>Industries</a>
     <a class="nv-link {% if page=='resources' %}active{% endif %}" href="/resources" data-cursor>Resources</a>
   </div>{% endif %}
   <div class="nv-cta">
@@ -1126,7 +1124,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="hero-l">
         <span class="pill-eye reveal in"><span class="dt"></span> Agent directory · Position2</span>
         <h1 class="h-hero reveal in" style="transition-delay:80ms">Meet the agents<br>that <span class="ital grad">never sleep.</span></h1>
-        <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents spanning intent, SEO, content, GEO and paid — they find the moment, name the buyer, and hand your team the next move. Browse what we’ve built — or have us build one just for you.</p>
+        <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents spanning intent, SEO, content, GEO and paid, they find the moment, name the buyer, and hand your team the next move. Browse what we’ve built, or have us build one just for you.</p>
         <div class="hero-cta reveal in" style="transition-delay:240ms">
           <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
           <a class="btn-ghost" href="#dir" data-cursor>Explore agents &darr;</a>
@@ -1162,22 +1160,22 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="wrap">
     <section class="orch reveal">
       <div class="sec-head" style="margin-top:64px"><span class="pill-eye"><span class="dt"></span> Better together</span><h2 class="h-sec">Agents that work as <span class="ital grad">one team.</span></h2></div>
-      <p class="lead" style="text-align:center;margin:0 auto 34px">No agent works alone. A signal fires, the right agents pick it up, Vimi drafts the move, and the work lands in your stack &mdash; automatically.</p>
+      <p class="lead" style="text-align:center;margin:0 auto 34px">No agent works alone. A signal fires, the right agents pick it up, Vimi drafts the move, and the work lands in your stack, automatically.</p>
       <div class="flow">
-        <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span><b>A signal fires</b><p>Funding, a pricing-page visit, an AI mention &mdash; detected the moment it happens.</p></div>
+        <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span><b>A signal fires</b><p>Funding, a pricing-page visit, an AI mention, detected the moment it happens.</p></div>
         <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span><b>The right agents act</b><p>SEO, content, paid and intent agents respond to the same scored event.</p></div>
         <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></span><b>Vimi drafts the move</b><p>The account is researched and a ready-to-send next step is written for you.</p></div>
         <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-        <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><b>It lands in your stack</b><p>Routed into HubSpot, Salesforce, Slack and Gmail &mdash; where your team already works.</p></div>
+        <div class="flow-step glass"><span class="fs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><b>It lands in your stack</b><p>Routed into HubSpot, Salesforce, Slack and Gmail, where your team already works.</p></div>
       </div>
     </section>
   </div>
 
   <div class="wrap" id="dir">
     <div class="shead">
-      <div><span class="pill-eye"><span class="dt"></span> The directory</span><h2 style="margin-top:14px">Your always-on growth team</h2><p class="shead-sub">{{ agents|length }} specialized agents and growing &mdash; across intent, SEO, content, GEO and paid. Each one ships work, not dashboards.</p></div>
+      <div><span class="pill-eye"><span class="dt"></span> The directory</span><h2 style="margin-top:14px">Your always-on growth team</h2><p class="shead-sub">{{ agents|length }} specialized agents and growing, across intent, SEO, content, GEO and paid. Each one ships work, not dashboards.</p></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="dirSearch" type="text" placeholder="Search agents…" aria-label="Search agents" data-cursor></div>
     </div>
     <div class="chips" id="dirChips">
@@ -1204,10 +1202,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       </a>
       {% endfor %}
     </div>
-    <div class="noresults" id="dirNo">No agents match that search. Try another term — or <a href="#" data-demo style="color:#a5b4fc;font-weight:600">ask us to build one</a>.</div>
+    <div class="noresults" id="dirNo">No agents match that search. Try another term, or <a href="#" data-demo style="color:#a5b4fc;font-weight:600">ask us to build one</a>.</div>
     <div class="band reveal">
       <h3>Don’t see the agent you need?</h3>
-      <p>We build bespoke agents around your signals, your data and your workflow — usually live within weeks.</p>
+      <p>We build bespoke agents around your signals, your data and your workflow, usually live within weeks.</p>
       <div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Build a custom agent" data-cursor>Build a custom agent</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div>
     </div>
   </div>
@@ -1252,8 +1250,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="aout glass reveal in" style="--cat:{{ agent.accent }}">
       <div class="aout-h"><span class="aout-dot"></span>Representative output{% if agent.metric %}<span class="aout-tag">{{ agent.metric }}</span>{% endif %}</div>
       <div class="aout-rows">
-        <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span><div class="aout-t">The top opportunity, surfaced<span>Ranked by impact, newest first &mdash; no list-scrubbing.</span></div><span class="aout-bar2"><i style="width:94%"></i></span></div>
-        <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg></span><div class="aout-t">The reason why, in plain language<span>What fired and why it matters &mdash; nothing to decode.</span></div><span class="aout-bar2"><i style="width:80%"></i></span></div>
+        <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span><div class="aout-t">The top opportunity, surfaced<span>Ranked by impact, newest first, no list-scrubbing.</span></div><span class="aout-bar2"><i style="width:94%"></i></span></div>
+        <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg></span><div class="aout-t">The reason why, in plain language<span>What fired and why it matters, nothing to decode.</span></div><span class="aout-bar2"><i style="width:80%"></i></span></div>
         <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><div class="aout-t">The next step, ready to action<span>A recommended move routed into your stack.</span></div><span class="aout-bar2"><i style="width:88%"></i></span></div>
       </div>
       <div class="aout-note">Representative preview of what {{ agent.name }} delivers.</div>
@@ -1275,7 +1273,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="hero2">
       <div class="reveal in"><span class="pill-eye"><span class="dt"></span> The intelligence layer</span>
         <h1 class="h-hero">Every buying signal.<br>One <span class="ital grad">intelligence layer.</span></h1>
-        <p class="lead">Intelligence by Position2 reads your market in real time — surfacing the accounts showing genuine momentum, scoring and explaining each one in plain language, then pointing your team to the conversations most likely to convert.</p>
+        <p class="lead">Intelligence by Position2 reads your market in real time, surfacing the accounts showing genuine momentum, scoring and explaining each one in plain language, then pointing your team to the conversations most likely to convert.</p>
       </div>
       <div class="hero-art reveal in"><div class="art-dial"><svg viewBox="0 0 220 220"><defs><linearGradient id="pdial" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><circle cx="110" cy="110" r="92" fill="none" stroke="rgba(124,140,220,.16)" stroke-width="14"/><circle class="art-dial-fg" cx="110" cy="110" r="92" fill="none" stroke="url(#pdial)" stroke-width="14" stroke-linecap="round" stroke-dasharray="578" stroke-dashoffset="578" transform="rotate(-90 110 110)"/></svg><div class="art-dial-c"><b>9.4</b><span>intent score</span></div><div class="art-chip art-chip-1"><span class="acd"></span>Funding round</div><div class="art-chip art-chip-2">&#9650; Top account today</div></div></div>
     </div>
@@ -1285,19 +1283,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <a class="stat glass" href="/signals" data-cursor><b>24/7</b><span>Always-on</span></a>
     </div>
     <div class="feat">
-      <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Real-time signals</h4><p>Funding, leadership moves, M&amp;A, launches and more — detected across the open web as they happen.</p><span class="more">See signals →</span></a>
-      <a class="fcard glass tilt reveal" href="/signals" data-cursor style="transition-delay:90ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance — severity, recency and multi-intent stacking decide who to call first.</p><span class="more">How it scores →</span></a>
+      <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Real-time signals</h4><p>Funding, leadership moves, M&amp;A, launches and more, detected across the open web as they happen.</p><span class="more">See signals →</span></a>
+      <a class="fcard glass tilt reveal" href="/signals" data-cursor style="transition-delay:90ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h4>Intent scoring</h4><p>Every account ranked by importance, severity, recency and multi-intent stacking decide who to call first.</p><span class="more">How it scores →</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-cursor style="transition-delay:180ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>Vimi, your analyst</h4><p>An embedded AI assistant that researches accounts, drafts outreach and explains why each one is hot.</p><span class="more">See Vimi in a demo →</span></a>
     </div>
     <section class="spot-sec reveal" style="margin-top:70px">
       <div class="sec-head"><span class="pill-eye"><span class="dt"></span> Under the hood</span><h2 class="h-sec">One number you can <span class="ital grad">actually trust.</span></h2></div>
       <div class="spot-row">
-        <div class="spot-txt"><h3>Scored, not guessed</h3><p>Every event is weighted by type, severity and recency &mdash; and stacking signals compound. The result is a single 0&ndash;10 score that ranks your worklist honestly, every time.</p></div>
+        <div class="spot-txt"><h3>Scored, not guessed</h3><p>Every event is weighted by type, severity and recency, and stacking signals compound. The result is a single 0&ndash;10 score that ranks your worklist honestly, every time.</p></div>
         <div class="spot-art"><div class="formula"><span>type</span><i>&times;</i><span>severity</span><i>&times;</i><span>recency</span><b>= intent score</b></div></div>
       </div>
       <div class="spot-row alt">
-        <div class="spot-txt"><h3>Explained in plain language</h3><p>No black box. Each score arrives with the reason it fired &mdash; so a rep acts in seconds instead of decoding a dashboard.</p></div>
-        <div class="spot-art"><div class="vnote"><div class="vnote-h"><span class="mv-orb"></span>Vimi</div><p>&ldquo;Acme just closed a Series B &mdash; here&rsquo;s a 3-line intro to their new VP Marketing.&rdquo;</p></div></div>
+        <div class="spot-txt"><h3>Explained in plain language</h3><p>No black box. Each score arrives with the reason it fired, so a rep acts in seconds instead of decoding a dashboard.</p></div>
+        <div class="spot-art"><div class="vnote"><div class="vnote-h"><span class="mv-orb"></span>Vimi</div><p>&ldquo;Acme just closed a Series B, here&rsquo;s a 3-line intro to their new VP Marketing.&rdquo;</p></div></div>
       </div>
     </section>
     <div class="band reveal"><h3>See your market, live.</h3><p>Book a walkthrough on your own target accounts and watch the signal layer light up.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
@@ -1308,7 +1306,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="hero2">
       <div class="reveal in"><span class="pill-eye"><span class="dt"></span> What we track</span>
         <h1 class="h-hero">The signals<br>that <span class="ital grad">move pipeline.</span></h1>
-        <p class="lead">A live catalog of every buying signal the platform watches for — from company moves and website intent to social engagement and competitor activity. Each one is a reason to reach out at exactly the right moment.</p>
+        <p class="lead">A live catalog of every buying signal the platform watches for, from company moves and website intent to social engagement and competitor activity. Each one is a reason to reach out at exactly the right moment.</p>
       </div>
       <div class="hero-art reveal in"><div class="art-const"><svg viewBox="0 0 300 280"><g stroke="rgba(167,139,250,.34)" stroke-width="1"><line x1="150" y1="140" x2="64" y2="60"/><line x1="150" y1="140" x2="238" y2="58"/><line x1="150" y1="140" x2="250" y2="170"/><line x1="150" y1="140" x2="70" y2="200"/><line x1="150" y1="140" x2="150" y2="244"/><line x1="64" y1="60" x2="238" y2="58"/></g><g><circle class="cnode c0" cx="150" cy="140" r="9"/><circle class="cnode c1" cx="64" cy="60" r="5"/><circle class="cnode c2" cx="238" cy="58" r="5"/><circle class="cnode c3" cx="250" cy="170" r="5"/><circle class="cnode c4" cx="70" cy="200" r="5"/><circle class="cnode c5" cx="150" cy="244" r="5"/></g></svg><div class="art-chip art-chip-1"><span class="acd"></span>New CMO joined</div><div class="art-chip art-chip-2">M&amp;A activity</div></div></div>
     </div>
@@ -1337,27 +1335,27 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       {% endfor %}
     </div>
     <div class="snull" id="sigNull">No signals match that search.</div>
-    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these into your target list and surface who’s moving — all in one prioritized view.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these into your target list and surface who’s moving, all in one prioritized view.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'solutions' %}
   <div class="wrap sectionpad">
     <div class="reveal in"><span class="pill-eye"><span class="dt"></span> From signal to pipeline</span>
       <h1 class="h-hero">We don’t just find the moment.<br>We help you <span class="ital grad">win it.</span></h1>
-      <p class="lead">Position2 is a full-service B2B growth agency. The intelligence layer tells you who is ready — and our teams run the plays that turn that intent into pipeline and revenue.</p>
+      <p class="lead">Position2 is a full-service B2B growth agency. The intelligence layer tells you who is ready, and our teams run the plays that turn that intent into pipeline and revenue.</p>
     </div>
     <div class="feat">
-      <a class="fcard glass tilt reveal" href="/agents" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h4>SEO &amp; organic growth</h4><p>Win the searches your buyers run when a signal fires — and the AI answers they read.</p><span class="more">Explore →</span></a>
+      <a class="fcard glass tilt reveal" href="/agents" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h4>SEO &amp; organic growth</h4><p>Win the searches your buyers run when a signal fires, and the AI answers they read.</p><span class="more">Explore →</span></a>
       <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></div><h4>Performance &amp; paid social</h4><p>Spin up campaigns aimed at in-market accounts the instant intent peaks.</p><span class="more">Explore →</span></a>
       <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3z"/></svg></div><h4>Content &amp; brand</h4><p>Messaging and creative that speaks to the exact moment an account is in.</p><span class="more">Explore →</span></a>
       <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div><h4>RevOps &amp; HubSpot</h4><p>Route, score and action signals inside the CRM your team already lives in.</p><span class="more">Explore →</span></a>
-      <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>Always-on programs</h4><p>A continuous motion — not a one-off burst — tuned to live market signal.</p><span class="more">Explore →</span></a>
+      <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>Always-on programs</h4><p>A continuous motion, not a one-off burst, tuned to live market signal.</p><span class="more">Explore →</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-interest="Build a custom agent" data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><h4>Custom agents</h4><p>Need a signal or workflow we don’t have yet? We build bespoke agents around your exact motion.</p><span class="more">Request one →</span></a>
     </div>
     <div class="sec-head reveal" style="margin-top:66px"><span class="pill-eye"><span class="dt"></span> Who it's for</span><h2 class="h-sec">Built for the people who <span class="ital grad">own the number.</span></h2></div>
-    <p class="lead reveal" style="text-align:center;margin:0 auto">Different teams act on the same live signal in different ways. Here is where the intelligence layer earns its place &mdash; by role, and by industry.</p>
+    <p class="lead reveal" style="text-align:center;margin:0 auto">Different teams act on the same live signal in different ways. Here is where the intelligence layer earns its place, by role, and by industry.</p>
     <div class="icp">
-      <div class="icard glass reveal"><div class="ir">By role &middot; Sales leadership</div><h4>VP Sales &amp; SDR leaders</h4><p>Point reps at accounts that are actually in-market &mdash; not a cold, alphabetical list.</p><ul><li>A daily worklist ranked by intent score</li><li>The reason to reach out, ready for the rep</li><li>Fewer dials, more real conversations</li></ul></div>
+      <div class="icard glass reveal"><div class="ir">By role &middot; Sales leadership</div><h4>VP Sales &amp; SDR leaders</h4><p>Point reps at accounts that are actually in-market, not a cold, alphabetical list.</p><ul><li>A daily worklist ranked by intent score</li><li>The reason to reach out, ready for the rep</li><li>Fewer dials, more real conversations</li></ul></div>
       <div class="icard glass reveal" style="transition-delay:70ms"><div class="ir">By role &middot; Marketing</div><h4>Demand gen &amp; ABM</h4><p>Trigger campaigns the moment an account shows intent, and prove which signals drove pipeline.</p><ul><li>Signal-triggered audiences and creative</li><li>Account-level intent for ABM plays</li><li>Spend aimed at accounts in-market now</li></ul></div>
       <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">By role &middot; RevOps</div><h4>RevOps &amp; enablement</h4><p>Route and score signals inside the CRM your team already runs on.</p><ul><li>Signals scored and synced to HubSpot / Salesforce</li><li>Clean routing rules, no manual triage</li><li>One source of intent truth</li></ul></div>
     </div>
@@ -1367,14 +1365,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">By industry &middot; Financial &amp; Pro services</div><h4>Financial &amp; professional services</h4><p>Spot M&amp;A, leadership change and growth signals that open a high-value conversation.</p></div>
     </div>
 
-    <div class="band reveal"><h3>Let’s turn signal into pipeline.</h3><p>Tell us your goals and we’ll show you the plays — and the agents — to get there.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Let’s turn signal into pipeline.</h3><p>Tell us your goals and we’ll show you the plays, and the agents, to get there.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 {% elif page == 'home' %}
   <div class="wrap">
     <header class="home-hero">
       <span class="pill-eye reveal in"><span class="dt"></span> B2B Revenue Intelligence · Position2</span>
       <h1 class="h-hero reveal in" style="transition-delay:80ms">Know who’s ready to buy<br><span class="ital grad">before they raise a hand.</span></h1>
-      <p class="lead reveal in" style="transition-delay:160ms;margin:0 auto;text-align:center">We watch the open web, your site and social for the moments that signal intent — then hand your team the exact account to reach, and why.</p>
+      <p class="lead reveal in" style="transition-delay:160ms;margin:0 auto;text-align:center">We watch the open web, your site and social for the moments that signal intent, then hand your team the exact account to reach, and why.</p>
       <div class="hero-cta reveal in" style="transition-delay:240ms;justify-content:center">
         <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15.5px">Request access</button>
         <button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button>
@@ -1394,10 +1392,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
             <span class="pill-eye"><span class="dt"></span> How it works</span>
             <h2 class="h-sec">Watch a signal become<br><span class="ital grad">a conversation.</span></h2>
             <div class="story-steps">
-              <div class="sstep" data-i="0"><span class="sn">01</span><div><b>A signal fires</b><p>Acme Cloud closes a funding round — we catch it the moment it hits the open web.</p></div></div>
+              <div class="sstep" data-i="0"><span class="sn">01</span><div><b>A signal fires</b><p>Acme Cloud closes a funding round, we catch it the moment it hits the open web.</p></div></div>
               <div class="sstep" data-i="1"><span class="sn">02</span><div><b>It’s scored</b><p>Type, severity and recency combine into a live intent score, instantly.</p></div></div>
               <div class="sstep" data-i="2"><span class="sn">03</span><div><b>The account rises</b><p>It jumps to the top of your worklist, with the reason why in plain language.</p></div></div>
-              <div class="sstep" data-i="3"><span class="sn">04</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer — you reach out first.</p></div></div>
+              <div class="sstep" data-i="3"><span class="sn">04</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer, you reach out first.</p></div></div>
             </div>
           </div>
           <div class="story-vis">
@@ -1408,7 +1406,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
                 <div class="svc-num"><b id="svScore">9.4</b><span>intent score</span></div>
               </div>
               <div class="svc-badge">▲ Top account today</div>
-              <div class="svc-vimi"><div class="svc-vimi-h"><span class="mv-orb"></span><b>Vimi</b></div><p>“Acme just raised a Series B — here’s a 3-line intro to their new VP Marketing.”</p><button type="button" class="svc-draft" data-demo data-cursor>Open draft →</button></div>
+              <div class="svc-vimi"><div class="svc-vimi-h"><span class="mv-orb"></span><b>Vimi</b></div><p>“Acme just raised a Series B, here’s a 3-line intro to their new VP Marketing.”</p><button type="button" class="svc-draft" data-demo data-cursor>Open draft →</button></div>
             </div>
           </div>
         </div>
@@ -1471,10 +1469,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
           <div class="sc-cap">Representative product view &middot; animated preview</div>
         </div>
         <div class="sc-points">
-          <div class="sc-pt"><span class="scn">1</span><div><b>A prioritized worklist</b><p>Every in-market account ranked by one intent score — newest signals on top.</p></div></div>
-          <div class="sc-pt"><span class="scn">2</span><div><b>The reason, in plain language</b><p>Each row shows the signal that fired and why it matters &mdash; no dashboards to decode.</p></div></div>
+          <div class="sc-pt"><span class="scn">1</span><div><b>A prioritized worklist</b><p>Every in-market account ranked by one intent score, newest signals on top.</p></div></div>
+          <div class="sc-pt"><span class="scn">2</span><div><b>The reason, in plain language</b><p>Each row shows the signal that fired and why it matters, no dashboards to decode.</p></div></div>
           <div class="sc-pt"><span class="scn">3</span><div><b>Vimi drafts the next step</b><p>An embedded analyst researches the account and writes the outreach for you to review and send.</p></div></div>
-          <div class="sc-pt"><span class="scn">4</span><div><b>It acts inside your stack</b><p>Routes to HubSpot, Salesforce, Slack and Gmail — where your team already is.</p></div></div>
+          <div class="sc-pt"><span class="scn">4</span><div><b>It acts inside your stack</b><p>Routes to HubSpot, Salesforce, Slack and Gmail, where your team already is.</p></div></div>
         </div>
       </div>
     </section>
@@ -1495,7 +1493,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
           <b>24/7</b><i class="pfu"></i><span>Real-time detection</span>
         </div>
       </div>
-      <p class="proof-by reveal">Built by <b>Position2</b> — a B2B digital-growth agency running demand generation, paid media, SEO, content and RevOps for global brands.</p>
+      <p class="proof-by reveal">Built by <b>Position2</b>, a B2B digital-growth agency running demand generation, paid media, SEO, content and RevOps for global brands.</p>
     </section>
 
     <section class="home-sec">
@@ -1513,11 +1511,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="priv-l">
           <span class="pill-eye"><span class="dt"></span> Privacy &amp; security</span>
           <h2 class="h-sec" style="margin-top:14px">Built privacy-first,<br><span class="ital grad">by design.</span></h2>
-          <p class="lead" style="margin-top:14px;max-width:none">Intent intelligence only earns trust when it’s handled responsibly — built around privacy and compliance, with your data staying yours.</p>
+          <p class="lead" style="margin-top:14px;max-width:none">Intent intelligence only earns trust when it’s handled responsibly, built around privacy and compliance, with your data staying yours.</p>
           <a class="btn-ghost" href="/security" data-cursor style="margin-top:22px">See our security &amp; trust approach →</a>
         </div>
         <div class="priv-r">
-          <div class="priv-pt"><span class="pk"></span><div><b>Privacy-compliant</b><p>Built for US state privacy laws (CCPA/CPRA) and GDPR &mdash; we honor opt-out and Do-Not-Sell-or-Share requests.</p></div></div>
+          <div class="priv-pt"><span class="pk"></span><div><b>Privacy-compliant</b><p>Built for US state privacy laws (CCPA/CPRA) and GDPR, we honor opt-out and Do-Not-Sell-or-Share requests.</p></div></div>
           <div class="priv-pt"><span class="pk"></span><div><b>Your data, your control</b><p>We don’t sell your data. Request an export or deletion at any time.</p></div></div>
           <div class="priv-pt"><span class="pk"></span><div><b>Secured in transit &amp; at rest</b><p>Encrypted connections, least-privilege access and audited data handling.</p></div></div>
         </div>
@@ -1562,7 +1560,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="hero2">
       <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Integrations</span>
         <h1 class="h-hero">Works inside the stack<br>you <span class="ital grad">already run.</span></h1>
-        <p class="lead">Intelligence plugs into your CRM, analytics, ad platforms and search tools &mdash; so signals, scores and the next move show up where your team already works. No rip-and-replace.</p>
+        <p class="lead">Intelligence plugs into your CRM, analytics, ad platforms and search tools, so signals, scores and the next move show up where your team already works. No rip-and-replace.</p>
       </div>
       <div class="hero-art reveal in"><div class="art-hub"><svg viewBox="0 0 300 280"><defs><radialGradient id="ihub" cx="150" cy="140" r="60" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#22d3ee" stop-opacity=".2"/></radialGradient></defs><g class="streams" stroke="#22d3ee" stroke-width="1.6" fill="none" opacity=".55"><path class="stream" d="M150 140 L60 56"/><path class="stream" d="M150 140 L244 56"/><path class="stream" d="M150 140 L258 150"/><path class="stream" d="M150 140 L52 156"/><path class="stream" d="M150 140 L96 230"/><path class="stream" d="M150 140 L210 232"/></g><circle cx="150" cy="140" r="34" fill="url(#ihub)"/><circle cx="150" cy="140" r="22" fill="none" stroke="#a5f3fc" stroke-width="1.5"/><g class="isat"><circle cx="60" cy="56" r="15"/><circle cx="244" cy="56" r="15"/><circle cx="258" cy="150" r="15"/><circle cx="52" cy="156" r="15"/><circle cx="96" cy="230" r="15"/><circle cx="210" cy="232" r="15"/></g></svg></div></div>
     </div>
@@ -1580,7 +1578,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="ig-cat glass reveal" style="transition-delay:60ms"><div class="ig-h"><span class="ig-ic"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><h4>Data &amp; Sheets</h4></div><div class="ig-tools"><span class="ig-tool">Google Sheets</span><span class="ig-tool">BigQuery</span><span class="ig-tool">Apify</span></div></div>
       <div class="ig-cat glass reveal" style="transition-delay:120ms"><div class="ig-h"><span class="ig-ic"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><h4>Web &amp; Commerce</h4></div><div class="ig-tools"><span class="ig-tool">Your website (GTM)</span><span class="ig-tool">Shopify</span></div></div>
     </div>
-    <div class="band reveal"><h3>Don&rsquo;t see your tool?</h3><p>We wire bespoke connectors into your workflow &mdash; tell us your stack and we&rsquo;ll make it fit.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Build a custom agent" data-prefill="We use the following tools and would like to connect them: " data-cursor>Talk to us about your stack</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Don&rsquo;t see your tool?</h3><p>We wire bespoke connectors into your workflow, tell us your stack and we&rsquo;ll make it fit.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Build a custom agent" data-prefill="We use the following tools and would like to connect them: " data-cursor>Talk to us about your stack</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'resources' %}
@@ -1588,19 +1586,19 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="hero2">
       <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Resources</span>
         <h1 class="h-hero">Get sharper on<br><span class="ital grad">buying signals.</span></h1>
-        <p class="lead">The thinking behind intent-led growth &mdash; plus the live catalog of everything we track and the agents that act on it. Start here.</p>
+        <p class="lead">The thinking behind intent-led growth, plus the live catalog of everything we track and the agents that act on it. Start here.</p>
       </div>
       <div class="hero-art reveal in"><div class="art-report"><div class="art-report-top"><span class="art-report-eye">Position2 &middot; Report</span><span class="art-report-yr">2026</span></div><div class="art-report-ttl">The State of <span class="ital grad">Buying Signals.</span></div><div class="art-report-lines"><i style="width:90%"></i><i style="width:70%"></i><i style="width:80%"></i></div><div class="art-report-foot"><span class="acd"></span>Intent-led growth playbook</div></div></div>
     </div>
     <div class="feat" style="margin-top:40px">
-      <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>The 26 buying signals</h4><p>The full catalog of intent signals we watch for &mdash; what each one means and why it matters.</p><span class="more">Explore signals &rarr;</span></a>
-      <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div><h4>Meet the agents</h4><p>19 always-on agents across intent, SEO, content, GEO and paid &mdash; and what each one ships.</p><span class="more">Browse the directory &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>The 26 buying signals</h4><p>The full catalog of intent signals we watch for, what each one means and why it matters.</p><span class="more">Explore signals &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div><h4>Meet the agents</h4><p>19 always-on agents across intent, SEO, content, GEO and paid, and what each one ships.</p><span class="more">Browse the directory &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>How intent scoring works</h4><p>How type, severity, recency and signal-stacking combine into one number that ranks your worklist.</p><span class="more">See the platform &rarr;</span></a>
-      <a class="fcard glass tilt reveal" href="/security" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Privacy &amp; de-anonymization, explained</h4><p>How visitor identification works responsibly &mdash; opt-outs, CCPA/CPRA, GDPR and your controls.</p><span class="more">Read the approach &rarr;</span></a>
-      <a class="fcard glass tilt reveal" href="/solutions" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3 3 7-8"/><path d="M16 7h4v4"/></svg></div><h4>From signal to pipeline</h4><p>The plays Position2 runs &mdash; SEO, paid, content and RevOps &mdash; the moment intent fires.</p><span class="more">See solutions &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="/security" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Privacy &amp; de-anonymization, explained</h4><p>How visitor identification works responsibly, opt-outs, CCPA/CPRA, GDPR and your controls.</p><span class="more">Read the approach &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="/solutions" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3 3 7-8"/><path d="M16 7h4v4"/></svg></div><h4>From signal to pipeline</h4><p>The plays Position2 runs, SEO, paid, content and RevOps, the moment intent fires.</p><span class="more">See solutions &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-interest="Request access" data-prefill="I'd like the State of Buying Signals 2026 report." data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><h4>The State of Buying Signals &middot; 2026</h4><p>Our upcoming report on how B2B teams turn intent into pipeline. Request early access.</p><span class="more">Request the report &rarr;</span></a>
     </div>
-    <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO &mdash; no spam, just the good stuff.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO, no spam, just the good stuff.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'security' %}
@@ -1608,12 +1606,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="hero2">
       <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Security &amp; trust</span>
         <h1 class="h-hero">Intent intelligence,<br><span class="ital grad">handled responsibly.</span></h1>
-        <p class="lead">De-anonymization and intent data only earn trust when they&rsquo;re handled with care. Here&rsquo;s how we protect your data and honor privacy choices &mdash; by design, not as an afterthought.</p>
+        <p class="lead">De-anonymization and intent data only earn trust when they&rsquo;re handled with care. Here&rsquo;s how we protect your data and honor privacy choices, by design, not as an afterthought.</p>
       </div>
       <div class="hero-art reveal in"><div class="art-shield"><span class="art-ring r1"></span><span class="art-ring r2"></span><svg viewBox="0 0 200 220"><defs><linearGradient id="sgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><path d="M100 14 L176 44 V104 C176 158 142 192 100 208 C58 192 24 158 24 104 V44 Z" fill="rgba(16,185,129,.08)" stroke="url(#sgrad)" stroke-width="3"/><path class="art-check" d="M68 110 l22 22 l44 -50" fill="none" stroke="#34d399" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="art-chip art-chip-1"><span class="acd"></span>CCPA/CPRA &amp; GDPR</div><div class="art-chip art-chip-2">Encrypted &middot; least-privilege</div></div></div>
     </div>
     <div class="feat" style="margin-top:38px">
-      <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/></svg></div><h4>Privacy-compliant</h4><p>Built for US state privacy laws (CCPA/CPRA) and GDPR &mdash; we honor opt-out and Do-Not-Sell-or-Share requests.</p></div>
+      <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/></svg></div><h4>Privacy-compliant</h4><p>Built for US state privacy laws (CCPA/CPRA) and GDPR, we honor opt-out and Do-Not-Sell-or-Share requests.</p></div>
       <div class="fcard glass reveal" style="transition-delay:80ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8h14M5 16h14"/></svg></div><h4>Your data, your control</h4><p>We don&rsquo;t sell your data. Request an export or deletion at any time, and disable any signal source whenever you want.</p></div>
       <div class="fcard glass reveal" style="transition-delay:160ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h4>Secured in transit &amp; at rest</h4><p>Encrypted connections, least-privilege access and audited handling, with vetted sub-processors under agreement.</p></div>
     </div>
@@ -1622,7 +1620,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <h3>De-anonymization &amp; consent</h3><p>Where visitor identification is enabled, it&rsquo;s intended for traffic you&rsquo;re permitted to process, with appropriate notice and consent on your properties. You own your site&rsquo;s consent banner and privacy notice; we provide controls and guidance to help you stay compliant with CCPA/CPRA, GDPR and other applicable privacy laws.</p>
       <h3>Your rights</h3><p>You can request access, correction, export or deletion of data we process on your behalf, and disable specific signal sources at any time. We honour valid data-subject and opt-out requests.</p>
       <h3>Sub-processors &amp; access</h3><p>Data is encrypted in transit and at rest, access is least-privilege, and handling is logged and reviewed. We work with vetted sub-processors under appropriate agreements, available on request.</p>
-      <h3>Request a DPA</h3><p>Need our Data Processing Agreement or a security overview for your review? We&rsquo;ll share them on request &mdash; <a href="mailto:privacy@position2.com">privacy@position2.com</a>.</p>
+      <h3>Request a DPA</h3><p>Need our Data Processing Agreement or a security overview for your review? We&rsquo;ll share them on request, <a href="mailto:privacy@position2.com">privacy@position2.com</a>.</p>
     </div>
     <div class="band reveal"><h3>Need our security overview or a DPA?</h3><p>We&rsquo;ll walk your team through how data is handled, and provide the documents your security review needs.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
@@ -1631,7 +1629,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="wrap sectionpad">
     <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Industries</span>
       <h1 class="h-hero">Built for your<br><span class="ital grad">industry&rsquo;s motion.</span></h1>
-      <p class="lead ind-lead">One signal engine, tuned to the way your market actually buys. Pick an industry to see the buying signals we watch, the agents reframed in your vocabulary, and how Position2 turns intent into pipeline &mdash; with healthcare as our deepest build.</p>
+      <p class="lead ind-lead">One signal engine, tuned to the way your market actually buys. Pick an industry to see the buying signals we watch, the agents reframed in your vocabulary, and how Position2 turns intent into pipeline, with healthcare as our deepest build.</p>
     </div>
     <div class="ind-grid">
       {% for ind in industries %}
@@ -1703,20 +1701,20 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signal to action</span><h2 class="h-sec">Watch a healthcare signal<br><span class="ital grad">become a conversation.</span></h2></div>
     <div class="ind-journey">
       <div class="ij-steps reveal">
-        <div class="ij-step"><span class="ijn">1</span><div><b>A signal fires</b><p>Orbit Health closes a Series C and opens two new cardiology centers &mdash; we catch both the moment they hit the open web.</p></div></div>
-        <div class="ij-step"><span class="ijn">2</span><div><b>It&rsquo;s scored</b><p>Funding plus a service-line launch stack into one live intent score &mdash; instantly.</p></div></div>
+        <div class="ij-step"><span class="ijn">1</span><div><b>A signal fires</b><p>Orbit Health closes a Series C and opens two new cardiology centers, we catch both the moment they hit the open web.</p></div></div>
+        <div class="ij-step"><span class="ijn">2</span><div><b>It&rsquo;s scored</b><p>Funding plus a service-line launch stack into one live intent score, instantly.</p></div></div>
         <div class="ij-step"><span class="ijn">3</span><div><b>The committee is mapped</b><p>The CMIO, VP of Revenue Cycle and service-line director surface, with their recent moves.</p></div></div>
-        <div class="ij-step"><span class="ijn">4</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer, grounded in the exact signal &mdash; you reach out first.</p></div></div>
+        <div class="ij-step"><span class="ijn">4</span><div><b>Vimi drafts the outreach</b><p>A ready-to-send intro to the right buyer, grounded in the exact signal, you reach out first.</p></div></div>
       </div>
       <div class="ij-card glass reveal">
         <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs><linearGradient id="ijg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#34d399"/></linearGradient></defs></svg>
         <div class="ij-top"><span class="ij-co"><span class="dd"></span>Orbit Health</span><span class="ij-tag">Funding + Service line</span></div>
         <div class="ij-score">
           <div class="ij-ring"><svg viewBox="0 0 100 100"><circle class="ij-bg" cx="50" cy="50" r="46"/><circle class="ij-fg" cx="50" cy="50" r="46" style="stroke-dashoffset:17"/></svg><b>9.4</b></div>
-          <div class="ij-sc-txt"><b>Top account today</b><span>Series C close &bull; 2 new cardiology centers &bull; new CMIO &mdash; three signals stacked in 11 days.</span></div>
+          <div class="ij-sc-txt"><b>Top account today</b><span>Series C close &bull; 2 new cardiology centers &bull; new CMIO, three signals stacked in 11 days.</span></div>
         </div>
         <div class="ij-comm"><span>CMIO</span><span>VP Revenue Cycle</span><span>Service-line Director</span><span>CFO</span></div>
-        <div class="ij-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>&ldquo;Orbit Health just raised a Series C and is expanding cardiology &mdash; here&rsquo;s a 3-line intro to their new CMIO.&rdquo;</p></div></div>
+        <div class="ij-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>&ldquo;Orbit Health just raised a Series C and is expanding cardiology, here&rsquo;s a 3-line intro to their new CMIO.&rdquo;</p></div></div>
       </div>
     </div>
     {% endif %}
@@ -1725,6 +1723,16 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <p class="lead reveal" style="text-align:center;margin:0 auto">Same engine, your vocabulary. Each agent below is one of our core agents, tuned to the signals and language of {{ industry.short|lower }}.</p>
     <div class="ind-agents">
       {% for a in industry.agents %}
+      {% if a.slug %}
+      <a class="ind-agent reveal" href="/industries/{{ industry.slug }}/agents/{{ a.slug }}" data-cursor style="--page:{{ a.accent }};--page2:{{ a.accent2 }};transition-delay:{{ loop.index0 * 45 }}ms">
+        {% if a.badge %}<span class="ia-badge">{{ a.badge }}</span>{% endif %}
+        <div class="ia-ic">{{ a.icon|safe }}</div>
+        <h4>{{ a.name }}</h4>
+        <div class="ia-base"><i>&#8635;</i> from {{ a.base }}</div>
+        <p>{{ a.use }}</p>
+        <span class="ia-more">View details &rarr;</span>
+      </a>
+      {% else %}
       <div class="ind-agent reveal" style="transition-delay:{{ loop.index0 * 45 }}ms">
         {% if a.badge %}<span class="ia-badge">{{ a.badge }}</span>{% endif %}
         <div class="ia-ic">{{ a.icon|safe }}</div>
@@ -1732,6 +1740,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="ia-base"><i>&#8635;</i> from {{ a.base }}</div>
         <p>{{ a.use }}</p>
       </div>
+      {% endif %}
       {% endfor %}
     </div>
 
@@ -1753,6 +1762,66 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     {% endif %}
 
     <div class="band reveal"><h3>See it on your {{ industry.short|lower }} accounts.</h3><p>Request access and watch the signal layer light up on the {{ industry.short|lower }} organizations you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="{{ industry.name }}" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+  </div>
+
+{% elif page == 'iagent' %}
+  <div class="wrap">
+    <div class="crumb"><a href="/industries" data-cursor>Industries</a><span class="sep">›</span><a href="/industries/{{ industry.slug }}" data-cursor>{{ industry.short }}</a><span class="sep">›</span><span class="cur">{{ agent.name }}</span></div>
+    <div class="detail-head reveal in">
+      <div class="halo"><div class="ic">{{ agent.icon|safe }}</div></div>
+      <div>
+        <h1 class="h-hero" style="font-size:clamp(38px,5.4vw,68px);margin:0 0 10px">{{ agent.name }}</h1>
+        <span class="pill-eye"><span class="dt"></span> {{ agent.role }}</span>{% if agent.metric %}<span class="detail-metric">{{ agent.metric }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="panel glass reveal in"><span class="glow-line"></span>
+        <div class="phead"><span class="pi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.5L21 9l-5 4.2L17.5 21 12 17l-5.5 4 1.5-7.8L3 9l6.6-.5z"/></svg></span><b>Agent details</b></div>
+        <div class="pbody">
+          <div class="summary">{{ agent.summary }}</div>
+          <div class="trips">
+            <div class="trip"><h4><i></i>Why you&rsquo;ll love it</h4><p>{{ agent.benefit }}</p></div>
+            <div class="trip"><h4><i></i>How it works</h4><p>{{ agent.how }}</p></div>
+            <div class="trip"><h4><i></i>Who it helps</h4><p>{{ agent.who }}</p></div>
+          </div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="card glass reveal in" style="transition-delay:80ms">
+          <div class="lbl">Built by</div>
+          <div class="builtby"><span class="m">P</span><b>Position2</b></div>
+          <div class="lbl" style="margin-top:18px">Tuned for</div>
+          <div class="tags"><span class="tag">{{ industry.short }}</span><span class="tag">from {{ agent.base }}</span></div>
+          <div class="lbl" style="margin-top:18px">Works with</div>
+          <div class="tags">{% for c in agent.connects %}<span class="tag">{{ c }}</span>{% endfor %}</div>
+        </div>
+        <div class="card cta-card reveal in" style="transition-delay:140ms">
+          <b>Want this agent?</b>
+          <p>See it live on your accounts, or have us tailor it to your stack.</p>
+          <button class="btn-grad mag" data-demo data-interest="{{ agent.name }}" data-prefill="I'd like a demo of the {{ agent.name }} agent for {{ industry.short }}." data-cursor>Request access</button>
+          <button class="ghost" data-demo data-interest="Build a custom agent" data-prefill="I'd like a version of {{ agent.name }} customised for us." data-cursor>Build a custom version</button>
+        </div>
+      </aside>
+    </div>
+    <div class="aout glass reveal in" style="--cat:{{ agent.accent }}">
+      <div class="aout-h"><span class="aout-dot"></span>Representative output{% if agent.metric %}<span class="aout-tag">{{ agent.metric }}</span>{% endif %}</div>
+      <div class="aout-rows">
+        {% for o in agent.out %}
+        <div class="aout-row"><span class="aout-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span><div class="aout-t">{{ o.t }}<span>{{ o.s }}</span></div><span class="aout-bar2"><i style="width:{{ o.w }}%"></i></span></div>
+        {% endfor %}
+      </div>
+      <div class="aout-note">Representative preview of what {{ agent.name }} delivers.</div>
+    </div>
+    <div class="related">
+      <span class="pill-eye"><span class="dt"></span> More {{ industry.short }} agents</span>
+      <div class="feat" style="margin-top:18px">
+        {% for a in related %}
+        <a class="fcard glass tilt reveal" href="/industries/{{ industry.slug }}/agents/{{ a.slug }}" data-cursor style="--tc:{{ a.accent }};transition-delay:{{ loop.index0 * 60 }}ms">
+          <div class="ic">{{ a.icon|safe }}</div><h4>{{ a.name }}</h4><p>{{ a.use }}</p><span class="more">View details →</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
   </div>
 
 {% elif page == 'login' %}
@@ -1789,7 +1858,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="wrap foot-in">
     <div class="foot-brand">
       <a class="nv-brand" href="/" data-cursor><svg class="nv-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/></svg><span class="nv-wm"><b>INTELLIGENCE</b><i>by Position2</i></span></a>
-      <p class="foot-tag">Know who&rsquo;s ready to buy &mdash; before they raise a hand.</p>
+      <p class="foot-tag">Know who&rsquo;s ready to buy, before they raise a hand.</p>
       {% if page!='login' %}<button class="btn-grad mag foot-cta" data-demo data-cursor>Request access</button>{% endif %}
     </div>
     {% if page!='login' %}
@@ -1815,7 +1884,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div id="nvFormBody">
       <div class="nv-fhead">
         <svg class="nv-orb" viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.4" fill="#67e8f9"/></svg>
-        <div><h3>Request access</h3><p>Tell us where to send it — we’ll get in touch.</p></div>
+        <div><h3>Request access</h3><p>Tell us where to send it, and we’ll get in touch.</p></div>
       </div>
       <form id="nvDemoForm" autocomplete="on" novalidate>
         <div class="nv-pills">
@@ -1837,7 +1906,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="nv-confetti" id="nvConfetti"></div>
       <div class="nv-check"><svg viewBox="0 0 36 36"><path d="M9 19l6 6 12-14"/></svg></div>
       <h3>You’re on the list 🎉</h3>
-      <p id="nvSuccessMsg">Thanks — our team will get in touch to get you set up.</p>
+      <p id="nvSuccessMsg">Thanks, our team will get in touch to get you set up.</p>
       <button type="button" class="nv-submit" id="nvSuccessClose" data-cursor><span>Done</span></button>
     </div>
   </div>
@@ -1998,7 +2067,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   }
 
 
-  // scroll story — continuous, lerp-smoothed scrubbing
+  // scroll story: continuous, lerp-smoothed scrubbing
   var story=document.querySelector('.story');
   if(story && window.matchMedia('(min-width:821px)').matches && !RM){
     story.classList.add('anim');
@@ -2080,8 +2149,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
       .then(function(res){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access';
         if(res.ok&&res.d&&res.d.ok){ document.getElementById('nvSuccessMsg').textContent = interest==='Build a custom agent'
-            ? 'Thanks — our team will get in touch to scope your custom agent.'
-            : 'Thanks — our team will get in touch to get you set up with access.';
+            ? 'Thanks, our team will get in touch to scope your custom agent.'
+            : 'Thanks, our team will get in touch to get you set up with access.';
           document.getElementById('nvFormBody').style.display='none'; document.getElementById('nvSuccess').classList.add('on'); confetti(); try{document.dispatchEvent(new CustomEvent('p2:lead_submit',{detail:{interest:interest}}));}catch(e){}
         } else { errEl.textContent=(res.d&&res.d.error)?res.d.error:'Something went wrong. Please try again.'; } })
       .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access'; errEl.textContent='Network error. Please try again.'; });
@@ -2183,7 +2252,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="vmodal-ov" data-vclose></div>
   <div class="vmodal-card glass" role="dialog" aria-modal="true" aria-labelledby="vmodal-t">
     <button class="vmodal-x" type="button" data-vclose aria-label="Close demo">&times;</button>
-    <div class="vmodal-h"><span class="pill-eye"><span class="dt"></span> Platform walkthrough</span><h3 id="vmodal-t">Inside the platform &mdash; how it works &amp; how it&rsquo;s built</h3></div>
+    <div class="vmodal-h"><span class="pill-eye"><span class="dt"></span> Platform walkthrough</span><h3 id="vmodal-t">Inside the platform: how it works &amp; how it&rsquo;s built</h3></div>
     <div class="vframe" id="vframe">
       <div class="vph">
         <span class="vph-play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg></span>
@@ -2323,7 +2392,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 })();
 </script>
 
-<!-- First-party visitor analytics — anonymous/public visitors only (admins/users excluded) -->
+<!-- First-party visitor analytics: anonymous/public visitors only (admins/users excluded) -->
 {% if not user %}
 <script src="{{ url_for('static', filename='js/visitor_track.js') }}"></script>
 {% endif %}
