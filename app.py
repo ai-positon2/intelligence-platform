@@ -1184,6 +1184,12 @@ def robots_txt():
     from flask import Response
     return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
 
+@app.route("/favicon.ico")
+@app.route("/favicon.svg")
+def favicon():
+    return send_from_directory("static", "favicon.svg", mimetype="image/svg+xml")
+
+
 @app.route("/")
 def index():
     if _get_user():
