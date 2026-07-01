@@ -27,15 +27,15 @@ _FEED_UA = "Mozilla/5.0 (compatible; SignalTracker/1.0; +https://intelligence.po
 _NEWS_CACHE: dict[str, list[dict]] = {}
 
 
-_FEED_RETRIES = 2        # attempts per URL on transient failures (503/429/timeout)
-_FEED_BACKOFF = 1.5      # base seconds; grows exponentially with jitter
+_FEED_RETRIES = 1        # attempts per URL; when Google IP-blocks CI a 2nd try never succeeds, it only doubles wasted time
+_FEED_BACKOFF = 0.8      # base seconds; grows exponentially with jitter
 
 # ── Circuit breaker ─────────────────────────────────────────────────────────
 # Google blocks CI/datacenter IPs outright (every request 503s/times out). When
 # that happens, retrying 1,200+ companies wastes an hour for zero data. After
 # this many failures with no intervening success, we "open" the circuit and
 # every further fetch returns instantly-empty so the step finishes in seconds.
-_CIRCUIT_THRESHOLD = 30
+_CIRCUIT_THRESHOLD = 12
 _circuit_lock = threading.Lock()
 _circuit_fails = 0
 _circuit_open = False
