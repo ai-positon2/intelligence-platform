@@ -119,6 +119,12 @@ h1,h2,h3,.brand-name,.brand b,.ph-left h1,.stat-value,.stat b,.kpi b,.card-title
 /* ===== stat / KPI cards (Usage look, applied to all variants) ===== */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
 .stats,.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin:0 0 26px}
+/* Visitor Analytics KPIs: two balanced rows of four */
+.kpis{grid-template-columns:repeat(4,1fr);gap:20px;align-items:stretch}
+.kpis .kpi{min-height:128px;display:flex;flex-direction:column}
+@media(max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kpis{grid-template-columns:1fr}}
+
 .stat-card,.stat,.kpi{
   background:rgba(13,15,24,.85) !important;border:1px solid rgba(255,255,255,.06) !important;
   border-radius:18px !important;padding:22px 24px !important;position:relative;overflow:hidden;

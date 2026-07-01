@@ -199,8 +199,7 @@ function load(force){
       kcard((k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
       kcard(k.video_sessions||0,'Watched walkthrough')+
       kcard(k.identified||0,'Identified visitors')+
-      kcard(k.companies||0,'Companies seen')+
-      kcard(k.total_rage||0,'Rage clicks');
+      kcard(k.companies||0,'Companies seen');
     // time series
     var s=d.series||[],sx=document.getElementById('seriesX');
     var smax=Math.max.apply(null,s.map(function(x){return x[1];}))||1;
