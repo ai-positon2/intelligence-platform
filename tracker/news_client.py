@@ -55,6 +55,30 @@ def _circuit_record(success: bool) -> None:
                              "remaining fetches this run.", _circuit_fails)
 
 
+# ── GDELT circuit breaker (separate from RSS) ───────────────────────────────
+# GDELT rate-limits shared CI IPs (HTTP 429). Once it starts refusing, retrying
+# every company just burns minutes for zero data, so we open after a run of
+# consecutive failures and return instantly-empty for the rest of the run.
+_GDELT_THRESHOLD = 15
+_gdelt_lock = threading.Lock()
+_gdelt_fails = 0
+_gdelt_open = False
+
+
+def _gdelt_record(success: bool) -> None:
+    global _gdelt_fails, _gdelt_open
+    with _gdelt_lock:
+        if success:
+            _gdelt_fails = 0
+        else:
+            _gdelt_fails += 1
+            if _gdelt_fails >= _GDELT_THRESHOLD and not _gdelt_open:
+                _gdelt_open = True
+                logger.error("[NEWS] GDELT circuit OPEN after %d consecutive failures "
+                             "(rate-limited / 429). Skipping remaining GDELT fetches this run.",
+                             _gdelt_fails)
+
+
 def _fetch_feed(url: str):
     """Download an RSS URL with a hard timeout + retry/backoff, then parse bytes.
 
@@ -238,17 +262,22 @@ def _fetch_json(url: str, timeout: int = 12, retries: int = 2):
     Independent of the RSS circuit breaker: GDELT is reachable from CI even when
     Google News RSS is IP-blocked, so RSS failures must not disable GDELT.
     """
+    if _gdelt_open:
+        return None
     last = None
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": _FEED_UA})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 raw = resp.read()
+            _gdelt_record(True)
             return json.loads(raw.decode("utf-8", "ignore"))
         except Exception as exc:
             last = exc
-            if attempt < retries - 1:
-                time.sleep(1.0 + random.uniform(0, 0.5))
+            if attempt < retries - 1 and not _gdelt_open:
+                is429 = getattr(exc, "code", None) == 429
+                time.sleep((3.0 if is429 else 1.0) + random.uniform(0, 0.5))
+    _gdelt_record(False)
     logger.warning("[NEWS] GDELT fetch failed for %s: %s", url, last)
     return None
 

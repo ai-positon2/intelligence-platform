@@ -45,7 +45,13 @@ def _load_config(path: Path = _DEFAULT_CONFIG) -> dict:
         console.print(f"[red]config.yaml not found at {path}[/red]")
         raise typer.Exit(code=1)
     with path.open() as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        console.print("[yellow]config.yaml is empty or not a valid mapping - is the CONFIG_YAML "
+                      "secret set? Continuing with an empty config; Sheets/Slack settings may be "
+                      "missing.[/yellow]")
+        return {}
+    return data
 
 
 def _setup_logging(verbose: bool = False) -> None:
@@ -476,7 +482,7 @@ def run(
     if news_only:
         console.print("[cyan]--news-only: Refreshing Google News RSS, skipping Sheets.[/cyan]")
 
-    if (config.get("behaviour") or {}).get("dry_run") and not dry_run:
+    if ((config or {}).get("behaviour") or {}).get("dry_run") and not dry_run:
         dry_run = True
 
     if dry_run:
