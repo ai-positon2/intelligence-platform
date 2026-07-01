@@ -1712,7 +1712,7 @@ def _fetch_visitor_analytics() -> dict:
     if svc:
         try:
             r = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Analytics!A1:AM8000").execute()
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Analytics!A:AM").execute()
             rows = r.get("values", [])
         except Exception as e:
             log.warning("visitor analytics read failed: %s", e)
@@ -1856,7 +1856,7 @@ def _fetch_visitor_analytics() -> dict:
     identified.sort(key=lambda x: -x["pages"]); identified = identified[:60]
 
     recent = []
-    for r in reversed(data[-200:]):
+    for r in reversed(data):
         recent.append({
             "ts": c(r,"Timestamp (IST)"), "vid": (c(r,"Visitor ID") or "")[:8],
             "page": c(r,"Page Title") or c(r,"Page URL"), "landing": c(r,"Landing Page"),
@@ -1867,7 +1867,6 @@ def _fetch_visitor_analytics() -> dict:
             "who": (idmap.get(c(r,"Visitor ID")) or {}).get("name",""),
             "company": ((idmap.get(c(r,"Visitor ID")) or {}).get("company","") or vid_company.get(c(r,"Visitor ID"),"")),
         })
-        if len(recent) >= 60: break
 
     return {
         "configured": bool(svc),
