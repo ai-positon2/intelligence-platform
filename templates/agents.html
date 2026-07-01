@@ -1628,7 +1628,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <div class="wrap sectionpad">
     <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Industries</span>
       <h1 class="h-hero">Built for your<br><span class="ital grad">industry&rsquo;s motion.</span></h1>
-      <p class="lead ind-lead">One signal engine, tuned to the way your market actually buys. Pick an industry to see the buying signals we watch, the agents reframed in your vocabulary, and how Position2 turns intent into pipeline, with healthcare as our deepest build.</p>
+      <p class="lead ind-lead">One signal engine, tuned to the way your market actually buys. Pick an industry to see the buying signals we watch, the agents reframed in your vocabulary, and how Position2 turns intent into pipeline, with health tech and healthcare as our deepest builds.</p>
     </div>
     <div class="ind-grid">
       {% for ind in industries %}
@@ -1640,7 +1640,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
             <h3>{{ ind.name }}</h3>
             <p>{{ ind.lead }}</p>
             <div class="ind-tags">{% for s in ind.segments %}<span class="ind-tag">{{ s }}</span>{% endfor %}</div>
-            <span class="more">Explore healthcare &rarr;</span>
+            <span class="more">Explore {{ ind.short|lower }} &rarr;</span>
           </div>
           <div class="ind-fr">
             <div class="ind-orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="odot od1"></span><span class="odot od2"></span><span class="odot od3"></span><span class="odot od4"></span><span class="ind-core">{{ ind.icon|safe }}</span></div>
@@ -1676,9 +1676,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="hero-art reveal in">
         <div class="ind-hero-art">
           <div class="ind-orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="odot od1"></span><span class="odot od2"></span><span class="odot od3"></span><span class="odot od4"></span><span class="ind-core">{{ industry.icon|safe }}</span></div>
-          <div class="ind-fchip ind-fchip-1"><span class="acd"></span>Signal fired</div>
-          <div class="ind-fchip ind-fchip-2"><span class="acd"></span>Intent score 9.4</div>
-          <div class="ind-fchip ind-fchip-3"><span class="acd"></span>Committee mapped</div>
+          {% set _chips = industry.chips or ['Signal fired', 'Intent score 9.4', 'Committee mapped'] %}
+          {% for ch in _chips %}<div class="ind-fchip ind-fchip-{{ loop.index }}"><span class="acd"></span>{{ ch }}</div>{% endfor %}
         </div>
       </div>
     </div>
@@ -1696,8 +1695,8 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       {% endfor %}
     </div>
 
-    {% if industry.featured %}
-    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signal to action</span><h2 class="h-sec">Watch a healthcare signal<br><span class="ital grad">become a conversation.</span></h2></div>
+    {% if industry.slug == 'health-tech' %}
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signal to action</span><h2 class="h-sec">Watch a health-tech signal<br><span class="ital grad">become a conversation.</span></h2></div>
     <div class="ind-journey">
       <div class="ij-steps reveal">
         <div class="ij-step"><span class="ijn">1</span><div><b>A signal fires</b><p>Orbit Health closes a Series C and opens two new cardiology centers, we catch both the moment they hit the open web.</p></div></div>
@@ -1714,6 +1713,26 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         </div>
         <div class="ij-comm"><span>CMIO</span><span>VP Revenue Cycle</span><span>Service-line Director</span><span>CFO</span></div>
         <div class="ij-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>&ldquo;Orbit Health just raised a Series C and is expanding cardiology, here&rsquo;s a 3-line intro to their new CMIO.&rdquo;</p></div></div>
+      </div>
+    </div>
+    {% elif industry.slug == 'healthcare' %}
+    <div class="sec-head reveal" style="margin-top:72px"><span class="pill-eye"><span class="dt"></span> Signal to action</span><h2 class="h-sec">Watch a patient search<br><span class="ital grad">become a booked visit.</span></h2></div>
+    <div class="ind-journey">
+      <div class="ij-steps reveal">
+        <div class="ij-step"><span class="ijn">1</span><div><b>A patient searches</b><p>Someone nearby types &ldquo;best cardiologist near me&rdquo; or asks ChatGPT about a symptom they are worried about.</p></div></div>
+        <div class="ij-step"><span class="ijn">2</span><div><b>You are the answer</b><p>Your clinic surfaces in the AI answer, the map pack and the near-me results, backed by reviews that build trust.</p></div></div>
+        <div class="ij-step"><span class="ijn">3</span><div><b>They choose you</b><p>An accurate, trustworthy page and strong ratings turn that search into a booked visit at the right location.</p></div></div>
+        <div class="ij-step"><span class="ijn">4</span><div><b>You keep getting better</b><p>Every call, review and survey rolls into a live sentiment score, so you see what patients feel and act on it.</p></div></div>
+      </div>
+      <div class="ij-card glass reveal">
+        <svg width="0" height="0" aria-hidden="true" style="position:absolute"><defs><linearGradient id="ijg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#c084fc"/></linearGradient></defs></svg>
+        <div class="ij-top"><span class="ij-co"><span class="dd"></span>&ldquo;dermatologist near me&rdquo;</span><span class="ij-tag">Near-me + AI</span></div>
+        <div class="ij-score">
+          <div class="ij-ring"><svg viewBox="0 0 100 100"><circle class="ij-bg" cx="50" cy="50" r="46"/><circle class="ij-fg" cx="50" cy="50" r="46" style="stroke:url(#ijg2);stroke-dashoffset:12"/></svg><b>4.9</b></div>
+          <div class="ij-sc-txt"><b>You are the top answer</b><span>Cited by AI &bull; #1 in the map pack &bull; 4.9 stars across 812 reviews, at your Midtown clinic.</span></div>
+        </div>
+        <div class="ij-comm"><span>Google Maps</span><span>AI Overview</span><span>ChatGPT</span><span>Reviews</span></div>
+        <div class="ij-vimi"><span class="mv-orb"></span><div><b>Vimi</b><p>&ldquo;Patients near your Midtown clinic are searching for the best dermatologist. You are the top answer, and here are two reviews worth featuring.&rdquo;</p></div></div>
       </div>
     </div>
     {% endif %}
