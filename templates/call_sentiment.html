@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Call &amp; Sentiment Intelligence — GTM</title>
+  <title>Sentiment Pulse — GTM</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236366f1'/%3E%3Ccircle cx='16' cy='21' r='2.5' fill='%23fff'/%3E%3Cpath d='M10 15 Q16 9 22 15' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11 Q16 2 26 11' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,6 +16,7 @@
 :root{--pos:#2dd4aa;--neu:#f5a623;--neg:#fb7185;--mono:'JetBrains Mono',ui-monospace,monospace}
 .main{max-width:1320px!important}
 .page-header,.cs-kpis{position:relative;z-index:1}
+.page-header{min-height:0;display:block;margin:2px 0 22px}
 .cs-glow{position:absolute;top:-70px;left:50%;transform:translateX(-50%);width:min(960px,92%);height:380px;pointer-events:none;z-index:0;
   background:radial-gradient(58% 60% at 50% 0%,rgba(45,212,170,.11),transparent 70%),radial-gradient(46% 64% at 16% 8%,rgba(124,131,245,.12),transparent 72%),radial-gradient(46% 64% at 86% 8%,rgba(34,211,238,.09),transparent 72%);filter:blur(26px)}
 .cs-seclabel{display:flex;align-items:center;gap:14px;margin:34px 0 16px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--tx3)}
@@ -213,7 +214,7 @@
         <span class="bc-sep">›</span>
         <a href="/gtm" class="bc-link">GTM</a>
         <span class="bc-sep">›</span>
-        <span class="bc-cur">Call &amp; Sentiment</span>
+        <span class="bc-cur">Sentiment Pulse</span>
       </div>
     </div>
     <div class="topbar-right">
@@ -251,8 +252,8 @@
     <div class="cs-wrap">
       <div class="cs-glow"></div>
       <div class="page-header">
-        <h1 class="page-title">Call &amp; Sentiment Intelligence</h1>
-        <p class="page-sub">Voice-of-patient sentiment unified across calls, reviews and surveys — scored for every location.</p>
+        <h1 class="page-title">Sentiment Pulse</h1>
+        <p class="page-sub">A live read on how patients feel, by tracking every call, review and survey, and scoring sentiment for each location.</p>
         <div class="cs-sub-icons">
           <span class="cs-srcpill"><span class="d" style="background:var(--cyan)"></span>Network: <b>Cedar Valley Health</b></span>
           <span class="cs-srcpill"><span class="d" style="background:var(--accent)"></span><b id="csPillLoc">10</b> locations · 3 states</span>
@@ -817,7 +818,7 @@
   })();
   </script>
   <script>
-  (function(){var s=Date.now(),sent=false;function send(){if(sent)return;sent=true;try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Call & Sentiment Intelligence',seconds:Math.round((Date.now()-s)/1000),email:document.body.dataset.email||''}),keepalive:true}).catch(function(){});}catch(e){}}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')send();});window.addEventListener('beforeunload',send);})();
+  (function(){var s=Date.now(),sent=false;function send(){if(sent)return;sent=true;try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Sentiment Pulse',seconds:Math.round((Date.now()-s)/1000),email:document.body.dataset.email||''}),keepalive:true}).catch(function(){});}catch(e){}}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')send();});window.addEventListener('beforeunload',send);})();
   </script>
   <!-- shared WebGL particle background (same as LinkedIn Intelligence / admin dashboards) -->
   <script src="{{ url_for('static', filename='js/pfx_bg.js') }}"></script>
