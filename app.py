@@ -619,12 +619,12 @@ def _isvg(inner: str) -> str:
 INDUSTRIES = [
     {
         "slug": "health-tech",
-        "name": "Health Tech & Life Sciences",
+        "name": "Health Tech",
         "short": "Health Tech",
         "featured": True,
         "accent": "#22d3ee", "accent2": "#34d399",
         "icon": _isvg('<path d="M3 12h3.5l2 5 4-12 2.2 7H21"/>'),
-        "eyebrow": "Industry · Health Tech & Life Sciences",
+        "eyebrow": "Industry · Health Tech",
         "headline": "Reach the health system",
         "headline_ital": "the moment it’s ready.",
         "lead": "Selling into healthcare is slow, committee-driven and built on trust. Intelligence watches every provider, payer, digital-health and medtech org for the signals that precede a budget, funding, mergers, new facilities, service-line launches and leadership moves, then hands your team the account, the committee and the next move.",
