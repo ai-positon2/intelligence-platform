@@ -1292,11 +1292,18 @@ def gtm():
     return render_template("gtm.html", user=_get_user())
 
 
-@app.route("/gtm/call-sentiment")
-@app.route("/gtm/call-sentiment/")
+@app.route("/gtm/sentiment-pulse")
+@app.route("/gtm/sentiment-pulse/")
 @login_required
 def call_sentiment():
     return render_template("call_sentiment.html", user=_get_user())
+
+
+@app.route("/gtm/call-sentiment")
+@app.route("/gtm/call-sentiment/")
+@login_required
+def call_sentiment_legacy():
+    return redirect(url_for("call_sentiment"))
 
 # ── Legacy /ppc* page URLs → 301 redirect to canonical /gtm* (links still resolve) ──
 @app.route("/ppc")
