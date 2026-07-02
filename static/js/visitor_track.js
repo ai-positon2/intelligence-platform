@@ -216,7 +216,7 @@
       if (document.getElementById("p2cc")) return;
       var st = document.createElement("style");
       st.textContent =
-        "#p2cc{position:fixed;left:18px;bottom:18px;z-index:99990;max-width:300px;" +
+        "#p2cc{position:fixed;right:18px;bottom:18px;z-index:99990;max-width:300px;" +
         "background:rgba(9,12,24,.93);border:1px solid rgba(124,140,220,.22);border-radius:14px;" +
         "padding:12px 14px 11px;font-family:'Inter',system-ui,sans-serif;" +
         "box-shadow:0 12px 40px rgba(2,4,12,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" +
