@@ -1,23 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
 <defs>
-<radialGradient id="g1" cx="18%" cy="12%" r="55%"><stop offset="0%" stop-color="#4cbf92" stop-opacity=".42"/><stop offset="100%" stop-color="#4cbf92" stop-opacity="0"/></radialGradient>
-<radialGradient id="g2" cx="88%" cy="8%" r="55%"><stop offset="0%" stop-color="#6ea8ff" stop-opacity=".40"/><stop offset="100%" stop-color="#6ea8ff" stop-opacity="0"/></radialGradient>
-<radialGradient id="g3" cx="82%" cy="98%" r="60%"><stop offset="0%" stop-color="#9b87fd" stop-opacity=".38"/><stop offset="100%" stop-color="#9b87fd" stop-opacity="0"/></radialGradient>
-<radialGradient id="g4" cx="4%" cy="94%" r="50%"><stop offset="0%" stop-color="#22d3ee" stop-opacity=".28"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
-<linearGradient id="title" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#c8d3f0"/></linearGradient>
-<linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#4cbf92"/><stop offset="55%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#6ea8ff"/></linearGradient>
+<radialGradient id="m1" cx="12%" cy="0%" r="60%"><stop offset="0%" stop-color="#155e63" stop-opacity=".55"/><stop offset="100%" stop-color="#155e63" stop-opacity="0"/></radialGradient>
+<radialGradient id="m2" cx="92%" cy="10%" r="58%"><stop offset="0%" stop-color="#3b2f79" stop-opacity=".6"/><stop offset="100%" stop-color="#3b2f79" stop-opacity="0"/></radialGradient>
+<radialGradient id="m3" cx="50%" cy="118%" r="70%"><stop offset="0%" stop-color="#2a1d5e" stop-opacity=".7"/><stop offset="100%" stop-color="#2a1d5e" stop-opacity="0"/></radialGradient>
+<radialGradient id="m4" cx="30%" cy="85%" r="45%"><stop offset="0%" stop-color="#0b3f54" stop-opacity=".45"/><stop offset="100%" stop-color="#0b3f54" stop-opacity="0"/></radialGradient>
+<linearGradient id="serif" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0%" stop-color="#5fd8cd"/><stop offset="45%" stop-color="#9fb6ec"/><stop offset="100%" stop-color="#a78bfa"/>
+</linearGradient>
+<linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+  <stop offset="0%" stop-color="#4cbf92" stop-opacity=".8"/><stop offset="100%" stop-color="#6ea8ff" stop-opacity=".5"/>
+</linearGradient>
+<radialGradient id="under" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#7c83f5" stop-opacity=".22"/><stop offset="100%" stop-color="#7c83f5" stop-opacity="0"/></radialGradient>
+<radialGradient id="vig" cx="50%" cy="46%" r="75%"><stop offset="62%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".5"/></radialGradient>
 </defs>
-<rect width="1200" height="630" fill="#050714"/>
-<rect width="1200" height="630" fill="url(#g1)"/><rect width="1200" height="630" fill="url(#g2)"/>
-<rect width="1200" height="630" fill="url(#g3)"/><rect width="1200" height="630" fill="url(#g4)"/>
-<g opacity=".08" stroke="#7c8cdc" stroke-width="1">
-<line x1="0" y1="0" x2="0" y2="630"/><line x1="60" y1="0" x2="60" y2="630"/><line x1="120" y1="0" x2="120" y2="630"/><line x1="180" y1="0" x2="180" y2="630"/><line x1="240" y1="0" x2="240" y2="630"/><line x1="300" y1="0" x2="300" y2="630"/><line x1="360" y1="0" x2="360" y2="630"/><line x1="420" y1="0" x2="420" y2="630"/><line x1="480" y1="0" x2="480" y2="630"/><line x1="540" y1="0" x2="540" y2="630"/><line x1="600" y1="0" x2="600" y2="630"/><line x1="660" y1="0" x2="660" y2="630"/><line x1="720" y1="0" x2="720" y2="630"/><line x1="780" y1="0" x2="780" y2="630"/><line x1="840" y1="0" x2="840" y2="630"/><line x1="900" y1="0" x2="900" y2="630"/><line x1="960" y1="0" x2="960" y2="630"/><line x1="1020" y1="0" x2="1020" y2="630"/><line x1="1080" y1="0" x2="1080" y2="630"/><line x1="1140" y1="0" x2="1140" y2="630"/><line x1="1200" y1="0" x2="1200" y2="630"/>
-<line x1="0" y1="0" x2="1200" y2="0"/><line x1="0" y1="60" x2="1200" y2="60"/><line x1="0" y1="120" x2="1200" y2="120"/><line x1="0" y1="180" x2="1200" y2="180"/><line x1="0" y1="240" x2="1200" y2="240"/><line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="360" x2="1200" y2="360"/><line x1="0" y1="420" x2="1200" y2="420"/><line x1="0" y1="480" x2="1200" y2="480"/><line x1="0" y1="540" x2="1200" y2="540"/><line x1="0" y1="600" x2="1200" y2="600"/>
+
+<rect width="1200" height="630" fill="#040510"/>
+<rect width="1200" height="630" fill="url(#m1)"/><rect width="1200" height="630" fill="url(#m2)"/>
+<rect width="1200" height="630" fill="url(#m3)"/><rect width="1200" height="630" fill="url(#m4)"/>
+<line x1="120" y1="120" x2="240" y2="80" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="240" y1="80" x2="200" y2="210" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="120" y1="120" x2="200" y2="210" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="1040" y1="110" x2="1120" y2="190" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="1040" y1="110" x2="980" y2="180" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="150" y1="520" x2="260" y2="560" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><line x1="1080" y1="520" x2="1010" y2="580" stroke="#7e8ecf" stroke-opacity=".14" stroke-width="1"/><circle cx="120" cy="120" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="240" cy="80" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="200" cy="210" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="1040" cy="110" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="1120" cy="190" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="980" cy="180" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="150" cy="520" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="260" cy="560" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="1080" cy="520" r="2.4" fill="#9db0ea" opacity=".4"/><circle cx="1010" cy="580" r="2.4" fill="#9db0ea" opacity=".4"/>
+<circle cx="396" cy="109" r="1.2" fill="#8b9be0" opacity="0.12"/><circle cx="444" cy="54" r="1.6" fill="#7ea0e8" opacity="0.11"/><circle cx="505" cy="162" r="3.0" fill="#8b9be0" opacity="0.12"/><circle cx="1119" cy="392" r="1.2" fill="#7ea0e8" opacity="0.26"/><circle cx="78" cy="150" r="1.6" fill="#22d3ee" opacity="0.18"/><circle cx="647" cy="357" r="1.6" fill="#22d3ee" opacity="0.13"/><circle cx="452" cy="343" r="1.2" fill="#22d3ee" opacity="0.26"/><circle cx="596" cy="334" r="2.2" fill="#7ea0e8" opacity="0.23"/><circle cx="439" cy="167" r="1.6" fill="#22d3ee" opacity="0.30"/><circle cx="115" cy="197" r="3.0" fill="#7ea0e8" opacity="0.35"/><circle cx="354" cy="598" r="1.2" fill="#22d3ee" opacity="0.24"/><circle cx="898" cy="110" r="3.0" fill="#8b9be0" opacity="0.22"/><circle cx="907" cy="358" r="2.2" fill="#a78bfa" opacity="0.20"/><circle cx="709" cy="362" r="3.0" fill="#8b9be0" opacity="0.12"/><circle cx="1116" cy="300" r="1.2" fill="#a78bfa" opacity="0.12"/><circle cx="771" cy="606" r="3.0" fill="#7ea0e8" opacity="0.18"/><circle cx="1049" cy="225" r="3.0" fill="#8b9be0" opacity="0.20"/><circle cx="593" cy="149" r="2.2" fill="#22d3ee" opacity="0.14"/><circle cx="482" cy="561" r="3.0" fill="#7ea0e8" opacity="0.12"/><circle cx="486" cy="184" r="1.6" fill="#a78bfa" opacity="0.33"/><circle cx="839" cy="602" r="3.0" fill="#22d3ee" opacity="0.37"/><circle cx="116" cy="109" r="1.6" fill="#22d3ee" opacity="0.10"/><circle cx="325" cy="22" r="3.0" fill="#a78bfa" opacity="0.25"/><circle cx="1126" cy="427" r="1.2" fill="#7ea0e8" opacity="0.23"/><circle cx="482" cy="253" r="3.0" fill="#8b9be0" opacity="0.28"/><circle cx="241" cy="601" r="3.0" fill="#a78bfa" opacity="0.15"/><circle cx="717" cy="80" r="1.6" fill="#a78bfa" opacity="0.25"/><circle cx="732" cy="61" r="1.6" fill="#22d3ee" opacity="0.27"/><circle cx="756" cy="584" r="2.2" fill="#8b9be0" opacity="0.23"/><circle cx="1005" cy="606" r="3.0" fill="#a78bfa" opacity="0.23"/><circle cx="120" cy="80" r="2.2" fill="#7ea0e8" opacity="0.31"/><circle cx="981" cy="115" r="1.2" fill="#a78bfa" opacity="0.16"/><circle cx="190" cy="340" r="1.2" fill="#a78bfa" opacity="0.31"/><circle cx="1155" cy="529" r="2.2" fill="#22d3ee" opacity="0.25"/><circle cx="433" cy="151" r="2.2" fill="#22d3ee" opacity="0.28"/><circle cx="955" cy="503" r="1.6" fill="#7ea0e8" opacity="0.16"/><circle cx="432" cy="37" r="1.2" fill="#7ea0e8" opacity="0.32"/><circle cx="321" cy="429" r="2.2" fill="#a78bfa" opacity="0.23"/><circle cx="1128" cy="235" r="1.6" fill="#7ea0e8" opacity="0.13"/><circle cx="248" cy="141" r="1.2" fill="#a78bfa" opacity="0.23"/><circle cx="948" cy="70" r="1.2" fill="#22d3ee" opacity="0.35"/><circle cx="575" cy="125" r="2.2" fill="#7ea0e8" opacity="0.12"/><circle cx="557" cy="459" r="1.2" fill="#22d3ee" opacity="0.30"/><circle cx="1172" cy="36" r="3.0" fill="#22d3ee" opacity="0.33"/><circle cx="729" cy="372" r="3.0" fill="#a78bfa" opacity="0.28"/><circle cx="201" cy="343" r="1.2" fill="#8b9be0" opacity="0.10"/>
+<ellipse cx="600" cy="330" rx="480" ry="150" fill="url(#under)"/>
+
+<!-- eyebrow pill -->
+<g>
+  <rect x="358" y="52" width="484" height="42" rx="21" fill="#10162e" fill-opacity=".75" stroke="#39406b" stroke-width="1"/>
+  <circle cx="386" cy="73" r="4.5" fill="#22d3ee"/>
+  <circle cx="386" cy="73" r="8.5" fill="none" stroke="#22d3ee" stroke-opacity=".35"/>
+  <text x="402" y="79" font-family="JBMono SB" font-size="15" fill="#c7d0f0" letter-spacing="3.4">B2B REVENUE INTELLIGENCE &#183; POSITION2</text>
 </g>
-<!-- brand row -->
-<g transform="translate(90,86)">
-  <circle cx="34" cy="34" r="40" fill="#0c1226" stroke="#4cbf92" stroke-opacity=".4"/>
-  <g transform="translate(11,11) scale(0.56)">
+
+<!-- headline -->
+<text x="600" y="222" text-anchor="middle" font-family="Bricolage XB" font-size="88" fill="#f4f2fc" letter-spacing="-1.5">Know who&#8217;s ready to buy</text>
+<text x="600" y="330" text-anchor="middle" font-family="Instrument Serif" font-style="italic" font-size="94" fill="url(#serif)">before they raise a hand.</text>
+
+<!-- sub -->
+<text x="600" y="408" text-anchor="middle" font-family="Inter Med" font-size="25" fill="#a6b0d6">We watch the open web, your site and social for the moments that signal intent,</text>
+<text x="600" y="446" text-anchor="middle" font-family="Inter Med" font-size="25" fill="#a6b0d6">then hand your team the exact account to reach, and why.</text>
+
+<!-- brand lockup (centered, logo optically centered) -->
+<g>
+  <circle cx="475" cy="545" r="34" fill="#0d1428" stroke="url(#ring)" stroke-width="1.6"/><g transform="translate(450.00,520.00) scale(0.5)">
   <g transform="translate(12.00,12.87) scale(0.8214)">
     <path fill="#53795b" d="M83.2,69.05l-5.06-15.55-23.06,24.42,15.92,3.68c8.14,2.03,14.58-5.09,12.21-12.55Z"/>
     <path fill="#53795b" d="M67.62,20.27l-4.07-13.23C61.18-.08,52.36-2.45,46.94,2.98l-9.49,10.17,30.18,7.12Z"/>
@@ -28,19 +50,9 @@
     <path fill="#4a6a7c" d="M36.34,12.86l-14.16-3.78c-7.8-1.7-14.24,5.43-12.21,12.89l4.09,14.48,22.28-23.59Z"/>
   </g>
 </g>
-  <text x="98" y="30" font-family="DejaVu Sans" font-weight="bold" font-size="26" fill="#eaf0ff" letter-spacing="3">INTELLIGENCE</text>
-  <text x="98" y="60" font-family="DejaVu Sans" font-size="20" fill="#8b94be" letter-spacing="1">by Position2</text>
+  <text x="527" y="540" font-family="Bricolage XB" font-size="25" fill="#eef1fb" letter-spacing="4.5">INTELLIGENCE</text>
+  <text x="527" y="568" font-family="Inter Med" font-size="17" fill="#8b94be" letter-spacing=".4">by Position2</text>
 </g>
-<!-- headline -->
-<text x="90" y="322" font-family="DejaVu Sans" font-weight="bold" font-size="68" fill="url(#title)">Know who&#8217;s ready to buy,</text>
-<text x="90" y="404" font-family="DejaVu Sans" font-weight="bold" font-size="68" fill="url(#title)">before they raise a hand.</text>
-<rect x="92" y="450" width="120" height="6" rx="3" fill="url(#accent)"/>
-<text x="90" y="512" font-family="DejaVu Sans" font-size="30" fill="#aab4dc">B2B revenue intelligence — the buying signals that</text>
-<text x="90" y="552" font-family="DejaVu Sans" font-size="30" fill="#aab4dc">show intent, turned into your team&#8217;s next best move.</text>
-<!-- score chip, bottom-right -->
-<g transform="translate(940,430)">
-  <rect x="0" y="0" width="180" height="120" rx="20" fill="#0b1122" stroke="#4cbf92" stroke-opacity=".45"/>
-  <text x="90" y="66" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="58" fill="url(#accent)">9.4</text>
-  <text x="90" y="96" text-anchor="middle" font-family="DejaVu Sans" font-size="18" fill="#8b94be" letter-spacing="1">intent score</text>
-</g>
+
+<rect width="1200" height="630" fill="url(#vig)"/>
 </svg>
