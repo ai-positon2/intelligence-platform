@@ -1,0 +1,185 @@
+/* ════════════════════════════════════════════════════════════════
+   AURORA — internal app visual elevation layer (loaded LAST).
+   Additive polish on top of ds-tokens / hub / gtm / seo / admin.
+   Theme-aware. Reduced-motion safe. No layout restructuring.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ---- brand accent for the internal app (Arena green ↔ indigo) ---- */
+:root{
+  --au-brand:#4cbf92; --au-brand2:#6ea8ff; --au-brand3:#9b87fd;
+  --au-glow:rgba(76,191,146,.30);
+  --au-ring:0 0 0 2px rgba(110,168,255,.55);
+}
+
+/* ════ 1 · Ambient aurora field (drifts behind everything) ════ */
+body::before{
+  content:"";position:fixed;inset:-20% -10% -10% -10%;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(46% 40% at 14% 8%,  rgba(76,191,146,.16), transparent 62%),
+    radial-gradient(42% 46% at 88% 4%,  rgba(110,168,255,.15), transparent 60%),
+    radial-gradient(60% 50% at 78% 96%, rgba(155,135,253,.13), transparent 64%),
+    radial-gradient(40% 40% at 4% 92%,  rgba(34,211,238,.10),  transparent 62%);
+  filter:saturate(118%);
+  animation:au-drift 34s ease-in-out infinite alternate;
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes au-drift{
+  0%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(-2.2%,1.6%,0) scale(1.05)}
+  100%{transform:translate3d(1.8%,-1.2%,0) scale(1.03)}
+}
+[data-theme="light"] body::before{
+  background:
+    radial-gradient(46% 40% at 14% 8%,  rgba(76,191,146,.18), transparent 62%),
+    radial-gradient(42% 46% at 88% 4%,  rgba(110,168,255,.16), transparent 60%),
+    radial-gradient(60% 50% at 78% 96%, rgba(155,135,253,.12), transparent 64%);
+}
+[data-theme="light"] body::after{opacity:.03}
+
+/* ════ 2 · Topbar — deeper frost + hairline gradient underline ════ */
+.topbar{
+  background:color-mix(in srgb, var(--bg) 72%, transparent)!important;
+  backdrop-filter:blur(22px) saturate(140%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(140%)!important;
+  border-bottom:1px solid transparent!important;
+  background-image:linear-gradient(color-mix(in srgb,var(--bg) 72%,transparent),color-mix(in srgb,var(--bg) 72%,transparent)),
+    linear-gradient(90deg,transparent,var(--au-glow),transparent)!important;
+  background-origin:border-box!important;background-clip:padding-box,border-box!important;
+}
+.brand-icon,.tb-brand-icon,.orb{box-shadow:0 0 0 1px rgba(255,255,255,.06),0 6px 20px -6px var(--au-glow)!important}
+.user-pill{transition:transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),background .18s,border-color .18s!important}
+.user-pill:hover{transform:translateY(-1px)}
+
+/* dropdown lift */
+.dd-menu,.tb-dd-menu{box-shadow:0 24px 60px -18px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04)!important;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.dd-item,.tb-dd-item{transition:background .14s,color .14s,padding-left .14s!important}
+.dd-item:hover,.tb-dd-item:hover{padding-left:16px!important}
+
+/* ════ 3 · Cards — depth, top-light, cursor spotlight, hover glow ════ */
+.hub-card,.dash-card,.ds-card,.workspace-card,.lx-card{
+  position:relative;isolation:isolate;
+  transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1)),
+             box-shadow .3s ease, border-color .3s ease!important;
+}
+/* inner top highlight — reads as a surface catching light */
+.hub-card::before,.dash-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 0 0 1px rgba(255,255,255,.02);
+}
+/* cursor-follow spotlight (fed by aurora.js --mx/--my; falls back to top-center) */
+.hub-card::after,.dash-card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
+  opacity:0;transition:opacity .35s ease;
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%),
+            color-mix(in srgb,var(--card-accent,var(--au-brand)) 26%,transparent),transparent 60%);
+}
+.hub-card:hover::after,.dash-card:hover::after{opacity:.9}
+.hub-card:hover,.dash-card:hover,.ds-card--hover:hover{
+  transform:translateY(-4px)!important;
+  border-color:color-mix(in srgb,var(--card-accent,var(--au-brand)) 55%,transparent)!important;
+  box-shadow:0 26px 60px -22px rgba(0,0,0,.75),
+             0 0 0 1px color-mix(in srgb,var(--card-accent,var(--au-brand)) 30%,transparent),
+             0 18px 50px -30px var(--card-accent,var(--au-glow))!important;
+}
+/* per-card accent hooks (match existing c-* / card-* classes) */
+.c-signals,.card-gtm{--card-accent:#6ea8ff}
+.c-adint{--card-accent:#f5a623}
+.c-visitors{--card-accent:#22d3ee}
+.c-linkedin{--card-accent:#0a91e0}
+.c-sentiment{--card-accent:#2dd4aa}
+.c-job{--card-accent:#b78bfa}
+.card-seo{--card-accent:#4cbf92}
+.dash-card.soon{--card-accent:#8a94be}
+
+/* arrow easing */
+.card-arrow,.dash-arrow{transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1))!important}
+.hub-card:hover .card-arrow,.dash-card:hover .dash-arrow{transform:translateX(6px)}
+
+/* ════ 4 · Numbers — the product's signature (tabular, glowing) ════ */
+.lx-stats2 b,.kpi-val,.stat-val,.ds-stat-val,.cs-kpi .kv,.card-stat span{
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.lx-stats2 b,.hero-stat b{color:var(--au-brand2);filter:drop-shadow(0 2px 14px rgba(76,191,146,.22))}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .lx-stats2 b,.hero-stat b{
+    background:linear-gradient(120deg,var(--au-brand),var(--au-brand2) 60%,var(--au-brand3));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+}
+
+/* ════ 5 · Icon chips — makes emoji/SVG icons feel intentional ════ */
+.card-preview-icon,.dash-ic,.dc-ic{
+  transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1)),filter .3s ease!important;
+}
+.hub-card:hover .card-preview-icon,.dash-card:hover .dash-ic{
+  transform:translateY(-2px) scale(1.06);filter:drop-shadow(0 6px 16px var(--au-glow))
+}
+.au-ic{width:22px;height:22px;display:block;stroke:currentColor;fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.au-icbox{display:inline-flex;align-items:center;justify-content:center;
+  width:46px;height:46px;border-radius:14px;
+  color:var(--card-accent,var(--au-brand));
+  background:color-mix(in srgb,var(--card-accent,var(--au-brand)) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--card-accent,var(--au-brand)) 30%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+
+/* ════ 6 · Buttons — magnetic lift + sheen ════ */
+.ds-btn--primary,.btn-primary,.refresh-btn,.cs-reset{
+  transition:transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),box-shadow .25s,filter .25s!important}
+.ds-btn--primary:hover,.btn-primary:hover{transform:translateY(-2px);filter:saturate(112%)}
+.ds-btn--primary::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);
+  transform:translateX(-120%);transition:transform .6s ease}
+.ds-btn--primary{position:relative;overflow:hidden}
+.ds-btn--primary:hover::after{transform:translateX(120%)}
+
+/* ════ 7 · Tables — quiet zebra + row hover + tabular figures ════ */
+table td{transition:background .12s ease}
+tbody tr:hover td{background:color-mix(in srgb,var(--au-brand) 7%,transparent)!important}
+table th{letter-spacing:.04em}
+td.num,.num td,td[data-num]{font-variant-numeric:tabular-nums;text-align:right}
+
+/* ════ 8 · Focus-visible — accessible + on-brand ════ */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
+[tabindex]:focus-visible,.hub-card:focus-visible,.dash-card:focus-visible{
+  outline:none!important;box-shadow:var(--au-ring),0 10px 30px -12px var(--au-glow)!important;
+  border-radius:12px;
+}
+
+/* ════ 9 · Selection ════ */
+::selection{background:rgba(76,191,146,.32);color:#fff}
+[data-theme="light"] ::selection{background:rgba(76,191,146,.28);color:#0e1526}
+
+/* ════ 10 · Entrance — cards rise on load (progressive, motion-safe) ════ */
+@keyframes au-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.hub-grid>*, .dash-grid>*, .gtm-grid>*{animation:au-rise .7s var(--ease,cubic-bezier(.16,1,.3,1)) both}
+.hub-grid>*:nth-child(2){animation-delay:.08s}
+.dash-grid>*:nth-child(2),.gtm-grid>*:nth-child(2){animation-delay:.06s}
+.dash-grid>*:nth-child(3),.gtm-grid>*:nth-child(3){animation-delay:.12s}
+.dash-grid>*:nth-child(4),.gtm-grid>*:nth-child(4){animation-delay:.18s}
+.dash-grid>*:nth-child(5),.gtm-grid>*:nth-child(5){animation-delay:.24s}
+.dash-grid>*:nth-child(6),.gtm-grid>*:nth-child(6){animation-delay:.30s}
+
+/* deep-link page title shimmer */
+.page-title,.main-title,.hb-title{background-size:200% auto}
+
+@media (prefers-reduced-motion:reduce){
+  body::before{animation:none!important}
+  .hub-grid>*,.dash-grid>*,.gtm-grid>*{animation:none!important}
+  .ds-btn--primary::after{display:none}
+  *{scroll-behavior:auto!important}
+}
+
+/* ════ 11 · Crafted icons replace emoji (hub + gtm cards) ════ */
+.card-thumb-icon svg.au-ic{width:58px;height:58px;opacity:1;stroke-width:1.5}
+.card-thumb-icon{opacity:1!important;color:var(--card-accent,var(--au-brand));
+  filter:drop-shadow(0 8px 22px color-mix(in srgb,var(--card-accent,var(--au-brand)) 45%,transparent))!important}
+.dash-card.soon .card-thumb-icon{color:#8a94be}
+.card-preview-icon svg.au-ic{width:62px;height:62px;opacity:1;stroke-width:1.4}
+.card-preview-icon{opacity:1!important;font-size:0!important;
+  color:var(--card-accent,var(--au-brand));
+  filter:drop-shadow(0 10px 26px color-mix(in srgb,var(--card-accent,var(--au-brand)) 45%,transparent))!important}
