@@ -216,6 +216,8 @@
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=1">
   <script src="/static/js/aurora.js?v=1" defer></script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 </head>
 <body data-email="{{ user.email if user else '' }}">
   <div class="bg-grid"></div>
@@ -270,7 +272,8 @@
     <div class="cs-wrap">
       <div class="cs-glow"></div>
       <div class="page-header">
-        <h1 class="page-title">Sentiment Pulse</h1>
+        <div class="au-eyebrow"><span class="d"></span>Voice of patient · Live</div>
+        <h1 class="page-title">Sentiment <em>Pulse.</em></h1>
         <p class="page-sub">A live read on how patients feel, by tracking every call, review and survey, and scoring sentiment for each location.</p>
         <div class="cs-sub-icons">
           <span class="cs-srcpill"><span class="d" style="background:var(--cyan)"></span>Network: <b>Cedar Valley Health</b></span>
