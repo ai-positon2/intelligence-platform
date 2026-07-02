@@ -1,0 +1,42 @@
+/* ════════════════════════════════════════════════════════════════
+   AURORA (public) — additive polish for the marketing site.
+   Loaded LAST. Deliberately light-touch: the public site is already
+   richly designed, so this only sharpens focus states, accessibility,
+   and smoothness. No layout changes.
+   ════════════════════════════════════════════════════════════════ */
+
+/* smoother in-page scrolling */
+html{scroll-behavior:smooth}
+
+/* accessible, on-brand focus rings (keyboard users) */
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
+[tabindex]:focus-visible,.fcard:focus-visible,.acard:focus-visible,.chip:focus-visible{
+  outline:none!important;
+  box-shadow:0 0 0 2px rgba(5,7,20,.9),0 0 0 4px rgba(76,191,146,.85),
+             0 12px 34px -12px rgba(76,191,146,.6)!important;
+  border-radius:14px;
+}
+
+/* refined scrollbar */
+*::-webkit-scrollbar{width:11px;height:11px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{
+  background:linear-gradient(180deg,rgba(124,140,220,.4),rgba(124,140,220,.22));
+  border-radius:100px;border:3px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(76,191,146,.7),rgba(34,211,238,.5));background-clip:content-box}
+
+/* CTA buttons: a touch more life on press */
+.btn-grad:active{transform:translateY(1px) scale(.99)}
+
+/* ACCESSIBILITY — respect reduced-motion: restore the native cursor
+   and disable the custom one so the pointer can never be lost. */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  body,a,button,.chip,.tilt,.onode,[data-cursor]{cursor:auto!important}
+  #cring,#cdot{display:none!important}
+}
+/* touch devices never need the custom cursor */
+@media (pointer:coarse){
+  #cring,#cdot{display:none!important}
+  body,a,button{cursor:auto!important}
+}
