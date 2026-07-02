@@ -183,3 +183,105 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
 .card-preview-icon{opacity:1!important;font-size:0!important;
   color:var(--card-accent,var(--au-brand));
   filter:drop-shadow(0 10px 26px color-mix(in srgb,var(--card-accent,var(--au-brand)) 45%,transparent))!important}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AURORA v2 — brand parity with the public marketing site.
+   Bricolage display + Instrument Serif italics, glass surfaces,
+   gradient CTAs, eyebrow pills, nebula-friendly transparency,
+   full light-theme coverage.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  --au-display:'Bricolage Grotesque',var(--font,system-ui),sans-serif;
+  --au-serif:'Instrument Serif',Georgia,serif;
+}
+
+/* let the nebula/aurora field show through the page shell */
+body{background:transparent!important}
+html{background:var(--bg)}
+html::before{content:"";position:fixed;inset:0;z-index:-3;background:
+  radial-gradient(120% 90% at 50% -10%, #0a1024 0%, var(--bg) 55%)}
+[data-theme="light"] html::before{background:
+  radial-gradient(120% 90% at 50% -10%, #f4f7ff 0%, var(--bg) 60%)}
+
+/* ---- 1 · Display typography (titles) ---- */
+.page-title,.main-heading,.hb-title,.heading,
+.main-title,.section-title,.hero-title,
+.au-main h1,.page-header h1{
+  font-family:var(--au-display)!important;
+  font-weight:800!important;letter-spacing:-.028em!important;
+  line-height:1.02!important;
+}
+/* Instrument Serif italic accent — used as <em>/.ital/.au-ital inside titles */
+.page-title em,.page-title .ital,.au-ital,
+h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
+.lx-kinetic-done em,.lx-kinetic-done .ital{
+  font-family:var(--au-serif)!important;font-style:italic!important;
+  font-weight:400!important;letter-spacing:.005em;
+  background:linear-gradient(100deg,#5fd8cd,#9fb6ec 48%,#b78bfa)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+  padding-right:.08em;
+}
+@supports not ((-webkit-background-clip:text) or (background-clip:text)){
+  .au-ital,.page-title em,h1 em,.heading em,.heading .ital{-webkit-text-fill-color:#9fb6ec;color:#9fb6ec}
+}
+
+/* ---- 2 · Eyebrow pill (mono kicker, matches public .pill-eye) ---- */
+.au-eyebrow{display:inline-flex;align-items:center;gap:9px;
+  font-family:'JetBrains Mono',ui-monospace,'Space Grotesk',monospace;
+  font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;font-weight:600;
+  color:var(--tx2);background:var(--s2);border:1px solid var(--b2);
+  border-radius:999px;padding:7px 15px;margin-bottom:16px}
+.au-eyebrow .d{width:7px;height:7px;border-radius:50%;
+  background:var(--au-brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--au-brand) 22%,transparent);
+  animation:au-pulse 2.4s ease-in-out infinite}
+@keyframes au-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--au-brand) 40%,transparent)}
+  50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--au-brand) 0%,transparent)}}
+
+/* ---- 3 · Glass surfaces (match public .glass) ---- */
+.hub-card,.dash-card,.ds-card,.glass,.stat-card,.kpi,
+.panel,.lx-card,.data-card,.chart-card,.au-glass{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018))!important;
+  border:1px solid var(--b1)!important;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 24px 60px -34px rgba(0,0,0,.85)!important;
+}
+[data-theme="light"] .hub-card,[data-theme="light"] .dash-card,[data-theme="light"] .ds-card,
+[data-theme="light"] .glass,[data-theme="light"] .panel,[data-theme="light"] .kpi,[data-theme="light"] .chart-card,[data-theme="light"] .au-glass{
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.72))!important;
+  border-color:var(--b1)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 20px 50px -34px rgba(30,40,80,.35)!important;
+}
+
+/* ---- 4 · Gradient primary CTA (match public .btn-grad) ---- */
+.ds-btn--primary,.btn-grad,.au-cta,.refresh-btn.primary{
+  border:0!important;color:#fff!important;border-radius:999px!important;
+  background:linear-gradient(110deg,#22d3ee,#6366f1 42%,#a855f7 80%,#e879f9)!important;
+  background-size:220% 100%!important;background-position:0% 50%!important;
+  box-shadow:0 10px 30px -10px rgba(99,102,241,.6),inset 0 0 0 1px rgba(255,255,255,.18)!important;
+  transition:background-position .6s ease,transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),box-shadow .25s!important}
+.ds-btn--primary:hover,.btn-grad:hover,.au-cta:hover{background-position:100% 50%!important;transform:translateY(-2px)!important}
+
+/* ---- 5 · Chips / badges refine ---- */
+.ds-chip.is-on,.chip.is-on,.filter.active{
+  background:color-mix(in srgb,var(--au-brand) 16%,transparent)!important;
+  border-color:color-mix(in srgb,var(--au-brand) 55%,transparent)!important;color:var(--au-brand)!important}
+
+/* ---- 6 · Section eyebrows already present get brand dot color ---- */
+.hb-eyebrow,.lx-sec-eyebrow,.section-eyebrow{color:var(--tx3)}
+
+/* ---- 7 · Topbar brand icon → gradient ring to match ---- */
+.brand-icon,.tb-brand-icon{background:linear-gradient(135deg,#4cbf92,#6ea8ff)!important}
+
+/* ---- 8 · Scrollbar (internal shows a slim branded one now) ---- */
+.main::-webkit-scrollbar,.content::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--au-brand) 45%,transparent);border-radius:99px;
+  border:3px solid transparent;background-clip:content-box}
+
+/* ---- 9 · Light-theme aurora field warmth ---- */
+[data-theme="light"] .au-eyebrow{background:rgba(255,255,255,.7)}
+
+@media (prefers-reduced-motion:reduce){
+  .au-eyebrow .d{animation:none}
+}
