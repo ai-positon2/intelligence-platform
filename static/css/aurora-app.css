@@ -11,33 +11,7 @@
   --au-ring:0 0 0 2px rgba(110,168,255,.55);
 }
 
-/* ════ 1 · Ambient aurora field (drifts behind everything) ════ */
-body::before{
-  content:"";position:fixed;inset:-20% -10% -10% -10%;z-index:-2;pointer-events:none;
-  background:
-    radial-gradient(46% 40% at 14% 8%,  rgba(76,191,146,.16), transparent 62%),
-    radial-gradient(42% 46% at 88% 4%,  rgba(110,168,255,.15), transparent 60%),
-    radial-gradient(60% 50% at 78% 96%, rgba(155,135,253,.13), transparent 64%),
-    radial-gradient(40% 40% at 4% 92%,  rgba(34,211,238,.10),  transparent 62%);
-  filter:saturate(118%);
-  animation:au-drift 34s ease-in-out infinite alternate;
-}
-body::after{
-  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-@keyframes au-drift{
-  0%{transform:translate3d(0,0,0) scale(1)}
-  50%{transform:translate3d(-2.2%,1.6%,0) scale(1.05)}
-  100%{transform:translate3d(1.8%,-1.2%,0) scale(1.03)}
-}
-[data-theme="light"] body::before{
-  background:
-    radial-gradient(46% 40% at 14% 8%,  rgba(76,191,146,.18), transparent 62%),
-    radial-gradient(42% 46% at 88% 4%,  rgba(110,168,255,.16), transparent 60%),
-    radial-gradient(60% 50% at 78% 96%, rgba(155,135,253,.12), transparent 64%);
-}
-[data-theme="light"] body::after{opacity:.03}
+/* (aurora ambient field removed — original page backgrounds preserved) */
 
 /* ════ 2 · Topbar — deeper frost + hairline gradient underline ════ */
 .topbar{
@@ -168,7 +142,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
 .page-title,.main-title,.hb-title{background-size:200% auto}
 
 @media (prefers-reduced-motion:reduce){
-  body::before{animation:none!important}
   .hub-grid>*,.dash-grid>*,.gtm-grid>*{animation:none!important}
   .ds-btn--primary::after{display:none}
   *{scroll-behavior:auto!important}
@@ -196,13 +169,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
   --au-serif:'Instrument Serif',Georgia,serif;
 }
 
-/* let the nebula/aurora field show through the page shell */
-body{background:transparent!important}
-html{background:var(--bg)}
-html::before{content:"";position:fixed;inset:0;z-index:-3;background:
-  radial-gradient(120% 90% at 50% -10%, #0a1024 0%, var(--bg) 55%)}
-[data-theme="light"] html::before{background:
-  radial-gradient(120% 90% at 50% -10%, #f4f7ff 0%, var(--bg) 60%)}
+/* (page-shell background overrides removed — keep each page's native background) */
 
 /* ---- 1 · Display typography (titles) ---- */
 .page-title,.main-heading,.hb-title,.heading,
