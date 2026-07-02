@@ -9,6 +9,7 @@
   --display:'Bricolage Grotesque',system-ui,sans-serif;
   --serif:'Instrument Serif',Georgia,serif;
   --sans:'Inter',system-ui,sans-serif;
+  --logo-bg:#151b2e;
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --line:rgba(255,255,255,.06); --line2:rgba(255,255,255,.12);
   --indigo:#6366f1; --violet:#8b5cf6; --cyan:#22d3ee;
@@ -286,3 +287,29 @@ td.dim{color:#5a6488}
 .bars .bar:nth-child(5n+3) .fill,.bar-row:nth-child(5n+3) .bar-fill{background:linear-gradient(90deg,#34d399,#6ee7b7)}
 .bars .bar:nth-child(5n+4) .fill,.bar-row:nth-child(5n+4) .bar-fill{background:linear-gradient(90deg,#f59e0b,#fcd34d)}
 .bars .bar:nth-child(5n+5) .fill,.bar-row:nth-child(5n+5) .bar-fill{background:linear-gradient(90deg,#e879f9,#a855f7)}
+
+
+/* ════ LIGHT THEME (admin) ════ */
+:root[data-theme="light"]{--logo-bg:#ffffff}
+[data-theme="light"] body{background:#eef1f8 !important;color:#17213a !important}
+[data-theme="light"] body::after{opacity:.22 !important}
+[data-theme="light"] .topbar{background:rgba(255,255,255,.85) !important;border-bottom:1px solid rgba(18,26,54,.10) !important}
+[data-theme="light"] .brand-name,[data-theme="light"] .brand b{color:#17213a !important}
+[data-theme="light"] .bc,[data-theme="light"] .bc a,[data-theme="light"] .bc-link,[data-theme="light"] .bc .sep,[data-theme="light"] .bc-sep{color:#5a6488 !important}
+[data-theme="light"] .bc-cur,[data-theme="light"] .bc .cur{color:#17213a !important}
+[data-theme="light"] .user-pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important}
+[data-theme="light"] .uname,[data-theme="light"] .user-name{color:#17213a !important}
+[data-theme="light"] .pill-chevron{color:#5a6488 !important}
+[data-theme="light"] .user-dropdown{background:#fff !important;border-color:rgba(18,26,54,.12) !important;box-shadow:0 24px 60px rgba(30,40,80,.18) !important}
+[data-theme="light"] .dd-item{color:#4d5680 !important}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
+[data-theme="light"] .dd-name{color:#17213a !important}
+[data-theme="light"] .dd-email{color:#5a6488 !important}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10) !important}
+[data-theme="light"] h1,[data-theme="light"] h2,[data-theme="light"] h3,[data-theme="light"] .ph-left h1,[data-theme="light"] .hero h1,[data-theme="light"] .card-title{color:#12203a !important}
+[data-theme="light"] .sub,[data-theme="light"] .hero p,[data-theme="light"] .eyebrow,[data-theme="light"] .card-meta,[data-theme="light"] .meta,[data-theme="light"] .ts{color:#5a6488 !important}
+[data-theme="light"] .card,[data-theme="light"] .kpi,[data-theme="light"] .stat,[data-theme="light"] .glass,[data-theme="light"] .sect,[data-theme="light"] .ph{background:#ffffff !important;border-color:rgba(18,26,54,.10) !important;box-shadow:0 12px 30px -16px rgba(30,40,80,.20) !important}
+[data-theme="light"] thead th,[data-theme="light"] th{color:#5a6488 !important;border-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] td{color:#2a3352 !important;border-color:rgba(18,26,54,.08) !important}
+[data-theme="light"] tbody tr:hover td,[data-theme="light"] tr:hover td{background:rgba(18,26,54,.03) !important}
+[data-theme="light"] .tag,[data-theme="light"] .pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#4d5680 !important}

@@ -812,3 +812,16 @@ html.lenis,html.lenis body{height:auto}
 .ke-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 @media(max-width:560px){.ke-meta{grid-template-columns:1fr}.ke-int{flex-direction:column}}
 
+
+
+/* ════ LIGHT THEME OVERRIDES ════ */
+[data-theme="light"] body{color:#17213a}
+[data-theme="light"] .tb-topbar,[data-theme="light"] .topbar{background:rgba(255,255,255,.85) !important;border-bottom-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .tb-brand-name,[data-theme="light"] .brand-name{color:#17213a !important}
+[data-theme="light"] .tb-bc-cur,[data-theme="light"] .page-hdr-title{color:#17213a !important}
+[data-theme="light"] .tb-bc-link,[data-theme="light"] .tb-bc-sep{color:#5a6488 !important}
+[data-theme="light"] .tb-user-pill,[data-theme="light"] .user-pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#17213a !important}
+[data-theme="light"] .tb-dd-menu,[data-theme="light"] .user-dropdown{background:#fff !important;border-color:rgba(18,26,54,.12) !important;box-shadow:0 24px 60px rgba(30,40,80,.18) !important}
+[data-theme="light"] .tb-dd-item,[data-theme="light"] .dd-item{color:#4d5680 !important}
+[data-theme="light"] .tb-dd-item:hover,[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
+[data-theme="light"] .card,[data-theme="light"] .glass,[data-theme="light"] .panel{background:#fff !important;border-color:rgba(18,26,54,.10) !important}

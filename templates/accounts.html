@@ -113,13 +113,32 @@
     .arrow{font-size:16px;color:var(--accent-text);opacity:0;transition:opacity .15s,transform .15s}
     .card:hover .arrow{opacity:1;transform:translateX(3px)}
     .foot{margin-top:48px;font-size:12px;color:#13151f}
-  </style>
+  
+:root{--logo-bg:#151b2e}
+[data-theme="light"]{--logo-bg:#ffffff}
+[data-theme="light"] body{background:#eef1f8 !important;color:#17213a !important}
+[data-theme="light"] .topbar{background:rgba(255,255,255,.85) !important;border-bottom-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .brand-name{color:#17213a !important}
+[data-theme="light"] .breadcrumb,[data-theme="light"] .bc-link,[data-theme="light"] .bc a,[data-theme="light"] .bc-sep{color:#5a6488 !important}
+[data-theme="light"] .bc-cur{color:#17213a !important}
+[data-theme="light"] .user-pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#17213a !important}
+[data-theme="light"] .user-name,[data-theme="light"] .uname{color:#17213a !important}
+[data-theme="light"] .user-dropdown{background:#fff !important;border-color:rgba(18,26,54,.12) !important;box-shadow:0 24px 60px rgba(30,40,80,.18) !important}
+[data-theme="light"] .dd-item{color:#4d5680 !important}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
+[data-theme="light"] .dd-name{color:#17213a !important}[data-theme="light"] .dd-email{color:#5a6488 !important}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10) !important}
+[data-theme="light"] .card,[data-theme="light"] .glass,[data-theme="light"] .panel{background:#fff !important;border-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .card-name{color:#12203a !important}
+[data-theme="light"] .card-desc,[data-theme="light"] .sub{color:#5a6488 !important}
+</style>
 <style id="hide-scrollbars">
 html,body{scrollbar-width:none;-ms-overflow-style:none;}
 html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
 *{scrollbar-width:none;-ms-overflow-style:none;}
 *::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important;}
 </style>
+  <script src="/static/js/theme.js"></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -127,7 +146,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   <div class="topbar">
     <div class="tl">
       <a href="/hub" class="brand">
-        <div class="brand-icon" style="background:none;box-shadow:none;overflow:visible;padding:0"><img src="/favicon.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
+        <div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:5px"><img src="/logo-mark.svg?v=1" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
         <span class="brand-name">Intelligence</span>
       </a>
       <div class="bc">
@@ -150,7 +169,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           <div class="dd-name">{{ user.name or 'User' }}</div>
           <div class="dd-email">{{ user.email }}</div>
         </div>
-        <div class="dd-items">
+        <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
           {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
           <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
           <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>

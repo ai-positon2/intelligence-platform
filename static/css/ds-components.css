@@ -71,3 +71,7 @@
 /* ---- Empty state ---- */
 .ds-empty{text-align:center;padding:48px 18px;color:var(--tx3);}
 .ds-empty-ico{font-size:26px;opacity:.6;margin-bottom:8px;}
+
+/* LIGHT THEME baseline */
+[data-theme="light"] body{background:var(--bg);color:var(--tx)}
+[data-theme="light"] .ds-btn{color:var(--tx)}

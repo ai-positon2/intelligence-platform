@@ -307,3 +307,33 @@ html.lenis,html.lenis body{height:auto}
 @media (prefers-reduced-motion:reduce){.sm-ring,.sm-line,.sm-area,.sm-dot{animation:none;stroke-dashoffset:0;opacity:.8}}
 
 .seo-motif{display:none!important}
+
+
+/* ════════════ LIGHT THEME OVERRIDES ════════════ */
+[data-theme="light"] body{background:#eef1f8 !important;color:#17213a !important}
+[data-theme="light"] .bg-grid,[data-theme="light"] #bggrid,[data-theme="light"] .grid-bg{opacity:.35 !important;filter:invert(1) brightness(.5) !important}
+[data-theme="light"] .topbar{background:rgba(255,255,255,.85) !important;border-bottom:1px solid rgba(18,26,54,.10) !important}
+[data-theme="light"] .brand-name,[data-theme="light"] .logo-text{color:#17213a !important}
+[data-theme="light"] .breadcrumb,[data-theme="light"] .bc-link{color:#5a6488 !important}
+[data-theme="light"] .bc-cur{color:#17213a !important}
+[data-theme="light"] .bc-sep{color:#aab2cc !important}
+[data-theme="light"] .user-pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#17213a !important}
+[data-theme="light"] .user-pill:hover,[data-theme="light"] .user-pill.open{background:rgba(18,26,54,.08) !important;border-color:rgba(99,102,241,.4) !important}
+[data-theme="light"] .user-name{color:#17213a !important}
+[data-theme="light"] .pill-chevron{color:#5a6488 !important}
+[data-theme="light"] .user-dropdown{background:rgba(255,255,255,.99) !important;border-color:rgba(18,26,54,.12) !important;box-shadow:0 24px 60px rgba(30,40,80,.18) !important}
+[data-theme="light"] .dd-header{border-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .dd-name{color:#17213a !important}
+[data-theme="light"] .dd-email{color:#5a6488 !important}
+[data-theme="light"] .dd-item{color:#4d5680 !important}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10) !important}
+[data-theme="light"] .page-title{background:linear-gradient(120deg,#12203a 30%,#5b63e6 88%) !important;-webkit-background-clip:text !important;background-clip:text !important;-webkit-text-fill-color:transparent !important}
+[data-theme="light"] .page-sub,[data-theme="light"] .section-label{color:#5a6488 !important}
+[data-theme="light"] .hb-cue{color:#5a6488 !important}
+[data-theme="light"] .dash-card,[data-theme="light"] .card,[data-theme="light"] .glass,[data-theme="light"] .panel,[data-theme="light"] .tool-card{background:#ffffff !important;border-color:rgba(18,26,54,.10) !important;box-shadow:0 12px 30px -16px rgba(30,40,80,.22) !important}
+[data-theme="light"] .card-name,[data-theme="light"] .tool-name{color:#12203a !important}
+[data-theme="light"] .card-desc,[data-theme="light"] .tool-desc{color:#5a6488 !important}
+[data-theme="light"] .card-thumb{background:linear-gradient(160deg,#f3f5fb,#e9edf7) !important}
+[data-theme="light"] .card-footer{border-color:rgba(18,26,54,.08) !important}
+[data-theme="light"] .card-tags .tag,[data-theme="light"] .tag,[data-theme="light"] .chip{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#4d5680 !important}
