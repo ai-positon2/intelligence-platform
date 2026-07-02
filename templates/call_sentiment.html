@@ -199,7 +199,21 @@
 .cs-dsec h4{font-size:12px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px}
 .cs-print{font-size:11px}
 @media print{.cs-filters,.topbar,.bg-grid{display:none}}
+
+/* ════ LIGHT THEME ════ */
+[data-theme="light"] body{background:#eef1f8 !important;color:#17213a !important}
+[data-theme="light"] .cs-panel,[data-theme="light"] .cs-filters,[data-theme="light"] .cs-kpi,[data-theme="light"] .cs-drawer,[data-theme="light"] .cs-fi{background:#ffffff !important;border-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .cs-kpi{box-shadow:0 12px 30px -18px rgba(30,40,80,.22) !important}
+[data-theme="light"] .cs-kpi .kv{color:color-mix(in srgb,var(--kc,var(--accent)) 60%,#0b1224) !important;text-shadow:none !important}
+[data-theme="light"] .cs-panel::before{background:linear-gradient(90deg,transparent,rgba(18,26,54,.12),transparent) !important}
+[data-theme="light"] .cs-ph h3{color:#12203a !important}
+[data-theme="light"] .cs-ph .sub,[data-theme="light"] .cs-flabel,[data-theme="light"] .cs-seclabel,[data-theme="light"] .cs-updated,[data-theme="light"] .kl,[data-theme="light"] .cs-legend,[data-theme="light"] .cs-loc-name span{color:#5a6488 !important}
+[data-theme="light"] .cs-seg,[data-theme="light"] .cs-chip,[data-theme="light"] .cs-select,[data-theme="light"] .cs-search,[data-theme="light"] .cs-srcpill,[data-theme="light"] .cs-tab{background:#f2f4fb !important;border-color:rgba(18,26,54,.12) !important;color:#17213a !important}
+[data-theme="light"] .cs-search input{color:#17213a !important}
+[data-theme="light"] .cs-loc-tbl td,[data-theme="light"] .cs-loc-tbl th,[data-theme="light"] #recent td,[data-theme="light"] #recent th{border-color:rgba(18,26,54,.08) !important}
+[data-theme="light"] .cs-loc-tbl tr:hover td{background:rgba(18,26,54,.03) !important}
 </style>
+  <script src="/static/js/theme.js"></script>
 </head>
 <body data-email="{{ user.email if user else '' }}">
   <div class="bg-grid"></div>
@@ -208,7 +222,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <a href="/hub" class="brand">
-        <div class="brand-icon" style="background:none;box-shadow:none;overflow:visible;padding:0"><img src="/favicon.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
+        <div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:5px"><img src="/logo-mark.svg?v=1" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
         <span class="brand-name">Intelligence</span>
       </a>
       <div class="breadcrumb">
@@ -234,7 +248,7 @@
             <div class="dd-name">{{ user.name or 'User' }}</div>
             <div class="dd-email">{{ user.email }}</div>
           </div>
-          <div class="dd-items">
+          <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
             {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
             <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
             <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
