@@ -32,6 +32,7 @@
   }
   function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
 
+  function boot() {
   var vid = ls("p2_vid"), isNew = false;
   if (!vid) { vid = uuid(); ls("p2_vid", vid); isNew = true; }
   // mirror into a first-party cookie so the server can stitch identity on form submit / login
@@ -182,4 +183,79 @@
   }
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") send(); });
   addEventListener("pagehide", send);
+  } /* end boot */
+
+  /* ── EU/UK consent gate ──
+     Gated visitors (browser timezone in Europe/* or EEA Atlantic zones) get a
+     small consent card. Until they click Allow, boot() never runs: no cookie,
+     no localStorage id, no beacons. Decline is remembered (re-asked after 12
+     months). Everyone else tracks as before. ?p2geo=eu forces the gate for
+     testing; ?p2geo=off bypasses it. */
+  var EXTRA_TZ = { "Atlantic/Reykjavik": 1, "Atlantic/Canary": 1, "Atlantic/Madeira": 1, "Atlantic/Azores": 1, "Atlantic/Faroe": 1 };
+  function inGatedRegion() {
+    try {
+      var q = new URLSearchParams(location.search).get("p2geo");
+      if (q === "eu") return true;
+      if (q === "off") return false;
+    } catch (e) {}
+    try {
+      var tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "";
+      return /^Europe\//.test(tz) || !!EXTRA_TZ[tz];
+    } catch (e) { return true; }
+  }
+  function consentState() {
+    var v = ls("p2_consent") || "", p = v.split(":");
+    if (p[0] !== "yes" && p[0] !== "no") return null;
+    var ts = parseInt(p[1], 10) || 0;
+    if (Date.now() - ts > 31536000000) return null; /* re-ask after 12 months */
+    return p[0];
+  }
+  function showConsentCard() {
+    function mount() {
+      if (document.getElementById("p2cc")) return;
+      var st = document.createElement("style");
+      st.textContent =
+        "#p2cc{position:fixed;left:18px;bottom:18px;z-index:99990;max-width:300px;" +
+        "background:rgba(9,12,24,.93);border:1px solid rgba(124,140,220,.22);border-radius:14px;" +
+        "padding:12px 14px 11px;font-family:'Inter',system-ui,sans-serif;" +
+        "box-shadow:0 12px 40px rgba(2,4,12,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" +
+        "opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}" +
+        "#p2cc.on{opacity:1;transform:none}" +
+        "#p2cc,#p2cc *{cursor:auto!important}" +
+        "#p2cc .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.14em;" +
+        "text-transform:uppercase;color:#7e89b8;margin-bottom:5px}" +
+        "#p2cc .t{font-size:11.5px;line-height:1.5;color:#a6b0d6;margin-bottom:9px}" +
+        "#p2cc .t a{color:#c7d0f2;text-decoration:underline;text-underline-offset:2px}" +
+        "#p2cc .r{display:flex;gap:8px}" +
+        "#p2cc button{font-family:inherit;font-size:11.5px;font-weight:600;border-radius:999px;" +
+        "padding:5px 14px;border:1px solid transparent}" +
+        "#p2cc .ok{background:linear-gradient(120deg,#6366f1,#8b5cf6);color:#fff}" +
+        "#p2cc .no{background:transparent;border-color:rgba(124,140,220,.3);color:#99a4cc}" +
+        "@media (max-width:640px){#p2cc{left:12px;right:12px;bottom:12px;max-width:none}}";
+      var el = document.createElement("div");
+      el.id = "p2cc";
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-label", "Cookie consent");
+      el.innerHTML =
+        '<div class="k">Cookies</div>' +
+        '<div class="t">We use one first-party cookie for anonymous analytics. No ad networks, no third parties. <a href="/privacy">Privacy</a></div>' +
+        '<div class="r"><button class="ok" id="p2ccY">Allow</button><button class="no" id="p2ccN">Decline</button></div>';
+      document.head.appendChild(st);
+      document.body.appendChild(el);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
+      function done(v) {
+        ls("p2_consent", v + ":" + Date.now());
+        el.classList.remove("on");
+        setTimeout(function () { el.remove(); }, 500);
+        if (v === "yes") boot();
+      }
+      document.getElementById("p2ccY").addEventListener("click", function () { done("yes"); });
+      document.getElementById("p2ccN").addEventListener("click", function () { done("no"); });
+    }
+    if (document.readyState === "loading") addEventListener("DOMContentLoaded", mount); else mount();
+  }
+
+  var __c = consentState();
+  if (!inGatedRegion() || __c === "yes") boot();
+  else if (__c !== "no") showConsentCard();
 })();
