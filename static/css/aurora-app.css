@@ -269,6 +269,11 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
   -webkit-text-fill-color:transparent!important;color:transparent!important;
 }
 
-/* ═══ FIX · particles visible above page background, behind content ═══ */
-#pfx-bg{z-index:0!important}
-.main,.cs-wrap,.page-hdr,[id^="tab-"]{position:relative;z-index:1}
+/* ═══ FIX · reveal particle canvas — background on root, body transparent ═══
+   Each page's own bg lives on body which was covering the fixed canvas.
+   Move a base to the root (pages may override via :root for their gradient),
+   make body transparent, and keep the canvas behind content. ═══ */
+html{background:#070912}
+:root[data-theme="light"] html,[data-theme="light"] html{background:#eef1f8}
+body{background:transparent!important}
+#pfx-bg{z-index:-1!important}
