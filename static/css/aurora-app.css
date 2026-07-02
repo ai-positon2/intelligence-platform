@@ -285,3 +285,22 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 @media (prefers-reduced-motion:reduce){
   .au-eyebrow .d{animation:none}
 }
+
+/* ═══ FIX · light-theme title contrast (LUX kinetic forces near-white) ═══ */
+[data-theme="light"] .lx-kinetic-done,
+[data-theme="light"] .lx-kinetic-done .lxk-w,
+[data-theme="light"] .page-title,
+[data-theme="light"] .main-heading,
+[data-theme="light"] .heading,
+[data-theme="light"] .hb-title{
+  color:#131a30!important;-webkit-text-fill-color:#131a30!important;
+}
+/* keep the Instrument Serif italic accent as a gradient in light theme */
+[data-theme="light"] .page-title em,[data-theme="light"] .heading em,
+[data-theme="light"] .main-heading em,[data-theme="light"] .lx-kinetic-done em,
+[data-theme="light"] .page-title .ital,[data-theme="light"] .heading .ital,
+[data-theme="light"] .au-ital{
+  background:linear-gradient(100deg,#159e94,#5b74d6 48%,#8b5cf6)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+}

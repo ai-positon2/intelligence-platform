@@ -143,7 +143,6 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   <script src="/static/js/aurora.js?v=1" defer></script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-  <script src="/static/js/pfx_bg.js?v=2" defer></script>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -693,7 +692,6 @@ start();
 <script>
 (function(){if(window.__pfx)return;window.__pfx=1;
 if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-var ORB=!!window.__PFX_ORB;
 function start(){if(!window.THREE)return;var MOB=matchMedia('(pointer:coarse)').matches;
 var cv=document.createElement('canvas');cv.id='pfx-bg';cv.style.cssText='position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.6s ease';
 document.body.insertBefore(cv,document.body.firstChild);
