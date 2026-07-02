@@ -171,7 +171,7 @@
     };
   }
   function send() {
-    if (sent) return; sent = true;
+    if (sent || window.__P2VT_KILL) return; sent = true;
     var body = JSON.stringify(payload());
     try {
       if (navigator.sendBeacon) {
@@ -187,9 +187,10 @@
 
   /* ── EU/UK consent gate ──
      Gated visitors (browser timezone in Europe/* or EEA Atlantic zones) get a
-     small consent card. Until they click Allow, boot() never runs: no cookie,
-     no localStorage id, no beacons. Decline is remembered (re-asked after 12
-     months). Everyone else tracks as before. ?p2geo=eu forces the gate for
+     small consent card (opt-out model): tracking runs by default and stops
+     only on Decline, which also wipes the visitor id and suppresses beacons
+     for the current page. Decline is remembered (re-asked after 12 months).
+     Everyone else tracks as before, with no card. ?p2geo=eu forces the gate for
      testing; ?p2geo=off bypasses it. */
   var EXTRA_TZ = { "Atlantic/Reykjavik": 1, "Atlantic/Canary": 1, "Atlantic/Madeira": 1, "Atlantic/Azores": 1, "Atlantic/Faroe": 1 };
   function inGatedRegion() {
@@ -247,7 +248,12 @@
         ls("p2_consent", v + ":" + Date.now());
         el.classList.remove("on");
         setTimeout(function () { el.remove(); }, 500);
-        if (v === "yes") boot();
+        if (v === "no") {
+          window.__P2VT_KILL = 1; /* suppress any future beacons this page */
+          try { localStorage.removeItem("p2_vid"); } catch (e) {}
+          try { document.cookie = "p2_vid=; max-age=0; path=/"; } catch (e) {}
+          try { sessionStorage.clear(); } catch (e) {}
+        }
       }
       document.getElementById("p2ccY").addEventListener("click", function () { done("yes"); });
       document.getElementById("p2ccN").addEventListener("click", function () { done("no"); });
@@ -256,6 +262,7 @@
   }
 
   var __c = consentState();
-  if (!inGatedRegion() || __c === "yes") boot();
-  else if (__c !== "no") showConsentCard();
+  if (__c === "no") { /* respected: no tracking at all */ }
+  else if (!inGatedRegion() || __c === "yes") boot();
+  else { boot(); showConsentCard(); } /* opt-out: track unless/until declined */
 })();
