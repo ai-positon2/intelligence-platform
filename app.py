@@ -1330,30 +1330,126 @@ def index():
     return render_template("agents.html", page="home", agents=AGENTS, agent=None,
                            related=[], signals_list=SIGNALS)
 
-# Placeholder cards on the signed-in home. Each opens a detail page (/app/<id>).
-# Accents pair a primary + secondary colour for gradients; content is placeholder.
-APP_CARDS = [
-    {"id": 1, "ac": "#22d3ee", "ac2": "#6366f1", "agent_url": ""},
-    {"id": 2, "ac": "#8b5cf6", "ac2": "#e879f9", "agent_url": ""},
-    {"id": 3, "ac": "#34d399", "ac2": "#22d3ee", "agent_url": ""},
-    {"id": 4, "ac": "#e879f9", "ac2": "#8b5cf6", "agent_url": ""},
+# ── Public agents on the signed-in home (/app) ───────────────────────────────────
+# These are the SAME SEO tools embedded internally at /p2/seo/<seo_slug> (served by
+# the SERP app), just re-presented for ALL signed-in Google users under public,
+# fancily-named slugs. "Use this agent" embeds the live tool (see /app/<slug>/use).
+_SVG_COMPASS = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+    'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/>'
+    '<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>')
+_SVG_BRIEF = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+    '<path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>')
+_SVG_ALCHEMY = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10z"/>'
+    '<path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg>')
+_SVG_SOON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+    'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>')
+
+APP_AGENTS = [
+    {
+        "slug": "keyword-compass", "name": "Keyword Compass",
+        "tagline": "AI keyword discovery, scoring & clustering",
+        "seo_slug": "keyword-research", "ac": "#22d3ee", "ac2": "#6366f1", "icon": _SVG_COMPASS,
+        "pill1": "Keyword intelligence", "pill2": "SERP · AI · clustering",
+        "lead": ("Point it at a topic and it finds the keywords worth chasing. Keyword Compass "
+            "pulls candidate terms, enriches them with live search data, then scores and clusters "
+            "them into clean topic groups so you know exactly what to target next."),
+        "trips": [
+            {"t": "What it does", "d": "Shortlists high-opportunity keywords with AI and groups them into topic clusters you can act on."},
+            {"t": "How it works", "d": "Gathers candidate terms, layers on SERP and volume signals, then scores and clusters each one by intent and opportunity."},
+            {"t": "Best for", "d": "SEO and content teams deciding what to write and which terms are actually worth the effort."},
+        ],
+        "tags": ["Keywords", "SERP", "Clustering", "Intent", "AI"],
+    },
+    {
+        "slug": "brief-architect", "name": "Brief Architect",
+        "tagline": "Structured, SERP-backed content briefs",
+        "seo_slug": "article-recommendation", "ac": "#8b5cf6", "ac2": "#e879f9", "icon": _SVG_BRIEF,
+        "pill1": "Content briefs", "pill2": "SERP · outlines · entities",
+        "lead": ("Turn a target keyword into a ready-to-write brief. Brief Architect studies the "
+            "pages currently ranking and assembles the structure, headings, questions and entities "
+            "your article needs to compete, so writers start with a plan instead of a blank page."),
+        "trips": [
+            {"t": "What it does", "d": "Builds a complete, competitor-informed content brief from a single target keyword."},
+            {"t": "How it works", "d": "Analyses the live top-ranking results, extracts their structure, entities and FAQs, and composes a recommended outline."},
+            {"t": "Best for", "d": "Writers and strategists who want briefs that already reflect what it takes to rank."},
+        ],
+        "tags": ["Briefs", "SERP", "Outlines", "Entities", "Content"],
+    },
+    {
+        "slug": "content-alchemist", "name": "Content Alchemist",
+        "tagline": "Multi-LLM + SERP article enhancement",
+        "seo_slug": "article-enhancement", "ac": "#34d399", "ac2": "#22d3ee", "icon": _SVG_ALCHEMY,
+        "pill1": "Content enhancement", "pill2": "multi-LLM · SERP · E-E-A-T",
+        "lead": ("Feed it an existing article and it levels the piece up. Content Alchemist compares "
+            "your page against the current top competitors and returns concrete recommendations on "
+            "structure, depth and authority, drawing on multiple language models."),
+        "trips": [
+            {"t": "What it does", "d": "Upgrades an already-published article with specific, competitor-aware improvements."},
+            {"t": "How it works", "d": "Runs multi-LLM analysis alongside a live SERP competitor comparison and returns concrete edits and gaps to close."},
+            {"t": "Best for", "d": "Refreshing existing content that has stalled or is being out-ranked."},
+        ],
+        "tags": ["Enhance", "LLM", "SERP", "E-E-A-T"],
+    },
+    {
+        "slug": "coming-soon", "name": "Coming soon",
+        "tagline": "A new agent, arriving shortly",
+        "seo_slug": None, "ac": "#e879f9", "ac2": "#8b5cf6", "icon": _SVG_SOON,
+        "pill1": "Lorem ipsum", "pill2": "dolor sit amet",
+        "lead": ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor "
+            "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud "
+            "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."),
+        "trips": [
+            {"t": "Lorem ipsum", "d": "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor."},
+            {"t": "Dolor sit", "d": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip."},
+            {"t": "Consectetur", "d": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore."},
+        ],
+        "tags": ["Lorem", "Ipsum", "Dolor", "Sit amet"],
+    },
 ]
+APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
+
+def _app_embed_url(agent):
+    """Build the live SERP tool URL for an agent (same as the internal /p2/seo embed)."""
+    seo_slug = agent.get("seo_slug")
+    if not seo_slug:
+        return ""
+    tool = next((t for t in _seo_tools() if t.get("slug") == seo_slug), None)
+    path = (tool or {}).get("path") or ("/" + seo_slug)
+    ext = (tool or {}).get("url")
+    if ext:
+        return ext
+    pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
+    sep = "?" if "?" not in path else "&"
+    return f"{_SERP_BASE}{path}{(sep + 'pt=' + pt) if pt else ''}"
 
 @app.route("/app")
 @login_required
 def app_home():
-    """Signed-in home for ALL Google users (Position2 and external alike).
-    Placeholder card grid for now -- real content to be defined next."""
-    return render_template("app.html", user=_get_user(), cards=APP_CARDS)
+    """Signed-in home for ALL Google users (Position2 and external alike)."""
+    return render_template("app.html", user=_get_user(), agents=APP_AGENTS)
 
-@app.route("/app/<int:card_id>")
+@app.route("/app/<slug>")
 @login_required
-def app_detail(card_id):
-    """Detail page for a signed-in-home card. Placeholder (lorem ipsum) for now."""
-    card = next((c for c in APP_CARDS if c["id"] == card_id), None)
-    if not card:
+def app_detail(slug):
+    """Public agent detail page."""
+    agent = APP_AGENTS_BY_SLUG.get(slug)
+    if not agent:
         return redirect("/app")
-    return render_template("app_detail.html", user=_get_user(), card=card)
+    return render_template("app_detail.html", user=_get_user(), agent=agent)
+
+@app.route("/app/<slug>/use")
+@login_required
+def app_use(slug):
+    """Run the agent — embeds the live SERP tool (same one used internally)."""
+    agent = APP_AGENTS_BY_SLUG.get(slug)
+    if not agent:
+        return redirect("/app")
+    embed_url = _app_embed_url(agent)
+    if not embed_url:
+        return redirect("/app/" + slug)
+    return render_template("app_embed.html", user=_get_user(), agent=agent, embed_url=embed_url)
 
 
 @app.route("/privacy")
