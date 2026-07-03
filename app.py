@@ -1421,8 +1421,12 @@ def _app_embed_url(agent):
     if ext:
         return ext
     pt = os.environ.get("SERP_PLATFORM_TOKEN", "")
-    sep = "?" if "?" not in path else "&"
-    return f"{_SERP_BASE}{path}{(sep + 'pt=' + pt) if pt else ''}"
+    # embed=1 tells the SERP app to render chrome-less (no sidebar / studio nav),
+    # so public users only see the single agent they opened. Internal /p2/seo does
+    # NOT pass this, so staff keep the full SEO Studio.
+    qs = ([("pt", pt)] if pt else []) + [("embed", "1")]
+    sep = "&" if "?" in path else "?"
+    return f"{_SERP_BASE}{path}{sep}" + "&".join("%s=%s" % kv for kv in qs)
 
 @app.route("/app")
 @login_required
