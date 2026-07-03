@@ -94,7 +94,7 @@
   </style>
   {% block styles %}{% endblock %}
 </head>
-<body>
+<body data-email="{{ user.email }}">
   <header class="hdr">
     <a class="brand" href="/app">
       <div class="brand-icon"><img src="/static/logo-mark.svg?v=3" alt="Intelligence"></div>
@@ -140,6 +140,17 @@
       catch(err){ el.textContent = new Date().toLocaleTimeString(); }
     }
     tickClock(); setInterval(tickClock, 30000);
+  </script>
+  <script>
+    /* post-login page-view tracking for members (kept out of the Usage Dashboard,
+       which is filtered to @position2.com; surfaced in Member Analytics). */
+    (function(){if(window.__mtrk)return;window.__mtrk=1;var _s=Date.now(),_d=false;
+      function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);
+        try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({page:location.pathname,title:document.title,seconds:s,email:(document.body.dataset.email||'')}),
+          keepalive:true}).catch(function(){});}catch(e){}}
+      document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});
+      window.addEventListener('beforeunload',f);})();
   </script>
 </body>
 </html>

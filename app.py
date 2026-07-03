@@ -184,6 +184,54 @@ def _log_login_to_sheet(user: dict) -> None:
         log.warning("Login sheet log failed: %s", e)
 
 
+_MEMBER_TAB = "Member Signins"
+_MS_HEADER = ["Timestamp (IST)","Date","Time (IST)","Day","Hour (IST)","Email","Full Name",
+    "First Name","Profile Picture","Visitor ID","IP","Browser","Browser Version","OS","Device",
+    "User Agent","Referrer","Landing Page","Session ID","Platform"]
+
+def _log_member_signin(user: dict) -> None:
+    """Append one PUBLIC (non-Position2) Google sign-in to the 'Member Signins' tab.
+    Records the anonymous visitor id (p2_vid cookie) so the member can be joined to
+    their pre-login Visitor Analytics journey. Fails silently."""
+    if not LOGIN_LOG_SHEET_ID:
+        return
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return
+        now = datetime.now(IST)
+        ua_raw = request.headers.get("User-Agent", "")
+        browser, bv, os_name, device = _parse_ua(ua_raw)
+        ip = (request.headers.get("X-Forwarded-For", "") or
+              request.headers.get("X-Real-IP", "") or request.remote_addr or "")
+        ip = ip.split(",")[0].strip()
+        vid = (request.cookies.get("p2_vid") or "").strip()[:64]
+        row = [now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
+               now.strftime("%H:%M:%S"), now.strftime("%A"), now.strftime("%H"),
+               user.get("email", ""), user.get("name", ""), user.get("given_name", ""),
+               user.get("picture", ""), vid, ip, browser, bv, os_name, device,
+               ua_raw[:200], request.referrer or "direct", "/app", "Google OAuth",
+               "intelligence.position2.com"]
+        tab = _MEMBER_TAB
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            try:
+                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
+            except Exception:
+                pass
+            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_MS_HEADER]}).execute()
+        svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+    except Exception as e:
+        log.warning("member signin log failed: %s", e)
+
+
 # ── Demo / custom-agent request intake (login-page form) ─────────────────────────
 DEMO_REQUEST_SHEET_ID = os.environ.get("DEMO_REQUEST_SHEET_ID", "") or LOGIN_LOG_SHEET_ID
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
@@ -1242,7 +1290,12 @@ def auth_google():
         "picture":    idinfo.get("picture", ""),
     }
     session.permanent = True
-    _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
+    # Route sign-in logging: Position2 -> internal Usage Dashboard; public Google
+    # accounts -> Member Analytics (kept out of the Usage Dashboard entirely).
+    if email.lower().endswith("@position2.com"):
+        _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
+    else:
+        _log_member_signin(session["google_user"])    # public member -> Member Analytics
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
         nxt = "/app"
@@ -2056,6 +2109,206 @@ def admin_visitors_data():
     return jsonify(_fetch_visitor_analytics())
 
 
+def _fetch_member_analytics() -> dict:
+    """Public (non-Position2) Google sign-ins, joined to their pre-login Visitor
+    Analytics journey (by p2_vid) and post-login Page Views (by email). This is the
+    'sync' dashboard: the same person, before and after they signed in."""
+    from collections import Counter, defaultdict
+    svc = _va_sheets_service()
+    def read(rng):
+        if not svc:
+            return []
+        try:
+            return svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+        except Exception as e:
+            log.warning("member analytics read failed (%s): %s", rng, e)
+            return []
+
+    ms_rows = read("%s!A:T" % _MEMBER_TAB)
+    va_rows = read("Visitor Analytics!A:AM")
+    pv_rows = read("Page Views!A:M")
+    ms = ms_rows[1:] if len(ms_rows) > 1 else []
+    va = va_rows[1:] if len(va_rows) > 1 else []
+    pv = pv_rows[1:] if len(pv_rows) > 1 else []
+
+    MS = {n: i for i, n in enumerate(_MS_HEADER)}
+    VA = {n: i for i, n in enumerate(_VA_HEADER)}
+    def mc(r, n, d=""):
+        i = MS.get(n, -1); return r[i] if 0 <= i < len(r) else d
+    def vc(r, n, d=""):
+        i = VA.get(n, -1); return r[i] if 0 <= i < len(r) else d
+    def pc(r, i, d=""):
+        return r[i] if i < len(r) else d
+    def to_int(x):
+        try: return int(float(x))
+        except Exception: return 0
+    def fmt(sec):
+        sec = int(sec or 0); mm, ss = divmod(sec, 60); hh, mm = divmod(mm, 60)
+        return (("%dh %dm" % (hh, mm)) if hh else ("%dm %ds" % (mm, ss)) if mm else ("%ds" % ss)) if sec else "—"
+
+    va = [r for r in va if vc(r, "Bot", "No") != "Yes"]
+    va_by_vid = defaultdict(list)
+    for r in va:
+        vid = vc(r, "Visitor ID")
+        if vid: va_by_vid[vid].append(r)
+    idmap = _va_identity_map()
+
+    pv_by_email = defaultdict(list)   # post-login page views, public members only
+    for r in pv:
+        e = (pc(r, 4) or "").lower()
+        if e and not e.endswith("@position2.com"):
+            pv_by_email[e].append(r)
+
+    members = {}
+    for r in ms:
+        e = (mc(r, "Email") or "").lower()
+        if not e:
+            continue
+        mem = members.get(e)
+        ts = mc(r, "Timestamp (IST)")
+        if not mem:
+            mem = members[e] = {"email": mc(r, "Email"), "name": mc(r, "Full Name"),
+                "picture": mc(r, "Profile Picture"), "vids": set(), "signins": 0,
+                "first_signin": ts, "last_signin": ts, "device": "", "browser": "",
+                "os": "", "ip": mc(r, "IP")}
+        mem["signins"] += 1
+        vid = mc(r, "Visitor ID")
+        if vid: mem["vids"].add(vid)
+        if ts and (not mem["first_signin"] or ts < mem["first_signin"]): mem["first_signin"] = ts
+        if ts > mem["last_signin"]: mem["last_signin"] = ts
+        mem["device"] = mc(r, "Device") or mem["device"]
+        mem["browser"] = mc(r, "Browser") or mem["browser"]
+        mem["os"] = mc(r, "OS") or mem["os"]
+        if mc(r, "IP"): mem["ip"] = mc(r, "IP")
+
+    out_members = []
+    signup_by_day = Counter(); src_counter = Counter(); utm_counter = Counter()
+    dev_counter = Counter(); os_counter = Counter(); br_counter = Counter()
+    prelogin_pages_counter = Counter(); company_counter = Counter()
+    total_pre = 0; linked = 0; pre_eng_total = 0; pre_eng_n = 0
+
+    for e, mem in members.items():
+        pre = []
+        for vid in mem["vids"]:
+            pre.extend(va_by_vid.get(vid, []))
+        pre.sort(key=lambda r: vc(r, "Timestamp (IST)"))
+        prelogin_pages = len(pre)
+        first_seen = vc(pre[0], "Timestamp (IST)") if pre else mem["first_signin"]
+        source = "direct"; landing = ""
+        if pre:
+            f = pre[0]
+            source = vc(f, "UTM Source") or (vc(f, "Referrer Host") or "direct")
+            landing = vc(f, "Landing Page")
+        engaged = sum(to_int(vc(r, "Engaged Time (s)")) for r in pre)
+        company = ""
+        for vid in mem["vids"]:
+            company = (idmap.get(vid) or {}).get("company") or company
+        if not company and mem.get("ip"):
+            company = _ip_company(mem["ip"]) or ""
+        posts = pv_by_email.get(e, [])
+        status = "returning" if mem["signins"] > 1 else "new"
+        last_active = mem["last_signin"]
+        if posts:
+            lp = max(pc(r, 0) for r in posts)
+            if lp > last_active: last_active = lp
+
+        tl = []
+        for r in pre:
+            tl.append({"t": vc(r, "Timestamp (IST)"), "kind": "view",
+                       "label": vc(r, "Page Title") or vc(r, "Page URL") or "Page view",
+                       "meta": (vc(r, "Referrer Host") or "")})
+        tl.append({"t": mem["first_signin"], "kind": "signin", "label": "Signed in with Google", "meta": ""})
+        if mem["signins"] > 1:
+            tl.append({"t": mem["last_signin"], "kind": "signin",
+                       "label": "Returned (%d total sign-ins)" % mem["signins"], "meta": ""})
+        for r in posts:
+            tl.append({"t": pc(r, 0), "kind": "post",
+                       "label": pc(r, 5) or pc(r, 6) or "Page view", "meta": pc(r, 8)})
+        tl.sort(key=lambda x: x["t"] or "")
+        tl = tl[:60]
+
+        signup_by_day[(mem["first_signin"] or "")[:10]] += 1
+        src_counter[source or "direct"] += 1
+        if pre and vc(pre[0], "UTM Source"): utm_counter[vc(pre[0], "UTM Source")] += 1
+        dev_counter[mem["device"] or "—"] += 1
+        os_counter[mem["os"] or "—"] += 1
+        br_counter[mem["browser"] or "—"] += 1
+        for r in pre:
+            prelogin_pages_counter[vc(r, "Page Title") or vc(r, "Page URL")] += 1
+        if company: company_counter[company] += 1
+        total_pre += prelogin_pages
+        if mem["vids"]: linked += 1
+        if engaged: pre_eng_total += engaged; pre_eng_n += 1
+
+        out_members.append({
+            "email": mem["email"], "name": mem["name"] or "—", "picture": mem["picture"],
+            "company": company, "vid": (sorted(mem["vids"])[0][:8] if mem["vids"] else ""),
+            "signins": mem["signins"], "prelogin_pages": prelogin_pages, "post_pages": len(posts),
+            "first_seen": first_seen, "joined": mem["first_signin"], "last_active": last_active,
+            "source": source, "landing": landing, "engaged": fmt(engaged),
+            "device": mem["device"] or "—", "browser": mem["browser"] or "—", "os": mem["os"] or "—",
+            "status": status, "linked": bool(mem["vids"]), "timeline": tl,
+        })
+
+    out_members.sort(key=lambda x: x["last_active"] or "", reverse=True)
+
+    total_members = len(members)
+    total_signins = sum(mem["signins"] for mem in members.values())
+    new_members = sum(1 for x in out_members if x["status"] == "new")
+    returning_members = total_members - new_members
+    unique_visitors = len(va_by_vid)
+    conv_rate = round(linked / unique_visitors * 100, 1) if unique_visitors else 0
+    avg_pre = round(total_pre / linked, 1) if linked else 0
+    avg_engaged = fmt(round(pre_eng_total / pre_eng_n) if pre_eng_n else 0)
+    signup_series = sorted(signup_by_day.items())[-30:]
+
+    engaged_visitors = 0
+    for vid, rows in va_by_vid.items():
+        pages = max((to_int(vc(r, "Pages In Session")) for r in rows), default=0)
+        eng = max((to_int(vc(r, "Engaged Time (s)")) for r in rows), default=0)
+        if pages > 1 or eng >= 15:
+            engaged_visitors += 1
+
+    recent = []
+    for r in reversed(ms[-150:]):
+        recent.append({"ts": mc(r, "Timestamp (IST)"), "email": mc(r, "Email"),
+            "name": mc(r, "Full Name"), "vid": (mc(r, "Visitor ID") or "")[:8],
+            "device": mc(r, "Device"), "browser": mc(r, "Browser"),
+            "ref": mc(r, "Referrer Host") if False else (mc(r, "Referrer") or "direct")})
+
+    return {
+        "configured": bool(svc),
+        "kpis": {"members": total_members, "signins": total_signins, "new": new_members,
+            "returning": returning_members, "linked": linked, "avg_pre": avg_pre,
+            "avg_engaged": avg_engaged, "companies": len(company_counter),
+            "visitors": unique_visitors, "conv_rate": conv_rate},
+        "series": signup_series,
+        "sources": src_counter.most_common(12), "utm": utm_counter.most_common(10),
+        "devices": dev_counter.most_common(), "oses": os_counter.most_common(),
+        "browsers": br_counter.most_common(8),
+        "prelogin_pages": prelogin_pages_counter.most_common(15),
+        "companies": company_counter.most_common(15),
+        "funnel": {"visitors": unique_visitors, "engaged": engaged_visitors,
+                   "members": total_members, "returning": returning_members},
+        "members": out_members[:200], "recent": recent[:100],
+    }
+
+
+@app.route("/p2/admin/members")
+@admin_required
+def admin_members():
+    """Admin-only analytics for public Google sign-ins (members), synced with
+    their pre-login Visitor Analytics journey."""
+    return render_template("admin_members.html", user=_get_user())
+
+
+@app.route("/p2/admin/members/data")
+@admin_required
+def admin_members_data():
+    return jsonify(_fetch_member_analytics())
+
+
 def _fetch_usage_data() -> dict:
     """Fetch login + page view data from Sheets. Shared by shell and data endpoints."""
     def _fetch(tab_range):
@@ -2084,6 +2337,12 @@ def _fetch_usage_data() -> dict:
     page_rows  = _fetch("Page Views!A1:M2000")
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
+
+    # Usage Dashboard is INTERNAL only: keep @position2.com sign-ins & activity,
+    # drop public members (they live in Member Analytics instead).
+    def _is_p2(e): return (e or "").lower().endswith("@position2.com")
+    login_data = [r for r in login_data if _is_p2(col(r, 5))]
+    page_data  = [r for r in page_data  if _is_p2(col(r, 4))]
 
     from collections import Counter
 
