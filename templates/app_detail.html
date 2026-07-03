@@ -1,5 +1,5 @@
 {% extends "app_base.html" %}
-{% block title %}Lorem ipsum · Intelligence by Position2{% endblock %}
+{% block title %}{{ agent.name }} · Intelligence by Position2{% endblock %}
 {% block styles %}
 <style>
   .dwrap{ width:100%; max-width:1180px; margin:0 auto; padding:34px 26px 96px; position:relative; z-index:1 }
@@ -9,13 +9,12 @@
   .crumb a{ color:var(--tx2); text-decoration:none } .crumb a:hover{ color:var(--tx) }
   .crumb .sep{ opacity:.45 }
 
-  /* header */
   .dhead{ display:flex; align-items:center; gap:26px; margin:26px 0 40px; position:relative }
   .dicon{ position:relative; width:96px; height:96px; border-radius:24px; flex:none;
     display:flex; align-items:center; justify-content:center;
     background:linear-gradient(145deg, var(--ac), var(--ac2));
     box-shadow:0 18px 55px -14px color-mix(in srgb, var(--ac) 75%, transparent) }
-  .dicon svg{ width:46px; height:46px; stroke:#fff; opacity:.96 }
+  .dicon svg{ width:46px; height:46px; stroke:#fff; opacity:.98 }
   .dicon::after{ content:""; position:absolute; inset:-30%; border-radius:50%;
     background:radial-gradient(closest-side, color-mix(in srgb, var(--ac) 45%, transparent), transparent 70%);
     filter:blur(14px); z-index:-1 }
@@ -29,7 +28,6 @@
   .pill.ac{ border-color:color-mix(in srgb, var(--ac) 42%, transparent);
     color:color-mix(in srgb, var(--ac) 72%, #fff); background:color-mix(in srgb, var(--ac) 10%, transparent) }
 
-  /* layout */
   .dgrid{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start }
 
   .panel{ background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:22px; padding:32px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
@@ -52,6 +50,22 @@
   .trip p{ margin:0; font-size:13px; line-height:1.68; color:var(--tx2) }
 
   .side{ display:flex; flex-direction:column; gap:20px }
+  .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
+    text-decoration:none; border-radius:20px; padding:22px 24px;
+    background:linear-gradient(135deg, var(--ac), var(--ac2));
+    box-shadow:0 16px 46px -14px color-mix(in srgb, var(--ac) 70%, transparent);
+    transition:transform .2s ease, box-shadow .2s ease }
+  .use-card:hover{ transform:translateY(-3px);
+    box-shadow:0 24px 60px -14px color-mix(in srgb, var(--ac) 82%, transparent) }
+  .use-card.disabled{ background:rgba(255,255,255,.05); box-shadow:none; cursor:default; pointer-events:none;
+    border:1px solid var(--line) }
+  .use-card .uc-title{ font-size:17px; font-weight:700; letter-spacing:-.01em; color:#05121b }
+  .use-card .uc-sub{ margin-top:3px; font-size:12.5px; font-weight:500; color:rgba(5,18,27,.72) }
+  .use-card.disabled .uc-title{ color:var(--tx) } .use-card.disabled .uc-sub{ color:var(--tx2) }
+  .use-card .uc-arrow{ width:40px; height:40px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(5,18,27,.16); color:#05121b; font-size:18px }
+  .use-card.disabled .uc-arrow{ background:rgba(255,255,255,.06); color:var(--tx2) }
   .scard{ background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:20px; padding:24px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
   .scard .lbl{ font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
     color:var(--tx3); margin-bottom:15px }
@@ -67,45 +81,24 @@
     transition:border-color .2s ease, color .2s ease }
   .tag:hover{ border-color:color-mix(in srgb, var(--ac) 45%, transparent); color:var(--tx) }
 
-  /* prominent CTA card -> opens the agent (link set later) */
-  .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
-    text-decoration:none; border-radius:20px; padding:22px 24px;
-    background:linear-gradient(135deg, var(--ac), var(--ac2));
-    box-shadow:0 16px 46px -14px color-mix(in srgb, var(--ac) 70%, transparent);
-    transition:transform .2s ease, box-shadow .2s ease }
-  .use-card:hover{ transform:translateY(-3px);
-    box-shadow:0 24px 60px -14px color-mix(in srgb, var(--ac) 82%, transparent) }
-  .use-card .uc-title{ font-size:17px; font-weight:700; letter-spacing:-.01em; color:#05121b }
-  .use-card .uc-sub{ margin-top:3px; font-size:12.5px; font-weight:500; color:rgba(5,18,27,.72) }
-  .use-card .uc-arrow{ width:40px; height:40px; border-radius:50%; flex:none;
-    display:flex; align-items:center; justify-content:center;
-    background:rgba(5,18,27,.16); color:#05121b; font-size:18px }
-
-  @media (max-width:900px){
-    .dgrid{ grid-template-columns:1fr }
-    .trips{ grid-template-columns:1fr }
-  }
-  @media (max-width:560px){
-    .dhead{ gap:18px } .dicon{ width:76px; height:76px; border-radius:20px } .dicon svg{ width:36px; height:36px }
-  }
+  @media (max-width:900px){ .dgrid{ grid-template-columns:1fr } .trips{ grid-template-columns:1fr } }
+  @media (max-width:560px){ .dhead{ gap:18px } .dicon{ width:76px; height:76px; border-radius:20px } .dicon svg{ width:36px; height:36px } }
 </style>
 {% endblock %}
 {% block content %}
-<div class="dwrap" style="--ac:{{ card.ac }};--ac2:{{ card.ac2 }}">
+<div class="dwrap" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
 
   <nav class="crumb">
-    <a href="/app">Home</a><span class="sep">&rsaquo;</span><span>Lorem ipsum</span>
+    <a href="/app">Home</a><span class="sep">&rsaquo;</span><span>{{ agent.name }}</span>
   </nav>
 
   <div class="dhead">
-    <div class="dicon">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 4-5"/></svg>
-    </div>
+    <div class="dicon">{{ agent.icon|safe }}</div>
     <div class="dtitle">
-      <h1>Lorem ipsum</h1>
+      <h1>{{ agent.name }}</h1>
       <div class="pills">
-        <span class="pill"><span class="d"></span>Lorem ipsum dolor</span>
-        <span class="pill ac">sit amet &middot; consectetur</span>
+        <span class="pill"><span class="d"></span>{{ agent.pill1 }}</span>
+        <span class="pill ac">{{ agent.pill2 }}</span>
       </div>
     </div>
   </div>
@@ -116,31 +109,32 @@
         <div class="pi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9L21 9.3l-5.4 4.2L17.6 21 12 16.9 6.4 21l2-7.5L3 9.3l6.6-.4L12 2z"/></svg></div>
         <h2>Details</h2>
       </div>
-      <p class="lead">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum.</p>
+      <p class="lead">{{ agent.lead }}</p>
       <div class="trips">
-        <div class="trip">
-          <h4><span class="d"></span>Lorem ipsum</h4>
-          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-        </div>
-        <div class="trip">
-          <h4><span class="d"></span>Dolor sit</h4>
-          <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-        </div>
-        <div class="trip">
-          <h4><span class="d"></span>Consectetur</h4>
-          <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-        </div>
+        {% for t in agent.trips %}
+        <div class="trip"><h4><span class="d"></span>{{ t.t }}</h4><p>{{ t.d }}</p></div>
+        {% endfor %}
       </div>
     </section>
 
     <aside class="side">
-      <a class="use-card" href="{{ card.agent_url or '#' }}">
+      {% if agent.seo_slug %}
+      <a class="use-card" href="/app/{{ agent.slug }}/use">
         <div>
           <div class="uc-title">Use this agent</div>
-          <div class="uc-sub">Open the live agent</div>
+          <div class="uc-sub">Open {{ agent.name }} &amp; start now</div>
         </div>
         <span class="uc-arrow">&rarr;</span>
       </a>
+      {% else %}
+      <div class="use-card disabled">
+        <div>
+          <div class="uc-title">Coming soon</div>
+          <div class="uc-sub">This agent isn&rsquo;t live yet</div>
+        </div>
+        <span class="uc-arrow">&rarr;</span>
+      </div>
+      {% endif %}
       <div class="scard">
         <div class="lbl">Built by</div>
         <div class="builtby"><span class="bi">P</span><b>Position2</b></div>
@@ -148,11 +142,7 @@
       <div class="scard">
         <div class="lbl">Works with</div>
         <div class="tags">
-          <span class="tag">Lorem</span>
-          <span class="tag">Ipsum</span>
-          <span class="tag">Dolor</span>
-          <span class="tag">Sit amet</span>
-          <span class="tag">Consectetur</span>
+          {% for tg in agent.tags %}<span class="tag">{{ tg }}</span>{% endfor %}
         </div>
       </div>
     </aside>
