@@ -226,13 +226,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   <!-- Topbar -->
   <div class="topbar">
     <div class="tl">
-      <a href="/hub" class="brand">
+      <a href="/p2/hub" class="brand">
         <div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
         <span class="brand-name">Platform</span>
       </a>
       <div class="bc">
-        <a href="/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/admin/usage">Admin</a><span class="bc-sep">›</span>
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span>
         <span class="bc-cur">Usage Dashboard</span>
       </div>
     </div>
@@ -252,9 +252,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
             <div class="dd-email">{{ user.email }}</div>
           </div>
           <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-            <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
-            <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
-            <a href="/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+            <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
+            <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
+            <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
             <div class="dd-divider"></div>
             <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
           </div>
@@ -272,8 +272,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         <div class="eyebrow">Admin · Platform Intelligence</div>
         <h1>Usage Dashboard</h1>
       </div>
-      <a class="refresh-btn" href="/admin/visitors" style="text-decoration:none;margin-right:10px">🌐 Visitor analytics</a>
-      <a class="refresh-btn" href="/admin/requests" style="text-decoration:none;margin-right:10px">📥 Access requests</a>
+      <a class="refresh-btn" href="/p2/admin/visitors" style="text-decoration:none;margin-right:10px">🌐 Visitor analytics</a>
+      <a class="refresh-btn" href="/p2/admin/requests" style="text-decoration:none;margin-right:10px">📥 Access requests</a>
       <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
         <span class="refresh-icon" id="refreshIcon">↻</span> Refresh
       </button>
@@ -504,7 +504,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       icon.style.transform = 'rotate(360deg)';
       setTimeout(function(){ icon.style.transition='none'; icon.style.transform='rotate(0deg)'; btn.classList.remove('spinning'); }, 700);
 
-      fetch('/admin/usage/data')
+      fetch('/p2/admin/usage/data')
         .then(function(r){ return r.json(); })
         .then(function(d) {
           /* Stats */
@@ -554,15 +554,15 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
 (function(){
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
-    {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
-    {t:'GTM Tools',d:'Go-to-market intelligence',u:'/gtm',i:'◎'},
-    {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
+    {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+    {t:'GTM Tools',d:'Go-to-market intelligence',u:'/p2/gtm',i:'◎'},
+    {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/gtm/linkedin-scraper',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/gtm/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/gtm/anonymous-visitors',i:'◌'},
-    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/accounts',i:'⇄'}
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/gtm/linkedin-scraper',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/gtm/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/gtm/anonymous-visitors',i:'◌'},
+    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
   var css=document.createElement('style');
@@ -1027,7 +1027,7 @@ tbody tr:nth-child(n+45){animation:none}
   if(window.__uxx)return;window.__uxx=1;
   var COLORS=['#6366f1','#34d399','#a78bfa','#fbbf24','#22d3ee'];
   var D=null,pending=[];
-  function load(cb){pending.push(cb);if(D){flush();return;}if(load.__l)return;load.__l=1;fetch('/admin/usage/data').then(function(r){return r.json();}).then(function(j){D=j||{};flush();}).catch(function(){D={};flush();});}
+  function load(cb){pending.push(cb);if(D){flush();return;}if(load.__l)return;load.__l=1;fetch('/p2/admin/usage/data').then(function(r){return r.json();}).then(function(j){D=j||{};flush();}).catch(function(){D={};flush();});}
   function flush(){pending.splice(0).forEach(function(cb){try{cb(D);}catch(e){}});}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function bars(items){if(!items||!items.length)return '<div style="color:#475569;font-size:12px;padding:10px 0">No data yet</div>';var max=items[0][1]||1;return items.map(function(it,i){var pct=Math.round(it[1]/max*100);var c=COLORS[i%COLORS.length];return '<div class="ux-bar-row"><span class="ux-bar-name">'+esc(it[0]||'—')+'</span><span class="ux-bar-wrap"><span class="ux-bar" data-w="'+pct+'" style="background:'+c+'"></span></span><span class="ux-bar-val">'+it[1]+'</span></div>';}).join('');}

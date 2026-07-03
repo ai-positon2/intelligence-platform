@@ -147,7 +147,7 @@ def _log_login_to_sheet(user: dict) -> None:
             device,                                     # 14 Device Type
             ua_raw[:200],                               # 15 User Agent (truncated)
             request.referrer or "direct",               # 16 Referrer
-            "/hub",                                     # 17 Landing Page
+            "/p2/hub",                                     # 17 Landing Page
             "Google OAuth",                             # 18 Auth Method
             str(uuid.uuid4())[:8],                      # 19 Session ID (short)
             "intelligence.position2.com",               # 20 Platform
@@ -1227,7 +1227,7 @@ def auth_google():
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
-        nxt = "/hub"
+        nxt = "/p2/hub"
     return jsonify({"success": True, "redirect": nxt})
 
 
@@ -1293,20 +1293,63 @@ def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
+
+# ── v16: internal app relocated to /p2/* ─────────────────────────────────────────
+# The entire logged-in surface now lives under /p2. These stubs 301-redirect the old
+# internal URLs to their /p2 equivalents (query strings preserved) so bookmarks and
+# external links keep resolving. Actual serving + @login_required lives on the /p2
+# routes below. Static assets and /api/* endpoints intentionally stay at their old
+# paths (they are referenced by absolute path from page JS / the Ad Intel bundle).
+def _p2_relocate_redirect(**kwargs):
+    tgt = "/p2" + request.path
+    if request.query_string:
+        tgt += "?" + request.query_string.decode("utf-8", "ignore")
+    return redirect(tgt, code=301)
+
+_P2_LEGACY_RULES = [
+    ("/hub",                                          "p2legacy_hub"),
+    ("/gtm",                                          "p2legacy_gtm"),
+    ("/gtm/sentiment-pulse",                          "p2legacy_sentiment"),
+    ("/gtm/sentiment-pulse/",                         "p2legacy_sentiment_slash"),
+    ("/gtm/ad-intelligence",                          "p2legacy_adintel"),
+    ("/gtm/ad-intelligence/",                         "p2legacy_adintel_slash"),
+    ("/gtm/anonymous-visitors",                       "p2legacy_anon"),
+    ("/gtm/linkedin-scraper",                         "p2legacy_linkedin"),
+    ("/seo",                                          "p2legacy_seo"),
+    ("/seo/<tool_slug>",                              "p2legacy_seo_tool"),
+    ("/accounts",                                     "p2legacy_accounts"),
+    ("/signal-tracker/<account_id>",                  "p2legacy_st"),
+    ("/signal-tracker/<account_id>/<section>",        "p2legacy_st_section"),
+    ("/admin/usage",                                  "p2legacy_admin_usage"),
+    ("/admin/usage/data",                             "p2legacy_admin_usage_data"),
+    ("/admin/visitors",                               "p2legacy_admin_visitors"),
+    ("/admin/visitors/data",                          "p2legacy_admin_visitors_data"),
+    ("/admin/requests",                               "p2legacy_admin_requests"),
+    ("/admin/email-test",                             "p2legacy_admin_email_test"),
+]
+for _rule, _endpoint in _P2_LEGACY_RULES:
+    app.add_url_rule(_rule, _endpoint, _p2_relocate_redirect)
+
+@app.route("/p2")
+@app.route("/p2/")
+def p2_root():
+    """Bare /p2 entry -> the relocated hub."""
+    return redirect("/p2/hub", code=302)
+
 # ── Hub pages ───────────────────────────────────────────────────────────────────
-@app.route("/hub")
+@app.route("/p2/hub")
 @login_required
 def hub():
     return render_template("hub.html", user=_get_user())
 
-@app.route("/gtm")
+@app.route("/p2/gtm")
 @login_required
 def gtm():
     return render_template("gtm.html", user=_get_user())
 
 
-@app.route("/gtm/sentiment-pulse")
-@app.route("/gtm/sentiment-pulse/")
+@app.route("/p2/gtm/sentiment-pulse")
+@app.route("/p2/gtm/sentiment-pulse/")
 @login_required
 def call_sentiment():
     return render_template("call_sentiment.html", user=_get_user())
@@ -1322,22 +1365,22 @@ def call_sentiment_legacy():
 @app.route("/ppc")
 @app.route("/ppc/")
 def ppc_redirect():
-    return redirect("/gtm", code=301)
+    return redirect("/p2/gtm", code=301)
 
 @app.route("/ppc/ad-intelligence")
 @app.route("/ppc/ad-intelligence/")
 def ppc_ad_intelligence_redirect():
-    return redirect("/gtm/ad-intelligence", code=301)
+    return redirect("/p2/gtm/ad-intelligence", code=301)
 
 @app.route("/ppc/anonymous-visitors")
 def ppc_anonymous_visitors_redirect():
-    return redirect("/gtm/anonymous-visitors", code=301)
+    return redirect("/p2/gtm/anonymous-visitors", code=301)
 
 @app.route("/ppc/linkedin-scraper")
 def ppc_linkedin_scraper_redirect():
-    return redirect("/gtm/linkedin-scraper", code=301)
+    return redirect("/p2/gtm/linkedin-scraper", code=301)
 
-@app.route("/seo")
+@app.route("/p2/seo")
 @login_required
 def seo():
     return render_template("seo.html", user=_get_user(), seo_tools=_seo_tools())
@@ -1348,8 +1391,8 @@ _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 # ── Ad Intelligence (built React app served directly — no iframe) ────────────
 AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
-@app.route("/gtm/ad-intelligence")
-@app.route("/gtm/ad-intelligence/")
+@app.route("/p2/gtm/ad-intelligence")
+@app.route("/p2/gtm/ad-intelligence/")
 @login_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
@@ -1413,7 +1456,7 @@ def _seo_tools():
     _SEO_MANIFEST.update(ts=now, tools=tools)
     return tools
 
-@app.route("/seo/<tool_slug>")
+@app.route("/p2/seo/<tool_slug>")
 @login_required
 def seo_tool(tool_slug: str):
     tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
@@ -1431,20 +1474,20 @@ def seo_tool(tool_slug: str):
         user=_get_user(),
         title=tool["name"],
         embed_url=embed_url,
-        breadcrumb=[("Hub", "/hub"), ("SEO", "/seo")],
+        breadcrumb=[("Hub", "/p2/hub"), ("SEO", "/p2/seo")],
         current=tool["name"],
         accent="#34d399",
     )
 
 # ── Company Signal Tracker ───────────────────────────────────────────────────────
-@app.route("/accounts")
+@app.route("/p2/accounts")
 @login_required
 def accounts():
     cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
     return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
-@app.route("/signal-tracker/<account_id>")
-@app.route("/signal-tracker/<account_id>/<section>")
+@app.route("/p2/signal-tracker/<account_id>")
+@app.route("/p2/signal-tracker/<account_id>/<section>")
 @login_required
 def dashboard(account_id: str, section: str = None):
     cfg = ACCOUNTS.get(account_id)
@@ -1476,7 +1519,7 @@ def _no_html_cache(resp):
 @login_required
 def dashboard_legacy(account_id: str, section: str = None):
     """Back-compat: old /dashboard/* URLs redirect to canonical /signal-tracker/*."""
-    target = "/signal-tracker/" + account_id + (("/" + section) if section else "")
+    target = "/p2/signal-tracker/" + account_id + (("/" + section) if section else "")
     return redirect(target, code=301)
 
 @app.route("/api/whoami")
@@ -1951,13 +1994,13 @@ def _fetch_visitor_analytics() -> dict:
         "top_companies": top_companies, "identified": identified,
     }
 
-@app.route("/admin/visitors")
+@app.route("/p2/admin/visitors")
 @admin_required
 def admin_visitors():
     """Admin-only anonymous visitor analytics dashboard."""
     return render_template("admin_visitors.html", user=_get_user())
 
-@app.route("/admin/visitors/data")
+@app.route("/p2/admin/visitors/data")
 @admin_required
 def admin_visitors_data():
     """JSON aggregates for the visitor analytics dashboard."""
@@ -2095,21 +2138,21 @@ def _read_access_requests(limit=300):
         return []
 
 
-@app.route("/admin/usage")
+@app.route("/p2/admin/usage")
 @admin_required
 def admin_usage():
     """Shell page — renders instantly, JS fetches /admin/usage/data async."""
     return render_template("admin_usage.html", user=_get_user())
 
 
-@app.route("/admin/usage/data")
+@app.route("/p2/admin/usage/data")
 @admin_required
 def admin_usage_data():
     """JSON data endpoint called by the admin usage shell page."""
     data = _fetch_usage_data()
     return jsonify(data)
 
-@app.route("/admin/requests")
+@app.route("/p2/admin/requests")
 @admin_required
 def admin_requests():
     """Admin view of everyone who submitted the Request Access form."""
@@ -2117,7 +2160,7 @@ def admin_requests():
     return render_template("admin_requests.html", user=_get_user(),
                            requests=reqs, count=len(reqs))
 
-@app.route("/admin/email-test")
+@app.route("/p2/admin/email-test")
 @admin_required
 def admin_email_test():
     """Admin-only SMTP diagnostic. Attempts a real send with subject 'Test Mail'
@@ -2281,7 +2324,7 @@ def _fetch_anon_visitors_data(force: bool = False) -> dict:
     return _result
 
 
-@app.route("/gtm/anonymous-visitors")
+@app.route("/p2/gtm/anonymous-visitors")
 @login_required
 def anonymous_visitors():
     """Anonymous Visitors dashboard shell — loads data async."""
@@ -2312,7 +2355,7 @@ def anonymous_visitors_data():
 
 
 
-@app.route("/gtm/linkedin-scraper")
+@app.route("/p2/gtm/linkedin-scraper")
 @login_required
 def linkedin_scraper():
     """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""

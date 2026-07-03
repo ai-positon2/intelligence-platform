@@ -25,12 +25,12 @@
   <!-- Topbar -->
   <div class="topbar">
     <div class="topbar-left">
-      <a href="/hub" class="brand">
+      <a href="/p2/hub" class="brand">
         <div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div>
         <span class="brand-name">Intelligence</span>
       </a>
       <div class="breadcrumb">
-        <a href="/hub" class="bc-link">Hub</a>
+        <a href="/p2/hub" class="bc-link">Hub</a>
         <span class="bc-sep">›</span>
         <span class="bc-cur">SEO</span>
       </div>
@@ -52,9 +52,9 @@
           </div>
           <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
             {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com'] %}
-            <a href="/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
-            <a href="/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
-            <a href="/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+            <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
+            <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
+            <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
             <div class="dd-divider"></div>
             {% endif %}
             <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
@@ -77,7 +77,7 @@
       {% set _themes = {'seo-geo-audit':'c-seo-geo','article-recommendation':'c-article','content-enhancement':'c-enhancement','content-research':'c-research','keyword-research':'c-keyword','agent-readiness-audit':'c-agent','image-alt-audit':'c-image','knowledge-base':'c-knowledge','team-insights':'c-team','location-page-builder':'c-location'} %}
       {% set _cycle = ['c-seo-geo','c-article','c-enhancement','c-research','c-keyword','c-agent','c-image','c-knowledge','c-team','c-location'] %}
       {% for t in seo_tools %}
-      <a href="/seo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
+      <a href="/p2/seo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
         <div class="card-band"></div>
         <div class="card-thumb">
           <div class="card-thumb-icon">{{ t.icon or "🌿" }}</div>
@@ -123,15 +123,15 @@
 (function(){
   if(window.__kpal)return;window.__kpal=1;
   var BASE=[
-    {t:'Hub',d:'Platform home',u:'/hub',i:'⌂'},
-    {t:'GTM Tools',d:'Go-to-market intelligence',u:'/gtm',i:'◎'},
-    {t:'SEO Tools',d:'Organic intelligence',u:'/seo',i:'⌕'},
+    {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+    {t:'GTM Tools',d:'Go-to-market intelligence',u:'/p2/gtm',i:'◎'},
+    {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
-    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/gtm/linkedin-scraper',i:'⦿'},
-    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/gtm/ad-intelligence',i:'◈'},
-    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/gtm/anonymous-visitors',i:'◌'},
-    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/accounts',i:'⇄'}
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/gtm/linkedin-scraper',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/gtm/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/gtm/anonymous-visitors',i:'◌'},
+    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
   var css=document.createElement('style');
