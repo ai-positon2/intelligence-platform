@@ -1859,15 +1859,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="login-card glass">
       <span class="lc-glow" aria-hidden="true"></span>
       <svg class="login-orb" viewBox="0 0 40 40" fill="none" aria-hidden="true"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
-      <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Position2 team sign-in</span>
+      <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Secure sign-in</span>
       <h1 class="h-sec" style="margin:16px 0 8px">Welcome back.</h1>
-      <p class="login-sub">Sign in with your Position2 Google account to open your live intelligence dashboard.</p>
+      <p class="login-sub">Sign in with your Google account to continue.</p>
       <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
       <div class="gbtn">
         <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
         <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
       </div>
-      <div class="login-secure"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Position2 accounts only &middot; secure Google SSO</div>
+      <div class="login-secure"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Secure sign-in with Google</div>
       <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Request access &rarr;</a></div>
     </div>
   </div>
@@ -1876,7 +1876,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     var c=document.getElementById('gerr');
     fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})})
     .then(function(r){return r.json();})
-    .then(function(d){ if(d.success){ window.location.href=d.redirect||'/hub'; } else { if(c){ c.textContent='⚠ '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
+    .then(function(d){ if(d.success){ window.location.href=d.redirect||'/app'; } else { if(c){ c.textContent='⚠ '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
     .catch(function(){ if(c){ c.textContent='⚠ Network error. Please try again.'; c.style.display='flex'; } });
   }
   </script>
