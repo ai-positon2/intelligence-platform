@@ -1277,12 +1277,30 @@ def index():
     return render_template("agents.html", page="home", agents=AGENTS, agent=None,
                            related=[], signals_list=SIGNALS)
 
+# Placeholder cards on the signed-in home. Each opens a detail page (/app/<id>).
+# Accents pair a primary + secondary colour for gradients; content is placeholder.
+APP_CARDS = [
+    {"id": 1, "ac": "#22d3ee", "ac2": "#6366f1"},
+    {"id": 2, "ac": "#8b5cf6", "ac2": "#e879f9"},
+    {"id": 3, "ac": "#34d399", "ac2": "#22d3ee"},
+    {"id": 4, "ac": "#e879f9", "ac2": "#8b5cf6"},
+]
+
 @app.route("/app")
 @login_required
 def app_home():
-    """Blank signed-in home for ALL Google users (Position2 and external alike).
-    Content intentionally left empty for now -- to be defined next."""
-    return render_template("app.html", user=_get_user())
+    """Signed-in home for ALL Google users (Position2 and external alike).
+    Placeholder card grid for now -- real content to be defined next."""
+    return render_template("app.html", user=_get_user(), cards=APP_CARDS)
+
+@app.route("/app/<int:card_id>")
+@login_required
+def app_detail(card_id):
+    """Detail page for a signed-in-home card. Placeholder (lorem ipsum) for now."""
+    card = next((c for c in APP_CARDS if c["id"] == card_id), None)
+    if not card:
+        return redirect("/app")
+    return render_template("app_detail.html", user=_get_user(), card=card)
 
 
 @app.route("/privacy")
