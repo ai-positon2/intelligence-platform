@@ -1280,10 +1280,10 @@ def index():
 # Placeholder cards on the signed-in home. Each opens a detail page (/app/<id>).
 # Accents pair a primary + secondary colour for gradients; content is placeholder.
 APP_CARDS = [
-    {"id": 1, "ac": "#22d3ee", "ac2": "#6366f1"},
-    {"id": 2, "ac": "#8b5cf6", "ac2": "#e879f9"},
-    {"id": 3, "ac": "#34d399", "ac2": "#22d3ee"},
-    {"id": 4, "ac": "#e879f9", "ac2": "#8b5cf6"},
+    {"id": 1, "ac": "#22d3ee", "ac2": "#6366f1", "agent_url": ""},
+    {"id": 2, "ac": "#8b5cf6", "ac2": "#e879f9", "agent_url": ""},
+    {"id": 3, "ac": "#34d399", "ac2": "#22d3ee", "agent_url": ""},
+    {"id": 4, "ac": "#e879f9", "ac2": "#8b5cf6", "agent_url": ""},
 ]
 
 @app.route("/app")
