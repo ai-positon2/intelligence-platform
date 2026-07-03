@@ -980,6 +980,15 @@ INDUSTRIES = [
 ]
 INDUSTRIES_BY_SLUG = {i["slug"]: i for i in INDUSTRIES}
 
+# Font-variant duplicate of the Healthcare (Patient Growth) page, requested as a one-off Poppins-font
+# test page. Exact copy of the 'healthcare' industry content, reachable only at /industries/healthcare-poppins
+# (deliberately NOT added to the INDUSTRIES list, so it does not appear on /industries or in any
+# "more industries" rail — it is a standalone duplicate page, not a real industry).
+import copy as _copy
+_healthcare_poppins = _copy.deepcopy(INDUSTRIES_BY_SLUG["healthcare"])
+_healthcare_poppins["slug"] = "healthcare-poppins"
+INDUSTRIES_BY_SLUG["healthcare-poppins"] = _healthcare_poppins
+
 # ── Signal catalog (flat list of everything we track) ────────────────────────────
 _SIG_PAL = ["#a78bfa", "#22d3ee", "#818cf8", "#f472b6", "#34d399", "#fbbf24", "#38bdf8"]
 _SIGNALS_RAW = [
