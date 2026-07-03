@@ -1035,7 +1035,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 </style>
 {% if (page == 'industry' or page == 'iagent') and industry and industry.slug == 'healthcare-poppins' %}
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
-<style>:root{--display:'Poppins',system-ui,sans-serif;--serif:'Poppins',system-ui,sans-serif;--sans:'Poppins',system-ui,sans-serif;--mono:'Poppins',system-ui,sans-serif;}</style>
+<style>:root{--display:'Poppins',system-ui,sans-serif;--serif:'Poppins',system-ui,sans-serif;--sans:'Poppins',system-ui,sans-serif;--mono:'Poppins',system-ui,sans-serif;}.hero2 .h-hero{font-size:clamp(42px,7.4vw,94px);}</style>
 {% endif %}
 </head>
 <body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% elif page=='iagent' %}{{ agent.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% elif page=='iagent' %}{{ agent.accent2 }}{% else %}#8b5cf6{% endif %}">
