@@ -1246,7 +1246,11 @@ def auth_google():
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
         nxt = "/app"
-    return jsonify({"success": True, "redirect": nxt})
+    resp = jsonify({"success": True, "redirect": nxt})
+    # Mark this browser as having signed in before, so the login page can greet
+    # returning visitors with "Welcome back." (first-timers see "Welcome.").
+    resp.set_cookie("p2_seen", "1", max_age=60*60*24*365, samesite="Lax", secure=True)
+    return resp
 
 
 # ── Core routes ─────────────────────────────────────────────────────────────────
@@ -1307,7 +1311,8 @@ def login_page():
         return redirect("/app")
     return render_template("agents.html", page="login", agents=AGENTS, agent=None,
                            related=[], google_client_id=GOOGLE_CLIENT_ID,
-                           error=request.args.get("error", ""))
+                           error=request.args.get("error", ""),
+                           returning=bool(request.cookies.get("p2_seen")))
 
 @app.route("/login-preview")
 def login_preview():
