@@ -1184,8 +1184,25 @@ def admin_required(f):
         user = _get_user()
         if not user:
             return _login_redirect()
-        if user.get("email", "").lower() not in ADMIN_EMAILS:
-            abort(403)
+        email = user.get("email", "").lower()
+        if not email.endswith("@position2.com"):
+            return redirect("/app")          # external users never see internal /p2
+        if email not in ADMIN_EMAILS:
+            abort(403)                        # Position2 non-admins: forbidden
+        return f(*args, **kwargs)
+    return decorated
+
+def position2_required(f):
+    """Gate an internal /p2 route to @position2.com Google accounts.
+    Logged-out visitors are sent to sign in (remembering their target); signed-in
+    non-Position2 users are bounced to their blank signed-in home (/app)."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = _get_user()
+        if not user:
+            return _login_redirect()
+        if not user.get("email", "").lower().endswith("@position2.com"):
+            return redirect("/app")
         return f(*args, **kwargs)
     return decorated
 
@@ -1214,8 +1231,9 @@ def auth_google():
             return jsonify({"success": False, "error": str(e)}), 401
 
     email = idinfo.get("email", "")
-    if not email.lower().endswith("@position2.com"):
-        return jsonify({"success": False, "error": "Access restricted to Position2 accounts only."}), 403
+    # v17: sign-in is open to ANY Google account. Area-level access control is enforced
+    # separately -- only @position2.com may reach the internal /p2/* pages (see
+    # position2_required). General users land on the blank signed-in home (/app).
 
     session["google_user"] = {
         "email":      email,
@@ -1227,7 +1245,7 @@ def auth_google():
     _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
-        nxt = "/p2/hub"
+        nxt = "/app"
     return jsonify({"success": True, "redirect": nxt})
 
 
@@ -1251,9 +1269,17 @@ def favicon():
 @app.route("/")
 def index():
     if _get_user():
-        return redirect(url_for("hub"))
+        return redirect("/app")
     return render_template("agents.html", page="home", agents=AGENTS, agent=None,
                            related=[], signals_list=SIGNALS)
+
+@app.route("/app")
+@login_required
+def app_home():
+    """Blank signed-in home for ALL Google users (Position2 and external alike).
+    Content intentionally left empty for now -- to be defined next."""
+    return render_template("app.html", user=_get_user())
+
 
 @app.route("/privacy")
 def privacy_page():
@@ -1278,7 +1304,7 @@ def security_page():
 @app.route("/login")
 def login_page():
     if _get_user():
-        return redirect(url_for("hub"))
+        return redirect("/app")
     return render_template("agents.html", page="login", agents=AGENTS, agent=None,
                            related=[], google_client_id=GOOGLE_CLIENT_ID,
                            error=request.args.get("error", ""))
@@ -1297,7 +1323,7 @@ def logout():
 # ── v16: internal app relocated to /p2/* ─────────────────────────────────────────
 # The entire logged-in surface now lives under /p2. These stubs 301-redirect the old
 # internal URLs to their /p2 equivalents (query strings preserved) so bookmarks and
-# external links keep resolving. Actual serving + @login_required lives on the /p2
+# external links keep resolving. Actual serving + @position2_required lives on the /p2
 # routes below. Static assets and /api/* endpoints intentionally stay at their old
 # paths (they are referenced by absolute path from page JS / the Ad Intel bundle).
 def _p2_relocate_redirect(**kwargs):
@@ -1338,26 +1364,26 @@ def p2_root():
 
 # ── Hub pages ───────────────────────────────────────────────────────────────────
 @app.route("/p2/hub")
-@login_required
+@position2_required
 def hub():
     return render_template("hub.html", user=_get_user())
 
 @app.route("/p2/gtm")
-@login_required
+@position2_required
 def gtm():
     return render_template("gtm.html", user=_get_user())
 
 
 @app.route("/p2/gtm/sentiment-pulse")
 @app.route("/p2/gtm/sentiment-pulse/")
-@login_required
+@position2_required
 def call_sentiment():
     return render_template("call_sentiment.html", user=_get_user())
 
 
 @app.route("/gtm/call-sentiment")
 @app.route("/gtm/call-sentiment/")
-@login_required
+@position2_required
 def call_sentiment_legacy():
     return redirect(url_for("call_sentiment"))
 
@@ -1381,7 +1407,7 @@ def ppc_linkedin_scraper_redirect():
     return redirect("/p2/gtm/linkedin-scraper", code=301)
 
 @app.route("/p2/seo")
-@login_required
+@position2_required
 def seo():
     return render_template("seo.html", user=_get_user(), seo_tools=_seo_tools())
 
@@ -1393,7 +1419,7 @@ AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
 @app.route("/p2/gtm/ad-intelligence")
 @app.route("/p2/gtm/ad-intelligence/")
-@login_required
+@position2_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
 
@@ -1457,7 +1483,7 @@ def _seo_tools():
     return tools
 
 @app.route("/p2/seo/<tool_slug>")
-@login_required
+@position2_required
 def seo_tool(tool_slug: str):
     tool = next((t for t in _seo_tools() if t.get("slug") == tool_slug), None)
     if not tool:
@@ -1481,14 +1507,14 @@ def seo_tool(tool_slug: str):
 
 # ── Company Signal Tracker ───────────────────────────────────────────────────────
 @app.route("/p2/accounts")
-@login_required
+@position2_required
 def accounts():
     cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
     return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
 @app.route("/p2/signal-tracker/<account_id>")
 @app.route("/p2/signal-tracker/<account_id>/<section>")
-@login_required
+@position2_required
 def dashboard(account_id: str, section: str = None):
     cfg = ACCOUNTS.get(account_id)
     if not cfg:
@@ -1516,14 +1542,14 @@ def _no_html_cache(resp):
 
 @app.route("/dashboard/<account_id>")
 @app.route("/dashboard/<account_id>/<section>")
-@login_required
+@position2_required
 def dashboard_legacy(account_id: str, section: str = None):
     """Back-compat: old /dashboard/* URLs redirect to canonical /signal-tracker/*."""
     target = "/p2/signal-tracker/" + account_id + (("/" + section) if section else "")
     return redirect(target, code=301)
 
 @app.route("/api/whoami")
-@login_required
+@position2_required
 def whoami():
     u = _get_user() or {}
     return jsonify({"name": u.get("name", ""), "given_name": u.get("given_name", ""),
@@ -2325,7 +2351,7 @@ def _fetch_anon_visitors_data(force: bool = False) -> dict:
 
 
 @app.route("/p2/gtm/anonymous-visitors")
-@login_required
+@position2_required
 def anonymous_visitors():
     """Anonymous Visitors dashboard shell — loads data async."""
     return render_template("anonymous_visitors.html", user=_get_user())
@@ -2333,7 +2359,7 @@ def anonymous_visitors():
 
 @app.route("/gtm/anonymous-visitors/data")
 @app.route("/ppc/anonymous-visitors/data")
-@login_required
+@position2_required
 def anonymous_visitors_data():
     """JSON data endpoint for the Anonymous Visitors dashboard (gzipped, cached)."""
     force = request.args.get("fresh") in ("1", "true", "yes")
@@ -2356,7 +2382,7 @@ def anonymous_visitors_data():
 
 
 @app.route("/p2/gtm/linkedin-scraper")
-@login_required
+@position2_required
 def linkedin_scraper():
     """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""
     try:
@@ -2375,7 +2401,7 @@ def health():
 
 @app.route("/api/weekly-stats")
 @app.route("/api/weekly-stats/<account_id>")
-@login_required
+@position2_required
 def weekly_stats(account_id: str = "healthcare"):
     cfg = ACCOUNTS.get(account_id)
     if not cfg:
@@ -3031,7 +3057,7 @@ def _build_ppc_context() -> str:
 
 
 @app.route("/api/ppc-chat", methods=["POST"])
-@login_required
+@position2_required
 def ppc_chat():
     """PPC AI assistant — context injection."""
     from openai import OpenAI
@@ -3267,7 +3293,7 @@ _MAX_TEXT_CHARS  = 40_000             # truncate extracted text at 40k chars
 
 
 @app.route("/api/ppc-upload", methods=["POST"])
-@login_required
+@position2_required
 def ppc_upload():
     """Parse an uploaded file and return its extracted content for the chatbot."""
     if "file" not in request.files:
@@ -3406,7 +3432,7 @@ def _strip_revenue_fields(obj):
     return obj
 
 @app.route("/api/insights-meta/<account_id>")
-@login_required
+@position2_required
 def insights_meta(account_id):
     import sqlite3
     from pathlib import Path
@@ -3444,7 +3470,7 @@ INSIGHTS_MIN_SCORE = 6.0
 INSIGHTS_MAX_SIGNALS = 120
 
 @app.route("/api/insights/<account_id>")
-@login_required
+@position2_required
 def insights_generate(account_id):
     import sqlite3, re as _re
     from pathlib import Path
@@ -3646,7 +3672,7 @@ def insights_generate(account_id):
 
 
 @app.route("/api/ppc-chat-debug")
-@login_required
+@position2_required
 def ppc_chat_debug():
     """Shows exactly what data the chatbot sees — use to diagnose blank/wrong answers."""
     _PPC_CTX_CACHE["ts"] = 0   # force refresh
@@ -3763,7 +3789,7 @@ def get_ad_intelligence_data(competitor=None, ad_format=None, status=None,
 
 
 @app.route("/api/company-analysis/<account_id>")
-@login_required
+@position2_required
 def company_analysis(account_id):
     """Deep AI analysis of a single company for the insights drawer."""
     import sqlite3, re as _re
@@ -3843,7 +3869,7 @@ def company_analysis(account_id):
 
 
 @app.route("/api/generate-email/<account_id>")
-@login_required
+@position2_required
 def generate_email(account_id):
     """GPT-powered personalised email using company signals."""
     import sqlite3, re as _re
@@ -3945,7 +3971,7 @@ def generate_email(account_id):
 
 
 @app.route("/api/research-company/<account_id>")
-@login_required
+@position2_required
 def research_company(account_id):
     """AI research on a company: GPT + web search -> key facts, insights, Position2 angle."""
     import sqlite3, re as _re
@@ -4037,7 +4063,7 @@ def research_company(account_id):
 
 
 @app.route("/api/decision-makers/<account_id>")
-@login_required
+@position2_required
 def decision_makers(account_id):
     """Use OpenAI web search to find C-suite / key people at a company with LinkedIn URLs."""
     import re as _re
@@ -4090,7 +4116,7 @@ def decision_makers(account_id):
         return jsonify({"error": str(exc)})
 
 @app.route("/api/vimi-chat/<account_id>", methods=["POST"])
-@login_required
+@position2_required
 def vimi_chat(account_id):
     """Conversational Vimi: grounded on the account signal DB, web-search for the rest."""
     import sqlite3, re as _re
@@ -4269,7 +4295,7 @@ def _strip_md(t):
 
 
 @app.route("/api/vimi-export", methods=["POST"])
-@login_required
+@position2_required
 def vimi_export():
     """Convert Vimi markdown output into CSV / XLSX / DOCX / PDF / PPTX and stream it back."""
     import io
@@ -4425,7 +4451,7 @@ def vimi_export():
 
 
 @app.route("/api/refresh-dashboard", methods=["POST"])
-@login_required
+@position2_required
 def refresh_dashboard():
     """Trigger the GitHub Action that fetches the latest signals (HIGH from
     Sheets, LOW from Google News with filters) for both accounts, rebuilds the
@@ -4469,7 +4495,7 @@ def _refresh_stage(name):
     return "Preparing…"
 
 @app.route("/api/refresh-status")
-@login_required
+@position2_required
 def refresh_status():
     """Live status of the most recent refresh Action run (for the progress bar)."""
     import datetime as _dt, time as _t
