@@ -313,3 +313,19 @@ td.dim{color:#5a6488}
 [data-theme="light"] td{color:#2a3352 !important;border-color:rgba(18,26,54,.08) !important}
 [data-theme="light"] tbody tr:hover td,[data-theme="light"] tr:hover td{background:rgba(18,26,54,.03) !important}
 [data-theme="light"] .tag,[data-theme="light"] .pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#4d5680 !important}
+
+/* ── Sleek scrollbars for inner scroll areas (tables, drawers) ──────────────── */
+/* The page (html/body) scrollbar is hidden above; these style the remaining
+   overflow containers so they read thin, rounded and on-brand instead of the
+   thick OS default. */
+.tbl-wrap, .tline{ scrollbar-width:thin; scrollbar-color:rgba(139,92,246,.55) transparent }
+.tbl-wrap::-webkit-scrollbar, .tline::-webkit-scrollbar{ width:8px; height:8px }
+.tbl-wrap::-webkit-scrollbar-track, .tline::-webkit-scrollbar-track{ background:transparent }
+.tbl-wrap::-webkit-scrollbar-thumb, .tline::-webkit-scrollbar-thumb{
+  background:rgba(139,92,246,.45); border-radius:20px;
+  border:2px solid transparent; background-clip:padding-box; }
+.tbl-wrap::-webkit-scrollbar-thumb:hover, .tline::-webkit-scrollbar-thumb:hover{
+  background:rgba(34,211,238,.8); background-clip:padding-box; }
+.tbl-wrap::-webkit-scrollbar-corner, .tline::-webkit-scrollbar-corner{ background:transparent }
+[data-theme="light"] .tbl-wrap, [data-theme="light"] .tline{ scrollbar-color:rgba(99,102,241,.5) transparent }
+[data-theme="light"] .tbl-wrap::-webkit-scrollbar-thumb, [data-theme="light"] .tline::-webkit-scrollbar-thumb{ background:rgba(99,102,241,.4); background-clip:padding-box }
