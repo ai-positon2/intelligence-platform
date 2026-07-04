@@ -1864,8 +1864,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <p class="login-sub">Sign in with your Google account to continue.</p>
       <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
       <div class="gbtn">
-        <div id="g_id_onload" data-client_id="{{ google_client_id }}" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
-        <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left" data-width="300"></div>
+        <div id="gsiBtn" data-cid="{{ google_client_id }}"></div>
       </div>
       <div class="login-secure"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Secure sign-in with Google</div>
       <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Request access &rarr;</a></div>
@@ -1876,9 +1875,23 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     var c=document.getElementById('gerr');
     fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})})
     .then(function(r){return r.json();})
-    .then(function(d){ if(d.success){ window.location.href=d.redirect||'/app'; } else { if(c){ c.textContent='⚠ '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
-    .catch(function(){ if(c){ c.textContent='⚠ Network error. Please try again.'; c.style.display='flex'; } });
+    .then(function(d){ if(d.success){ window.location.href=d.redirect||'/app'; } else { if(c){ c.textContent='\u26A0 '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
+    .catch(function(){ if(c){ c.textContent='\u26A0 Network error. Please try again.'; c.style.display='flex'; } });
   }
+  /* Manual Google Sign-In init. No One Tap, no auto-select: a user who signs out
+     must click to sign back in (fixes auto re-login after logout). */
+  (function(){
+    var host=document.getElementById('gsiBtn'); if(!host) return;
+    var cid=host.getAttribute('data-cid')||'';
+    function init(){
+      if(!(window.google && google.accounts && google.accounts.id)){ return setTimeout(init,120); }
+      google.accounts.id.initialize({ client_id:cid, callback:handleCredentialResponse, auto_select:false, itp_support:true, cancel_on_tap_outside:true });
+      try{ google.accounts.id.disableAutoSelect(); }catch(e){}
+      google.accounts.id.renderButton(host, { type:'standard', shape:'pill', theme:'filled_black', text:'signin_with', size:'large', logo_alignment:'left', width:300 });
+      /* intentionally NOT calling google.accounts.id.prompt() -> no automatic sign-in */
+    }
+    init();
+  })();
   </script>
 {% endif %}
 </main>
