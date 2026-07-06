@@ -1458,6 +1458,14 @@ def _log_agent_run(user: dict, agent: dict) -> None:
     except Exception as e:
         log.warning("agent run log failed: %s", e)
 
+def _canonical_agent_slug(slug: str) -> str:
+    """Map a possibly-renamed agent slug to its current canonical one. Every
+    reader of the 'Agent Runs' tab must pass slugs through this — rows logged
+    before a rename still contain the old slug, and won't otherwise match
+    the current APP_AGENTS list (silently under-counting that agent's runs
+    and letting a renamed agent's cap be bypassed)."""
+    return _LEGACY_AGENT_SLUGS.get(slug, slug)
+
 def _agent_run_counts(email: str) -> dict:
     """Return {agent_slug: run_count} for one user, read fresh from 'Agent Runs'.
     Used both to enforce the cap and to show 'runs left' on the dashboard."""
@@ -1479,6 +1487,7 @@ def _agent_run_counts(email: str) -> dict:
             if (ac(r, "Email") or "").lower() == e:
                 slug = ac(r, "Agent Slug")
                 if slug:
+                    slug = _canonical_agent_slug(slug)
                     counts[slug] = counts.get(slug, 0) + 1
     except Exception as ex:
         log.warning("agent run count read failed: %s", ex)
@@ -1510,7 +1519,7 @@ def _fetch_agent_run_stats() -> dict:
         email = (ac(r, "Email") or "").lower()
         if not email:
             continue
-        slug = ac(r, "Agent Slug") or "?"
+        slug = _canonical_agent_slug(ac(r, "Agent Slug") or "?")
         ts = ac(r, "Timestamp (IST)")
         u = by_user.setdefault(email, {"email": email, "name": "", "total": 0,
                                         "agents": {}, "last_run": ""})
