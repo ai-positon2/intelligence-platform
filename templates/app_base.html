@@ -142,8 +142,8 @@
     tickClock(); setInterval(tickClock, 30000);
   </script>
   <script>
-    /* post-login page-view tracking for members (kept out of the Usage Dashboard,
-       which is filtered to @position2.com; surfaced in Member Analytics). */
+    /* post-login page-view tracking for members (kept out of Internal Usage,
+       which is filtered to @position2.com; surfaced in Public Page Analytics). */
     (function(){if(window.__mtrk)return;window.__mtrk=1;var _s=Date.now(),_d=false;
       function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);
         try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},

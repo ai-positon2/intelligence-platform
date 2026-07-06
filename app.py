@@ -152,7 +152,7 @@ def _log_login_to_sheet(user: dict) -> None:
             "Google OAuth",                             # 18 Auth Method
             str(uuid.uuid4())[:8],                      # 19 Session ID (short)
             "intelligence.position2.com",               # 20 Platform
-            vid,                                         # 21 Visitor ID (p2_vid, for Member Analytics linking)
+            vid,                                         # 21 Visitor ID (p2_vid, for Public Page Analytics linking)
         ]
 
         # Check if header row exists; if sheet is empty, prepend it
@@ -240,7 +240,7 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 # Free/personal webmail domains -- excluded when inferring a member's company from
-# their sign-in email domain (Member Analytics). Not exhaustive, but covers the
+# their sign-in email domain (Public Page Analytics). Not exhaustive, but covers the
 # overwhelming majority of personal-account sign-ins.
 _FREE_EMAIL_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.co.uk",
@@ -1306,15 +1306,15 @@ def auth_google():
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
         nxt = "/app"
-    # Route sign-in logging: @position2.com -> always the internal Usage Dashboard,
-    # PLUS Member Analytics too when landing on the public /app surface (not deep-
-    # linking straight into /p2). Everyone else -> Member Analytics only.
+    # Route sign-in logging: @position2.com -> always Internal Usage,
+    # PLUS Public Page Analytics too when landing on the public /app surface (not
+    # deep-linking straight into /p2). Everyone else -> Public Page Analytics only.
     if email.lower().endswith("@position2.com"):
         _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
         if not nxt.startswith("/p2"):
             _log_member_signin(session["google_user"])
     else:
-        _log_member_signin(session["google_user"])    # public member -> Member Analytics
+        _log_member_signin(session["google_user"])    # public member -> Public Page Analytics
     resp = jsonify({"success": True, "redirect": nxt})
     # Mark this browser as having signed in before, so the login page can greet
     # returning visitors with "Welcome back." (first-timers see "Welcome.").
@@ -2521,8 +2521,8 @@ def _fetch_usage_data() -> dict:
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
 
-    # Usage Dashboard is INTERNAL only: keep @position2.com sign-ins & activity,
-    # drop public members (they live in Member Analytics instead).
+    # Internal Usage is INTERNAL only: keep @position2.com sign-ins & activity,
+    # drop public members (they live in Public Page Analytics instead).
     def _is_p2(e): return (e or "").lower().endswith("@position2.com")
     login_data = [r for r in login_data if _is_p2(col(r, 5))]
     page_data  = [r for r in page_data  if _is_p2(col(r, 4))]
