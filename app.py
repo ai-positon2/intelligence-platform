@@ -1612,9 +1612,11 @@ def app_detail(slug):
 @app.route("/app/<slug>/use")
 @login_required
 def app_use(slug):
-    """Run the agent — embeds the live SERP tool (same one used internally).
-    Each load counts as one run against the per-agent cap; once a user hits
-    the cap, we show a friendly limit-reached state instead of the iframe."""
+    """Embeds the live SERP tool (same one used internally). Opening this page
+    does NOT count as a run by itself — the cap is checked against past runs
+    so someone already at the cap still sees the blocked state, but a fresh
+    run is only logged once app_use_log_run fires (see below), which happens
+    client-side after real interaction with the embedded tool is detected."""
     if slug in _LEGACY_AGENT_SLUGS:
         return redirect("/app/" + _LEGACY_AGENT_SLUGS[slug] + "/use", code=301)
     agent = APP_AGENTS_BY_SLUG.get(slug)
@@ -1629,9 +1631,28 @@ def app_use(slug):
     embed_url = _app_embed_url(agent)
     if not embed_url:
         return redirect("/app/" + slug)
-    _log_agent_run(user, agent)
     return render_template("app_embed.html", user=user, agent=agent, embed_url=embed_url,
-                           runs_used=runs_used + 1, runs_cap=AGENT_RUN_CAP, limit_reached=False)
+                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=False)
+
+@app.route("/app/<slug>/use/log-run", methods=["POST"])
+@login_required
+def app_use_log_run(slug):
+    """Logs one real run. Called client-side only after the embedded tool has
+    actually been interacted with (focus moves into the iframe) — NOT on page
+    load — so simply opening an agent and navigating away doesn't count
+    against the cap. See app_embed.html's blur/activeElement listener."""
+    agent = APP_AGENTS_BY_SLUG.get(slug)
+    if not agent:
+        return jsonify({"logged": False, "error": "unknown agent"}), 404
+    user = _get_user()
+    email = (user or {}).get("email", "")
+    runs_used = _agent_run_counts(email).get(slug, 0)
+    if runs_used >= AGENT_RUN_CAP:
+        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP, "at_cap": True})
+    _log_agent_run(user, agent)
+    runs_used += 1
+    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP,
+                    "at_cap": runs_used >= AGENT_RUN_CAP})
 
 @app.route("/app/history")
 @login_required
