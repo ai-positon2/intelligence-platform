@@ -109,7 +109,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .tl-c small{display:block;color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:2px}
 .tl-c .k{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
 .tl-c .k.view{color:var(--cyan)}.tl-c .k.signin{color:var(--lime)}.tl-c .k.post{color:var(--violet)}
-/* Agent Usage (embedded within Public Page Analytics) */
+/* Public Agent Usage (embedded within Public Page Analytics) */
 .au-intro{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
 .au-intro p{margin:0;color:var(--dim);font-size:13px;max-width:620px;line-height:1.6}
 .au-link{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;
@@ -176,8 +176,8 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
           <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
           <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
           <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
+          <a href="/p2/admin/agent-runs" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
           <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
-          <a href="/p2/admin/agent-runs" class="dd-item"><span class="dd-item-icon">🤖</span> Agent Usage</a>
           <div class="dd-divider"></div>
           <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
         </div>
@@ -230,11 +230,11 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <tbody></tbody></table></div></div>
   </div>
 
-  <div class="sect"><h2>Agent usage <span class="muted" style="font-weight:400;font-size:12px">· the same members, running the 3 /app agents</span></h2>
+  <div class="sect"><h2>Public Agent usage <span class="muted" style="font-weight:400;font-size:12px">· the same members, running the 3 /app agents</span></h2>
     <div class="card">
       <div class="au-intro">
         <p>Every run of a public <b>/app</b> agent by the members tracked above, against the <b>10-run cap</b> enforced per agent, per account.</p>
-        <a class="au-link" href="/p2/admin/agent-runs">Full Agent Usage dashboard ↗</a>
+        <a class="au-link" href="/p2/admin/agent-runs">Full Public Agent Usage dashboard ↗</a>
       </div>
       <div id="auEmpty" class="empty" style="display:none"></div>
       <div class="au-kpirow" id="auKpis"></div>
