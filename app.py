@@ -1532,13 +1532,15 @@ def _fetch_agent_run_stats() -> dict:
                 "slug": slug, "name": meta.get("name", slug), "count": cnt,
                 "cap": AGENT_RUN_CAP, "remaining": max(0, AGENT_RUN_CAP - cnt),
                 "at_cap": cnt >= AGENT_RUN_CAP,
+                "ac": meta.get("ac", "#8b5cf6"), "ac2": meta.get("ac2", "#22d3ee"),
             })
         users_out.append({"email": u["email"], "name": u["name"] or u["email"],
                            "total": u["total"], "last_run": u["last_run"], "agents": agents_list})
     users_out.sort(key=lambda x: -x["total"])
 
     agents_out = [{"slug": a["slug"], "name": a["name"], "runs": agent_totals.get(a["slug"], 0),
-                   "cap": AGENT_RUN_CAP} for a in APP_AGENTS]
+                   "cap": AGENT_RUN_CAP, "ac": a["ac"], "ac2": a["ac2"], "icon": a["icon"]}
+                  for a in APP_AGENTS]
     users_at_cap = sum(1 for u in users_out if any(a["at_cap"] for a in u["agents"]))
 
     return {
