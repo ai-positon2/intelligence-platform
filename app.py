@@ -1359,16 +1359,14 @@ _SVG_BRIEF = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 _SVG_ALCHEMY = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
     'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10z"/>'
     '<path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg>')
-_SVG_SOON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
-    'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>')
 
 APP_AGENTS = [
     {
-        "slug": "keyword-compass", "name": "Keyword Compass",
+        "slug": "keyword-compass", "name": "Keyword Finder",
         "tagline": "AI keyword discovery, scoring & clustering",
         "seo_slug": "keyword-research", "ac": "#22d3ee", "ac2": "#6366f1", "icon": _SVG_COMPASS,
         "pill1": "Keyword intelligence", "pill2": "SERP · AI · clustering",
-        "lead": ("Point it at a topic and it finds the keywords worth chasing. Keyword Compass "
+        "lead": ("Point it at a topic and it finds the keywords worth chasing. Keyword Finder "
             "pulls candidate terms, enriches them with live search data, then scores and clusters "
             "them into clean topic groups so you know exactly what to target next."),
         "trips": [
@@ -1379,11 +1377,11 @@ APP_AGENTS = [
         "tags": ["Keywords", "SERP", "Clustering", "Intent", "AI"],
     },
     {
-        "slug": "brief-architect", "name": "Brief Architect",
+        "slug": "brief-architect", "name": "Content Brief Generator",
         "tagline": "Structured, SERP-backed content briefs",
         "seo_slug": "article-recommendation", "ac": "#8b5cf6", "ac2": "#e879f9", "icon": _SVG_BRIEF,
         "pill1": "Content briefs", "pill2": "SERP · outlines · entities",
-        "lead": ("Turn a target keyword into a ready-to-write brief. Brief Architect studies the "
+        "lead": ("Turn a target keyword into a ready-to-write brief. Content Brief Generator studies the "
             "pages currently ranking and assembles the structure, headings, questions and entities "
             "your article needs to compete, so writers start with a plan instead of a blank page."),
         "trips": [
@@ -1394,11 +1392,11 @@ APP_AGENTS = [
         "tags": ["Briefs", "SERP", "Outlines", "Entities", "Content"],
     },
     {
-        "slug": "content-alchemist", "name": "Content Alchemist",
+        "slug": "content-alchemist", "name": "Content Enhancer",
         "tagline": "Multi-LLM + SERP article enhancement",
         "seo_slug": "article-enhancement", "ac": "#34d399", "ac2": "#22d3ee", "icon": _SVG_ALCHEMY,
         "pill1": "Content enhancement", "pill2": "multi-LLM · SERP · E-E-A-T",
-        "lead": ("Feed it an existing article and it levels the piece up. Content Alchemist compares "
+        "lead": ("Feed it an existing article and it levels the piece up. Content Enhancer compares "
             "your page against the current top competitors and returns concrete recommendations on "
             "structure, depth and authority, drawing on multiple language models."),
         "trips": [
@@ -1407,21 +1405,6 @@ APP_AGENTS = [
             {"t": "Best for", "d": "Refreshing existing content that has stalled or is being out-ranked."},
         ],
         "tags": ["Enhance", "LLM", "SERP", "E-E-A-T"],
-    },
-    {
-        "slug": "coming-soon", "name": "Coming soon",
-        "tagline": "A new agent, arriving shortly",
-        "seo_slug": None, "ac": "#e879f9", "ac2": "#8b5cf6", "icon": _SVG_SOON,
-        "pill1": "Lorem ipsum", "pill2": "dolor sit amet",
-        "lead": ("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor "
-            "incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud "
-            "exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."),
-        "trips": [
-            {"t": "Lorem ipsum", "d": "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor."},
-            {"t": "Dolor sit", "d": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip."},
-            {"t": "Consectetur", "d": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore."},
-        ],
-        "tags": ["Lorem", "Ipsum", "Dolor", "Sit amet"],
     },
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
