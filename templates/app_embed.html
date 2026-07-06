@@ -29,6 +29,21 @@
     text-transform:uppercase; color:color-mix(in srgb, var(--ac) 75%, #fff); flex:none }
   .ebar .elive .d{ width:7px; height:7px; border-radius:50%; background:var(--ac); box-shadow:0 0 9px var(--ac); animation:epulse 2s ease-in-out infinite }
   @keyframes epulse{ 0%,100%{ opacity:1 } 50%{ opacity:.4 } }
+  .ebar .eruns{ display:flex; align-items:center; gap:9px; font-size:11.5px; font-weight:600; color:var(--tx2); flex:none;
+    padding:7px 13px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.03) }
+  .ebar .eruns.at-cap{ color:#fb7185; border-color:rgba(251,113,133,.3); background:rgba(251,113,133,.08) }
+  .limit-wrap{ flex:1; display:flex; align-items:center; justify-content:center; text-align:center;
+    border-radius:22px; border:1px solid rgba(251,113,133,.25); background:rgba(251,113,133,.06); padding:48px 24px }
+  .limit-box{ max-width:420px }
+  .limit-box .li{ width:56px; height:56px; margin:0 auto 20px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg,#fb7185,#f472b6); box-shadow:0 16px 40px -14px rgba(251,113,133,.6) }
+  .limit-box .li svg{ width:26px; height:26px; stroke:#fff }
+  .limit-box h2{ margin:0 0 10px; font-size:22px; font-weight:700; color:#fff; letter-spacing:-.01em }
+  .limit-box p{ margin:0 0 22px; font-size:14px; color:var(--tx2); line-height:1.65 }
+  .limit-box a{ display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:11px;
+    text-decoration:none; font-size:13.5px; font-weight:600; color:var(--tx); border:1px solid var(--line);
+    background:rgba(255,255,255,.04); transition:.2s }
+  .limit-box a:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2) }
   .frame-wrap{ flex:1; position:relative; min-height:0; background:#0a0d1a;
     border-radius:22px; border:1px solid color-mix(in srgb, var(--ac) 22%, var(--line)); overflow:hidden;
     box-shadow:0 30px 70px -30px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02) inset }
@@ -59,12 +74,28 @@
         <div class="etxt"><b>{{ agent.name }}</b><span>{{ agent.tagline }}</span></div>
       </div>
     </div>
+    {% if limit_reached %}
+    <div class="eruns at-cap">Run limit reached &middot; {{ runs_used }}/{{ runs_cap }}</div>
+    {% else %}
+    <div class="eruns">Run {{ runs_used }} of {{ runs_cap }}</div>
     <div class="elive"><span class="d"></span>Live</div>
+    {% endif %}
   </div>
+  {% if limit_reached %}
+  <div class="limit-wrap">
+    <div class="limit-box">
+      <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+      <h2>Run limit reached</h2>
+      <p>You&rsquo;ve used all {{ runs_cap }} runs available for {{ agent.name }}. This limit is per agent, per account &mdash; your other agents are unaffected.</p>
+      <a href="/app/{{ agent.slug }}">&larr; Back to {{ agent.name }}</a>
+    </div>
+  </div>
+  {% else %}
   <div class="frame-wrap">
     <div class="frame-loader" id="floader"><span class="sp"></span> Loading {{ agent.name }}…</div>
     <iframe class="tool" id="toolFrame" src="{{ embed_url }}" allow="clipboard-write; clipboard-read; fullscreen"></iframe>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}
