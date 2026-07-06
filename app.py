@@ -2286,6 +2286,20 @@ def _fetch_member_analytics() -> dict:
         mem["os"] = mc(r, "OS") or mem["os"]
         if mc(r, "IP"): mem["ip"] = mc(r, "IP")
 
+    # Sessions persist for weeks, so plenty of /app usage comes from people who
+    # signed in before their Member Signins row existed (or whose session simply
+    # hasn't expired since). Surface them from their actual Page Views activity
+    # too, instead of only counting people who've freshly re-authenticated.
+    for e, rows in pv_by_email.items():
+        if e in members:
+            continue
+        rows = sorted(rows, key=lambda r: pc(r, 0))
+        last_row = rows[-1]
+        members[e] = {"email": e, "name": "—", "picture": "", "vids": set(), "signins": 1,
+            "first_signin": pc(rows[0], 0), "last_signin": pc(last_row, 0),
+            "device": pc(last_row, 12), "browser": pc(last_row, 10),
+            "os": pc(last_row, 11), "ip": pc(last_row, 9)}
+
     out_members = []
     signup_by_day = Counter(); src_counter = Counter(); utm_counter = Counter()
     dev_counter = Counter(); os_counter = Counter(); br_counter = Counter()
