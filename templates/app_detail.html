@@ -28,9 +28,9 @@
   .pill.ac{ border-color:color-mix(in srgb, var(--ac) 42%, transparent);
     color:color-mix(in srgb, var(--ac) 72%, #fff); background:color-mix(in srgb, var(--ac) 10%, transparent) }
 
-  .dgrid{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start }
+  .dgrid{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:stretch }
 
-  .panel{ background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:22px; padding:32px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
+  .panel{ display:flex; flex-direction:column; background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:22px; padding:32px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
   .panel-head{ display:flex; align-items:center; gap:13px; padding-bottom:22px;
     border-bottom:1px solid var(--line); margin-bottom:24px }
   .panel-head .pi{ width:40px; height:40px; border-radius:12px; flex:none;
