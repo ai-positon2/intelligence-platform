@@ -1,11 +1,26 @@
 {% extends "app_base.html" %}
 {% block styles %}
 <style>
-  .main{ flex:1; display:flex; align-items:center; justify-content:center }
-  .wrap{ width:100%; max-width:1160px; padding:48px 24px; position:relative; z-index:1 }
-  .intro{ text-align:center; margin-bottom:34px }
-  .intro h1{ margin:0 0 8px; font-size:clamp(26px,4vw,38px); font-weight:700; letter-spacing:-.025em; color:#f2f6ff }
-  .intro p{ margin:0 auto; max-width:560px; color:var(--tx2); font-size:15px; line-height:1.6 }
+  .dash{ flex:1; width:100%; max-width:1240px; margin:0 auto; padding:34px 32px 64px; position:relative; z-index:1 }
+  .sect{ margin-bottom:44px }
+  .sect .eyebrow{ font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#9b8bff; margin-bottom:8px }
+  .sect h2{ margin:0 0 6px; font-size:clamp(22px,2.6vw,30px); font-weight:700; letter-spacing:-.02em; color:#f2f6ff }
+  .sect .sub{ margin:0; font-size:14px; color:var(--tx2); line-height:1.6 }
+
+  /* hero */
+  .hero{
+    border-radius:22px; border:1px solid var(--line); padding:36px 38px; margin-bottom:44px;
+    background:
+      radial-gradient(720px 300px at 8% 0%, rgba(124,92,255,.16), transparent 65%),
+      radial-gradient(600px 300px at 96% 12%, rgba(34,211,238,.12), transparent 65%),
+      rgba(12,15,30,.55);
+    backdrop-filter:blur(8px); position:relative; overflow:hidden;
+  }
+  .hero .eyebrow{ font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#9b8bff; margin-bottom:10px }
+  .hero h1{ margin:0 0 10px; font-size:clamp(26px,3.4vw,38px); font-weight:700; letter-spacing:-.025em; color:#fff }
+  .hero p{ margin:0; font-size:14.5px; color:var(--tx2) }
+  .hero p b{ color:var(--tx); font-weight:600 }
+
   .cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:22px }
   .card{
     display:flex; flex-direction:column; text-decoration:none; color:inherit;
@@ -13,7 +28,7 @@
       linear-gradient(160deg, color-mix(in srgb, var(--ac) 14%, transparent), transparent 60%),
       rgba(12,15,30,.62);
     border:1px solid color-mix(in srgb, var(--ac) 26%, rgba(255,255,255,.09));
-    border-radius:18px; padding:26px; min-height:196px;
+    border-radius:18px; padding:26px; min-height:206px;
     position:relative; overflow:hidden;
     backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
     box-shadow:0 10px 40px -18px rgba(0,0,0,.6);
@@ -24,36 +39,120 @@
   .card:hover{ transform:translateY(-3px);
     border-color:color-mix(in srgb, var(--ac) 55%, transparent);
     box-shadow:0 18px 52px -20px color-mix(in srgb, var(--ac) 45%, transparent) }
-  .card .cicon{ width:48px; height:48px; border-radius:13px; flex:none; margin-bottom:16px;
+  .card .ctop{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px }
+  .card .cicon{ width:48px; height:48px; border-radius:13px; flex:none;
     display:flex; align-items:center; justify-content:center;
     background:linear-gradient(145deg, var(--ac), var(--ac2));
     box-shadow:0 12px 34px -12px color-mix(in srgb, var(--ac) 70%, transparent) }
   .card .cicon svg{ width:24px; height:24px; stroke:#fff }
+  .card .cext{ color:var(--tx3); font-size:15px; opacity:.7; transition:opacity .2s ease, transform .2s ease }
+  .card:hover .cext{ opacity:1; transform:translate(2px,-2px) }
   .card h3{ margin:0 0 6px; font-size:19px; font-weight:600; letter-spacing:-.01em; color:#f2f6ff }
   .card p{ margin:0; font-size:13.5px; line-height:1.6; color:var(--tx2) }
+  .card .cmeta{ display:flex; align-items:center; gap:6px; margin-top:16px; font-size:12px; color:var(--tx3) }
+  .card .cmeta svg{ width:13px; height:13px; stroke:currentColor; flex:none }
   .card .more{ margin-top:auto; padding-top:16px; font-size:13px; font-weight:600;
     color:color-mix(in srgb, var(--ac) 72%, #fff) }
+
+  .activity-box{
+    border-radius:18px; border:1px solid var(--line); background:rgba(12,15,30,.5);
+    padding:28px; min-height:120px;
+  }
+  .act-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+    padding:24px 10px; color:var(--tx2); font-size:13.5px; text-align:center }
+  .act-empty svg{ width:34px; height:34px; stroke:var(--tx3); opacity:.7 }
+  .act-list{ display:flex; flex-direction:column; gap:2px }
+  .act-row{
+    display:flex; align-items:center; gap:14px; padding:12px 8px; border-radius:11px;
+    text-decoration:none; color:inherit; transition:background .15s ease;
+  }
+  .act-row:hover{ background:rgba(255,255,255,.04) }
+  .act-row .aic{ width:36px; height:36px; border-radius:10px; flex:none; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg,var(--ac),var(--ac2)) }
+  .act-row .aic svg{ width:17px; height:17px; stroke:#fff }
+  .act-row .at{ flex:1; min-width:0 }
+  .act-row .at b{ display:block; font-size:14px; font-weight:600; color:var(--tx) }
+  .act-row .at span{ display:block; font-size:12px; color:var(--tx3); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .act-row .ats{ flex:none; font-size:11.5px; color:var(--tx3); font-family:ui-monospace,monospace }
+
   @media (max-width:900px){ .cards{grid-template-columns:repeat(2,1fr)} }
-  @media (max-width:720px){ .cards{grid-template-columns:1fr} .wrap{padding:32px 16px} }
+  @media (max-width:720px){ .cards{grid-template-columns:1fr} .dash{padding:24px 16px 48px} .hero{padding:26px 22px} }
 </style>
 {% endblock %}
 {% block content %}
-<main class="main">
-  <div class="wrap">
-    <div class="intro">
-      <h1>Your AI agents</h1>
-      <p>Pick an agent to get started. Each one is a focused tool you can run right here.</p>
-    </div>
-    <div class="cards">
+<div class="dash">
+
+  <div class="hero">
+    <div class="eyebrow">Workspace</div>
+    <h1>Welcome{{ ', ' + (user.given_name or '') if user.given_name else '' }}</h1>
+    <p>Signed in as <b>{{ user.email }}</b> &middot; pick an agent below to get started.</p>
+  </div>
+
+  <div class="sect">
+    <div class="eyebrow">AI Agents</div>
+    <h2>Launch an agent</h2>
+    <p class="sub">Each one is a focused tool you can run right here.</p>
+    <div class="cards" style="margin-top:22px">
       {% for a in agents %}
       <a class="card" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
-        <div class="cicon">{{ a.icon|safe }}</div>
+        <div class="ctop">
+          <div class="cicon">{{ a.icon|safe }}</div>
+          <span class="cext">&#8599;</span>
+        </div>
         <h3>{{ a.name }}</h3>
         <p>{{ a.tagline }}</p>
-        <div class="more">Open &rarr;</div>
+        <div class="cmeta" data-lastrun="{{ a.slug }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.2 2"/></svg>
+          <span class="lastrun-txt">Not opened yet</span>
+        </div>
+        <div class="more">Open agent &rarr;</div>
       </a>
       {% endfor %}
     </div>
   </div>
-</main>
+
+  <div class="sect">
+    <div class="eyebrow">Activity</div>
+    <h2>Recently opened</h2>
+    <p class="sub">Agents you've opened in this browser, most recent first.</p>
+    <div class="activity-box" id="activityBox" style="margin-top:22px"></div>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function(){
+    var list = p2GetAgentActivity();
+    var box = document.getElementById('activityBox');
+    var metas = {};
+    document.querySelectorAll('.cmeta[data-lastrun]').forEach(function(m){ metas[m.getAttribute('data-lastrun')] = m; });
+
+    if(!list.length){
+      box.innerHTML = '<div class="act-empty">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
+        + '<span>No agents opened yet. Open one above to see it here.</span></div>';
+      return;
+    }
+    function fmt(ts){
+      var d = new Date(ts), diff = Date.now()-ts, m = Math.round(diff/60000);
+      if(m < 1) return 'just now';
+      if(m < 60) return m+'m ago';
+      var h = Math.round(m/60); if(h < 24) return h+'h ago';
+      return d.toLocaleDateString();
+    }
+    var rows = list.map(function(item){
+      return '<a class="act-row" href="/app/'+item.slug+'" style="--ac:'+item.ac+';--ac2:'+item.ac2+'">'
+        + '<div class="aic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 12l1.8 1.8L15 10"/></svg></div>'
+        + '<div class="at"><b>'+item.name+'</b><span>'+(item.tagline||'')+'</span></div>'
+        + '<div class="ats">'+fmt(item.ts)+'</div></a>';
+    }).join('');
+    box.innerHTML = '<div class="act-list">'+rows+'</div>';
+
+    list.forEach(function(item){
+      var m = metas[item.slug];
+      if(m) m.querySelector('.lastrun-txt').textContent = 'Opened ' + fmt(item.ts);
+    });
+  })();
+</script>
 {% endblock %}

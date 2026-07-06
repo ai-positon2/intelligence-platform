@@ -1,0 +1,90 @@
+{% extends "app_base.html" %}
+{% block title %}History · Intelligence by Position2{% endblock %}
+{% block styles %}
+<style>
+  .hwrap{ flex:1; width:100%; max-width:1100px; margin:0 auto; padding:34px 32px 64px; position:relative; z-index:1 }
+  .hwrap h1{ margin:0 0 8px; font-size:clamp(24px,3vw,32px); font-weight:700; letter-spacing:-.02em; color:#f2f6ff }
+  .hwrap .sub{ margin:0 0 26px; font-size:14px; color:var(--tx2); line-height:1.6; max-width:640px }
+  .hsearch{
+    display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:13px;
+    border:1px solid var(--line); background:rgba(255,255,255,.03); margin-bottom:22px;
+  }
+  .hsearch svg{ width:16px; height:16px; stroke:var(--tx3); flex:none }
+  .hsearch input{ flex:1; background:none; border:0; outline:0; color:var(--tx); font:inherit; font-size:14px }
+  .hsearch input::placeholder{ color:var(--tx3) }
+  .hbox{ border-radius:18px; border:1px solid var(--line); background:rgba(12,15,30,.5); padding:10px; min-height:160px }
+  .h-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    padding:56px 20px; color:var(--tx2); font-size:14px; text-align:center }
+  .h-empty svg{ width:40px; height:40px; stroke:var(--tx3); opacity:.7 }
+  .h-empty a{ color:#9b8bff; text-decoration:none; font-weight:600 }
+  .h-empty a:hover{ text-decoration:underline }
+  .h-row{
+    display:flex; align-items:center; gap:16px; padding:16px 14px; border-radius:13px;
+    text-decoration:none; color:inherit; transition:background .15s ease;
+  }
+  .h-row:hover{ background:rgba(255,255,255,.045) }
+  .h-row + .h-row{ border-top:1px solid var(--line) }
+  .h-row .aic{ width:42px; height:42px; border-radius:12px; flex:none; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg,var(--ac),var(--ac2)) }
+  .h-row .aic svg{ width:19px; height:19px; stroke:#fff }
+  .h-row .at{ flex:1; min-width:0 }
+  .h-row .at b{ display:block; font-size:15px; font-weight:600; color:var(--tx) }
+  .h-row .at span{ display:block; font-size:12.5px; color:var(--tx3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .h-row .ats{ flex:none; font-size:12px; color:var(--tx3); font-family:ui-monospace,monospace; text-align:right }
+  .h-row .ats b{ display:block; color:var(--tx2); font-family:inherit; font-weight:500 }
+  @media (max-width:720px){ .hwrap{ padding:24px 16px 48px } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="hwrap">
+  <h1>Execution History</h1>
+  <p class="sub">Every agent you open is remembered right here in this browser — revisit it any time. This is tracked locally, not on a server, so it won't follow you to a different device.</p>
+  <div class="hsearch">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input type="text" id="hSearch" placeholder="Search across agent history…" autocomplete="off">
+  </div>
+  <div class="hbox" id="hBox"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function(){
+    var list = p2GetAgentActivity();
+    var box = document.getElementById('hBox'), search = document.getElementById('hSearch');
+
+    function fmtDate(ts){
+      var d = new Date(ts);
+      return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+    }
+    function fmtRel(ts){
+      var m = Math.round((Date.now()-ts)/60000);
+      if(m < 1) return 'just now';
+      if(m < 60) return m+'m ago';
+      var h = Math.round(m/60); if(h < 24) return h+'h ago';
+      return Math.round(h/24)+'d ago';
+    }
+    function render(filter){
+      var rows = list.filter(function(item){
+        if(!filter) return true;
+        var q = filter.toLowerCase();
+        return (item.name||'').toLowerCase().indexOf(q)!==-1 || (item.tagline||'').toLowerCase().indexOf(q)!==-1;
+      });
+      if(!rows.length){
+        box.innerHTML = '<div class="h-empty">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
+          + (list.length ? '<span>No matches for that search.</span>' : '<span>No agent executions yet.<br><a href="/app">Run an agent</a> to build your history.</span>')
+          + '</div>';
+        return;
+      }
+      box.innerHTML = rows.map(function(item){
+        return '<a class="h-row" href="/app/'+item.slug+'" style="--ac:'+item.ac+';--ac2:'+item.ac2+'">'
+          + '<div class="aic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 12l1.8 1.8L15 10"/></svg></div>'
+          + '<div class="at"><b>'+item.name+'</b><span>'+(item.tagline||'')+'</span></div>'
+          + '<div class="ats"><b>'+fmtRel(item.ts)+'</b>'+fmtDate(item.ts)+'</div></a>';
+      }).join('');
+    }
+    render('');
+    search.addEventListener('input', function(){ render(search.value.trim()); });
+  })();
+</script>
+{% endblock %}

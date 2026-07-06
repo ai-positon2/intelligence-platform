@@ -1427,6 +1427,12 @@ def _app_embed_url(agent):
     sep = "&" if "?" in path else "?"
     return f"{_SERP_BASE}{path}{sep}" + "&".join("%s=%s" % kv for kv in qs)
 
+@app.context_processor
+def _inject_app_agents():
+    """Make the /app agent list available to every template (app_base.html's
+    sidebar needs it regardless of which child page is rendering)."""
+    return {"app_agents": APP_AGENTS}
+
 @app.route("/app")
 @login_required
 def app_home():
@@ -1453,6 +1459,22 @@ def app_use(slug):
     if not embed_url:
         return redirect("/app/" + slug)
     return render_template("app_embed.html", user=_get_user(), agent=agent, embed_url=embed_url)
+
+@app.route("/app/history")
+@login_required
+def app_history():
+    """Recently-opened agents. Tracked client-side (localStorage) — we don't run
+    agents server-side (they're embedded external tools), so there's no server
+    execution log to show; this is an honest per-browser recency list instead."""
+    return render_template("app_history.html", user=_get_user())
+
+@app.route("/app/settings")
+@login_required
+def app_settings():
+    """Account settings for the public /app area. No API-key management here —
+    unlike the reference product, our agents call out to Position2's own SERP
+    tooling, not a user-supplied OpenAI key."""
+    return render_template("app_settings.html", user=_get_user())
 
 
 @app.route("/privacy")
