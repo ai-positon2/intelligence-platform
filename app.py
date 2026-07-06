@@ -2231,9 +2231,11 @@ def _fetch_member_analytics() -> dict:
     ms_rows = read("%s!A:T" % _MEMBER_TAB)
     va_rows = read("Visitor Analytics!A:AM")
     pv_rows = read("Page Views!A:M")
+    login_rows = read("A1:T5000")   # internal login log -- has real names for @position2.com
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
     va = va_rows[1:] if len(va_rows) > 1 else []
     pv = pv_rows[1:] if len(pv_rows) > 1 else []
+    login_data = login_rows[1:] if len(login_rows) > 1 else []
 
     MS = {n: i for i, n in enumerate(_MS_HEADER)}
     VA = {n: i for i, n in enumerate(_VA_HEADER)}
@@ -2256,6 +2258,15 @@ def _fetch_member_analytics() -> dict:
         vid = vc(r, "Visitor ID")
         if vid: va_by_vid[vid].append(r)
     idmap = _va_identity_map()
+
+    # Page Views has no name/picture column, so for members we only see via page-view
+    # activity (no Member Signins row yet), backfill their name/picture from the
+    # internal login log, which Google always populates on every @position2.com sign-in.
+    profile_by_email = {}
+    for r in login_data:
+        e = (pc(r, 5) or "").lower()
+        if e and e not in profile_by_email:
+            profile_by_email[e] = {"name": pc(r, 6), "picture": pc(r, 8)}
 
     pv_by_email = defaultdict(list)   # post-login page views on the /app member surface
     for r in pv:
@@ -2295,7 +2306,9 @@ def _fetch_member_analytics() -> dict:
             continue
         rows = sorted(rows, key=lambda r: pc(r, 0))
         last_row = rows[-1]
-        members[e] = {"email": e, "name": "—", "picture": "", "vids": set(), "signins": 1,
+        prof = profile_by_email.get(e, {})
+        members[e] = {"email": e, "name": prof.get("name") or "—", "picture": prof.get("picture") or "",
+            "vids": set(), "signins": 1,
             "first_signin": pc(rows[0], 0), "last_signin": pc(last_row, 0),
             "device": pc(last_row, 12), "browser": pc(last_row, 10),
             "os": pc(last_row, 11), "ip": pc(last_row, 9)}
@@ -2394,6 +2407,16 @@ def _fetch_member_analytics() -> dict:
             "name": mc(r, "Full Name"), "vid": (mc(r, "Visitor ID") or "")[:8],
             "device": mc(r, "Device"), "browser": mc(r, "Browser"),
             "ref": mc(r, "Referrer Host") if False else (mc(r, "Referrer") or "direct")})
+    # Members surfaced only via Page Views (no Member Signins row) still belong here --
+    # use their most recent app activity as the event, since we have no signin event.
+    ms_emails = {(mc(r, "Email") or "").lower() for r in ms}
+    for e, mem in members.items():
+        if e in ms_emails:
+            continue
+        recent.append({"ts": mem["last_signin"], "email": mem["email"], "name": mem["name"],
+            "vid": "", "device": mem["device"], "browser": mem["browser"], "ref": "—"})
+    recent.sort(key=lambda x: x["ts"] or "", reverse=True)
+    recent = recent[:150]
 
     return {
         "configured": bool(svc),
