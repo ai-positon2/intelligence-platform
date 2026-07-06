@@ -77,7 +77,7 @@
     {% if limit_reached %}
     <div class="eruns at-cap">Run limit reached &middot; {{ runs_used }}/{{ runs_cap }}</div>
     {% else %}
-    <div class="eruns">Run {{ runs_used }} of {{ runs_cap }}</div>
+    <div class="eruns" id="eRunsBadge">{{ runs_used }} / {{ runs_cap }} used</div>
     <div class="elive"><span class="d"></span>Live</div>
     {% endif %}
   </div>
@@ -106,5 +106,29 @@
     setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 8000);
   })();
   p2RecordAgentVisit({slug:"{{ agent.slug }}", name:"{{ agent.name }}", tagline:"{{ agent.tagline }}", ac:"{{ agent.ac }}", ac2:"{{ agent.ac2 }}"});
+  {% if not limit_reached %}
+  (function(){
+    /* Opening this page must NOT count as a run — only real interaction with
+       the embedded tool should. We can't see inside the iframe (cross-origin,
+       a separate app), so the closest available signal is focus moving into
+       it: when the window blurs and the iframe is what's now focused, the
+       user clicked into the tool. Logs at most once per page view. */
+    var fr=document.getElementById('toolFrame');
+    if(!fr) return;
+    var logged=false;
+    function logRun(){
+      if(logged) return;
+      logged=true;
+      fetch('/app/{{ agent.slug }}/use/log-run', {method:'POST'}).then(function(r){return r.json();}).then(function(d){
+        if(!d || !d.logged) return;
+        var badge=document.getElementById('eRunsBadge');
+        if(badge) badge.textContent=d.runs_used+' / '+d.runs_cap+' used';
+      }).catch(function(){});
+    }
+    window.addEventListener('blur', function(){
+      setTimeout(function(){ if(document.activeElement===fr) logRun(); }, 0);
+    });
+  })();
+  {% endif %}
 </script>
 {% endblock %}
