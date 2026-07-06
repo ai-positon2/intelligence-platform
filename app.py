@@ -1290,15 +1290,18 @@ def auth_google():
         "picture":    idinfo.get("picture", ""),
     }
     session.permanent = True
-    # Route sign-in logging: Position2 -> internal Usage Dashboard; public Google
-    # accounts -> Member Analytics (kept out of the Usage Dashboard entirely).
-    if email.lower().endswith("@position2.com"):
-        _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
-    else:
-        _log_member_signin(session["google_user"])    # public member -> Member Analytics
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
         nxt = "/app"
+    # Route sign-in logging: @position2.com -> always the internal Usage Dashboard,
+    # PLUS Member Analytics too when landing on the public /app surface (not deep-
+    # linking straight into /p2). Everyone else -> Member Analytics only.
+    if email.lower().endswith("@position2.com"):
+        _log_login_to_sheet(session["google_user"])   # fire-and-forget, fails silently
+        if not nxt.startswith("/p2"):
+            _log_member_signin(session["google_user"])
+    else:
+        _log_member_signin(session["google_user"])    # public member -> Member Analytics
     resp = jsonify({"success": True, "redirect": nxt})
     # Mark this browser as having signed in before, so the login page can greet
     # returning visitors with "Welcome back." (first-timers see "Welcome.").
@@ -2254,10 +2257,11 @@ def _fetch_member_analytics() -> dict:
         if vid: va_by_vid[vid].append(r)
     idmap = _va_identity_map()
 
-    pv_by_email = defaultdict(list)   # post-login page views, public members only
+    pv_by_email = defaultdict(list)   # post-login page views on the /app member surface
     for r in pv:
         e = (pc(r, 4) or "").lower()
-        if e and not e.endswith("@position2.com"):
+        path = pc(r, 6) or ""
+        if e and (not e.endswith("@position2.com") or path.startswith("/app")):
             pv_by_email[e].append(r)
 
     members = {}
