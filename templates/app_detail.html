@@ -40,14 +40,16 @@
   .panel-head h2{ margin:0; font-size:20px; font-weight:600; letter-spacing:-.01em }
   .lead{ margin:0 0 28px; font-size:16.5px; line-height:1.78; color:#c6cee2 }
 
-  .trips{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
-  .trip{ background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:15px; padding:22px 20px;
-    transition:border-color .2s ease, transform .2s ease }
-  .trip:hover{ border-color:color-mix(in srgb, var(--ac) 40%, transparent); transform:translateY(-2px) }
-  .trip h4{ margin:0 0 11px; font-size:14.5px; font-weight:600; color:#eef2fb;
+  .trips{ flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-content:stretch }
+  .trip{ display:flex; flex-direction:column; justify-content:center; gap:2px;
+    background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:15px; padding:26px 22px;
+    transition:border-color .2s ease, transform .2s ease, background .2s ease }
+  .trip:hover{ border-color:color-mix(in srgb, var(--ac) 40%, transparent); transform:translateY(-2px);
+    background:color-mix(in srgb, var(--ac) 6%, rgba(255,255,255,.05)) }
+  .trip h4{ margin:0 0 12px; font-size:14.5px; font-weight:600; color:#eef2fb;
     display:flex; align-items:center; gap:8px }
-  .trip h4 .d{ width:7px; height:7px; border-radius:50%; background:var(--ac) }
-  .trip p{ margin:0; font-size:13px; line-height:1.68; color:var(--tx2) }
+  .trip h4 .d{ width:7px; height:7px; border-radius:50%; background:var(--ac); box-shadow:0 0 8px var(--ac) }
+  .trip p{ margin:0; font-size:13px; line-height:1.7; color:var(--tx2) }
 
   .side{ display:flex; flex-direction:column; gap:20px }
   .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
