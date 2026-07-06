@@ -1494,7 +1494,7 @@ def _agent_run_counts(email: str) -> dict:
     return counts
 
 def _fetch_agent_run_stats() -> dict:
-    """Per-user, per-agent run counts for the admin 'Agent Usage' dashboard."""
+    """Per-user, per-agent run counts for the admin 'Public Agent Usage' dashboard."""
     from collections import defaultdict
     svc = _va_sheets_service()
     def read(rng):
