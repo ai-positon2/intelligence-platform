@@ -128,8 +128,9 @@ def _log_login_to_sheet(user: dict) -> None:
               request.headers.get("X-Real-IP", "") or
               request.remote_addr or "")
         ip = ip.split(",")[0].strip()  # X-Forwarded-For can be a list
+        vid = (request.cookies.get("p2_vid") or "").strip()[:64]
 
-        # 20 columns — add header row automatically on first write
+        # 21 columns — add header row automatically on first write
         row = [
             now.strftime("%Y-%m-%d %H:%M:%S IST"),   # 1  Timestamp
             now.strftime("%Y-%m-%d"),                  # 2  Date
@@ -151,6 +152,7 @@ def _log_login_to_sheet(user: dict) -> None:
             "Google OAuth",                             # 18 Auth Method
             str(uuid.uuid4())[:8],                      # 19 Session ID (short)
             "intelligence.position2.com",               # 20 Platform
+            vid,                                         # 21 Visitor ID (p2_vid, for Member Analytics linking)
         ]
 
         # Check if header row exists; if sheet is empty, prepend it
@@ -163,7 +165,7 @@ def _log_login_to_sheet(user: dict) -> None:
                 "Email", "Full Name", "First Name", "Profile Picture",
                 "IP Address", "Browser", "Browser Version", "OS", "Device",
                 "User Agent", "Referrer", "Landing Page", "Auth Method",
-                "Session ID", "Platform",
+                "Session ID", "Platform", "Visitor ID",
             ]]
             svc.spreadsheets().values().append(
                 spreadsheetId=LOGIN_LOG_SHEET_ID,
@@ -236,6 +238,17 @@ def _log_member_signin(user: dict) -> None:
 DEMO_REQUEST_SHEET_ID = os.environ.get("DEMO_REQUEST_SHEET_ID", "") or LOGIN_LOG_SHEET_ID
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Free/personal webmail domains -- excluded when inferring a member's company from
+# their sign-in email domain (Member Analytics). Not exhaustive, but covers the
+# overwhelming majority of personal-account sign-ins.
+_FREE_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.co.uk",
+    "outlook.com", "hotmail.com", "hotmail.co.uk", "live.com", "msn.com",
+    "icloud.com", "me.com", "mac.com", "aol.com", "protonmail.com", "proton.me",
+    "gmx.com", "gmx.de", "mail.com", "yandex.com", "zoho.com", "rediffmail.com",
+    "ymail.com", "rocketmail.com", "pm.me",
+}
 
 
 def _demo_request_to_sheet(row: list) -> bool:
@@ -2231,7 +2244,7 @@ def _fetch_member_analytics() -> dict:
     ms_rows = read("%s!A:T" % _MEMBER_TAB)
     va_rows = read("Visitor Analytics!A:AM")
     pv_rows = read("Page Views!A:M")
-    login_rows = read("A1:T5000")   # internal login log -- has real names for @position2.com
+    login_rows = read("A1:U5000")   # internal login log -- has real names + p2_vid for @position2.com
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
     va = va_rows[1:] if len(va_rows) > 1 else []
     pv = pv_rows[1:] if len(pv_rows) > 1 else []
@@ -2259,14 +2272,20 @@ def _fetch_member_analytics() -> dict:
         if vid: va_by_vid[vid].append(r)
     idmap = _va_identity_map()
 
-    # Page Views has no name/picture column, so for members we only see via page-view
-    # activity (no Member Signins row yet), backfill their name/picture from the
-    # internal login log, which Google always populates on every @position2.com sign-in.
+    # Page Views has no name/picture/vid columns, so for members we only see via
+    # page-view activity (no Member Signins row yet), backfill name/picture/p2_vid
+    # from the internal login log, which Google always populates on every
+    # @position2.com sign-in. Scan chronologically so the most recent known value
+    # for each field wins (older rows predate the Visitor ID column).
     profile_by_email = {}
     for r in login_data:
         e = (pc(r, 5) or "").lower()
-        if e and e not in profile_by_email:
-            profile_by_email[e] = {"name": pc(r, 6), "picture": pc(r, 8)}
+        if not e:
+            continue
+        prof = profile_by_email.setdefault(e, {"name": "", "picture": "", "vid": ""})
+        if pc(r, 6): prof["name"] = pc(r, 6)
+        if pc(r, 8): prof["picture"] = pc(r, 8)
+        if pc(r, 20): prof["vid"] = pc(r, 20)
 
     pv_by_email = defaultdict(list)   # post-login page views on the /app member surface
     for r in pv:
@@ -2307,11 +2326,20 @@ def _fetch_member_analytics() -> dict:
         rows = sorted(rows, key=lambda r: pc(r, 0))
         last_row = rows[-1]
         prof = profile_by_email.get(e, {})
+        vids = {prof["vid"]} if prof.get("vid") else set()
         members[e] = {"email": e, "name": prof.get("name") or "—", "picture": prof.get("picture") or "",
-            "vids": set(), "signins": 1,
+            "vids": vids, "signins": 1,
             "first_signin": pc(rows[0], 0), "last_signin": pc(last_row, 0),
             "device": pc(last_row, 12), "browser": pc(last_row, 10),
             "os": pc(last_row, 11), "ip": pc(last_row, 9)}
+
+    # Backfill any member still missing a visitor-ID link (e.g. a Member Signins row
+    # written before p2_vid capture existed) from the login log's most recent vid.
+    for e, mem in members.items():
+        if not mem["vids"]:
+            prof = profile_by_email.get(e, {})
+            if prof.get("vid"):
+                mem["vids"] = {prof["vid"]}
 
     out_members = []
     signup_by_day = Counter(); src_counter = Counter(); utm_counter = Counter()
@@ -2337,6 +2365,10 @@ def _fetch_member_analytics() -> dict:
             company = (idmap.get(vid) or {}).get("company") or company
         if not company and mem.get("ip"):
             company = _ip_company(mem["ip"]) or ""
+        if not company:
+            domain = e.rsplit("@", 1)[-1] if "@" in e else ""
+            if domain and domain not in _FREE_EMAIL_DOMAINS:
+                company = domain
         posts = pv_by_email.get(e, [])
         status = "returning" if mem["signins"] > 1 else "new"
         last_active = mem["last_signin"]
@@ -2389,7 +2421,16 @@ def _fetch_member_analytics() -> dict:
     new_members = sum(1 for x in out_members if x["status"] == "new")
     returning_members = total_members - new_members
     unique_visitors = len(va_by_vid)
-    conv_rate = round(linked / unique_visitors * 100, 1) if unique_visitors else 0
+
+    # Visitor->member conversion is about the public marketing funnel: @position2.com
+    # staff never arrive as anonymous visitors, so they're excluded from this ratio
+    # (they still count toward the "Members" KPI above, which intentionally covers
+    # all /app usage per the two-tier design).
+    external_out = [x for x in out_members if not x["email"].lower().endswith("@position2.com")]
+    external_members = len(external_out)
+    external_returning = sum(1 for x in external_out if x["status"] == "returning")
+
+    conv_rate = round(external_members / unique_visitors * 100, 1) if unique_visitors else 0
     avg_pre = round(total_pre / linked, 1) if linked else 0
     avg_engaged = fmt(round(pre_eng_total / pre_eng_n) if pre_eng_n else 0)
     signup_series = sorted(signup_by_day.items())[-30:]
@@ -2414,7 +2455,8 @@ def _fetch_member_analytics() -> dict:
         if e in ms_emails:
             continue
         recent.append({"ts": mem["last_signin"], "email": mem["email"], "name": mem["name"],
-            "vid": "", "device": mem["device"], "browser": mem["browser"], "ref": "—"})
+            "vid": (sorted(mem["vids"])[0][:8] if mem["vids"] else ""),
+            "device": mem["device"], "browser": mem["browser"], "ref": "—"})
     recent.sort(key=lambda x: x["ts"] or "", reverse=True)
     recent = recent[:150]
 
@@ -2431,7 +2473,7 @@ def _fetch_member_analytics() -> dict:
         "prelogin_pages": prelogin_pages_counter.most_common(15),
         "companies": company_counter.most_common(15),
         "funnel": {"visitors": unique_visitors, "engaged": engaged_visitors,
-                   "members": total_members, "returning": returning_members},
+                   "members": external_members, "returning": external_returning},
         "members": out_members[:200], "recent": recent[:100],
     }
 
