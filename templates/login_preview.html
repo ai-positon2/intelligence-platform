@@ -7,7 +7,7 @@
 <title>Intelligence — Position2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
@@ -15,7 +15,7 @@
   --cyan:#22d3ee; --violet:#8b5cf6; --indigo:#6366f1;
   --line:rgba(120,140,210,.16);
   --mono:'JetBrains Mono',ui-monospace,monospace;
-  --sans:'Space Grotesk',system-ui,sans-serif;
+  --sans:'Bricolage Grotesque',system-ui,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:auto;scrollbar-width:none;background:var(--bg)}
@@ -343,7 +343,7 @@ main{position:relative;z-index:10;pointer-events:none}
       // F7: sample INTELLIGENCE
       var cw=1100, ch=240, cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
       var x2=cv.getContext('2d'); x2.fillStyle='#000'; x2.fillRect(0,0,cw,ch);
-      x2.fillStyle='#fff'; x2.textAlign='center'; x2.textBaseline='middle'; x2.font='700 150px "Space Grotesk", sans-serif';
+      x2.fillStyle='#fff'; x2.textAlign='center'; x2.textBaseline='middle'; x2.font='700 150px "Bricolage Grotesque", sans-serif';
       x2.fillText('INTELLIGENCE', cw/2, ch/2+4);
       var dat=x2.getImageData(0,0,cw,ch).data, pts=[];
       for(var yy=0;yy<ch;yy+=2){ for(var xx=0;xx<cw;xx+=2){ if(dat[(yy*cw+xx)*4]>120) pts.push([xx,yy]); } }

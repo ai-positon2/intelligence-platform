@@ -16,7 +16,7 @@
   --pink:#e879f9;
   --line:rgba(120,140,210,.16);
   --mono:'JetBrains Mono',ui-monospace,monospace;
-  --sans:'Inter',system-ui,sans-serif;
+  --sans:'Bricolage Grotesque',system-ui,sans-serif;
   --display:'Bricolage Grotesque',system-ui,sans-serif;
   --serif:'Instrument Serif',Georgia,serif;
 }
@@ -409,7 +409,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       // F7: sample INTELLIGENCE
       var cw=1100, ch=240, cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
       var x2=cv.getContext('2d'); x2.fillStyle='#000'; x2.fillRect(0,0,cw,ch);
-      x2.fillStyle='#fff'; x2.textAlign='center'; x2.textBaseline='middle'; x2.font='700 150px "Space Grotesk", sans-serif';
+      x2.fillStyle='#fff'; x2.textAlign='center'; x2.textBaseline='middle'; x2.font='700 150px "Bricolage Grotesque", sans-serif';
       x2.fillText('INTELLIGENCE', cw/2, ch/2+4);
       var dat=x2.getImageData(0,0,cw,ch).data, pts=[];
       for(var yy=0;yy<ch;yy+=2){ for(var xx=0;xx<cw;xx+=2){ if(dat[(yy*cw+xx)*4]>120) pts.push([xx,yy]); } }
