@@ -109,6 +109,46 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .tl-c small{display:block;color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:2px}
 .tl-c .k{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
 .tl-c .k.view{color:var(--cyan)}.tl-c .k.signin{color:var(--lime)}.tl-c .k.post{color:var(--violet)}
+/* Agent Usage (embedded within Public Page Analytics) */
+.au-intro{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.au-intro p{margin:0;color:var(--dim);font-size:13px;max-width:620px;line-height:1.6}
+.au-link{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;
+  color:var(--cyan);border:1px solid rgba(34,211,238,.35);border-radius:999px;padding:9px 16px;white-space:nowrap;
+  transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.au-link:hover{background:rgba(34,211,238,.1);border-color:rgba(34,211,238,.65);transform:translateY(-1px)}
+.au-kpirow{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.au-kpirow .k{flex:1;min-width:130px;border:1px solid var(--line);border-radius:13px;padding:14px 16px;background:rgba(255,255,255,.02)}
+.au-kpirow .k b{display:block;font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.02em}
+.au-kpirow .k span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-top:6px}
+.au-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px}
+@media(max-width:860px){.au-cards{grid-template-columns:1fr}}
+.au-card{position:relative;overflow:hidden;border-radius:18px;border:1px solid var(--line);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--ac) 16%,transparent),transparent 60%),rgba(255,255,255,.02);
+  padding:22px;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.au-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ac),transparent 85%)}
+.au-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ac) 55%,transparent);
+  box-shadow:0 20px 46px -22px color-mix(in srgb,var(--ac) 50%,transparent)}
+.au-card .aic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;
+  background:linear-gradient(145deg,var(--ac),var(--ac2));box-shadow:0 12px 28px -10px color-mix(in srgb,var(--ac) 65%,transparent)}
+.au-card .aic svg{width:20px;height:20px;stroke:#fff}
+.au-card b.an{display:block;font-family:var(--display);font-weight:700;font-size:14.5px;letter-spacing:-.005em;color:var(--ink)}
+.au-card .aruns{display:flex;align-items:baseline;gap:7px;margin:12px 0 12px}
+.au-card .aruns em{font-style:normal;font-family:var(--display);font-weight:800;font-size:32px;letter-spacing:-.02em;color:var(--ink)}
+.au-card .aruns span{font-family:var(--mono);font-size:10px;color:var(--dim2);text-transform:uppercase;letter-spacing:.1em}
+.au-card .atrack{height:6px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+.au-card .afill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+.au-card small{display:block;margin-top:11px;color:var(--dim2);font-size:11.5px}
+.au-userlist{display:flex;flex-direction:column;gap:2px}
+.au-urow{display:flex;align-items:center;gap:14px;padding:12px 8px;border-radius:11px;transition:background .15s ease}
+.au-urow:hover{background:rgba(255,255,255,.03)}
+.au-urow+.au-urow{border-top:1px solid rgba(255,255,255,.05)}
+.au-urow .who{flex:none;width:190px}
+.au-pills{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.au-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;padding:4px 10px 4px 6px;
+  border-radius:20px;border:1px solid var(--line2);white-space:nowrap;color:var(--dim)}
+.au-pill .d{width:6px;height:6px;border-radius:50%;flex:none}
+.au-pill.cap{color:#fb7185;border-color:rgba(251,113,133,.45);background:rgba(251,113,133,.08)}
+.au-total{flex:none;font-family:var(--mono);font-size:13px;color:var(--ink);min-width:30px;text-align:right}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
   <script src="/static/js/theme.js"></script>
@@ -123,7 +163,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
     <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Page Analytics</span></div>
   </div>
   <div class="tr">
-    <button class="btn" id="refreshBtn" onclick="load(true)">↻ Refresh</button>
+    <button class="btn" id="refreshBtn" onclick="refreshAll()">↻ Refresh</button>
     <div class="user-menu" id="userMenu">
       <div class="user-pill" id="userPill" onclick="toggleMenu()">
         <div class="avatar">{% if user and user.picture %}<img src="{{ user.picture }}" alt="" />{% else %}{{ ((user.name or 'A')[:2]|upper) if user else 'A' }}{% endif %}</div>
@@ -188,6 +228,19 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
     <div class="card" style="padding:6px"><div class="tbl-wrap" style="max-height:420px"><table id="recent">
       <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Visitor</th><th>Device</th><th>Referrer</th></tr></thead>
       <tbody></tbody></table></div></div>
+  </div>
+
+  <div class="sect"><h2>Agent usage <span class="muted" style="font-weight:400;font-size:12px">· the same members, running the 3 /app agents</span></h2>
+    <div class="card">
+      <div class="au-intro">
+        <p>Every run of a public <b>/app</b> agent by the members tracked above, against the <b>10-run cap</b> enforced per agent, per account.</p>
+        <a class="au-link" href="/p2/admin/agent-runs">Full Agent Usage dashboard ↗</a>
+      </div>
+      <div id="auEmpty" class="empty" style="display:none"></div>
+      <div class="au-kpirow" id="auKpis"></div>
+      <div class="au-cards" id="auCards"></div>
+      <div class="au-userlist" id="auUsers"></div>
+    </div>
   </div>
 </div>
 
@@ -413,7 +466,44 @@ function load(force){
   }).catch(function(){if(btn)btn.textContent='↻ Refresh';
     var n=document.getElementById('emptyNote');n.style.display='block';n.textContent='Failed to load member analytics.';});
 }
+function loadAgentUsage(){
+  fetch('/p2/admin/agent-runs/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    var empty=document.getElementById('auEmpty');
+    if(!d.configured){empty.style.display='block';empty.textContent='⚠ Sheets not configured for agent usage tracking.';}
+    else if(!d.total_runs){empty.style.display='block';empty.textContent='No agent runs yet. When a member opens a live agent under /app, it appears here.';}
+    else{empty.style.display='none';}
+    document.getElementById('auKpis').innerHTML=
+      '<div class="k"><b>'+(d.total_runs||0)+'</b><span>Total runs</span></div>'+
+      '<div class="k"><b>'+(d.total_users||0)+'</b><span>Distinct users</span></div>'+
+      '<div class="k"><b>'+(d.users_at_cap||0)+'</b><span>Users at cap</span></div>'+
+      '<div class="k"><b>'+(d.cap||10)+'</b><span>Run cap / agent</span></div>';
+    var agents=d.agents||[];
+    var maxRuns=Math.max.apply(null,agents.map(function(a){return a.runs;}).concat([1]));
+    document.getElementById('auCards').innerHTML=agents.map(function(a){
+      var pct=Math.round(a.runs/maxRuns*100);
+      return '<div class="au-card" style="--ac:'+a.ac+';--ac2:'+a.ac2+'">'+
+        '<div class="aic">'+a.icon+'</div>'+
+        '<b class="an">'+esc(a.name)+'</b>'+
+        '<div class="aruns"><em>'+a.runs+'</em><span>total runs</span></div>'+
+        '<div class="atrack"><div class="afill" style="width:'+pct+'%"></div></div>'+
+        '<small>Cap: '+a.cap+' runs per user</small>'+
+      '</div>';
+    }).join('');
+    var users=(d.users||[]).slice(0,8);
+    document.getElementById('auUsers').innerHTML=users.length?users.map(function(u){
+      var pills=(u.agents||[]).map(function(a){
+        return '<span class="au-pill'+(a.at_cap?' cap':'')+'"><span class="d" style="background:'+(a.at_cap?'#fb7185':a.ac)+'"></span>'+esc(a.name)+' '+a.count+'/'+a.cap+'</span>';
+      }).join('');
+      return '<div class="au-urow"><div class="who">'+avatar(u)+'<div class="nm"><b>'+esc(u.name)+'</b><small>'+esc(u.email)+'</small></div></div>'+
+        '<div class="au-pills">'+pills+'</div><div class="au-total">'+u.total+'</div></div>';
+    }).join(''):'';
+  }).catch(function(){
+    var empty=document.getElementById('auEmpty');empty.style.display='block';empty.textContent='Failed to load agent usage.';
+  });
+}
+function refreshAll(){load(true);loadAgentUsage();}
 load();
+loadAgentUsage();
 </script>
 <script>
 function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
