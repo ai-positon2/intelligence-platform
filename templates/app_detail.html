@@ -30,7 +30,7 @@
 
   .dgrid{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:stretch }
 
-  .panel{ display:flex; flex-direction:column; background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:22px; padding:32px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
+  .panel{ display:flex; flex-direction:column; background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:22px; padding:36px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
   .panel-head{ display:flex; align-items:center; gap:13px; padding-bottom:22px;
     border-bottom:1px solid var(--line); margin-bottom:24px }
   .panel-head .pi{ width:40px; height:40px; border-radius:12px; flex:none;
@@ -38,18 +38,24 @@
     background:linear-gradient(145deg, var(--ac), var(--ac2)) }
   .panel-head .pi svg{ width:20px; height:20px; stroke:#fff }
   .panel-head h2{ margin:0; font-size:20px; font-weight:600; letter-spacing:-.01em }
-  .lead{ margin:0 0 28px; font-size:16.5px; line-height:1.78; color:#c6cee2 }
+  .lead{ margin:0 0 32px; font-size:17px; line-height:1.8; color:#c6cee2 }
 
-  .trips{ flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-content:stretch }
-  .trip{ display:flex; flex-direction:column; justify-content:center; gap:2px;
-    background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:15px; padding:26px 22px;
-    transition:border-color .2s ease, transform .2s ease, background .2s ease }
-  .trip:hover{ border-color:color-mix(in srgb, var(--ac) 40%, transparent); transform:translateY(-2px);
-    background:color-mix(in srgb, var(--ac) 6%, rgba(255,255,255,.05)) }
-  .trip h4{ margin:0 0 12px; font-size:14.5px; font-weight:600; color:#eef2fb;
-    display:flex; align-items:center; gap:8px }
-  .trip h4 .d{ width:7px; height:7px; border-radius:50%; background:var(--ac); box-shadow:0 0 8px var(--ac) }
-  .trip p{ margin:0; font-size:13px; line-height:1.7; color:var(--tx2) }
+  .trips{ flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-content:stretch }
+  .trip{ display:flex; flex-direction:column; justify-content:center; gap:4px; position:relative; overflow:hidden;
+    background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:17px; padding:30px 24px;
+    transition:border-color .25s ease, transform .25s ease, background .25s ease, box-shadow .25s ease }
+  .trip::after{ content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, var(--ac), transparent 85%); opacity:.7 }
+  .trip:hover{ border-color:color-mix(in srgb, var(--ac) 42%, transparent); transform:translateY(-3px);
+    background:color-mix(in srgb, var(--ac) 7%, rgba(255,255,255,.05));
+    box-shadow:0 20px 44px -22px color-mix(in srgb, var(--ac) 45%, transparent) }
+  .trip-ic{ width:42px; height:42px; border-radius:12px; flex:none; margin-bottom:16px;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2));
+    box-shadow:0 12px 28px -10px color-mix(in srgb, var(--ac) 65%, transparent) }
+  .trip-ic svg{ width:20px; height:20px; stroke:#fff }
+  .trip h4{ margin:0 0 12px; font-size:16px; font-weight:700; letter-spacing:-.01em; color:#f2f6ff }
+  .trip p{ margin:0; font-size:13.5px; line-height:1.75; color:var(--tx2) }
 
   .side{ display:flex; flex-direction:column; gap:20px }
   .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
@@ -121,9 +127,18 @@
         <h2>Details</h2>
       </div>
       <p class="lead">{{ agent.lead }}</p>
+      {% set trip_icons = [
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 000-3l2-1.6-2-3.4-2.4 1a7.7 7.7 0 00-2.6-1.5L14 2.5h-4l-.4 2.5a7.7 7.7 0 00-2.6 1.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 000 3l-2 1.6 2 3.4 2.4-1a7.7 7.7 0 002.6 1.5l.4 2.5h4l.4-2.5a7.7 7.7 0 002.6-1.5l2.4 1 2-3.4-2-1.6z"/></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.3"/></svg>'
+      ] %}
       <div class="trips">
         {% for t in agent.trips %}
-        <div class="trip"><h4><span class="d"></span>{{ t.t }}</h4><p>{{ t.d }}</p></div>
+        <div class="trip">
+          <div class="trip-ic">{{ trip_icons[loop.index0 % 3] | safe }}</div>
+          <h4>{{ t.t }}</h4>
+          <p>{{ t.d }}</p>
+        </div>
         {% endfor %}
       </div>
     </section>

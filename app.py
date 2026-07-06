@@ -1362,7 +1362,7 @@ _SVG_ALCHEMY = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 
 APP_AGENTS = [
     {
-        "slug": "keyword-compass", "name": "Keyword Finder",
+        "slug": "keyword-finder", "name": "Keyword Finder",
         "tagline": "AI keyword discovery, scoring & clustering",
         "seo_slug": "keyword-research", "ac": "#22d3ee", "ac2": "#6366f1", "icon": _SVG_COMPASS,
         "pill1": "Keyword intelligence", "pill2": "SERP · AI · clustering",
@@ -1377,7 +1377,7 @@ APP_AGENTS = [
         "tags": ["Keywords", "SERP", "Clustering", "Intent", "AI"],
     },
     {
-        "slug": "brief-architect", "name": "Content Brief Generator",
+        "slug": "content-brief-generator", "name": "Content Brief Generator",
         "tagline": "Structured, SERP-backed content briefs",
         "seo_slug": "article-recommendation", "ac": "#8b5cf6", "ac2": "#e879f9", "icon": _SVG_BRIEF,
         "pill1": "Content briefs", "pill2": "SERP · outlines · entities",
@@ -1392,7 +1392,7 @@ APP_AGENTS = [
         "tags": ["Briefs", "SERP", "Outlines", "Entities", "Content"],
     },
     {
-        "slug": "content-alchemist", "name": "Content Enhancer",
+        "slug": "content-enhancer", "name": "Content Enhancer",
         "tagline": "Multi-LLM + SERP article enhancement",
         "seo_slug": "article-enhancement", "ac": "#34d399", "ac2": "#22d3ee", "icon": _SVG_ALCHEMY,
         "pill1": "Content enhancement", "pill2": "multi-LLM · SERP · E-E-A-T",
@@ -1408,6 +1408,15 @@ APP_AGENTS = [
     },
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
+
+# Old slugs from before the agents were renamed (Keyword Compass -> Keyword
+# Finder, etc). Kept so links already shared/bookmarked under the old URLs
+# still resolve, via a 301 to the new canonical slug.
+_LEGACY_AGENT_SLUGS = {
+    "keyword-compass": "keyword-finder",
+    "brief-architect": "content-brief-generator",
+    "content-alchemist": "content-enhancer",
+}
 
 # ── Per-agent run cap ─────────────────────────────────────────────────────────
 # A "run" = one load of /app/<slug>/use (opening the embedded tool). We can't see
@@ -1579,6 +1588,8 @@ def app_home():
 @login_required
 def app_detail(slug):
     """Public agent detail page."""
+    if slug in _LEGACY_AGENT_SLUGS:
+        return redirect("/app/" + _LEGACY_AGENT_SLUGS[slug], code=301)
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return redirect("/app")
@@ -1593,6 +1604,8 @@ def app_use(slug):
     """Run the agent — embeds the live SERP tool (same one used internally).
     Each load counts as one run against the per-agent cap; once a user hits
     the cap, we show a friendly limit-reached state instead of the iframe."""
+    if slug in _LEGACY_AGENT_SLUGS:
+        return redirect("/app/" + _LEGACY_AGENT_SLUGS[slug] + "/use", code=301)
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return redirect("/app")
