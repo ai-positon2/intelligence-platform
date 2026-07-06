@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex,nofollow" />
-<title>Visitor Analytics · Intelligence by Position²</title>
+<title>Anonymous Traffic · Intelligence by Position²</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -108,7 +108,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="topbar">
   <div class="tl">
     <a href="/p2/hub" class="brand"><div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div><span class="brand-name">Intelligence</span></a>
-    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Visitor Analytics</span></div>
+    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Anonymous Traffic</span></div>
   </div>
   <div class="tr">
     <button class="btn" id="refreshBtn" onclick="load(true)">↻ Refresh</button>
@@ -121,9 +121,9 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <div class="user-dropdown" id="userDropdown">
         <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
         <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
-          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
-          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Member Analytics</a>
+          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
+          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
+          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
           <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
           <div class="dd-divider"></div>
           <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
@@ -135,7 +135,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 
 <div class="wrap">
   <div class="hero">
-    <h1>Anonymous <em>visitor analytics</em></h1>
+    <h1>Anonymous <em>traffic</em></h1>
     <p>Behaviour of people on the public marketing &amp; login pages <b>before they sign in</b> — sources, engagement, intent signals and conversions. Bots are excluded from headline metrics.</p>
   </div>
 
@@ -375,7 +375,7 @@ function load(force){
 }
 load();
 </script>
-<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Visitor Analytics',seconds:s,email:''}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Anonymous Traffic',seconds:s,email:''}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 <script>
 function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
 document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');}});

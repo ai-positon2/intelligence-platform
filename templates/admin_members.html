@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex,nofollow" />
-<title>Member Analytics · Intelligence by Position²</title>
+<title>Public Page Analytics · Intelligence by Position²</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -118,7 +118,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="topbar">
   <div class="tl">
     <a href="/p2/hub" class="brand"><div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div><span class="brand-name">Intelligence</span></a>
-    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Member Analytics</span></div>
+    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Page Analytics</span></div>
   </div>
   <div class="tr">
     <button class="btn" id="refreshBtn" onclick="load(true)">↻ Refresh</button>
@@ -131,9 +131,9 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <div class="user-dropdown" id="userDropdown">
         <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
         <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
-          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
-          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Member Analytics</a>
+          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
+          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
+          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
           <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
           <div class="dd-divider"></div>
           <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
@@ -145,8 +145,8 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 
 <div class="wrap">
   <div class="hero">
-    <h1>Member <em>analytics</em></h1>
-    <p>Everyone who signs in with a <b>public Google account</b> (Position2 sign-ins stay in the Usage Dashboard). Each member is synced to their pre-login <b>Visitor Analytics</b> journey by visitor id, so you see the full story: what they browsed before joining, when they signed in, and what they did after.</p>
+    <h1>Public Page <em>analytics</em></h1>
+    <p>Everyone who signs in with a <b>public Google account</b> (Position2 sign-ins stay in Internal Usage). Each member is synced to their pre-login <b>Anonymous Traffic</b> journey by visitor id, so you see the full story: what they browsed before joining, when they signed in, and what they did after.</p>
   </div>
 
   <div id="emptyNote" class="note" style="display:none"></div>
@@ -231,7 +231,7 @@ function miniBars(arr,suffix){
 var KPI_INFO={
   members:{
     title:'Members',
-    desc:'Everyone who has signed in with a Google account and used the platform — public sign-ups on /app, plus @position2.com staff browsing /app specifically (their internal /p2 usage is tracked separately in the Usage Dashboard, not counted here).',
+    desc:'Everyone who has signed in with a Google account and used the platform — public sign-ups on /app, plus @position2.com staff browsing /app specifically (their internal /p2 usage is tracked separately in Internal Usage, not counted here).',
     render:function(d){
       var k=d.kpis||{};
       return '<div class="kstats">'+
@@ -258,7 +258,7 @@ var KPI_INFO={
   },
   linked:{
     title:'Linked to pre-login',
-    desc:'How many members we could match to their pre-login (anonymous) Visitor Analytics journey, via a first-party cookie carried from their browsing session into their sign-in. Members without a match either cleared cookies, signed in on a different device, or never visited the marketing site before joining — not an error, just no journey to show.',
+    desc:'How many members we could match to their pre-login Anonymous Traffic journey, via a first-party cookie carried from their browsing session into their sign-in. Members without a match either cleared cookies, signed in on a different device, or never visited the marketing site before joining — not an error, just no journey to show.',
     render:function(d){
       var k=d.kpis||{};
       var pct=k.members?Math.round((k.linked||0)/k.members*100):0;
@@ -354,7 +354,7 @@ function load(force){
     var k=d.kpis||{};
     var note=document.getElementById('emptyNote');
     if(!d.configured){note.style.display='block';note.textContent='⚠ Sheets not configured (GOOGLE_SA_JSON / LOGIN_LOG_SHEET_ID missing).';}
-    else if(!k.members){note.style.display='block';note.textContent='No public member sign-ins yet. When someone signs in with a non-Position2 Google account, they appear here (data lands in the “Member Signins” sheet tab) and are matched to their pre-login Visitor Analytics.';}
+    else if(!k.members){note.style.display='block';note.textContent='No public member sign-ins yet. When someone signs in with a non-Position2 Google account, they appear here (data lands in the “Member Signins” sheet tab) and are matched to their pre-login Anonymous Traffic.';}
     else{note.style.display='none';}
     document.getElementById('kpis').innerHTML=
       kcard('members',k.members||0,'Members',(k.new||0)+' new · '+(k.returning||0)+' returning')+

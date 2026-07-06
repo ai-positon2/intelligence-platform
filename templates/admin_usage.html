@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Usage Dashboard — Admin</title>
+  <title>Internal Usage — Admin</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -233,7 +233,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       <div class="bc">
         <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
         <a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span>
-        <span class="bc-cur">Usage Dashboard</span>
+        <span class="bc-cur">Internal Usage</span>
       </div>
     </div>
     <div class="tr">
@@ -252,9 +252,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
             <div class="dd-email">{{ user.email }}</div>
           </div>
           <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-            <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Usage Dashboard</a>
-            <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Visitor Analytics</a>
-          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Member Analytics</a>
+            <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
+            <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
+          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
             <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
             <div class="dd-divider"></div>
             <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
@@ -271,7 +271,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     <div class="ph">
       <div class="ph-left">
         <div class="eyebrow">Admin · Platform Intelligence</div>
-        <h1>Usage Dashboard</h1>
+        <h1>Internal Usage</h1>
       </div>
       <a class="refresh-btn" href="/p2/admin/visitors" style="text-decoration:none;margin-right:10px">🌐 Visitor analytics</a>
       <a class="refresh-btn" href="/p2/admin/requests" style="text-decoration:none;margin-right:10px">📥 Access requests</a>
@@ -912,7 +912,7 @@ html.lenis,html.lenis body{height:auto}
 </script>
 
 <style>
-/* ===== Usage Dashboard upgrade: contained scroll areas + polish ===== */
+/* ===== Internal Usage upgrade: contained scroll areas + polish ===== */
 #users-wrap{max-height:360px;overflow-y:auto;padding-right:6px}
 #pane-views .tbl-wrap,#pane-logins .tbl-wrap{max-height:560px;overflow-y:auto}
 #c-tables thead th{position:sticky;top:0;z-index:2;background:#0d0f18}
@@ -981,7 +981,7 @@ tbody tr:nth-child(n+45){animation:none}
   var pend=null;
   ready(function(){new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;run();},320);}).observe(document.body,{childList:true,subtree:true});});
 })();</script>
-<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Usage Dashboard',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Internal Usage',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 
 <style>
 /* clickable KPI cards */
