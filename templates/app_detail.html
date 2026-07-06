@@ -149,3 +149,8 @@
   </div>
 </div>
 {% endblock %}
+{% block scripts %}
+<script>
+  p2RecordAgentVisit({slug:"{{ agent.slug }}", name:"{{ agent.name }}", tagline:"{{ agent.tagline }}", ac:"{{ agent.ac }}", ac2:"{{ agent.ac2 }}"});
+</script>
+{% endblock %}

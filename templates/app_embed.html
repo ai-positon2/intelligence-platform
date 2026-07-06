@@ -66,11 +66,14 @@
     <iframe class="tool" id="toolFrame" src="{{ embed_url }}" allow="clipboard-write; clipboard-read; fullscreen"></iframe>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
 <script>
   (function(){
     var fr=document.getElementById('toolFrame'), ld=document.getElementById('floader');
     if(fr){ fr.addEventListener('load', function(){ setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 800); }); }
     setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 8000);
   })();
+  p2RecordAgentVisit({slug:"{{ agent.slug }}", name:"{{ agent.name }}", tagline:"{{ agent.tagline }}", ac:"{{ agent.ac }}", ac2:"{{ agent.ac2 }}"});
 </script>
 {% endblock %}
