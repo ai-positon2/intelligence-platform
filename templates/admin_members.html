@@ -31,10 +31,8 @@ a{color:inherit;text-decoration:none}
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;line-height:1.05}
 .kpi span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2);margin-top:9px}
 .kpi small{display:block;color:var(--dim);font-size:12px;margin-top:5px}
-.kpi{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease;position:relative}
+.kpi{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease}
 .kpi:hover{border-color:var(--line2);transform:translateY(-2px);background:rgba(255,255,255,.045)}
-.kpi .hint{position:absolute;top:14px;right:16px;font-family:var(--mono);font-size:10px;color:var(--dim2);opacity:0;transition:opacity .15s ease}
-.kpi:hover .hint{opacity:1}
 .drawer .kdesc{color:var(--dim);font-size:13px;line-height:1.55;margin:14px 0 0}
 .drawer .kstats{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .drawer .kstat{flex:1;min-width:100px;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:rgba(255,255,255,.02)}
@@ -211,7 +209,7 @@ function bars(id, arr, opts){
   }).join('');
 }
 function kcard(key,b,label,small){
-  return '<div class="card kpi" onclick="openKpiDrawer(\''+key+'\')"><span class="hint">Details →</span><b>'+esc(b)+'</b><span>'+esc(label)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</div>';
+  return '<div class="card kpi" onclick="openKpiDrawer(\''+key+'\')"><b>'+esc(b)+'</b><span>'+esc(label)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</div>';
 }
 function initials(n){n=(n||'').trim();if(!n)return 'M';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
 function avatar(m,big){

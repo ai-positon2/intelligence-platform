@@ -40,6 +40,8 @@ border-radius:10px;padding:8px 13px;background:var(--card);cursor:pointer;transi
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;line-height:1.05}
 .kpi span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2);margin-top:9px}
 .kpi small{display:block;color:var(--dim);font-size:12px;margin-top:5px}
+.kpi{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease}
+.kpi:hover{border-color:var(--line2);transform:translateY(-2px);background:rgba(255,255,255,.045)}
 .sect{margin-top:30px}
 .sect h2{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.01em;margin:0 0 13px;display:flex;align-items:center;gap:9px}
 .sect h2::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 9px var(--cyan)}
@@ -76,6 +78,25 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .empty{color:var(--dim2);padding:18px;text-align:center;font-size:13px}
 .tbl-wrap{overflow:auto;max-height:520px;border-radius:12px}
 .muted{color:var(--dim2)}
+/* drawer (KPI details) */
+.overlay{position:fixed;inset:0;background:rgba(2,3,10,.6);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:.22s;z-index:60}
+.overlay.open{opacity:1;visibility:visible}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,94vw);background:#080a17;border-left:1px solid var(--line2);
+  box-shadow:-30px 0 80px -30px rgba(0,0,0,.8);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:61;
+  display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer .dh{padding:22px 22px 18px;border-bottom:1px solid var(--line);position:relative}
+.drawer .dh h3{margin:0;font-family:var(--display);font-weight:700;font-size:19px}
+.drawer .close{position:absolute;top:16px;right:18px;font-size:20px;color:var(--dim2);cursor:pointer;background:none;border:0}
+.drawer .close:hover{color:#fff}
+.drawer .kdesc{color:var(--dim);font-size:13px;line-height:1.55;margin:14px 0 0}
+.drawer .tline{padding:20px 22px;overflow:auto;flex:1}
+.drawer .kstats{display:flex;flex-wrap:wrap;gap:10px}
+.drawer .kstat{flex:1;min-width:100px;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:rgba(255,255,255,.02)}
+.drawer .kstat b{display:block;font-family:var(--display);font-weight:800;font-size:20px}
+.drawer .kstat span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-top:4px}
+.drawer .ksect{margin-top:22px}
+.drawer .ksect h4{font-family:var(--display);font-weight:700;font-size:13px;margin:0 0 10px;color:var(--ink)}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
   <script src="/static/js/theme.js"></script>
@@ -172,6 +193,13 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
   </div>
 </div>
 
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <button class="close" onclick="closeDrawer()">✕</button>
+  <div class="dh" id="drawerHead"></div>
+  <div class="tline" id="drawerTline"></div>
+</aside>
+
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function bars(id, arr, opts){
@@ -185,27 +213,115 @@ function bars(id, arr, opts){
       '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
   }).join('');
 }
-function kcard(b,label,small){
-  return '<div class="card kpi"><b>'+esc(b)+'</b><span>'+esc(label)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</div>';
+function kcard(key,b,label,small){
+  return '<div class="card kpi" onclick="openKpiDrawer(\''+key+'\')"><b>'+esc(b)+'</b><span>'+esc(label)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</div>';
 }
+function miniBars(arr,suffix){
+  if(!arr||!arr.length)return '<div class="empty">No data yet</div>';
+  var max=Math.max.apply(null,arr.map(function(x){return x[1];}))||1;
+  return '<div class="bars">'+arr.map(function(x){
+    var pct=Math.round(x[1]/max*100);
+    return '<div class="bar"><div class="lab" title="'+esc(x[0])+'">'+esc(x[0]||'—')+'</div>'+
+      '<div class="n">'+x[1]+(suffix||'')+'</div>'+
+      '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+  }).join('')+'</div>';
+}
+var LAST_DATA=null;
+var KPI_INFO={
+  pageviews:{
+    title:'Page views',
+    desc:'Every anonymous page view recorded on the public marketing & login pages, before sign-in. Bots are excluded.',
+    render:function(d){return '<div class="ksect"><h4>Top pages</h4>'+miniBars(d.top_pages)+'</div>';}
+  },
+  visitors:{
+    title:'Unique visitors',
+    desc:'Distinct anonymous browser IDs (a first-party cookie), not distinct people — the same person on two devices counts twice, and a cleared cookie makes a returning visitor look new.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats">'+
+          '<div class="kstat"><b>'+(k.new||0)+'</b><span>New</span></div>'+
+          '<div class="kstat"><b>'+(k.returning||0)+'</b><span>Returning</span></div>'+
+        '</div>'+
+        '<div class="ksect"><h4>Device</h4>'+miniBars(d.devices)+'</div>';
+    }
+  },
+  sessions:{
+    title:'Sessions',
+    desc:'One browsing visit (resets after a period of inactivity). Bounce rate is the share of sessions that viewed only one page before leaving.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats"><div class="kstat"><b>'+(k.bounce_rate||0)+'%</b><span>Bounce rate</span></div></div>'+
+        '<div class="ksect"><h4>Landing pages</h4>'+miniBars(d.top_landing)+'</div>';
+    }
+  },
+  avg_engaged:{
+    title:'Avg engaged time',
+    desc:'Average active (not idle) time per session, vs. average raw time on page — engaged time discounts tabs left open in the background.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats">'+
+          '<div class="kstat"><b>'+(k.avg_engaged||'—')+'</b><span>Avg engaged</span></div>'+
+          '<div class="kstat"><b>'+(k.avg_time||'—')+'</b><span>Avg on page</span></div>'+
+        '</div>'+
+        '<div class="ksect"><h4>Scroll depth</h4>'+miniBars(d.scroll)+'</div>';
+    }
+  },
+  conversions:{
+    title:'Access requests',
+    desc:'Visitors who submitted the "Request access" form, as a share of all visitors. The funnel below shows where people drop off before submitting.',
+    render:function(d){
+      var f=d.form_funnel||{};
+      return '<div class="ksect"><h4>Request-access funnel</h4><div class="funnel" style="margin-top:2px">'+
+          '<div class="step"><b>'+(f.opened||0)+'</b><span>Opened</span></div>'+
+          '<div class="step"><b>'+(f.started||0)+'</b><span>Started</span></div>'+
+          '<div class="step"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>'+
+        '</div></div>';
+    }
+  },
+  video_sessions:{
+    title:'Watched walkthrough',
+    desc:'Sessions where the product-walkthrough video was played, at least briefly, on the marketing site.',
+    render:function(d){return '<div class="ksect"><h4>CTA & clicks</h4>'+miniBars(d.cta)+'</div>';}
+  },
+  identified:{
+    title:'Identified visitors',
+    desc:'Visitors matched to a real name/company — either via reverse-IP lookup, by submitting the access-request form, or a provider posting to /api/identify. Everyone else stays anonymous by design.',
+    render:function(d){return '<div class="ksect"><h4>Top companies</h4>'+miniBars(d.top_companies)+'</div>';}
+  },
+  companies:{
+    title:'Companies seen',
+    desc:'Distinct companies detected across all visitors via reverse-IP lookup on their network address — broader than "Identified visitors", which requires a name too.',
+    render:function(d){return '<div class="ksect"><h4>All companies</h4>'+miniBars(d.top_companies)+'</div>';}
+  }
+};
+function openKpiDrawer(key){
+  var info=KPI_INFO[key];if(!info||!LAST_DATA)return;
+  document.getElementById('drawerHead').innerHTML='<h3>'+esc(info.title)+'</h3><p class="kdesc">'+esc(info.desc)+'</p>';
+  document.getElementById('drawerTline').innerHTML=info.render(LAST_DATA);
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer(){document.getElementById('overlay').classList.remove('open');document.getElementById('drawer').classList.remove('open');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
 function load(force){
   var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
   fetch('/p2/admin/visitors/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(btn)btn.textContent='↻ Refresh';
+    LAST_DATA=d;
     var k=d.kpis||{};
     var note=document.getElementById('emptyNote');
     if(!d.configured){note.style.display='block';note.textContent='⚠ Sheets not configured (GOOGLE_SA_JSON / LOGIN_LOG_SHEET_ID missing) — analytics cannot be stored or read yet.';}
     else if(!k.pageviews){note.style.display='block';note.textContent='No visitor data yet. Once the public site is live with the tracker and visitors browse, this dashboard fills automatically (data lands in the “Visitor Analytics” sheet tab).';}
     else{note.style.display='none';}
     document.getElementById('kpis').innerHTML=
-      kcard(k.pageviews||0,'Page views')+
-      kcard(k.visitors||0,'Unique visitors',(k.new||0)+' new · '+(k.returning||0)+' returning')+
-      kcard(k.sessions||0,'Sessions','Bounce '+(k.bounce_rate||0)+'%')+
-      kcard(k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
-      kcard((k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
-      kcard(k.video_sessions||0,'Watched walkthrough')+
-      kcard(k.identified||0,'Identified visitors')+
-      kcard(k.companies||0,'Companies seen');
+      kcard('pageviews',k.pageviews||0,'Page views')+
+      kcard('visitors',k.visitors||0,'Unique visitors',(k.new||0)+' new · '+(k.returning||0)+' returning')+
+      kcard('sessions',k.sessions||0,'Sessions','Bounce '+(k.bounce_rate||0)+'%')+
+      kcard('avg_engaged',k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
+      kcard('conversions',(k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
+      kcard('video_sessions',k.video_sessions||0,'Watched walkthrough')+
+      kcard('identified',k.identified||0,'Identified visitors')+
+      kcard('companies',k.companies||0,'Companies seen');
     // time series
     var s=d.series||[],sx=document.getElementById('seriesX');
     var smax=Math.max.apply(null,s.map(function(x){return x[1];}))||1;
