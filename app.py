@@ -1409,6 +1409,139 @@ APP_AGENTS = [
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 
+# ── Per-agent run cap ─────────────────────────────────────────────────────────
+# A "run" = one load of /app/<slug>/use (opening the embedded tool). We can't see
+# inside the iframe (it's a separate app), so this is the closest honest signal
+# we have to "the user ran this agent" — logged to its own sheet tab so it's
+# visible to admins and enforceable across devices/browsers (unlike the
+# localStorage-based "recently opened" list, which is just a UX nicety).
+AGENT_RUN_CAP = 10
+_AR_TAB = "Agent Runs"
+_AR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name"]
+
+def _log_agent_run(user: dict, agent: dict) -> None:
+    """Append one agent-run event to the 'Agent Runs' tab. Fails silently."""
+    if not LOGIN_LOG_SHEET_ID:
+        return
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return
+        now = datetime.now(IST)
+        row = [now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
+               user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", "")]
+        tab = _AR_TAB
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            try:
+                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
+            except Exception:
+                pass
+            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AR_HEADER]}).execute()
+        svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+    except Exception as e:
+        log.warning("agent run log failed: %s", e)
+
+def _agent_run_counts(email: str) -> dict:
+    """Return {agent_slug: run_count} for one user, read fresh from 'Agent Runs'.
+    Used both to enforce the cap and to show 'runs left' on the dashboard."""
+    counts = {}
+    if not LOGIN_LOG_SHEET_ID or not email:
+        return counts
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return counts
+        rows = svc.spreadsheets().values().get(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AR_TAB).execute().get("values", [])
+        rows = rows[1:] if len(rows) > 1 else []
+        AR = {n: i for i, n in enumerate(_AR_HEADER)}
+        def ac(r, n, d=""):
+            i = AR.get(n, -1); return r[i] if 0 <= i < len(r) else d
+        e = email.lower()
+        for r in rows:
+            if (ac(r, "Email") or "").lower() == e:
+                slug = ac(r, "Agent Slug")
+                if slug:
+                    counts[slug] = counts.get(slug, 0) + 1
+    except Exception as ex:
+        log.warning("agent run count read failed: %s", ex)
+    return counts
+
+def _fetch_agent_run_stats() -> dict:
+    """Per-user, per-agent run counts for the admin 'Agent Usage' dashboard."""
+    from collections import defaultdict
+    svc = _va_sheets_service()
+    def read(rng):
+        if not svc:
+            return []
+        try:
+            return svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+        except Exception as e:
+            log.warning("agent run stats read failed (%s): %s", rng, e)
+            return []
+
+    rows = read("%s!A:F" % _AR_TAB)
+    rows = rows[1:] if len(rows) > 1 else []
+    AR = {n: i for i, n in enumerate(_AR_HEADER)}
+    def ac(r, n, d=""):
+        i = AR.get(n, -1); return r[i] if 0 <= i < len(r) else d
+
+    by_user = {}
+    agent_totals = {}
+    for r in rows:
+        email = (ac(r, "Email") or "").lower()
+        if not email:
+            continue
+        slug = ac(r, "Agent Slug") or "?"
+        ts = ac(r, "Timestamp (IST)")
+        u = by_user.setdefault(email, {"email": email, "name": "", "total": 0,
+                                        "agents": {}, "last_run": ""})
+        if ac(r, "Name"):
+            u["name"] = ac(r, "Name")
+        u["agents"][slug] = u["agents"].get(slug, 0) + 1
+        u["total"] += 1
+        if ts and ts > u["last_run"]:
+            u["last_run"] = ts
+        agent_totals[slug] = agent_totals.get(slug, 0) + 1
+
+    agent_meta = {a["slug"]: a for a in APP_AGENTS}
+    users_out = []
+    for email, u in by_user.items():
+        agents_list = []
+        for slug, cnt in sorted(u["agents"].items(), key=lambda x: -x[1]):
+            meta = agent_meta.get(slug, {})
+            agents_list.append({
+                "slug": slug, "name": meta.get("name", slug), "count": cnt,
+                "cap": AGENT_RUN_CAP, "remaining": max(0, AGENT_RUN_CAP - cnt),
+                "at_cap": cnt >= AGENT_RUN_CAP,
+            })
+        users_out.append({"email": u["email"], "name": u["name"] or u["email"],
+                           "total": u["total"], "last_run": u["last_run"], "agents": agents_list})
+    users_out.sort(key=lambda x: -x["total"])
+
+    agents_out = [{"slug": a["slug"], "name": a["name"], "runs": agent_totals.get(a["slug"], 0),
+                   "cap": AGENT_RUN_CAP} for a in APP_AGENTS]
+    users_at_cap = sum(1 for u in users_out if any(a["at_cap"] for a in u["agents"]))
+
+    return {
+        "configured": bool(svc),
+        "cap": AGENT_RUN_CAP,
+        "total_runs": sum(agent_totals.values()),
+        "total_users": len(users_out),
+        "users_at_cap": users_at_cap,
+        "agents": agents_out,
+        "users": users_out,
+    }
+
 def _app_embed_url(agent):
     """Build the live SERP tool URL for an agent (same as the internal /p2/seo embed)."""
     seo_slug = agent.get("seo_slug")
@@ -1437,7 +1570,10 @@ def _inject_app_agents():
 @login_required
 def app_home():
     """Signed-in home for ALL Google users (Position2 and external alike)."""
-    return render_template("app.html", user=_get_user(), agents=APP_AGENTS)
+    user = _get_user()
+    run_counts = _agent_run_counts((user or {}).get("email", ""))
+    return render_template("app.html", user=user, agents=APP_AGENTS,
+                           run_counts=run_counts, run_cap=AGENT_RUN_CAP)
 
 @app.route("/app/<slug>")
 @login_required
@@ -1446,19 +1582,32 @@ def app_detail(slug):
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return redirect("/app")
-    return render_template("app_detail.html", user=_get_user(), agent=agent)
+    user = _get_user()
+    runs_used = _agent_run_counts((user or {}).get("email", "")).get(slug, 0)
+    return render_template("app_detail.html", user=user, agent=agent,
+                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP)
 
 @app.route("/app/<slug>/use")
 @login_required
 def app_use(slug):
-    """Run the agent — embeds the live SERP tool (same one used internally)."""
+    """Run the agent — embeds the live SERP tool (same one used internally).
+    Each load counts as one run against the per-agent cap; once a user hits
+    the cap, we show a friendly limit-reached state instead of the iframe."""
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return redirect("/app")
+    user = _get_user()
+    email = (user or {}).get("email", "")
+    runs_used = _agent_run_counts(email).get(slug, 0)
+    if runs_used >= AGENT_RUN_CAP:
+        return render_template("app_embed.html", user=user, agent=agent, embed_url=None,
+                               runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=True)
     embed_url = _app_embed_url(agent)
     if not embed_url:
         return redirect("/app/" + slug)
-    return render_template("app_embed.html", user=_get_user(), agent=agent, embed_url=embed_url)
+    _log_agent_run(user, agent)
+    return render_template("app_embed.html", user=user, agent=agent, embed_url=embed_url,
+                           runs_used=runs_used + 1, runs_cap=AGENT_RUN_CAP, limit_reached=False)
 
 @app.route("/app/history")
 @login_required
@@ -2655,6 +2804,18 @@ def admin_requests():
     reqs = _read_access_requests()
     return render_template("admin_requests.html", user=_get_user(),
                            requests=reqs, count=len(reqs))
+
+@app.route("/p2/admin/agent-runs")
+@admin_required
+def admin_agent_runs():
+    """Admin-only view of per-user, per-agent run counts against the cap."""
+    return render_template("admin_agent_runs.html", user=_get_user())
+
+@app.route("/p2/admin/agent-runs/data")
+@admin_required
+def admin_agent_runs_data():
+    """JSON data endpoint called by the admin agent-usage shell page."""
+    return jsonify(_fetch_agent_run_stats())
 
 @app.route("/p2/admin/email-test")
 @admin_required

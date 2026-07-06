@@ -81,6 +81,15 @@
     transition:border-color .2s ease, color .2s ease }
   .tag:hover{ border-color:color-mix(in srgb, var(--ac) 45%, transparent); color:var(--tx) }
 
+  .runs-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px }
+  .runs-row b{ font-family:var(--display,inherit); font-size:26px; font-weight:800; color:var(--tx); letter-spacing:-.02em }
+  .runs-row span{ font-size:12px; color:var(--tx3) }
+  .runs-track{ height:7px; border-radius:5px; background:rgba(255,255,255,.08); overflow:hidden }
+  .runs-fill{ height:100%; border-radius:5px; background:linear-gradient(90deg,var(--ac),var(--ac2)) }
+  .runs-fill.at-cap{ background:linear-gradient(90deg,#fb7185,#f472b6) }
+  .runs-note{ margin:12px 0 0; font-size:12px; color:var(--tx3); line-height:1.55 }
+  .runs-note.at-cap{ color:#fb7185 }
+
   @media (max-width:900px){ .dgrid{ grid-template-columns:1fr } .trips{ grid-template-columns:1fr } }
   @media (max-width:560px){ .dhead{ gap:18px } .dicon{ width:76px; height:76px; border-radius:20px } .dicon svg{ width:36px; height:36px } }
 </style>
@@ -118,7 +127,16 @@
     </section>
 
     <aside class="side">
-      {% if agent.seo_slug %}
+      {% set at_cap = runs_used >= runs_cap %}
+      {% if at_cap %}
+      <div class="use-card disabled">
+        <div>
+          <div class="uc-title">Run limit reached</div>
+          <div class="uc-sub">You&rsquo;ve used all {{ runs_cap }} runs for this agent</div>
+        </div>
+        <span class="uc-arrow">&times;</span>
+      </div>
+      {% elif agent.seo_slug %}
       <a class="use-card" href="/app/{{ agent.slug }}/use">
         <div>
           <div class="uc-title">Use this agent</div>
@@ -133,6 +151,18 @@
           <div class="uc-sub">This agent isn&rsquo;t live yet</div>
         </div>
         <span class="uc-arrow">&rarr;</span>
+      </div>
+      {% endif %}
+      {% if agent.seo_slug %}
+      <div class="scard">
+        <div class="lbl">Runs</div>
+        <div class="runs-row"><b>{{ runs_used }}</b><span>of {{ runs_cap }} used &middot; {{ 0 if at_cap else (runs_cap - runs_used) }} left</span></div>
+        <div class="runs-track"><div class="runs-fill{{ ' at-cap' if at_cap }}" style="width:{{ (runs_used / runs_cap * 100) if runs_cap else 0 }}%"></div></div>
+        {% if at_cap %}
+        <p class="runs-note at-cap">You&rsquo;ve reached the run limit for this agent. Limits reset per agent, not shared across agents.</p>
+        {% else %}
+        <p class="runs-note">Each run is one open of the live tool. Limits are per agent, per account.</p>
+        {% endif %}
       </div>
       {% endif %}
       <div class="scard">
