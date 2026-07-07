@@ -1360,6 +1360,13 @@ _SVG_ALCHEMY = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
     'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10z"/>'
     '<path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"/></svg>')
 
+def _asvg(inner: str) -> str:
+    """Icon wrapper for APP_AGENTS entries that mirrors _SVG_COMPASS/_BRIEF/_ALCHEMY's
+    style (currentColor + 1.9 stroke) so agents ported over from the marketing AGENTS
+    list (which uses a fixed white stroke) render consistently with the original three."""
+    return ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+            'stroke-linecap="round" stroke-linejoin="round">' + inner + "</svg>")
+
 APP_AGENTS = [
     {
         "slug": "keyword-finder", "name": "Keyword Finder",
@@ -1405,6 +1412,220 @@ APP_AGENTS = [
             {"t": "Best for", "d": "Refreshing existing content that has stalled or is being out-ranked — before it falls further behind."},
         ],
         "tags": ["Enhance", "LLM", "SERP", "E-E-A-T"],
+    },
+
+    # Agents below are shown publicly (dashboard, sidebar, detail pages) but are
+    # not yet connected to a live tool -- no "seo_slug", so every reader of
+    # APP_AGENTS must treat that as the single source of truth for "connected"
+    # vs. "request access" (see _app_embed_url, app_home, app_detail, app.html,
+    # app_detail.html). Ported from the marketing /agents directory.
+    {
+        "slug": "signal-tracker", "name": "ABM Signal Tracker",
+        "tagline": "Account Intent Monitoring",
+        "ac": "#a78bfa", "ac2": "#818cf8", "icon": _asvg("<path d=\"M3 3v18h18\"/><path d=\"M7 14l4-4 3 3 5-6\"/>"),
+        "pill1": "Account Intent Monitoring", "pill2": "26 signal types \u00b7 scored weekly",
+        "lead": ("Always-on monitoring for your target-account universe. Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week."),
+        "trips": [
+            {"t": "What it does", "d": "You never miss the moment an account becomes ready. The most urgent opportunities rise to the top automatically \u2014 no manual list-scrubbing."},
+            {"t": "How it works", "d": "It ingests curated, authenticated high-tier sources plus open-web news, scores each event as type_weight \u00d7 severity \u00d7 recency (with a bonus when signals stack), keeps a rolling 90-day window, and ships a weekly digest."},
+            {"t": "Best for", "d": "Demand-gen and sales teams running account-based programs."},
+        ],
+        "tags": ["Curated sources", "News", "Slack", "Sheets"],
+    },
+    {
+        "slug": "generative-search-visibility", "name": "Generative Search Visibility",
+        "tagline": "AI Answer-Engine Tracking",
+        "ac": "#22d3ee", "ac2": "#38bdf8", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/><path d=\"M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z\"/>"),
+        "pill1": "AI Answer-Engine Tracking", "pill2": "ChatGPT \u00b7 Gemini \u00b7 Perplexity",
+        "lead": ("See exactly where your brand shows up across AI answer engines \u2014 ChatGPT, Google AI Overviews, Gemini and Perplexity \u2014 track your share of voice, and find the prompts you are losing."),
+        "trips": [
+            {"t": "What it does", "d": "Win the answer, not just the link. Know your AI share of voice, which sources get cited, and where to act before a competitor owns the response."},
+            {"t": "How it works", "d": "It monitors branded and category prompts across major AI engines, measures mention frequency and share of voice over time, maps the domains and pages being cited, and flags the gaps to close."},
+            {"t": "Best for", "d": "SEO, content and brand teams defending visibility in AI search."},
+        ],
+        "tags": ["Brand Radar", "AI engines", "GSC", "Sheets"],
+    },
+    {
+        "slug": "anonymous-visitors", "name": "Anonymous Website Visitors",
+        "tagline": "Visitor De-anonymization",
+        "ac": "#34d399", "ac2": "#2dd4bf", "icon": _asvg("<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4 4-6 8-6s8 2 8 6\"/>"),
+        "pill1": "Visitor De-anonymization", "pill2": "Recovers 95%+ of lost visitors",
+        "lead": ("Turn silent website traffic into named accounts. Anonymous Visitor ID reveals the companies \u2014 and the people \u2014 browsing your site, and hands reps a ready-to-act narrative."),
+        "trips": [
+            {"t": "What it does", "d": "Recover the 95%+ of visitors who never fill out a form, and reach them while the intent is still warm."},
+            {"t": "How it works", "d": "Visit data is matched to firmographic and person-level identity, the session journey is reconstructed page-by-page, and each visitor becomes a first-person CRM narrative with suggested outreach."},
+            {"t": "Best for", "d": "Website, demand-gen and SDR teams who want to act on anonymous intent."},
+        ],
+        "tags": ["GTM", "Sheets", "CRM"],
+    },
+    {
+        "slug": "technical-seo-geo-auditor", "name": "Technical SEO & GEO Auditor",
+        "tagline": "Site Health & AI Readiness",
+        "ac": "#38bdf8", "ac2": "#22d3ee", "icon": _asvg("<path d=\"M9 11l3 3 8-8\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
+        "pill1": "Site Health & AI Readiness", "pill2": "200+ checks \u00b7 scored in seconds",
+        "lead": ("A full technical, on-page and GEO audit of any site \u2014 200+ checks scored and ranked \u2014 with AI-written fixes your team can ship immediately."),
+        "trips": [
+            {"t": "What it does", "d": "Replace week-long manual audits with a scored, prioritized fix-list in seconds, so the highest-impact issues get fixed first."},
+            {"t": "How it works", "d": "It crawls the site, runs 200+ technical, on-page, structured-data and answer-engine checks, scores each by impact, and generates specific, AI-written recommendations."},
+            {"t": "Best for", "d": "SEO leads, technical SEOs and web teams."},
+        ],
+        "tags": ["Crawl", "GSC", "Sheets"],
+    },
+    {
+        "slug": "ai-readiness-auditor", "name": "AI Readiness Auditor",
+        "tagline": "Answer-Engine Optimization",
+        "ac": "#818cf8", "ac2": "#a78bfa", "icon": _asvg("<rect x=\"4\" y=\"8\" width=\"16\" height=\"11\" rx=\"3\"/><path d=\"M12 8V4\"/><circle cx=\"9\" cy=\"13.5\" r=\"1.1\"/><circle cx=\"15\" cy=\"13.5\" r=\"1.1\"/>"),
+        "pill1": "Answer-Engine Optimization", "pill2": "Score any site in ~15 seconds",
+        "lead": ("Score any site's readiness to be understood and cited by AI agents and answer engines \u2014 in about 15 seconds \u2014 with the exact fixes to get picked up."),
+        "trips": [
+            {"t": "What it does", "d": "Get ahead of the shift to AI search. Know precisely what is blocking your pages from being cited, and how to fix it."},
+            {"t": "How it works", "d": "It evaluates structure, schema, crawlability, content clarity and machine-readability against answer-engine best practices, then returns a score and prioritized fixes."},
+            {"t": "Best for", "d": "SEO and content teams future-proofing for AI search."},
+        ],
+        "tags": ["Crawl", "Schema", "GSC"],
+    },
+    {
+        "slug": "content-authority-optimizer", "name": "Content Authority Optimizer",
+        "tagline": "On-Page & E-E-A-T",
+        "ac": "#e879f9", "ac2": "#c084fc", "icon": _asvg("<path d=\"M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>"),
+        "pill1": "On-Page & E-E-A-T", "pill2": "Tuned for AEO & E-E-A-T",
+        "lead": ("Audit and rewrite existing pages for structure, depth and authority signals \u2014 tuned for answer engines and E-E-A-T \u2014 so pages climb."),
+        "trips": [
+            {"t": "What it does", "d": "Get more from content you have already published. Targeted, authority-building edits that move rankings without a full rewrite."},
+            {"t": "How it works", "d": "It assesses topical depth, structure, internal links and trust signals, then recommends specific edits aligned to E-E-A-T and AEO."},
+            {"t": "Best for", "d": "Content and SEO teams optimizing existing libraries."},
+        ],
+        "tags": ["GSC", "CMS", "Docs"],
+    },
+    {
+        "slug": "competitor-seo-intelligence", "name": "Competitor SEO Intelligence",
+        "tagline": "Organic Benchmarking",
+        "ac": "#fb7185", "ac2": "#f472b6", "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><path d=\"M12 3v3M12 18v3M3 12h3M18 12h3\"/>"),
+        "pill1": "Organic Benchmarking", "pill2": "Gaps \u00b7 backlinks \u00b7 authority",
+        "lead": ("Benchmark your organic footprint against any rival \u2014 keyword gaps, backlink profiles, authority and page speed \u2014 with the plays to overtake them."),
+        "trips": [
+            {"t": "What it does", "d": "See exactly where competitors beat you and where they are exposed, then act on a prioritized gap list."},
+            {"t": "How it works", "d": "It compares domains across rankings, keyword gaps, backlinks and authority, validates the findings, and drafts opportunity-and-recommendation notes."},
+            {"t": "Best for", "d": "SEO leads and growth teams in competitive markets."},
+        ],
+        "tags": ["Semrush", "Ahrefs", "Sheets"],
+    },
+    {
+        "slug": "local-visibility-builder", "name": "Local Visibility Builder",
+        "tagline": "Multi-Location SEO",
+        "ac": "#2dd4bf", "ac2": "#34d399", "icon": _asvg("<path d=\"M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.6\"/>"),
+        "pill1": "Multi-Location SEO", "pill2": "Dev-ready local pages at scale",
+        "lead": ("Compose approved, developer-ready location and service pages at scale \u2014 with optimized copy and image alt text \u2014 for multi-location brands."),
+        "trips": [
+            {"t": "What it does", "d": "Launch hundreds of consistent, optimized local pages without the manual grind, and capture 'near me' demand."},
+            {"t": "How it works", "d": "It assembles location and service pages from approved templates and data, generates optimized copy and bulk image alt tags, and outputs dev-ready pages."},
+            {"t": "Best for", "d": "Local SEO and web teams managing many locations."},
+        ],
+        "tags": ["Sheets", "CMS", "Maps"],
+    },
+    {
+        "slug": "search-term-intelligence", "name": "Search Term Intelligence",
+        "tagline": "Search Query Mining",
+        "ac": "#f472b6", "ac2": "#fb7185", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/><path d=\"M8 10h6M8 13h4\"/>"),
+        "pill1": "Search Query Mining", "pill2": "Negatives + winners, weekly",
+        "lead": ("Mine every paid search query for waste and hidden winners \u2014 auto-suggested negative keywords and new keyword opportunities, every week."),
+        "trips": [
+            {"t": "What it does", "d": "Cut wasted spend and capture converting terms you are not bidding on, without manually combing search-term reports."},
+            {"t": "How it works", "d": "It classifies search terms by relevance and performance, flags high-spend/no-conversion waste, and recommends negatives and new keywords."},
+            {"t": "Best for", "d": "Paid search and performance teams."},
+        ],
+        "tags": ["Google Ads", "Microsoft Ads", "Sheets"],
+    },
+    {
+        "slug": "linkedin-intelligence", "name": "LinkedIn Intelligence",
+        "tagline": "Engagement Signals",
+        "ac": "#0ea5e9", "ac2": "#38bdf8", "icon": _asvg("<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"3\"/><path d=\"M7 17v-5M12 17V8M17 17v-3\"/>"),
+        "pill1": "Engagement Signals", "pill2": "Buying-committee engagement",
+        "lead": ("Know which members of the buying committee are already paying attention. LinkedIn Intelligence captures engagement signals and maps them to your target accounts."),
+        "trips": [
+            {"t": "What it does", "d": "Prioritize the people actually engaging \u2014 not just the logo \u2014 so outreach lands with the right person at the right time."},
+            {"t": "How it works", "d": "It tracks engagement on relevant posts and profiles, attributes it to your accounts, and scores buying-committee interest for ABM plays."},
+            {"t": "Best for", "d": "ABM and social-selling teams."},
+        ],
+        "tags": ["LinkedIn", "GTM", "CRM"],
+    },
+    {
+        "slug": "ad-intelligence", "name": "Competitor Ad Intelligence",
+        "tagline": "Competitive Creative",
+        "ac": "#a855f7", "ac2": "#e879f9", "icon": _asvg("<path d=\"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>"),
+        "pill1": "Competitive Creative", "pill2": "Live competitor creative tracking",
+        "lead": ("See exactly what your competitors are running. Competitor Ad Intelligence tracks live competitor creative so your messaging stays a step ahead."),
+        "trips": [
+            {"t": "What it does", "d": "Stop guessing competitor strategy \u2014 watch their real ads, formats and shifts over time."},
+            {"t": "How it works", "d": "It continuously collects competitor ads across platforms and surfaces messaging themes, creative formats, and changes as they happen."},
+            {"t": "Best for", "d": "Paid media, brand and competitive-intelligence teams."},
+        ],
+        "tags": ["Paid social", "Search", "Brand"],
+    },
+    {
+        "slug": "pipeline-command-center", "name": "Pipeline Command Center",
+        "tagline": "Program Analytics",
+        "ac": "#a3e635", "ac2": "#34d399", "icon": _asvg("<rect x=\"3\" y=\"3\" width=\"8\" height=\"8\" rx=\"1.5\"/><rect x=\"13\" y=\"3\" width=\"8\" height=\"5\" rx=\"1.5\"/><rect x=\"13\" y=\"11\" width=\"8\" height=\"10\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"8\" height=\"7\" rx=\"1.5\"/>"),
+        "pill1": "Program Analytics", "pill2": "Every account & task, live",
+        "lead": ("One live command center for your whole go-to-market program \u2014 every account, signal, ranking and deliverable in a single prioritized view."),
+        "trips": [
+            {"t": "What it does", "d": "Replace scattered spreadsheets and dashboards with one source of truth your whole team works from."},
+            {"t": "How it works", "d": "It unifies signals, rankings, tasks and account data from your connected sources into a live, filterable dashboard."},
+            {"t": "Best for", "d": "Marketing ops, SEO PMs and team leads."},
+        ],
+        "tags": ["Sheets", "GSC", "CRM"],
+    },
+    {
+        "slug": "gbp-qc-agent", "name": "GBP QC Agent",
+        "tagline": "Google Business Profile QC",
+        "ac": "#f97316", "ac2": "#fbbf24", "icon": _asvg("<path d=\"M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z\"/><path d=\"M9 10l2 2 4-4\"/>"),
+        "pill1": "Google Business Profile QC", "pill2": "3-stage QC \u00b7 brand-checked",
+        "lead": ("A quality-control and content-generation tool for Google Business Profile posts. Run base content through a 3-stage workflow \u2014 base review, location-specific QC, and automated location content generation \u2014 all checked against your brand guidelines."),
+        "trips": [
+            {"t": "What it does", "d": "Ship on-brand GBP posts at multi-location scale without manual review \u2014 every post scored and checked against the client's exact rules, with the fixes written for you."},
+            {"t": "How it works", "d": "Pick a client and a stage. It runs base-content review, location-specific QC against the approved base, and automated location content generation \u2014 scoring each post 0-100, flagging only real violations by severity, and returning recommended fixes plus a corrected version, all against client brand guidelines."},
+            {"t": "Best for", "d": "Local and multi-location SEO and content teams managing Google Business Profile posts across many locations and clients."},
+        ],
+        "tags": ["Google Business Profile", "Brand guidelines", "Sheets"],
+    },
+    {
+        "slug": "on-page-auditor", "name": "On-Page SEO Auditor",
+        "tagline": "On-Page Optimization",
+        "ac": "#14b8a6", "ac2": "#2dd4bf", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/><path d=\"M8.4 11l2 2 3.4-3.4\"/>"),
+        "pill1": "On-Page Optimization", "pill2": "23 sections \u00b7 live CWV + PageSpeed",
+        "lead": ("A full on-page audit of any URL \u2014 23 sections spanning URL structure, meta, headings, content, schema, Core Web Vitals, canonicals, OG tags and crawlability \u2014 scored against live data."),
+        "trips": [
+            {"t": "What it does", "d": "Find and fix every on-page issue holding a page back, ranked by impact and backed by live PageSpeed and Core Web Vitals data \u2014 no guesswork."},
+            {"t": "How it works", "d": "Enter a URL and primary keywords; it pulls live performance data and runs 23 audit sections across technical, content, schema and performance, scoring each and returning prioritized fixes."},
+            {"t": "Best for", "d": "SEO and web teams optimizing individual pages."},
+        ],
+        "tags": ["PageSpeed", "Crawl", "GSC"],
+    },
+    {
+        "slug": "hub-spoke-architect", "name": "Hub & Spoke Architect",
+        "tagline": "Internal-Linking Strategy",
+        "ac": "#8b5cf6", "ac2": "#a78bfa", "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"3\"/><circle cx=\"5\" cy=\"5\" r=\"2\"/><circle cx=\"19\" cy=\"5\" r=\"2\"/><circle cx=\"5\" cy=\"19\" r=\"2\"/><circle cx=\"19\" cy=\"19\" r=\"2\"/><path d=\"M10 10 6.5 6.5M14 10 17.5 6.5M10 14 6.5 17.5M14 14 17.5 17.5\"/>"),
+        "pill1": "Internal-Linking Strategy", "pill2": "AI clusters \u00b7 linking map",
+        "lead": ("Turn a URL list or an existing spreadsheet into an AI-categorized hub-and-spoke structure, then generate targeted internal-linking recommendations across every cluster."),
+        "trips": [
+            {"t": "What it does", "d": "Build topical authority and route link equity where it counts \u2014 a clear, approved internal-linking plan instead of ad-hoc guesswork."},
+            {"t": "How it works", "d": "Upload a hub/spoke sheet or paste a URL list; AI auto-categorizes pages into clusters, you review and approve the structure, and it generates anchor-text and internal-link recommendations."},
+            {"t": "Best for", "d": "SEO teams running content clusters and topical-authority plays."},
+        ],
+        "tags": ["Sheets", "Crawl", "CMS"],
+    },
+    {
+        "slug": "robots-monitor", "name": "Robots & Index Monitor",
+        "tagline": "Index-Health Monitoring",
+        "ac": "#f59e0b", "ac2": "#fbbf24", "icon": _asvg("<path d=\"M7 3h8l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z\"/><path d=\"M14 3v5h5\"/><path d=\"M9.5 13.5l4 4M13.5 13.5l-4 4\"/>"),
+        "pill1": "Index-Health Monitoring", "pill2": "Daily noindex alerts",
+        "lead": ("Automatically crawl sitemaps, sample pages by type, and verify noindex signals across production and staging \u2014 with instant Slack alerts the moment a live page goes dark."),
+        "trips": [
+            {"t": "What it does", "d": "Catch accidental noindex and deindexing before it tanks traffic \u2014 automated daily checks instead of manual spot-checks."},
+            {"t": "How it works", "d": "It crawls your sitemaps, samples pages by template, verifies index/noindex on production and staging domains, and fires a Slack alert if a production page is suddenly noindexed."},
+            {"t": "Best for", "d": "Technical SEO and web teams guarding against accidental deindexing."},
+        ],
+        "tags": ["Sitemaps", "Slack", "Crawl"],
     },
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
@@ -1547,9 +1768,13 @@ def _fetch_agent_run_stats() -> dict:
                            "total": u["total"], "last_run": u["last_run"], "agents": agents_list})
     users_out.sort(key=lambda x: x["last_run"] or "", reverse=True)
 
+    # Only agents connected to a live tool can ever have a run logged — agents
+    # awaiting "Request Access" would just pad this list with permanent zeroes,
+    # so they're excluded here (unlike agent_meta above, which needs every
+    # agent for slug lookups).
     agents_out = [{"slug": a["slug"], "name": a["name"], "runs": agent_totals.get(a["slug"], 0),
                    "cap": AGENT_RUN_CAP, "ac": a["ac"], "ac2": a["ac2"], "icon": a["icon"]}
-                  for a in APP_AGENTS]
+                  for a in APP_AGENTS if a.get("seo_slug")]
     users_at_cap = sum(1 for u in users_out if any(a["at_cap"] for a in u["agents"]))
 
     return {
@@ -1561,6 +1786,103 @@ def _fetch_agent_run_stats() -> dict:
         "agents": agents_out,
         "users": users_out,
     }
+
+# ── Agent access requests ─────────────────────────────────────────────────────
+# For agents shown on /app that aren't connected to a live tool yet (no
+# "seo_slug" — see APP_AGENTS above), the sidebar CTA is "Request Access"
+# instead of "Use this agent". A request is logged once per (email, agent)
+# — repeat clicks / page reloads don't re-log or re-notify — and surfaces in
+# the "Access Requests" admin dashboard plus a Slack ping, same channel as
+# the platform-wide "Request access" form.
+_AAR_TAB = "Agent Access Requests"
+_AAR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name"]
+
+def _log_agent_access_request(user: dict, agent: dict) -> bool:
+    """Append one access-request row to the 'Agent Access Requests' tab. Returns
+    True on success, False (silently) on any failure."""
+    if not LOGIN_LOG_SHEET_ID:
+        return False
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return False
+        now = datetime.now(IST)
+        row = [now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
+               user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", "")]
+        tab = _AAR_TAB
+        try:
+            existing = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
+            if not existing.get("values"):
+                raise Exception("empty")
+        except Exception:
+            try:
+                svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    body={"requests": [{"addSheet": {"properties": {"title": tab}}}]}).execute()
+            except Exception:
+                pass
+            svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AAR_HEADER]}).execute()
+        svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
+            valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+        return True
+    except Exception as e:
+        log.warning("agent access request log failed: %s", e)
+        return False
+
+def _agent_access_requests_raw(limit=2000):
+    """Read every row from 'Agent Access Requests', newest first. Fails to []."""
+    if not LOGIN_LOG_SHEET_ID:
+        return []
+    try:
+        svc = _va_sheets_service()
+        if not svc:
+            return []
+        rows = svc.spreadsheets().values().get(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AAR_TAB).execute().get("values", [])
+        rows = rows[1:] if len(rows) > 1 else []
+        AH = {n: i for i, n in enumerate(_AAR_HEADER)}
+        def ac(r, n, d=""):
+            i = AH.get(n, -1); return r[i] if 0 <= i < len(r) else d
+        out = [{"ts": ac(r, "Timestamp (IST)"), "email": ac(r, "Email"), "name": ac(r, "Name"),
+                "slug": ac(r, "Agent Slug"), "agent_name": ac(r, "Agent Name")} for r in rows]
+        out.reverse()
+        return out[:limit]
+    except Exception as e:
+        log.warning("agent access requests read failed: %s", e)
+        return []
+
+def _agent_access_requested_slugs(email: str) -> set:
+    """Slugs `email` has already requested access to — used both to dedupe
+    repeat submissions and to render the 'Request sent' state on reload."""
+    if not email:
+        return set()
+    e = email.lower()
+    return {r["slug"] for r in _agent_access_requests_raw() if (r["email"] or "").lower() == e and r["slug"]}
+
+def _agent_access_request_to_slack(user: dict, agent: dict) -> bool:
+    """Post a new agent access request to the same #intelligence-platform-request-access
+    channel used for the platform-wide 'Request access' form."""
+    text = (":raised_hand: *New agent access request*\n"
+            f"*User:* {user.get('name','') or '—'} <{user.get('email','')}>\n"
+            f"*Agent:* {agent.get('name','')}")
+    if SLACK_BOT_TOKEN:
+        try:
+            r = requests.post("https://slack.com/api/chat.postMessage",
+                              headers={"Authorization": "Bearer " + SLACK_BOT_TOKEN},
+                              json={"channel": SLACK_CHANNEL_ID, "text": text}, timeout=8)
+            if r.ok and r.json().get("ok"):
+                return True
+            log.warning("Slack chat.postMessage (agent access) failed: %s", r.text[:200])
+        except Exception as e:
+            log.warning("Slack chat.postMessage (agent access) error: %s", e)
+    if SLACK_WEBHOOK_URL and SLACK_WEBHOOK_URL != "YOUR_SLACK_WEBHOOK_URL":
+        try:
+            requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=8)
+            return True
+        except Exception as e:
+            log.warning("Agent access request Slack webhook post failed: %s", e)
+    return False
 
 def _app_embed_url(agent):
     """Build the live SERP tool URL for an agent (same as the internal /p2/seo embed)."""
@@ -1591,9 +1913,12 @@ def _inject_app_agents():
 def app_home():
     """Signed-in home for ALL Google users (Position2 and external alike)."""
     user = _get_user()
-    run_counts = _agent_run_counts((user or {}).get("email", ""))
+    email = (user or {}).get("email", "")
+    run_counts = _agent_run_counts(email)
+    requested = _agent_access_requested_slugs(email)
     return render_template("app.html", user=user, agents=APP_AGENTS,
-                           run_counts=run_counts, run_cap=AGENT_RUN_CAP)
+                           run_counts=run_counts, run_cap=AGENT_RUN_CAP,
+                           requested_agents=requested)
 
 @app.route("/app/<slug>")
 @login_required
@@ -1605,9 +1930,32 @@ def app_detail(slug):
     if not agent:
         return redirect("/app")
     user = _get_user()
-    runs_used = _agent_run_counts((user or {}).get("email", "")).get(slug, 0)
+    email = (user or {}).get("email", "")
+    runs_used = _agent_run_counts(email).get(slug, 0)
+    already_requested = slug in _agent_access_requested_slugs(email)
     return render_template("app_detail.html", user=user, agent=agent,
-                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP)
+                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP,
+                           already_requested=already_requested)
+
+@app.route("/app/<slug>/request-access", methods=["POST"])
+@login_required
+def app_request_access(slug):
+    """Logs a request for access to an agent that isn't connected to a live tool
+    yet, notifies Slack, and shows up in the 'Access Requests' admin dashboard.
+    Idempotent per (email, agent) — a second click just confirms, it doesn't
+    re-log or re-notify."""
+    agent = APP_AGENTS_BY_SLUG.get(slug)
+    if not agent:
+        return jsonify({"ok": False, "error": "unknown agent"}), 404
+    if agent.get("seo_slug"):
+        return jsonify({"ok": False, "error": "agent is already connected"}), 400
+    user = _get_user()
+    email = (user or {}).get("email", "")
+    if slug in _agent_access_requested_slugs(email):
+        return jsonify({"ok": True, "already_requested": True})
+    _log_agent_access_request(user, agent)
+    _agent_access_request_to_slack(user, agent)
+    return jsonify({"ok": True, "already_requested": False})
 
 @app.route("/app/<slug>/use")
 @login_required
@@ -2872,10 +3220,13 @@ def admin_usage_data():
 @app.route("/p2/admin/access-requests")
 @admin_required
 def admin_requests():
-    """Admin view of everyone who submitted the Request Access form."""
+    """Admin view of everyone who submitted the Request Access form, plus
+    everyone who requested access to a not-yet-connected agent from /app."""
     reqs = _read_access_requests()
+    agent_reqs = _agent_access_requests_raw()
     return render_template("admin_requests.html", user=_get_user(),
-                           requests=reqs, count=len(reqs))
+                           requests=reqs, count=len(reqs),
+                           agent_requests=agent_reqs, agent_count=len(agent_reqs))
 
 @app.route("/p2/admin/public-agent-usage")
 @admin_required

@@ -96,6 +96,10 @@
     .empty b{display:block;color:#fff;font-family:var(--display);font-size:19px;font-weight:700;margin-bottom:8px}
     .empty p{color:var(--dim);font-size:14px;max-width:460px;margin:0 auto;line-height:1.6}
     .resn{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim3);margin:14px 4px 0}
+    .sect-head{display:flex;align-items:baseline;gap:12px;margin:54px 0 18px}
+    .sect-head h2{font-family:var(--display);font-weight:800;font-size:clamp(22px,3vw,28px);letter-spacing:-.02em;color:#fff}
+    .sect-head .cnt{font-family:var(--mono);font-size:12px;color:var(--dim3);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+    .agic{width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#e879f9,#a855f7);color:#fff;font-weight:700;font-size:13px}
     @media (max-width:760px){
       thead{display:none}
       tbody td{display:flex;justify-content:space-between;gap:18px;padding:9px 18px;border:0;text-align:right}
@@ -185,24 +189,64 @@
       <p>Submissions to the Request-access form will appear here. If you expected entries, confirm the service account can read the &ldquo;Demo Requests&rdquo; sheet tab.</p>
     </div></div>
     {% endif %}
+
+    <div class="sect-head"><h2>Agent access <span class="ital" style="font-family:var(--serif);font-style:italic;font-weight:400">requests.</span><span class="cnt">{{ agent_count }}</span></h2></div>
+    <div class="sub" style="margin-bottom:22px">Signed-in users asking for access to agents on <a href="/app" style="color:#a5b4fc">/app</a> that aren&rsquo;t connected to a live tool yet &mdash; newest first.</div>
+
+    {% if agent_requests %}
+    <div class="toolbar">
+      <div class="search"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="aq" type="text" placeholder="Search name, email, agent…"></div>
+      <button class="exp" type="button" id="exportAgentCsv"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Export CSV</button>
+    </div>
+    <div class="card">
+      <div class="scroller">
+      <table id="atbl">
+        <thead><tr><th>When</th><th>Name</th><th>Work email</th><th>Agent requested</th></tr></thead>
+        <tbody>
+          {% for r in agent_requests %}
+          <tr data-s="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.agent_name) | lower }}">
+            <td class="ts" data-l="When">{{ r.ts }}</td>
+            <td data-l="Name"><span class="nm">{{ r.name or '—' }}</span></td>
+            <td class="em" data-l="Email">{% if r.email %}<a href="mailto:{{ r.email }}">{{ r.email }}</a>{% else %}—{% endif %}</td>
+            <td data-l="Agent"><span class="pill agent">{{ r.agent_name or r.slug }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="resn" id="aresn"></div>
+    {% else %}
+    <div class="card"><div class="empty">
+      <div class="eorb" style="background:linear-gradient(145deg,#e879f9,#a855f7);box-shadow:0 16px 40px -16px #a855f7"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><path d="M9 10l2 2 4-4"/></svg></div>
+      <b>No agent access requests yet</b>
+      <p>When a signed-in user hits &ldquo;Request Access&rdquo; on an agent that isn&rsquo;t connected yet, it will appear here (and post to Slack).</p>
+    </div></div>
+    {% endif %}
   </div>
 
   <script>
   (function(){
-    var q=document.getElementById('q'), tbl=document.getElementById('tbl'), resn=document.getElementById('resn');
-    var rows=tbl?Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')):[];
-    function note(n){ if(resn) resn.textContent=n+' of '+rows.length+(rows.length===1?' request':' requests'); }
-    note(rows.length);
-    if(q && tbl){ q.addEventListener('input',function(){ var v=q.value.toLowerCase().trim(), shown=0;
-      rows.forEach(function(tr){ var ok=!v||(tr.getAttribute('data-s')||'').indexOf(v)>=0; tr.style.display=ok?'':'none'; if(ok)shown++; }); note(shown); }); }
-    var ex=document.getElementById('exportCsv');
-    if(ex && tbl){ ex.addEventListener('click',function(e){ e.preventDefault();
-      var out=[['When','Name','Email','Company','Interest','Message']];
-      rows.forEach(function(tr){ if(tr.style.display==='none')return; var c=tr.querySelectorAll('td');
-        out.push([c[0].innerText.trim(),c[1].innerText.trim(),c[2].innerText.trim(),c[3].innerText.trim(),c[4].innerText.trim(),c[5].innerText.trim()]); });
-      var csv=out.map(function(r){ return r.map(function(x){ return '"'+String(x).replace(/"/g,'""').replace(/\n/g,' ')+'"'; }).join(','); }).join('\n');
-      var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='access-requests.csv'; a.click();
-    }); }
+    function wireTable(opts){
+      var q=document.getElementById(opts.q), tbl=document.getElementById(opts.tbl), resn=document.getElementById(opts.resn);
+      var rows=tbl?Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')):[];
+      function note(n){ if(resn) resn.textContent=n+' of '+rows.length+(rows.length===1?' request':' requests'); }
+      note(rows.length);
+      if(q && tbl){ q.addEventListener('input',function(){ var v=q.value.toLowerCase().trim(), shown=0;
+        rows.forEach(function(tr){ var ok=!v||(tr.getAttribute('data-s')||'').indexOf(v)>=0; tr.style.display=ok?'':'none'; if(ok)shown++; }); note(shown); }); }
+      var ex=document.getElementById(opts.ex);
+      if(ex && tbl){ ex.addEventListener('click',function(e){ e.preventDefault();
+        var out=[opts.cols];
+        rows.forEach(function(tr){ if(tr.style.display==='none')return; var c=tr.querySelectorAll('td');
+          out.push(Array.prototype.slice.call(c).map(function(td){ return td.innerText.trim(); })); });
+        var csv=out.map(function(r){ return r.map(function(x){ return '"'+String(x).replace(/"/g,'""').replace(/\n/g,' ')+'"'; }).join(','); }).join('\n');
+        var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=opts.file; a.click();
+      }); }
+    }
+    wireTable({q:'q', tbl:'tbl', resn:'resn', ex:'exportCsv', file:'access-requests.csv',
+      cols:['When','Name','Email','Company','Interest','Message']});
+    wireTable({q:'aq', tbl:'atbl', resn:'aresn', ex:'exportAgentCsv', file:'agent-access-requests.csv',
+      cols:['When','Name','Email','Agent requested']});
   })();
   </script>
 <script>
