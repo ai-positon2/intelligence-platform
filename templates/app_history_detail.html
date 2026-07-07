@@ -56,12 +56,12 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="dwrap">
+<div class="dwrap" style="--ac:{{ agent.ac or '#8b5cf6' }};--ac2:{{ agent.ac2 or '#22d3ee' }}">
   <nav class="crumb">
     <a href="/app">Home</a><span class="sep">&rsaquo;</span><a href="/app/history">History</a><span class="sep">&rsaquo;</span><span>{{ run.title or run.agent_name }}</span>
   </nav>
 
-  <div class="dhead" style="--ac:{{ agent.ac or '#8b5cf6' }};--ac2:{{ agent.ac2 or '#22d3ee' }}">
+  <div class="dhead">
     <div class="dicon">{{ (agent.icon or '')|safe }}</div>
     <div>
       <h1>{{ run.title or run.agent_name }}</h1>
