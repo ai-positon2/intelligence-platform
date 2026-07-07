@@ -1396,13 +1396,13 @@ APP_AGENTS = [
         "tagline": "Multi-LLM + SERP article enhancement",
         "seo_slug": "article-enhancement", "ac": "#34d399", "ac2": "#22d3ee", "icon": _SVG_ALCHEMY,
         "pill1": "Content enhancement", "pill2": "multi-LLM · SERP · E-E-A-T",
-        "lead": ("Feed it an existing article and it levels the piece up. Content Enhancer compares "
-            "your page against the current top competitors and returns concrete recommendations on "
-            "structure, depth and authority, drawing on multiple language models."),
+        "lead": ("Feed it an existing article and it levels the piece up. Content Enhancer analyzes "
+            "your page and returns concrete recommendations on structure, depth and authority, "
+            "drawing on multiple language models to spot gaps a single model would miss."),
         "trips": [
-            {"t": "What it does", "d": "Upgrades an already-published article with specific, competitor-aware improvements."},
-            {"t": "How it works", "d": "Runs multi-LLM analysis alongside a live SERP competitor comparison and returns concrete edits and gaps to close."},
-            {"t": "Best for", "d": "Refreshing existing content that has stalled or is being out-ranked."},
+            {"t": "What it does", "d": "Upgrades an already-published article with specific, LLM-concepts-aware improvements you can act on right away."},
+            {"t": "How it works", "d": "Runs multi-LLM analysis and returns concrete edits and gaps to close, weighing each model's take to surface the fixes that matter most."},
+            {"t": "Best for", "d": "Refreshing existing content that has stalled or is being out-ranked — before it falls further behind."},
         ],
         "tags": ["Enhance", "LLM", "SERP", "E-E-A-T"],
     },
