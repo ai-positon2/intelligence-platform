@@ -119,7 +119,7 @@
         </div>
         <div class="cmeta" data-lastrun="{{ a.slug }}">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.2 2"/></svg>
-          <span class="lastrun-txt">Not opened yet</span>
+          <span class="lastrun-txt">Not run yet</span>
         </div>
         <div class="more">{% if at_cap %}Run limit reached{% else %}Open agent &rarr;{% endif %}</div>
       </a>
@@ -129,8 +129,8 @@
 
   <div class="sect">
     <div class="eyebrow">Activity</div>
-    <h2>Recently opened</h2>
-    <p class="sub">Agents you've opened in this browser, most recent first.</p>
+    <h2>Recently run</h2>
+    <p class="sub">Agents you've actually run in this browser, most recent first.</p>
     <div class="activity-box" id="activityBox" style="margin-top:22px"></div>
   </div>
 
@@ -147,7 +147,7 @@
     if(!list.length){
       box.innerHTML = '<div class="act-empty">'
         + '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
-        + '<span>No agents opened yet. Open one above to see it here.</span></div>';
+        + '<span>No agents run yet. Run one above to see it here.</span></div>';
       return;
     }
     function fmt(ts){
@@ -167,7 +167,7 @@
 
     list.forEach(function(item){
       var m = metas[item.slug];
-      if(m) m.querySelector('.lastrun-txt').textContent = 'Opened ' + fmt(item.ts);
+      if(m) m.querySelector('.lastrun-txt').textContent = 'Run ' + fmt(item.ts);
     });
   })();
 </script>
