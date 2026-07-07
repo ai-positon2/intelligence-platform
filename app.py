@@ -1868,19 +1868,50 @@ def _agent_access_requested_slugs(email: str) -> set:
     e = email.lower()
     return {r["slug"] for r in _agent_access_requests_raw() if (r["email"] or "").lower() == e and r["slug"]}
 
+def _slack_mrkdwn_escape(s: str) -> str:
+    """Escape &, <, > for Slack mrkdwn text — untrusted input (a user's typed
+    reason) could otherwise be misread as Slack link syntax."""
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def _agent_access_request_slack_blocks(user: dict, agent: dict, message: str = "") -> tuple:
+    """Build the Block Kit payload for a 'New agent access request' Slack post.
+    Returns (fallback_text, blocks) — fallback_text is what notification
+    previews / screen readers show; blocks is the rich structured layout."""
+    name = user.get("name", "") or "Unknown"
+    email = user.get("email", "")
+    agent_name = agent.get("name", "")
+    when = datetime.now(IST).strftime("%b %d, %Y · %I:%M %p IST")
+    fallback = f"New agent access request: {name} <{email}> wants access to {agent_name}"
+    requester = _slack_mrkdwn_escape(name)
+    if email:
+        requester += f"\n<mailto:{email}|{email}>"
+    blocks = [
+        {"type": "header", "text": {"type": "plain_text", "text": "🙋 New agent access request", "emoji": True}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": f"*Requested by*\n{requester}"},
+            {"type": "mrkdwn", "text": f"*Agent*\n{_slack_mrkdwn_escape(agent_name)}"},
+        ]},
+    ]
+    if message:
+        quoted = "> " + _slack_mrkdwn_escape(message).replace("\n", "\n> ")
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason given*\n{quoted}"}})
+    else:
+        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "_No reason given_"}]})
+    blocks.append({"type": "divider"})
+    blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
+        "text": f":clock3: {when}  ·  <https://intelligence.position2.com/p2/admin/access-requests|View all access requests →>"}]})
+    return fallback, blocks
+
 def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -> bool:
     """Post a new agent access request to the same #intelligence-platform-request-access
-    channel used for the platform-wide 'Request access' form."""
-    text = (":raised_hand: *New agent access request*\n"
-            f"*User:* {user.get('name','') or '—'} <{user.get('email','')}>\n"
-            f"*Agent:* {agent.get('name','')}")
-    if message:
-        text += f"\n*Reason:* {message}"
+    channel used for the platform-wide 'Request access' form, as a structured
+    Block Kit message (requester, agent, reason, timestamp, admin link)."""
+    fallback, blocks = _agent_access_request_slack_blocks(user, agent, message)
     if SLACK_BOT_TOKEN:
         try:
             r = requests.post("https://slack.com/api/chat.postMessage",
                               headers={"Authorization": "Bearer " + SLACK_BOT_TOKEN},
-                              json={"channel": SLACK_CHANNEL_ID, "text": text}, timeout=8)
+                              json={"channel": SLACK_CHANNEL_ID, "text": fallback, "blocks": blocks}, timeout=8)
             if r.ok and r.json().get("ok"):
                 return True
             log.warning("Slack chat.postMessage (agent access) failed: %s", r.text[:200])
@@ -1888,7 +1919,7 @@ def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -
             log.warning("Slack chat.postMessage (agent access) error: %s", e)
     if SLACK_WEBHOOK_URL and SLACK_WEBHOOK_URL != "YOUR_SLACK_WEBHOOK_URL":
         try:
-            requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=8)
+            requests.post(SLACK_WEBHOOK_URL, json={"text": fallback, "blocks": blocks}, timeout=8)
             return True
         except Exception as e:
             log.warning("Agent access request Slack webhook post failed: %s", e)
