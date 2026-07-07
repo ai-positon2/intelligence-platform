@@ -32,59 +32,60 @@
   .h-row .at span{ display:block; font-size:12.5px; color:var(--tx3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
   .h-row .ats{ flex:none; font-size:12px; color:var(--tx3); font-family:ui-monospace,monospace; text-align:right }
   .h-row .ats b{ display:block; color:var(--tx2); font-family:inherit; font-weight:500 }
-  @media (max-width:720px){ .hwrap{ padding:24px 16px 48px } }
+  .h-row .go{ flex:none; color:var(--tx3); font-size:16px }
+  .hnote{ margin:0 0 26px; font-size:12.5px; color:var(--tx3) }
+  @media (max-width:720px){ .hwrap{ padding:24px 16px 48px } .h-row .at span{ display:none } }
 </style>
 {% endblock %}
 {% block content %}
 <div class="hwrap">
   <h1>Execution History</h1>
-  <p class="sub">Every agent you actually run — not just open — is remembered right here in this browser, so you can revisit it any time. This is tracked locally, not on a server, so it won't follow you to a different device.</p>
+  <p class="sub">Every run of Keyword Finder, Content Brief Generator or Content Enhancer — with its full result, not just that it happened — saved here so you can come back and reopen it any time, on any device.</p>
+  {% if runs %}
   <div class="hsearch">
     <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
     <input type="text" id="hSearch" placeholder="Search across agent history…" autocomplete="off">
   </div>
-  <div class="hbox" id="hBox"></div>
+  <div class="hbox" id="hBox">
+    {% for r in runs %}
+    <a class="h-row" href="/app/history/{{ r.id }}" style="--ac:{{ r.ac }};--ac2:{{ r.ac2 }}" data-s="{{ (r.title ~ ' ' ~ r.agent_name) | lower }}">
+      <div class="aic">{{ r.icon|safe }}</div>
+      <div class="at"><b>{{ r.title or r.agent_name }}</b><span>{{ r.agent_name }}</span></div>
+      <div class="ats">{{ r.display_ts }}</div>
+      <span class="go">&rarr;</span>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="hnote" id="hCount"></div>
+  {% else %}
+  <div class="hbox">
+    <div class="h-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+      <span>No agent executions yet.<br><a href="/app">Run an agent</a> to build your history.</span>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}
+{% if runs %}
 <script>
   (function(){
-    var list = p2GetAgentActivity();
     var box = document.getElementById('hBox'), search = document.getElementById('hSearch');
-
-    function fmtDate(ts){
-      var d = new Date(ts);
-      return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
-    }
-    function fmtRel(ts){
-      var m = Math.round((Date.now()-ts)/60000);
-      if(m < 1) return 'just now';
-      if(m < 60) return m+'m ago';
-      var h = Math.round(m/60); if(h < 24) return h+'h ago';
-      return Math.round(h/24)+'d ago';
-    }
-    function render(filter){
-      var rows = list.filter(function(item){
-        if(!filter) return true;
-        var q = filter.toLowerCase();
-        return (item.name||'').toLowerCase().indexOf(q)!==-1 || (item.tagline||'').toLowerCase().indexOf(q)!==-1;
+    var count = document.getElementById('hCount');
+    var rows = Array.prototype.slice.call(box.querySelectorAll('.h-row'));
+    function note(n){ count.textContent = n+' of '+rows.length+(rows.length===1?' run':' runs'); }
+    note(rows.length);
+    search.addEventListener('input', function(){
+      var v = search.value.trim().toLowerCase(), shown = 0;
+      rows.forEach(function(r){
+        var ok = !v || (r.getAttribute('data-s')||'').indexOf(v) !== -1;
+        r.style.display = ok ? '' : 'none';
+        if(ok) shown++;
       });
-      if(!rows.length){
-        box.innerHTML = '<div class="h-empty">'
-          + '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
-          + (list.length ? '<span>No matches for that search.</span>' : '<span>No agent executions yet.<br><a href="/app">Run an agent</a> to build your history.</span>')
-          + '</div>';
-        return;
-      }
-      box.innerHTML = rows.map(function(item){
-        return '<a class="h-row" href="/app/'+item.slug+'" style="--ac:'+item.ac+';--ac2:'+item.ac2+'">'
-          + '<div class="aic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 12l1.8 1.8L15 10"/></svg></div>'
-          + '<div class="at"><b>'+item.name+'</b><span>'+(item.tagline||'')+'</span></div>'
-          + '<div class="ats"><b>'+fmtRel(item.ts)+'</b>'+fmtDate(item.ts)+'</div></a>';
-      }).join('');
-    }
-    render('');
-    search.addEventListener('input', function(){ render(search.value.trim()); });
+      note(shown);
+    });
   })();
 </script>
+{% endif %}
 {% endblock %}

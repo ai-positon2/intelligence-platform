@@ -118,7 +118,7 @@
        a confirmed run — not on page load — so an agent that was merely
        opened never shows up there either. */
     var EXPECTED_ORIGIN='{{ serp_origin }}', EXPECTED_TOOL='{{ agent.seo_slug }}';
-    var logged=false;
+    var logged=false, finished=false;
     function logRun(){
       if(logged) return;
       logged=true;
@@ -129,12 +129,25 @@
         p2RecordAgentVisit({slug:{{ agent.slug|tojson }}, name:{{ agent.name|tojson }}, tagline:{{ agent.tagline|tojson }}, ac:{{ agent.ac|tojson }}, ac2:{{ agent.ac2|tojson }}});
       }).catch(function(){});
     }
+    /* The tool sends its full result once the run actually finishes (a
+       separate, later message from 'agent-run-started' above) so it can be
+       saved for the History page — see seo-apps' agentRunSignal.js
+       notifyAgentRunFinished, called from each page's own completion
+       handler. At most once per page view, same guard shape as logRun. */
+    function finishRun(output){
+      if(finished) return;
+      finished=true;
+      fetch('/app/{{ agent.slug }}/use/finish-run', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({output:output})
+      }).catch(function(){});
+    }
     window.addEventListener('message', function(e){
       if(e.origin!==EXPECTED_ORIGIN) return;
       var d=e.data;
-      if(!d || d.source!=='p2-seo-tool' || d.type!=='agent-run-started') return;
-      if(d.tool!==EXPECTED_TOOL) return;
-      logRun();
+      if(!d || d.source!=='p2-seo-tool' || d.tool!==EXPECTED_TOOL) return;
+      if(d.type==='agent-run-started') logRun();
+      else if(d.type==='agent-run-finished' && d.output && typeof d.output==='object') finishRun(d.output);
     });
   })();
   {% endif %}
