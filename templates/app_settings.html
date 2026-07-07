@@ -83,7 +83,7 @@
       <h2>Your agents</h2>
     </div>
     <div class="wa-list">
-      {% for a in app_agents %}
+      {% for a in app_agents if a.seo_slug %}
       <a class="wa-row" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
         <span class="wic">{{ a.icon|safe }}</span>
         <b>{{ a.name }}</b>
