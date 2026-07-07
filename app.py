@@ -2411,13 +2411,13 @@ def _fetch_visitor_analytics() -> dict:
         "top_companies": top_companies, "identified": identified,
     }
 
-@app.route("/p2/admin/visitors")
+@app.route("/p2/admin/anonymous-traffic")
 @admin_required
 def admin_visitors():
     """Admin-only anonymous visitor analytics dashboard."""
     return render_template("admin_visitors.html", user=_get_user())
 
-@app.route("/p2/admin/visitors/data")
+@app.route("/p2/admin/anonymous-traffic/data")
 @admin_required
 def admin_visitors_data():
     """JSON aggregates for the visitor analytics dashboard."""
@@ -2659,25 +2659,48 @@ def _fetch_member_analytics() -> dict:
     recent.sort(key=lambda x: x["ts"] or "", reverse=True)
     recent = recent[:150]
 
+    # Post-login page views: what members do on /app after signing in (mirrors
+    # Internal Usage's "Top pages" + page-views table, but for the member
+    # population instead of @position2.com staff). pv_by_email already applies
+    # the right population filter (see above): every non-P2 view, plus P2 views
+    # specifically on /app.
+    post_page_counter = Counter()
+    post_page_rows = []
+    for e, rows in pv_by_email.items():
+        mem_name = (members.get(e) or {}).get("name") or "—"
+        for r in rows:
+            title = pc(r, 5) or pc(r, 6) or "—"
+            post_page_counter[title] += 1
+            post_page_rows.append({
+                "ts": pc(r, 0), "email": e, "name": mem_name,
+                "title": pc(r, 5) or "—", "url": pc(r, 6) or "", "duration": pc(r, 8) or "—",
+            })
+    post_page_rows.sort(key=lambda x: x["ts"] or "", reverse=True)
+    total_post_page_views = len(post_page_rows)
+    views_per_member = round(total_post_page_views / total_members, 1) if total_members else 0
+
     return {
         "configured": bool(svc),
         "kpis": {"members": total_members, "signins": total_signins, "new": new_members,
             "returning": returning_members, "linked": linked, "avg_pre": avg_pre,
             "avg_engaged": avg_engaged, "companies": len(company_counter),
-            "visitors": unique_visitors, "conv_rate": conv_rate},
+            "visitors": unique_visitors, "conv_rate": conv_rate,
+            "page_views": total_post_page_views, "views_per_member": views_per_member},
         "series": signup_series,
         "sources": src_counter.most_common(12), "utm": utm_counter.most_common(10),
         "devices": dev_counter.most_common(), "oses": os_counter.most_common(),
         "browsers": br_counter.most_common(8),
         "prelogin_pages": prelogin_pages_counter.most_common(15),
+        "post_pages": post_page_counter.most_common(15),
         "companies": company_counter.most_common(15),
         "funnel": {"visitors": unique_visitors, "engaged": engaged_visitors,
                    "members": external_members, "returning": external_returning},
         "members": out_members[:200], "recent": recent[:100],
+        "page_views_table": post_page_rows[:150],
     }
 
 
-@app.route("/p2/admin/members")
+@app.route("/p2/admin/public-page-analytics")
 @admin_required
 def admin_members():
     """Admin-only analytics for public Google sign-ins (members), synced with
@@ -2685,7 +2708,7 @@ def admin_members():
     return render_template("admin_members.html", user=_get_user())
 
 
-@app.route("/p2/admin/members/data")
+@app.route("/p2/admin/public-page-analytics/data")
 @admin_required
 def admin_members_data():
     return jsonify(_fetch_member_analytics())
@@ -2828,21 +2851,21 @@ def _read_access_requests(limit=300):
         return []
 
 
-@app.route("/p2/admin/usage")
+@app.route("/p2/admin/internal-usage")
 @admin_required
 def admin_usage():
-    """Shell page — renders instantly, JS fetches /admin/usage/data async."""
+    """Shell page — renders instantly, JS fetches /admin/internal-usage/data async."""
     return render_template("admin_usage.html", user=_get_user())
 
 
-@app.route("/p2/admin/usage/data")
+@app.route("/p2/admin/internal-usage/data")
 @admin_required
 def admin_usage_data():
     """JSON data endpoint called by the admin usage shell page."""
     data = _fetch_usage_data()
     return jsonify(data)
 
-@app.route("/p2/admin/requests")
+@app.route("/p2/admin/access-requests")
 @admin_required
 def admin_requests():
     """Admin view of everyone who submitted the Request Access form."""
@@ -2850,17 +2873,57 @@ def admin_requests():
     return render_template("admin_requests.html", user=_get_user(),
                            requests=reqs, count=len(reqs))
 
-@app.route("/p2/admin/agent-runs")
+@app.route("/p2/admin/public-agent-usage")
 @admin_required
 def admin_agent_runs():
     """Admin-only view of per-user, per-agent run counts against the cap."""
     return render_template("admin_agent_runs.html", user=_get_user())
 
-@app.route("/p2/admin/agent-runs/data")
+@app.route("/p2/admin/public-agent-usage/data")
 @admin_required
 def admin_agent_runs_data():
     """JSON data endpoint called by the admin agent-usage shell page."""
     return jsonify(_fetch_agent_run_stats())
+
+# ── Legacy admin URLs (pre-rename) ───────────────────────────────────────────
+# These pages' URLs originally didn't match their display names (e.g. "Public
+# Page Analytics" lived at /p2/admin/members). Renamed the routes above to
+# match; these 301s keep any bookmarked/shared old links working.
+@app.route("/p2/admin/usage")
+def _legacy_admin_usage():
+    return redirect("/p2/admin/internal-usage", code=301)
+
+@app.route("/p2/admin/usage/data")
+def _legacy_admin_usage_data():
+    return redirect("/p2/admin/internal-usage/data", code=301)
+
+@app.route("/p2/admin/visitors")
+def _legacy_admin_visitors():
+    return redirect("/p2/admin/anonymous-traffic", code=301)
+
+@app.route("/p2/admin/visitors/data")
+def _legacy_admin_visitors_data():
+    return redirect("/p2/admin/anonymous-traffic/data", code=301)
+
+@app.route("/p2/admin/members")
+def _legacy_admin_members():
+    return redirect("/p2/admin/public-page-analytics", code=301)
+
+@app.route("/p2/admin/members/data")
+def _legacy_admin_members_data():
+    return redirect("/p2/admin/public-page-analytics/data", code=301)
+
+@app.route("/p2/admin/requests")
+def _legacy_admin_requests():
+    return redirect("/p2/admin/access-requests", code=301)
+
+@app.route("/p2/admin/agent-runs")
+def _legacy_admin_agent_runs():
+    return redirect("/p2/admin/public-agent-usage", code=301)
+
+@app.route("/p2/admin/agent-runs/data")
+def _legacy_admin_agent_runs_data():
+    return redirect("/p2/admin/public-agent-usage/data", code=301)
 
 @app.route("/p2/admin/email-test")
 @admin_required

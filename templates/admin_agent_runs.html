@@ -103,7 +103,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="topbar">
   <div class="tl">
     <a href="/p2/hub" class="brand"><div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div><span class="brand-name">Intelligence</span></a>
-    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Agent Usage</span></div>
+    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Agent Usage</span></div>
   </div>
   <div class="tr">
     <button class="btn" id="refreshBtn" onclick="load(true)">↻ Refresh</button>
@@ -116,11 +116,11 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <div class="user-dropdown" id="userDropdown">
         <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
         <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
-          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
-          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
-          <a href="/p2/admin/agent-runs" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
-          <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+          <a href="/p2/admin/internal-usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
+          <a href="/p2/admin/anonymous-traffic" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
+          <a href="/p2/admin/public-page-analytics" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
+          <a href="/p2/admin/public-agent-usage" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
+          <a href="/p2/admin/access-requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
           <div class="dd-divider"></div>
           <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
         </div>
@@ -242,7 +242,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer(
 
 function load(force){
   var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
-  fetch('/p2/admin/agent-runs/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+  fetch('/p2/admin/public-agent-usage/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(btn)btn.textContent='↻ Refresh';
     LAST_DATA=d;
     var note=document.getElementById('emptyNote');
