@@ -160,7 +160,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="topbar">
   <div class="tl">
     <a href="/p2/hub" class="brand"><div class="brand-icon" style="background:var(--logo-bg,#151b2e);box-shadow:none;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:0"><img src="/static/logo-mark.svg?v=3" alt="Intelligence" style="display:block;width:100%;height:100%;object-fit:contain"></div><span class="brand-name">Intelligence</span></a>
-    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Page Analytics</span></div>
+    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Public Page Analytics</span></div>
   </div>
   <div class="tr">
     <button class="btn" id="refreshBtn" onclick="refreshAll()">↻ Refresh</button>
@@ -173,11 +173,11 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <div class="user-dropdown" id="userDropdown">
         <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
         <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><div class="dd-divider"></div>
-          <a href="/p2/admin/usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
-          <a href="/p2/admin/visitors" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
-          <a href="/p2/admin/members" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
-          <a href="/p2/admin/agent-runs" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
-          <a href="/p2/admin/requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
+          <a href="/p2/admin/internal-usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
+          <a href="/p2/admin/anonymous-traffic" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
+          <a href="/p2/admin/public-page-analytics" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
+          <a href="/p2/admin/public-agent-usage" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
+          <a href="/p2/admin/access-requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
           <div class="dd-divider"></div>
           <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
         </div>
@@ -230,11 +230,21 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <tbody></tbody></table></div></div>
   </div>
 
+  <div class="sect"><h2>Top pages viewed <span class="muted" style="font-weight:400;font-size:12px">· post-login, on /app</span></h2>
+    <div class="card"><div class="bars" id="postPages"></div></div>
+  </div>
+
+  <div class="sect"><h2>Recent page views <span class="muted" style="font-weight:400;font-size:12px">· post-login activity on /app</span></h2>
+    <div class="card" style="padding:6px"><div class="tbl-wrap" style="max-height:420px"><table id="pageViews">
+      <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Page</th><th>URL</th><th>Time on page</th></tr></thead>
+      <tbody></tbody></table></div></div>
+  </div>
+
   <div class="sect"><h2>Public Agent usage <span class="muted" style="font-weight:400;font-size:12px">· the same members, running the 3 /app agents</span></h2>
     <div class="card">
       <div class="au-intro">
         <p>Every run of a public <b>/app</b> agent by the members tracked above, against the <b>10-run cap</b> enforced per agent, per account.</p>
-        <a class="au-link" href="/p2/admin/agent-runs">Full Public Agent Usage dashboard ↗</a>
+        <a class="au-link" href="/p2/admin/public-agent-usage">Full Public Agent Usage dashboard ↗</a>
       </div>
       <div id="auEmpty" class="empty" style="display:none"></div>
       <div class="au-kpirow" id="auKpis"></div>
@@ -365,6 +375,18 @@ var KPI_INFO={
       return '<div class="kstats"><div class="kstat"><b>'+(k.companies||0)+'</b><span>Distinct companies</span></div></div>'+
         '<div class="ksect"><h4>All companies</h4>'+miniBars(d.companies)+'</div>';
     }
+  },
+  page_views:{
+    title:'Page views',
+    desc:'Every page a member viewed after signing in, on /app (plus @position2.com staff specifically browsing /app — their internal /p2 usage is tracked separately, in Internal Usage).',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats">'+
+          '<div class="kstat"><b>'+(k.page_views||0)+'</b><span>Total page views</span></div>'+
+          '<div class="kstat"><b>'+(k.views_per_member||0)+'</b><span>Avg per member</span></div>'+
+        '</div>'+
+        '<div class="ksect"><h4>Top pages</h4>'+miniBars(d.post_pages)+'</div>';
+    }
   }
 };
 function openKpiDrawer(key){
@@ -404,7 +426,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer(
 
 function load(force){
   var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
-  fetch('/p2/admin/members/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+  fetch('/p2/admin/public-page-analytics/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(btn)btn.textContent='↻ Refresh';
     LAST_DATA=d;
     var k=d.kpis||{};
@@ -418,7 +440,8 @@ function load(force){
       kcard('linked',k.linked||0,'Linked to pre-login',(k.avg_pre||0)+' avg pages before joining')+
       kcard('avg_engaged',k.avg_engaged||'—','Avg engaged pre-login')+
       kcard('conv_rate',(k.conv_rate||0)+'%','Visitor → member','of '+(k.visitors||0)+' visitors')+
-      kcard('companies',k.companies||0,'Companies');
+      kcard('companies',k.companies||0,'Companies')+
+      kcard('page_views',k.page_views||0,'Page views',(k.views_per_member||0)+' avg per member');
     // funnel
     var f=d.funnel||{};
     var vis=f.visitors||0;
@@ -438,7 +461,7 @@ function load(force){
     sx.innerHTML=s.length?('<span>'+esc(s[0][0])+'</span><span>'+esc(s[s.length-1][0])+'</span>'):'';
     bars('sources',d.sources);bars('prePages',d.prelogin_pages);
     bars('devices',d.devices);bars('oses',d.oses);bars('browsers',d.browsers);
-    bars('utm',d.utm);bars('companies',d.companies);
+    bars('utm',d.utm);bars('companies',d.companies);bars('postPages',d.post_pages);
     // members table
     MEMBERS=d.members||[];
     var tb=document.querySelector('#members tbody');
@@ -463,11 +486,18 @@ function load(force){
         '<td class="muted">'+esc(x.email)+'</td><td class="muted">'+esc(x.vid)+'</td>'+
         '<td>'+esc(x.device)+'</td><td>'+esc(x.ref)+'</td></tr>';
     }).join(''):'<tr><td colspan="6" class="empty">No sign-ins yet</td></tr>';
+    // page views
+    var pvb=document.querySelector('#pageViews tbody');var pvRows=d.page_views_table||[];
+    pvb.innerHTML=pvRows.length?pvRows.map(function(x){
+      return '<tr><td class="muted">'+esc(x.ts)+'</td><td>'+esc(x.name||'—')+'</td>'+
+        '<td class="muted">'+esc(x.email)+'</td><td>'+esc(x.title||'—')+'</td>'+
+        '<td class="muted" title="'+esc(x.url)+'">'+esc(x.url)+'</td><td class="muted">'+esc(x.duration)+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">No page views yet</td></tr>';
   }).catch(function(){if(btn)btn.textContent='↻ Refresh';
     var n=document.getElementById('emptyNote');n.style.display='block';n.textContent='Failed to load member analytics.';});
 }
 function loadAgentUsage(){
-  fetch('/p2/admin/agent-runs/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+  fetch('/p2/admin/public-agent-usage/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     var empty=document.getElementById('auEmpty');
     if(!d.configured){empty.style.display='block';empty.textContent='⚠ Sheets not configured for agent usage tracking.';}
     else if(!d.total_runs){empty.style.display='block';empty.textContent='No agent runs yet. When a member opens a live agent under /app, it appears here.';}
