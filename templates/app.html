@@ -61,6 +61,18 @@
   .card .more{ margin-top:auto; padding-top:16px; font-size:13px; font-weight:600;
     color:color-mix(in srgb, var(--ac) 72%, #fff) }
 
+  .card.locked{ opacity:.88 }
+  .card.locked:hover{ opacity:1 }
+  .card.locked .cicon{ filter:saturate(.75) }
+  .card .lockpill{ display:inline-flex; align-items:center; gap:7px; margin-top:16px;
+    padding:6px 12px; border-radius:999px; font-size:11.5px; font-weight:600; color:var(--tx3);
+    border:1px dashed var(--line); background:rgba(255,255,255,.02); width:fit-content }
+  .card .lockpill svg{ width:12px; height:12px; stroke:currentColor; flex:none }
+  .card.requested .lockpill{ color:color-mix(in srgb, var(--ac) 78%, #fff);
+    border:1px solid color-mix(in srgb, var(--ac) 40%, transparent); border-style:solid;
+    background:color-mix(in srgb, var(--ac) 10%, transparent) }
+  .card.requested .more{ color:color-mix(in srgb, var(--ac) 78%, #fff) }
+
   .activity-box{
     border-radius:18px; border:1px solid var(--line); background:rgba(12,15,30,.5);
     padding:28px; min-height:120px;
@@ -100,7 +112,7 @@
     <h2>Launch an agent</h2>
     <p class="sub">Each one is a focused tool you can run right here.</p>
     <div class="cards" style="margin-top:22px">
-      {% for a in agents %}
+      {% for a in agents if a.seo_slug %}
       <a class="card" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
         <div class="ctop">
           <div class="cicon">{{ a.icon|safe }}</div>
@@ -133,6 +145,30 @@
     <p class="sub">Agents you've actually run in this browser, most recent first.</p>
     <div class="activity-box" id="activityBox" style="margin-top:22px"></div>
   </div>
+
+  {% set locked_agents = agents | rejectattr('seo_slug') | list %}
+  {% if locked_agents %}
+  <div class="sect">
+    <div class="eyebrow">Coming soon</div>
+    <h2>More agents</h2>
+    <p class="sub">Not connected yet &mdash; request access and we&rsquo;ll notify you the moment one goes live.</p>
+    <div class="cards cards-locked" style="margin-top:22px">
+      {% for a in locked_agents %}
+      {% set req = a.slug in requested_agents %}
+      <a class="card locked{{ ' requested' if req }}" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
+        <div class="ctop">
+          <div class="cicon">{{ a.icon|safe }}</div>
+          <span class="cext">&#8599;</span>
+        </div>
+        <h3>{{ a.name }}</h3>
+        <p>{{ a.tagline }}</p>
+        <div class="lockpill">{% if req %}<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Access requested{% else %}Not connected yet{% endif %}</div>
+        <div class="more">{% if req %}Request sent{% else %}Request access &rarr;{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}
