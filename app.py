@@ -1795,9 +1795,9 @@ def _fetch_agent_run_stats() -> dict:
 # the "Access Requests" admin dashboard plus a Slack ping, same channel as
 # the platform-wide "Request access" form.
 _AAR_TAB = "Agent Access Requests"
-_AAR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name"]
+_AAR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name", "Message"]
 
-def _log_agent_access_request(user: dict, agent: dict) -> bool:
+def _log_agent_access_request(user: dict, agent: dict, message: str = "") -> bool:
     """Append one access-request row to the 'Agent Access Requests' tab. Returns
     True on success, False (silently) on any failure."""
     if not LOGIN_LOG_SHEET_ID:
@@ -1808,13 +1808,20 @@ def _log_agent_access_request(user: dict, agent: dict) -> bool:
             return False
         now = datetime.now(IST)
         row = [now.strftime("%Y-%m-%d %H:%M:%S IST"), now.strftime("%Y-%m-%d"),
-               user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", "")]
+               user.get("email", ""), user.get("name", ""), agent.get("slug", ""), agent.get("name", ""),
+               message]
         tab = _AAR_TAB
         try:
             existing = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:A1" % tab).execute()
-            if not existing.get("values"):
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1:G1" % tab).execute()
+            header_row = (existing.get("values") or [[]])[0]
+            if not header_row:
                 raise Exception("empty")
+            # Migrate a tab created before the "Message" column existed (older
+            # header row only spans A:F) so appended rows line up with a label.
+            if len(header_row) < len(_AAR_HEADER):
+                svc.spreadsheets().values().update(spreadsheetId=LOGIN_LOG_SHEET_ID,
+                    range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AAR_HEADER]}).execute()
         except Exception:
             try:
                 svc.spreadsheets().batchUpdate(spreadsheetId=LOGIN_LOG_SHEET_ID,
@@ -1839,13 +1846,14 @@ def _agent_access_requests_raw(limit=2000):
         if not svc:
             return []
         rows = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AAR_TAB).execute().get("values", [])
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:G" % _AAR_TAB).execute().get("values", [])
         rows = rows[1:] if len(rows) > 1 else []
         AH = {n: i for i, n in enumerate(_AAR_HEADER)}
         def ac(r, n, d=""):
             i = AH.get(n, -1); return r[i] if 0 <= i < len(r) else d
         out = [{"ts": ac(r, "Timestamp (IST)"), "email": ac(r, "Email"), "name": ac(r, "Name"),
-                "slug": ac(r, "Agent Slug"), "agent_name": ac(r, "Agent Name")} for r in rows]
+                "slug": ac(r, "Agent Slug"), "agent_name": ac(r, "Agent Name"),
+                "message": ac(r, "Message")} for r in rows]
         out.reverse()
         return out[:limit]
     except Exception as e:
@@ -1860,12 +1868,14 @@ def _agent_access_requested_slugs(email: str) -> set:
     e = email.lower()
     return {r["slug"] for r in _agent_access_requests_raw() if (r["email"] or "").lower() == e and r["slug"]}
 
-def _agent_access_request_to_slack(user: dict, agent: dict) -> bool:
+def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -> bool:
     """Post a new agent access request to the same #intelligence-platform-request-access
     channel used for the platform-wide 'Request access' form."""
     text = (":raised_hand: *New agent access request*\n"
             f"*User:* {user.get('name','') or '—'} <{user.get('email','')}>\n"
             f"*Agent:* {agent.get('name','')}")
+    if message:
+        text += f"\n*Reason:* {message}"
     if SLACK_BOT_TOKEN:
         try:
             r = requests.post("https://slack.com/api/chat.postMessage",
@@ -1943,7 +1953,8 @@ def app_request_access(slug):
     """Logs a request for access to an agent that isn't connected to a live tool
     yet, notifies Slack, and shows up in the 'Access Requests' admin dashboard.
     Idempotent per (email, agent) — a second click just confirms, it doesn't
-    re-log or re-notify."""
+    re-log or re-notify. Accepts an optional {"message": "..."} JSON body from
+    the request-access modal so users can say why they need the agent."""
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return jsonify({"ok": False, "error": "unknown agent"}), 404
@@ -1951,10 +1962,12 @@ def app_request_access(slug):
         return jsonify({"ok": False, "error": "agent is already connected"}), 400
     user = _get_user()
     email = (user or {}).get("email", "")
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()[:600]
     if slug in _agent_access_requested_slugs(email):
         return jsonify({"ok": True, "already_requested": True})
-    _log_agent_access_request(user, agent)
-    _agent_access_request_to_slack(user, agent)
+    _log_agent_access_request(user, agent, message)
+    _agent_access_request_to_slack(user, agent, message)
     return jsonify({"ok": True, "already_requested": False})
 
 @app.route("/app/<slug>/use")

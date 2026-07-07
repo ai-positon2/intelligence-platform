@@ -201,14 +201,15 @@
     <div class="card">
       <div class="scroller">
       <table id="atbl">
-        <thead><tr><th>When</th><th>Name</th><th>Work email</th><th>Agent requested</th></tr></thead>
+        <thead><tr><th>When</th><th>Name</th><th>Work email</th><th>Agent requested</th><th>Reason</th></tr></thead>
         <tbody>
           {% for r in agent_requests %}
-          <tr data-s="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.agent_name) | lower }}">
+          <tr data-s="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.agent_name ~ ' ' ~ r.message) | lower }}">
             <td class="ts" data-l="When">{{ r.ts }}</td>
             <td data-l="Name"><span class="nm">{{ r.name or '—' }}</span></td>
             <td class="em" data-l="Email">{% if r.email %}<a href="mailto:{{ r.email }}">{{ r.email }}</a>{% else %}—{% endif %}</td>
             <td data-l="Agent"><span class="pill agent">{{ r.agent_name or r.slug }}</span></td>
+            <td class="msg" data-l="Reason">{{ r.message or '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -246,7 +247,7 @@
     wireTable({q:'q', tbl:'tbl', resn:'resn', ex:'exportCsv', file:'access-requests.csv',
       cols:['When','Name','Email','Company','Interest','Message']});
     wireTable({q:'aq', tbl:'atbl', resn:'aresn', ex:'exportAgentCsv', file:'agent-access-requests.csv',
-      cols:['When','Name','Email','Agent requested']});
+      cols:['When','Name','Email','Agent requested','Reason']});
   })();
   </script>
 <script>
