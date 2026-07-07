@@ -105,7 +105,6 @@
     if(fr){ fr.addEventListener('load', function(){ setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 800); }); }
     setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 8000);
   })();
-  p2RecordAgentVisit({slug:"{{ agent.slug }}", name:"{{ agent.name }}", tagline:"{{ agent.tagline }}", ac:"{{ agent.ac }}", ac2:"{{ agent.ac2 }}"});
   {% if not limit_reached %}
   (function(){
     /* Opening this page must NOT count as a run, and neither should merely
@@ -114,7 +113,10 @@
        cross-origin) tells us exactly when that happens via postMessage —
        see seo-apps' client/src/lib/agentRunSignal.js, called from each
        tool's run-start handler right after its own field validation passes.
-       Logs at most once per page view. */
+       Logs at most once per page view. The client-side "recently run"
+       tracker (History / dashboard activity) is recorded here too, ONLY on
+       a confirmed run — not on page load — so an agent that was merely
+       opened never shows up there either. */
     var EXPECTED_ORIGIN='{{ serp_origin }}', EXPECTED_TOOL='{{ agent.seo_slug }}';
     var logged=false;
     function logRun(){
@@ -124,6 +126,7 @@
         if(!d || !d.logged) return;
         var badge=document.getElementById('eRunsBadge');
         if(badge) badge.textContent=d.runs_used+' / '+d.runs_cap+' used';
+        p2RecordAgentVisit({slug:{{ agent.slug|tojson }}, name:{{ agent.name|tojson }}, tagline:{{ agent.tagline|tojson }}, ac:{{ agent.ac|tojson }}, ac2:{{ agent.ac2|tojson }}});
       }).catch(function(){});
     }
     window.addEventListener('message', function(e){
