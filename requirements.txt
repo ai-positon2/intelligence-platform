@@ -19,3 +19,5 @@ google-auth>=2.29.0
 google-auth-httplib2>=0.2.0
 google-api-python-client>=2.127.0
 gspread>=6.0.0
+# Postgres (agent run-history storage)
+psycopg2-binary>=2.9.9

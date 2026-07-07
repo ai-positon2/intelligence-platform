@@ -56,6 +56,12 @@ ANON_VISITORS_SHEET_ID = "1y5_ef9Df5v8PVuGs60DzzlzE1ZJLxwvB5MQsB6ug458"
 LOGIN_LOG_SHEET_ID = os.environ.get("LOGIN_LOG_SHEET_ID", "")
 _SA_JSON = str(Path(__file__).parent / "service_account.json")
 
+# Postgres connection string (set DATABASE_URL in Railway Variables). Used only
+# for agent run-history (full run outputs) -- everything else still lives in
+# Sheets. Sheets cells cap at ~50k chars and Content Enhancer's rewritten
+# articles can exceed that on their own, so that one datastore needed to grow.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
 # ── Login logger ────────────────────────────────────────────────────────────────
 def _parse_ua(ua: str) -> tuple[str, str, str, str]:
     """Return (browser_name, browser_version, os_name, device_type) from User-Agent."""
@@ -1928,6 +1934,167 @@ def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -
             log.warning("Agent access request Slack webhook post failed: %s", e)
     return False
 
+# ── Agent run history (full outputs, Postgres) ────────────────────────────────
+# The three live /app agents are embedded, cross-origin tools (see _SERP_BASE) —
+# this app never sees their output unless the tool itself hands it over. Each
+# tool's completion handler now posts { source:'p2-seo-tool', type:
+# 'agent-run-finished', tool, output } to the parent window (see seo-apps'
+# agentRunSignal.js + each page's SSE 'done'/'result' handler); app_embed.html
+# relays that to POST /app/<slug>/use/finish-run, which lands here. This is
+# deliberately separate from _log_agent_run/"Agent Runs" (Sheets) above, which
+# still owns the run-cap count -- that logic is untouched. A full run's output
+# (especially Content Enhancer's rewritten article) can exceed a single Sheets
+# cell's ~50k-char limit, so it needs a real database instead.
+def _pg_conn():
+    """One-off Postgres connection. None if DATABASE_URL isn't configured."""
+    if not DATABASE_URL:
+        return None
+    try:
+        import psycopg2
+        return psycopg2.connect(DATABASE_URL, connect_timeout=8)
+    except Exception as e:
+        log.warning("Postgres connection failed: %s", e)
+        return None
+
+_RUN_HISTORY_TABLE_READY = False
+
+def _ensure_run_history_table(conn) -> None:
+    """CREATE TABLE IF NOT EXISTS, once per process. Concurrent gunicorn workers
+    racing this on cold start is safe -- Postgres serializes the DDL."""
+    global _RUN_HISTORY_TABLE_READY
+    if _RUN_HISTORY_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS agent_run_history (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                name TEXT,
+                agent_slug TEXT NOT NULL,
+                agent_name TEXT,
+                title TEXT,
+                output JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_agent_run_history_email
+            ON agent_run_history (email, created_at DESC)
+        """)
+    conn.commit()
+    _RUN_HISTORY_TABLE_READY = True
+
+def _run_title(slug: str, output: dict) -> str:
+    """A short human label for a run, derived from its output -- what shows in
+    the History list before you open it."""
+    output = output or {}
+    if slug == "keyword-finder":
+        return output.get("keyword") or "Keyword research"
+    if slug == "content-brief-generator":
+        return output.get("keyword") or "Content brief"
+    if slug == "content-enhancer":
+        meta = output.get("articleMeta") or {}
+        return meta.get("title") or output.get("url") or "Content enhancement"
+    return output.get("title") or ""
+
+def _save_agent_run(user: dict, agent: dict, output: dict):
+    """Persist one finished run's full output. Returns the new row's id, or
+    None on any failure (missing DATABASE_URL, connection error, etc.) --
+    callers should treat that as 'not saved' and fail silently, same as every
+    other best-effort logging path in this app (Sheets, Slack)."""
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        from psycopg2.extras import Json
+        _ensure_run_history_table(conn)
+        title = _run_title(agent.get("slug", ""), output)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO agent_run_history (email, name, agent_slug, agent_name, title, output) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                ((user or {}).get("email", "").lower(), (user or {}).get("name", ""),
+                 agent.get("slug", ""), agent.get("name", ""), title, Json(output or {})),
+            )
+            new_id = cur.fetchone()[0]
+        conn.commit()
+        return new_id
+    except Exception as e:
+        log.warning("save agent run failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _list_agent_runs(email: str, limit: int = 200) -> list:
+    """This user's saved runs, newest first. [] on any failure or if Postgres
+    isn't configured -- History just renders empty rather than erroring."""
+    conn = _pg_conn()
+    if not conn or not email:
+        return []
+    try:
+        _ensure_run_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, agent_slug, agent_name, title, created_at FROM agent_run_history "
+                "WHERE email = %s ORDER BY created_at DESC LIMIT %s",
+                (email.lower(), limit),
+            )
+            rows = cur.fetchall()
+        return [{"id": r[0], "slug": r[1], "agent_name": r[2], "title": r[3], "created_at": r[4].isoformat()}
+                for r in rows]
+    except Exception as e:
+        log.warning("list agent runs failed: %s", e)
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _get_agent_run(email: str, run_id: int):
+    """One saved run's full output, scoped to `email` so a user can only ever
+    open their own runs (the id is a public URL param, not a secret)."""
+    conn = _pg_conn()
+    if not conn or not email:
+        return None
+    try:
+        _ensure_run_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, agent_slug, agent_name, title, output, created_at FROM agent_run_history "
+                "WHERE id = %s AND email = %s",
+                (run_id, email.lower()),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "slug": row[1], "agent_name": row[2], "title": row[3],
+                "output": row[4], "created_at": row[5].isoformat()}
+    except Exception as e:
+        log.warning("get agent run failed: %s", e)
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def _fmt_run_ts(iso_str: str) -> str:
+    """A saved run's ISO timestamp (UTC, from Postgres) -> a friendly IST
+    string for display, matching the rest of the app's timestamp style."""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.astimezone(IST).strftime("%b %d, %Y · %I:%M %p IST")
+    except Exception:
+        return iso_str or ""
+
 def _app_embed_url(agent):
     """Build the live SERP tool URL for an agent (same as the internal /p2/seo embed)."""
     seo_slug = agent.get("seo_slug")
@@ -2053,13 +2220,54 @@ def app_use_log_run(slug):
     return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP,
                     "at_cap": runs_used >= AGENT_RUN_CAP})
 
+@app.route("/app/<slug>/use/finish-run", methods=["POST"])
+@login_required
+def app_use_finish_run(slug):
+    """Saves one run's full output. Called client-side after app_embed.html's
+    message listener receives an 'agent-run-finished' postMessage from the
+    embedded tool (see seo-apps' agentRunSignal.js / each page's SSE 'done'
+    handler) -- the tool hands over its actual result here, not just the fact
+    that it ran. Separate from log-run above, which still owns the run-cap
+    count against Sheets; this only powers the History page."""
+    agent = APP_AGENTS_BY_SLUG.get(slug)
+    if not agent:
+        return jsonify({"saved": False, "error": "unknown agent"}), 404
+    data = request.get_json(silent=True) or {}
+    output = data.get("output")
+    if not isinstance(output, dict):
+        return jsonify({"saved": False, "error": "missing output"}), 400
+    user = _get_user()
+    run_id = _save_agent_run(user, agent, output)
+    return jsonify({"saved": run_id is not None, "id": run_id})
+
 @app.route("/app/history")
 @login_required
 def app_history():
-    """Recently-opened agents. Tracked client-side (localStorage) — we don't run
-    agents server-side (they're embedded external tools), so there's no server
-    execution log to show; this is an honest per-browser recency list instead."""
-    return render_template("app_history.html", user=_get_user())
+    """Every saved run (with its full output) for the signed-in user, across
+    the three connected agents, newest first -- backed by Postgres so it
+    survives across devices and browsers, unlike the old localStorage-only
+    'recently opened' list this replaced."""
+    user = _get_user()
+    runs = _list_agent_runs((user or {}).get("email", ""))
+    for r in runs:
+        meta = APP_AGENTS_BY_SLUG.get(r["slug"], {})
+        r["ac"] = meta.get("ac", "#8b5cf6")
+        r["ac2"] = meta.get("ac2", "#22d3ee")
+        r["icon"] = meta.get("icon", "")
+        r["display_ts"] = _fmt_run_ts(r["created_at"])
+    return render_template("app_history.html", user=user, runs=runs)
+
+@app.route("/app/history/<int:run_id>")
+@login_required
+def app_history_detail(run_id):
+    """One saved run's full output, formatted per agent type."""
+    user = _get_user()
+    run = _get_agent_run((user or {}).get("email", ""), run_id)
+    if not run:
+        return redirect("/app/history")
+    run["display_ts"] = _fmt_run_ts(run["created_at"])
+    agent = APP_AGENTS_BY_SLUG.get(run["slug"], {})
+    return render_template("app_history_detail.html", user=user, run=run, agent=agent)
 
 @app.route("/app/settings")
 @login_required
