@@ -146,14 +146,19 @@ body[data-page="iagent"] #scene{opacity:.42}
 @media (max-width:900px){ #nv{gap:10px;padding:0 16px}
   .nv-links{position:absolute;top:68px;left:0;right:0;flex-direction:column;align-items:stretch;gap:0;background:rgba(7,9,20,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);padding:8px;transform:translateY(-8px);opacity:0;pointer-events:none;transition:.25s}
   .nv-links.open{transform:none;opacity:1;pointer-events:auto}
-  .nv-link{padding:13px 16px}.nv-link::after{display:none}.nv-wm i{display:none}.nv-burger{display:flex} }
+  .nv-link{padding:13px 16px}.nv-link::after{display:none}.nv-wm i{display:none}.nv-burger{display:flex}
+  .nv-scrim{position:fixed;top:68px;left:0;right:0;bottom:0;z-index:8999;background:rgba(4,5,16,.6);
+    opacity:0;pointer-events:none;transition:opacity .25s}
+  .nv-scrim.open{opacity:1;pointer-events:auto}
+  body.nv-menu-open{overflow:hidden} }
+@media (min-width:901px){ .nv-scrim{display:none} }
 @media (max-width:520px){ .nv-signin{display:none} }
 
 /* ===== shared ===== */
 main{position:relative;z-index:3;padding-top:68px}
 main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94vw);height:600px;transform:translateX(-50%);pointer-events:none;z-index:-1;background:radial-gradient(ellipse 58% 62% at 50% 30%,rgba(124,92,255,.20),rgba(34,211,238,.07) 46%,transparent 72%);animation:heroGlow 13s ease-in-out infinite}
 @keyframes heroGlow{0%,100%{opacity:.78;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.06)}}
-.sectionpad{padding:108px 0 40px}
+.sectionpad{padding-top:108px;padding-bottom:40px}
 .pill-eye{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:#c7d0f0;text-transform:uppercase;
   background:rgba(124,140,220,.08);border:1px solid var(--line2);border-radius:999px;padding:8px 15px}
 .pill-eye .dt{width:7px;height:7px;border-radius:50%;background:var(--page,var(--cyan));box-shadow:0 0 10px var(--page,var(--cyan));animation:pulse 2.4s infinite}
@@ -1128,6 +1133,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     {% if page!='login' %}<button class="nv-burger" id="nvBurger" aria-label="Open menu"><span></span><span></span><span></span></button>{% endif %}
   </div>
 </nav>
+{% if page!='login' %}<div class="nv-scrim" id="nvScrim"></div>{% endif %}
 
 <main>
 {% if page == 'agents' %}
@@ -1989,8 +1995,15 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   }
 
   // mobile menu
-  var burger=document.getElementById('nvBurger'), links=document.getElementById('nvLinks');
-  if(burger){ burger.addEventListener('click',function(){ links.classList.toggle('open'); }); }
+  var burger=document.getElementById('nvBurger'), links=document.getElementById('nvLinks'), scrim=document.getElementById('nvScrim');
+  function setMenuOpen(open){
+    links.classList.toggle('open',open);
+    if(scrim) scrim.classList.toggle('open',open);
+    document.body.classList.toggle('nv-menu-open',open);
+  }
+  if(burger){ burger.addEventListener('click',function(){ setMenuOpen(!links.classList.contains('open')); }); }
+  if(scrim){ scrim.addEventListener('click',function(){ setMenuOpen(false); }); }
+  if(links){ links.querySelectorAll('a').forEach(function(a){ a.addEventListener('click',function(){ setMenuOpen(false); }); }); }
 
   // reveal
   var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{threshold:.12});
