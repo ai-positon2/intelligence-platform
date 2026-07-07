@@ -1545,7 +1545,7 @@ def _fetch_agent_run_stats() -> dict:
             })
         users_out.append({"email": u["email"], "name": u["name"] or u["email"],
                            "total": u["total"], "last_run": u["last_run"], "agents": agents_list})
-    users_out.sort(key=lambda x: -x["total"])
+    users_out.sort(key=lambda x: x["last_run"] or "", reverse=True)
 
     agents_out = [{"slug": a["slug"], "name": a["name"], "runs": agent_totals.get(a["slug"], 0),
                    "cap": AGENT_RUN_CAP, "ac": a["ac"], "ac2": a["ac2"], "icon": a["icon"]}
