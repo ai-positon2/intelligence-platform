@@ -75,6 +75,13 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .pill.link{color:var(--cyan);border-color:rgba(34,211,238,.4)}
 .empty{color:var(--dim2);padding:18px;text-align:center;font-size:13px}
 .tbl-wrap{overflow:auto;max-height:560px;border-radius:12px}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px}
+.tab-btn{padding:14px 20px;font-size:13px;font-weight:600;color:var(--dim2);background:none;border:none;cursor:pointer;
+  font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:var(--dim)}
+.tab-btn.active{color:var(--violet);border-bottom-color:var(--indigo)}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
 .muted{color:var(--dim2)}
 .who{display:flex;align-items:center;gap:9px;min-width:0}
 .mavatar{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
@@ -224,20 +231,27 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
       <tbody></tbody></table></div></div>
   </div>
 
-  <div class="sect"><h2>Recent sign-ins</h2>
-    <div class="card" style="padding:6px"><div class="tbl-wrap" style="max-height:420px"><table id="recent">
-      <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Visitor</th><th>Device</th><th>Referrer</th></tr></thead>
-      <tbody></tbody></table></div></div>
-  </div>
-
   <div class="sect"><h2>Top pages viewed <span class="muted" style="font-weight:400;font-size:12px">· post-login, on /app</span></h2>
     <div class="card"><div class="bars" id="postPages"></div></div>
   </div>
 
-  <div class="sect"><h2>Recent page views <span class="muted" style="font-weight:400;font-size:12px">· post-login activity on /app</span></h2>
-    <div class="card" style="padding:6px"><div class="tbl-wrap" style="max-height:420px"><table id="pageViews">
-      <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Page</th><th>URL</th><th>Time on page</th></tr></thead>
-      <tbody></tbody></table></div></div>
+  <div class="sect"><h2>Recent activity <span class="muted" style="font-weight:400;font-size:12px">· post-login on /app</span></h2>
+    <div class="card" style="padding:0">
+      <div class="tabs">
+        <button class="tab-btn active" id="btn-logins" onclick="switchTab('logins')">Logins</button>
+        <button class="tab-btn" id="btn-views" onclick="switchTab('views')">Page Views</button>
+      </div>
+      <div id="pane-logins" class="tab-pane active">
+        <div class="tbl-wrap" style="max-height:420px"><table id="recent">
+          <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Visitor</th><th>Device</th><th>Referrer</th></tr></thead>
+          <tbody></tbody></table></div>
+      </div>
+      <div id="pane-views" class="tab-pane">
+        <div class="tbl-wrap" style="max-height:420px"><table id="pageViews">
+          <thead><tr><th>Time (IST)</th><th>Member</th><th>Email</th><th>Page</th><th>URL</th><th>Time on page</th></tr></thead>
+          <tbody></tbody></table></div>
+      </div>
+    </div>
   </div>
 
   <div class="sect"><h2>Public Agent usage <span class="muted" style="font-weight:400;font-size:12px">· the same members, running the 3 /app agents</span></h2>
@@ -493,6 +507,8 @@ function load(force){
         '<td class="muted">'+esc(x.email)+'</td><td>'+esc(x.title||'—')+'</td>'+
         '<td class="muted" title="'+esc(x.url)+'">'+esc(x.url)+'</td><td class="muted">'+esc(x.duration)+'</td></tr>';
     }).join(''):'<tr><td colspan="6" class="empty">No page views yet</td></tr>';
+    document.getElementById('btn-logins').textContent='Logins ('+rows.length+')';
+    document.getElementById('btn-views').textContent='Page Views ('+pvRows.length+')';
   }).catch(function(){if(btn)btn.textContent='↻ Refresh';
     var n=document.getElementById('emptyNote');n.style.display='block';n.textContent='Failed to load member analytics.';});
 }
@@ -536,6 +552,12 @@ load();
 loadAgentUsage();
 </script>
 <script>
+function switchTab(name){
+  ['logins','views'].forEach(function(n){
+    document.getElementById('pane-'+n).classList.toggle('active',n===name);
+    document.getElementById('btn-'+n).classList.toggle('active',n===name);
+  });
+}
 function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
 document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');}});
 (function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');}});}catch(e){}})();
