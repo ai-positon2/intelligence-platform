@@ -108,13 +108,14 @@
   p2RecordAgentVisit({slug:"{{ agent.slug }}", name:"{{ agent.name }}", tagline:"{{ agent.tagline }}", ac:"{{ agent.ac }}", ac2:"{{ agent.ac2 }}"});
   {% if not limit_reached %}
   (function(){
-    /* Opening this page must NOT count as a run — only real interaction with
-       the embedded tool should. We can't see inside the iframe (cross-origin,
-       a separate app), so the closest available signal is focus moving into
-       it: when the window blurs and the iframe is what's now focused, the
-       user clicked into the tool. Logs at most once per page view. */
-    var fr=document.getElementById('toolFrame');
-    if(!fr) return;
+    /* Opening this page must NOT count as a run, and neither should merely
+       clicking into the tool to fill in a field — only actually clicking its
+       Run/Start/Generate CTA should. The embedded tool (a separate app,
+       cross-origin) tells us exactly when that happens via postMessage —
+       see seo-apps' client/src/lib/agentRunSignal.js, called from each
+       tool's run-start handler right after its own field validation passes.
+       Logs at most once per page view. */
+    var EXPECTED_ORIGIN='{{ serp_origin }}', EXPECTED_TOOL='{{ agent.seo_slug }}';
     var logged=false;
     function logRun(){
       if(logged) return;
@@ -125,8 +126,12 @@
         if(badge) badge.textContent=d.runs_used+' / '+d.runs_cap+' used';
       }).catch(function(){});
     }
-    window.addEventListener('blur', function(){
-      setTimeout(function(){ if(document.activeElement===fr) logRun(); }, 0);
+    window.addEventListener('message', function(e){
+      if(e.origin!==EXPECTED_ORIGIN) return;
+      var d=e.data;
+      if(!d || d.source!=='p2-seo-tool' || d.type!=='agent-run-started') return;
+      if(d.tool!==EXPECTED_TOOL) return;
+      logRun();
     });
   })();
   {% endif %}

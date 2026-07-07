@@ -1627,20 +1627,24 @@ def app_use(slug):
     runs_used = _agent_run_counts(email).get(slug, 0)
     if runs_used >= AGENT_RUN_CAP:
         return render_template("app_embed.html", user=user, agent=agent, embed_url=None,
-                               runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=True)
+                               runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=True,
+                               serp_origin=_SERP_BASE)
     embed_url = _app_embed_url(agent)
     if not embed_url:
         return redirect("/app/" + slug)
     return render_template("app_embed.html", user=user, agent=agent, embed_url=embed_url,
-                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=False)
+                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=False,
+                           serp_origin=_SERP_BASE)
 
 @app.route("/app/<slug>/use/log-run", methods=["POST"])
 @login_required
 def app_use_log_run(slug):
-    """Logs one real run. Called client-side only after the embedded tool has
-    actually been interacted with (focus moves into the iframe) — NOT on page
-    load — so simply opening an agent and navigating away doesn't count
-    against the cap. See app_embed.html's blur/activeElement listener."""
+    """Logs one real run. Called client-side only after the embedded tool
+    itself reports (via postMessage) that the user filled in the required
+    fields and clicked its Run/Start/Generate CTA — NOT on page load, and
+    NOT on merely clicking into the iframe — so opening an agent and looking
+    around doesn't count against the cap. See app_embed.html's message
+    listener and seo-apps' agentRunSignal.js."""
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return jsonify({"logged": False, "error": "unknown agent"}), 404
