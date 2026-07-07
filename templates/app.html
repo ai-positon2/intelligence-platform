@@ -139,13 +139,6 @@
     </div>
   </div>
 
-  <div class="sect">
-    <div class="eyebrow">Activity</div>
-    <h2>Recently run</h2>
-    <p class="sub">Agents you've actually run in this browser, most recent first.</p>
-    <div class="activity-box" id="activityBox" style="margin-top:22px"></div>
-  </div>
-
   {% set locked_agents = agents | rejectattr('seo_slug') | list %}
   {% if locked_agents %}
   <div class="sect">
@@ -169,6 +162,13 @@
     </div>
   </div>
   {% endif %}
+
+  <div class="sect">
+    <div class="eyebrow">Activity</div>
+    <h2>Recently run</h2>
+    <p class="sub">Agents you've actually run in this browser, most recent first.</p>
+    <div class="activity-box" id="activityBox" style="margin-top:22px"></div>
+  </div>
 
 </div>
 {% endblock %}
