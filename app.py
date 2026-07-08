@@ -3345,8 +3345,11 @@ def _fetch_usage_data() -> dict:
     def col(row, i, default=""):
         return row[i] if len(row) > i else default
 
-    login_rows = _fetch("A1:T1000")
-    page_rows  = _fetch("Page Views!A1:M2000")
+    # Read the FULL tabs — Sheets appends new rows at the bottom, so a fixed
+    # top cap (was A1:T1000 / Page Views!A1:M2000) silently dropped every row
+    # past the cap, i.e. all the most-recent activity once the sheet grew.
+    login_rows = _fetch("A:T")
+    page_rows  = _fetch("Page Views!A:M")
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
 
@@ -3418,7 +3421,7 @@ def _fetch_usage_data() -> dict:
                    for r in reversed(login_data)][:100]
     page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
                     "url": col(r,6), "duration": col(r,8)}
-                   for r in reversed(page_data)]
+                   for r in reversed(page_data)][:200]
 
     return dict(total_logins=total_logins, unique_users=unique_users,
                 total_page_views=total_page_views, total_time_fmt=total_time_fmt,
