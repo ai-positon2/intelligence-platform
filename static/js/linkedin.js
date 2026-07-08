@@ -22,7 +22,8 @@ const isEmployee=p=>p&&(p.relationship==='Employee'||(p.company||'').toLowerCase
 /* ── state ── */
 let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};
 let _filteredPosts=[];
-let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false};
+let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false,rel:'all'};
+const jsstr=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
 let _liLoading=false;
@@ -43,6 +44,47 @@ function switchTab(t){
     document.getElementById('nt-'+k).classList.toggle('active',k===t);
   });
   setTimeout(countUp,50);
+}
+
+/* ═══════════════════════════════════
+   CROSS-FILTER NAV — overview blocks → detail tabs, filter pre-applied
+═══════════════════════════════════ */
+function _scrollTabs(){var m=document.querySelector('.mega-tabs');if(m)m.scrollIntoView({behavior:'smooth',block:'start'});}
+function _blankPLF(){return {sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false,rel:'all'};}
+function _blankPF(){return {sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};}
+function goPeople(patch){
+  PLF=Object.assign(_blankPLF(),patch||{});
+  switchTab('people');buildPeopleTab();_syncPeopleControls();_scrollTabs();
+}
+function _syncPeopleControls(){
+  var senTxt={all:'All',csuite:'C-Suite',vpdirector:'VP/Dir',managers:'Manager',ics:'IC'}[PLF.sen]||'All';
+  var grp=document.querySelector('#tab-people .fbar-primary .chips');
+  if(grp)grp.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.textContent.indexOf(senTxt)>=0);});
+  var dm=document.getElementById('plf-dm');if(dm)dm.classList.toggle('on',!!PLF.dm);
+  var p2=document.getElementById('plf-p2');if(p2)p2.classList.toggle('on',!!PLF.excludeP2);
+  var sels=document.querySelectorAll('#tab-people .fbar-secondary .lkf-sel');
+  if(sels[0])sels[0].value=(PLF.country&&PLF.country!=='all')?PLF.country:'all';
+}
+function goPosts(patch){
+  PF=Object.assign(_blankPF(),patch||{});
+  switchTab('post');buildPostTab();_syncPostControls();_scrollTabs();
+}
+function _syncPostControls(){
+  var g=document.getElementById('pf-sen');
+  var lbl={'all':'All','C-Level / Founder':'C-Level','VP':'VP','Director':'Director','Manager':'Manager'}[PF.sen]||'All';
+  if(g)g.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.textContent.trim()===lbl);});
+  var rg=document.getElementById('pf-react');
+  if(rg){var rl={'all':'All','LIKE':'Like','PRAISE':'Praise','EMPATHY':'Empathy','APPRECIATION':'Appreciation','INTEREST':'Interest'}[PF.react]||'All';
+    rg.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.textContent.indexOf(rl)>=0);});}
+}
+function goCompanies(){switchTab('companies');_scrollTabs();}
+/* map a seniority-breakdown label to the People-tab bucket key */
+function _senToBucket(k){
+  if(/C-Level|Founder/.test(k))return'csuite';
+  if(/^VP$|Director/.test(k))return'vpdirector';
+  if(/Manager/.test(k))return'managers';
+  if(/IC|Individual/.test(k))return'ics';
+  return'all';
 }
 
 /* ═══════════════════════════════════
@@ -113,14 +155,15 @@ function buildOverviewTab(){
   const el=document.getElementById('tab-overview');if(!el)return;
   const st=D.stats||{};
   const kpis=[
-    {v:st.total_engagements||0,l:'Total Engagements',c:'vi',kc:'#7c83f5',ic:'⚡'},
-    {v:st.total_people||0,l:'Unique People',c:'vg',kc:'#2dd4aa',ic:'👥'},
-    {v:st.total_dms||0,l:'Decision Makers',c:'va',kc:'#f5a623',ic:'🎯'},
-    {v:st.csuite_count||0,l:'C-Suite Reached',c:'vp',kc:'#b78bfa',ic:'👑'},
-    {v:st.total_companies||0,l:'Companies Reached',c:'vc',kc:'#22d3ee',ic:'🏢'},
-    {v:st.total_comments||0,l:'Comments',c:'vr',kc:'#fb7185',ic:'💬'},
+    {v:st.total_engagements||0,l:'Total Engagements',c:'vi',kc:'#7c83f5',ic:'⚡',go:'goPosts({})',t:'See every post & engager'},
+    {v:st.total_people||0,l:'Unique People',c:'vg',kc:'#2dd4aa',ic:'👥',go:'goPeople({})',t:'Browse all people'},
+    {v:st.total_dms||0,l:'Decision Makers',c:'va',kc:'#f5a623',ic:'🎯',go:'goPeople({dm:true})',t:'People flagged as decision-makers'},
+    {v:st.csuite_count||0,l:'C-Suite Reached',c:'vp',kc:'#b78bfa',ic:'👑',go:"goPeople({sen:'csuite'})",t:'C-level & founders'},
+    {v:st.total_companies||0,l:'Companies Reached',c:'vc',kc:'#22d3ee',ic:'🏢',go:'goCompanies()',t:'Company intelligence'},
+    {v:st.total_comments||0,l:'Comments',c:'vr',kc:'#fb7185',ic:'💬',go:'goPosts({})',t:'Posts & comment signal'},
   ];
-  function barList(counts,total,colorFn){
+  /* navFn(key) → a JS onclick string, or null for non-clickable rows */
+  function barList(counts,total,colorFn,navFn){
     const entries=Object.entries(counts||{}).sort((a,b)=>b[1]-a[1]);
     if(!entries.length)return'<div class="nores" style="padding:24px"><p>No data yet</p></div>';
     const max=Math.max(...entries.map(e=>e[1]),1);
@@ -128,7 +171,9 @@ function buildOverviewTab(){
       const widthPct=Math.round(v/max*100);
       const shareLbl=total?(Math.round(v/total*100)+'%'):'';
       const barColor=colorFn?('background:'+colorFn(k)+';'):'';
-      return'<div class="lbitem lbitem-static">'
+      const nav=navFn?navFn(k):'';
+      const clickable=nav?' lbitem-click" onclick="'+nav+'" title="Filter by '+esc(k)+'':'';
+      return'<div class="lbitem lbitem-static'+clickable+'">'
         +'<div class="lbname" style="flex:0 0 130px">'+esc(k)+'</div>'
         +'<div class="lbtrack"><div class="lbfill" style="width:'+widthPct+'%;'+barColor+'"></div></div>'
         +'<div class="lbnum">'+v+(shareLbl?' <span class="lbnum-pct">&middot; '+shareLbl+'</span>':'')+'</div>'
@@ -138,25 +183,25 @@ function buildOverviewTab(){
   const relTotal=Object.values(st.relationship_breakdown||{}).reduce((a,b)=>a+b,0);
   el.innerHTML=`
   <div class="ov-kpis">
-    ${kpis.map(k=>`<div class="ov-kpi" style="--kc:${k.kc}"><div class="ov-kpi-ic">${k.ic}</div><div class="ov-kpi-val ${k.c}" data-count="${k.v}">0</div><div class="ov-kpi-lbl">${k.l}</div></div>`).join('')}
+    ${kpis.map(k=>`<div class="ov-kpi ov-kpi-click" style="--kc:${k.kc}" onclick="${k.go}" title="${k.t}"><div class="ov-kpi-ic">${k.ic}</div><div class="ov-kpi-val ${k.c}" data-count="${k.v}">0</div><div class="ov-kpi-lbl">${k.l}</div><div class="ov-kpi-go">View →</div></div>`).join('')}
   </div>
   <div class="ov-grid">
     <div class="lbcard ov-card" style="--kc:#22d3ee">
       <div class="lbtitle"><span class="ov-chip">⚡</span> Reaction Mix</div>
-      ${barList(st.reaction_breakdown,st.total_engagements,k=>({LIKE:'#60a5fa',PRAISE:'#fbbf24',INTEREST:'#a5b4fc',APPRECIATION:'#fca5a5',EMPATHY:'#f9a8d4'}[k]||'var(--accent)'))}
+      ${barList(st.reaction_breakdown,st.total_engagements,k=>({LIKE:'#60a5fa',PRAISE:'#fbbf24',INTEREST:'#a5b4fc',APPRECIATION:'#fca5a5',EMPATHY:'#f9a8d4'}[k]||'var(--accent)'),k=>"goPosts({react:'"+jsstr(k)+"'})")}
     </div>
     <div class="lbcard ov-card" style="--kc:#f5a623">
       <div class="lbtitle"><span class="ov-chip">🏅</span> Seniority Mix</div>
-      ${barList(st.seniority_breakdown,st.total_people,k=>({'C-Level / Founder':'#fbbf24','VP':'#818cf8','Director':'#a5b4fc','Manager':'#2dd4aa','IC / Individual Contributor':'#94a3b8'}[k]||'var(--accent)'))}
+      ${barList(st.seniority_breakdown,st.total_people,k=>({'C-Level / Founder':'#fbbf24','VP':'#818cf8','Director':'#a5b4fc','Manager':'#2dd4aa','IC / Individual Contributor':'#94a3b8'}[k]||'var(--accent)'),k=>"goPeople({sen:'"+_senToBucket(k)+"'})")}
     </div>
     <div class="lbcard ov-card" style="--kc:#2dd4aa">
       <div class="lbtitle"><span class="ov-chip">🌍</span> Top Locations</div>
-      ${barList(st.country_breakdown,st.total_people,()=>'linear-gradient(90deg,#2dd4aa,#22d3ee)')}
+      ${barList(st.country_breakdown,st.total_people,()=>'linear-gradient(90deg,#2dd4aa,#22d3ee)',k=>"goPeople({country:'"+jsstr(k)+"'})")}
     </div>
     <div class="lbcard ov-card" style="--kc:#fb7185">
       <div class="lbtitle"><span class="ov-chip">🎯</span> Employee vs. External</div>
-      ${barList(st.relationship_breakdown,relTotal,k=>k==='Employee'?'#f5a623':'linear-gradient(90deg,#fb7185,#b78bfa)')}
-      <div class="ov-note">External reactions are real prospect signal — employee amplification is tracked separately so it doesn't inflate reach.</div>
+      ${barList(st.relationship_breakdown,relTotal,k=>k==='Employee'?'#f5a623':'linear-gradient(90deg,#fb7185,#b78bfa)',k=>"goPeople({rel:'"+jsstr(k)+"'})")}
+      <div class="ov-note">External reactions are real prospect signal — employee amplification is tracked separately so it doesn't inflate reach. <span class="ov-note-hint">Click any row to drill in.</span></div>
     </div>
   </div>
   <div class="sec-hdr" style="margin-top:22px"><div class="sec-ttl"><span class="ov-chip" style="--kc:#7c83f5">🏆</span> Top Companies by Engagement</div></div>
@@ -190,6 +235,16 @@ function buildPostTab(){
         <button class="chip" onclick="setPF('sen','VP',this)">VP</button>
         <button class="chip" onclick="setPF('sen','Director',this)">Director</button>
         <button class="chip" onclick="setPF('sen','Manager',this)">Manager</button>
+      </div>
+    </div>
+    <div class="fgroup">
+      <div class="chips" id="pf-react">
+        <button class="chip on" onclick="setPF('react','all',this)">All reactions</button>
+        <button class="chip" onclick="setPF('react','LIKE',this)">👍 Like</button>
+        <button class="chip" onclick="setPF('react','PRAISE',this)">🙌 Praise</button>
+        <button class="chip" onclick="setPF('react','EMPATHY',this)">🫂 Empathy</button>
+        <button class="chip" onclick="setPF('react','APPRECIATION',this)">❤️ Appreciation</button>
+        <button class="chip" onclick="setPF('react','INTEREST',this)">🤔 Interest</button>
       </div>
     </div>
     <div class="sep"></div>
@@ -433,7 +488,7 @@ function peoplStatClick(mode,el){
   applyPLF();
 }
 function setPLF(k,v,el){PLF[k]=v;el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');applyPLF();}
-function resetPLF(){PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false};buildPeopleTab();}
+function resetPLF(){PLF=_blankPLF();buildPeopleTab();}
 function plStat(mode,el){document.querySelectorAll('#tab-people .scard').forEach(c=>c.classList.remove('active-filter'));if(el)el.classList.add('active-filter');if(mode==='dm'){PLF.dm=true;PLF.sen='all';}else if(mode==='csuite'){PLF.dm=false;PLF.sen='csuite';}else{PLF.dm=false;PLF.sen='all';}applyPLF();}
 function togglePLFDM(){PLF.dm=!PLF.dm;document.getElementById('plf-dm').classList.toggle('on',PLF.dm);applyPLF();}
 
@@ -449,6 +504,8 @@ function applyPLF(){
     if(city&&city!=='all'&&p._city!==city)return false;
     if(dFrom||dTo){var ds=(window.PDATES&&window.PDATES[(p.name||'').toLowerCase()])||[];if(!ds.some(function(d){return (!dFrom||d>=dFrom)&&(!dTo||d<=dTo);}))return false;}
     if(PLF.excludeP2&&isEmployee(p))return false;
+    if(PLF.rel==='Employee'&&!isEmployee(p))return false;
+    if(PLF.rel==='External'&&isEmployee(p))return false;
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
     return true;
   });
