@@ -12,8 +12,9 @@
   .hsearch svg{ width:16px; height:16px; stroke:var(--tx3); flex:none }
   .hsearch input{ flex:1; background:none; border:0; outline:0; color:var(--tx); font:inherit; font-size:14px }
   .hsearch input::placeholder{ color:var(--tx3) }
-  .hbox{ border-radius:18px; border:1px solid var(--line); background:rgba(12,15,30,.5); padding:10px; min-height:160px }
-  .h-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  .hbox{ border-radius:18px; border:1px solid var(--line); background:rgba(12,15,30,.5); padding:8px }
+  .hbox--empty{ min-height:200px; display:flex }
+  .h-empty{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
     padding:56px 20px; color:var(--tx2); font-size:14px; text-align:center }
   .h-empty svg{ width:40px; height:40px; stroke:var(--tx3); opacity:.7 }
   .h-empty a{ color:#9b8bff; text-decoration:none; font-weight:600 }
@@ -58,7 +59,7 @@
   </div>
   <div class="hnote" id="hCount"></div>
   {% else %}
-  <div class="hbox">
+  <div class="hbox hbox--empty">
     <div class="h-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
       <span>No agent executions yet.<br><a href="/app">Run an agent</a> to build your history.</span>
