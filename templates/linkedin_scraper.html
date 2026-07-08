@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}?v=2">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=1">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -68,15 +68,25 @@
 
 <div class="page-hdr">
   <div class="page-hdr-icon">🔗</div>
-  <div>
+  <div style="flex:1;min-width:0">
     <div class="page-hdr-title">LinkedIn Intelligence</div>
     <div class="page-hdr-sub">Signal tracking: people, companies &amp; post engagement</div>
   </div>
+  <div class="li-toolbar">
+    <div class="li-sync" id="liSync"><span class="li-sync-dot" id="liSyncDot"></span><span id="liSyncLabel">Loading…</span></div>
+    <button class="li-refresh-btn" id="liRefreshBtn" onclick="refreshLI()" title="Re-pull the latest rows from the Google Sheet">
+      <span class="li-refresh-ic" id="liRefreshIc">↻</span> Refresh
+    </button>
+  </div>
 </div>
 <div class="mega-tabs">
-  <button class="mtab active" onclick="switchTab('people')" id="nt-people">
+  <button class="mtab active" onclick="switchTab('overview')" id="nt-overview">
+    <div class="mtab-label">Overview</div>
+    <div class="mtab-val vp" id="tc-overview">—</div>
+  </button>
+  <button class="mtab" onclick="switchTab('people')" id="nt-people">
     <div class="mtab-label">People</div>
-    <div class="mtab-val vg" id="tc-people">99</div>
+    <div class="mtab-val vg" id="tc-people">—</div>
   </button>
   <button class="mtab" onclick="switchTab('companies')" id="nt-companies">
     <div class="mtab-label">Companies</div>
@@ -84,10 +94,11 @@
   </button>
   <button class="mtab" onclick="switchTab('post')" id="nt-post">
     <div class="mtab-label">Posts</div>
-    <div class="mtab-val vi" id="tc-post">8</div>
+    <div class="mtab-val vi" id="tc-post">—</div>
   </button>
 </div>
-<div id="tab-people" class="page active"></div>
+<div id="tab-overview" class="page active"></div>
+<div id="tab-people" class="page"></div>
 <div id="tab-companies" class="page"></div>
 <div id="tab-post" class="page"></div>
 </div>
@@ -123,8 +134,9 @@ document.addEventListener('click',function(e){
 });
 </script>
 {% include 'ppc_chat_widget.html' %}
-<script>window.__LIDATA__ = {{ li_data|tojson|safe }};</script>
-<script src="{{ url_for('static', filename='js/linkedin.js') }}"></script>
+<div class="li-toast" id="liToast"></div>
+<script>window.__LI_DATA_URL__ = "{{ url_for('linkedin_scraper_data') }}";</script>
+<script src="{{ url_for('static', filename='js/linkedin.js') }}?v=2"></script>
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
 (function(){

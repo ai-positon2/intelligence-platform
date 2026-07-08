@@ -1,5 +1,5 @@
-/* LinkedIn Scraper — page logic. Data is injected via window.__LIDATA__ (see template). */
-const D = window.__LIDATA__;
+/* LinkedIn Scraper — page logic. Data is fetched live from window.__LI_DATA_URL__ (see template). */
+let D = {posts:[],people:[],companies:[],company_lb:[],stats:{}};
 /* ── helpers ── */
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ini=n=>(n||'?').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2);
@@ -16,6 +16,8 @@ const RCLS={LIKE:'blike',PRAISE:'bprs',INTEREST:'bint',APPRECIATION:'bapp',EMPAT
 const SCLS=s=>!s?'bic':s.includes('C-Level')||s.includes('Founder')?'bcs':s.includes('VP')?'bvp':s.includes('Director')?'bvp':s.includes('Manager')?'bmg':'bic';
 const SLBL=s=>(s||'Unknown').replace('IC / Individual Contributor','IC').replace('C-Level / Founder','C-Level');
 const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').replace('FIRST_DEGREE','1st'):'';
+const fmtN=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);};
+const isEmployee=p=>p&&(p.relationship==='Employee'||(p.company||'').toLowerCase().includes('position'));
 
 /* ── state ── */
 let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};
@@ -23,6 +25,7 @@ let _filteredPosts=[];
 let PLF={sen:'all',deg:'all',minP:0,country:'all',city:'all',dFrom:'',dTo:'',q:'',excludeP2:false,dm:false};
 let CF={q:'',dm:false,minPpl:0};
 let activeStatFilter=null;
+let _liLoading=false;
 
 /* ── counter animation ── */
 function countUp(){
@@ -35,11 +38,139 @@ function countUp(){
 
 /* ── tab switch ── */
 function switchTab(t){
-  ['post','people','companies'].forEach(k=>{
+  ['overview','post','people','companies'].forEach(k=>{
     document.getElementById('tab-'+k).classList.toggle('active',k===t);
     document.getElementById('nt-'+k).classList.toggle('active',k===t);
   });
   setTimeout(countUp,50);
+}
+
+/* ═══════════════════════════════════
+   LIVE DATA — load / refresh / toast
+═══════════════════════════════════ */
+function liToast(msg,kind){
+  const t=document.getElementById('liToast');if(!t)return;
+  t.textContent=msg;t.className='li-toast show'+(kind?' '+kind:'');
+  clearTimeout(t.__hideT);t.__hideT=setTimeout(()=>t.classList.remove('show'),3200);
+}
+function timeAgo(iso){
+  if(!iso)return'never';
+  const d=new Date(iso);if(isNaN(d))return'never';
+  const s=Math.max(0,Math.round((Date.now()-d.getTime())/1000));
+  if(s<45)return'just now';
+  if(s<3600)return Math.round(s/60)+'m ago';
+  if(s<86400)return Math.round(s/3600)+'h ago';
+  return Math.round(s/86400)+'d ago';
+}
+function updateSyncLabel(){
+  const el=document.getElementById('liSyncLabel'),dot=document.getElementById('liSyncDot');
+  if(!el)return;
+  const st=D.stats||{};
+  if(!st.last_synced){el.textContent='Not synced yet';dot.classList.remove('bad');return;}
+  const ok=D.synced_ok!==false;
+  dot.classList.toggle('bad',!ok);
+  el.textContent=(ok?'Synced ':'Last good sync ')+timeAgo(st.last_synced)+(st.source_accounts&&st.source_accounts.length>1?' · '+st.source_accounts.length+' seats':'');
+  el.title='Sheet extracted at '+st.last_synced;
+}
+function setLoading(on){
+  _liLoading=on;
+  const btn=document.getElementById('liRefreshBtn'),ic=document.getElementById('liRefreshIc');
+  if(btn)btn.disabled=on;
+  if(ic)ic.classList.toggle('spin',on);
+}
+function renderAll(){
+  buildOverviewTab();buildPostTab();buildPeopleTab();buildCompaniesTab();
+  document.getElementById('tc-post').textContent=D.posts.length;
+  document.getElementById('tc-companies').textContent=D.companies.filter(c=>c.name!=='(Unknown)').length;
+  document.getElementById('tc-overview').textContent=(D.stats&&D.stats.total_engagements)||0;
+  updateSyncLabel();
+  setTimeout(countUp,50);
+}
+async function loadLinkedInData(force){
+  if(_liLoading)return;
+  setLoading(true);
+  try{
+    const url=window.__LI_DATA_URL__+(force?'?fresh=1':'');
+    const res=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    D=data;
+    if(force)liToast(D.synced_ok===false?'Could not reach the sheet — showing last good data':'Refreshed from Google Sheet','ok');
+  }catch(e){
+    console.error('LinkedIn data load failed',e);
+    liToast('Refresh failed — check connection','err');
+  }finally{
+    renderAll();
+    setLoading(false);
+  }
+}
+function refreshLI(){loadLinkedInData(true);}
+
+/* ═══════════════════════════════════
+   OVERVIEW
+═══════════════════════════════════ */
+function buildOverviewTab(){
+  const el=document.getElementById('tab-overview');if(!el)return;
+  const st=D.stats||{};
+  const kpis=[
+    {v:st.total_engagements||0,l:'Total Engagements',c:'vi'},
+    {v:st.total_people||0,l:'Unique People',c:'vg'},
+    {v:st.total_dms||0,l:'Decision Makers',c:'va'},
+    {v:st.csuite_count||0,l:'C-Suite Reached',c:'vp'},
+    {v:st.total_companies||0,l:'Companies Reached',c:'vc'},
+    {v:st.total_comments||0,l:'Comments',c:'vi'},
+  ];
+  function barList(counts,total,colorFn){
+    const entries=Object.entries(counts||{}).sort((a,b)=>b[1]-a[1]);
+    if(!entries.length)return'<div class="nores" style="padding:24px"><p>No data yet</p></div>';
+    const max=Math.max(...entries.map(e=>e[1]),1);
+    return entries.map(([k,v],i)=>{
+      const widthPct=Math.round(v/max*100);
+      const shareLbl=total?(Math.round(v/total*100)+'%'):'';
+      const barColor=colorFn?('background:'+colorFn(k)+';'):'';
+      return'<div class="lbitem lbitem-static">'
+        +'<div class="lbname" style="flex:0 0 130px">'+esc(k)+'</div>'
+        +'<div class="lbtrack"><div class="lbfill" style="width:'+widthPct+'%;'+barColor+'"></div></div>'
+        +'<div class="lbnum">'+v+(shareLbl?' <span class="lbnum-pct">&middot; '+shareLbl+'</span>':'')+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  const relTotal=Object.values(st.relationship_breakdown||{}).reduce((a,b)=>a+b,0);
+  el.innerHTML=`
+  <div class="ov-kpis">
+    ${kpis.map(k=>`<div class="ov-kpi"><div class="ov-kpi-val ${k.c}" data-count="${k.v}">0</div><div class="ov-kpi-lbl">${k.l}</div></div>`).join('')}
+  </div>
+  <div class="ov-grid">
+    <div class="lbcard">
+      <div class="lbtitle">⚡ Reaction Mix</div>
+      ${barList(st.reaction_breakdown,st.total_engagements,k=>({LIKE:'#60a5fa',PRAISE:'#fde047',INTEREST:'#a5b4fc',APPRECIATION:'#fca5a5',EMPATHY:'#f9a8d4'}[k]||'var(--accent)'))}
+    </div>
+    <div class="lbcard">
+      <div class="lbtitle">🏅 Seniority Mix</div>
+      ${barList(st.seniority_breakdown,st.total_people,k=>({'C-Level / Founder':'#fbbf24','VP':'#818cf8','Director':'#818cf8','Manager':'#00e5a0','IC / Individual Contributor':'#94a3b8'}[k]||'var(--accent)'))}
+    </div>
+    <div class="lbcard">
+      <div class="lbtitle">🌍 Top Locations</div>
+      ${barList(st.country_breakdown,st.total_people)}
+    </div>
+    <div class="lbcard">
+      <div class="lbtitle">🎯 Employee vs. External</div>
+      ${barList(st.relationship_breakdown,relTotal,k=>k==='Employee'?'#f59e0b':'var(--accent)')}
+      <div style="margin-top:10px;font-size:11px;color:var(--tx3)">External reactions are real prospect signal — employee amplification is tracked separately so it doesn't inflate reach.</div>
+    </div>
+  </div>
+  <div class="sec-hdr" style="margin-top:22px"><div class="sec-ttl">🏆 Top Companies by Engagement</div></div>
+  <div class="lbcard">
+    ${(D.company_lb||[]).length?D.company_lb.map(([name,cnt],i)=>{
+      const maxLb=D.company_lb[0][1]||1;
+      return`<div class="lbitem" onclick="switchTab('companies');setTimeout(()=>openCompanyDrawerByName('${esc(name)}'),120)">
+        <div class="lbrank ${i===0?'rank-g':i===1?'rank-s':i===2?'rank-b':''}">${i+1}</div>
+        <div class="lbname">${esc(name)}</div>
+        <div class="lbtrack"><div class="lbfill" style="width:${Math.round(cnt/maxLb*100)}%"></div></div>
+        <div class="lbnum">${cnt}</div>
+      </div>`;
+    }).join(''):'<div class="nores" style="padding:24px"><p>No company data yet</p></div>'}
+  </div>`;
 }
 
 /* ═══════════════════════════════════
@@ -123,6 +254,7 @@ function applyPF(){
   g.innerHTML=filtered.map((p,pi)=>{
     const eng=p.fe,dmN=eng.filter(e=>e.dm?.toLowerCase()==='yes').length;
     const csN=eng.filter(e=>e.seniority?.includes('C-Level')||e.seniority?.includes('Founder')).length;
+    const cmN=eng.filter(e=>e.commented).length;
     const reacts=[...new Set(eng.map(e=>e.reaction).filter(Boolean))].slice(0,2);
     const ori=D.posts.indexOf(p);
     return`<div class="pcard" id="pc-${pi}" onclick="openPostModal(${pi})" style="animation-delay:${pi*.05}s">
@@ -134,6 +266,7 @@ function applyPF(){
       <div class="psnip">${esc(p.snippet)}</div>
       <div class="pmets">
         <div class="mpill mp-g">${eng.length} Engager${eng.length!==1?'s':''}</div>
+        ${cmN?`<div class="mpill mp-c">💬 ${cmN} Comment${cmN!==1?'s':''}</div>`:''}
         ${dmN?`<div class="mpill mp-a">${dmN} DM${dmN!==1?'s':''}</div>`:''}
         ${csN?`<div class="mpill mp-p">${csN} C-Suite</div>`:''}
         ${p.url?`<a href="${esc(p.url)}" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>`:''}
@@ -159,10 +292,11 @@ const BKT=[
   {k:'ics',l:'Individual Contributors',i:'💼',c:'#94a3b8'},
   {k:'unknown',l:'Unknown Seniority',i:'❓',c:'#64748b'},
 ];
-const maxP=Math.max(...D.people.map(p=>p.posts_engaged),1);
+let maxP=1;
 
 function buildPeopleTab(){
   const {people,companies,company_lb,stats}=D;
+  maxP=Math.max(...people.map(p=>p.posts_engaged),1);
   const maxLb=company_lb[0]?company_lb[0][1]:1;
   const el=document.getElementById('tab-people');
   var _KNOWN_C=['India','United States','United Kingdom','Canada','Australia','Germany','France','Singapore','Netherlands','Ireland','Spain','Italy','Brazil','Mexico','Japan','China','United Arab Emirates','Philippines','Israel','Sweden'];
@@ -170,7 +304,7 @@ function buildPeopleTab(){
     var parts=(p.location||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
     p._city=parts.length?parts[0]:'';
     var last=parts.length>1?parts[parts.length-1]:'';
-    p._country=_KNOWN_C.indexOf(last)>=0?last:'';
+    p._country=p.country||(_KNOWN_C.indexOf(last)>=0?last:'');
   });
   if(!window.PDATES){window.PDATES={};(D.posts||[]).forEach(function(po){(po.engagers||[]).forEach(function(e){var k=(e.name||'').toLowerCase();(window.PDATES[k]=window.PDATES[k]||[]).push(po.date);});});}
   var _countries=[...new Set(D.people.map(function(p){return p._country;}).filter(Boolean))].sort();
@@ -314,7 +448,7 @@ function applyPLF(){
     if(country&&country!=='all'&&p._country!==country)return false;
     if(city&&city!=='all'&&p._city!==city)return false;
     if(dFrom||dTo){var ds=(window.PDATES&&window.PDATES[(p.name||'').toLowerCase()])||[];if(!ds.some(function(d){return (!dFrom||d>=dFrom)&&(!dTo||d<=dTo);}))return false;}
-    if(PLF.excludeP2&&(p.company||'').toLowerCase().includes('position'))return false;
+    if(PLF.excludeP2&&isEmployee(p))return false;
     if(ql&&!(p.name.toLowerCase().includes(ql)||p.company.toLowerCase().includes(ql)||(p.title||'').toLowerCase().includes(ql)))return false;
     return true;
   });
@@ -336,9 +470,11 @@ function applyPLF(){
             const idx=D.people.indexOf(p);
                       const pct=Math.round(p.posts_engaged/maxP*100);
             return`<div class="pcrd" onclick="openPersonDrawer(${idx})" style="animation-delay:${pi*.04}s">
-              <div class="pctop">${av(p.name,'',44,'pcav')}<div><div class="pcn">${esc(p.name)}</div><div class="pct">${esc(p.title||p.headline)}</div></div></div>
+              <div class="pctop">${av(p.name,p.pic,44,'pcav')}<div><div class="pcn">${esc(p.name)}</div><div class="pct">${esc(p.title||p.headline)}</div></div></div>
               <div class="pcbdg">
                 ${p.seniority?`<span class="b ${SCLS(p.seniority)}">${esc(SLBL(p.seniority))}</span>`:''}
+                ${p.dm==='Yes'?`<span class="b bdm">🎯 DM</span>`:''}
+                ${isEmployee(p)?`<span class="b brel-emp">🏢 P² Employee</span>`:''}
                 ${p.degree?`<span class="b bdeg">${DLBL(p.degree)}</span>`:''}
                 ${p.country?`<span class="b bic">🌏 ${esc(p.country)}</span>`:''}
                 ${p.industry?`<span class="b bic" style="background:rgba(79,70,229,0.18);border-color:rgba(79,70,229,0.35)">${esc(p.industry)}</span>`:''}
@@ -347,6 +483,7 @@ function applyPLF(){
                 ${p.company?`<div class="pcmi">🏢 <span>${esc(p.company)}</span></div>`:''}
                 ${p.location?`<div class="pcmi">📍 <span>${esc(p.location)}</span></div>`:''}
                 ${p.size?`<div class="pcmi">👥 <span>${esc(p.size)}</span></div>`:''}
+                ${p.followers?`<div class="pcmi">📶 <span>${fmtN(p.followers)} followers</span></div>`:''}
                 ${p.url?`<div class="pcmi"><a href="${esc(p.url)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--accent);text-decoration:none;font-size:10px;font-weight:600">↗ LinkedIn</a></div>`:''}
               </div>
               ${p.posts_engaged>0?`<div class="actbar"><div class="acttrack"><div class="actfill" style="width:${pct}%"></div></div><div class="actlbl">${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</div></div>`:''}
@@ -436,8 +573,10 @@ function openEngDrawer(pi,ei){
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const badges=[
     e.seniority?`<span class="b ${SCLS(e.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(e.seniority))}</span>`:'',
+    isEmployee(e)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 Position² Employee</span>`:'',
     e.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(e.degree)} degree</span>`:'',
     e.reaction?`<span class="b ${RCLS[e.reaction]||'bic'}" style="font-size:12px;padding:4px 11px">${RICO[e.reaction]||''} ${e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()}</span>`:'',
+    e.commented?`<span class="b blike" style="font-size:12px;padding:4px 11px">💬 Commented</span>`:'',
   ].filter(Boolean);
   document.getElementById('dbody').innerHTML=`
     <div class="dsec"><div class="tagrow">${badges.join('')}</div></div>
@@ -447,6 +586,8 @@ function openEngDrawer(pi,ei){
         <div class="ibox"><div class="ilbl">Industry</div><div class="ival">${esc(e.industry||'-')}</div></div>
         <div class="ibox"><div class="ilbl">Location</div><div class="ival">${esc(e.location||'-')}</div></div>
         <div class="ibox"><div class="ilbl">Reaction</div><div class="ival">${RICO[e.reaction]||''} ${esc(e.reaction||'-')}</div></div>
+        <div class="ibox"><div class="ilbl">Followers</div><div class="ival">${fmtN(e.followers||0)}</div></div>
+        <div class="ibox"><div class="ilbl">Connections</div><div class="ival">${fmtN(e.connections||0)}</div></div>
       </div>
     </div>
     <div class="dsec"><div class="dslbl">Post Engaged With</div>
@@ -462,17 +603,25 @@ function openPersonDrawer(idx){
   const p=D.people[idx];if(!p)return;
   const pct=Math.round(p.posts_engaged/maxP*100);
   document.getElementById('dhdr').innerHTML=`
-    ${av(p.name,'',58,'dav')}
+    ${av(p.name,p.pic,58,'dav')}
     <div style="flex:1"><div class="dname">${esc(p.name)}</div><div class="dsub">${esc(p.title||p.headline)}</div>
     ${p.url?`<a href="${esc(p.url)}" target="_blank" class="lilink">🔗 LinkedIn Profile</a>`:''}</div>
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const badges=[
     p.seniority?`<span class="b ${SCLS(p.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(p.seniority))}</span>`:'',
+    p.dm==='Yes'?`<span class="b bdm" style="font-size:12px;padding:4px 11px">🎯 Decision Maker</span>`:'',
+    isEmployee(p)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 Position² Employee</span>`:'',
     p.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(p.degree)} degree</span>`:'',
     p.posts_engaged>0?`<span class="b bmg" style="font-size:12px;padding:4px 11px">⚡ ${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</span>`:'',
   ].filter(Boolean);
   document.getElementById('dbody').innerHTML=`
     <div class="dsec"><div class="tagrow">${badges.join('')}</div></div>
+    ${(p.followers||p.connections)?`<div class="dsec"><div class="dslbl">LinkedIn Reach</div>
+      <div class="igrid">
+        <div class="ibox"><div class="ilbl">Followers</div><div class="ival">${fmtN(p.followers||0)}</div></div>
+        <div class="ibox"><div class="ilbl">Connections</div><div class="ival">${fmtN(p.connections||0)}</div></div>
+      </div>
+    </div>`:''}
     ${p.posts_engaged>0?`<div class="dsec"><div class="dslbl">Engagement Activity</div>
       <div style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,.03);border:1px solid var(--card-b);border-radius:10px">
         <div style="flex:1"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Relative activity vs. most active person</div>
@@ -480,6 +629,7 @@ function openPersonDrawer(idx){
         </div>
         <div style="font-size:26px;font-weight:700;color:var(--green)">${p.posts_engaged}</div>
       </div>
+      ${p.comments_count?`<div style="margin-top:8px;font-size:11px;color:var(--muted)">💬 Commented ${p.comments_count} time${p.comments_count!==1?'s':''}</div>`:''}
     </div>`:''}
     <div class="dsec"><div class="dslbl">Profile Details</div>
       <div class="igrid">
@@ -500,9 +650,15 @@ function openCompanyDrawer(idx){
   const SEN_C=['C-Level / Founder','VP','Director','Manager','IC / Individual Contributor'];
   const SEN_COLS=['#fbbf24','#818cf8','#818cf8','#00e5a0','#94a3b8'];
   const [cc1,cc2]=gradFor(c.name);
+  const coLinks=[
+    c.website?`<a href="${esc(/^https?:/.test(c.website)?c.website:'https://'+c.website)}" target="_blank" class="lilink">🌐 Website</a>`:'',
+    c.li_url?`<a href="${esc(c.li_url)}" target="_blank" class="lilink">🔗 LinkedIn Page</a>`:'',
+  ].filter(Boolean).join('');
   document.getElementById('dhdr').innerHTML=`
     <div class="dav" style="border-radius:14px;background:linear-gradient(135deg,${cc1},${cc2})">${ini(c.name)}</div>
-    <div style="flex:1"><div class="dname">${esc(c.name)}</div><div class="dsub">${esc(c.industry||'-')} ${c.size?'· '+esc(c.size)+' employees':''}</div></div>
+    <div style="flex:1"><div class="dname">${esc(c.name)}</div><div class="dsub">${esc(c.industry||'-')} ${c.size?'· '+esc(c.size)+' employees':''}</div>
+    ${c.hq?`<div class="dsub" style="margin-top:2px">🏙 ${esc(c.hq)}</div>`:''}
+    ${coLinks?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${coLinks}</div>`:''}</div>
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const total=c.people_count||1;
   const senBars=SEN_C.map((s,i)=>{const cnt=c.seniority_map[s]||0;if(!cnt)return'';return`<div class="cc-bar-seg" style="width:${Math.round(cnt/total*100)}%;background:${SEN_COLS[i]};height:8px"></div>`;}).join('');
@@ -587,10 +743,6 @@ function closePostModal(){
   document.body.style.overflow='';
 }
 /* ── INIT ── */
-buildPostTab();
-buildPeopleTab();
-buildCompaniesTab();
-document.getElementById('tc-post').textContent=D.posts.length;
-document.getElementById('tc-companies').textContent=D.companies.length;
-switchTab('people');
+switchTab('overview');
+loadLinkedInData(false);
 
