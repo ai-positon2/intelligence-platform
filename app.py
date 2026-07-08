@@ -3178,6 +3178,9 @@ def _fetch_member_analytics() -> dict:
         if posts:
             lp = max(pc(r, 0) for r in posts)
             if lp > last_active: last_active = lp
+        post_secs = sum(to_int(pc(r, 7)) for r in posts)
+        _tos_h, _tos_r = divmod(post_secs, 3600); _tos_m = _tos_r // 60
+        time_on_site = f"{_tos_h}h {_tos_m}m" if _tos_h else (f"{_tos_m}m" if _tos_m else "—")
 
         tl = []
         for r in pre:
@@ -3212,7 +3215,7 @@ def _fetch_member_analytics() -> dict:
             "company": company, "vid": (sorted(mem["vids"])[0][:8] if mem["vids"] else ""),
             "signins": mem["signins"], "prelogin_pages": prelogin_pages, "post_pages": len(posts),
             "first_seen": first_seen, "joined": mem["first_signin"], "last_active": last_active,
-            "source": source, "landing": landing, "engaged": fmt(engaged),
+            "source": source, "landing": landing, "engaged": fmt(engaged), "time_on_site": time_on_site,
             "device": mem["device"] or "—", "browser": mem["browser"] or "—", "os": mem["os"] or "—",
             "status": status, "linked": bool(mem["vids"]), "timeline": tl,
         })
