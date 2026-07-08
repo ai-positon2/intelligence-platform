@@ -3416,12 +3416,13 @@ def _fetch_usage_data() -> dict:
         u["time_fmt"] = f"{uh}h {um}m" if uh else (f"{um}m" if um else "—")
     user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
 
+    # Full tables, newest first — no cap (return every login and page view).
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
                     "browser": col(r,10), "os": col(r,12), "device": col(r,13)}
-                   for r in reversed(login_data)][:100]
+                   for r in reversed(login_data)]
     page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
                     "url": col(r,6), "duration": col(r,8)}
-                   for r in reversed(page_data)][:200]
+                   for r in reversed(page_data)]
 
     return dict(total_logins=total_logins, unique_users=unique_users,
                 total_page_views=total_page_views, total_time_fmt=total_time_fmt,
