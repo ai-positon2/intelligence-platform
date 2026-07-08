@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}?v=5">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=1">
   <script src="/static/js/aurora.js?v=1" defer></script>
@@ -80,20 +80,20 @@
   </div>
 </div>
 <div class="mega-tabs">
-  <button class="mtab active" onclick="switchTab('overview')" id="nt-overview">
-    <div class="mtab-label">Overview</div>
+  <button class="mtab active" style="--kc:#b78bfa" onclick="switchTab('overview')" id="nt-overview">
+    <div class="mtab-label">📊 Overview</div>
     <div class="mtab-val vp" id="tc-overview">—</div>
   </button>
-  <button class="mtab" onclick="switchTab('people')" id="nt-people">
-    <div class="mtab-label">People</div>
+  <button class="mtab" style="--kc:#2dd4aa" onclick="switchTab('people')" id="nt-people">
+    <div class="mtab-label">👥 People</div>
     <div class="mtab-val vg" id="tc-people">—</div>
   </button>
-  <button class="mtab" onclick="switchTab('companies')" id="nt-companies">
-    <div class="mtab-label">Companies</div>
+  <button class="mtab" style="--kc:#22d3ee" onclick="switchTab('companies')" id="nt-companies">
+    <div class="mtab-label">🏢 Companies</div>
     <div class="mtab-val vc" id="tc-companies">—</div>
   </button>
-  <button class="mtab" onclick="switchTab('post')" id="nt-post">
-    <div class="mtab-label">Posts</div>
+  <button class="mtab" style="--kc:#7c83f5" onclick="switchTab('post')" id="nt-post">
+    <div class="mtab-label">📣 Posts</div>
     <div class="mtab-val vi" id="tc-post">—</div>
   </button>
 </div>
@@ -136,7 +136,7 @@ document.addEventListener('click',function(e){
 {% include 'ppc_chat_widget.html' %}
 <div class="li-toast" id="liToast"></div>
 <script>window.__LI_DATA_URL__ = "{{ url_for('linkedin_scraper_data') }}";</script>
-<script src="{{ url_for('static', filename='js/linkedin.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/linkedin.js') }}?v=5"></script>
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
 (function(){
@@ -400,7 +400,10 @@ document.addEventListener('click',function(e){
   if(window.__lbrace)return;window.__lbrace=1;
   var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   function race(){
-    var items=document.querySelectorAll('.lbitem');if(!items.length)return;
+    /* .lbitem-static = overview breakdown bars whose label is "N · NN%"; the
+       count-up strips non-digits (→ "7 · 47%" becomes 747) and overwrites the
+       percent span, so only race real ranked leaderboards (pure-integer .lbnum). */
+    var items=document.querySelectorAll('.lbitem:not(.lbitem-static)');if(!items.length)return;
     items.forEach(function(it,i){
       if(it.__raced)return;it.__raced=1;
       var dl=60+Math.min(i*70,1000);

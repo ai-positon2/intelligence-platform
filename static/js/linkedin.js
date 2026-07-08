@@ -113,12 +113,12 @@ function buildOverviewTab(){
   const el=document.getElementById('tab-overview');if(!el)return;
   const st=D.stats||{};
   const kpis=[
-    {v:st.total_engagements||0,l:'Total Engagements',c:'vi'},
-    {v:st.total_people||0,l:'Unique People',c:'vg'},
-    {v:st.total_dms||0,l:'Decision Makers',c:'va'},
-    {v:st.csuite_count||0,l:'C-Suite Reached',c:'vp'},
-    {v:st.total_companies||0,l:'Companies Reached',c:'vc'},
-    {v:st.total_comments||0,l:'Comments',c:'vi'},
+    {v:st.total_engagements||0,l:'Total Engagements',c:'vi',kc:'#7c83f5',ic:'⚡'},
+    {v:st.total_people||0,l:'Unique People',c:'vg',kc:'#2dd4aa',ic:'👥'},
+    {v:st.total_dms||0,l:'Decision Makers',c:'va',kc:'#f5a623',ic:'🎯'},
+    {v:st.csuite_count||0,l:'C-Suite Reached',c:'vp',kc:'#b78bfa',ic:'👑'},
+    {v:st.total_companies||0,l:'Companies Reached',c:'vc',kc:'#22d3ee',ic:'🏢'},
+    {v:st.total_comments||0,l:'Comments',c:'vr',kc:'#fb7185',ic:'💬'},
   ];
   function barList(counts,total,colorFn){
     const entries=Object.entries(counts||{}).sort((a,b)=>b[1]-a[1]);
@@ -138,29 +138,29 @@ function buildOverviewTab(){
   const relTotal=Object.values(st.relationship_breakdown||{}).reduce((a,b)=>a+b,0);
   el.innerHTML=`
   <div class="ov-kpis">
-    ${kpis.map(k=>`<div class="ov-kpi"><div class="ov-kpi-val ${k.c}" data-count="${k.v}">0</div><div class="ov-kpi-lbl">${k.l}</div></div>`).join('')}
+    ${kpis.map(k=>`<div class="ov-kpi" style="--kc:${k.kc}"><div class="ov-kpi-ic">${k.ic}</div><div class="ov-kpi-val ${k.c}" data-count="${k.v}">0</div><div class="ov-kpi-lbl">${k.l}</div></div>`).join('')}
   </div>
   <div class="ov-grid">
-    <div class="lbcard">
-      <div class="lbtitle">⚡ Reaction Mix</div>
-      ${barList(st.reaction_breakdown,st.total_engagements,k=>({LIKE:'#60a5fa',PRAISE:'#fde047',INTEREST:'#a5b4fc',APPRECIATION:'#fca5a5',EMPATHY:'#f9a8d4'}[k]||'var(--accent)'))}
+    <div class="lbcard ov-card" style="--kc:#22d3ee">
+      <div class="lbtitle"><span class="ov-chip">⚡</span> Reaction Mix</div>
+      ${barList(st.reaction_breakdown,st.total_engagements,k=>({LIKE:'#60a5fa',PRAISE:'#fbbf24',INTEREST:'#a5b4fc',APPRECIATION:'#fca5a5',EMPATHY:'#f9a8d4'}[k]||'var(--accent)'))}
     </div>
-    <div class="lbcard">
-      <div class="lbtitle">🏅 Seniority Mix</div>
-      ${barList(st.seniority_breakdown,st.total_people,k=>({'C-Level / Founder':'#fbbf24','VP':'#818cf8','Director':'#818cf8','Manager':'#00e5a0','IC / Individual Contributor':'#94a3b8'}[k]||'var(--accent)'))}
+    <div class="lbcard ov-card" style="--kc:#f5a623">
+      <div class="lbtitle"><span class="ov-chip">🏅</span> Seniority Mix</div>
+      ${barList(st.seniority_breakdown,st.total_people,k=>({'C-Level / Founder':'#fbbf24','VP':'#818cf8','Director':'#a5b4fc','Manager':'#2dd4aa','IC / Individual Contributor':'#94a3b8'}[k]||'var(--accent)'))}
     </div>
-    <div class="lbcard">
-      <div class="lbtitle">🌍 Top Locations</div>
-      ${barList(st.country_breakdown,st.total_people)}
+    <div class="lbcard ov-card" style="--kc:#2dd4aa">
+      <div class="lbtitle"><span class="ov-chip">🌍</span> Top Locations</div>
+      ${barList(st.country_breakdown,st.total_people,()=>'linear-gradient(90deg,#2dd4aa,#22d3ee)')}
     </div>
-    <div class="lbcard">
-      <div class="lbtitle">🎯 Employee vs. External</div>
-      ${barList(st.relationship_breakdown,relTotal,k=>k==='Employee'?'#f59e0b':'var(--accent)')}
-      <div style="margin-top:10px;font-size:11px;color:var(--tx3)">External reactions are real prospect signal — employee amplification is tracked separately so it doesn't inflate reach.</div>
+    <div class="lbcard ov-card" style="--kc:#fb7185">
+      <div class="lbtitle"><span class="ov-chip">🎯</span> Employee vs. External</div>
+      ${barList(st.relationship_breakdown,relTotal,k=>k==='Employee'?'#f5a623':'linear-gradient(90deg,#fb7185,#b78bfa)')}
+      <div class="ov-note">External reactions are real prospect signal — employee amplification is tracked separately so it doesn't inflate reach.</div>
     </div>
   </div>
-  <div class="sec-hdr" style="margin-top:22px"><div class="sec-ttl">🏆 Top Companies by Engagement</div></div>
-  <div class="lbcard">
+  <div class="sec-hdr" style="margin-top:22px"><div class="sec-ttl"><span class="ov-chip" style="--kc:#7c83f5">🏆</span> Top Companies by Engagement</div></div>
+  <div class="lbcard ov-card ov-card-lb" style="--kc:#7c83f5">
     ${(D.company_lb||[]).length?D.company_lb.map(([name,cnt],i)=>{
       const maxLb=D.company_lb[0][1]||1;
       return`<div class="lbitem" onclick="switchTab('companies');setTimeout(()=>openCompanyDrawerByName('${esc(name)}'),120)">
