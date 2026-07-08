@@ -866,3 +866,210 @@ html.lenis,html.lenis body{height:auto}
 [data-theme="light"] .tb-dd-item,[data-theme="light"] .dd-item{color:#4d5680 !important}
 [data-theme="light"] .tb-dd-item:hover,[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
 [data-theme="light"] .card,[data-theme="light"] .glass,[data-theme="light"] .panel{background:#fff !important;border-color:rgba(18,26,54,.10) !important}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   RICH REDESIGN v2 — colour, depth & opacity pass (LinkedIn page only)
+   Richer tinted glass surfaces, per-section accent colour, vivid tabs,
+   glowing KPIs & bars. Uses the shared palette tokens from ds-tokens.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* — surface opacity bump: lift the near-invisible white-alpha fills — */
+:root{
+  --s1:rgba(255,255,255,.05);
+  --s2:rgba(255,255,255,.08);
+  --s3:rgba(255,255,255,.11);
+  --b1:rgba(255,255,255,.10);
+  --b2:rgba(255,255,255,.16);
+}
+
+/* — a warmer, more colourful canvas glow behind everything — */
+body::before{
+  background:
+    radial-gradient(ellipse 78% 58% at 12% 12%,rgba(124,131,245,.30) 0%,transparent 55%),
+    radial-gradient(ellipse 64% 52% at 88% 18%,rgba(34,211,238,.20) 0%,transparent 55%),
+    radial-gradient(ellipse 70% 55% at 82% 82%,rgba(183,139,250,.22) 0%,transparent 55%),
+    radial-gradient(ellipse 58% 48% at 18% 88%,rgba(45,212,170,.18) 0%,transparent 55%),
+    radial-gradient(ellipse 52% 42% at 50% 50%,rgba(251,113,133,.10) 0%,transparent 62%) !important;
+}
+/* richer, more saturated aurora blobs (one warm for colour variety) */
+.li-aurora .b1{background:radial-gradient(circle at 30% 30%,rgba(99,102,241,.46),transparent 60%) !important}
+.li-aurora .b2{background:radial-gradient(circle at 60% 40%,rgba(34,211,238,.36),transparent 60%) !important}
+.li-aurora .b3{background:radial-gradient(circle at 50% 50%,rgba(251,113,133,.30),transparent 62%) !important}
+
+/* — page header icon: give it a living gradient — */
+.page-hdr-icon{
+  background:linear-gradient(135deg,#7c83f5,#22d3ee 60%,#2dd4aa) !important;
+  border:none !important;color:#fff;
+  box-shadow:0 8px 24px -6px rgba(124,131,245,.8),0 0 0 1px rgba(255,255,255,.12) inset;
+}
+.page-hdr-title{
+  background:linear-gradient(92deg,#fff,#c7d2fe 60%,#a5f3ea);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+
+/* ══ MEGA-TABS — per-tab accent colour (--kc) ══ */
+.mega-tabs{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+  border-color:var(--b2);
+  box-shadow:0 18px 50px -28px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.03) inset;
+}
+.mtab::before{background:radial-gradient(150px 80px at 26px 6px,color-mix(in srgb,var(--kc,var(--accent)) 40%,transparent),transparent 72%)}
+.mtab.active{background:color-mix(in srgb,var(--kc,var(--accent)) 12%,transparent)}
+.mtab.active .mtab-label{color:var(--kc,var(--accent))}
+.mtab.active::after{background:var(--kc,var(--accent));box-shadow:0 0 18px 2px var(--kc,var(--accent))}
+.mtab-val{
+  background:linear-gradient(160deg,#fff,color-mix(in srgb,var(--kc,var(--accent)) 65%,#fff));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 4px 14px color-mix(in srgb,var(--kc,var(--accent)) 45%,transparent));
+}
+.mtab.active .mtab-val{filter:drop-shadow(0 4px 20px color-mix(in srgb,var(--kc,var(--accent)) 70%,transparent))}
+
+/* ══ OVERVIEW — KPI TILES (colourful, glowing) ══ */
+.vr{color:var(--rose)}
+.ov-kpis{gap:12px}
+.ov-kpi{
+  position:relative;overflow:hidden;
+  padding:18px 20px;
+  background:
+    linear-gradient(158deg,color-mix(in srgb,var(--kc,var(--accent)) 20%,transparent),color-mix(in srgb,var(--kc,var(--accent)) 5%,transparent)),
+    var(--s1);
+  border:1px solid color-mix(in srgb,var(--kc,var(--accent)) 34%,transparent);
+  border-radius:var(--rxl);
+  box-shadow:0 10px 30px -14px color-mix(in srgb,var(--kc,var(--accent)) 55%,transparent),0 1px 0 rgba(255,255,255,.06) inset;
+  transition:transform .22s var(--ease),box-shadow .25s,border-color .2s;
+}
+.ov-kpi::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--kc,var(--accent)),transparent);
+  opacity:.9;
+}
+.ov-kpi:hover{
+  transform:translateY(-4px);
+  border-color:color-mix(in srgb,var(--kc,var(--accent)) 60%,transparent);
+  box-shadow:0 22px 50px -16px color-mix(in srgb,var(--kc,var(--accent)) 70%,transparent),0 0 30px -6px color-mix(in srgb,var(--kc,var(--accent)) 40%,transparent),0 1px 0 rgba(255,255,255,.08) inset;
+}
+.ov-kpi-ic{
+  position:absolute;top:14px;right:14px;
+  width:34px;height:34px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  background:color-mix(in srgb,var(--kc,var(--accent)) 18%,transparent);
+  border:1px solid color-mix(in srgb,var(--kc,var(--accent)) 32%,transparent);
+  box-shadow:0 6px 16px -6px color-mix(in srgb,var(--kc,var(--accent)) 60%,transparent);
+}
+.ov-kpi-val{
+  font-size:34px;font-weight:800;line-height:1;letter-spacing:-.02em;
+  color:var(--kc,var(--accent));font-variant-numeric:tabular-nums;
+  text-shadow:0 2px 20px color-mix(in srgb,var(--kc,var(--accent)) 45%,transparent);
+}
+.ov-kpi-lbl{font-size:11.5px;color:var(--tx2);text-transform:uppercase;letter-spacing:.07em;margin-top:8px;font-weight:600}
+
+/* ══ OVERVIEW — BREAKDOWN CARDS (--kc accent) ══ */
+.ov-card{
+  position:relative;top:auto;overflow:hidden;  /* reset .lbcard's sticky top:68px */
+  background:
+    linear-gradient(180deg,color-mix(in srgb,var(--kc,var(--accent)) 10%,transparent),transparent 42%),
+    var(--s1);
+  border:1px solid color-mix(in srgb,var(--kc,var(--accent)) 24%,transparent);
+  border-radius:var(--rxl);
+  box-shadow:0 14px 40px -20px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.05) inset;
+  padding:16px 18px;
+}
+.ov-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--kc,var(--accent)),transparent 80%);
+}
+.ov-card .lbtitle{color:color-mix(in srgb,var(--kc,var(--accent)) 78%,#fff);display:flex;align-items:center;gap:8px;font-size:11px}
+.ov-chip{
+  width:24px;height:24px;border-radius:8px;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;
+  background:color-mix(in srgb,var(--kc,var(--accent)) 20%,transparent);
+  border:1px solid color-mix(in srgb,var(--kc,var(--accent)) 34%,transparent);
+}
+.ov-note{margin-top:10px;font-size:11px;color:var(--tx3);line-height:1.5;padding-top:10px;border-top:1px solid var(--b1)}
+
+/* richer bars everywhere on the overview */
+.ov-card .lbtrack,.ov-card-lb .lbtrack{height:7px;border-radius:5px;background:rgba(255,255,255,.06)}
+.ov-card .lbfill,.ov-card-lb .lbfill{
+  border-radius:5px;
+  background:linear-gradient(90deg,var(--kc,var(--accent)),color-mix(in srgb,var(--kc,var(--accent)) 55%,#fff));
+  box-shadow:0 0 12px -2px color-mix(in srgb,var(--kc,var(--accent)) 70%,transparent);
+}
+.ov-card .lbitem,.ov-card-lb .lbitem{padding:9px 0}
+.ov-card .lbname{font-size:12.5px;color:var(--tx)}
+.ov-card .lbnum{font-size:12.5px;color:var(--tx);font-weight:700}
+.ov-grid{gap:14px}
+
+/* ══ CARDS — richer glass + colourful hover (people / companies / posts) ══ */
+.pcrd,.ccrd,.pcard{
+  background:linear-gradient(168deg,rgba(255,255,255,.06),rgba(255,255,255,.02)) !important;
+  border:1px solid var(--b1);
+}
+.pcrd:hover{
+  border-color:rgba(45,212,170,.5) !important;
+  box-shadow:0 16px 40px -16px rgba(0,0,0,.6),0 0 26px -6px rgba(45,212,170,.28) !important;
+}
+.ccrd:hover{
+  border-color:rgba(34,211,238,.5) !important;
+  box-shadow:0 16px 40px -16px rgba(0,0,0,.6),0 0 26px -6px rgba(34,211,238,.28) !important;
+}
+/* company card mini-stats get a little colour */
+.ccrd .cc-stat{background:rgba(255,255,255,.03);border-color:var(--b1)}
+.ccrd .cc-stat:first-child .cc-stat-val{color:var(--green)}
+.ccrd .cc-stat:last-child .cc-stat-val{color:var(--amber)}
+
+/* bucket section headers — a touch of accent */
+.bhdr{background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.02))}
+.bhdr:hover{background:rgba(124,131,245,.10);border-color:var(--accent-g)}
+
+/* ══ BADGES — a little more vivid ══ */
+.b{font-weight:650}
+.bcs{background:rgba(183,139,250,.18);color:#d3bafd}
+.bvp{background:rgba(129,140,248,.18);color:#b3bcff}
+.bmg{background:rgba(45,212,170,.18);color:#6ee7c6}
+.bdm{background:rgba(245,166,35,.18);color:#fbcb74}
+.bdeg{background:rgba(124,131,245,.16);color:#b3bcff}
+.brel-emp{background:rgba(245,158,11,.18);color:#fbcb74;border:1px solid rgba(245,158,11,.36)}
+
+/* ══ COMPANY LEADERBOARD (overview + sidebar) — glow bars ══ */
+.ov-card-lb .lbfill{background:linear-gradient(90deg,#7c83f5,#22d3ee)}
+.lbcard .lbtitle{letter-spacing:.08em}
+
+/* ══ REFRESH BUTTON — richer gradient + glow ══ */
+.li-refresh-btn{
+  background:linear-gradient(135deg,#7c83f5,#9b87fd);
+  border:1px solid rgba(155,135,253,.5);color:#fff;
+  box-shadow:0 10px 26px -10px rgba(124,131,245,.85);
+}
+.li-refresh-btn:hover{
+  background:linear-gradient(135deg,#8b91ff,#a78bfa);
+  box-shadow:0 14px 32px -10px rgba(124,131,245,1);
+}
+.li-sync-dot{box-shadow:0 0 10px var(--green)}
+
+/* keep it civil on small screens */
+@media(max-width:560px){
+  .ov-kpi-val{font-size:28px}
+  .ov-kpi-ic{width:30px;height:30px;font-size:14px}
+}
+/* 4 mega-tabs get tight at phone widths — shrink so the count doesn't crowd the label */
+@media(max-width:640px){
+  .mtab{padding:13px 8px}
+  .mtab-val{font-size:26px}
+  .mtab-label{font-size:9.5px;letter-spacing:.04em;margin-bottom:5px}
+}
+
+/* ══ LIGHT THEME — keep the colour, calm the glass ══ */
+[data-theme="light"]:root{
+  --s1:rgba(18,26,54,.03);--s2:rgba(18,26,54,.05);--s3:rgba(18,26,54,.08);
+  --b1:rgba(18,26,54,.10);--b2:rgba(18,26,54,.16);
+}
+[data-theme="light"] .page-hdr-title{-webkit-text-fill-color:initial;background:none;color:#17213a}
+[data-theme="light"] .ov-kpi{
+  background:linear-gradient(158deg,color-mix(in srgb,var(--kc,var(--accent)) 14%,#fff),#fff);
+}
+[data-theme="light"] .ov-card{background:linear-gradient(180deg,color-mix(in srgb,var(--kc,var(--accent)) 8%,#fff),#fff)}
+[data-theme="light"] .pcrd,[data-theme="light"] .ccrd,[data-theme="light"] .pcard{
+  background:#fff !important;
+}
+[data-theme="light"] .mtab-val{-webkit-text-fill-color:initial;background:none;color:var(--kc,var(--accent));filter:none}
