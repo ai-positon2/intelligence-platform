@@ -1889,7 +1889,6 @@ def _agent_access_request_slack_blocks(user: dict, agent: dict, message: str = "
     name = user.get("name", "") or "Unknown"
     email = user.get("email", "")
     agent_name = agent.get("name", "")
-    when = datetime.now(IST).strftime("%b %d, %Y · %I:%M %p IST")
     fallback = f"New agent access request: {name} <{email}> wants access to {agent_name}"
     requester = _slack_mrkdwn_escape(name)
     if email:
@@ -1906,9 +1905,6 @@ def _agent_access_request_slack_blocks(user: dict, agent: dict, message: str = "
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason given*\n{quoted}"}})
     else:
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": "_No reason given_"}]})
-    blocks.append({"type": "divider"})
-    blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
-        "text": f":clock3: {when}  ·  <https://intelligence.position2.com/p2/admin/access-requests|View all access requests →>"}]})
     return fallback, blocks
 
 def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -> bool:
@@ -1920,7 +1916,8 @@ def _agent_access_request_to_slack(user: dict, agent: dict, message: str = "") -
         try:
             r = requests.post("https://slack.com/api/chat.postMessage",
                               headers={"Authorization": "Bearer " + SLACK_BOT_TOKEN},
-                              json={"channel": SLACK_CHANNEL_ID, "text": fallback, "blocks": blocks}, timeout=8)
+                              json={"channel": SLACK_CHANNEL_ID, "text": fallback, "blocks": blocks,
+                                    "unfurl_links": False, "unfurl_media": False}, timeout=8)
             if r.ok and r.json().get("ok"):
                 return True
             log.warning("Slack chat.postMessage (agent access) failed: %s", r.text[:200])
