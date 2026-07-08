@@ -43,8 +43,22 @@ a{color:inherit;text-decoration:none}
 .sect{margin-top:30px}
 .sect h2{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.01em;margin:0 0 13px;display:flex;align-items:center;gap:9px}
 .sect h2::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 9px var(--violet)}
-.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr 1fr 1fr}
-@media(max-width:860px){.two,.three{grid-template-columns:1fr}}
+.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr 1fr 1fr}.two-wide{grid-template-columns:2fr 1fr}
+@media(max-width:860px){.two,.three,.two-wide{grid-template-columns:1fr}}
+.bars.compact{gap:8px}
+.bars.compact .bar{grid-template-columns:150px 1fr 34px;column-gap:10px}
+.bars.compact .bar .lab{order:1}
+.bars.compact .bar .track{order:2;grid-column:auto}
+.bars.compact .bar .n{order:3;text-align:right}
+.mem-list{display:flex;flex-direction:column}
+.mem-row{display:flex;align-items:center;gap:14px;padding:10px 6px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;border-radius:8px;transition:background .12s ease}
+.mem-row:last-child{border-bottom:none}
+.mem-row:hover{background:rgba(255,255,255,.04)}
+.mem-row .who{flex:1;min-width:0}
+.mem-stats{display:flex;gap:16px;flex-shrink:0}
+.mem-stat{text-align:right;min-width:44px}
+.mem-stat b{display:block;font-family:var(--display);font-weight:800;font-size:15px;color:var(--ink);line-height:1.1}
+.mem-stat span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-top:2px}
 .bars{display:flex;flex-direction:column;gap:9px}
 .bar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
 .bar .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink)}
@@ -68,11 +82,6 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
 tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
-.memrow{cursor:pointer}
-.pill{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:20px;border:1px solid var(--line2)}
-.pill.new{color:var(--emerald);border-color:rgba(52,211,153,.4)}
-.pill.ret{color:var(--lime);border-color:rgba(163,230,53,.4)}
-.pill.link{color:var(--cyan);border-color:rgba(34,211,238,.4)}
 .empty{color:var(--dim2);padding:18px;text-align:center;font-size:13px}
 .tbl-wrap{overflow:auto;max-height:560px;border-radius:12px}
 .tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px}
@@ -225,14 +234,9 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
     <div class="card"><h2 style="margin-top:0">Companies <span class="muted" style="font-weight:400;font-size:12px">· reverse-IP / identity</span></h2><div class="bars" id="companies"></div></div>
   </div>
 
-  <div class="sect"><h2>Members <span class="muted" style="font-weight:400;font-size:12px">· click a row for the full before/after timeline</span></h2>
-    <div class="card" style="padding:6px"><div class="tbl-wrap"><table id="members">
-      <thead><tr><th>Member</th><th>Company</th><th>Source</th><th>Pre-login</th><th>Sign-ins</th><th>First seen</th><th>Joined</th><th>Last active</th><th>Status</th></tr></thead>
-      <tbody></tbody></table></div></div>
-  </div>
-
-  <div class="sect"><h2>Top pages viewed <span class="muted" style="font-weight:400;font-size:12px">· post-login, on /app</span></h2>
-    <div class="card"><div class="bars" id="postPages"></div></div>
+  <div class="sect grid two-wide">
+    <div class="card"><h2 style="margin-top:0">Top pages viewed <span class="muted" style="font-weight:400;font-size:12px">· post-login, on /app</span></h2><div class="bars compact" id="postPages"></div></div>
+    <div class="card" style="padding:14px 10px 6px"><h2 style="margin:0 0 6px 8px">Members <span class="muted" style="font-weight:400;font-size:12px">· click for full timeline</span></h2><div class="mem-list" id="memberList"></div></div>
   </div>
 
   <div class="sect"><h2>Recent activity <span class="muted" style="font-weight:400;font-size:12px">· post-login on /app</span></h2>
@@ -298,6 +302,20 @@ function avatar(m,big){
 }
 var MEMBERS=[];
 var LAST_DATA=null;
+function renderMemberList(){
+  var el=document.getElementById('memberList');if(!el)return;
+  var arr=MEMBERS.slice().sort(function(a,b){return (b.signins||0)-(a.signins||0);}).slice(0,8);
+  if(!arr.length){el.innerHTML='<div class="empty">No members yet</div>';return;}
+  el.innerHTML=arr.map(function(m){
+    var idx=MEMBERS.indexOf(m);
+    return '<div class="mem-row" onclick="openDrawer('+idx+')">'+
+      '<div class="who">'+avatar(m)+'<div class="nm"><b>'+esc(m.name||m.email)+'</b><small>'+esc(m.email)+'</small></div></div>'+
+      '<div class="mem-stats">'+
+        '<div class="mem-stat"><b>'+(m.signins||0)+'</b><span>sign-ins</span></div>'+
+        '<div class="mem-stat"><b style="color:var(--emerald)">'+esc(m.time_on_site||'—')+'</b><span>on site</span></div>'+
+      '</div></div>';
+  }).join('');
+}
 function miniBars(arr,suffix){
   if(!arr||!arr.length)return '<div class="empty">No data yet</div>';
   var max=Math.max.apply(null,arr.map(function(x){return x[1];}))||1;
@@ -476,23 +494,9 @@ function load(force){
     bars('sources',d.sources);bars('prePages',d.prelogin_pages);
     bars('devices',d.devices);bars('oses',d.oses);bars('browsers',d.browsers);
     bars('utm',d.utm);bars('companies',d.companies);bars('postPages',d.post_pages);
-    // members table
+    // members (compact list, top by sign-ins)
     MEMBERS=d.members||[];
-    var tb=document.querySelector('#members tbody');
-    tb.innerHTML=MEMBERS.length?MEMBERS.map(function(m,i){
-      var st=m.status==='returning'?'<span class="pill ret">returning</span>':'<span class="pill new">new</span>';
-      var lk=m.linked?' <span class="pill link">linked</span>':'';
-      return '<tr class="memrow" onclick="openDrawer('+i+')">'+
-        '<td><div class="who">'+avatar(m)+'<div class="nm"><b>'+esc(m.name)+'</b><small>'+esc(m.email)+'</small></div></div></td>'+
-        '<td>'+esc(m.company||'—')+'</td>'+
-        '<td title="'+esc(m.source)+'">'+esc(m.source)+'</td>'+
-        '<td>'+m.prelogin_pages+'</td>'+
-        '<td>'+m.signins+'</td>'+
-        '<td class="muted">'+esc(m.first_seen)+'</td>'+
-        '<td class="muted">'+esc(m.joined)+'</td>'+
-        '<td class="muted">'+esc(m.last_active)+'</td>'+
-        '<td>'+st+lk+'</td></tr>';
-    }).join(''):'<tr><td colspan="9" class="empty">No members yet</td></tr>';
+    renderMemberList();
     // recent
     var rb=document.querySelector('#recent tbody');var rows=d.recent||[];
     rb.innerHTML=rows.length?rows.map(function(x){
