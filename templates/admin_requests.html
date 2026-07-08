@@ -52,6 +52,8 @@
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
     h1{font-family:var(--display);font-weight:800;font-size:clamp(34px,5vw,52px);letter-spacing:-.02em;line-height:1.02;margin:18px 0 10px;color:#fff}
     h1 .ital{font-family:var(--serif);font-style:italic;font-weight:400;background:linear-gradient(110deg,#22d3ee,#a5b4fc 45%,#e879f9);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .hnote{font-family:var(--mono);font-size:14px;font-weight:400;letter-spacing:.01em;color:var(--dim3);vertical-align:middle}
+    .sect-head h2 .hnote{font-size:13px}
     .sub{color:var(--dim);font-size:15.5px;max-width:560px}
     /* ===== stats ===== */
     .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:34px 0 30px;max-width:680px}
@@ -148,8 +150,8 @@
 
   <div class="wrap">
     <div class="eyebrow"><span class="dt"></span> Admin &middot; Demand</div>
-    <h1>Access <span class="ital">Requests.</span></h1>
-    <div class="sub">Everyone who submitted the &ldquo;Request access&rdquo; form &mdash; newest first.</div>
+    <h1>Access <span class="ital">Requests.</span> <span class="hnote">(pre-login)</span></h1>
+    <div class="sub">Everyone who submitted the &ldquo;Request access&rdquo; form before signing in &mdash; newest first.</div>
 
     <div class="stats">
       <div class="stat"><b>{{ count }}</b><span>Total requests</span></div>
@@ -190,7 +192,7 @@
     </div></div>
     {% endif %}
 
-    <div class="sect-head"><h2>Agent access <span class="ital" style="font-family:var(--serif);font-style:italic;font-weight:400">requests.</span><span class="cnt">{{ agent_count }}</span></h2></div>
+    <div class="sect-head"><h2>Agent access <span class="ital" style="font-family:var(--serif);font-style:italic;font-weight:400">requests.</span> <span class="hnote">(post-login, per-agent)</span><span class="cnt">{{ agent_count }}</span></h2></div>
     <div class="sub" style="margin-bottom:22px">Signed-in users asking for access to agents on <a href="/app" style="color:#a5b4fc">/app</a> that aren&rsquo;t connected to a live tool yet &mdash; newest first.</div>
 
     {% if agent_requests %}
