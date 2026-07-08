@@ -964,6 +964,27 @@ body::before{
 }
 .ov-kpi-lbl{font-size:11.5px;color:var(--tx2);text-transform:uppercase;letter-spacing:.07em;margin-top:8px;font-weight:600}
 
+/* ══ CLICKABLE / DYNAMIC affordances ══ */
+.ov-kpi-click{cursor:pointer}
+.ov-kpi-go{
+  position:absolute;left:20px;bottom:14px;
+  font-size:11px;font-weight:700;letter-spacing:.02em;
+  color:color-mix(in srgb,var(--kc,var(--accent)) 82%,#fff);
+  opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s;
+}
+.ov-kpi-click:hover .ov-kpi-lbl{opacity:0}
+.ov-kpi-click:hover .ov-kpi-go{opacity:1;transform:translateX(0)}
+.ov-kpi-click:active{transform:translateY(-1px) scale(.995)}
+/* clickable breakdown rows */
+.lbitem-click{cursor:pointer;border-radius:9px;padding-left:8px !important;padding-right:8px !important;margin:0 -8px;transition:background .18s,box-shadow .18s}
+.lbitem-click:hover{background:color-mix(in srgb,var(--kc,var(--accent)) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--kc,var(--accent)) 26%,transparent)}
+.lbitem-click:hover .lbname{color:#fff}
+.ov-card-lb .lbitem{cursor:pointer;border-radius:9px;transition:background .18s}
+.ov-card-lb .lbitem:hover{background:color-mix(in srgb,var(--kc,var(--accent)) 12%,transparent)}
+.ov-note-hint{color:color-mix(in srgb,var(--kc,var(--accent)) 70%,#fff);font-weight:600;white-space:nowrap}
+[data-theme="light"] .ov-kpi-click:hover .ov-kpi-lbl{opacity:1}
+[data-theme="light"] .ov-kpi-go{color:color-mix(in srgb,var(--kc,var(--accent)) 55%,#000)}
+
 /* ══ OVERVIEW — BREAKDOWN CARDS (--kc accent) ══ */
 .ov-card{
   position:relative;top:auto;overflow:hidden;  /* reset .lbcard's sticky top:68px */
