@@ -3730,16 +3730,262 @@ def anonymous_visitors_data():
 
 
 
+# ── LinkedIn Intelligence (live Google Sheet) ────────────────────────────────
+# "6th July Linkedin Agent Sheet" — one row per person×post engagement, refreshed
+# by an external scraper. We read it live (header-mapped, so column order/count
+# can drift) instead of the old committed data/linkedin.json snapshot.
+LINKEDIN_INTEL_SHEET_ID = "17qjHoVN9zSzblP2XxXkHZhjCSH7I13STt49imle_fVw"
+
+_LI_SENIORITY_BUCKET = {
+    "C-Level / Founder": "csuite",
+    "VP": "vpdirector",
+    "Director": "vpdirector",
+    "Manager": "managers",
+    "IC / Individual Contributor": "ics",
+}
+
+
+def _li_bucket(label):
+    return _LI_SENIORITY_BUCKET.get((label or "").strip(), "unknown")
+
+
+def _li_int(s):
+    try:
+        return int(str(s).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def _li_yes(s):
+    return (s or "").strip().lower() == "yes"
+
+
+def _empty_linkedin_result():
+    return {"posts": [], "people": [], "companies": [], "company_lb": [], "stats": {
+        "total_people": 0, "total_posts": 0, "total_companies": 0, "total_engagements": 0,
+        "total_dms": 0, "total_comments": 0, "csuite_count": 0, "vp_count": 0,
+        "director_count": 0, "reaction_breakdown": {}, "seniority_breakdown": {},
+        "country_breakdown": {}, "relationship_breakdown": {}, "source_accounts": [],
+        "last_synced": "",
+    }, "synced_ok": False, "fetched_at": 0}
+
+
+def _transform_linkedin_rows(rows):
+    """Turn the flat 'one row per person x post engagement' sheet into the
+    posts/people/companies shape the dashboard renders. Columns are looked up
+    by header name (not position), so reordering/adding sheet columns is safe."""
+    if not rows or len(rows) < 2:
+        return _empty_linkedin_result()
+    header = rows[0]
+    H = {name.strip(): i for i, name in enumerate(header) if name}
+
+    def g(row, key, default=""):
+        i = H.get(key)
+        if i is None or i >= len(row):
+            return default
+        return (row[i] or "").strip()
+
+    posts, people, companies = {}, {}, {}
+    reaction_ctr, relationship_ctr = Counter(), Counter()
+    source_accounts, last_synced = set(), ""
+
+    for row in rows[1:]:
+        name = g(row, "Person Full Name")
+        if not name:
+            continue
+
+        person_id = g(row, "Person ID") or name.lower()
+        company_name = g(row, "Current Company Name") or "(Unknown)"
+        company_id = g(row, "Current Company ID") or company_name
+        post_id = g(row, "Post ID") or g(row, "Post URL") or g(row, "Post Snippet")[:60]
+        seniority = g(row, "Seniority Bucket")
+        bucket = _li_bucket(seniority)
+        dm = "Yes" if _li_yes(g(row, "Decision-Maker?")) else "No"
+        commented = _li_yes(g(row, "Commented?"))
+        reaction = g(row, "Reaction Type")
+        relationship = g(row, "Relationship to Target") or "External"
+        extracted_at = g(row, "Extracted At")
+        if extracted_at:
+            last_synced = max(last_synced, extracted_at)
+        src = g(row, "Source Account")
+        if src:
+            source_accounts.add(src)
+        if reaction:
+            reaction_ctr[reaction] += 1
+        relationship_ctr[relationship] += 1
+
+        person_summary = {
+            "name": name,
+            "first": g(row, "First Name"),
+            "last": g(row, "Last Name"),
+            "url": g(row, "LinkedIn Profile URL"),
+            "title": g(row, "Current Job Title"),
+            "headline": g(row, "Headline"),
+            "company": company_name,
+            "industry": g(row, "Person Industry"),
+            "size": g(row, "Company Size / Employee Count"),
+            "location": g(row, "Person Location / Region"),
+            "country": g(row, "Person Country"),
+            "seniority": seniority,
+            "bucket": bucket,
+            "dm": dm,
+            "degree": g(row, "Connection Degree"),
+            "pic": g(row, "Profile Picture URL"),
+            "followers": _li_int(g(row, "Followers Count")),
+            "connections": _li_int(g(row, "Connections Count")),
+            "relationship": relationship,
+        }
+
+        post = posts.get(post_id)
+        if post is None:
+            post = {
+                "id": post_id,
+                "url": g(row, "Post URL"),
+                "snippet": g(row, "Post Snippet"),
+                "date": g(row, "Post Date") or g(row, "Like / Reaction Date")[:10] or extracted_at[:10],
+                "author": g(row, "Post Author (Target Company)") or "Position²",
+                "engagers": [],
+            }
+            posts[post_id] = post
+        post["engagers"].append({**person_summary, "reaction": reaction, "commented": commented})
+
+        p = people.get(person_id)
+        if p is None:
+            p = dict(person_summary)
+            p["_posts"] = set()
+            p["_comments"] = 0
+            people[person_id] = p
+        p["_posts"].add(post_id)
+        if commented:
+            p["_comments"] += 1
+        if not p.get("pic") and person_summary.get("pic"):
+            p["pic"] = person_summary["pic"]
+
+        c = companies.get(company_id)
+        if c is None:
+            c = {
+                "name": company_name,
+                "industry": g(row, "Company Industry"),
+                "size": g(row, "Company Size / Employee Count"),
+                "website": g(row, "Company Website"),
+                "hq": g(row, "Company HQ Location"),
+                "li_url": g(row, "Current Company LinkedIn URL"),
+                "people": {},
+                "_posts": set(),
+            }
+            companies[company_id] = c
+        c["people"][person_id] = person_summary
+        c["_posts"].add(post_id)
+
+    people_list = []
+    for p in people.values():
+        p["posts_engaged"] = len(p.pop("_posts"))
+        p["comments_count"] = p.pop("_comments")
+        people_list.append(p)
+    people_list.sort(key=lambda x: (-x["posts_engaged"], x["name"]))
+
+    SEN_LABELS = ["C-Level / Founder", "VP", "Director", "Manager", "IC / Individual Contributor"]
+    company_list = []
+    for c in companies.values():
+        ppl = list(c["people"].values())
+        c["people"] = ppl
+        c["people_count"] = len(ppl)
+        c["dm_count"] = sum(1 for x in ppl if x["dm"] == "Yes")
+        c["posts_engaged"] = len(c.pop("_posts"))
+        c["seniority_map"] = dict(Counter(x["seniority"] for x in ppl if x["seniority"] in SEN_LABELS))
+        company_list.append(c)
+    company_list.sort(key=lambda x: (-x["people_count"], x["name"]))
+
+    company_lb = [[c["name"], c["people_count"]] for c in company_list if c["name"] != "(Unknown)"][:15]
+
+    posts_list = sorted(posts.values(), key=lambda p: p.get("date") or "", reverse=True)
+    seniority_breakdown = Counter(p["seniority"] for p in people_list if p["seniority"])
+    country_breakdown = Counter(p["country"] for p in people_list if p["country"])
+
+    stats = {
+        "total_people": len(people_list),
+        "total_posts": len(posts_list),
+        "total_companies": len([c for c in company_list if c["name"] != "(Unknown)"]),
+        "total_engagements": sum(len(p["engagers"]) for p in posts_list),
+        "total_dms": sum(1 for p in people_list if p["dm"] == "Yes"),
+        "total_comments": sum(p["comments_count"] for p in people_list),
+        "csuite_count": sum(1 for p in people_list if p["bucket"] == "csuite"),
+        "vp_count": sum(1 for p in people_list if p["seniority"] == "VP"),
+        "director_count": sum(1 for p in people_list if p["seniority"] == "Director"),
+        "reaction_breakdown": dict(reaction_ctr.most_common()),
+        "seniority_breakdown": dict(seniority_breakdown.most_common()),
+        "country_breakdown": dict(country_breakdown.most_common(10)),
+        "relationship_breakdown": dict(relationship_ctr.most_common()),
+        "source_accounts": sorted(source_accounts),
+        "last_synced": last_synced,
+    }
+
+    return {"posts": posts_list, "people": people_list, "companies": company_list,
+            "company_lb": company_lb, "stats": stats}
+
+
+_LI_CACHE = {"data": None, "ts": 0.0}
+_LI_GZ = {"ts": None, "raw": b"", "gz": b""}
+_LI_CACHE_TTL = 300  # seconds — served from cache between refreshes; the button forces a live pull
+
+
+def _fetch_linkedin_intel_data(force: bool = False) -> dict:
+    """Fetch + transform the LinkedIn Intelligence Google Sheet (TTL-cached)."""
+    now = time.time()
+    if not force and _LI_CACHE["data"] is not None and (now - _LI_CACHE["ts"]) < _LI_CACHE_TTL:
+        return _LI_CACHE["data"]
+    rows = None
+    try:
+        svc = _sheets_service()
+        resp = svc.spreadsheets().values().get(
+            spreadsheetId=LINKEDIN_INTEL_SHEET_ID, range="Sheet1").execute()
+        rows = resp.get("values", [])
+    except Exception as e:
+        log.warning("linkedin intel sheet read failed: %s", e)
+    if rows:
+        try:
+            result = _transform_linkedin_rows(rows)
+            result["synced_ok"] = True
+        except Exception as e:
+            log.warning("linkedin intel transform failed: %s", e)
+            result = _LI_CACHE["data"] or _empty_linkedin_result()
+            result["synced_ok"] = False
+    else:
+        result = _LI_CACHE["data"] or _empty_linkedin_result()
+        result["synced_ok"] = False
+    result["fetched_at"] = now
+    _LI_CACHE["data"] = result
+    _LI_CACHE["ts"] = now
+    return result
+
+
 @app.route("/p2/gtm/linkedin-scraper")
 @position2_required
 def linkedin_scraper():
-    """LinkedIn ABM Intelligence dashboard — Post & People Intelligence."""
-    try:
-        with open(os.path.join(os.path.dirname(__file__), "data", "linkedin.json"), encoding="utf-8") as _f:
-            li_data = json.load(_f)
-    except Exception:
-        li_data = {"posts": [], "people": [], "companies": [], "company_lb": [], "stats": {}}
-    return render_template("linkedin_scraper.html", user=_get_user(), li_data=li_data)
+    """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
+    return render_template("linkedin_scraper.html", user=_get_user())
+
+
+@app.route("/p2/gtm/linkedin-scraper/data")
+@position2_required
+def linkedin_scraper_data():
+    """JSON data endpoint for the LinkedIn Intelligence dashboard (gzipped, cached).
+    ?fresh=1 bypasses the cache and re-pulls the sheet live — this is what the
+    dashboard's Refresh button calls."""
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    data = _fetch_linkedin_intel_data(force=force)
+    if _LI_GZ["ts"] != _LI_CACHE["ts"]:
+        _LI_GZ["raw"] = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        _LI_GZ["gz"] = gzip.compress(_LI_GZ["raw"], 6)
+        _LI_GZ["ts"] = _LI_CACHE["ts"]
+    use_gz = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    resp = make_response(_LI_GZ["gz"] if use_gz else _LI_GZ["raw"])
+    resp.headers["Content-Type"] = "application/json"
+    resp.headers["Cache-Control"] = "private, max-age=30"
+    resp.headers["Vary"] = "Accept-Encoding"
+    if use_gz:
+        resp.headers["Content-Encoding"] = "gzip"
+    return resp
 
 @app.route("/health")
 def health():
