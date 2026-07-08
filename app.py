@@ -1160,16 +1160,16 @@ def solutions_page():
     return render_template("agents.html", page="solutions", agents=AGENTS, agent=None, related=[])
 
 
-# Industries feature disabled site-wide (routes unregistered so the URLs 404,
-# nav link removed in agents.html) -- kept commented out rather than deleted so
-# the code/content stays in the repo if it's ever needed again.
-# @app.route("/industries")
+# Industries feature is UNLINKED but live: the routes below are registered so the
+# URLs work for anyone with a direct link, but the nav link in agents.html stays
+# commented out so the pages are not reachable by navigating the site.
+@app.route("/industries")
 def industries_page():
     return render_template("agents.html", page="industries", agents=AGENTS, agent=None,
                            related=[], industries=INDUSTRIES)
 
 
-# @app.route("/industries/<slug>")
+@app.route("/industries/<slug>")
 def industry_detail(slug):
     ind = INDUSTRIES_BY_SLUG.get(slug)
     if not ind:
@@ -1179,7 +1179,7 @@ def industry_detail(slug):
                            related=[], industry=ind, industries=INDUSTRIES, other_industries=others)
 
 
-# @app.route("/industries/<islug>/agents/<aslug>")
+@app.route("/industries/<islug>/agents/<aslug>")
 def industry_agent_detail(islug, aslug):
     ind = INDUSTRIES_BY_SLUG.get(islug)
     if not ind:
