@@ -238,6 +238,35 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
       window.addEventListener('beforeunload', _send);
     })();
+
+    /* Keep the address bar + breadcrumb in sync with the embedded tool.
+       The tool lives in a cross-origin iframe, so we can't read its URL — the
+       SEO app posts a {source:'p2-seo-tool', type:'route-change', tool, name}
+       message on every navigation (see seo-apps' RouteBridge). We reflect that
+       into /p2/seo/<slug> via pushState so the URL always names the current
+       agent and the browser's back/forward works across agents. */
+    (function(){
+      var frame = document.getElementById('embed-frame');
+      var expectedOrigin = '';
+      try { expectedOrigin = new URL(frame.src, location.href).origin; } catch(e){}
+      window.addEventListener('message', function(e){
+        if(expectedOrigin && e.origin !== expectedOrigin) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-seo-tool' || d.type !== 'route-change' || !d.tool) return;
+        var target = '/p2/seo/' + d.tool;
+        if(location.pathname === target) return;
+        history.pushState({seoTool:d.tool}, '', target);
+        var cur = document.querySelector('.bc-cur');
+        if(cur && d.name) cur.textContent = d.name;
+        if(d.name) document.title = d.name + ' — Platform';
+      });
+      /* On back/forward the parent URL changes but the cross-origin iframe
+         won't follow on its own, so reload to let the server render the tool
+         that the (now-current) URL points at. */
+      window.addEventListener('popstate', function(){
+        if(/^\/p2\/seo\/[^/]+/.test(location.pathname)) window.location.reload();
+      });
+    })();
   </script>
 <script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
 </body>
