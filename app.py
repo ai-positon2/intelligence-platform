@@ -2302,6 +2302,7 @@ def login_page():
     return render_template("agents.html", page="login", agents=AGENTS, agent=None,
                            related=[], google_client_id=GOOGLE_CLIENT_ID,
                            error=request.args.get("error", ""),
+                           logged_out=bool(request.args.get("logged_out")),
                            returning=bool(request.cookies.get("p2_seen")))
 
 @app.route("/login-preview")
@@ -2311,8 +2312,30 @@ def login_preview():
 
 @app.route("/logout")
 def logout():
+    # Wipe the server-side session and force the browser to drop EVERY cookie +
+    # client storage for this origin, so a returning visitor stays signed out
+    # until they explicitly click "Sign in with Google" again.
+    #
+    # Why the belt-and-suspenders: a plain Set-Cookie deletion only removes a
+    # cookie whose attributes (Domain/Path/SameSite/Secure) exactly match what
+    # delete_cookie emits. If the session cookie was ever issued with different
+    # attributes (a proxy, an older config, a parent-domain cookie), the browser
+    # keeps sending it and the user looks "auto-logged-in" on their next visit.
+    # Clear-Site-Data: "cookies" purges them regardless of attributes; "storage"
+    # clears any lingering client-side auth remnants (localStorage/sessionStorage).
+    # NB: don't touch session.permanent after clear() — assigning it re-adds a
+    # key, making the session non-empty and causing Flask to re-issue the cookie.
+    # An empty session lets Flask delete the cookie outright.
     session.clear()
-    return redirect(url_for("login_page"))
+    resp = make_response(redirect(url_for("login_page", logged_out=1)))
+    cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
+    resp.delete_cookie(cookie_name, path="/")
+    resp.delete_cookie("p2_seen", path="/")
+    resp.headers["Clear-Site-Data"] = '"cookies", "storage"'
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ── v16: internal app relocated to /p2/* ─────────────────────────────────────────

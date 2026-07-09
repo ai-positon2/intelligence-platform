@@ -613,6 +613,7 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .gbtn:hover{transform:translateY(-2px);box-shadow:0 20px 56px -6px rgba(168,85,247,.7),0 0 76px -12px rgba(34,211,238,.5)}
 @keyframes gflow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 .gerr{align-items:center;justify-content:center;gap:8px;margin:16px 0 0;padding:10px 14px;border-radius:12px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);color:#fca5a5;font-size:13px}
+.gok{display:flex;align-items:center;justify-content:center;gap:8px;margin:16px 0 0;padding:10px 14px;border-radius:12px;background:rgba(45,212,170,.1);border:1px solid rgba(45,212,170,.4);color:#5eead4;font-size:13px}
 .login-foot{margin-top:18px;font-size:13px;color:var(--dim2)}
 .login-foot a{color:#a5b4fc;font-weight:600}
 .login-card{position:relative;padding:46px 40px;border-radius:26px;animation:cardIn .7s cubic-bezier(.2,.9,.25,1) both}
@@ -1870,6 +1871,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Secure sign-in</span>
       <h1 class="h-sec" style="margin:16px 0 8px">{% if returning %}Welcome back.{% else %}Welcome.{% endif %}</h1>
       <p class="login-sub">Sign in with your Google account to continue.</p>
+      {% if logged_out %}<div class="gok" id="gok">&#10003; You&rsquo;ve been signed out. Sign in with Google to continue.</div>{% endif %}
       <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
       <div class="gbtn">
         <div id="gsiBtn" data-cid="{{ google_client_id }}"></div>
