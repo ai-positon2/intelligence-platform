@@ -522,7 +522,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
           <p>Buying signals · competitor ads · anonymous visitors · LinkedIn · AI search — turned into ready-to-act intelligence.</p>
         </div>
 
-        <div class="cx-st cx-card" style="--sa:#67e8f9;--sb:#818cf8"><span class="sg"></span><b><span data-cxn="19">0</span></b><span>AI agents</span></div>
+        <div class="cx-st cx-card" style="--sa:#67e8f9;--sb:#818cf8"><span class="sg"></span><b><span data-cxn="18">0</span></b><span>AI agents</span></div>
         <div class="cx-st cx-card" style="--sa:#34d399;--sb:#2dd4bf"><span class="sg"></span><b><span data-cxn="3">0</span></b><span>live for everyone</span></div>
         <div class="cx-st cx-card" style="--sa:#a78bfa;--sb:#e879f9"><span class="sg"></span><b><span data-cxn="1200" data-cxs="+">0</span></b><span>companies tracked</span></div>
         <div class="cx-st cx-card" style="--sa:#fbbf24;--sb:#fb923c"><span class="sg"></span><b><span data-cxn="26">0</span></b><span>signal types</span></div>
@@ -553,7 +553,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 
         <div class="cx-explore cx-card">
           <span class="xl">Go deeper</span>
-          <button type="button" class="xbtn" onclick="cxActivate('agents')"><span class="xi" style="background:linear-gradient(135deg,#6366f1,#a855f7)">🤖</span><span><b>Meet the 19 agents</b><small>one spotlight at a time</small></span><span class="xa">→</span></button>
+          <button type="button" class="xbtn" onclick="cxActivate('agents')"><span class="xi" style="background:linear-gradient(135deg,#6366f1,#a855f7)">🤖</span><span><b>Meet the 18 agents</b><small>one spotlight at a time</small></span><span class="xa">→</span></button>
           <button type="button" class="xbtn" onclick="cxActivate('how')"><span class="xi" style="background:linear-gradient(135deg,#22d3ee,#6366f1)">⚙</span><span><b>See the pipelines</b><small>where every agent gets its data</small></span><span class="xa">→</span></button>
           <button type="button" class="xbtn" onclick="cxActivate('video')"><span class="xi" style="background:linear-gradient(135deg,#34d399,#22d3ee)">▶</span><span><b>Watch the 2-min demo</b><small>the whole platform, moving</small></span><span class="xa">→</span></button>
         </div>
@@ -582,7 +582,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
     <section class="cx-panel" id="p-agents">
       <div class="cx-ph">
         <h2>Pick an agent, <em>see everything.</em></h2>
-        <p>19 agents in three buckets — one spotlight at a time.</p>
+        <p>18 agents in three buckets — one spotlight at a time.</p>
       </div>
       <div class="cx-agx">
         <div class="cx-rail" id="cxRail"></div>
@@ -635,7 +635,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
           </div>
         </div>
         <div class="cx-av custom cx-card">
-          <div class="big">5</div>
+          <div class="big">4</div>
           <h3>Custom builds</h3>
           <div class="who">Per client · needs inputs</div>
           <div class="cx-meter"><i></i></div><div class="mlab">setup effort: client inputs required</div>
@@ -644,7 +644,6 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
             <span class="cx-pill">Ad Intelligence<small>needs competitor list</small></span>
             <span class="cx-pill">Anonymous Visitors<small>needs site script</small></span>
             <span class="cx-pill">LinkedIn Intelligence<small>needs who to track</small></span>
-            <span class="cx-pill">Command Center<small>needs program data</small></span>
           </div>
         </div>
       </div>
@@ -813,8 +812,7 @@ function cxGlow(scope){
     {p:'95% of visitors leave nameless',      a:'<b>Apollo</b> names companies & people'},
     {p:'Competitor ads are a black box',      a:'<b>Live tracking</b> on Google · Meta · LinkedIn'},
     {p:'AI answers replace blue links',       a:'<b>GEO agents</b> track & win AI visibility'},
-    {p:'Audits take days of manual work',     a:'<b>200+ checks</b> scored in seconds'},
-    {p:'Every tool in a different tab',       a:'<b>One command center</b> for the program'}
+    {p:'Audits take days of manual work',     a:'<b>200+ checks</b> scored in seconds'}
   ];
   var pairEl = document.getElementById('cxRotPair');
   var dotsEl = document.getElementById('cxRotDots');
@@ -870,10 +868,6 @@ var CX_AGENTS = [
    d:'Tracks any person, company or page and maps engagement to accounts.',
    more:'Point it at a LinkedIn target and it captures the engagement around them via Unipile — showing which buying-committee members are already paying attention, and from which account.',
    src:['Arena','Unipile'], needs:'LinkedIn target to track'},
-  {name:'Pipeline Command Center', bucket:'gtm', ac:'#a3e635', ac2:'#34d399',
-   d:'Every account, signal & task in one live view.',
-   more:'It unifies signals, rankings, tasks and account data from your connected sources into one live, filterable dashboard — a single source of truth for the whole program.',
-   src:['Google Sheets','Connected agents'], needs:'Client program data'},
 
   {name:'Generative Search Visibility', bucket:'seo', ac:'#22d3ee', ac2:'#38bdf8',
    d:'Your share of voice inside ChatGPT, Gemini & Perplexity.',
