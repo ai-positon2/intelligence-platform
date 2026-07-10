@@ -2386,6 +2386,12 @@ def p2_root():
 def hub():
     return render_template("hub.html", user=_get_user())
 
+@app.route("/p2/context")
+@position2_required
+def p2_context():
+    """Internal explainer — what the platform is, every agent, how it all works."""
+    return render_template("context.html", user=_get_user())
+
 @app.route("/p2/gtm")
 @position2_required
 def gtm():
