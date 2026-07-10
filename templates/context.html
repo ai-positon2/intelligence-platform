@@ -21,14 +21,17 @@
 /* aurora-app.css forces body{background:transparent!important} so the page
    background must live on the root element */
 html {
-  background:
+  background-color:#070912;            /* solid base so rubber-band overscroll never flashes white */
+  background-image:
     radial-gradient(ellipse 80% 50% at 20% 0%,   rgba(99,102,241,0.12) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 85% 60%,  rgba(139,92,246,0.10) 0%, transparent 55%),
     radial-gradient(ellipse 50% 60% at 50% 100%, rgba(30,27,75,0.5)    0%, transparent 70%),
     linear-gradient(160deg, #080b18 0%, #0a0d1a 40%, #070912 100%);
+  background-attachment:fixed;          /* gradient stays pinned to the viewport during overscroll */
+  overscroll-behavior-y:none;           /* damp the rubber-band on the root scroller */
 }
-html[data-theme="light"]{background:#eef1f8}
-body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; overflow-x:hidden; }
+html[data-theme="light"]{background-color:#eef1f8;background-image:none}
+body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; overflow-x:hidden; background-color:transparent; }
 .bg-grid {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image: radial-gradient(circle, rgba(99,102,241,0.12) 1px, transparent 1px);
@@ -157,22 +160,31 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-st > span{font-size:11.5px;color:#64748b;letter-spacing:.04em}
 .cx-st .sg{position:absolute;right:-26px;bottom:-26px;width:110px;height:110px;border-radius:50%;background:var(--sa,#818cf8);opacity:.12;filter:blur(34px);pointer-events:none}
 /* rotating problem→answer cell */
-.cx-rot{grid-column:span 2;padding:22px 26px;display:flex;flex-direction:column;justify-content:center;gap:13px;min-height:130px}
+.cx-rot{grid-column:span 2;padding:24px 28px;display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:130px;position:relative;overflow:hidden}
 .cx-rot .rh{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.cx-rot .rh .lab{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8}
-.cx-rot .dots{display:flex;gap:5px}
-.cx-rot .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.14);transition:all .3s}
-.cx-rot .dots i.on{background:#818cf8;box-shadow:0 0 8px rgba(129,140,248,.8);transform:scale(1.2)}
-.cx-rot .pair{display:flex;flex-direction:column;gap:9px}
-.cx-rot .pl{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
-.cx-rot .pl .sig{flex:0 0 auto;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px}
-.cx-rot .pl.bad{color:#e6ebf7}
-.cx-rot .pl.bad .sig{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.35);color:#fb7185}
-.cx-rot .pl.good{color:#a7f3d0;font-size:13px}
-.cx-rot .pl.good .sig{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:#5eead4}
-.cx-rot .pl.good b{color:#fff;font-weight:600}
-.cx-rot .pair.sw{animation:cxRotIn .45s cubic-bezier(.22,1,.36,1)}
-@keyframes cxRotIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.cx-rot .rh .lab{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8}
+.cx-rot .rh .lab .lp{width:6px;height:6px;border-radius:50%;background:#818cf8;box-shadow:0 0 10px rgba(129,140,248,.9);animation:cxPulse 2.4s infinite}
+/* clickable, progress-filling dots */
+.cx-rot .dots{display:flex;align-items:center;gap:6px}
+.cx-rot .dots button{-webkit-appearance:none;appearance:none;padding:0;border:0;height:7px;width:7px;border-radius:99px;background:rgba(255,255,255,.16);cursor:pointer;transition:width .4s cubic-bezier(.22,1,.36,1),background .3s;position:relative;overflow:hidden}
+.cx-rot .dots button:hover{background:rgba(255,255,255,.42)}
+.cx-rot .dots button.on{width:30px;background:rgba(129,140,248,.22)}
+.cx-rot .dots button.on::after{content:"";position:absolute;inset:0;border-radius:99px;background:linear-gradient(90deg,#818cf8,#22d3ee);transform:scaleX(0);transform-origin:left;animation:cxDotFill 3600ms linear forwards}
+.cx-rot.paused .dots button.on::after{animation-play-state:paused}
+@keyframes cxDotFill{to{transform:scaleX(1)}}
+/* problem → answer, shown as a connected transformation */
+.cx-rot .pair{position:relative;display:flex;flex-direction:column;gap:14px}
+.cx-rot .pair::before{content:"";position:absolute;left:16px;top:34px;height:12px;width:2px;border-radius:2px;background:linear-gradient(180deg,rgba(251,113,133,.55),rgba(52,211,153,.55));z-index:0}
+.cx-rot .pair.sw{animation:cxRotIn .5s cubic-bezier(.22,1,.36,1)}
+@keyframes cxRotIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.cx-rot .pl{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.cx-rot .pl .sig{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.cx-rot .pl .tx{font-size:15.5px;font-weight:600;line-height:1.3}
+.cx-rot .pl.bad .tx{color:#dbe1f0}
+.cx-rot .pl.bad .sig{background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.4);color:#fb7185}
+.cx-rot .pl.good .tx{color:#a7f3d0;font-size:14.5px}
+.cx-rot .pl.good .sig{background:linear-gradient(135deg,rgba(52,211,153,.22),rgba(34,211,238,.16));border:1px solid rgba(52,211,153,.45);color:#5eead4;box-shadow:0 0 18px -4px rgba(52,211,153,.5)}
+.cx-rot .pl.good .tx b{color:#fff;font-weight:700}
 /* go-deeper cell */
 .cx-explore{grid-column:span 2;padding:20px 24px;display:flex;flex-direction:column;gap:8px;justify-content:center;min-height:130px}
 .cx-explore .xl{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8;margin-bottom:3px}
@@ -369,7 +381,9 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 [data-theme="light"] .cx-rot .pl.bad{color:#141c36}
 [data-theme="light"] .cx-rot .pl.good{color:#0f5c46}
 [data-theme="light"] .cx-rot .pl.good b{color:#065f46}
-[data-theme="light"] .cx-rot .dots i{background:rgba(18,26,54,.15)}
+[data-theme="light"] .cx-rot .dots button{background:rgba(18,26,54,.15)}
+[data-theme="light"] .cx-rot .dots button.on{background:rgba(79,70,229,.18)}
+[data-theme="light"] .cx-rot .pl.bad .tx{color:#141c36}
 [data-theme="light"] .cx-st > span,[data-theme="light"] .cx-sn p,[data-theme="light"] .cx-dnode span,[data-theme="light"] .cx-av .mlab{color:#828cac}
 [data-theme="light"] .cx-chip,[data-theme="light"] .cx-tech,[data-theme="light"] .cx-pill{background:rgba(18,26,54,.04);border-color:rgba(18,26,54,.12);color:#3d466b}
 [data-theme="light"] .cx-fstep{background:#f7f8fd;border-color:rgba(18,26,54,.12)}
@@ -547,7 +561,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
         </div>
 
         <div class="cx-rot cx-card" id="cxRot">
-          <div class="rh"><span class="lab">Solves real problems</span><span class="dots" id="cxRotDots"></span></div>
+          <div class="rh"><span class="lab"><span class="lp"></span>Solves real problems</span><span class="dots" id="cxRotDots"></span></div>
           <div class="pair" id="cxRotPair"></div>
         </div>
 
@@ -816,25 +830,38 @@ function cxGlow(scope){
   ];
   var pairEl = document.getElementById('cxRotPair');
   var dotsEl = document.getElementById('cxRotDots');
-  if(!pairEl) return;
-  var idx = 0, timer = null;
-  dotsEl.innerHTML = PAIRS.map(function(){ return '<i></i>'; }).join('');
-  function show(i){
-    idx = i % PAIRS.length;
-    var d = PAIRS[idx];
-    pairEl.classList.remove('sw'); void pairEl.offsetWidth;
-    pairEl.classList.add('sw');
-    pairEl.innerHTML = '<div class="pl bad"><span class="sig">✕</span>'+d.p+'</div>'
-      + '<div class="pl good"><span class="sig">✓</span><span>'+d.a+'</span></div>';
-    Array.prototype.forEach.call(dotsEl.children, function(el,j){ el.classList.toggle('on', j===idx); });
-  }
-  function tick(){ show(idx+1); }
-  function play(){ if(!timer) timer = setInterval(tick, 3400); }
-  function stop(){ clearInterval(timer); timer = null; }
   var box = document.getElementById('cxRot');
-  box.addEventListener('mouseenter', stop);
-  box.addEventListener('mouseleave', play);
-  show(0); play();
+  if(!pairEl) return;
+  var idx = 0;
+  dotsEl.innerHTML = PAIRS.map(function(_,i){
+    return '<button type="button" data-i="'+i+'" aria-label="Show problem '+(i+1)+' of '+PAIRS.length+'"></button>';
+  }).join('');
+  var dots = dotsEl.children;
+  function show(i){
+    idx = (i + PAIRS.length) % PAIRS.length;
+    var d = PAIRS[idx];
+    pairEl.classList.remove('sw'); void pairEl.offsetWidth; pairEl.classList.add('sw');
+    pairEl.innerHTML =
+        '<div class="pl bad"><span class="sig">✕</span><span class="tx">'+d.p+'</span></div>'
+      + '<div class="pl good"><span class="sig">✓</span><span class="tx">'+d.a+'</span></div>';
+    // Force the active dot's fill animation to restart from zero every time.
+    for(var j=0;j<dots.length;j++) dots[j].classList.remove('on');
+    void dotsEl.offsetWidth;
+    dots[idx].classList.add('on');
+  }
+  // Advance when the active dot's progress fill finishes — keeps the visible
+  // timer and the rotation perfectly in sync, and pausing the CSS animation
+  // (on hover) naturally pauses advancement too.
+  box.addEventListener('animationend', function(e){
+    if(e.animationName === 'cxDotFill' && !box.classList.contains('paused')) show(idx + 1);
+  });
+  dotsEl.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    show(parseInt(b.getAttribute('data-i'), 10));
+  });
+  box.addEventListener('mouseenter', function(){ box.classList.add('paused'); });
+  box.addEventListener('mouseleave', function(){ box.classList.remove('paused'); });
+  show(0);
 })();
 
 // ── Agent explorer (master-detail) ──
