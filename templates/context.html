@@ -223,7 +223,6 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-row.on{background:linear-gradient(95deg,rgba(79,70,229,.28),rgba(124,58,237,.14));border-color:rgba(129,140,248,.45);color:#fff;box-shadow:0 6px 22px -10px rgba(99,102,241,.7)}
 /* detail panel */
 .cx-detail{position:relative;padding:36px 38px;min-height:480px;overflow:hidden;display:flex;flex-direction:column;gap:20px}
-.cx-detail .beam{position:absolute;inset:-45%;background:conic-gradient(from 0deg,transparent 72%,var(--a1,#818cf8) 86%,transparent 100%);animation:cxSpin 8s linear infinite;opacity:.13;pointer-events:none}
 .cx-detail .wm{position:absolute;right:-46px;bottom:-52px;width:250px;height:250px;opacity:.05;pointer-events:none}
 .cx-detail .wm svg{width:100%;height:100%;stroke:var(--a1,#818cf8);fill:none;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
 .cx-dtop{display:flex;align-items:center;gap:18px;position:relative;z-index:1}
@@ -234,6 +233,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-dnav button{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#9aa5c4;font-size:15px;cursor:pointer;transition:all .18s;font-family:inherit}
 .cx-dnav button:hover{color:#fff;border-color:rgba(129,140,248,.5);background:rgba(99,102,241,.14)}
 .cx-ddesc{font-size:16.5px;line-height:1.6;color:#c3cbe6;max-width:560px;position:relative;z-index:1;animation:cxIn .45s cubic-bezier(.22,1,.36,1)}
+.cx-dmore{font-size:13px;line-height:1.7;color:#8b96b8;max-width:600px;position:relative;z-index:1;margin-top:-8px;animation:cxIn .5s cubic-bezier(.22,1,.36,1)}
 .cx-dgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;position:relative;z-index:1;margin-top:auto}
 .cx-dbox{background:rgba(10,13,26,.6);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:15px 17px;animation:cxIn .5s cubic-bezier(.22,1,.36,1)}
 .cx-dbox .bl{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#64748b;margin-bottom:9px}
@@ -364,6 +364,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 [data-theme="light"] .cx-hero h1,[data-theme="light"] .cx-ph h2,[data-theme="light"] .cx-hero-cell h3,[data-theme="light"] .cx-persona h3,[data-theme="light"] .cx-flowpanel h3,[data-theme="light"] .cx-av h3,[data-theme="light"] .cx-layer .lh h3,[data-theme="light"] .cx-sn h4,[data-theme="light"] .cx-dnode b,[data-theme="light"] .cx-dname{color:#141c36}
 [data-theme="light"] .cx-hero p,[data-theme="light"] .cx-ph p,[data-theme="light"] .cx-hero-cell p,[data-theme="light"] .cx-flowpanel .fp-sub{color:#5a6488}
 [data-theme="light"] .cx-persona li,[data-theme="light"] .cx-fstep .fs-d,[data-theme="light"] .cx-ddesc{color:#3d466b}
+[data-theme="light"] .cx-dmore{color:#5a6488}
 [data-theme="light"] .cx-persona li b,[data-theme="light"] .cx-fnote b{color:#141c36}
 [data-theme="light"] .cx-rot .pl.bad{color:#141c36}
 [data-theme="light"] .cx-rot .pl.good{color:#0f5c46}
@@ -387,7 +388,6 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 [data-theme="light"] .cx-badge.live{color:#0d9488}
 [data-theme="light"] .cx-badge.beta{color:#b45309}
 [data-theme="light"] .cx-badge.custom{color:#6d28d9}
-[data-theme="light"] .cx-detail .beam{opacity:.07}
 [data-theme="light"] .cx-orbit{opacity:.55}
 [data-theme="light"] .xbtn{background:rgba(18,26,54,.03);border-color:rgba(18,26,54,.10);color:#3d466b}
 [data-theme="light"] .xbtn b{color:#141c36}
@@ -492,7 +492,6 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
   <header class="cx-hero">
     <div class="cx-hero-badge"><span class="dot"></span> Internal · Platform Context</div>
     <h1>The Intelligence platform, <em>decoded.</em></h1>
-    <p>Pick a bucket. Everything explained in visuals, not essays.</p>
   </header>
 
   <!-- Bucket tab bar -->
@@ -843,45 +842,83 @@ function cxGlow(scope){
 // ── Agent explorer (master-detail) ──
 var CX_AGENTS = [
   {name:'Keyword Finder', bucket:'live', ac:'#22d3ee', ac2:'#6366f1',
-   d:'Type a topic → scored, clustered keywords worth chasing.', src:['ChatGPT API','Semrush API']},
+   d:'Type a topic → scored, clustered keywords worth chasing.',
+   more:'It pulls candidate terms, layers on live search and volume data, then scores and clusters everything into clean topic groups — so you know exactly what to target next.',
+   src:['ChatGPT API','Semrush API']},
   {name:'Content Brief Generator', bucket:'live', ac:'#8b5cf6', ac2:'#e879f9',
-   d:'One keyword → a ready-to-write, SERP-backed article brief.', src:['ChatGPT API','Live SERP']},
+   d:'One keyword → a ready-to-write, SERP-backed article brief.',
+   more:'It studies the pages currently ranking for your keyword and assembles the structure, headings, questions and entities your article needs to compete — writers start with a plan, not a blank page.',
+   src:['ChatGPT API','Live SERP']},
   {name:'Content Enhancer', bucket:'live', ac:'#34d399', ac2:'#22d3ee',
-   d:'Paste an article → multi-LLM upgrade recommendations.', src:['Multiple LLMs','Live SERP']},
+   d:'Paste an article → multi-LLM upgrade recommendations.',
+   more:'Several AI models review the piece together and return concrete edits on structure, depth and authority — spotting gaps a single model would miss.',
+   src:['Multiple LLMs','Live SERP']},
 
   {name:'ABM Signal Tracker', bucket:'gtm', ac:'#a78bfa', ac2:'#818cf8',
-   d:'Watches target accounts 24/7 and ranks the hottest ones weekly.', src:['Arena','Google News'], needs:'Target company list'},
+   d:'Watches target accounts 24/7 and ranks the hottest ones weekly.',
+   more:'It monitors curated sources and Google News for funding rounds, leadership changes, hiring spikes and 20+ other buying signals, scores every event, and resurfaces the most urgent accounts each week.',
+   src:['Arena','Google News'], needs:'Target company list'},
   {name:'Competitor Ad Intelligence', bucket:'gtm', ac:'#a855f7', ac2:'#e879f9',
-   d:'Every competitor ad on Google, Meta & LinkedIn — live.', src:['Arena','Ad platforms'], needs:'Competitor list'},
+   d:'Every competitor ad on Google, Meta & LinkedIn — live.',
+   more:'Give it your competitor list and it continuously collects the ads they run across all three networks — surfacing their messaging, creative formats and strategy shifts as they happen.',
+   src:['Arena','Ad platforms'], needs:'Competitor list'},
   {name:'Anonymous Website Visitors', bucket:'gtm', ac:'#34d399', ac2:'#2dd4bf',
-   d:'Names the companies & people browsing your site.', src:['Apollo'], needs:'Script on the site'},
+   d:'Names the companies & people browsing your site.',
+   more:'A small script on the site matches visits to Apollo’s identity data and reconstructs each journey page-by-page — handing reps a named, ready-to-contact account while intent is still warm.',
+   src:['Apollo'], needs:'Script on the site'},
   {name:'LinkedIn Intelligence', bucket:'gtm', ac:'#0ea5e9', ac2:'#38bdf8',
-   d:'Tracks any person, company or page and maps engagement to accounts.', src:['Arena','Unipile'], needs:'LinkedIn target to track'},
+   d:'Tracks any person, company or page and maps engagement to accounts.',
+   more:'Point it at a LinkedIn target and it captures the engagement around them via Unipile — showing which buying-committee members are already paying attention, and from which account.',
+   src:['Arena','Unipile'], needs:'LinkedIn target to track'},
   {name:'Pipeline Command Center', bucket:'gtm', ac:'#a3e635', ac2:'#34d399',
-   d:'Every account, signal & task in one live view.', src:['Google Sheets','Connected agents'], needs:'Client program data'},
+   d:'Every account, signal & task in one live view.',
+   more:'It unifies signals, rankings, tasks and account data from your connected sources into one live, filterable dashboard — a single source of truth for the whole program.',
+   src:['Google Sheets','Connected agents'], needs:'Client program data'},
 
   {name:'Generative Search Visibility', bucket:'seo', ac:'#22d3ee', ac2:'#38bdf8',
-   d:'Your share of voice inside ChatGPT, Gemini & Perplexity.', src:['AI engines']},
+   d:'Your share of voice inside ChatGPT, Gemini & Perplexity.',
+   more:'It monitors branded and category prompts across the major AI engines — measuring share of voice over time, mapping which pages get cited, and flagging the prompts you’re losing.',
+   src:['AI engines']},
   {name:'Technical SEO & GEO Auditor', bucket:'seo', ac:'#38bdf8', ac2:'#22d3ee',
-   d:'200+ site checks, scored, with AI-written fixes.', src:['Site crawl','ChatGPT API']},
+   d:'200+ site checks, scored, with AI-written fixes.',
+   more:'It crawls the site, runs 200+ technical, on-page and answer-engine checks, scores each by impact, and writes specific fixes your team can ship immediately.',
+   src:['Site crawl','ChatGPT API']},
   {name:'AI Readiness Auditor', bucket:'seo', ac:'#818cf8', ac2:'#a78bfa',
-   d:'Scores how citable your site is to AI — in ~15 seconds.', src:['Site crawl','Schema']},
+   d:'Scores how citable your site is to AI — in ~15 seconds.',
+   more:'It evaluates structure, schema, crawlability and machine-readability against answer-engine best practices, then returns a score and the prioritized fixes to get your pages picked up.',
+   src:['Site crawl','Schema']},
   {name:'Content Authority Optimizer', bucket:'seo', ac:'#e879f9', ac2:'#c084fc',
-   d:'Authority-building edits for pages already published.', src:['ChatGPT API','Live SERP']},
+   d:'Authority-building edits for pages already published.',
+   more:'It assesses topical depth, structure, internal links and trust signals, then recommends targeted E-E-A-T and answer-engine edits that move rankings without a full rewrite.',
+   src:['ChatGPT API','Live SERP']},
   {name:'Competitor SEO Intelligence', bucket:'seo', ac:'#fb7185', ac2:'#f472b6',
-   d:'Keyword, backlink & authority gaps vs any rival.', src:['Semrush API']},
+   d:'Keyword, backlink & authority gaps vs any rival.',
+   more:'It benchmarks your domain against any competitor across rankings, keyword gaps, backlinks and authority — and drafts the plays to overtake them.',
+   src:['Semrush API']},
   {name:'Local Visibility Builder', bucket:'seo', ac:'#2dd4bf', ac2:'#34d399',
-   d:'Dev-ready location & service pages at scale.', src:['ChatGPT API','Sheets']},
+   d:'Dev-ready location & service pages at scale.',
+   more:'It composes approved, developer-ready location and service pages from templates and data — optimized copy and bulk image alt text included — for multi-location brands.',
+   src:['ChatGPT API','Sheets']},
   {name:'Search Term Intelligence', bucket:'seo', ac:'#f472b6', ac2:'#fb7185',
-   d:'Weekly negatives & winners mined from paid queries.', src:['Google Ads']},
+   d:'Weekly negatives & winners mined from paid queries.',
+   more:'It classifies every paid search query by relevance and performance, flags high-spend/no-conversion waste, and recommends negative keywords plus new opportunities every week.',
+   src:['Google Ads']},
   {name:'GBP QC Agent', bucket:'seo', ac:'#f97316', ac2:'#fbbf24',
-   d:'Scores & fixes GBP posts against brand rules.', src:['ChatGPT API','Brand rules']},
+   d:'Scores & fixes GBP posts against brand rules.',
+   more:'A 3-stage workflow — base review, location-specific QC and automated content generation — scores every Google Business Profile post 0–100 against the client’s brand guidelines, with fixes written for you.',
+   src:['ChatGPT API','Brand rules']},
   {name:'On-Page SEO Auditor', bucket:'seo', ac:'#14b8a6', ac2:'#2dd4bf',
-   d:'23-section audit of any URL with live CWV data.', src:['PageSpeed','ChatGPT API']},
+   d:'23-section audit of any URL with live CWV data.',
+   more:'Enter a URL and primary keywords; it pulls live PageSpeed and Core Web Vitals data and audits 23 sections spanning meta, headings, content, schema and crawlability — each scored with prioritized fixes.',
+   src:['PageSpeed','ChatGPT API']},
   {name:'Hub & Spoke Architect', bucket:'seo', ac:'#8b5cf6', ac2:'#a78bfa',
-   d:'URL list → topic clusters + internal-link map.', src:['ChatGPT API','Sheets']},
+   d:'URL list → topic clusters + internal-link map.',
+   more:'It auto-categorizes your URLs into hub-and-spoke clusters, you approve the structure, and it generates anchor-text and internal-linking recommendations for every cluster.',
+   src:['ChatGPT API','Sheets']},
   {name:'Robots & Index Monitor', bucket:'seo', ac:'#f59e0b', ac2:'#fbbf24',
-   d:'Daily noindex checks with instant Slack alerts if a page goes dark.', src:['Sitemaps','Slack']}
+   d:'Daily noindex checks with instant Slack alerts if a page goes dark.',
+   more:'It crawls sitemaps daily, samples pages by template, and verifies index status on production and staging — firing a Slack alert the moment a live page accidentally goes noindex.',
+   src:['Sitemaps','Slack']}
 ];
 
 (function(){
@@ -923,8 +960,7 @@ var CX_AGENTS = [
     detEl.style.setProperty('--a1', a.ac);
     detEl.style.setProperty('--a2', a.ac2);
     detEl.innerHTML =
-        '<div class="beam" aria-hidden="true"></div>'
-      + '<div class="wm" aria-hidden="true">'+ICON+'</div>'
+        '<div class="wm" aria-hidden="true">'+ICON+'</div>'
       + '<div class="cx-dtop">'
       +   '<span class="cx-dico">'+ICON+'</span>'
       +   '<div><div class="cx-dname">'+esc(a.name)+'</div>'
@@ -932,6 +968,7 @@ var CX_AGENTS = [
       +   '<div class="cx-dnav"><button type="button" data-nav="-1" aria-label="Previous agent">‹</button><button type="button" data-nav="1" aria-label="Next agent">›</button></div>'
       + '</div>'
       + '<p class="cx-ddesc">'+esc(a.d)+'</p>'
+      + (a.more ? '<p class="cx-dmore">'+esc(a.more)+'</p>' : '')
       + '<div class="cx-dgrid">'
       +   '<div class="cx-dbox"><div class="bl">Data comes from</div><div class="bv">'+chips+'</div></div>'
       +   needsBox
