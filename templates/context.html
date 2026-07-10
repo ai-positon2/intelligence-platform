@@ -132,34 +132,71 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-card:hover{transform:translateY(-3px);border-color:rgba(129,140,248,.32);box-shadow:0 24px 54px -24px rgba(0,0,0,.8)}
 .cx-card:hover::before{opacity:1}
 
-/* ── Overview: stats ── */
-.cx-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.cx-stat{padding:22px 10px;text-align:center}
-.cx-stat b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:42px;font-weight:750;letter-spacing:-.02em;background:linear-gradient(120deg,#e2e8f0,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
-.cx-stat b span{font:inherit;color:inherit}
-.cx-stat > span{display:block;margin-top:4px;font-size:11.5px;color:#64748b;letter-spacing:.04em}
-
-/* TLDR */
-.cx-tldr{margin-top:16px;padding:22px 28px;border-radius:18px;text-align:center;background:linear-gradient(120deg,rgba(34,211,238,.07),rgba(99,102,241,.09) 50%,rgba(232,121,249,.06));border:1px solid rgba(129,140,248,.22)}
-.cx-tldr p{font-size:15.5px;line-height:1.65;color:#cbd5f0;max-width:860px;margin:0 auto}
-.cx-tldr p strong{color:#fff;font-weight:600}
-
-/* Surfaces infographic */
-.cx-surfaces{display:grid;grid-template-columns:1fr 40px 1fr 40px 1fr;align-items:stretch;margin-top:16px}
-.cx-surf{padding:20px 18px;text-align:center}
-.cx-surf .ic{width:44px;height:44px;margin:0 auto 10px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:19px}
-.cx-surf h4{font-size:14.5px;font-weight:700;color:#f1f5f9}
-.cx-surf .u{font-size:11px;font-weight:700;color:#818cf8;margin-top:2px}
-.cx-surf p{font-size:11.5px;color:#7c86a8;margin-top:7px;line-height:1.5}
-.cx-sarrow{display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+/* ═══════ OVERVIEW · bento grid ═══════ */
+.cx-bento{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;grid-auto-flow:dense}
+.cx-hero-cell{grid-column:span 2;grid-row:span 2;padding:30px;display:flex;flex-direction:column;justify-content:center;gap:16px;position:relative;min-height:280px}
+.cx-hero-cell .ey{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#67e8f9}
+.cx-hero-cell .ey::before{content:"";width:20px;height:1px;background:linear-gradient(90deg,#22d3ee,#818cf8)}
+.cx-hero-cell h3{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(21px,2.5vw,29px);font-weight:720;letter-spacing:-.02em;line-height:1.22;color:#f1f5f9;max-width:78%;position:relative;z-index:1}
+.cx-hero-cell h3 em{font-family:'Instrument Serif',serif;font-style:italic;font-weight:400;background:linear-gradient(95deg,#67e8f9,#a5b4fc 50%,#e879f9);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cx-hero-cell p{font-size:13px;line-height:1.6;color:#8b96b8;max-width:72%;position:relative;z-index:1}
+.cx-orbit{position:absolute;right:-88px;top:50%;transform:translateY(-50%);width:300px;height:300px;pointer-events:none;opacity:.85}
+.cx-orbit .ring{position:absolute;inset:0;border:1px dashed rgba(129,140,248,.28);border-radius:50%;animation:cxSpin 26s linear infinite}
+.cx-orbit .ring.r2{inset:44px;animation-duration:17s;animation-direction:reverse;border-color:rgba(34,211,238,.24)}
+.cx-orbit .ring.r3{inset:88px;animation-duration:11s;border-color:rgba(232,121,249,.22)}
+.cx-orbit .ring i{position:absolute;top:-5px;left:50%;margin-left:-5px;width:10px;height:10px;border-radius:50%}
+.cx-orbit .ring.r1 i{background:#a78bfa;box-shadow:0 0 14px #a78bfa}
+.cx-orbit .ring.r2 i{background:#22d3ee;box-shadow:0 0 14px #22d3ee}
+.cx-orbit .ring.r3 i{background:#e879f9;box-shadow:0 0 14px #e879f9}
+.cx-orbit .core{position:absolute;inset:126px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.95),rgba(99,102,241,.25) 60%,transparent 75%);animation:cxCore 3.4s ease-in-out infinite}
+@keyframes cxSpin{to{transform:rotate(360deg)}}
+@keyframes cxCore{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.25);opacity:1}}
+.cx-st{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;gap:3px;position:relative;min-height:130px}
+.cx-st b{font-family:'Bricolage Grotesque',sans-serif;font-size:38px;font-weight:750;letter-spacing:-.02em;line-height:1;background:linear-gradient(120deg,var(--sa,#e2e8f0),var(--sb,#a5b4fc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.cx-st b span{font:inherit;color:inherit}
+.cx-st > span{font-size:11.5px;color:#64748b;letter-spacing:.04em}
+.cx-st .sg{position:absolute;right:-26px;bottom:-26px;width:110px;height:110px;border-radius:50%;background:var(--sa,#818cf8);opacity:.12;filter:blur(34px);pointer-events:none}
+/* rotating problem→answer cell */
+.cx-rot{grid-column:span 2;padding:22px 26px;display:flex;flex-direction:column;justify-content:center;gap:13px;min-height:130px}
+.cx-rot .rh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cx-rot .rh .lab{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8}
+.cx-rot .dots{display:flex;gap:5px}
+.cx-rot .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.14);transition:all .3s}
+.cx-rot .dots i.on{background:#818cf8;box-shadow:0 0 8px rgba(129,140,248,.8);transform:scale(1.2)}
+.cx-rot .pair{display:flex;flex-direction:column;gap:9px}
+.cx-rot .pl{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.cx-rot .pl .sig{flex:0 0 auto;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px}
+.cx-rot .pl.bad{color:#e6ebf7}
+.cx-rot .pl.bad .sig{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.35);color:#fb7185}
+.cx-rot .pl.good{color:#a7f3d0;font-size:13px}
+.cx-rot .pl.good .sig{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:#5eead4}
+.cx-rot .pl.good b{color:#fff;font-weight:600}
+.cx-rot .pair.sw{animation:cxRotIn .45s cubic-bezier(.22,1,.36,1)}
+@keyframes cxRotIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* go-deeper cell */
+.cx-explore{grid-column:span 2;padding:20px 24px;display:flex;flex-direction:column;gap:8px;justify-content:center;min-height:130px}
+.cx-explore .xl{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8;margin-bottom:3px}
+.xbtn{font-family:inherit;display:flex;align-items:center;gap:12px;text-align:left;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:all .18s;color:#c3cbe6;width:100%}
+.xbtn .xi{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+.xbtn b{display:block;font-size:12.5px;font-weight:700;color:#e2e8f0}
+.xbtn small{display:block;font-size:10.5px;color:#64748b;margin-top:1px}
+.xbtn .xa{margin-left:auto;color:#4b5572;font-size:14px;transition:transform .18s,color .18s}
+.xbtn:hover{border-color:rgba(129,140,248,.4);background:rgba(99,102,241,.08);transform:translateX(3px)}
+.xbtn:hover .xa{transform:translateX(3px);color:#a5b4fc}
+/* slim access-flow row */
+.cx-flowrow{grid-column:span 4;display:grid;grid-template-columns:1fr 44px 1fr 44px 1fr;align-items:center;padding:18px 24px}
+.cx-sn{display:flex;align-items:center;gap:13px;min-width:0}
+.cx-sn .ic{flex:0 0 auto;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.cx-sn h4{font-size:13.5px;font-weight:700;color:#f1f5f9;line-height:1.2}
+.cx-sn .u{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#818cf8;margin-top:2px}
+.cx-sn p{font-size:11px;color:#7c86a8;margin-top:3px;line-height:1.45}
+.cx-sarrow{display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;height:100%}
 .cx-sarrow::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:repeating-linear-gradient(90deg,rgba(129,140,248,.55) 0 5px,transparent 5px 10px);animation:cxDash 1.1s linear infinite}
 @keyframes cxDash{to{transform:translateX(10px)}}
 .cx-sarrow svg{position:relative;z-index:1;width:15px;height:15px;background:#0b0e1c;border-radius:50%}
-
-/* Personas — compact */
-.cx-personas{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
-.cx-persona{padding:22px 24px}
-.cx-persona .tag{display:inline-flex;font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;border-radius:999px;padding:5px 13px;margin-bottom:12px}
+/* personas */
+.cx-persona{grid-column:span 2;padding:24px 26px}
+.cx-persona .tag{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;border-radius:999px;padding:5px 13px;margin-bottom:12px}
 .cx-persona.sales .tag{color:#67e8f9;background:rgba(34,211,238,.09);border:1px solid rgba(34,211,238,.3)}
 .cx-persona.mkt .tag{color:#e879f9;background:rgba(232,121,249,.08);border:1px solid rgba(232,121,249,.3)}
 .cx-persona h3{font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:12px}
@@ -170,31 +207,42 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-persona.mkt li::before{color:#e879f9}
 .cx-persona li b{color:#fff;font-weight:600}
 
-/* Problem strip — compact infographic */
-.cx-why{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
-.cx-wcard{padding:18px 20px;display:flex;flex-direction:column;gap:10px}
-.cx-wcard .prob{display:flex;align-items:center;gap:10px}
-.cx-wcard .prob .x{flex:0 0 auto;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.3);color:#fb7185}
-.cx-wcard .prob h4{font-size:13.5px;font-weight:700;color:#f1f5f9;line-height:1.3}
-.cx-wcard .ans{display:flex;gap:9px;align-items:center;padding:9px 12px;border-radius:11px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2)}
-.cx-wcard .ans .v{flex:0 0 auto;font-size:11px;color:#5eead4}
-.cx-wcard .ans p{font-size:12px;line-height:1.45;color:#a7f3d0}
-.cx-wcard .ans p b{color:#fff;font-weight:600}
-
-/* ── Agents ── */
-.cx-tabs{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 0 22px}
-.cx-tab{font-family:inherit;font-size:12.5px;font-weight:600;color:#8b96b8;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:9px 18px;cursor:pointer;transition:all .2s}
-.cx-tab:hover{color:#e2e8f0;border-color:rgba(255,255,255,.2)}
-.cx-tab.on{color:#fff;background:linear-gradient(95deg,rgba(79,70,229,.35),rgba(124,58,237,.22));border-color:rgba(129,140,248,.45);box-shadow:0 0 20px -8px rgba(99,102,241,.7)}
-.cx-tab .n{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:700;color:#67e8f9;background:rgba(34,211,238,.1);border-radius:99px;padding:1px 8px}
-.cx-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.cx-agent{padding:20px;display:flex;flex-direction:column;gap:11px;animation:cxIn .4s cubic-bezier(.22,1,.36,1)}
+/* ═══════ AGENTS · master-detail explorer ═══════ */
+.cx-agx{display:grid;grid-template-columns:288px 1fr;gap:16px;align-items:start}
+.cx-rail{display:flex;flex-direction:column;gap:2px;max-height:600px;overflow-y:auto;padding:8px;background:rgba(15,18,34,.45);border:1px solid rgba(255,255,255,.06);border-radius:18px;scrollbar-width:thin;scrollbar-color:rgba(129,140,248,.3) transparent}
+.cx-rail::-webkit-scrollbar{width:5px}
+.cx-rail::-webkit-scrollbar-thumb{background:rgba(129,140,248,.3);border-radius:99px}
+.cx-gh{display:flex;align-items:center;gap:8px;font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#64748b;padding:14px 10px 7px}
+.cx-gh:first-child{padding-top:6px}
+.cx-gh .gd{width:7px;height:7px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.cx-gh .gn{margin-left:auto;font-size:9.5px;color:#4b5572}
+.cx-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:11px;cursor:pointer;border:1px solid transparent;font-size:13px;font-weight:600;color:#9aa5c4;transition:all .18s;font-family:inherit;text-align:left;background:transparent;width:100%}
+.cx-row .rdot{flex:0 0 auto;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.cx-row .rdot svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.cx-row:hover{background:rgba(255,255,255,.045);color:#e2e8f0;transform:translateX(2px)}
+.cx-row.on{background:linear-gradient(95deg,rgba(79,70,229,.28),rgba(124,58,237,.14));border-color:rgba(129,140,248,.45);color:#fff;box-shadow:0 6px 22px -10px rgba(99,102,241,.7)}
+/* detail panel */
+.cx-detail{position:relative;padding:36px 38px;min-height:480px;overflow:hidden;display:flex;flex-direction:column;gap:20px}
+.cx-detail .beam{position:absolute;inset:-45%;background:conic-gradient(from 0deg,transparent 72%,var(--a1,#818cf8) 86%,transparent 100%);animation:cxSpin 8s linear infinite;opacity:.13;pointer-events:none}
+.cx-detail .wm{position:absolute;right:-46px;bottom:-52px;width:250px;height:250px;opacity:.05;pointer-events:none}
+.cx-detail .wm svg{width:100%;height:100%;stroke:var(--a1,#818cf8);fill:none;stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+.cx-dtop{display:flex;align-items:center;gap:18px;position:relative;z-index:1}
+.cx-dico{flex:0 0 auto;width:66px;height:66px;border-radius:19px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--a1),var(--a2));box-shadow:0 14px 40px -10px var(--a1),0 0 30px -12px var(--a2);animation:cxIn .4s cubic-bezier(.22,1,.36,1)}
+.cx-dico svg{width:30px;height:30px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.cx-dname{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(21px,2.6vw,28px);font-weight:720;letter-spacing:-.02em;color:#f1f5f9;line-height:1.1}
+.cx-dnav{margin-left:auto;display:flex;gap:7px}
+.cx-dnav button{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#9aa5c4;font-size:15px;cursor:pointer;transition:all .18s;font-family:inherit}
+.cx-dnav button:hover{color:#fff;border-color:rgba(129,140,248,.5);background:rgba(99,102,241,.14)}
+.cx-ddesc{font-size:16.5px;line-height:1.6;color:#c3cbe6;max-width:560px;position:relative;z-index:1;animation:cxIn .45s cubic-bezier(.22,1,.36,1)}
+.cx-dgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;position:relative;z-index:1;margin-top:auto}
+.cx-dbox{background:rgba(10,13,26,.6);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:15px 17px;animation:cxIn .5s cubic-bezier(.22,1,.36,1)}
+.cx-dbox .bl{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#64748b;margin-bottom:9px}
+.cx-dbox .bv{display:flex;flex-wrap:wrap;gap:7px}
+.cx-dbox.needs{border-style:dashed;border-color:rgba(129,140,248,.35);background:rgba(99,102,241,.05)}
+.cx-dbox.needs .nv{font-size:13px;font-weight:600;color:#c7d2fe;line-height:1.5}
+.cx-dbox.ok .nv{font-size:13px;font-weight:600;color:#5eead4;line-height:1.5}
+.cx-dbox.who .nv{font-size:13px;font-weight:600;color:#c3cbe6;line-height:1.5}
 @keyframes cxIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.cx-agent .top{display:flex;align-items:center;gap:12px}
-.cx-agent .ic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -8px rgba(0,0,0,.7)}
-.cx-agent .ic svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.cx-agent h4{font-size:14.5px;font-weight:700;color:#f1f5f9;line-height:1.25}
-.cx-agent p{font-size:12.5px;line-height:1.55;color:#9aa5c4;flex:1}
 .cx-badge{display:inline-flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:99px;padding:4px 10px;white-space:nowrap}
 .cx-badge .d{width:6px;height:6px;border-radius:50%}
 .cx-badge.live{color:#5eead4;background:rgba(45,212,170,.09);border:1px solid rgba(45,212,170,.35)}
@@ -203,10 +251,7 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 .cx-badge.custom .d{background:#a78bfa;box-shadow:0 0 8px rgba(167,139,250,.9)}
 .cx-badge.beta{color:#fcd34d;background:rgba(245,158,11,.08);border:1px solid rgba(251,191,36,.32)}
 .cx-badge.beta .d{background:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.9)}
-.cx-chips{display:flex;flex-wrap:wrap;gap:6px}
-.cx-chip{font-size:10px;font-weight:600;color:#8b96b8;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:7px;padding:3px 8px}
-.cx-needs{font-size:11px;color:#94a3b8;background:rgba(99,102,241,.06);border:1px dashed rgba(129,140,248,.3);border-radius:9px;padding:6px 10px;line-height:1.45}
-.cx-needs b{color:#c7d2fe;font-weight:600}
+.cx-chip{font-size:11px;font-weight:600;color:#c3cbe6;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 11px}
 
 /* ── How it works ── */
 .cx-how{display:grid;grid-template-columns:270px 1fr;gap:16px;align-items:start}
@@ -312,16 +357,20 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 [data-theme="light"] .cx-tb{background:#fff;border-color:rgba(18,26,54,.12);color:#5a6488}
 [data-theme="light"] .cx-tb.on{color:#312e81}
 [data-theme="light"] .cx-card,[data-theme="light"] .cx-flowbtn{background:#fff;border-color:rgba(18,26,54,.10)}
-[data-theme="light"] .cx-hero h1,[data-theme="light"] .cx-ph h2,[data-theme="light"] .cx-agent h4,[data-theme="light"] .cx-persona h3,[data-theme="light"] .cx-flowpanel h3,[data-theme="light"] .cx-av h3,[data-theme="light"] .cx-layer .lh h3,[data-theme="light"] .cx-wcard .prob h4,[data-theme="light"] .cx-surf h4,[data-theme="light"] .cx-dnode b{color:#141c36}
-[data-theme="light"] .cx-hero p,[data-theme="light"] .cx-ph p,[data-theme="light"] .cx-agent p,[data-theme="light"] .cx-flowpanel .fp-sub{color:#5a6488}
-[data-theme="light"] .cx-persona li,[data-theme="light"] .cx-tldr p,[data-theme="light"] .cx-fstep .fs-d{color:#3d466b}
-[data-theme="light"] .cx-tldr p strong,[data-theme="light"] .cx-persona li b,[data-theme="light"] .cx-needs b,[data-theme="light"] .cx-fnote b{color:#141c36}
-[data-theme="light"] .cx-stat b{background:linear-gradient(120deg,#1e2b56,#4f46e5);-webkit-background-clip:text;background-clip:text}
-[data-theme="light"] .cx-tldr{background:linear-gradient(120deg,rgba(34,211,238,.08),rgba(99,102,241,.08) 50%,rgba(232,121,249,.07));border-color:rgba(79,70,229,.22)}
+[data-theme="light"] .cx-rail{background:rgba(255,255,255,.7);border-color:rgba(18,26,54,.10)}
+[data-theme="light"] .cx-row{color:#5a6488}
+[data-theme="light"] .cx-row:hover{background:rgba(18,26,54,.05);color:#141c36}
+[data-theme="light"] .cx-row.on{color:#312e81;background:linear-gradient(95deg,rgba(79,70,229,.12),rgba(124,58,237,.08))}
+[data-theme="light"] .cx-hero h1,[data-theme="light"] .cx-ph h2,[data-theme="light"] .cx-hero-cell h3,[data-theme="light"] .cx-persona h3,[data-theme="light"] .cx-flowpanel h3,[data-theme="light"] .cx-av h3,[data-theme="light"] .cx-layer .lh h3,[data-theme="light"] .cx-sn h4,[data-theme="light"] .cx-dnode b,[data-theme="light"] .cx-dname{color:#141c36}
+[data-theme="light"] .cx-hero p,[data-theme="light"] .cx-ph p,[data-theme="light"] .cx-hero-cell p,[data-theme="light"] .cx-flowpanel .fp-sub{color:#5a6488}
+[data-theme="light"] .cx-persona li,[data-theme="light"] .cx-fstep .fs-d,[data-theme="light"] .cx-ddesc{color:#3d466b}
+[data-theme="light"] .cx-persona li b,[data-theme="light"] .cx-fnote b{color:#141c36}
+[data-theme="light"] .cx-rot .pl.bad{color:#141c36}
+[data-theme="light"] .cx-rot .pl.good{color:#0f5c46}
+[data-theme="light"] .cx-rot .pl.good b{color:#065f46}
+[data-theme="light"] .cx-rot .dots i{background:rgba(18,26,54,.15)}
+[data-theme="light"] .cx-st > span,[data-theme="light"] .cx-sn p,[data-theme="light"] .cx-dnode span,[data-theme="light"] .cx-av .mlab{color:#828cac}
 [data-theme="light"] .cx-chip,[data-theme="light"] .cx-tech,[data-theme="light"] .cx-pill{background:rgba(18,26,54,.04);border-color:rgba(18,26,54,.12);color:#3d466b}
-[data-theme="light"] .cx-tab{background:rgba(18,26,54,.04);border-color:rgba(18,26,54,.12);color:#5a6488}
-[data-theme="light"] .cx-tab.on{color:#312e81}
-[data-theme="light"] .cx-tab .n{color:#0e7490;background:rgba(14,116,144,.08)}
 [data-theme="light"] .cx-fstep{background:#f7f8fd;border-color:rgba(18,26,54,.12)}
 [data-theme="light"] .cx-fstep .fs-t{color:#141c36}
 [data-theme="light"] .cx-fstep .fs-k{filter:brightness(.6)}
@@ -329,24 +378,43 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 [data-theme="light"] .cx-flowbtn b{color:#141c36}
 [data-theme="light"] .cx-flowbtn.on{background:linear-gradient(95deg,rgba(79,70,229,.10),rgba(124,58,237,.07))}
 [data-theme="light"] .cx-footer{border-top-color:rgba(18,26,54,.10)}
-[data-theme="light"] .cx-needs,[data-theme="light"] .cx-fnote{color:#4d5680;background:rgba(79,70,229,.05)}
-[data-theme="light"] .cx-wcard .ans p{color:#0f5c46}
-[data-theme="light"] .cx-wcard .ans p b{color:#065f46}
+[data-theme="light"] .cx-fnote{color:#4d5680;background:rgba(79,70,229,.05)}
+[data-theme="light"] .cx-dbox{background:#f7f8fd;border-color:rgba(18,26,54,.12)}
+[data-theme="light"] .cx-dbox.needs{background:rgba(79,70,229,.05);border-color:rgba(79,70,229,.3)}
+[data-theme="light"] .cx-dbox.needs .nv{color:#4338ca}
+[data-theme="light"] .cx-dbox.ok .nv{color:#0d9488}
+[data-theme="light"] .cx-dnav button{background:rgba(18,26,54,.04);border-color:rgba(18,26,54,.15);color:#5a6488}
 [data-theme="light"] .cx-badge.live{color:#0d9488}
 [data-theme="light"] .cx-badge.beta{color:#b45309}
 [data-theme="light"] .cx-badge.custom{color:#6d28d9}
-[data-theme="light"] .cx-surf p,[data-theme="light"] .cx-dnode span,[data-theme="light"] .cx-stat > span,[data-theme="light"] .cx-av .mlab{color:#828cac}
-[data-theme="light"] .cx-pill small{color:#828cac}
+[data-theme="light"] .cx-detail .beam{opacity:.07}
+[data-theme="light"] .cx-orbit{opacity:.55}
+[data-theme="light"] .xbtn{background:rgba(18,26,54,.03);border-color:rgba(18,26,54,.10);color:#3d466b}
+[data-theme="light"] .xbtn b{color:#141c36}
+[data-theme="light"] .xbtn:hover{background:rgba(79,70,229,.06)}
+[data-theme="light"] .xbtn small{color:#828cac}
+[data-theme="light"] .cx-hero h1 em,[data-theme="light"] .cx-ph h2 em,[data-theme="light"] .cx-hero-cell h3 em{background:linear-gradient(95deg,#0e7490,#4f46e5 55%,#a21caf);-webkit-background-clip:text;background-clip:text}
+[data-theme="light"] .cx-dbox.who .nv{color:#3d466b}
 
 /* ── Responsive ── */
 @media (max-width:980px){
-  .cx-agents{grid-template-columns:repeat(2,1fr)}
+  .cx-bento{grid-template-columns:repeat(2,1fr)}
+  .cx-hero-cell{grid-column:span 2}
+  .cx-rot{grid-column:span 2}
+  .cx-flowrow{grid-column:span 2;grid-template-columns:1fr;gap:6px}
+  .cx-sarrow{height:28px}
+  .cx-sarrow::before{left:50%;right:auto;top:0;bottom:0;width:1px;height:auto;background:repeating-linear-gradient(180deg,rgba(129,140,248,.55) 0 5px,transparent 5px 10px)}
+  .cx-sarrow svg{transform:rotate(90deg)}
+  .cx-persona{grid-column:span 2}
+  .cx-agx{grid-template-columns:1fr}
+  .cx-rail{flex-direction:row;overflow-x:auto;max-height:none;padding:8px;gap:6px}
+  .cx-gh{flex:0 0 auto;padding:8px 6px;writing-mode:initial}
+  .cx-gh .gn{display:none}
+  .cx-row{flex:0 0 auto;width:auto;white-space:nowrap}
   .cx-how{grid-template-columns:1fr}
   .cx-flowlist{flex-direction:row;overflow-x:auto;padding-bottom:6px}
   .cx-flowbtn{min-width:200px}
   .cx-avail{grid-template-columns:1fr}
-  .cx-stats{grid-template-columns:repeat(2,1fr)}
-  .cx-why{grid-template-columns:repeat(2,1fr)}
   .cx-layer{flex-wrap:wrap}
   .cx-layer .lh{flex:1 0 100%;padding-left:4px}
 }
@@ -354,15 +422,17 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
   .cx-main{padding:20px 18px 70px}
   .topbar{padding:0 16px}
   .user-name{display:none}
-  .cx-personas,.cx-agents,.cx-why{grid-template-columns:1fr}
+  .cx-bento{grid-template-columns:1fr}
+  .cx-hero-cell{grid-column:span 1;grid-row:span 1}
+  .cx-hero-cell h3,.cx-hero-cell p{max-width:100%}
+  .cx-orbit{display:none}
+  .cx-rot,.cx-persona,.cx-flowrow,.cx-explore{grid-column:span 1}
+  .cx-detail{padding:26px 22px}
+  .cx-dgrid{grid-template-columns:1fr}
   .cx-flow{grid-template-columns:1fr}
   .cx-farrow{height:26px}
   .cx-farrow::before{left:50%;right:auto;top:0;bottom:0;width:1px;height:auto;background:repeating-linear-gradient(180deg,rgba(129,140,248,.55) 0 5px,transparent 5px 10px)}
   .cx-farrow svg{transform:rotate(90deg)}
-  .cx-surfaces{grid-template-columns:1fr}
-  .cx-sarrow{height:30px}
-  .cx-sarrow::before{left:50%;right:auto;top:0;bottom:0;width:1px;height:auto;background:repeating-linear-gradient(180deg,rgba(129,140,248,.55) 0 5px,transparent 5px 10px)}
-  .cx-sarrow svg{transform:rotate(90deg)}
   .cx-deploy{flex-direction:column;gap:8px}
   .cx-darrow{transform:rotate(90deg);flex:0 0 30px}
   .cx-tb span.tl{display:none}
@@ -437,40 +507,27 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
 
   <main class="cx-main">
 
-    <!-- ═══ 1 · OVERVIEW ═══ -->
+    <!-- ═══ 1 · OVERVIEW · bento ═══ -->
     <section class="cx-panel on" id="p-overview">
-      <div class="cx-stats">
-        <div class="cx-stat cx-card"><b><span data-cxn="19">0</span></b><span>AI agents</span></div>
-        <div class="cx-stat cx-card"><b><span data-cxn="3">0</span></b><span>live for everyone</span></div>
-        <div class="cx-stat cx-card"><b><span data-cxn="1200" data-cxs="+">0</span></b><span>companies tracked</span></div>
-        <div class="cx-stat cx-card"><b><span data-cxn="26">0</span></b><span>signal types</span></div>
-      </div>
+      <div class="cx-bento">
 
-      <div class="cx-tldr">
-        <p><strong>Intelligence by Position²</strong> = AI agents that watch what teams can't — buying signals, competitor ads, anonymous visitors, LinkedIn, AI search — and turn it into <strong>ready-to-act intelligence</strong>.</p>
-      </div>
+        <div class="cx-hero-cell cx-card">
+          <div class="cx-orbit" aria-hidden="true">
+            <div class="ring r1"><i></i></div>
+            <div class="ring r2"><i></i></div>
+            <div class="ring r3"><i></i></div>
+            <div class="core"></div>
+          </div>
+          <span class="ey">What is this?</span>
+          <h3>AI agents that watch what teams can't — <em>around the clock.</em></h3>
+          <p>Buying signals · competitor ads · anonymous visitors · LinkedIn · AI search — turned into ready-to-act intelligence.</p>
+        </div>
 
-      <div class="cx-surfaces">
-        <div class="cx-surf cx-card">
-          <span class="ic" style="background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.35)">🌐</span>
-          <h4>Public site</h4><div class="u">anyone</div>
-          <p>Marketing pages, agent directory, demo video</p>
-        </div>
-        <div class="cx-sarrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-        <div class="cx-surf cx-card">
-          <span class="ic" style="background:rgba(99,102,241,.14);border:1px solid rgba(129,140,248,.35)">👤</span>
-          <h4>Member workspace</h4><div class="u">/app · Google sign-in</div>
-          <p>Run the 3 live agents, 10 runs each</p>
-        </div>
-        <div class="cx-sarrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-        <div class="cx-surf cx-card">
-          <span class="ic" style="background:rgba(232,121,249,.1);border:1px solid rgba(232,121,249,.35)">🛡</span>
-          <h4>Staff platform</h4><div class="u">/p2 · @position2.com only</div>
-          <p>All dashboards, every agent, admin analytics</p>
-        </div>
-      </div>
+        <div class="cx-st cx-card" style="--sa:#67e8f9;--sb:#818cf8"><span class="sg"></span><b><span data-cxn="19">0</span></b><span>AI agents</span></div>
+        <div class="cx-st cx-card" style="--sa:#34d399;--sb:#2dd4bf"><span class="sg"></span><b><span data-cxn="3">0</span></b><span>live for everyone</span></div>
+        <div class="cx-st cx-card" style="--sa:#a78bfa;--sb:#e879f9"><span class="sg"></span><b><span data-cxn="1200" data-cxs="+">0</span></b><span>companies tracked</span></div>
+        <div class="cx-st cx-card" style="--sa:#fbbf24;--sb:#fb923c"><span class="sg"></span><b><span data-cxn="26">0</span></b><span>signal types</span></div>
 
-      <div class="cx-personas">
         <div class="cx-persona sales cx-card">
           <span class="tag">Sales teams</span>
           <h3>Know who to call — and why.</h3>
@@ -489,44 +546,49 @@ body { font-family:'Space Grotesk',sans-serif; color:#e2e8f0; min-height:100vh; 
             <li><b>Keywords, briefs & audits</b> in seconds</li>
           </ul>
         </div>
-      </div>
 
-      <div class="cx-why">
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>Signals are scattered</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>Signal Tracker</b> ranks accounts weekly</p></div>
+        <div class="cx-rot cx-card" id="cxRot">
+          <div class="rh"><span class="lab">Solves real problems</span><span class="dots" id="cxRotDots"></span></div>
+          <div class="pair" id="cxRotPair"></div>
         </div>
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>95% of visitors leave nameless</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>Apollo</b> names companies & people</p></div>
+
+        <div class="cx-explore cx-card">
+          <span class="xl">Go deeper</span>
+          <button type="button" class="xbtn" onclick="cxActivate('agents')"><span class="xi" style="background:linear-gradient(135deg,#6366f1,#a855f7)">🤖</span><span><b>Meet the 19 agents</b><small>one spotlight at a time</small></span><span class="xa">→</span></button>
+          <button type="button" class="xbtn" onclick="cxActivate('how')"><span class="xi" style="background:linear-gradient(135deg,#22d3ee,#6366f1)">⚙</span><span><b>See the pipelines</b><small>where every agent gets its data</small></span><span class="xa">→</span></button>
+          <button type="button" class="xbtn" onclick="cxActivate('video')"><span class="xi" style="background:linear-gradient(135deg,#34d399,#22d3ee)">▶</span><span><b>Watch the 2-min demo</b><small>the whole platform, moving</small></span><span class="xa">→</span></button>
         </div>
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>Competitor ads are a black box</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>Live tracking</b> on Google · Meta · LinkedIn</p></div>
+
+        <div class="cx-flowrow cx-card">
+          <div class="cx-sn">
+            <span class="ic" style="background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.35)">🌐</span>
+            <div><h4>Public site</h4><div class="u">anyone</div><p>Marketing pages · directory · demo</p></div>
+          </div>
+          <div class="cx-sarrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="cx-sn">
+            <span class="ic" style="background:rgba(99,102,241,.14);border:1px solid rgba(129,140,248,.35)">👤</span>
+            <div><h4>Member workspace</h4><div class="u">/app · Google sign-in</div><p>3 live agents · 10 runs each</p></div>
+          </div>
+          <div class="cx-sarrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="cx-sn">
+            <span class="ic" style="background:rgba(232,121,249,.1);border:1px solid rgba(232,121,249,.35)">🛡</span>
+            <div><h4>Staff platform</h4><div class="u">/p2 · @position2.com</div><p>Everything + admin analytics</p></div>
+          </div>
         </div>
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>AI answers replace blue links</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>GEO agents</b> track & win AI visibility</p></div>
-        </div>
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>Audits take days</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>200+ checks</b> scored in seconds</p></div>
-        </div>
-        <div class="cx-wcard cx-card">
-          <div class="prob"><span class="x">✕</span><h4>Every tool in a different tab</h4></div>
-          <div class="ans"><span class="v">✓</span><p><b>One command center</b> for the program</p></div>
-        </div>
+
       </div>
     </section>
 
-    <!-- ═══ 2 · AGENTS ═══ -->
+    <!-- ═══ 2 · AGENTS · master-detail ═══ -->
     <section class="cx-panel" id="p-agents">
       <div class="cx-ph">
-        <h2>19 agents, <em>one line each.</em></h2>
-        <p>Filter by bucket — every card shows sources and what it needs to run.</p>
+        <h2>Pick an agent, <em>see everything.</em></h2>
+        <p>19 agents in three buckets — one spotlight at a time.</p>
       </div>
-      <div class="cx-tabs" id="cxTabs"></div>
-      <div class="cx-agents" id="cxAgents"></div>
+      <div class="cx-agx">
+        <div class="cx-rail" id="cxRail"></div>
+        <div class="cx-detail cx-card" id="cxDetail"></div>
+      </div>
     </section>
 
     <!-- ═══ 3 · HOW IT WORKS ═══ -->
@@ -715,6 +777,18 @@ document.addEventListener('keydown', function(e) {
   window.addEventListener('beforeunload', _send);
 })();
 
+// ── Card mouse-glow (global helper) ──
+function cxGlow(scope){
+  (scope||document).querySelectorAll('.cx-card').forEach(function(c){
+    if(c.__glow) return; c.__glow=1;
+    c.addEventListener('mousemove', function(e){
+      var r=c.getBoundingClientRect();
+      c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+      c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+    });
+  });
+}
+
 // ── Bucket switcher ──
 (function(){
   var bar = document.getElementById('cxTabbar');
@@ -733,7 +807,40 @@ document.addEventListener('keydown', function(e) {
   window.cxActivate = activate;
 })();
 
-// ── Agent directory data ──
+// ── Problem → answer rotator ──
+(function(){
+  var PAIRS = [
+    {p:'Buying signals are scattered',        a:'<b>Signal Tracker</b> ranks accounts weekly'},
+    {p:'95% of visitors leave nameless',      a:'<b>Apollo</b> names companies & people'},
+    {p:'Competitor ads are a black box',      a:'<b>Live tracking</b> on Google · Meta · LinkedIn'},
+    {p:'AI answers replace blue links',       a:'<b>GEO agents</b> track & win AI visibility'},
+    {p:'Audits take days of manual work',     a:'<b>200+ checks</b> scored in seconds'},
+    {p:'Every tool in a different tab',       a:'<b>One command center</b> for the program'}
+  ];
+  var pairEl = document.getElementById('cxRotPair');
+  var dotsEl = document.getElementById('cxRotDots');
+  if(!pairEl) return;
+  var idx = 0, timer = null;
+  dotsEl.innerHTML = PAIRS.map(function(){ return '<i></i>'; }).join('');
+  function show(i){
+    idx = i % PAIRS.length;
+    var d = PAIRS[idx];
+    pairEl.classList.remove('sw'); void pairEl.offsetWidth;
+    pairEl.classList.add('sw');
+    pairEl.innerHTML = '<div class="pl bad"><span class="sig">✕</span>'+d.p+'</div>'
+      + '<div class="pl good"><span class="sig">✓</span><span>'+d.a+'</span></div>';
+    Array.prototype.forEach.call(dotsEl.children, function(el,j){ el.classList.toggle('on', j===idx); });
+  }
+  function tick(){ show(idx+1); }
+  function play(){ if(!timer) timer = setInterval(tick, 3400); }
+  function stop(){ clearInterval(timer); timer = null; }
+  var box = document.getElementById('cxRot');
+  box.addEventListener('mouseenter', stop);
+  box.addEventListener('mouseleave', play);
+  show(0); play();
+})();
+
+// ── Agent explorer (master-detail) ──
 var CX_AGENTS = [
   {name:'Keyword Finder', bucket:'live', ac:'#22d3ee', ac2:'#6366f1',
    d:'Type a topic → scored, clustered keywords worth chasing.', src:['ChatGPT API','Semrush API']},
@@ -743,13 +850,13 @@ var CX_AGENTS = [
    d:'Paste an article → multi-LLM upgrade recommendations.', src:['Multiple LLMs','Live SERP']},
 
   {name:'ABM Signal Tracker', bucket:'gtm', ac:'#a78bfa', ac2:'#818cf8',
-   d:'Watches target accounts 24/7 · ranks the hottest weekly.', src:['Arena','Google News'], needs:'Target company list'},
+   d:'Watches target accounts 24/7 and ranks the hottest ones weekly.', src:['Arena','Google News'], needs:'Target company list'},
   {name:'Competitor Ad Intelligence', bucket:'gtm', ac:'#a855f7', ac2:'#e879f9',
    d:'Every competitor ad on Google, Meta & LinkedIn — live.', src:['Arena','Ad platforms'], needs:'Competitor list'},
   {name:'Anonymous Website Visitors', bucket:'gtm', ac:'#34d399', ac2:'#2dd4bf',
    d:'Names the companies & people browsing your site.', src:['Apollo'], needs:'Script on the site'},
   {name:'LinkedIn Intelligence', bucket:'gtm', ac:'#0ea5e9', ac2:'#38bdf8',
-   d:'Tracks any person, company or page · maps engagement to accounts.', src:['Arena','Unipile'], needs:'LinkedIn target to track'},
+   d:'Tracks any person, company or page and maps engagement to accounts.', src:['Arena','Unipile'], needs:'LinkedIn target to track'},
   {name:'Pipeline Command Center', bucket:'gtm', ac:'#a3e635', ac2:'#34d399',
    d:'Every account, signal & task in one live view.', src:['Google Sheets','Connected agents'], needs:'Client program data'},
 
@@ -774,68 +881,79 @@ var CX_AGENTS = [
   {name:'Hub & Spoke Architect', bucket:'seo', ac:'#8b5cf6', ac2:'#a78bfa',
    d:'URL list → topic clusters + internal-link map.', src:['ChatGPT API','Sheets']},
   {name:'Robots & Index Monitor', bucket:'seo', ac:'#f59e0b', ac2:'#fbbf24',
-   d:'Daily noindex checks · instant Slack alert if a page goes dark.', src:['Sitemaps','Slack']}
+   d:'Daily noindex checks with instant Slack alerts if a page goes dark.', src:['Sitemaps','Slack']}
 ];
 
-var CX_BUCKETS = {
-  all:   {label:'All'},
-  live:  {label:'⚡ Live for everyone', badge:'live',   btxt:'Live now'},
-  gtm:   {label:'🛠 GTM · custom', badge:'custom', btxt:'Custom build'},
-  seo:   {label:'🧪 SEO & content', badge:'beta',  btxt:'Internal / beta'}
-};
-
 (function(){
-  var tabsEl = document.getElementById('cxTabs');
-  var gridEl = document.getElementById('cxAgents');
-  var current = 'all';
+  var railEl = document.getElementById('cxRail');
+  var detEl  = document.getElementById('cxDetail');
+  if(!railEl) return;
+  var GROUPS = [
+    {k:'live', t:'Live for everyone', c:'#34d399', badge:'live',   btxt:'Live now',        avail:'Any member — sign in and run it.'},
+    {k:'gtm',  t:'GTM · custom',      c:'#a78bfa', badge:'custom', btxt:'Custom build',    avail:'Built per client on Arena / Apollo.'},
+    {k:'seo',  t:'SEO & content',     c:'#fbbf24', badge:'beta',   btxt:'Internal / beta', avail:'Staff only — zero configuration.'}
+  ];
+  var ICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
+  var sel = 0;
 
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-  function badgeFor(a){
-    var b = CX_BUCKETS[a.bucket];
-    return '<span class="cx-badge '+b.badge+'"><span class="d"></span>'+b.btxt+'</span>';
-  }
-  function renderTabs(){
-    var keys = ['all','live','gtm','seo'];
-    tabsEl.innerHTML = keys.map(function(k){
-      var count = k==='all' ? CX_AGENTS.length : CX_AGENTS.filter(function(a){return a.bucket===k;}).length;
-      return '<button type="button" class="cx-tab'+(k===current?' on':'')+'" data-k="'+k+'">'+CX_BUCKETS[k].label+'<span class="n">'+count+'</span></button>';
-    }).join('');
-  }
-  function renderGrid(){
-    var list = current==='all' ? CX_AGENTS : CX_AGENTS.filter(function(a){return a.bucket===current;});
-    gridEl.innerHTML = list.map(function(a){
-      var chips = a.src.map(function(s){return '<span class="cx-chip">'+esc(s)+'</span>';}).join('');
-      var needs = a.needs ? '<div class="cx-needs"><b>Needs:</b> '+esc(a.needs)+'</div>' : '';
-      return '<div class="cx-agent cx-card">'
-        + '<div class="top"><span class="ic" style="background:linear-gradient(135deg,'+a.ac+','+a.ac2+')">'
-        + '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></span>'
-        + '<div><h4>'+esc(a.name)+'</h4><div style="margin-top:4px">'+badgeFor(a)+'</div></div></div>'
-        + '<p>'+esc(a.d)+'</p>'
-        + '<div class="cx-chips">'+chips+'</div>'
-        + needs
-        + '</div>';
-    }).join('');
-    hoverGlow(gridEl);
-  }
-  tabsEl.addEventListener('click', function(e){
-    var b = e.target.closest('.cx-tab'); if(!b) return;
-    current = b.getAttribute('data-k');
-    renderTabs(); renderGrid();
-  });
-  renderTabs(); renderGrid();
+  function groupOf(a){ for(var i=0;i<GROUPS.length;i++) if(GROUPS[i].k===a.bucket) return GROUPS[i]; }
 
-  function hoverGlow(scope){
-    (scope||document).querySelectorAll('.cx-card').forEach(function(c){
-      if(c.__glow) return; c.__glow=1;
-      c.addEventListener('mousemove', function(e){
-        var r=c.getBoundingClientRect();
-        c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
-        c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
-      });
+  function renderRail(){
+    var html = '';
+    GROUPS.forEach(function(g){
+      var items = [];
+      CX_AGENTS.forEach(function(a,i){ if(a.bucket===g.k) items.push({a:a,i:i}); });
+      html += '<div class="cx-gh"><span class="gd" style="background:'+g.c+';color:'+g.c+'"></span>'+g.t+'<span class="gn">'+items.length+'</span></div>';
+      html += items.map(function(x){
+        return '<button type="button" class="cx-row'+(x.i===sel?' on':'')+'" data-i="'+x.i+'">'
+          + '<span class="rdot" style="background:linear-gradient(135deg,'+x.a.ac+','+x.a.ac2+')">'+ICON+'</span>'
+          + esc(x.a.name)+'</button>';
+      }).join('');
     });
+    railEl.innerHTML = html;
   }
-  window.__cxGlow = hoverGlow;
-  hoverGlow(document);
+
+  function renderDetail(){
+    var a = CX_AGENTS[sel], g = groupOf(a);
+    var chips = a.src.map(function(s){return '<span class="cx-chip">'+esc(s)+'</span>';}).join('');
+    var needsBox = a.needs
+      ? '<div class="cx-dbox needs"><div class="bl">Needs before it runs</div><div class="nv">'+esc(a.needs)+'</div></div>'
+      : '<div class="cx-dbox ok"><div class="bl">Setup required</div><div class="nv">None — ready to use</div></div>';
+    detEl.style.setProperty('--a1', a.ac);
+    detEl.style.setProperty('--a2', a.ac2);
+    detEl.innerHTML =
+        '<div class="beam" aria-hidden="true"></div>'
+      + '<div class="wm" aria-hidden="true">'+ICON+'</div>'
+      + '<div class="cx-dtop">'
+      +   '<span class="cx-dico">'+ICON+'</span>'
+      +   '<div><div class="cx-dname">'+esc(a.name)+'</div>'
+      +   '<div style="margin-top:7px"><span class="cx-badge '+g.badge+'"><span class="d"></span>'+g.btxt+'</span></div></div>'
+      +   '<div class="cx-dnav"><button type="button" data-nav="-1" aria-label="Previous agent">‹</button><button type="button" data-nav="1" aria-label="Next agent">›</button></div>'
+      + '</div>'
+      + '<p class="cx-ddesc">'+esc(a.d)+'</p>'
+      + '<div class="cx-dgrid">'
+      +   '<div class="cx-dbox"><div class="bl">Data comes from</div><div class="bv">'+chips+'</div></div>'
+      +   needsBox
+      +   '<div class="cx-dbox who" style="grid-column:1/-1"><div class="bl">Who can use it</div><div class="nv">'+g.avail+'</div></div>'
+      + '</div>';
+    cxGlow(detEl.parentNode);
+  }
+
+  railEl.addEventListener('click', function(e){
+    var b = e.target.closest('.cx-row'); if(!b) return;
+    sel = parseInt(b.getAttribute('data-i'),10);
+    renderRail(); renderDetail();
+  });
+  detEl.addEventListener('click', function(e){
+    var b = e.target.closest('[data-nav]'); if(!b) return;
+    sel = (sel + parseInt(b.getAttribute('data-nav'),10) + CX_AGENTS.length) % CX_AGENTS.length;
+    renderRail(); renderDetail();
+    var row = railEl.querySelector('.cx-row.on');
+    if(row && row.scrollIntoView) row.scrollIntoView({block:'nearest'});
+  });
+
+  renderRail(); renderDetail();
 })();
 
 // ── How-it-works flows ──
@@ -956,6 +1074,9 @@ var CX_FLOWS = [
     } else setTimeout(run,500);
   });
 })();
+
+// ── Init glow on static cards ──
+cxGlow(document);
 </script>
 <script>(function(){if(window.__amb)return;window.__amb=1;
 var a=document.createElement('div');a.className='amb-aurora';
