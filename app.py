@@ -616,16 +616,6 @@ AGENTS = [
         "connects": ["Paid social", "Search", "Brand"],
     },
     {
-        "slug": "pipeline-command-center", "name": "Pipeline Command Center", "role": "Program Analytics",
-        "badge": "NEW", "cat": "Analytics", "accent": "#a3e635", "metric": "Every account & task, live",
-        "icon": _svg('<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="14" width="8" height="7" rx="1.5"/>'),
-        "summary": "One live command center for your whole go-to-market program - every account, signal, ranking and deliverable in a single prioritized view.",
-        "benefit": "Replace scattered spreadsheets and dashboards with one source of truth your whole team works from.",
-        "how": "It unifies signals, rankings, tasks and account data from your connected sources into a live, filterable dashboard.",
-        "who": "Marketing ops, SEO PMs and team leads.",
-        "connects": ["Sheets", "GSC", "CRM"],
-    },
-    {
         "slug": "gbp-qc-agent", "name": "GBP QC Agent", "role": "Google Business Profile QC",
         "badge": "NEW", "cat": "SEO", "accent": "#f97316", "metric": "3-stage QC \u00b7 brand-checked",
         "icon": _svg('<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><path d="M9 10l2 2 4-4"/>'),
@@ -760,16 +750,6 @@ INDUSTRIES = [
              "who":"Website, demand-gen and outreach teams who want to act on anonymous intent.",
              "connects":["Your website","GTM","CRM","Sheets"],
              "out":[{"t":"The organizations on your site","s":"Named, even without a form fill.","w":90},{"t":"The pages they read","s":"Reconstructed session by session.","w":78},{"t":"A ready outreach narrative","s":"So reps can act while intent is warm.","w":74}]},
-            {"slug":"pipeline-command-center","name":"Pipeline Command Center","base":"Pipeline Command Center","accent":"#fb7185","accent2":"#f43f5e",
-             "role":"Prioritization & Routing","metric":"One intent score · routed to your CRM",
-             "icon": _isvg('<path d="M3 4h18v4H3z"/><path d="M5 8v12h14V8"/><path d="M9 12h6M9 16h4"/>'),
-             "use":"Ranks every in-market system by one intent score, explains why in plain language, and routes the account with suggested outreach into HubSpot, Salesforce and Slack.",
-             "summary":"Every in-market system ranked by one intent score, explained in plain language, and routed straight into the tools your team already uses.",
-             "benefit":"Your team works one prioritized list instead of many dashboards, with the reason to reach out ready for each account.",
-             "how":"It combines signals into a single intent score, explains why each account ranks where it does, and routes the account with suggested outreach into HubSpot, Salesforce and Slack.",
-             "who":"Revenue and sales operations teams in healthcare.",
-             "connects":["HubSpot","Salesforce","Slack","Sheets"],
-             "out":[{"t":"One ranked worklist","s":"Every in-market system, scored.","w":92},{"t":"The reason, in plain language","s":"Why each account ranks where it does.","w":82},{"t":"Routed into your stack","s":"HubSpot, Salesforce and Slack.","w":80}]},
 
         ],
         "plays": [
@@ -1570,19 +1550,6 @@ APP_AGENTS = [
             {"t": "Best for", "d": "Paid media, brand and competitive-intelligence teams."},
         ],
         "tags": ["Paid social", "Search", "Brand"],
-    },
-    {
-        "slug": "pipeline-command-center", "name": "Pipeline Command Center",
-        "tagline": "Program Analytics",
-        "ac": "#a3e635", "ac2": "#34d399", "icon": _asvg("<rect x=\"3\" y=\"3\" width=\"8\" height=\"8\" rx=\"1.5\"/><rect x=\"13\" y=\"3\" width=\"8\" height=\"5\" rx=\"1.5\"/><rect x=\"13\" y=\"11\" width=\"8\" height=\"10\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"8\" height=\"7\" rx=\"1.5\"/>"),
-        "pill1": "Program Analytics", "pill2": "Every account & task, live",
-        "lead": ("One live command center for your whole go-to-market program \u2014 every account, signal, ranking and deliverable in a single prioritized view."),
-        "trips": [
-            {"t": "What it does", "d": "Replace scattered spreadsheets and dashboards with one source of truth your whole team works from."},
-            {"t": "How it works", "d": "It unifies signals, rankings, tasks and account data from your connected sources into a live, filterable dashboard."},
-            {"t": "Best for", "d": "Marketing ops, SEO PMs and team leads."},
-        ],
-        "tags": ["Sheets", "GSC", "CRM"],
     },
     {
         "slug": "gbp-qc-agent", "name": "GBP QC Agent",
