@@ -267,14 +267,21 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .persona .p-foot a{font-size:12px;font-weight:700;color:#818cf8;text-decoration:none;white-space:nowrap}
 .persona .p-foot a:hover{text-decoration:underline}
 
-/* ── Ch4 How (steps + surfaces) ── */
-.steps{display:flex;align-items:stretch;gap:0}
-.step{flex:1 1 0;min-width:0;padding:24px 20px}
-.step .sn{width:34px;height:34px;margin-bottom:16px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-size:15px;font-weight:750;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 16px rgba(99,102,241,.4)}
-.step h4{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px}
-.step p{font-size:12px;line-height:1.6;color:var(--dim)}
-.step-arrow{display:flex;align-items:center;justify-content:center;width:30px;flex:0 0 auto;color:var(--mute)}
-.step-arrow svg{width:15px;height:15px}
+/* ── Ch4 How (navflows + surfaces) ── */
+.navflows{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.navflow{padding:28px}
+.nf-head{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.nf-badge{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:7px}
+.nf-head h4{font-family:'Bricolage Grotesque',sans-serif;font-size:16px;font-weight:700;color:var(--ink)}
+.nf-track{position:relative;display:flex;flex-direction:column;gap:20px}
+.nf-track::before{content:"";position:absolute;left:16.5px;top:16px;bottom:16px;width:1px;background:var(--bd)}
+.nf-step{display:flex;align-items:center;gap:15px;position:relative}
+.nf-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--card2);border:1px solid var(--bd);color:#67e8f9;position:relative;z-index:1}
+.nf-ico svg{width:16px;height:16px}
+.navflow.here .nf-ico{color:#a5b4fc}
+.nf-label{font-size:13px;font-weight:600;color:var(--ink2)}
+.nf-foot{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd);font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mute);text-align:center}
+.nf-foot.hi{color:#a5b4fc}
 .surfaces{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
 .surf{padding:26px 28px}
 .surf .u{font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px}
@@ -415,18 +422,14 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
 /* ── responsive ── */
 @media(max-width:980px){
   .hub-grid,.who-grid{grid-template-columns:repeat(2,1fr)}
-  .def,.why,.surfaces{grid-template-columns:1fr}
+  .def,.why,.surfaces,.navflows{grid-template-columns:1fr}
   .why .arrow{transform:rotate(90deg);justify-self:center}
   .agrid,.buckets{grid-template-columns:1fr 1fr}
-  .steps{flex-wrap:wrap;gap:14px}
-  .step{flex:1 1 45%}
-  .step-arrow{display:none}
   .am-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:600px){
   .wrap{padding:0 18px}
   .hub-grid,.who-grid,.agrid,.buckets{grid-template-columns:1fr}
-  .step{flex:1 1 100%}
   .am-grid{grid-template-columns:1fr}
   .topbar{padding:0 16px}.breadcrumb{display:none}
   .flowpipe{flex-direction:column}.fparrow{transform:rotate(90deg)}
@@ -612,35 +615,32 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       </div>
     </div>
   {% elif chapter.slug == 'how-to-navigate' %}
-    <div class="steps reveal">
-      <div class="step cx-card">
-        <div class="sn">1</div>
-        <h4>Sign in with Google</h4>
-        <p>One click, no password to create or remember. Your @position2.com account is the only credential, and it's what gates you into the /p2 side of the platform.</p>
+    <div class="navflows reveal">
+      <div class="navflow cx-card">
+        <div class="nf-head">
+          <span class="nf-badge" style="color:#67e8f9;background:rgba(34,211,238,.12)">/app</span>
+          <h4>Member workspace</h4>
+        </div>
+        <div class="nf-track">
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></span><span class="nf-label">Sign in with Google</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nf-label">Pick 1 of 3 tools</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4l13 8-13 8V4z"/></svg></span><span class="nf-label">Run it yourself</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6V3z"/><path d="M14 3v4h4"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg></span><span class="nf-label">Get your result</span></div>
+        </div>
+        <div class="nf-foot">10 runs per agent</div>
       </div>
-      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="step cx-card">
-        <div class="sn">2</div>
-        <h4>Land on the Hub</h4>
-        <p>Every agent lives on one page, grouped into three buckets: Live SEO tools, GTM Intelligence and the SEO fleet. You see the shape of the platform before picking anything.</p>
-      </div>
-      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="step cx-card">
-        <div class="sn">3</div>
-        <h4>Pick an agent</h4>
-        <p>Each card states what the agent does, what it needs from you, and whether it's ready to run now or needs a quick one-time setup, like a target list or a script on the site.</p>
-      </div>
-      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="step cx-card">
-        <div class="sn">4</div>
-        <h4>Give it input</h4>
-        <p>Most agents just need a keyword, a URL or a company list to get going. A few, like ABM Signal Tracker, are already watching in the background the moment they're configured.</p>
-      </div>
-      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="step cx-card">
-        <div class="sn">5</div>
-        <h4>Get results</h4>
-        <p>Results land wherever makes sense: right on the page, in a shared Google Sheet, or as a Slack alert the moment something worth acting on happens.</p>
+      <div class="navflow here cx-card">
+        <div class="nf-head">
+          <span class="nf-badge" style="color:#a5b4fc;background:rgba(99,102,241,.16)">/p2</span>
+          <h4>Internal staff</h4>
+        </div>
+        <div class="nf-track">
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></span><span class="nf-label">Sign in with Google</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="nf-label">Browse all 18 agents</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="4"/><circle cx="4" cy="12" r="2"/><line x1="12" y1="20" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="10" r="2"/><line x1="20" y1="20" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="4"/><circle cx="20" cy="14" r="2"/></svg></span><span class="nf-label">Configure if needed</span></div>
+          <div class="nf-step"><span class="nf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="18" y1="20" x2="18" y2="15"/></svg></span><span class="nf-label">Sheet, Slack or in-page</span></div>
+        </div>
+        <div class="nf-foot hi">No run limit</div>
       </div>
     </div>
     <div class="surfaces reveal">
@@ -649,8 +649,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <p>The client-facing side. Prospects and clients sign in here to run the public SEO tools themselves, no /p2 access required.</p>
         <div class="surf-list">
           <div class="srow"><span class="sck">✓</span>3 live agents: Keyword Finder, Content Brief Generator, Content Enhancer</div>
-          <div class="srow"><span class="sck">✓</span>Open to any client or prospect with an invite</div>
-          <div class="srow"><span class="sck">✓</span>Powers the campaigns, reports and pitches they see</div>
+          <div class="srow"><span class="sck">✓</span>10 runs per agent, then it resets</div>
         </div>
       </div>
       <div class="surf here cx-card">
@@ -658,8 +657,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <p>Position²-only. The full agent fleet, admin dashboards and this playbook, gated to @position2.com accounts.</p>
         <div class="surf-list">
           <div class="srow"><span class="sck">✓</span>All 18 agents: Live, GTM and the SEO fleet</div>
-          <div class="srow"><span class="sck">✓</span>Google sign-in restricted to @position2.com</div>
-          <div class="srow"><span class="sck">✓</span>10 runs per agent, so nothing runs away unattended</div>
+          <div class="srow"><span class="sck">✓</span>No run limit, use every agent as much as you need</div>
         </div>
       </div>
     </div>
