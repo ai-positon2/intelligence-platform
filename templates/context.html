@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Platform Playbook — Intelligence</title>
+  <title>Platform Playbook · Intelligence</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -166,8 +166,8 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .lc-stat{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--dim);background:var(--card2);
   border:1px solid var(--bd);border-radius:999px;padding:4px 10px;white-space:nowrap;transition:color .3s,border-color .3s}
 .lc:hover .lc-stat{color:var(--ac,#818cf8);border-color:var(--acbd,var(--bd-hi))}
-.lc-go{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--mute);transition:gap .3s,color .3s}
-.lc:hover .lc-go{gap:8px;color:var(--ac,#818cf8)}
+.lc-go{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--mute);transition:color .3s}
+.lc:hover .lc-go{color:var(--ac,#818cf8)}
 .lc-go svg{width:14px;height:14px}
 
 /* ══════════════ CHAPTER PAGE: nav rail + hero + pager ══════════════ */
@@ -181,7 +181,7 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .cdot:hover{color:var(--ink);border-color:var(--acbd,var(--bd-hi));transform:translateY(-2px)}
 .cdot.on{color:#fff;background:var(--ac,#818cf8);border-color:var(--ac,#818cf8);box-shadow:0 0 14px rgba(99,102,241,.5)}
 
-.chero{padding:52px 32px 8px;max-width:880px}
+.chero{padding:52px 32px 8px}
 .chero-badge{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
   color:var(--ac,#a5b4fc);background:var(--acbg,rgba(99,102,241,.12));border:1px solid var(--acbd,rgba(129,140,248,.34));
   border-radius:999px;padding:7px 15px 7px 11px;margin-bottom:20px}
@@ -211,19 +211,12 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .plain{display:flex;flex-direction:column;gap:10px;margin-top:22px}
 .plain .row{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--ink2)}
 .plain .row .ck{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;background:rgba(52,211,153,.14);color:#34d399}
-.node{display:flex;align-items:center;justify-content:center;padding:20px;min-height:230px}
-.orbit{position:relative;width:180px;height:180px}
-.orbit .core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 0 30px rgba(99,102,241,.5);z-index:2;animation:corebeat 3s ease-in-out infinite}
-@keyframes corebeat{0%,100%{box-shadow:0 0 24px rgba(99,102,241,.4)}50%{box-shadow:0 0 40px rgba(139,92,246,.7)}}
-.orbit .ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--bd)}
-.orbit .ring i{position:absolute;top:-4px;left:50%;width:9px;height:9px;border-radius:50%;transform:translateX(-50%)}
-.orbit .r1{animation:spin 9s linear infinite}
-.orbit .r2{inset:26px;animation:spin 6s linear infinite reverse}
-.orbit .r3{inset:52px;animation:spin 4s linear infinite}
-.orbit .r1 i{background:#22d3ee;box-shadow:0 0 12px #22d3ee}
-.orbit .r2 i{background:#e879f9;box-shadow:0 0 12px #e879f9}
-.orbit .r3 i{background:#34d399;box-shadow:0 0 12px #34d399}
-@keyframes spin{to{transform:rotate(360deg)}}
+.stat-panel{display:flex;flex-direction:column;justify-content:center;gap:20px;padding:32px 30px}
+.sp-item{display:flex;flex-direction:column;gap:4px;padding-bottom:20px;border-bottom:1px solid var(--bd)}
+.sp-item:last-child{padding-bottom:0;border-bottom:none}
+.sp-item b{font-family:'Bricolage Grotesque',sans-serif;font-size:32px;font-weight:750;letter-spacing:-.02em;
+  background:linear-gradient(95deg,#67e8f9,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp-item span{font-size:12.5px;color:var(--dim);line-height:1.4}
 .isnt{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
 .isnt .col{padding:20px 22px}
 .isnt .col h4{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
@@ -314,7 +307,7 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .afilter button.on[data-f="all"]{border-color:var(--bd-hi)}
 .afilter .cnt{font-size:10.5px;opacity:.6}
 .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.ag{padding:20px;position:relative;display:flex;flex-direction:column;cursor:pointer;transition:transform .25s,border-color .25s,background .25s}
+.ag{padding:20px;position:relative;display:flex;flex-direction:column;cursor:pointer;background:var(--card2);transition:transform .25s,border-color .25s,background .25s}
 .ag:hover{transform:translateY(-4px);border-color:var(--bd-hi)}
 .ag:focus-visible{outline:2px solid var(--bd-hi);outline-offset:2px}
 .ag .cap{position:absolute;top:0;left:0;width:3px;height:100%}
@@ -360,7 +353,7 @@ html[data-theme="light"] .am-overlay{background:rgba(30,36,60,.35)}
 .am-chip.good{color:#34d399;background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3)}
 
 /* ── Ch7 Tech (layers) ── */
-.stackwrap{position:relative;display:flex;flex-direction:column;gap:10px;max-width:940px}
+.stackwrap{position:relative;display:flex;flex-direction:column;gap:10px}
 .stackwrap::before{content:"";position:absolute;left:19px;top:24px;bottom:24px;width:2px;background:linear-gradient(180deg,#22d3ee,#818cf8,#e879f9,#34d399,#fbbf24);opacity:.5;border-radius:2px}
 .layer{position:relative;padding:18px 22px 18px 52px}
 .layer .ldot{position:absolute;left:12px;top:22px;width:16px;height:16px;border-radius:50%;border:3px solid #0a0d1a}
@@ -491,20 +484,17 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   {% if chapter.slug == 'what-it-is' %}
     <div class="def reveal">
       <div class="def-main cx-card">
-        <div class="big"><b>Intelligence</b> is Position²'s single front door to a fleet of AI agents that do real go-to-market and SEO work — from spotting buying signals to writing content briefs — all behind one Google login.</div>
+        <div class="big"><b>Intelligence</b> is Position²'s single front door to a fleet of AI agents that do real go-to-market and SEO work, from spotting buying signals to writing content briefs, all behind one Google login.</div>
         <div class="plain">
-          <div class="row"><span class="ck">✓</span> 18 agents under one roof — GTM and SEO, side by side</div>
-          <div class="row"><span class="ck">✓</span> Most run with zero setup — pick one and go</div>
-          <div class="row"><span class="ck">✓</span> Point-and-click — no code, no technical know-how</div>
+          <div class="row"><span class="ck">✓</span> 18 agents under one roof: GTM and SEO, side by side</div>
+          <div class="row"><span class="ck">✓</span> Most run with zero setup: pick one and go</div>
+          <div class="row"><span class="ck">✓</span> Point-and-click: no code, no technical know-how</div>
         </div>
       </div>
-      <div class="node cx-card">
-        <div class="orbit" aria-hidden="true">
-          <div class="core">✦</div>
-          <div class="ring r1"><i></i></div>
-          <div class="ring r2"><i></i></div>
-          <div class="ring r3"><i></i></div>
-        </div>
+      <div class="stat-panel cx-card">
+        <div class="sp-item"><b>18</b><span>AI agents, ready to run</span></div>
+        <div class="sp-item"><b>2</b><span>domains: GTM and SEO</span></div>
+        <div class="sp-item"><b>1</b><span>login for the whole fleet</span></div>
       </div>
     </div>
     <div class="isnt reveal">
@@ -516,7 +506,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <ul class="col no cx-card"><h4>What it isn't</h4>
         <li>Not a raw, technical back-end</li>
         <li>Not one-off scripts scattered around</li>
-        <li>Not something only engineers can touch</li>
+        <li>Not something only a few people can touch</li>
       </ul>
     </div>
   {% elif chapter.slug == 'why-we-built-it' %}
@@ -524,17 +514,17 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="wcard before cx-card">
         <span class="tag">Before</span>
         <h3>Great agents, no front door</h3>
-        <p>Arena is packed with powerful AI agents — but they live in a technical back-end built for engineers. There was no friendly, interactive front-end, so the people who needed these agents most couldn't actually use them.</p>
+        <p>Arena is packed with powerful AI agents, but it's an internal system that only Position² employees can reach. There was no friendly, interactive front-end for it, so the people who needed these agents most still couldn't actually use them.</p>
       </div>
       <div class="arrow">→</div>
       <div class="wcard after cx-card">
         <span class="tag">After</span>
-        <h3>A home anyone can use</h3>
-        <p>So we built Intelligence: a beautiful, interactive homepage for the whole fleet. The majority of agents are still powered by Arena under the hood — this platform is the front-end that lets anyone pick an agent and put it to work.</p>
+        <h3>A home our team can use</h3>
+        <p>So we built Intelligence: a beautiful, interactive homepage for the whole fleet. Most agents are still powered by Arena under the hood; this platform is the front-end that lets our team pick one and put it to work.</p>
       </div>
     </div>
     <div class="vision cx-card reveal">
-      <div class="q">Arena is the <b>engine.</b> Intelligence is the <b>cockpit</b> — where anyone can actually fly it.</div>
+      <div class="q">Arena is the <b>engine.</b> Intelligence is the <b>cockpit</b>, where our team can actually fly it.</div>
       <div class="by">The one-line vision</div>
     </div>
     <div class="flowpipe reveal">
@@ -549,26 +539,26 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   {% elif chapter.slug == 'who-its-for' %}
     <div class="who-grid">
       <div class="persona cx-card reveal"><div class="pi" style="background:rgba(167,139,250,.14);color:#a78bfa">🤝</div><h3>Sales · AM · BD</h3><p>Act on live buying signals and walk into every call already knowing what the account is doing.</p><div class="use"><b>Live with:</b> Signal Tracker, Ad & LinkedIn Intelligence</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(56,189,248,.14);color:#38bdf8">✍️</div><h3>SEO & Content teams</h3><p>Run the SEO/GEO fleet every day — keyword research, briefs, audits and authority edits.</p><div class="use"><b>Live with:</b> the 14-agent SEO fleet</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(52,211,153,.14);color:#34d399">📊</div><h3>Leadership</h3><p>See the full capability at a glance — what the platform can do, and where it's headed.</p><div class="use"><b>Live with:</b> this playbook & the demo</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(232,121,249,.14);color:#e879f9">🎁</div><h3>Clients & prospects</h3><p>They never see this page — but its outputs power their campaigns, reports and pitches.</p><div class="use"><b>Live with:</b> the public SEO tools on <code style="font-size:11px">/app</code></div></div>
+      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(56,189,248,.14);color:#38bdf8">✍️</div><h3>SEO & Content teams</h3><p>Run the SEO/GEO fleet every day: keyword research, briefs, audits and authority edits.</p><div class="use"><b>Live with:</b> the 14-agent SEO fleet</div></div>
+      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(52,211,153,.14);color:#34d399">📊</div><h3>Leadership</h3><p>See the full capability at a glance: what the platform can do, and where it's headed.</p><div class="use"><b>Live with:</b> this playbook & the demo</div></div>
+      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(232,121,249,.14);color:#e879f9">🎁</div><h3>Clients & prospects</h3><p>They never see this page, but its outputs power their campaigns, reports and pitches.</p><div class="use"><b>Live with:</b> the public SEO tools on <code style="font-size:11px">/app</code></div></div>
     </div>
   {% elif chapter.slug == 'how-to-navigate' %}
     <div class="steps reveal">
-      <div class="step"><div class="sn">1</div><h4>Sign in</h4><p>Google login — no passwords to remember.</p></div>
+      <div class="step"><div class="sn">1</div><h4>Sign in</h4><p>Google login, no passwords to remember.</p></div>
       <div class="step"><div class="sn">2</div><h4>Land on the Hub</h4><p>Every agent, grouped by bucket.</p></div>
       <div class="step"><div class="sn">3</div><h4>Pick an agent</h4><p>Open the one that fits the job.</p></div>
-      <div class="step"><div class="sn">4</div><h4>Give it input</h4><p>A keyword, a URL, a list — or it's already running.</p></div>
+      <div class="step"><div class="sn">4</div><h4>Give it input</h4><p>A keyword, a URL, a list, or it's already running.</p></div>
       <div class="step"><div class="sn">5</div><h4>Get results</h4><p>In-page, a Google Sheet, or a Slack alert.</p></div>
     </div>
     <div class="surfaces reveal">
       <div class="surf cx-card">
         <div class="u"><code>/app</code>Member workspace</div>
-        <p>The client-facing side. Members sign in to run the public SEO tools — this is where prospects and clients live.</p>
+        <p>The client-facing side. Members sign in to run the public SEO tools; this is where prospects and clients live.</p>
       </div>
       <div class="surf here cx-card">
         <div class="u"><code>/p2</code>Internal staff<span class="badge-here">You are here</span></div>
-        <p>Position²-only. The full agent fleet, admin dashboards and this playbook — gated to @position2.com accounts, with a 10-run cap per agent.</p>
+        <p>Position²-only. The full agent fleet, admin dashboards and this playbook, gated to @position2.com accounts, with a 10-run cap per agent.</p>
       </div>
     </div>
   {% elif chapter.slug == 'agent-landscape' %}
@@ -584,7 +574,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="bkt cx-card" data-bucket="gtm" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></span>
         <div class="bn" style="color:#a78bfa" data-n="4">0</div>
         <div class="bt">GTM Intelligence</div>
-        <div class="bd">Custom-built per client on Arena, Apollo & Unipile. Each needs a quick config — a list or a script.</div>
+        <div class="bd">Custom-built per client on Arena, Apollo & Unipile. Each needs a quick config: a list or a script.</div>
         <div class="bmeta"><span class="chip">Custom build</span><span class="chip">Internal</span><span class="chip">Needs setup</span></div>
         <div class="bkt-toggle"><span class="bkt-tlabel">See the 4 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
         <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#gtm">Explore all in detail →</a></div>
@@ -592,7 +582,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="bkt cx-card" data-bucket="seo" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
         <div class="bn" style="color:#38bdf8" data-n="11">0</div>
         <div class="bt">SEO fleet</div>
-        <div class="bd">The deep SEO & GEO toolkit — internal and beta, built on ChatGPT and Semrush APIs. No config needed.</div>
+        <div class="bd">The deep SEO & GEO toolkit (internal and beta), built on ChatGPT and Semrush APIs. No config needed.</div>
         <div class="bmeta"><span class="chip">Standard</span><span class="chip">Internal · beta</span><span class="chip">No config</span></div>
         <div class="bkt-toggle"><span class="bkt-tlabel">See the 11 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
         <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#seo">Explore all in detail →</a></div>
@@ -691,7 +681,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   <section class="wrap hub">
     <div class="hub-h">
       <h2>Pick a chapter</h2>
-      <p>Eight short chapters — tap one to open it.</p>
+      <p>Eight short chapters, tap one to open it.</p>
     </div>
     <div class="hub-grid">
       {% for c in chapters %}
@@ -773,7 +763,7 @@ document.addEventListener('keydown', function(e) {
     if(_sent) return; _sent = true;
     var s = Math.round((Date.now()-_start)/1000);
     fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({page: window.location.pathname, title: {{ ((chapter.title ~ ' — Playbook') if chapter else 'Platform Playbook')|tojson }}, seconds: s,
+      body: JSON.stringify({page: window.location.pathname, title: {{ ((chapter.title ~ ' · Playbook') if chapter else 'Platform Playbook')|tojson }}, seconds: s,
       email: {{ (user.email if user else '')|tojson }}}), keepalive: true}).catch(function(){});
   }
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
@@ -844,7 +834,7 @@ var CX_AGENTS = [
    src:['ChatGPT API','Live SERP']},
   {name:'Content Enhancer', bucket:'live', ac:'#22d3ee',
    d:'Paste an article → multi-LLM upgrade recommendations.',
-   more:'Several AI models review the piece together and return concrete edits on structure, depth and authority — catching gaps one model would miss.',
+   more:'Several AI models review the piece together and return concrete edits on structure, depth and authority, catching gaps one model would miss.',
    src:['Multiple LLMs','Live SERP']},
 
   {name:'ABM Signal Tracker', bucket:'gtm', ac:'#a78bfa',
@@ -852,41 +842,41 @@ var CX_AGENTS = [
    more:'It monitors curated sources and Google News for funding, leadership changes, hiring spikes and 20+ buying signals, scores every event, and resurfaces the most urgent accounts.',
    src:['Arena','Google News'], needs:'Target company list'},
   {name:'Competitor Ad Intelligence', bucket:'gtm', ac:'#a78bfa',
-   d:'Every competitor ad on Google, Meta & LinkedIn — live.',
-   more:'Give it your competitor list and it continuously collects the ads they run across all three networks — surfacing messaging, creative and strategy shifts.',
+   d:'Every competitor ad on Google, Meta & LinkedIn, live.',
+   more:'Give it your competitor list and it continuously collects the ads they run across all three networks, surfacing messaging, creative and strategy shifts.',
    src:['Arena','Ad platforms'], needs:'Competitor list'},
   {name:'Anonymous Website Visitors', bucket:'gtm', ac:'#a78bfa',
    d:'Names the companies & people browsing your site.',
-   more:'A small script matches visits to Apollo’s identity data and reconstructs each journey — handing reps a named, ready-to-contact account while intent is warm.',
+   more:'A small script matches visits to Apollo’s identity data and reconstructs each journey, handing reps a named, ready-to-contact account while intent is warm.',
    src:['Apollo'], needs:'Script on the site'},
   {name:'LinkedIn Intelligence', bucket:'gtm', ac:'#a78bfa',
    d:'Tracks any person, company or page and maps engagement to accounts.',
-   more:'Point it at a LinkedIn target and it captures the engagement around them via Unipile — showing which buying-committee members are already paying attention.',
+   more:'Point it at a LinkedIn target and it captures the engagement around them via Unipile, showing which buying-committee members are already paying attention.',
    src:['Arena','Unipile'], needs:'LinkedIn target'},
 
   {name:'Generative Search Visibility', bucket:'seo', ac:'#38bdf8',
    d:'Your share of voice inside ChatGPT, Gemini & Perplexity.',
-   more:'It monitors branded and category prompts across major AI engines — measuring share of voice, mapping which pages get cited, and flagging the prompts you’re losing.',
+   more:'It monitors branded and category prompts across major AI engines, measuring share of voice, mapping which pages get cited, and flagging the prompts you’re losing.',
    src:['AI engines']},
   {name:'Technical SEO & GEO Auditor', bucket:'seo', ac:'#38bdf8',
    d:'200+ site checks, scored, with AI-written fixes.',
    more:'It crawls the site, runs 200+ technical, on-page and answer-engine checks, scores each by impact, and writes specific fixes your team can ship immediately.',
    src:['Site crawl','ChatGPT API']},
   {name:'AI Readiness Auditor', bucket:'seo', ac:'#38bdf8',
-   d:'Scores how citable your site is to AI — in ~15 seconds.',
+   d:'Scores how citable your site is to AI, in ~15 seconds.',
    more:'It evaluates structure, schema, crawlability and machine-readability against answer-engine best practices, then returns a score and prioritized fixes.',
    src:['Site crawl','Schema']},
   {name:'Content Authority Optimizer', bucket:'seo', ac:'#38bdf8',
    d:'Authority-building edits for pages already published.',
-   more:'It assesses topical depth, structure, internal links and trust signals, then recommends targeted E-E-A-T and answer-engine edits — no full rewrite needed.',
+   more:'It assesses topical depth, structure, internal links and trust signals, then recommends targeted E-E-A-T and answer-engine edits, no full rewrite needed.',
    src:['ChatGPT API','Live SERP']},
   {name:'Competitor SEO Intelligence', bucket:'seo', ac:'#38bdf8',
    d:'Keyword, backlink & authority gaps vs any rival.',
-   more:'It benchmarks your domain against any competitor across rankings, keyword gaps, backlinks and authority — and drafts the plays to overtake them.',
+   more:'It benchmarks your domain against any competitor across rankings, keyword gaps, backlinks and authority, and drafts the plays to overtake them.',
    src:['Semrush API']},
   {name:'Local Visibility Builder', bucket:'seo', ac:'#38bdf8',
    d:'Dev-ready location & service pages at scale.',
-   more:'It composes approved, developer-ready location and service pages from templates and data — optimized copy and bulk image alt text included.',
+   more:'It composes approved, developer-ready location and service pages from templates and data, with optimized copy and bulk image alt text included.',
    src:['ChatGPT API','Sheets']},
   {name:'Search Term Intelligence', bucket:'seo', ac:'#38bdf8',
    d:'Weekly negatives & winners mined from paid queries.',
@@ -898,7 +888,7 @@ var CX_AGENTS = [
    src:['ChatGPT API','Brand rules']},
   {name:'On-Page SEO Auditor', bucket:'seo', ac:'#38bdf8',
    d:'23-section audit of any URL with live CWV data.',
-   more:'Enter a URL and keywords; it pulls live PageSpeed and Core Web Vitals and audits 23 sections across meta, headings, content, schema and crawlability — each scored.',
+   more:'Enter a URL and keywords; it pulls live PageSpeed and Core Web Vitals and audits 23 sections across meta, headings, content, schema and crawlability, each scored.',
    src:['PageSpeed','ChatGPT API']},
   {name:'Hub & Spoke Architect', bucket:'seo', ac:'#38bdf8',
    d:'URL list → topic clusters + internal-link map.',
@@ -906,7 +896,7 @@ var CX_AGENTS = [
    src:['ChatGPT API','Sheets']},
   {name:'Robots & Index Monitor', bucket:'seo', ac:'#38bdf8',
    d:'Daily noindex checks with instant Slack alerts.',
-   more:'It crawls sitemaps daily, samples pages by template, and verifies index status — firing a Slack alert the moment a live page accidentally goes noindex.',
+   more:'It crawls sitemaps daily, samples pages by template, and verifies index status, firing a Slack alert the moment a live page accidentally goes noindex.',
    src:['Sitemaps','Slack']}
 ];
 CX_AGENTS.forEach(function(a,i){ a.i=i; });
@@ -928,7 +918,7 @@ var CX_TIER={live:{t:'Live',c:'#22d3ee',bg:'rgba(34,211,238,.14)'},gtm:{t:'GTM',
     overlay.querySelector('#amSrc').innerHTML = a.src.map(function(s){return '<span class="am-chip">'+s+'</span>';}).join('');
     var access = a.bucket==='live' ? 'Everyone · /app' : 'Internal · /p2';
     overlay.querySelector('#amAccess').innerHTML = '<span class="am-chip">'+access+'</span>';
-    var setup = a.needs ? 'Needs: '+a.needs : 'Ready to use — zero config';
+    var setup = a.needs ? 'Needs: '+a.needs : 'Ready to use, zero config';
     overlay.querySelector('#amSetup').innerHTML = '<span class="am-chip'+(a.needs?'':' good')+'">'+setup+'</span>';
     overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false');
     document.body.style.overflow='hidden';
