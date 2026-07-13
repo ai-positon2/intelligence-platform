@@ -2353,11 +2353,58 @@ def p2_root():
 def hub():
     return render_template("hub.html", user=_get_user())
 
+CX_CHAPTERS = [
+    {"slug": "what-it-is", "num": 1, "icon": "💡", "title": "What it is",
+     "teaser": "The one-line version, and the big idea behind it.",
+     "stat": "30 sec read", "ac": "#22d3ee", "ac2": "#818cf8",
+     "bg": "rgba(34,211,238,.14)", "bd": "rgba(34,211,238,.34)"},
+    {"slug": "why-we-built-it", "num": 2, "icon": "🚀", "title": "Why we built it",
+     "teaser": "Arena had the agents. Nobody had the front door.",
+     "stat": "1 min read", "ac": "#fb7185", "ac2": "#34d399",
+     "bg": "rgba(251,113,133,.14)", "bd": "rgba(251,113,133,.34)"},
+    {"slug": "who-its-for", "num": 3, "icon": "🎯", "title": "Who it's for",
+     "teaser": "Four teams, one shared workspace.",
+     "stat": "30 sec read", "ac": "#a78bfa", "ac2": "#38bdf8",
+     "bg": "rgba(167,139,250,.14)", "bd": "rgba(167,139,250,.34)"},
+    {"slug": "how-to-navigate", "num": 4, "icon": "🧭", "title": "How to navigate",
+     "teaser": "Sign in → Hub → run an agent. That's it.",
+     "stat": "1 min read", "ac": "#6366f1", "ac2": "#8b5cf6",
+     "bg": "rgba(99,102,241,.14)", "bd": "rgba(99,102,241,.34)"},
+    {"slug": "agent-landscape", "num": 5, "icon": "🗺️", "title": "The agent landscape",
+     "teaser": "18 agents, 3 buckets, at a glance.",
+     "stat": "18 agents", "ac": "#22d3ee", "ac2": "#38bdf8",
+     "bg": "rgba(34,211,238,.14)", "bd": "rgba(34,211,238,.34)"},
+    {"slug": "every-agent", "num": 6, "icon": "🤖", "title": "Every agent, explained",
+     "teaser": "What each does, how it's built, who runs it.",
+     "stat": "18 cards", "ac": "#e879f9", "ac2": "#818cf8",
+     "bg": "rgba(232,121,249,.14)", "bd": "rgba(232,121,249,.34)"},
+    {"slug": "tech-stack", "num": 7, "icon": "🧬", "title": "Tech stack",
+     "teaser": "Five layers, full candor.",
+     "stat": "5 layers", "ac": "#fbbf24", "ac2": "#34d399",
+     "bg": "rgba(251,191,36,.14)", "bd": "rgba(251,191,36,.34)"},
+    {"slug": "demo", "num": 8, "icon": "▶️", "title": "Watch the demo",
+     "teaser": "Two minutes, the whole platform.",
+     "stat": "2 min video", "ac": "#fb7185", "ac2": "#f472b6",
+     "bg": "rgba(251,113,133,.14)", "bd": "rgba(251,113,133,.34)"},
+]
+
 @app.route("/p2/context")
 @position2_required
 def p2_context():
-    """Internal explainer — what the platform is, every agent, how it all works."""
-    return render_template("context.html", user=_get_user())
+    """Internal playbook hub — pick a chapter."""
+    return render_template("context.html", user=_get_user(), chapters=CX_CHAPTERS, chapter=None)
+
+@app.route("/p2/context/<slug>")
+@position2_required
+def p2_context_chapter(slug):
+    """A single playbook chapter as its own page."""
+    idx = next((i for i, c in enumerate(CX_CHAPTERS) if c["slug"] == slug), None)
+    if idx is None:
+        abort(404)
+    prev_chapter = CX_CHAPTERS[idx - 1] if idx > 0 else None
+    next_chapter = CX_CHAPTERS[idx + 1] if idx < len(CX_CHAPTERS) - 1 else None
+    return render_template("context.html", user=_get_user(), chapters=CX_CHAPTERS,
+                            chapter=CX_CHAPTERS[idx], prev_chapter=prev_chapter, next_chapter=next_chapter)
 
 @app.route("/p2/gtm")
 @position2_required

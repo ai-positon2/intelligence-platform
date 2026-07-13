@@ -141,25 +141,68 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .hub-h{text-align:center;margin-bottom:30px}
 .hub-h h2{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.02em;color:var(--ink)}
 .hub-h p{margin-top:8px;font-size:14px;color:var(--dim)}
-.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.lc{display:flex;flex-direction:column;gap:0;padding:22px;cursor:pointer;text-align:left;background:var(--card);border:1px solid var(--bd);border-radius:20px;color:inherit;font:inherit;transition:transform .25s,border-color .25s,background .25s}
-.lc:hover{transform:translateY(-5px);border-color:var(--bd-hi);background:var(--card2)}
-.lc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.lc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--mute)}
-.lc-ico{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;background:linear-gradient(135deg,rgba(129,140,248,.16),rgba(232,121,249,.12));border:1px solid var(--bd)}
-.lc h3{font-family:'Bricolage Grotesque',sans-serif;font-size:17px;font-weight:650;color:var(--ink);margin-bottom:6px;letter-spacing:-.01em}
-.lc p{font-size:12.5px;line-height:1.5;color:var(--dim)}
-.lc-go{margin-top:16px;display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#818cf8;opacity:.75;transition:gap .2s,opacity .2s}
-.lc:hover .lc-go{gap:11px;opacity:1}
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@keyframes cardIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.lc{position:relative;display:flex;flex-direction:column;gap:0;padding:26px 24px;cursor:pointer;text-align:left;
+  background:var(--card);border:1px solid var(--bd);border-radius:22px;color:inherit;font:inherit;text-decoration:none;
+  overflow:hidden;isolation:isolate;
+  transition:transform .3s cubic-bezier(.16,1,.3,1),border-color .3s,background .3s,box-shadow .3s;
+  animation:cardIn .6s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--d,0) * 70ms)}
+.lc-glow{position:absolute;inset:-40%;z-index:-1;opacity:0;transition:opacity .4s;
+  background:radial-gradient(circle at 30% 20%, var(--ac,#818cf8) 0%, transparent 60%);filter:blur(30px)}
+.lc-ghost{position:absolute;right:-6px;bottom:-28px;z-index:-1;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;
+  font-size:96px;line-height:1;color:var(--ink);opacity:.035;letter-spacing:-.05em;pointer-events:none;transition:opacity .3s,transform .4s}
+.lc:hover{transform:translateY(-7px) scale(1.015);border-color:var(--ac,var(--bd-hi));background:var(--card2);
+  box-shadow:0 20px 44px -18px rgba(0,0,0,.5)}
+.lc:hover .lc-glow{opacity:.16}
+.lc:hover .lc-ghost{opacity:.07;transform:translateY(-4px)}
+.lc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.lc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.14em;color:var(--mute)}
+.lc-ico{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;
+  background:linear-gradient(135deg,var(--acbg,rgba(129,140,248,.16)),transparent);border:1px solid var(--acbd,var(--bd));
+  transition:transform .3s}
+.lc:hover .lc-ico{transform:scale(1.08) rotate(-4deg)}
+.lc h3{font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:680;color:var(--ink);margin-bottom:7px;letter-spacing:-.01em}
+.lc p{font-size:12.5px;line-height:1.55;color:var(--dim);flex:1}
+.lc-foot{margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lc-stat{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--ac,#818cf8);background:var(--acbg,rgba(129,140,248,.12));
+  border-radius:999px;padding:4px 10px}
+.lc-go{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--ink2);opacity:.7;transition:gap .25s,opacity .25s,color .25s}
+.lc:hover .lc-go{gap:9px;opacity:1;color:var(--ac,#818cf8)}
 .lc-go svg{width:14px;height:14px}
 
-/* ══════════════ CHAPTERS ══════════════ */
-.ch{position:relative;padding:70px 0 10px;scroll-margin-top:78px}
-.ch-head{margin-bottom:34px;max-width:720px}
-.ch-head .ck{display:inline-block;font-family:'Bricolage Grotesque',sans-serif;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#818cf8;margin-bottom:12px}
-.ch-head h2{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(28px,4vw,44px);font-weight:750;letter-spacing:-.03em;line-height:1.05;color:var(--ink)}
-.ch-head .lead{margin-top:12px;font-size:15.5px;line-height:1.6;color:var(--dim)}
-.ch-div{height:1px;background:linear-gradient(90deg,transparent,var(--bd) 20%,var(--bd) 80%,transparent);margin-top:12px}
+/* ══════════════ CHAPTER PAGE: nav rail + hero + pager ══════════════ */
+.chnav{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;padding:26px 32px 0}
+.back-link{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dim);text-decoration:none;transition:color .2s,gap .2s}
+.back-link:hover{color:var(--ink);gap:10px}
+.back-link svg{width:15px;height:15px}
+.dot-rail{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cdot{width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;
+  color:var(--mute);background:var(--card);border:1px solid var(--bd);text-decoration:none;transition:all .2s}
+.cdot:hover{color:var(--ink);border-color:var(--acbd,var(--bd-hi));transform:translateY(-2px)}
+.cdot.on{color:#fff;background:var(--ac,#818cf8);border-color:var(--ac,#818cf8);box-shadow:0 0 14px rgba(99,102,241,.5)}
+
+.chero{padding:52px 32px 8px;max-width:880px}
+.chero-badge{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ac,#a5b4fc);background:var(--acbg,rgba(99,102,241,.12));border:1px solid var(--acbd,rgba(129,140,248,.34));
+  border-radius:999px;padding:7px 15px 7px 11px;margin-bottom:20px}
+.chero-badge .ci{font-size:14px}
+.chero h1{font-family:'Bricolage Grotesque','Space Grotesk',sans-serif;font-size:clamp(32px,5vw,54px);font-weight:750;
+  letter-spacing:-.03em;line-height:1.04;color:var(--ink)}
+.chero h1 .chd{color:var(--ac,#818cf8)}
+.chero p{margin-top:13px;font-size:15.5px;line-height:1.6;color:var(--dim);max-width:560px}
+
+.ch-body{padding:38px 0 6px}
+
+.pager{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:52px 0 16px}
+.pgcard{display:flex;flex-direction:column;gap:6px;padding:20px 22px;background:var(--card);border:1px solid var(--bd);
+  border-radius:16px;text-decoration:none;transition:all .25s}
+.pgcard:hover{border-color:var(--bd-hi);background:var(--card2);transform:translateY(-3px)}
+.pgcard.next{align-items:flex-end;text-align:right}
+.pglabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#818cf8}
+.pgcard.done .pglabel{color:#34d399}
+.pgtitle{font-family:'Bricolage Grotesque',sans-serif;font-size:16.5px;font-weight:650;color:var(--ink)}
+.pgspacer{visibility:hidden}
 
 /* ── Ch1 What ── */
 .def{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:stretch}
@@ -391,43 +434,26 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
   </div>
 
-  <!-- ═══════════ HERO ═══════════ -->
-  <header class="hero">
-    <div class="kick"><span class="dot"></span> Internal · Platform Playbook</div>
-    <h1>Everything you need to know about <span class="serif">Intelligence.</span></h1>
-    <p>A plain-English tour of the platform — what it is, why we built it, who it's for, and every agent inside. New here? Start at chapter one.</p>
-    <div class="hero-stats">
-      <div class="hs"><b data-n="18">0</b><span>AI agents</span></div>
-      <div class="hs"><b data-n="3">0</b><span>buckets</span></div>
-      <div class="hs"><b data-n="8">0</b><span>chapters</span></div>
-      <div class="hs"><b>~5</b><span>min read</span></div>
+  {% if chapter %}
+  <!-- ═══════════ CHAPTER NAV RAIL ═══════════ -->
+  <div class="wrap chnav">
+    <a href="/p2/context" class="back-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> All chapters</a>
+    <div class="dot-rail">
+      {% for c in chapters %}
+      <a href="/p2/context/{{ c.slug }}" class="cdot{{ ' on' if c.slug == chapter.slug else '' }}" style="--ac:{{ c.ac }}" title="{{ c.num }}. {{ c.title }}">{{ c.num }}</a>
+      {% endfor %}
     </div>
-    <div class="scrollcue">The playbook
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
-    </div>
+  </div>
+
+  <!-- ═══════════ CHAPTER HERO ═══════════ -->
+  <header class="wrap chero" style="--ac:{{ chapter.ac }};--ac2:{{ chapter.ac2 }};--acbg:{{ chapter.bg }};--acbd:{{ chapter.bd }}">
+    <div class="chero-badge"><span class="ci">{{ chapter.icon }}</span> Chapter {{ '%02d'|format(chapter.num) }} of {{ chapters|length }}</div>
+    <h1>{{ chapter.title }}<span class="chd">.</span></h1>
+    <p>{{ chapter.teaser }}</p>
   </header>
 
-  <!-- ═══════════ HUB ═══════════ -->
-  <section class="wrap hub" id="hub">
-    <div class="hub-h">
-      <h2>Pick a chapter</h2>
-      <p>Eight short chapters. Tap one to jump in — or just scroll the whole story top to bottom.</p>
-    </div>
-    <div class="hub-grid" id="hubGrid">
-      <button class="lc" data-go="ch1"><div class="lc-top"><span class="lc-num">01</span><span class="lc-ico">💡</span></div><h3>What it is</h3><p>The one-line version, and the big idea behind it.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch2"><div class="lc-top"><span class="lc-num">02</span><span class="lc-ico">🚀</span></div><h3>Why we built it</h3><p>Arena had the agents. Nobody had the front door.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch3"><div class="lc-top"><span class="lc-num">03</span><span class="lc-ico">🎯</span></div><h3>Who it's for</h3><p>Four teams, one shared workspace.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch4"><div class="lc-top"><span class="lc-num">04</span><span class="lc-ico">🧭</span></div><h3>How to navigate</h3><p>Sign in → Hub → run an agent. That's it.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch5"><div class="lc-top"><span class="lc-num">05</span><span class="lc-ico">🗺️</span></div><h3>The agent landscape</h3><p>18 agents, 3 buckets, at a glance.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch6"><div class="lc-top"><span class="lc-num">06</span><span class="lc-ico">🤖</span></div><h3>Every agent, explained</h3><p>What each does, how it's built, who runs it.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch7"><div class="lc-top"><span class="lc-num">07</span><span class="lc-ico">🧬</span></div><h3>Tech stack</h3><p>Five layers, full candor.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-      <button class="lc" data-go="ch8"><div class="lc-top"><span class="lc-num">08</span><span class="lc-ico">▶️</span></div><h3>Watch the demo</h3><p>Two minutes, the whole platform.</p><span class="lc-go">Read<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
-    </div>
-  </section>
-
-  <!-- ═══════════ CH1 · WHAT ═══════════ -->
-  <section class="wrap ch" id="ch1">
-    <div class="ch-head reveal"><div class="ck">Chapter 01</div><h2>What is <span class="serif">Intelligence?</span></h2><p class="lead">The short answer, before the details.</p><div class="ch-div"></div></div>
+  <div class="wrap ch-body">
+  {% if chapter.slug == 'what-it-is' %}
     <div class="def reveal">
       <div class="def-main cx-card">
         <div class="big"><b>Intelligence</b> is Position²'s single front door to a fleet of AI agents that do real go-to-market and SEO work — from spotting buying signals to writing content briefs — all behind one Google login.</div>
@@ -458,11 +484,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <li>Not something only engineers can touch</li>
       </ul>
     </div>
-  </section>
-
-  <!-- ═══════════ CH2 · WHY ═══════════ -->
-  <section class="wrap ch" id="ch2">
-    <div class="ch-head reveal"><div class="ck">Chapter 02</div><h2>Why we <span class="serif">built it.</span></h2><p class="lead">The vision, in one before-and-after.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'why-we-built-it' %}
     <div class="why reveal">
       <div class="wcard before cx-card">
         <span class="tag">Before</span>
@@ -489,22 +511,14 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="fparrow">→</div>
       <div class="fp"><span class="fi">🙌</span> You</div>
     </div>
-  </section>
-
-  <!-- ═══════════ CH3 · WHO ═══════════ -->
-  <section class="wrap ch" id="ch3">
-    <div class="ch-head reveal"><div class="ck">Chapter 03</div><h2>Who it's <span class="serif">for.</span></h2><p class="lead">Built for four groups at Position² — and the client work they drive.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'who-its-for' %}
     <div class="who-grid">
       <div class="persona cx-card reveal"><div class="pi" style="background:rgba(167,139,250,.14);color:#a78bfa">🤝</div><h3>Sales · AM · BD</h3><p>Act on live buying signals and walk into every call already knowing what the account is doing.</p><div class="use"><b>Live with:</b> Signal Tracker, Ad & LinkedIn Intelligence</div></div>
       <div class="persona cx-card reveal"><div class="pi" style="background:rgba(56,189,248,.14);color:#38bdf8">✍️</div><h3>SEO & Content teams</h3><p>Run the SEO/GEO fleet every day — keyword research, briefs, audits and authority edits.</p><div class="use"><b>Live with:</b> the 14-agent SEO fleet</div></div>
       <div class="persona cx-card reveal"><div class="pi" style="background:rgba(52,211,153,.14);color:#34d399">📊</div><h3>Leadership</h3><p>See the full capability at a glance — what the platform can do, and where it's headed.</p><div class="use"><b>Live with:</b> this playbook & the demo</div></div>
       <div class="persona cx-card reveal"><div class="pi" style="background:rgba(232,121,249,.14);color:#e879f9">🎁</div><h3>Clients & prospects</h3><p>They never see this page — but its outputs power their campaigns, reports and pitches.</p><div class="use"><b>Live with:</b> the public SEO tools on <code style="font-size:11px">/app</code></div></div>
     </div>
-  </section>
-
-  <!-- ═══════════ CH4 · HOW ═══════════ -->
-  <section class="wrap ch" id="ch4">
-    <div class="ch-head reveal"><div class="ck">Chapter 04</div><h2>How to <span class="serif">navigate.</span></h2><p class="lead">Five steps from login to results.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'how-to-navigate' %}
     <div class="steps reveal">
       <div class="step"><div class="sn">1</div><h4>Sign in</h4><p>Google login — no passwords to remember.</p></div>
       <div class="step"><div class="sn">2</div><h4>Land on the Hub</h4><p>Every agent, grouped by bucket.</p></div>
@@ -522,11 +536,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <p>Position²-only. The full agent fleet, admin dashboards and this playbook — gated to @position2.com accounts, with a 10-run cap per agent.</p>
       </div>
     </div>
-  </section>
-
-  <!-- ═══════════ CH5 · LANDSCAPE ═══════════ -->
-  <section class="wrap ch" id="ch5">
-    <div class="ch-head reveal"><div class="ck">Chapter 05</div><h2>The agent <span class="serif">landscape.</span></h2><p class="lead">18 agents fall into three buckets. Here's the whole map before we zoom in.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'agent-landscape' %}
     <div class="buckets reveal">
       <div class="bkt cx-card"><span class="cap" style="background:linear-gradient(90deg,#22d3ee,#67e8f9)"></span>
         <div class="bn" style="color:#22d3ee" data-n="3">0</div>
@@ -558,11 +568,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="meter cx-card"><div class="ml">Standard tool vs. custom build</div><div class="track"><div class="fill" data-w="78" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></div></div><div class="mv"><span style="color:#38bdf8"><b>14</b> standard</span><span style="color:#e879f9"><b>4</b> custom</span></div></div>
       <div class="meter cx-card"><div class="ml">Powered by Arena/Apollo vs. APIs</div><div class="track"><div class="fill" data-w="22" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></div></div><div class="mv"><span style="color:#a78bfa"><b>4</b> Arena/Apollo</span><span style="color:var(--mute)"><b>14</b> API-built</span></div></div>
     </div>
-  </section>
-
-  <!-- ═══════════ CH6 · AGENTS ═══════════ -->
-  <section class="wrap ch" id="ch6">
-    <div class="ch-head reveal"><div class="ck">Chapter 06</div><h2>Every agent, <span class="serif">explained.</span></h2><p class="lead">What each one does, how it's built, and who can run it. Filter by bucket.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'every-agent' %}
     <div class="afilter reveal" id="aFilter">
       <button data-f="all" class="on">All <span class="cnt">18</span></button>
       <button data-f="live"><span style="color:#22d3ee">●</span> Live SEO <span class="cnt">3</span></button>
@@ -570,11 +576,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <button data-f="seo"><span style="color:#38bdf8">●</span> SEO fleet <span class="cnt">11</span></button>
     </div>
     <div class="agrid" id="aGrid"></div>
-  </section>
-
-  <!-- ═══════════ CH7 · TECH ═══════════ -->
-  <section class="wrap ch" id="ch7">
-    <div class="ch-head reveal"><div class="ck">Chapter 07</div><h2>Tech stack, <span class="serif">full candor.</span></h2><p class="lead">Everything the platform runs on — staff eyes only.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'tech-stack' %}
     <div class="stackwrap reveal">
       <div class="layer cx-card"><span class="ldot" style="background:#22d3ee"></span><div class="lh"><span>Layer 01</span><h3>Experience</h3></div><div class="lb">
         <span class="tech"><span class="td" style="background:#22d3ee"></span>Flask + Jinja2 <small>all pages</small></span>
@@ -615,11 +617,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       <div class="darrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
       <div class="dnode cx-card"><b>intelligence.position2.com</b><span>live</span></div>
     </div>
-  </section>
-
-  <!-- ═══════════ CH8 · DEMO ═══════════ -->
-  <section class="wrap ch" id="ch8">
-    <div class="ch-head reveal"><div class="ck">Chapter 08</div><h2>Watch the <span class="serif">demo.</span></h2><p class="lead">Two minutes, the whole platform — the same walkthrough we show prospects.</p><div class="ch-div"></div></div>
+  {% elif chapter.slug == 'demo' %}
     <div class="video reveal" id="video">
       <button type="button" class="vfacade" id="vPlay" aria-label="Play the platform walkthrough">
         <img src="https://i.ytimg.com/vi/WqLzs2cFrhg/maxresdefault.jpg" alt="Platform walkthrough" loading="lazy" onerror="this.src='https://i.ytimg.com/vi/WqLzs2cFrhg/hqdefault.jpg'">
@@ -627,17 +625,70 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <span class="vtag">▶ Platform walkthrough · 2 min</span>
       </button>
     </div>
+  {% endif %}
+  </div>
+
+  <div class="wrap pager reveal">
+    {% if prev_chapter %}
+    <a class="pgcard prev" href="/p2/context/{{ prev_chapter.slug }}"><span class="pglabel">← Previous</span><span class="pgtitle">{{ prev_chapter.title }}</span></a>
+    {% else %}<span class="pgspacer"></span>{% endif %}
+    {% if next_chapter %}
+    <a class="pgcard next" href="/p2/context/{{ next_chapter.slug }}"><span class="pglabel">Next →</span><span class="pgtitle">{{ next_chapter.title }}</span></a>
+    {% else %}
+    <a class="pgcard next done" href="/p2/context"><span class="pglabel">🎉 That's the whole playbook</span><span class="pgtitle">Back to all chapters</span></a>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <!-- ═══════════ HERO + HUB ═══════════ -->
+  <header class="hero">
+    <div class="kick"><span class="dot"></span> Internal · Platform Playbook</div>
+    <h1>Everything you need to know about <span class="serif">Intelligence.</span></h1>
+    <div class="hero-stats">
+      <div class="hs"><b data-n="18">0</b><span>AI agents</span></div>
+      <div class="hs"><b data-n="3">0</b><span>buckets</span></div>
+      <div class="hs"><b data-n="8">0</b><span>chapters</span></div>
+      <div class="hs"><b>~5</b><span>min read</span></div>
+    </div>
+  </header>
+
+  <section class="wrap hub">
+    <div class="hub-h">
+      <h2>Pick a chapter</h2>
+      <p>Eight short chapters — tap one to open it.</p>
+    </div>
+    <div class="hub-grid">
+      {% for c in chapters %}
+      <a class="lc" href="/p2/context/{{ c.slug }}" style="--ac:{{ c.ac }};--ac2:{{ c.ac2 }};--acbg:{{ c.bg }};--acbd:{{ c.bd }};--d:{{ loop.index0 }}">
+        <span class="lc-glow" aria-hidden="true"></span>
+        <span class="lc-ghost">{{ '%02d'|format(c.num) }}</span>
+        <div class="lc-top">
+          <span class="lc-num">{{ '%02d'|format(c.num) }}</span>
+          <span class="lc-ico">{{ c.icon }}</span>
+        </div>
+        <h3>{{ c.title }}</h3>
+        <p>{{ c.teaser }}</p>
+        <div class="lc-foot">
+          <span class="lc-stat">{{ c.stat }}</span>
+          <span class="lc-go">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
   </section>
+  {% endif %}
 
   <footer class="foot">
     <p>Position² · Internal use only</p>
     <p><a href="/p2/hub">← Back to the Hub</a></p>
   </footer>
 
-  <button type="button" class="fab" id="fab">
+  {% if chapter %}
+  <a href="/p2/context" class="fab show">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-    Chapters
-  </button>
+    All chapters
+  </a>
+  {% endif %}
 
 <script>
 // ── User menu ──
@@ -668,8 +719,8 @@ document.addEventListener('keydown', function(e) {
     if(_sent) return; _sent = true;
     var s = Math.round((Date.now()-_start)/1000);
     fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({page: window.location.pathname, title: 'Platform Playbook', seconds: s,
-      email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
+      body: JSON.stringify({page: window.location.pathname, title: {{ ((chapter.title ~ ' — Playbook') if chapter else 'Platform Playbook')|tojson }}, seconds: s,
+      email: {{ (user.email if user else '')|tojson }}}), keepalive: true}).catch(function(){});
   }
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
   window.addEventListener('beforeunload', _send);
@@ -686,21 +737,6 @@ function cxGlow(scope){
     });
   });
 }
-
-// ── Hub launcher + FAB scroll-to-chapter ──
-(function(){
-  function jump(id){ var el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
-  document.getElementById('hubGrid').addEventListener('click', function(e){
-    var b=e.target.closest('.lc'); if(!b) return; jump(b.getAttribute('data-go'));
-  });
-  var fab=document.getElementById('fab');
-  fab.addEventListener('click', function(){ document.getElementById('hub').scrollIntoView({behavior:'smooth',block:'start'}); });
-  var hub=document.getElementById('hub');
-  window.addEventListener('scroll', function(){
-    var past = hub.getBoundingClientRect().bottom < 0;
-    fab.classList.toggle('show', past);
-  }, {passive:true});
-})();
 
 // ── Reveal on scroll ──
 (function(){
@@ -820,8 +856,10 @@ var CX_AGENTS = [
    src:['Sitemaps','Slack']}
 ];
 (function(){
-  var TIER={live:{t:'Live',c:'#22d3ee',bg:'rgba(34,211,238,.14)'},gtm:{t:'GTM',c:'#a78bfa',bg:'rgba(167,139,250,.14)'},seo:{t:'SEO',c:'#38bdf8',bg:'rgba(56,189,248,.14)'}};
   var grid=document.getElementById('aGrid');
+  var filterBar=document.getElementById('aFilter');
+  if(!grid || !filterBar) return;
+  var TIER={live:{t:'Live',c:'#22d3ee',bg:'rgba(34,211,238,.14)'},gtm:{t:'GTM',c:'#a78bfa',bg:'rgba(167,139,250,.14)'},seo:{t:'SEO',c:'#38bdf8',bg:'rgba(56,189,248,.14)'}};
   function card(a){
     var ti=TIER[a.bucket];
     var custom = a.bucket==='gtm';
@@ -843,7 +881,7 @@ var CX_AGENTS = [
     cxGlow(grid);
   }
   render('all');
-  document.getElementById('aFilter').addEventListener('click', function(e){
+  filterBar.addEventListener('click', function(e){
     var b=e.target.closest('button'); if(!b) return;
     document.querySelectorAll('#aFilter button').forEach(function(x){x.classList.toggle('on',x===b);});
     render(b.getAttribute('data-f'));
