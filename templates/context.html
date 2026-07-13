@@ -250,13 +250,22 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
   background:var(--card2);border:1px solid var(--bd);color:#818cf8;font-size:15px;font-weight:700}
 
 /* ── Ch3 Who (personas) ── */
-.who-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.persona{padding:24px}
-.persona .pi{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:23px;margin-bottom:16px;border:1px solid var(--bd)}
-.persona h3{font-family:'Bricolage Grotesque',sans-serif;font-size:16px;font-weight:650;color:var(--ink);margin-bottom:8px}
-.persona p{font-size:12.5px;line-height:1.55;color:var(--dim)}
-.persona .use{margin-top:14px;font-size:11px;color:var(--mute);border-top:1px solid var(--bd);padding-top:12px}
-.persona .use b{color:var(--ink2);font-weight:600}
+.who-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.persona{padding:30px}
+.persona .p-cap{position:absolute;top:0;left:0;right:0;height:3px}
+.persona .p-head{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+.persona .pi{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:24px;border:1px solid var(--bd);flex:0 0 auto}
+.persona .p-eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
+.persona h3{font-family:'Bricolage Grotesque',sans-serif;font-size:19px;font-weight:700;color:var(--ink);margin-bottom:13px}
+.persona p{font-size:13px;line-height:1.68;color:var(--dim)}
+.persona p b{color:var(--ink2);font-weight:650}
+.persona .p-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:19px}
+.persona .p-chips .chip{display:inline-flex;align-items:center;gap:6px}
+.persona .cdot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 6px currentColor}
+.persona .p-foot{margin-top:19px;padding-top:17px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.persona .p-foot>span{font-size:11px;color:var(--mute)}
+.persona .p-foot a{font-size:12px;font-weight:700;color:#818cf8;text-decoration:none;white-space:nowrap}
+.persona .p-foot a:hover{text-decoration:underline}
 
 /* ── Ch4 How (steps + surfaces) ── */
 .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative}
@@ -530,10 +539,70 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
   {% elif chapter.slug == 'who-its-for' %}
     <div class="who-grid">
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(167,139,250,.14);color:#a78bfa">🤝</div><h3>Sales · AM · BD</h3><p>Act on live buying signals and walk into every call already knowing what the account is doing.</p><div class="use"><b>Live with:</b> Signal Tracker, Ad & LinkedIn Intelligence</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(56,189,248,.14);color:#38bdf8">✍️</div><h3>SEO & Content teams</h3><p>Run the SEO/GEO fleet every day: keyword research, briefs, audits and authority edits.</p><div class="use"><b>Live with:</b> the 14-agent SEO fleet</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(52,211,153,.14);color:#34d399">📊</div><h3>Leadership</h3><p>See the full capability at a glance: what the platform can do, and where it's headed.</p><div class="use"><b>Live with:</b> this playbook & the demo</div></div>
-      <div class="persona cx-card reveal"><div class="pi" style="background:rgba(232,121,249,.14);color:#e879f9">🎁</div><h3>Clients & prospects</h3><p>They never see this page, but its outputs power their campaigns, reports and pitches.</p><div class="use"><b>Live with:</b> the public SEO tools on <code style="font-size:11px">/app</code></div></div>
+      <div class="persona cx-card reveal">
+        <span class="p-cap" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></span>
+        <div class="p-head">
+          <div class="pi" style="background:rgba(167,139,250,.14);color:#a78bfa">🤝</div>
+          <span class="p-eyebrow" style="color:#a78bfa">Go-to-market team</span>
+        </div>
+        <h3>Sales · AM · BD</h3>
+        <p>Before you dial, know the account's story. <b>ABM Signal Tracker</b> flags funding, leadership and hiring moves the moment they land. <b>LinkedIn Intelligence</b> shows which buying-committee members are already engaging. <b>Competitor Ad Intelligence</b> reveals what rivals are pitching the same account. Walk into every call already ahead of it.</p>
+        <div class="p-chips">
+          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>ABM Signal Tracker</span>
+          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>LinkedIn Intelligence</span>
+          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Competitor Ad Intel</span>
+          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Anonymous Visitors</span>
+        </div>
+        <div class="p-foot"><span>4-agent GTM bucket, custom setup per client</span><a href="/p2/context/every-agent#gtm">Explore →</a></div>
+      </div>
+      <div class="persona cx-card reveal">
+        <span class="p-cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
+        <div class="p-head">
+          <div class="pi" style="background:rgba(56,189,248,.14);color:#38bdf8">✍️</div>
+          <span class="p-eyebrow" style="color:#38bdf8">Daily operators</span>
+        </div>
+        <h3>SEO & Content teams</h3>
+        <p>The heaviest daily users of the fleet. <b>Keyword Finder</b> and <b>Content Brief Generator</b> plan the week's content. <b>Technical SEO & GEO Auditor</b> and <b>On-Page SEO Auditor</b> catch issues before a client does. <b>Content Authority Optimizer</b> and <b>Competitor SEO Intelligence</b> push published pages ahead of rivals. Fourteen agents, zero setup, one queue.</p>
+        <div class="p-chips">
+          <span class="chip"><span class="cdot" style="background:#38bdf8"></span>Keyword Finder</span>
+          <span class="chip"><span class="cdot" style="background:#38bdf8"></span>Content Brief Generator</span>
+          <span class="chip"><span class="cdot" style="background:#38bdf8"></span>Technical SEO Auditor</span>
+          <span class="chip"><span class="cdot" style="background:#38bdf8"></span>On-Page Auditor</span>
+          <span class="chip"><span class="cdot" style="background:#38bdf8"></span>Competitor SEO Intel</span>
+        </div>
+        <div class="p-foot"><span>14-agent SEO & GEO fleet, no configuration needed</span><a href="/p2/context/agent-landscape">Explore →</a></div>
+      </div>
+      <div class="persona cx-card reveal">
+        <span class="p-cap" style="background:linear-gradient(90deg,#34d399,#67e8f9)"></span>
+        <div class="p-head">
+          <div class="pi" style="background:rgba(52,211,153,.14);color:#34d399">📊</div>
+          <span class="p-eyebrow" style="color:#34d399">The big picture</span>
+        </div>
+        <h3>Leadership</h3>
+        <p>This playbook and the live demo are the fastest way to answer what Intelligence actually does and what it's worth. <b>Agent Landscape</b> shows the live-vs-custom-build split, <b>Every Agent</b> gives the full roster with details on each one, and <b>Tech Stack</b> shows what's running underneath. All of it without opening a single tool.</p>
+        <div class="p-chips">
+          <span class="chip"><span class="cdot" style="background:#34d399"></span>Agent Landscape</span>
+          <span class="chip"><span class="cdot" style="background:#34d399"></span>Every Agent</span>
+          <span class="chip"><span class="cdot" style="background:#34d399"></span>Tech Stack</span>
+          <span class="chip"><span class="cdot" style="background:#34d399"></span>Live demo</span>
+        </div>
+        <div class="p-foot"><span>18 agents, 2 domains, 1 login, one walkthrough</span><a href="/p2/context/demo">Explore →</a></div>
+      </div>
+      <div class="persona cx-card reveal">
+        <span class="p-cap" style="background:linear-gradient(90deg,#e879f9,#fb923c)"></span>
+        <div class="p-head">
+          <div class="pi" style="background:rgba(232,121,249,.14);color:#e879f9">🎁</div>
+          <span class="p-eyebrow" style="color:#e879f9">Never log in here</span>
+        </div>
+        <h3>Clients & prospects</h3>
+        <p>They never see this playbook or sign into <code style="font-size:11px">/p2</code>. But every content brief, technical audit and ranking report that reaches them was produced or checked by an agent running on this same platform. Their door in is the public workspace, three of these same agents wearing a client-facing coat.</p>
+        <div class="p-chips">
+          <span class="chip"><span class="cdot" style="background:#e879f9"></span>Keyword Finder</span>
+          <span class="chip"><span class="cdot" style="background:#e879f9"></span>Content Brief Generator</span>
+          <span class="chip"><span class="cdot" style="background:#e879f9"></span>Content Enhancer</span>
+        </div>
+        <div class="p-foot"><span>3 public tools, zero setup, live on /app</span><a href="/app">Open workspace →</a></div>
+      </div>
     </div>
   {% elif chapter.slug == 'how-to-navigate' %}
     <div class="steps reveal">
