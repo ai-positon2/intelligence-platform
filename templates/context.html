@@ -143,29 +143,32 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .hub-h p{margin-top:8px;font-size:14px;color:var(--dim)}
 .hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
 @keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.lc{position:relative;display:flex;flex-direction:column;padding:30px 26px;cursor:pointer;text-align:left;
-  background:var(--card);border:1px solid var(--bd);border-radius:20px;color:inherit;font:inherit;text-decoration:none;
+.lc{position:relative;display:flex;flex-direction:column;padding:30px 26px 26px 30px;cursor:pointer;text-align:left;
+  background:linear-gradient(155deg,var(--acbg,var(--card)) 0%,var(--card) 45%);
+  border:1px solid var(--acbd,var(--bd));border-radius:20px;color:inherit;font:inherit;text-decoration:none;
   overflow:hidden;isolation:isolate;
   transition:transform .35s cubic-bezier(.16,1,.3,1),border-color .35s,background .35s,box-shadow .35s;
   animation:cardIn .55s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--d,0) * 60ms)}
-.lc-glow{position:absolute;inset:-50%;z-index:-1;opacity:0;transition:opacity .5s;
-  background:radial-gradient(circle at 25% 15%, var(--ac,#818cf8) 0%, transparent 55%);filter:blur(40px)}
-.lc:hover{transform:translateY(-5px);border-color:var(--acbd,var(--bd-hi));background:var(--card2);
-  box-shadow:0 20px 44px -22px rgba(0,0,0,.45)}
-.lc:hover .lc-glow{opacity:.13}
+.lc::before{content:"";position:absolute;top:14px;bottom:14px;left:0;width:3px;border-radius:0 3px 3px 0;
+  background:linear-gradient(180deg,var(--ac,#818cf8),var(--ac2,#a78bfa));opacity:.85}
+.lc-glow{position:absolute;inset:-50%;z-index:-1;opacity:.1;transition:opacity .5s;
+  background:radial-gradient(circle at 22% 10%, var(--ac,#818cf8) 0%, transparent 55%);filter:blur(38px)}
+.lc:hover{transform:translateY(-6px);border-color:var(--ac,var(--bd-hi));background:linear-gradient(155deg,var(--acbg,var(--card2)) 0%,var(--card2) 55%);
+  box-shadow:0 22px 46px -20px var(--acbg,rgba(0,0,0,.5))}
+.lc:hover .lc-glow{opacity:.24}
 .lc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
 .lc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--mute)}
 .lc-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;
-  background:var(--card2);border:1px solid var(--bd);transition:background .35s,border-color .35s,transform .35s}
-.lc:hover .lc-ico{background:var(--acbg,var(--card2));border-color:var(--acbd,var(--bd-hi));transform:scale(1.06)}
+  background:linear-gradient(140deg,var(--ac,#818cf8),var(--ac2,#a78bfa));box-shadow:0 6px 18px -6px var(--acbg,transparent);
+  transition:transform .35s,box-shadow .35s}
+.lc:hover .lc-ico{transform:scale(1.08) rotate(-4deg);box-shadow:0 10px 26px -8px var(--acbg,transparent)}
 .lc h3{font-family:'Bricolage Grotesque',sans-serif;font-size:18.5px;font-weight:680;color:var(--ink);margin-bottom:9px;letter-spacing:-.01em}
-.lc p{font-size:13px;line-height:1.65;color:var(--dim);flex:1}
-.lc-foot{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px}
-.lc-stat{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--dim);background:var(--card2);
-  border:1px solid var(--bd);border-radius:999px;padding:5px 11px;transition:color .35s,border-color .35s}
-.lc:hover .lc-stat{color:var(--ac,#818cf8);border-color:var(--acbd,var(--bd-hi))}
-.lc-go{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--mute);transition:gap .3s,color .3s}
-.lc:hover .lc-go{gap:8px;color:var(--ac,#818cf8)}
+.lc p{font-size:13px;line-height:1.65;color:var(--ink2);flex:1}
+.lc-foot{margin-top:22px;padding-top:18px;border-top:1px solid var(--acbd,var(--bd));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lc-stat{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--ac,#818cf8);background:var(--acbg,rgba(129,140,248,.14));
+  border:1px solid var(--acbd,transparent);border-radius:999px;padding:5px 11px}
+.lc-go{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--ink2);opacity:.8;transition:gap .3s,opacity .3s,color .3s}
+.lc:hover .lc-go{gap:8px;opacity:1;color:var(--ac,#818cf8)}
 .lc-go svg{width:14px;height:14px}
 
 /* ══════════════ CHAPTER PAGE: nav rail + hero + pager ══════════════ */
