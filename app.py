@@ -2383,8 +2383,8 @@ CX_CHAPTERS = [
      "stat": "5 layers", "ac": "#fbbf24", "ac2": "#34d399",
      "bg": "rgba(251,191,36,.14)", "bd": "rgba(251,191,36,.34)"},
     {"slug": "demo", "num": 8, "icon": "▶️", "title": "Watch the demo",
-     "teaser": "Two minutes, the whole platform.",
-     "stat": "2 min video", "ac": "#fb7185", "ac2": "#f472b6",
+     "teaser": "The whole platform, in one watch.",
+     "stat": "Demo video", "ac": "#fb7185", "ac2": "#f472b6",
      "bg": "rgba(251,113,133,.14)", "bd": "rgba(251,113,133,.34)"},
 ]
 
