@@ -268,19 +268,24 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .persona .p-foot a:hover{text-decoration:underline}
 
 /* ── Ch4 How (steps + surfaces) ── */
-.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative}
-.step{position:relative;padding:0 12px;text-align:center}
-.step .sn{width:46px;height:46px;margin:0 auto 14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:700;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 20px rgba(99,102,241,.4);position:relative;z-index:2}
-.step:not(:last-child)::after{content:"";position:absolute;top:23px;left:60%;right:-40%;height:2px;background:linear-gradient(90deg,rgba(129,140,248,.5),rgba(129,140,248,.15));z-index:1}
-.step h4{font-size:13.5px;font-weight:650;color:var(--ink);margin-bottom:5px}
-.step p{font-size:11.5px;line-height:1.45;color:var(--dim)}
+.steps{display:flex;align-items:stretch;gap:0}
+.step{flex:1 1 0;min-width:0;padding:24px 20px}
+.step .sn{width:34px;height:34px;margin-bottom:16px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque',sans-serif;font-size:15px;font-weight:750;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 0 16px rgba(99,102,241,.4)}
+.step h4{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.step p{font-size:12px;line-height:1.6;color:var(--dim)}
+.step-arrow{display:flex;align-items:center;justify-content:center;width:30px;flex:0 0 auto;color:var(--mute)}
+.step-arrow svg{width:15px;height:15px}
 .surfaces{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
-.surf{padding:22px 24px}
+.surf{padding:26px 28px}
 .surf .u{font-family:'Bricolage Grotesque',sans-serif;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px}
 .surf .u code{font-family:ui-monospace,monospace;font-size:12px;color:#67e8f9;background:rgba(34,211,238,.1);padding:2px 7px;border-radius:6px;margin-right:8px}
 .surf p{font-size:12.5px;line-height:1.55;color:var(--dim);margin-top:8px}
 .surf.here{border-color:var(--bd-hi)}
 .surf .badge-here{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#a5b4fc;background:rgba(99,102,241,.14);border-radius:999px;padding:3px 9px;margin-left:8px}
+.surf-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;padding-top:18px;border-top:1px solid var(--bd)}
+.surf-list .srow{display:flex;align-items:flex-start;gap:11px;font-size:12px;line-height:1.55;color:var(--ink2)}
+.surf-list .sck{width:20px;height:20px;flex:0 0 auto;margin-top:1px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;background:rgba(52,211,153,.14);color:#34d399}
+.surf.here .surf-list .sck{background:rgba(129,140,248,.16);color:#818cf8}
 
 /* ── Ch5 Landscape ── */
 .buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;align-items:start}
@@ -413,13 +418,15 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   .def,.why,.surfaces{grid-template-columns:1fr}
   .why .arrow{transform:rotate(90deg);justify-self:center}
   .agrid,.buckets{grid-template-columns:1fr 1fr}
-  .steps{grid-template-columns:1fr 1fr;gap:24px 0}
-  .step:not(:last-child)::after{display:none}
+  .steps{flex-wrap:wrap;gap:14px}
+  .step{flex:1 1 45%}
+  .step-arrow{display:none}
   .am-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:600px){
   .wrap{padding:0 18px}
-  .hub-grid,.who-grid,.agrid,.buckets,.steps{grid-template-columns:1fr}
+  .hub-grid,.who-grid,.agrid,.buckets{grid-template-columns:1fr}
+  .step{flex:1 1 100%}
   .am-grid{grid-template-columns:1fr}
   .topbar{padding:0 16px}.breadcrumb{display:none}
   .flowpipe{flex-direction:column}.fparrow{transform:rotate(90deg)}
@@ -606,20 +613,54 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
   {% elif chapter.slug == 'how-to-navigate' %}
     <div class="steps reveal">
-      <div class="step"><div class="sn">1</div><h4>Sign in</h4><p>Google login, no passwords to remember.</p></div>
-      <div class="step"><div class="sn">2</div><h4>Land on the Hub</h4><p>Every agent, grouped by bucket.</p></div>
-      <div class="step"><div class="sn">3</div><h4>Pick an agent</h4><p>Open the one that fits the job.</p></div>
-      <div class="step"><div class="sn">4</div><h4>Give it input</h4><p>A keyword, a URL, a list, or it's already running.</p></div>
-      <div class="step"><div class="sn">5</div><h4>Get results</h4><p>In-page, a Google Sheet, or a Slack alert.</p></div>
+      <div class="step cx-card">
+        <div class="sn">1</div>
+        <h4>Sign in with Google</h4>
+        <p>One click, no password to create or remember. Your @position2.com account is the only credential, and it's what gates you into the /p2 side of the platform.</p>
+      </div>
+      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="step cx-card">
+        <div class="sn">2</div>
+        <h4>Land on the Hub</h4>
+        <p>Every agent lives on one page, grouped into three buckets: Live SEO tools, GTM Intelligence and the SEO fleet. You see the shape of the platform before picking anything.</p>
+      </div>
+      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="step cx-card">
+        <div class="sn">3</div>
+        <h4>Pick an agent</h4>
+        <p>Each card states what the agent does, what it needs from you, and whether it's ready to run now or needs a quick one-time setup, like a target list or a script on the site.</p>
+      </div>
+      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="step cx-card">
+        <div class="sn">4</div>
+        <h4>Give it input</h4>
+        <p>Most agents just need a keyword, a URL or a company list to get going. A few, like ABM Signal Tracker, are already watching in the background the moment they're configured.</p>
+      </div>
+      <div class="step-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="step cx-card">
+        <div class="sn">5</div>
+        <h4>Get results</h4>
+        <p>Results land wherever makes sense: right on the page, in a shared Google Sheet, or as a Slack alert the moment something worth acting on happens.</p>
+      </div>
     </div>
     <div class="surfaces reveal">
       <div class="surf cx-card">
         <div class="u"><code>/app</code>Member workspace</div>
-        <p>The client-facing side. Members sign in to run the public SEO tools; this is where prospects and clients live.</p>
+        <p>The client-facing side. Prospects and clients sign in here to run the public SEO tools themselves, no /p2 access required.</p>
+        <div class="surf-list">
+          <div class="srow"><span class="sck">✓</span>3 live agents: Keyword Finder, Content Brief Generator, Content Enhancer</div>
+          <div class="srow"><span class="sck">✓</span>Open to any client or prospect with an invite</div>
+          <div class="srow"><span class="sck">✓</span>Powers the campaigns, reports and pitches they see</div>
+        </div>
       </div>
       <div class="surf here cx-card">
         <div class="u"><code>/p2</code>Internal staff<span class="badge-here">You are here</span></div>
-        <p>Position²-only. The full agent fleet, admin dashboards and this playbook, gated to @position2.com accounts, with a 10-run cap per agent.</p>
+        <p>Position²-only. The full agent fleet, admin dashboards and this playbook, gated to @position2.com accounts.</p>
+        <div class="surf-list">
+          <div class="srow"><span class="sck">✓</span>All 18 agents: Live, GTM and the SEO fleet</div>
+          <div class="srow"><span class="sck">✓</span>Google sign-in restricted to @position2.com</div>
+          <div class="srow"><span class="sck">✓</span>10 runs per agent, so nothing runs away unattended</div>
+        </div>
       </div>
     </div>
   {% elif chapter.slug == 'agent-landscape' %}
