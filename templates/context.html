@@ -205,25 +205,26 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 
 /* ── Ch1 What ── */
 .def{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:stretch}
-.def-main{padding:30px}
+.def-main{padding:34px 32px}
+.eyebrow{display:block;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#67e8f9;margin-bottom:16px}
 .def-main .big{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(20px,2.5vw,28px);font-weight:600;line-height:1.32;color:var(--ink);letter-spacing:-.015em}
 .def-main .big b{background:linear-gradient(95deg,#67e8f9,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
-.plain{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.plain{display:flex;flex-direction:column;gap:10px;margin-top:24px;padding-top:22px;border-top:1px solid var(--bd)}
 .plain .row{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--ink2)}
 .plain .row .ck{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;background:rgba(52,211,153,.14);color:#34d399}
-.stat-panel{display:flex;flex-direction:column;justify-content:center;gap:20px;padding:32px 30px}
-.sp-item{display:flex;flex-direction:column;gap:4px;padding-bottom:20px;border-bottom:1px solid var(--bd)}
-.sp-item:last-child{padding-bottom:0;border-bottom:none}
-.sp-item b{font-family:'Bricolage Grotesque',sans-serif;font-size:32px;font-weight:750;letter-spacing:-.02em;
-  background:linear-gradient(95deg,#67e8f9,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sp-item span{font-size:12.5px;color:var(--dim);line-height:1.4}
-.isnt{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
-.isnt .col{padding:20px 22px}
-.isnt .col h4{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
-.isnt .col.is h4{color:#34d399}.isnt .col.no h4{color:#fb7185}
-.isnt .col li{list-style:none;font-size:13px;line-height:1.5;color:var(--ink2);padding-left:20px;position:relative;margin-bottom:7px}
-.isnt .col.is li::before{content:"✓";position:absolute;left:0;color:#34d399}
-.isnt .col.no li::before{content:"✕";position:absolute;left:0;color:#fb7185}
+.stat-panel{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:20px}
+.sp-item{display:flex;align-items:center;gap:18px;padding:16px 14px;border-radius:16px;transition:background .3s,transform .3s}
+.sp-item:hover{background:var(--card2);transform:translateX(3px)}
+.sp-ico{flex:0 0 auto;width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.sp-item.c1 .sp-ico{background:rgba(34,211,238,.14);box-shadow:0 6px 18px -8px rgba(34,211,238,.5)}
+.sp-item.c2 .sp-ico{background:rgba(129,140,248,.14);box-shadow:0 6px 18px -8px rgba(129,140,248,.5)}
+.sp-item.c3 .sp-ico{background:rgba(167,139,250,.14);box-shadow:0 6px 18px -8px rgba(167,139,250,.5)}
+.sp-text{display:flex;flex-direction:column;gap:2px}
+.sp-text b{font-family:'Bricolage Grotesque',sans-serif;font-size:27px;font-weight:750;letter-spacing:-.02em;color:var(--ink)}
+.sp-item.c1 .sp-text b{color:#22d3ee}
+.sp-item.c2 .sp-text b{color:#818cf8}
+.sp-item.c3 .sp-text b{color:#a78bfa}
+.sp-text span{font-size:12px;color:var(--dim);line-height:1.4}
 
 /* ── Ch2 Why (before/after) ── */
 .why{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
@@ -406,7 +407,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
 }
 @media(max-width:600px){
   .wrap{padding:0 18px}
-  .hub-grid,.who-grid,.agrid,.buckets,.isnt,.steps{grid-template-columns:1fr}
+  .hub-grid,.who-grid,.agrid,.buckets,.steps{grid-template-columns:1fr}
   .am-grid{grid-template-columns:1fr}
   .topbar{padding:0 16px}.breadcrumb{display:none}
   .flowpipe{flex-direction:column}.fparrow{transform:rotate(90deg)}
@@ -484,6 +485,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   {% if chapter.slug == 'what-it-is' %}
     <div class="def reveal">
       <div class="def-main cx-card">
+        <span class="eyebrow">The one-liner</span>
         <div class="big"><b>Intelligence</b> is Position²'s single front door to a fleet of AI agents that do real go-to-market and SEO work, from spotting buying signals to writing content briefs, all behind one Google login.</div>
         <div class="plain">
           <div class="row"><span class="ck">✓</span> 18 agents under one roof: GTM and SEO, side by side</div>
@@ -492,22 +494,10 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         </div>
       </div>
       <div class="stat-panel cx-card">
-        <div class="sp-item"><b>18</b><span>AI agents, ready to run</span></div>
-        <div class="sp-item"><b>2</b><span>domains: GTM and SEO</span></div>
-        <div class="sp-item"><b>1</b><span>login for the whole fleet</span></div>
+        <div class="sp-item c1"><span class="sp-ico">🤖</span><div class="sp-text"><b>18</b><span>AI agents, ready to run</span></div></div>
+        <div class="sp-item c2"><span class="sp-ico">🎯</span><div class="sp-text"><b>2</b><span>domains: GTM and SEO</span></div></div>
+        <div class="sp-item c3"><span class="sp-ico">🔑</span><div class="sp-text"><b>1</b><span>login for the whole fleet</span></div></div>
       </div>
-    </div>
-    <div class="isnt reveal">
-      <ul class="col is cx-card"><h4>What it is</h4>
-        <li>A friendly home for powerful agents</li>
-        <li>A shared workspace for whole teams</li>
-        <li>Ready-to-use tools with clean outputs</li>
-      </ul>
-      <ul class="col no cx-card"><h4>What it isn't</h4>
-        <li>Not a raw, technical back-end</li>
-        <li>Not one-off scripts scattered around</li>
-        <li>Not something only a few people can touch</li>
-      </ul>
     </div>
   {% elif chapter.slug == 'why-we-built-it' %}
     <div class="why reveal">
