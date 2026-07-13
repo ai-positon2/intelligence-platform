@@ -48,7 +48,7 @@
           <div class="tb-dd-name">{{ user.name or 'User' }}</div>
           <div class="tb-dd-email">{{ user.email }}</div>
         </div>
-        <div class="tb-dd-items"><button type="button" class="tb-dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/context" class="tb-dd-item"><span>🧭</span> Platform Context</a>
+        <div class="tb-dd-items"><button type="button" class="tb-dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/playbook" class="tb-dd-item"><span>🧭</span> Platform Playbook</a>
           {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com', 'reporting@position2.com'] %}
           <a href="/p2/admin/internal-usage" class="tb-dd-item"><span>⚙</span> Internal Usage</a>
           <a href="/p2/admin/anonymous-traffic" class="tb-dd-item"><span>🌐</span> Anonymous Traffic</a>

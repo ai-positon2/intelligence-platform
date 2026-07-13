@@ -2388,15 +2388,15 @@ CX_CHAPTERS = [
      "bg": "rgba(251,113,133,.14)", "bd": "rgba(251,113,133,.34)"},
 ]
 
-@app.route("/p2/context")
+@app.route("/p2/playbook")
 @position2_required
-def p2_context():
+def p2_playbook():
     """Internal playbook hub — pick a chapter."""
     return render_template("context.html", user=_get_user(), chapters=CX_CHAPTERS, chapter=None)
 
-@app.route("/p2/context/<slug>")
+@app.route("/p2/playbook/<slug>")
 @position2_required
-def p2_context_chapter(slug):
+def p2_playbook_chapter(slug):
     """A single playbook chapter as its own page."""
     idx = next((i for i, c in enumerate(CX_CHAPTERS) if c["slug"] == slug), None)
     if idx is None:
@@ -2405,6 +2405,16 @@ def p2_context_chapter(slug):
     next_chapter = CX_CHAPTERS[idx + 1] if idx < len(CX_CHAPTERS) - 1 else None
     return render_template("context.html", user=_get_user(), chapters=CX_CHAPTERS,
                             chapter=CX_CHAPTERS[idx], prev_chapter=prev_chapter, next_chapter=next_chapter)
+
+@app.route("/p2/context")
+def p2_context():
+    """Legacy URL, kept as a redirect so old bookmarks and links still work."""
+    return redirect(url_for("p2_playbook"), code=301)
+
+@app.route("/p2/context/<slug>")
+def p2_context_chapter(slug):
+    """Legacy URL, kept as a redirect so old bookmarks and links still work."""
+    return redirect(url_for("p2_playbook_chapter", slug=slug), code=301)
 
 @app.route("/p2/gtm")
 @position2_required
