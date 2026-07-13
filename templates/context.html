@@ -480,7 +480,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
             <div class="dd-name">{{ user.name or 'User' }}</div>
             <div class="dd-email">{{ user.email }}</div>
           </div>
-          <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/context" class="dd-item"><span class="dd-item-icon">🧭</span> Platform Context</a><div class="dd-divider"></div>
+          <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/playbook" class="dd-item"><span class="dd-item-icon">🧭</span> Platform Playbook</a><div class="dd-divider"></div>
             {% if user.email in ['krishna.ladha@position2.com', 'sudheer.d@position2.com', 'reporting@position2.com'] %}
             <a href="/p2/admin/internal-usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
             <a href="/p2/admin/anonymous-traffic" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
@@ -501,10 +501,10 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   {% if chapter %}
   <!-- ═══════════ CHAPTER NAV RAIL ═══════════ -->
   <div class="wrap chnav">
-    <a href="/p2/context" class="back-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> All chapters</a>
+    <a href="/p2/playbook" class="back-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> All chapters</a>
     <div class="dot-rail">
       {% for c in chapters %}
-      <a href="/p2/context/{{ c.slug }}" class="cdot{{ ' on' if c.slug == chapter.slug else '' }}" style="--ac:{{ c.ac }}" title="{{ c.num }}. {{ c.title }}">{{ c.num }}</a>
+      <a href="/p2/playbook/{{ c.slug }}" class="cdot{{ ' on' if c.slug == chapter.slug else '' }}" style="--ac:{{ c.ac }}" title="{{ c.num }}. {{ c.title }}">{{ c.num }}</a>
       {% endfor %}
     </div>
   </div>
@@ -576,7 +576,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Competitor Ad Intel</span>
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Anonymous Visitors</span>
         </div>
-        <div class="p-foot"><span>4-agent GTM bucket, custom setup per client</span><a href="/p2/context/every-agent#gtm">Explore →</a></div>
+        <div class="p-foot"><span>4-agent GTM bucket, custom setup per client</span><a href="/p2/playbook/every-agent#gtm">Explore →</a></div>
       </div>
       <div class="persona cx-card reveal">
         <span class="p-cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
@@ -593,7 +593,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
           <span class="chip"><span class="cdot" style="background:#38bdf8"></span>On-Page Auditor</span>
           <span class="chip"><span class="cdot" style="background:#38bdf8"></span>Competitor SEO Intel</span>
         </div>
-        <div class="p-foot"><span>14-agent SEO & GEO fleet, no configuration needed</span><a href="/p2/context/agent-landscape">Explore →</a></div>
+        <div class="p-foot"><span>14-agent SEO & GEO fleet, no configuration needed</span><a href="/p2/playbook/agent-landscape">Explore →</a></div>
       </div>
       <div class="persona cx-card reveal">
         <span class="p-cap" style="background:linear-gradient(90deg,#34d399,#67e8f9)"></span>
@@ -609,7 +609,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
           <span class="chip"><span class="cdot" style="background:#34d399"></span>Tech Stack</span>
           <span class="chip"><span class="cdot" style="background:#34d399"></span>Live demo</span>
         </div>
-        <div class="p-foot"><span>18 agents, 2 domains, 1 login, one walkthrough</span><a href="/p2/context/demo">Explore →</a></div>
+        <div class="p-foot"><span>18 agents, 2 domains, 1 login, one walkthrough</span><a href="/p2/playbook/demo">Explore →</a></div>
       </div>
       <div class="persona cx-card reveal">
         <span class="p-cap" style="background:linear-gradient(90deg,#e879f9,#fb923c)"></span>
@@ -692,7 +692,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <div class="bd">Ready for everyone with zero setup. The three tools clients use on the public workspace.</div>
         <div class="bmeta"><span class="chip">Standard</span><span class="chip">Everyone</span><span class="chip">No config</span></div>
         <div class="bkt-toggle"><span class="bkt-tlabel">See the 3 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
-        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#live">Explore all in detail →</a></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/playbook/every-agent#live">Explore all in detail →</a></div>
       </div>
       <div class="bkt cx-card" data-bucket="gtm" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></span>
         <div class="bn" style="color:#a78bfa" data-n="4">0</div>
@@ -700,7 +700,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <div class="bd">Custom-built per client on Arena, Apollo & Unipile. Each needs a quick config: a list or a script.</div>
         <div class="bmeta"><span class="chip">Custom build</span><span class="chip">Internal</span><span class="chip">Needs setup</span></div>
         <div class="bkt-toggle"><span class="bkt-tlabel">See the 4 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
-        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#gtm">Explore all in detail →</a></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/playbook/every-agent#gtm">Explore all in detail →</a></div>
       </div>
       <div class="bkt cx-card" data-bucket="seo" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
         <div class="bn" style="color:#38bdf8" data-n="11">0</div>
@@ -708,7 +708,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <div class="bd">The deep SEO & GEO toolkit (internal and beta), built on ChatGPT and Semrush APIs. No config needed.</div>
         <div class="bmeta"><span class="chip">Standard</span><span class="chip">Internal · beta</span><span class="chip">No config</span></div>
         <div class="bkt-toggle"><span class="bkt-tlabel">See the 11 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
-        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#seo">Explore all in detail →</a></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/playbook/every-agent#seo">Explore all in detail →</a></div>
       </div>
     </div>
     <div class="distbar reveal" id="distBar">
@@ -779,12 +779,12 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
 
   <div class="wrap pager reveal">
     {% if prev_chapter %}
-    <a class="pgcard prev" href="/p2/context/{{ prev_chapter.slug }}"><span class="pglabel">← Previous</span><span class="pgtitle">{{ prev_chapter.title }}</span></a>
+    <a class="pgcard prev" href="/p2/playbook/{{ prev_chapter.slug }}"><span class="pglabel">← Previous</span><span class="pgtitle">{{ prev_chapter.title }}</span></a>
     {% else %}<span class="pgspacer"></span>{% endif %}
     {% if next_chapter %}
-    <a class="pgcard next" href="/p2/context/{{ next_chapter.slug }}"><span class="pglabel">Next →</span><span class="pgtitle">{{ next_chapter.title }}</span></a>
+    <a class="pgcard next" href="/p2/playbook/{{ next_chapter.slug }}"><span class="pglabel">Next →</span><span class="pgtitle">{{ next_chapter.title }}</span></a>
     {% else %}
-    <a class="pgcard next done" href="/p2/context"><span class="pglabel">🎉 That's the whole playbook</span><span class="pgtitle">Back to all chapters</span></a>
+    <a class="pgcard next done" href="/p2/playbook"><span class="pglabel">🎉 That's the whole playbook</span><span class="pgtitle">Back to all chapters</span></a>
     {% endif %}
   </div>
 
@@ -808,7 +808,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
     <div class="hub-grid">
       {% for c in chapters %}
-      <a class="lc" href="/p2/context/{{ c.slug }}" style="--ac:{{ c.ac }};--ac2:{{ c.ac2 }};--acbg:{{ c.bg }};--acbd:{{ c.bd }};--d:{{ loop.index0 }}">
+      <a class="lc" href="/p2/playbook/{{ c.slug }}" style="--ac:{{ c.ac }};--ac2:{{ c.ac2 }};--acbg:{{ c.bg }};--acbd:{{ c.bd }};--d:{{ loop.index0 }}">
         <span class="lc-glow" aria-hidden="true"></span>
         <span class="lc-num">{{ '%02d'|format(c.num) }}</span>
         <div class="lc-body">
@@ -831,7 +831,7 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
   </footer>
 
   {% if chapter %}
-  <a href="/p2/context" class="fab show">
+  <a href="/p2/playbook" class="fab show">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
     All chapters
   </a>
