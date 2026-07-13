@@ -227,24 +227,27 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .sp-text span{font-size:12px;color:var(--dim);line-height:1.4}
 
 /* ── Ch2 Why (before/after) ── */
-.why{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+.why{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:stretch}
 .why .arrow{color:#818cf8;font-size:26px}
-.wcard{padding:26px}
-.wcard .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:5px 11px;border-radius:999px;margin-bottom:14px}
+.wcard{padding:26px;display:flex;flex-direction:column}
+.wcard .tag{display:inline-block;flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:5px 11px;border-radius:999px;margin-bottom:14px}
 .wcard.before .tag{color:#fb7185;background:rgba(251,113,133,.12)}
 .wcard.after .tag{color:#34d399;background:rgba(52,211,153,.12)}
-.wcard.after{border-color:rgba(52,211,153,.28)}
+.wcard.after{border-width:2px;border-color:rgba(52,211,153,.4)}
 .wcard h3{font-family:'Bricolage Grotesque',sans-serif;font-size:19px;font-weight:650;color:var(--ink);margin-bottom:10px}
 .wcard p{font-size:13.5px;line-height:1.6;color:var(--dim)}
 .vision{margin-top:20px;padding:34px 36px;text-align:center}
 .vision .q{font-family:'Instrument Serif',serif;font-style:italic;font-size:clamp(22px,3vw,30px);line-height:1.4;color:var(--ink)}
 .vision .q b{background:linear-gradient(95deg,#67e8f9,#a5b4fc 50%,#e879f9);-webkit-background-clip:text;background-clip:text;color:transparent;font-style:normal;font-weight:700;font-family:'Bricolage Grotesque',sans-serif}
-.vision .by{margin-top:14px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
-.flowpipe{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:22px}
-.fp{display:flex;align-items:center;gap:9px;padding:12px 18px;background:var(--card);border:1px solid var(--bd);border-radius:14px;font-size:13px;font-weight:600;color:var(--ink2)}
-.fp .fi{font-size:18px}
-.fp.hi{border-color:var(--bd-hi);background:var(--card2)}
-.fparrow{color:#818cf8;font-size:18px}
+.flowpipe{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:14px;margin-top:26px}
+.fp{display:flex;align-items:center;gap:11px;padding:16px 22px;background:var(--card);border:1px solid var(--bd);border-radius:14px;
+  font-size:13.5px;font-weight:650;color:var(--ink2);transition:transform .25s,border-color .25s,box-shadow .25s}
+.fp:hover{transform:translateY(-3px);border-color:var(--bd-hi)}
+.fp.hi{background:linear-gradient(135deg,rgba(34,211,238,.12),rgba(167,139,250,.14));border-color:rgba(167,139,250,.4);
+  color:var(--ink);font-weight:700;box-shadow:0 10px 28px -12px rgba(167,139,250,.45)}
+.fd{width:9px;height:9px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
+.fparrow{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;flex:0 0 auto;
+  background:var(--card2);border:1px solid var(--bd);color:#818cf8;font-size:15px;font-weight:700}
 
 /* ── Ch3 Who (personas) ── */
 .who-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
@@ -515,16 +518,15 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
     <div class="vision cx-card reveal">
       <div class="q">Arena is the <b>engine.</b> Intelligence is the <b>cockpit</b>, where our team can actually fly it.</div>
-      <div class="by">The one-line vision</div>
     </div>
     <div class="flowpipe reveal">
-      <div class="fp"><span class="fi">🏟️</span> Arena agents</div>
+      <div class="fp"><span class="fd" style="background:#a78bfa"></span>Arena agents</div>
       <div class="fparrow">+</div>
-      <div class="fp"><span class="fi">🔌</span> SEO APIs</div>
+      <div class="fp"><span class="fd" style="background:#38bdf8"></span>SEO APIs</div>
       <div class="fparrow">→</div>
-      <div class="fp hi"><span class="fi">✦</span> Intelligence front-end</div>
+      <div class="fp hi"><span class="fd" style="background:linear-gradient(135deg,#22d3ee,#a78bfa)"></span>Intelligence front-end</div>
       <div class="fparrow">→</div>
-      <div class="fp"><span class="fi">🙌</span> You</div>
+      <div class="fp"><span class="fd" style="background:#34d399"></span>You</div>
     </div>
   {% elif chapter.slug == 'who-its-for' %}
     <div class="who-grid">
