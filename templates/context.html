@@ -278,14 +278,28 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .surf .badge-here{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#a5b4fc;background:rgba(99,102,241,.14);border-radius:999px;padding:3px 9px;margin-left:8px}
 
 /* ── Ch5 Landscape ── */
-.buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-.bkt{padding:24px;position:relative;overflow:hidden}
+.buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;align-items:start}
+.bkt{padding:24px;position:relative;overflow:hidden;cursor:pointer;transition:transform .25s,border-color .25s,background .25s}
+.bkt:hover{transform:translateY(-4px);border-color:var(--bd-hi)}
+.bkt:focus-visible{outline:2px solid var(--bd-hi);outline-offset:2px}
 .bkt .cap{position:absolute;top:0;left:0;right:0;height:3px}
 .bkt .bn{font-family:'Bricolage Grotesque',sans-serif;font-size:44px;font-weight:750;line-height:1;letter-spacing:-.03em}
 .bkt .bt{font-size:14px;font-weight:700;color:var(--ink);margin:8px 0 6px}
 .bkt .bd{font-size:12px;line-height:1.5;color:var(--dim)}
 .bkt .bmeta{margin-top:14px;display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:10.5px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--card2);border:1px solid var(--bd);color:var(--dim)}
+.bkt-toggle{margin-top:18px;padding-top:14px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bkt-tlabel{font-size:11.5px;font-weight:700;color:var(--dim);transition:color .2s}
+.bkt:hover .bkt-tlabel{color:var(--ink2)}
+.bkt-chev{width:15px;height:15px;flex:0 0 auto;color:var(--mute);transition:transform .3s,color .2s}
+.bkt.open .bkt-chev{transform:rotate(180deg);color:var(--ink)}
+.bkt-agents{max-height:0;opacity:0;overflow:hidden;margin-top:0;transition:max-height .4s cubic-bezier(.16,1,.3,1),opacity .3s,margin-top .4s}
+.bkt.open .bkt-agents{max-height:420px;opacity:1;margin-top:14px}
+.baglist{display:flex;flex-wrap:wrap;gap:6px}
+.baglist .an{font-size:11px;font-weight:600;color:var(--ink2);background:var(--card2);border:1px solid var(--bd);border-radius:999px;padding:5px 11px;transition:border-color .2s,color .2s}
+.bkt:hover .baglist .an{border-color:var(--bd-hi)}
+.bkt-explore{display:inline-block;margin-top:13px;font-size:12px;font-weight:700;color:#818cf8;text-decoration:none}
+.bkt-explore:hover{text-decoration:underline}
 .distbar{display:flex;height:16px;border-radius:999px;overflow:hidden;margin-bottom:8px;border:1px solid var(--bd)}
 .distbar .seg{height:100%;transition:width 1.1s cubic-bezier(.16,1,.3,1);width:0}
 .distlabels{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin-bottom:26px}
@@ -538,23 +552,29 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
     </div>
   {% elif chapter.slug == 'agent-landscape' %}
     <div class="buckets reveal">
-      <div class="bkt cx-card"><span class="cap" style="background:linear-gradient(90deg,#22d3ee,#67e8f9)"></span>
+      <div class="bkt cx-card" data-bucket="live" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#22d3ee,#67e8f9)"></span>
         <div class="bn" style="color:#22d3ee" data-n="3">0</div>
         <div class="bt">Live SEO tools</div>
         <div class="bd">Ready for everyone with zero setup. The three tools clients use on the public workspace.</div>
         <div class="bmeta"><span class="chip">Standard</span><span class="chip">Everyone</span><span class="chip">No config</span></div>
+        <div class="bkt-toggle"><span class="bkt-tlabel">See the 3 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#live">Explore all in detail →</a></div>
       </div>
-      <div class="bkt cx-card"><span class="cap" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></span>
+      <div class="bkt cx-card" data-bucket="gtm" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#a78bfa,#e879f9)"></span>
         <div class="bn" style="color:#a78bfa" data-n="4">0</div>
         <div class="bt">GTM Intelligence</div>
         <div class="bd">Custom-built per client on Arena, Apollo & Unipile. Each needs a quick config — a list or a script.</div>
         <div class="bmeta"><span class="chip">Custom build</span><span class="chip">Internal</span><span class="chip">Needs setup</span></div>
+        <div class="bkt-toggle"><span class="bkt-tlabel">See the 4 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#gtm">Explore all in detail →</a></div>
       </div>
-      <div class="bkt cx-card"><span class="cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
+      <div class="bkt cx-card" data-bucket="seo" role="button" tabindex="0" aria-expanded="false"><span class="cap" style="background:linear-gradient(90deg,#38bdf8,#818cf8)"></span>
         <div class="bn" style="color:#38bdf8" data-n="11">0</div>
         <div class="bt">SEO fleet</div>
         <div class="bd">The deep SEO & GEO toolkit — internal and beta, built on ChatGPT and Semrush APIs. No config needed.</div>
         <div class="bmeta"><span class="chip">Standard</span><span class="chip">Internal · beta</span><span class="chip">No config</span></div>
+        <div class="bkt-toggle"><span class="bkt-tlabel">See the 11 agents</span><svg class="bkt-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+        <div class="bkt-agents"><div class="baglist"></div><a class="bkt-explore" href="/p2/context/every-agent#seo">Explore all in detail →</a></div>
       </div>
     </div>
     <div class="distbar reveal" id="distBar">
@@ -880,11 +900,41 @@ var CX_AGENTS = [
     grid.innerHTML = CX_AGENTS.filter(function(a){return f==='all'||a.bucket===f;}).map(card).join('');
     cxGlow(grid);
   }
-  render('all');
+  var initial = (location.hash||'').replace('#','');
+  if(['live','gtm','seo'].indexOf(initial)===-1) initial='all';
+  document.querySelectorAll('#aFilter button').forEach(function(x){x.classList.toggle('on', x.getAttribute('data-f')===initial);});
+  render(initial);
   filterBar.addEventListener('click', function(e){
     var b=e.target.closest('button'); if(!b) return;
     document.querySelectorAll('#aFilter button').forEach(function(x){x.classList.toggle('on',x===b);});
     render(b.getAttribute('data-f'));
+  });
+})();
+
+// ── Bucket agent accordion (agent-landscape chapter) ──
+(function(){
+  var buckets = document.querySelectorAll('.bkt[data-bucket]');
+  if(!buckets.length) return;
+  buckets.forEach(function(b){
+    var key = b.getAttribute('data-bucket');
+    var list = b.querySelector('.baglist');
+    var built = false;
+    function toggle(){
+      var open = b.classList.toggle('open');
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if(open && !built){
+        list.innerHTML = CX_AGENTS.filter(function(a){ return a.bucket===key; })
+          .map(function(a){ return '<span class="an">'+a.name+'</span>'; }).join('');
+        built = true;
+      }
+    }
+    b.addEventListener('click', function(e){
+      if(e.target.closest('.bkt-explore')) return;
+      toggle();
+    });
+    b.addEventListener('keydown', function(e){
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); toggle(); }
+    });
   });
 })();
 
