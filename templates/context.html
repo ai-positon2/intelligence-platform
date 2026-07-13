@@ -404,11 +404,6 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
 .tech:hover{border-color:var(--bd-hi);transform:translateY(-2px)}
 .tech .td{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
 .tech small{font-weight:500;color:var(--mute);font-size:10.5px}
-.deploy{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:22px}
-.dnode{padding:14px 20px;text-align:center}
-.dnode b{display:block;font-family:ui-monospace,monospace;font-size:13px;color:var(--ink)}
-.dnode span{font-size:11px;color:var(--dim)}
-.darrow svg{width:24px;height:24px}
 
 /* ── Ch8 Demo ── */
 .video{position:relative;max-width:840px;margin:0 auto;aspect-ratio:16/9;border-radius:20px;overflow:hidden;border:1px solid var(--bd);box-shadow:var(--shadow)}
@@ -758,13 +753,6 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <span class="tech"><span class="td" style="background:#c084fc"></span>Railway <small>auto-deploy</small></span>
         <span class="tech"><span class="td" style="background:#67e8f9"></span>HTTPS <small>custom domain</small></span>
       </div></div>
-    </div>
-    <div class="deploy reveal">
-      <div class="dnode cx-card"><b>git push</b><span>to main</span></div>
-      <div class="darrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="dnode cx-card"><b>Railway build</b><span>~90 seconds</span></div>
-      <div class="darrow"><svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
-      <div class="dnode cx-card"><b>intelligence.position2.com</b><span>live</span></div>
     </div>
   {% elif chapter.slug == 'demo' %}
     <div class="video reveal" id="video">
