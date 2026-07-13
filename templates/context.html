@@ -141,38 +141,31 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 .hub-h{text-align:center;margin-bottom:30px}
 .hub-h h2{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.02em;color:var(--ink)}
 .hub-h p{margin-top:8px;font-size:14px;color:var(--dim)}
-.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-@keyframes cardIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
-.lc{position:relative;display:flex;flex-direction:column;gap:0;padding:28px 25px 25px;cursor:pointer;text-align:left;
-  background:linear-gradient(165deg,var(--acbg,var(--card)) 0%,var(--card) 55%);
-  border:1px solid var(--acbd,var(--bd));border-radius:22px;color:inherit;font:inherit;text-decoration:none;
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.lc{position:relative;display:flex;flex-direction:column;padding:30px 26px;cursor:pointer;text-align:left;
+  background:var(--card);border:1px solid var(--bd);border-radius:20px;color:inherit;font:inherit;text-decoration:none;
   overflow:hidden;isolation:isolate;
-  transition:transform .3s cubic-bezier(.16,1,.3,1),border-color .3s,background .3s,box-shadow .3s;
-  animation:cardIn .6s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--d,0) * 70ms)}
-.lc::after{content:"";position:absolute;top:0;left:0;right:0;height:3px;z-index:2;
-  background:linear-gradient(90deg,var(--ac,#818cf8),var(--ac2,#a78bfa))}
-.lc-glow{position:absolute;inset:-40%;z-index:-1;opacity:.1;transition:opacity .4s;
-  background:radial-gradient(circle at 30% 20%, var(--ac,#818cf8) 0%, transparent 60%);filter:blur(30px)}
-.lc-ghost{position:absolute;right:-6px;bottom:-28px;z-index:-1;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;
-  font-size:96px;line-height:1;color:var(--ac,var(--ink));opacity:.06;letter-spacing:-.05em;pointer-events:none;transition:opacity .3s,transform .4s}
-.lc:hover{transform:translateY(-8px) scale(1.02);border-color:var(--ac,var(--bd-hi));background:linear-gradient(165deg,var(--acbg,var(--card2)) 0%,var(--card2) 60%);
-  box-shadow:0 26px 52px -18px var(--acbg,rgba(0,0,0,.5)),0 0 0 1px var(--acbd,transparent)}
-.lc:hover .lc-glow{opacity:.28}
-.lc:hover .lc-ghost{opacity:.1;transform:translateY(-4px)}
-.lc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.lc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--mute)}
-.lc-ico{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:25px;
-  background:linear-gradient(135deg,var(--acbg,rgba(129,140,248,.22)) 0%,var(--acbd,rgba(129,140,248,.08)) 100%);
-  border:1px solid var(--acbd,var(--bd));box-shadow:0 4px 18px -6px var(--acbg,transparent);
-  transition:transform .3s}
-.lc:hover .lc-ico{transform:scale(1.1) rotate(-5deg)}
-.lc h3{font-family:'Bricolage Grotesque',sans-serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:8px;letter-spacing:-.015em}
-.lc p{font-size:13.5px;line-height:1.6;color:var(--ink2);flex:1}
-.lc-foot{margin-top:22px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.lc-stat{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ac,#818cf8);background:var(--acbg,rgba(129,140,248,.14));
-  border:1px solid var(--acbd,transparent);border-radius:999px;padding:5px 11px}
-.lc-go{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--ink2);opacity:.75;transition:gap .25s,opacity .25s,color .25s}
-.lc:hover .lc-go{gap:9px;opacity:1;color:var(--ac,#818cf8)}
+  transition:transform .35s cubic-bezier(.16,1,.3,1),border-color .35s,background .35s,box-shadow .35s;
+  animation:cardIn .55s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--d,0) * 60ms)}
+.lc-glow{position:absolute;inset:-50%;z-index:-1;opacity:0;transition:opacity .5s;
+  background:radial-gradient(circle at 25% 15%, var(--ac,#818cf8) 0%, transparent 55%);filter:blur(40px)}
+.lc:hover{transform:translateY(-5px);border-color:var(--acbd,var(--bd-hi));background:var(--card2);
+  box-shadow:0 20px 44px -22px rgba(0,0,0,.45)}
+.lc:hover .lc-glow{opacity:.13}
+.lc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.lc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--mute)}
+.lc-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;
+  background:var(--card2);border:1px solid var(--bd);transition:background .35s,border-color .35s,transform .35s}
+.lc:hover .lc-ico{background:var(--acbg,var(--card2));border-color:var(--acbd,var(--bd-hi));transform:scale(1.06)}
+.lc h3{font-family:'Bricolage Grotesque',sans-serif;font-size:18.5px;font-weight:680;color:var(--ink);margin-bottom:9px;letter-spacing:-.01em}
+.lc p{font-size:13px;line-height:1.65;color:var(--dim);flex:1}
+.lc-foot{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lc-stat{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--dim);background:var(--card2);
+  border:1px solid var(--bd);border-radius:999px;padding:5px 11px;transition:color .35s,border-color .35s}
+.lc:hover .lc-stat{color:var(--ac,#818cf8);border-color:var(--acbd,var(--bd-hi))}
+.lc-go{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--mute);transition:gap .3s,color .3s}
+.lc:hover .lc-go{gap:8px;color:var(--ac,#818cf8)}
 .lc-go svg{width:14px;height:14px}
 
 /* ══════════════ CHAPTER PAGE: nav rail + hero + pager ══════════════ */
@@ -702,7 +695,6 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
       {% for c in chapters %}
       <a class="lc" href="/p2/context/{{ c.slug }}" style="--ac:{{ c.ac }};--ac2:{{ c.ac2 }};--acbg:{{ c.bg }};--acbd:{{ c.bd }};--d:{{ loop.index0 }}">
         <span class="lc-glow" aria-hidden="true"></span>
-        <span class="lc-ghost">{{ '%02d'|format(c.num) }}</span>
         <div class="lc-top">
           <span class="lc-num">{{ '%02d'|format(c.num) }}</span>
           <span class="lc-ico">{{ c.icon }}</span>
