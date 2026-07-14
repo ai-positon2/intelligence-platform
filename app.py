@@ -2625,6 +2625,7 @@ def track_page():
 
         mins, secs = divmod(seconds, 60)
         duration_fmt = f"{mins}m {secs}s" if mins else f"{secs}s"
+        vid = (request.cookies.get("p2_vid") or "").strip()[:64]
 
         now = datetime.now(IST)
         row = [
@@ -2641,6 +2642,9 @@ def track_page():
             _parse_ua(request.headers.get("User-Agent",""))[0],   # browser
             _parse_ua(request.headers.get("User-Agent",""))[2],   # OS
             _parse_ua(request.headers.get("User-Agent",""))[3],   # device
+            vid,   # Visitor ID (p2_vid) -- links this post-login page view back to the
+                   # visitor's pre-login Visitor Analytics journey, same key used by
+                   # Member Signins / internal login log.
         ]
 
         if not LOGIN_LOG_SHEET_ID:
@@ -2667,7 +2671,7 @@ def track_page():
                 raise Exception("empty")
         except Exception:
             header = [["Timestamp (IST)","Date","Time (IST)","Day","Email","Page Title",
-                       "Page URL","Seconds","Duration","IP","Browser","OS","Device"]]
+                       "Page URL","Seconds","Duration","IP","Browser","OS","Device","Visitor ID"]]
             try:
                 svc.spreadsheets().batchUpdate(
                     spreadsheetId=LOGIN_LOG_SHEET_ID,
@@ -2762,6 +2766,55 @@ def _va_identity_map() -> dict:
         except Exception:
             pass
     return m
+
+
+def _login_events_by_vid() -> dict:
+    """p2_vid -> {type, email, name, picture, events:[...]} across every Google
+    sign-in this platform has ever recorded -- 'Member Signins' (public /app
+    sign-ups) plus the internal login log (default tab, @position2.com staff).
+    This is the join that lets Anonymous Traffic show what an anonymous
+    visitor went on to do AFTER they signed in, not just before."""
+    svc = _va_sheets_service()
+    out: dict = {}
+    if not svc:
+        return out
+
+    def read(rng):
+        try:
+            return svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+        except Exception as e:
+            log.warning("login events by vid read failed (%s): %s", rng, e)
+            return []
+
+    def add(vid, email, name, picture, ts, kind):
+        if not vid:
+            return
+        entry = out.setdefault(vid, {"email": "", "name": "", "picture": "", "events": []})
+        entry["events"].append({"ts": ts, "email": email, "name": name, "kind": kind})
+        # Most recent event wins for the display profile.
+        if email: entry["email"] = email
+        if name: entry["name"] = name
+        if picture: entry["picture"] = picture
+
+    ms_rows = read("%s!A:T" % _MEMBER_TAB)
+    for r in (ms_rows[1:] if len(ms_rows) > 1 else []):
+        def mc(i, d=""): return r[i] if i < len(r) else d
+        add(mc(9), mc(5), mc(6), mc(8), mc(0), "member")
+
+    login_rows = read("A1:U5000")
+    for r in (login_rows[1:] if len(login_rows) > 1 else []):
+        def lc(i, d=""): return r[i] if i < len(r) else d
+        add(lc(20), lc(5), lc(6), lc(8), lc(0), "staff")
+
+    for entry in out.values():
+        entry["events"].sort(key=lambda e: e["ts"] or "")
+        entry["type"] = "staff" if (entry["email"] or "").lower().endswith("@position2.com") else "member"
+        entry["first_ts"] = entry["events"][0]["ts"] if entry["events"] else ""
+        entry["last_ts"] = entry["events"][-1]["ts"] if entry["events"] else ""
+        entry["count"] = len(entry["events"])
+    return out
+
 
 @app.route("/api/identify", methods=["POST"])
 def api_identify():
@@ -3019,23 +3072,63 @@ def _fetch_visitor_analytics() -> dict:
             co = _ip_company(ipv); _ipc[ipv] = co
         if co: vid_company[v] = co
     vid_pages = defaultdict(int)
+    va_by_vid = defaultdict(list)
     for r in human:
         v = c(r,"Visitor ID")
-        if v: vid_pages[v] += 1
+        if v:
+            vid_pages[v] += 1
+            va_by_vid[v].append(r)
     companies = Counter()
     for v in visitors:
         co = ((idmap.get(v,{}) or {}).get("company") or vid_company.get(v) or "").strip()
         if co: companies[co] += 1
     top_companies = companies.most_common(15)
+
+    # ---- did this anonymous visitor go on to sign in? (member or staff) ----
+    login_map = _login_events_by_vid()
+    signed_in = sum(1 for v in visitors if v in login_map)
+    signed_in_rate = round(signed_in/unique_visitors*100, 1) if unique_visitors else 0
+
+    pv_rows = []
+    if svc:
+        try:
+            pv_rows = svc.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A:N").execute().get("values", [])
+        except Exception as e:
+            log.warning("visitor analytics: page views read failed: %s", e)
+    pv_by_vid = defaultdict(list)
+    for r in (pv_rows[1:] if len(pv_rows) > 1 else []):
+        pvid = r[13] if len(r) > 13 else ""
+        if pvid: pv_by_vid[pvid].append(r)
+
     identified = []
     for v in visitors:
         idn = idmap.get(v) or {}
         co = idn.get("company") or vid_company.get(v) or ""
-        if idn or co:
-            identified.append({"vid": v[:8], "name": idn.get("name",""), "email": idn.get("email",""),
-                "company": co, "source": idn.get("source") or ("reverse-IP" if co else ""),
-                "pages": vid_pages.get(v,0)})
-    identified.sort(key=lambda x: -x["pages"]); identified = identified[:60]
+        lg = login_map.get(v)
+        if not (idn or co or lg):
+            continue
+        email = idn.get("email") or (lg or {}).get("email", "")
+        name = idn.get("name") or (lg or {}).get("name", "")
+        source = idn.get("source") or ("reverse-IP" if co else "")
+        tl = []
+        for r in sorted(va_by_vid.get(v, []), key=lambda r: c(r,"Timestamp (IST)")):
+            tl.append({"t": c(r,"Timestamp (IST)"), "kind": "view",
+                       "label": c(r,"Page Title") or c(r,"Page URL") or "Page view",
+                       "meta": c(r,"Referrer Host") or ""})
+        for ev in (lg or {}).get("events", []):
+            tl.append({"t": ev["ts"], "kind": "signin",
+                       "label": "Signed in as %s (%s)" % (ev["email"], ev["kind"]), "meta": ""})
+        for r in sorted(pv_by_vid.get(v, []), key=lambda r: r[0] if r else ""):
+            tl.append({"t": r[0] if len(r)>0 else "", "kind": "post",
+                       "label": (r[5] if len(r)>5 else "") or (r[6] if len(r)>6 else "") or "Page view",
+                       "meta": r[8] if len(r)>8 else ""})
+        tl.sort(key=lambda x: x["t"] or "")
+        identified.append({"vid": v[:8], "name": name, "email": email,
+            "company": co, "source": source, "pages": vid_pages.get(v,0),
+            "status": (lg or {}).get("type", ""), "converted": bool(lg),
+            "timeline": tl[:60]})
+    identified.sort(key=lambda x: (not x["converted"], -x["pages"])); identified = identified[:60]
 
     recent = []
     for r in reversed(data):
@@ -3059,6 +3152,7 @@ def _fetch_visitor_analytics() -> dict:
             "conversions": conversions, "conv_rate": conv_rate,
             "video_sessions": video_sessions, "total_rage": total_rage,
             "identified": len(identified), "companies": len(companies),
+            "signed_in": signed_in, "signed_in_rate": signed_in_rate,
         },
         "series": series, "top_pages": top_pages, "top_landing": top_landing,
         "referrers": referrers, "utm_source": utm_source, "utm_campaign": utm_campaign,
@@ -3401,10 +3495,14 @@ def _fetch_usage_data() -> dict:
     # Read the FULL tabs — Sheets appends new rows at the bottom, so a fixed
     # top cap (was A1:T1000 / Page Views!A1:M2000) silently dropped every row
     # past the cap, i.e. all the most-recent activity once the sheet grew.
-    login_rows = _fetch("A:T")
-    page_rows  = _fetch("Page Views!A:M")
+    # A:U (not A:T) so column U -- the p2_vid visitor ID -- is actually read;
+    # it's been written on every login since v17 but was silently dropped here.
+    login_rows = _fetch("A:U")
+    page_rows  = _fetch("Page Views!A:N")
+    va_rows    = _fetch("Visitor Analytics!A:AM")
     login_data = login_rows[1:] if len(login_rows) > 1 else []
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
+    va_data    = va_rows[1:]    if len(va_rows)    > 1 else []
 
     # Internal Usage is INTERNAL only: keep @position2.com sign-ins & activity,
     # drop public members (they live in Public Page Analytics instead).
@@ -3412,7 +3510,22 @@ def _fetch_usage_data() -> dict:
     login_data = [r for r in login_data if _is_p2(col(r, 5))]
     page_data  = [r for r in page_data  if _is_p2(col(r, 4))]
 
-    from collections import Counter
+    from collections import Counter, defaultdict
+
+    # Pre-login journey, by p2_vid -- the same visitor cookie captured on the
+    # public marketing site before a staff member ever signs in. Lets us show
+    # "this admin browsed the site, then signed in, then did X" end to end.
+    _VA_IDX = {n: i for i, n in enumerate(_VA_HEADER)}
+    def vc(r, name, d=""):
+        i = _VA_IDX.get(name, -1)
+        return r[i] if 0 <= i < len(r) else d
+    va_by_vid = defaultdict(list)
+    for r in va_data:
+        if vc(r, "Bot", "No") == "Yes":
+            continue
+        v = vc(r, "Visitor ID")
+        if v:
+            va_by_vid[v].append(r)
 
     unique_users     = len({col(r, 5) for r in login_data if col(r, 5)})
     total_logins     = len(login_data)
@@ -3452,22 +3565,64 @@ def _fetch_usage_data() -> dict:
 
     # Per-user activity
     user_map: dict = {}
+    pv_by_email = defaultdict(list)
+    for r in page_data:
+        e = col(r, 4)
+        if e: pv_by_email[e].append(r)
     for r in login_data:
         e = col(r, 5)
         if not e: continue
         if e not in user_map:
             user_map[e] = {"email": e, "name": col(r, 6), "logins": 0,
-                           "last_seen": col(r, 0), "total_secs": 0}
+                           "last_seen": col(r, 0), "first_login": col(r, 0),
+                           "total_secs": 0, "vids": set(), "login_rows": []}
         user_map[e]["logins"] += 1
         user_map[e]["last_seen"] = col(r, 0)   # rows are oldest→newest; last row = most recent
+        user_map[e]["login_rows"].append(r)
+        v = col(r, 20)
+        if v: user_map[e]["vids"].add(v)
     for r in page_data:
         e = col(r, 4)
         if e in user_map and col(r, 7).isdigit():
             user_map[e]["total_secs"] += int(col(r, 7))
+
+    total_pre_pages = 0; linked_users = 0
     for u in user_map.values():
         s = u["total_secs"]; uh, ur = divmod(s, 3600); um = ur // 60
         u["time_fmt"] = f"{uh}h {um}m" if uh else (f"{um}m" if um else "—")
+
+        pre = []
+        for vid in u["vids"]:
+            pre.extend(va_by_vid.get(vid, []))
+        pre.sort(key=lambda r: vc(r, "Timestamp (IST)"))
+        u["vid"] = (sorted(u["vids"])[0][:8] if u["vids"] else "")
+        u["prelogin_pages"] = len(pre)
+        u["linked"] = bool(pre)
+        u["first_seen"] = vc(pre[0], "Timestamp (IST)") if pre else u["first_login"]
+        u["source"] = (vc(pre[0], "UTM Source") or vc(pre[0], "Referrer Host") or "direct") if pre else ""
+
+        tl = []
+        for r in pre:
+            tl.append({"t": vc(r, "Timestamp (IST)"), "kind": "view",
+                       "label": vc(r, "Page Title") or vc(r, "Page URL") or "Page view",
+                       "meta": vc(r, "Referrer Host") or ""})
+        login_rows_sorted = sorted(u["login_rows"], key=lambda r: col(r, 0))
+        for i, r in enumerate(login_rows_sorted):
+            tl.append({"t": col(r, 0), "kind": "signin",
+                       "label": "Signed in with Google" if i == 0 else "Returned (login #%d)" % (i+1),
+                       "meta": ""})
+        for r in pv_by_email.get(u["email"], []):
+            tl.append({"t": col(r, 0), "kind": "post",
+                       "label": col(r, 5) or col(r, 6) or "Page view", "meta": col(r, 8)})
+        tl.sort(key=lambda x: x["t"] or "")
+        u["timeline"] = tl[:80]
+        del u["login_rows"], u["vids"]
+
+        total_pre_pages += u["prelogin_pages"]
+        if u["linked"]: linked_users += 1
+
     user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
+    avg_pre_pages = round(total_pre_pages/linked_users, 1) if linked_users else 0
 
     # Full tables, newest first — no cap (return every login and page view).
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
@@ -3484,7 +3639,8 @@ def _fetch_usage_data() -> dict:
                 login_table=login_table, page_table=page_table,
                 device_breakdown=device_breakdown, os_breakdown=os_breakdown,
                 busiest_day=busiest_day, avg_view_fmt=avg_view_fmt,
-                views_per_user=views_per_user)
+                views_per_user=views_per_user,
+                linked_users=linked_users, avg_pre_pages=avg_pre_pages)
 
 
 

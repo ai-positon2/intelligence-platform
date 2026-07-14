@@ -97,6 +97,29 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .drawer .kstat span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-top:4px}
 .drawer .ksect{margin-top:22px}
 .drawer .ksect h4{font-family:var(--display);font-weight:700;font-size:13px;margin:0 0 10px;color:var(--ink)}
+/* visitor journey timeline (shared drawer, click a row in Identified visitors) */
+.drawer .dh .top{display:flex;align-items:center;gap:13px}
+.drawer .dh .mavatar{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:17px;font-weight:800;font-family:var(--display)}
+.drawer .dh .em{color:var(--dim2);font-size:12.5px;font-family:var(--mono)}
+.drawer .dh .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{font-family:var(--mono);font-size:10.5px;color:var(--dim);border:1px solid var(--line2);border-radius:20px;padding:4px 9px}
+.chip.member{color:var(--lime);border-color:rgba(163,230,53,.4)}
+.chip.staff{color:#a5b4fc;border-color:rgba(99,102,241,.4)}
+.tl-item{display:grid;grid-template-columns:22px 1fr;gap:12px;position:relative;padding-bottom:18px}
+.tl-item:not(:last-child)::before{content:'';position:absolute;left:10px;top:20px;bottom:0;width:2px;background:var(--line)}
+.tl-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;z-index:1;
+  background:rgba(34,211,238,.16);color:var(--cyan);border:1px solid rgba(34,211,238,.5)}
+.tl-item.signin .tl-dot{background:rgba(163,230,53,.16);color:var(--lime);border-color:rgba(163,230,53,.6)}
+.tl-item.post .tl-dot{background:rgba(139,92,246,.16);color:var(--violet);border-color:rgba(139,92,246,.5)}
+.tl-c b{display:block;font-size:13px;color:var(--ink);font-weight:600;white-space:normal}
+.tl-c small{display:block;color:var(--dim2);font-size:11px;font-family:var(--mono);margin-top:2px}
+.tl-c .k{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
+.tl-c .k.view{color:var(--cyan)}.tl-c .k.signin{color:var(--lime)}.tl-c .k.post{color:var(--violet)}
+#identified tbody tr{cursor:pointer}
+.status-pill{font-family:var(--mono);font-size:9.5px;padding:3px 8px;border-radius:20px;border:1px solid var(--line2);color:var(--dim2)}
+.status-pill.member{color:var(--lime);border-color:rgba(163,230,53,.4);background:rgba(163,230,53,.08)}
+.status-pill.staff{color:#a5b4fc;border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.08)}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
   <script src="/static/js/theme.js"></script>
@@ -145,9 +168,9 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
   <div class="grid kpis" id="kpis"></div>
 
   <div class="sect grid two">
-    <div class="card"><h2 style="margin-top:0">Identified visitors &amp; companies</h2>
+    <div class="card"><h2 style="margin-top:0">Identified visitors &amp; companies <span class="muted" style="font-weight:400;font-size:12px">· click for full journey</span></h2>
       <div class="tbl-wrap" style="max-height:380px"><table id="identified">
-        <thead><tr><th>Visitor</th><th>Name</th><th>Company</th><th>Source</th><th>Pages</th></tr></thead>
+        <thead><tr><th>Visitor</th><th>Name</th><th>Company</th><th>Source</th><th>Status</th><th>Pages</th></tr></thead>
         <tbody></tbody></table></div></div>
     <div class="card"><h2 style="margin-top:0">Top companies <span class="muted" style="font-weight:400;font-size:12px">· reverse-IP / form</span></h2><div class="bars" id="companies"></div></div>
   </div>
@@ -284,6 +307,15 @@ var KPI_INFO={
     desc:'Sessions where the product-walkthrough video was played, at least briefly, on the marketing site.',
     render:function(d){return '<div class="ksect"><h4>CTA & clicks</h4>'+miniBars(d.cta)+'</div>';}
   },
+  signed_in:{
+    title:'Signed in later',
+    desc:'Anonymous visitors whose first-party cookie (p2_vid) was later carried into a Google sign-in — either a public /app member sign-up or an @position2.com staff login. This is the anonymous-to-identified link: click any row in "Identified visitors" below to see their full journey, pre-login and post-login, in one timeline.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats"><div class="kstat"><b>'+(k.signed_in_rate||0)+'%</b><span>Of all visitors</span></div></div>'+
+        '<div class="note" style="margin-top:16px">Open the "Identified visitors" table and click a row to see the full pre-login → sign-in → post-login timeline for that person.</div>';
+    }
+  },
   identified:{
     title:'Identified visitors',
     desc:'Visitors matched to a real name/company — either via reverse-IP lookup, by submitting the access-request form, or a provider posting to /api/identify. Everyone else stays anonymous by design.',
@@ -299,6 +331,32 @@ function openKpiDrawer(key){
   var info=KPI_INFO[key];if(!info||!LAST_DATA)return;
   document.getElementById('drawerHead').innerHTML='<h3>'+esc(info.title)+'</h3><p class="kdesc">'+esc(info.desc)+'</p>';
   document.getElementById('drawerTline').innerHTML=info.render(LAST_DATA);
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+var IDENTIFIED=[];
+function initials(n){n=(n||'').trim();if(!n)return '?';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
+function openVisitorDrawer(i){
+  var v=IDENTIFIED[i];if(!v)return;
+  var statusChip=v.status?('<span class="chip '+v.status+'">'+(v.status==='staff'?'@position2.com staff':'Public member')+'</span>'):'';
+  document.getElementById('drawerHead').innerHTML=
+    '<div class="top"><div class="mavatar">'+esc(initials(v.name||v.vid))+'</div><div><h3>'+esc(v.name||('Visitor '+v.vid))+'</h3>'+
+    '<div class="em">'+esc(v.email||'no email on file')+'</div></div></div>'+
+    '<div class="meta">'+
+      statusChip+
+      (v.company?'<span class="chip">🏢 '+esc(v.company)+'</span>':'')+
+      '<span class="chip">'+v.pages+' pre-login page'+(v.pages===1?'':'s')+'</span>'+
+      (v.source?'<span class="chip">↗ '+esc(v.source)+'</span>':'')+
+    '</div>';
+  var tl=v.timeline||[];
+  document.getElementById('drawerTline').innerHTML=tl.length?tl.map(function(e){
+    var kl=e.kind==='signin'?'signin':(e.kind==='post'?'post':'view');
+    var kt=e.kind==='signin'?'sign-in':(e.kind==='post'?'after login':'pre-login');
+    var ic=e.kind==='signin'?'★':(e.kind==='post'?'●':'○');
+    return '<div class="tl-item '+kl+'"><div class="tl-dot">'+ic+'</div><div class="tl-c">'+
+      '<b><span class="k '+kl+'">'+kt+'</span>'+esc(e.label)+'</b>'+
+      '<small>'+esc(e.t)+(e.meta?' · '+esc(e.meta):'')+'</small></div></div>';
+  }).join(''):'<div class="empty">No tracked activity found for this visitor.</div>';
   document.getElementById('overlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
 }
@@ -321,6 +379,7 @@ function load(force){
       kcard('avg_engaged',k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
       kcard('conversions',(k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
       kcard('video_sessions',k.video_sessions||0,'Watched walkthrough')+
+      kcard('signed_in',k.signed_in||0,'Signed in later',(k.signed_in_rate||0)+'% of visitors')+
       kcard('identified',k.identified||0,'Identified visitors')+
       kcard('companies',k.companies||0,'Companies seen');
     // time series
@@ -338,7 +397,11 @@ function load(force){
     bars('scroll',d.scroll);bars('cta',d.cta);bars('search',d.search);
     bars('landing',d.top_landing);bars('rage',d.rage);bars('companies',d.top_companies);
     var idb=document.querySelector('#identified tbody');var idr=d.identified||[];
-    idb.innerHTML=idr.length?idr.map(function(x){return '<tr><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Request access'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+esc(x.pages)+'</td></tr>';}).join(''):'<tr><td colspan="5" class="empty">No identified visitors yet — they appear when reverse-IP is enabled, someone submits the access form, or a provider posts to /api/identify.</td></tr>';
+    IDENTIFIED=idr;
+    idb.innerHTML=idr.length?idr.map(function(x,i){
+      var status=x.status?'<span class="status-pill '+x.status+'">'+(x.status==='staff'?'→ Staff':'→ Member')+'</span>':'<span class="status-pill">—</span>';
+      return '<tr onclick="openVisitorDrawer('+i+')"><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Request access'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+status+'</td><td>'+esc(x.pages)+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">No identified visitors yet — they appear when reverse-IP is enabled, someone submits the access form, signs in later, or a provider posts to /api/identify.</td></tr>';
     // funnel
     var f=d.form_funnel||{};
     document.getElementById('funnel').innerHTML=
