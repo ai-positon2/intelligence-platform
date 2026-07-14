@@ -94,13 +94,11 @@
     .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 18px 18px 0 0; }
     .sc-logins::before  { background: linear-gradient(90deg,#6366f1,#818cf8); }
     .sc-users::before   { background: linear-gradient(90deg,#8b5cf6,#a78bfa); }
-    .sc-views::before   { background: linear-gradient(90deg,#34d399,#6ee7b7); }
     .sc-time::before    { background: linear-gradient(90deg,#f59e0b,#fcd34d); }
     .sc-linked::before  { background: linear-gradient(90deg,#22d3ee,#67e8f9); }
     .sc-glow { position: absolute; top: -30px; right: -20px; width: 100px; height: 100px; border-radius: 50%; filter: blur(40px); opacity: .12; }
     .sc-logins .sc-glow { background: #6366f1; }
     .sc-users  .sc-glow { background: #8b5cf6; }
-    .sc-views  .sc-glow { background: #34d399; }
     .sc-time   .sc-glow { background: #f59e0b; }
     .sc-linked .sc-glow { background: #22d3ee; }
     .stat-label { font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #64748b; margin-bottom: 12px; position: relative; }
@@ -108,7 +106,6 @@
     .stat-small { font-size: 11.5px; color: #7c84a8; margin-top: 8px; position: relative; }
     .sc-logins .stat-value { color: #a5b4fc; }
     .sc-users  .stat-value { color: #c4b5fd; }
-    .sc-views  .stat-value { color: #6ee7b7; }
     .sc-time   .stat-value { color: #fcd34d; }
     .sc-linked .stat-value { color: #67e8f9; }
 
@@ -327,21 +324,16 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         <div class="stat-label">Unique Users</div>
         <div class="stat-value" id="sv-users"><span class="skel" style="width:36px;height:38px;display:inline-block"></span></div>
       </div>
-      <div class="stat-card sc-views" id="sc2">
-        <div class="sc-glow"></div>
-        <div class="stat-label">Page Views</div>
-        <div class="stat-value" id="sv-views"><span class="skel" style="width:44px;height:38px;display:inline-block"></span></div>
-      </div>
-      <div class="stat-card sc-time" id="sc3">
-        <div class="sc-glow"></div>
-        <div class="stat-label">Total Time Spent</div>
-        <div class="stat-value" id="sv-time"><span class="skel" style="width:56px;height:38px;display:inline-block"></span></div>
-      </div>
       <div class="stat-card sc-linked" id="sc4">
         <div class="sc-glow"></div>
         <div class="stat-label">Linked to Pre-Login</div>
         <div class="stat-value" id="sv-linked"><span class="skel" style="width:36px;height:38px;display:inline-block"></span></div>
         <div class="stat-small" id="sv-linked-sub"></div>
+      </div>
+      <div class="stat-card sc-time" id="sc3">
+        <div class="sc-glow"></div>
+        <div class="stat-label">Total Time Spent</div>
+        <div class="stat-value" id="sv-time"><span class="skel" style="width:56px;height:38px;display:inline-block"></span></div>
       </div>
     </div>
 
@@ -589,11 +581,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           /* Stats */
           document.getElementById('sv-logins').innerHTML = '';
           document.getElementById('sv-users').innerHTML  = '';
-          document.getElementById('sv-views').innerHTML  = '';
           document.getElementById('sv-time').innerHTML   = '';
           animateCount(document.getElementById('sv-logins'), d.total_logins, false);
           animateCount(document.getElementById('sv-users'),  d.unique_users,  false);
-          animateCount(document.getElementById('sv-views'),  d.total_page_views, false);
           document.getElementById('sv-time').textContent = d.total_time_fmt || '—';
           animateCount(document.getElementById('sv-linked'), d.linked_users || 0, false);
           document.getElementById('sv-linked-sub').textContent = (d.avg_pre_pages || 0) + ' avg pages before first login';
@@ -1176,7 +1166,7 @@ tbody tr:nth-child(n+45){animation:none}
   }
   function init(){
     ensureRow();load(renderExtras);
-    [['sc0','logins'],['sc1','users'],['sc2','views'],['sc3','time']].forEach(function(p){var el=document.getElementById(p[0]);if(el&&!el.__k){el.__k=1;el.addEventListener('click',function(){openKpi(p[1]);});}});
+    [['sc0','logins'],['sc1','users'],['sc3','time']].forEach(function(p){var el=document.getElementById(p[0]);if(el&&!el.__k){el.__k=1;el.addEventListener('click',function(){openKpi(p[1]);});}});
   }
   if(document.readyState!=='loading')setTimeout(init,600);else document.addEventListener('DOMContentLoaded',function(){setTimeout(init,600);});
   var pend=null;new MutationObserver(function(){if(pend)return;pend=setTimeout(function(){pend=null;init();},500);}).observe(document.body,{childList:true,subtree:true});
