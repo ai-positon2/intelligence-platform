@@ -3132,15 +3132,17 @@ def _fetch_visitor_analytics() -> dict:
 
     recent = []
     for r in reversed(data):
+        rvid = c(r,"Visitor ID")
+        rlg = login_map.get(rvid) or {}
         recent.append({
-            "ts": c(r,"Timestamp (IST)"), "vid": (c(r,"Visitor ID") or "")[:8],
+            "ts": c(r,"Timestamp (IST)"), "vid": (rvid or "")[:8],
             "page": c(r,"Page Title") or c(r,"Page URL"), "landing": c(r,"Landing Page"),
             "ref": c(r,"Referrer Host") or "direct", "device": c(r,"Device"),
             "engaged": fmt(to_int(c(r,"Engaged Time (s)"))), "scroll": c(r,"Max Scroll %"),
             "pages": c(r,"Pages In Session"), "new": c(r,"New Visitor"),
             "form": c(r,"Form Stage"), "bot": c(r,"Bot"),
-            "who": (idmap.get(c(r,"Visitor ID")) or {}).get("name",""),
-            "company": ((idmap.get(c(r,"Visitor ID")) or {}).get("company","") or vid_company.get(c(r,"Visitor ID"),"")),
+            "who": (idmap.get(rvid) or {}).get("name","") or rlg.get("name","") or rlg.get("email",""),
+            "company": ((idmap.get(rvid) or {}).get("company","") or vid_company.get(rvid,"")),
         })
 
     return {
