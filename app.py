@@ -3030,6 +3030,7 @@ def _fetch_visitor_analytics() -> dict:
         "submitted": sum(1 for v in sid_form.values() if order.get(v,0)>=3),
     }
     video_sessions = len(set(c(r,"Session ID") for r in human if c(r,"Video")))
+    video_pages = Counter(c(r,"Page Title") or c(r,"Page URL") for r in human if c(r,"Video")).most_common(10)
 
     search = Counter()
     for r in human:
@@ -3101,18 +3102,21 @@ def _fetch_visitor_analytics() -> dict:
         pvid = r[13] if len(r) > 13 else ""
         if pvid: pv_by_vid[pvid].append(r)
 
-    identified = []
-    for v in visitors:
+    # Every unique visitor gets a summary + timeline (not just identified ones) so the
+    # "Unique visitors"/"Signed in later" KPI cards can drill into real people, not just charts.
+    # Capped by page-activity to bound timeline-building cost on very large visitor counts.
+    all_visitors = []
+    visitor_ids_ranked = sorted(visitors, key=lambda v: vid_pages.get(v,0), reverse=True)[:500]
+    for v in visitor_ids_ranked:
         idn = idmap.get(v) or {}
         co = idn.get("company") or vid_company.get(v) or ""
         lg = login_map.get(v)
-        if not (idn or co or lg):
-            continue
         email = idn.get("email") or (lg or {}).get("email", "")
         name = idn.get("name") or (lg or {}).get("name", "")
         source = idn.get("source") or ("reverse-IP" if co else "")
+        rs_sorted = sorted(va_by_vid.get(v, []), key=lambda r: c(r,"Timestamp (IST)"))
         tl = []
-        for r in sorted(va_by_vid.get(v, []), key=lambda r: c(r,"Timestamp (IST)")):
+        for r in rs_sorted:
             tl.append({"t": c(r,"Timestamp (IST)"), "kind": "view",
                        "label": c(r,"Page Title") or c(r,"Page URL") or "Page view",
                        "meta": c(r,"Referrer Host") or ""})
@@ -3124,11 +3128,17 @@ def _fetch_visitor_analytics() -> dict:
                        "label": (r[5] if len(r)>5 else "") or (r[6] if len(r)>6 else "") or "Page view",
                        "meta": r[8] if len(r)>8 else ""})
         tl.sort(key=lambda x: x["t"] or "")
-        identified.append({"vid": v[:8], "name": name, "email": email,
+        all_visitors.append({"vid": v[:8], "name": name, "email": email,
             "company": co, "source": source, "pages": vid_pages.get(v,0),
+            "device": c(rs_sorted[0],"Device") if rs_sorted else "",
+            "first_ts": tl[0]["t"] if tl else "", "last_ts": tl[-1]["t"] if tl else "",
             "status": (lg or {}).get("type", ""), "converted": bool(lg),
             "timeline": tl[:60]})
+    all_visitors.sort(key=lambda x: (x["last_ts"] or x["first_ts"] or ""), reverse=True)
+
+    identified = [x for x in all_visitors if x["source"] or x["company"] or x["converted"] or x["name"]]
     identified.sort(key=lambda x: (not x["converted"], -x["pages"])); identified = identified[:60]
+    all_visitors = all_visitors[:300]
 
     recent = []
     for r in reversed(data):
@@ -3162,6 +3172,7 @@ def _fetch_visitor_analytics() -> dict:
         "scroll": sb, "cta": cta_top, "form_funnel": form_funnel,
         "search": search_top, "rage": rage_top, "cwv": cwv, "recent": recent,
         "top_companies": top_companies, "identified": identified,
+        "all_visitors": all_visitors, "video_pages": video_pages,
     }
 
 @app.route("/p2/admin/anonymous-traffic")
