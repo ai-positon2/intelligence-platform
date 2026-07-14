@@ -1139,6 +1139,12 @@ def signals_page():
 def solutions_page():
     return render_template("agents.html", page="solutions", agents=AGENTS, agent=None, related=[])
 
+# "Why Intelligence" comparison page. UNLINKED by design (no nav/footer entry) so it
+# can be reviewed and shared privately before being promoted. Reachable only by direct URL.
+@app.route("/why-intelligence")
+def why_intelligence_page():
+    return render_template("agents.html", page="why", agents=AGENTS, agent=None, related=[])
+
 
 # Industries feature is UNLINKED but live: the routes below are registered so the
 # URLs work for anyone with a direct link, but the nav link in agents.html stays
