@@ -120,6 +120,19 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .status-pill{font-family:var(--mono);font-size:9.5px;padding:3px 8px;border-radius:20px;border:1px solid var(--line2);color:var(--dim2)}
 .status-pill.member{color:var(--lime);border-color:rgba(163,230,53,.4);background:rgba(163,230,53,.08)}
 .status-pill.staff{color:#a5b4fc;border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.08)}
+/* KPI-card drill-down: real visitor list inside the drawer */
+.klink{display:inline-block;margin-bottom:12px;color:var(--cyan);font-family:var(--mono);font-size:11px;letter-spacing:.04em;cursor:pointer}
+.klink:hover{text-decoration:underline}
+.vlist{display:flex;flex-direction:column;gap:2px;margin-top:2px;max-height:340px;overflow:auto}
+.vrow{display:flex;align-items:center;gap:11px;padding:9px 6px;border-radius:9px;cursor:pointer;transition:background .12s}
+.vrow:hover{background:rgba(255,255,255,.045)}
+.vrow .va{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:10.5px;font-weight:800;font-family:var(--display)}
+.vrow .vmain{flex:1;min-width:0}
+.vrow .vmain b{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .vmain small{display:block;color:var(--dim2);font-size:10.5px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.vrow .vmeta{flex:none;font-family:var(--mono);font-size:10px;color:var(--dim2)}
+.vlist-more{padding:8px 6px;font-size:11px;color:var(--dim2)}
 </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
   <script src="/static/js/theme.js"></script>
@@ -259,14 +272,15 @@ var KPI_INFO={
   },
   visitors:{
     title:'Unique visitors',
-    desc:'Distinct anonymous browser IDs (a first-party cookie), not distinct people — the same person on two devices counts twice, and a cleared cookie makes a returning visitor look new.',
+    desc:'Distinct anonymous browser IDs (a first-party cookie), not distinct people — the same person on two devices counts twice, and a cleared cookie makes a returning visitor look new. Click anyone below to see their full journey.',
     render:function(d){
-      var k=d.kpis||{};
+      var k=d.kpis||{};var av=d.all_visitors||[];
       return '<div class="kstats">'+
           '<div class="kstat"><b>'+(k.new||0)+'</b><span>New</span></div>'+
           '<div class="kstat"><b>'+(k.returning||0)+'</b><span>Returning</span></div>'+
         '</div>'+
-        '<div class="ksect"><h4>Device</h4>'+miniBars(d.devices)+'</div>';
+        '<div class="ksect"><h4>Device</h4>'+miniBars(d.devices)+'</div>'+
+        '<div class="ksect"><h4>Visitors ('+(k.visitors||av.length)+')</h4>'+vrowList(pairsAll(av),'openAllVisitorDrawer','visitors')+'</div>';
     }
   },
   sessions:{
@@ -304,22 +318,25 @@ var KPI_INFO={
   },
   video_sessions:{
     title:'Watched walkthrough',
-    desc:'Sessions where the product-walkthrough video was played, at least briefly, on the marketing site.',
-    render:function(d){return '<div class="ksect"><h4>CTA & clicks</h4>'+miniBars(d.cta)+'</div>';}
+    desc:'Sessions where the product-walkthrough video was played, at least briefly, on the marketing site — broken down by which page it played on.',
+    render:function(d){return '<div class="ksect"><h4>Pages where the video played</h4>'+miniBars(d.video_pages)+'</div>';}
   },
   signed_in:{
     title:'Signed in later',
-    desc:'Anonymous visitors whose first-party cookie (p2_vid) was later carried into a Google sign-in — either a public /app member sign-up or an @position2.com staff login. This is the anonymous-to-identified link: click any row in "Identified visitors" below to see their full journey, pre-login and post-login, in one timeline.',
+    desc:'Anonymous visitors whose first-party cookie (p2_vid) was later carried into a Google sign-in — either a public /app member sign-up or an @position2.com staff login. Click anyone below to see their full pre-login → sign-in → post-login timeline.',
     render:function(d){
-      var k=d.kpis||{};
+      var k=d.kpis||{};var av=(d.all_visitors||[]).filter(function(x){return x.converted;});
       return '<div class="kstats"><div class="kstat"><b>'+(k.signed_in_rate||0)+'%</b><span>Of all visitors</span></div></div>'+
-        '<div class="note" style="margin-top:16px">Open the "Identified visitors" table and click a row to see the full pre-login → sign-in → post-login timeline for that person.</div>';
+        '<div class="ksect"><h4>Who signed in ('+av.length+')</h4>'+vrowList(pairsFiltered(d.all_visitors||[],function(x){return x.converted;}),'openAllVisitorDrawer','signed_in')+'</div>';
     }
   },
   identified:{
     title:'Identified visitors',
-    desc:'Visitors matched to a real name/company — either via reverse-IP lookup, by submitting the access-request form, or a provider posting to /api/identify. Everyone else stays anonymous by design.',
-    render:function(d){return '<div class="ksect"><h4>Top companies</h4>'+miniBars(d.top_companies)+'</div>';}
+    desc:'Visitors matched to a real name/company — either via reverse-IP lookup, by submitting the access-request form, signing in later, or a provider posting to /api/identify. Everyone else stays anonymous by design.',
+    render:function(d){
+      return '<div class="ksect"><h4>People ('+(d.identified||[]).length+')</h4>'+vrowList(pairsAll(d.identified||[]),'openVisitorDrawer','identified')+'</div>'+
+        '<div class="ksect"><h4>Top companies</h4>'+miniBars(d.top_companies)+'</div>';
+    }
   },
   companies:{
     title:'Companies seen',
@@ -334,18 +351,41 @@ function openKpiDrawer(key){
   document.getElementById('overlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
 }
-var IDENTIFIED=[];
+var IDENTIFIED=[],ALL_VISITORS=[];
 function initials(n){n=(n||'').trim();if(!n)return '?';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
-function openVisitorDrawer(i){
-  var v=IDENTIFIED[i];if(!v)return;
+// {v,i} pairs preserve each visitor's index in its source array, so a filtered/sliced
+// list can still open the right record via openAllVisitorDrawer(i)/openVisitorDrawer(i).
+function pairsAll(arr){return (arr||[]).map(function(v,i){return {v:v,i:i};});}
+function pairsFiltered(arr,fn){return pairsAll(arr).filter(function(p){return fn(p.v);});}
+function vrowList(pairs,opener,backKey,limit){
+  if(!pairs||!pairs.length)return '<div class="empty">No visitors yet.</div>';
+  var lim=limit||150,shown=pairs.slice(0,lim);
+  var html=shown.map(function(p){
+    var x=p.v;
+    var status=x.status?('<span class="chip '+x.status+'" style="padding:2px 7px;font-size:9px">'+(x.status==='staff'?'staff':'member')+'</span>'):'';
+    return '<div class="vrow" onclick="'+opener+'('+p.i+',\''+backKey+'\')">'+
+      '<div class="va">'+esc(initials(x.name||x.vid))+'</div>'+
+      '<div class="vmain"><b>'+esc(x.name||('Visitor '+x.vid))+status+'</b><small>'+esc(x.company||x.email||('vid '+x.vid))+'</small></div>'+
+      '<div class="vmeta">'+(x.pages||0)+' pg</div></div>';
+  }).join('');
+  if(pairs.length>shown.length)html+='<div class="vlist-more">Showing '+shown.length+' of '+pairs.length+'</div>';
+  return '<div class="vlist">'+html+'</div>';
+}
+function openVisitorDrawer(i,backKey){renderVisitorInto(IDENTIFIED[i],backKey);}
+function openAllVisitorDrawer(i,backKey){renderVisitorInto(ALL_VISITORS[i],backKey);}
+function renderVisitorInto(v,backKey){
+  if(!v)return;
   var statusChip=v.status?('<span class="chip '+v.status+'">'+(v.status==='staff'?'@position2.com staff':'Public member')+'</span>'):'';
+  var back=backKey?('<a class="klink" onclick="openKpiDrawer(\''+backKey+'\')">← Back</a>'):'';
   document.getElementById('drawerHead').innerHTML=
+    back+
     '<div class="top"><div class="mavatar">'+esc(initials(v.name||v.vid))+'</div><div><h3>'+esc(v.name||('Visitor '+v.vid))+'</h3>'+
     '<div class="em">'+esc(v.email||'no email on file')+'</div></div></div>'+
     '<div class="meta">'+
       statusChip+
       (v.company?'<span class="chip">🏢 '+esc(v.company)+'</span>':'')+
       '<span class="chip">'+v.pages+' pre-login page'+(v.pages===1?'':'s')+'</span>'+
+      (v.device?'<span class="chip">'+esc(v.device)+'</span>':'')+
       (v.source?'<span class="chip">↗ '+esc(v.source)+'</span>':'')+
     '</div>';
   var tl=v.timeline||[];
@@ -397,7 +437,7 @@ function load(force){
     bars('scroll',d.scroll);bars('cta',d.cta);bars('search',d.search);
     bars('landing',d.top_landing);bars('rage',d.rage);bars('companies',d.top_companies);
     var idb=document.querySelector('#identified tbody');var idr=d.identified||[];
-    IDENTIFIED=idr;
+    IDENTIFIED=idr;ALL_VISITORS=d.all_visitors||[];
     idb.innerHTML=idr.length?idr.map(function(x,i){
       var status=x.status?'<span class="status-pill '+x.status+'">'+(x.status==='staff'?'→ Staff':'→ Member')+'</span>':'<span class="status-pill">—</span>';
       return '<tr onclick="openVisitorDrawer('+i+')"><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Request access'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+status+'</td><td>'+esc(x.pages)+'</td></tr>';
