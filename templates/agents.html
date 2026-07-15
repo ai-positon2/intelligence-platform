@@ -492,6 +492,8 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .why-hero-vis{display:flex;justify-content:center;align-items:center}
 .why-hero-vis .orbit{width:min(520px,100%);max-width:520px}
 .why-hero-vis .orbit::before{content:'';position:absolute;inset:-8%;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(139,92,246,.20),rgba(34,211,238,.08) 45%,transparent 68%);filter:blur(8px);z-index:0;pointer-events:none}
+.feat.feat-2x2{grid-template-columns:repeat(2,1fr);gap:28px;max-width:920px;margin-left:auto;margin-right:auto}
+@media (max-width:880px){.feat.feat-2x2{grid-template-columns:1fr;max-width:none;margin-left:0;margin-right:0}}
 .why-lede{max-width:1120px}
 .why-lede .lead{font-size:17px;line-height:1.66;max-width:900px}
 /* alternative-kind cards: category -> heading -> description -> does / doesn't -> names */
@@ -1671,7 +1673,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     </div>
 
     <div class="sec-head reveal" style="margin-top:76px"><span class="pill-eye"><span class="dt"></span> What only we do</span><h2 class="h-sec">The go-to-market work the tools <span class="ital grad">leave on the table.</span></h2></div>
-    <div class="feat">
+    <div class="feat feat-2x2">
       <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Buying signals, scored to one worklist</h4><p>Funding, leadership moves, M&amp;A and launches across 26 signal types, weighted into a single intent score. No tool on this page offers account-level buying signals.</p></div>
       <div class="fcard glass reveal" style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>AI answer visibility you act on</h4><p>Plenty of tools chart where you show up in ChatGPT, Gemini and Perplexity. We fix the content behind the gaps, and our team ships the changes.</p></div>
       <div class="fcard glass reveal" style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>Visitors, wired into the same engine</h4><p>See the companies on your site before they fill in a form, recovering 95%+ of lost visitors, then feed them straight into intent scoring. A pixel alone is not the point. The connection is.</p></div>
