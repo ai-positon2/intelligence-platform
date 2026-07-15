@@ -484,6 +484,8 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .note code{font-family:var(--mono);font-size:12.5px;color:#c4b5fd;background:rgba(255,255,255,.07);padding:3px 9px;border-radius:7px}
 
 /* ===== why / compare page ===== */
+.why-hero{display:grid;grid-template-columns:1.15fr .85fr;gap:50px;align-items:center}
+@media (max-width:960px){.why-hero{grid-template-columns:1fr;gap:26px}.why-hero-vis{display:none}}
 .why-lede{max-width:1120px}
 .why-lede .lead{font-size:17px;line-height:1.66;max-width:900px}
 /* alternative-kind cards: category -> heading -> description -> does / doesn't -> names */
@@ -1475,11 +1477,32 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   </div>
 {% elif page == 'why' %}
   <div class="wrap sectionpad">
-    <div class="reveal in why-lede"><span class="pill-eye"><span class="dt"></span> Why Intelligence · an honest comparison</span>
-      <h1 class="h-hero">Know who's in-market. Show up in every AI answer.<br>Then go <span class="ital grad">close it.</span></h1>
-      <p class="lead">Most tools in this space do one slice well. They track your visibility in AI answers, or generate content, or audit a site. Intelligence by Position2 connects the whole motion: it surfaces the accounts showing real buying intent, de-anonymizes the companies already on your site, tracks how you show up across ChatGPT, Gemini and Perplexity, then runs the SEO and content that captures that demand, executed by a team.</p>
-      <p class="lead" style="margin-top:16px">Underneath it all is Arena, our in-house agentic platform. Arena reasons across Claude, ChatGPT, Gemini, Grok and the leading open-source models, and picks whichever fits the task best, instead of locking the whole platform to one vendor's roadmap or blind spots. That is what actually runs GTM here: every signal becomes a scored, prioritized account, and Vimi turns that into a ready next step inside HubSpot, Salesforce, Slack and Gmail, so go-to-market stops being a dashboard you read and becomes work that gets done.</p>
-      <p class="lead" style="margin-top:16px">Below is a fair, sourced look at how it compares, including where the incumbents are honestly ahead.</p>
+    <div class="why-hero">
+      <div class="reveal in why-lede"><span class="pill-eye"><span class="dt"></span> Why Intelligence · an honest comparison</span>
+        <h1 class="h-hero">Know who's in-market. Show up in every AI answer.<br>Then go <span class="ital grad">close it.</span></h1>
+        <p class="lead">Most tools in this space do one slice well. They track your visibility in AI answers, or generate content, or audit a site. Intelligence by Position2 connects the whole motion: it surfaces the accounts showing real buying intent, de-anonymizes the companies already on your site, tracks how you show up across ChatGPT, Gemini and Perplexity, then runs the SEO and content that captures that demand, executed by a team.</p>
+        <p class="lead" style="margin-top:16px">Underneath it all is Arena, our in-house agentic platform. Arena reasons across Claude, ChatGPT, Gemini, Grok and the leading open-source models, and picks whichever fits the task best, instead of locking the whole platform to one vendor's roadmap or blind spots. That is what actually runs GTM here: every signal becomes a scored, prioritized account, and Vimi turns that into a ready next step inside HubSpot, Salesforce, Slack and Gmail, so go-to-market stops being a dashboard you read and becomes work that gets done.</p>
+        <p class="lead" style="margin-top:16px">Below is a fair, sourced look at how it compares, including where the incumbents are honestly ahead.</p>
+      </div>
+      <div class="why-hero-vis reveal in" style="transition-delay:200ms">
+        <div class="orbit">
+          <svg class="olinks" viewBox="0 0 420 420" aria-hidden="true">
+            <defs><radialGradient id="ogr" cx="210" cy="210" r="150" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#c4b5fd" stop-opacity="0.95"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0.12"/></radialGradient></defs>
+            <circle class="oring" cx="210" cy="210" r="74"/>
+            <circle class="oring oring2" cx="210" cy="210" r="114"/>
+            <line class="ol" x1="210" y1="210" x2="210" y2="60"/>
+            <line class="ol" x1="210" y1="210" x2="360" y2="210"/>
+            <line class="ol" x1="210" y1="210" x2="210" y2="360"/>
+            <line class="ol" x1="210" y1="210" x2="60" y2="210"/>
+            <circle class="odash" cx="210" cy="210" r="150"/>
+          </svg>
+          <div class="core"><svg viewBox="0 0 40 40" fill="none"><g class="spin"><circle cx="20" cy="20" r="13" stroke="#fff" stroke-width="1.2" opacity=".55"/></g><circle cx="20" cy="20" r="4.2" fill="#fff"/></svg></div>
+          <div class="onode op0" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg><span class="lab">Claude</span></div>
+          <div class="onode op1" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg><span class="lab">ChatGPT</span></div>
+          <div class="onode op2" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 9l8 13 8-13-8-7z"/></svg><span class="lab">Gemini</span></div>
+          <div class="onode op3" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg><span class="lab">Grok</span></div>
+        </div>
+      </div>
     </div>
 
     <div class="sec-head reveal" style="margin-top:60px"><span class="pill-eye"><span class="dt"></span> The alternatives today</span><h2 class="h-sec">Four ways teams do this now. Each stops <span class="ital grad">somewhere.</span></h2></div>
