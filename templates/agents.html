@@ -484,55 +484,84 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .note code{font-family:var(--mono);font-size:12.5px;color:#c4b5fd;background:rgba(255,255,255,.07);padding:3px 9px;border-radius:7px}
 
 /* ===== why / compare page ===== */
-.why-lede{max-width:720px}
-.kind{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:14px}
-@media(max-width:960px){.kind{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.kind{grid-template-columns:1fr}}
-.kcard{position:relative;border-radius:18px;padding:22px 20px 20px;background:rgba(255,255,255,.025);border:1px solid var(--line);overflow:hidden}
-.kcard::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--kc,#22d3ee),transparent)}
-.kcard .kk{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--kc,#22d3ee)}
-.kcard h4{font-family:var(--display);font-weight:700;font-size:16.5px;letter-spacing:-.01em;margin:11px 0 8px;color:#fff}
-.kcard p{font-size:13.5px;color:var(--dim);line-height:1.6;margin:0 0 12px}
-.kcard .who{font-family:var(--mono);font-size:11px;color:var(--dim2);line-height:1.6;border-top:1px dashed var(--line2);padding-top:11px}
-.kcard .gap{color:#fb9db1}
+.why-lede{max-width:800px}
+.why-lede .lead{font-size:17px;line-height:1.66}
+/* alternative-kind cards: category -> heading -> description -> does / doesn't -> names */
+.kind{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:20px}
+@media(max-width:1040px){.kind{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.kind{grid-template-columns:1fr}}
+.kcard{position:relative;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.012));border:1px solid var(--line2);transition:transform .2s,border-color .2s,box-shadow .2s}
+.kcard:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--kc,#22d3ee) 50%,var(--line2));box-shadow:0 24px 60px -34px var(--kc,#22d3ee)}
+.kcard::before{content:'';position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,var(--kc,#22d3ee),transparent 92%)}
+.kc-h{padding:22px 22px 17px}
+.kk{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--kc,#22d3ee)}
+.kk::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--kc,#22d3ee);box-shadow:0 0 10px var(--kc,#22d3ee)}
+.kcard h4{font-family:var(--display);font-weight:700;font-size:18.5px;line-height:1.24;letter-spacing:-.01em;margin:14px 0 0;color:#fff}
+.kc-b{padding:0 22px 20px;display:flex;flex-direction:column;gap:15px;flex:1}
+.kcard p{font-size:13px;color:var(--dim);line-height:1.6;margin:0}
+.kpts{list-style:none;margin:0;padding:15px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:11px}
+.kpts li{display:grid;grid-template-columns:20px 1fr;gap:10px;font-size:12.5px;line-height:1.45;color:var(--dim)}
+.kpts .ki{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;margin-top:1px}
+.kpts .ki svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.kpts li.good .ki{background:rgba(52,211,153,.16);color:#5ee9b5}
+.kpts li.bad .ki{background:rgba(251,113,133,.13);color:#fb9db1}
+.kcard .who{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px;padding-top:2px}
+.kcard .who .wc{font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;color:var(--dim2);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
 /* comparison matrix */
-.cmp{margin-top:22px;border:1px solid var(--line2);border-radius:18px;overflow:auto;-webkit-overflow-scrolling:touch;background:rgba(9,11,24,.55)}
-.cmp table{width:100%;min-width:900px;border-collapse:separate;border-spacing:0;font-size:13.5px}
-.cmp th,.cmp td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
-.cmp thead th{position:sticky;top:0;z-index:2;background:#0b0e1f;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);font-weight:600;text-align:center;border-bottom:1px solid var(--line2)}
-.cmp thead th .sub{display:block;text-transform:none;letter-spacing:0;font-family:var(--sans);font-size:10.5px;color:var(--dim2);margin-top:4px;font-weight:400}
-.cmp tbody th{font-weight:600;color:var(--ink);font-family:var(--sans);font-size:13.5px;min-width:250px}
+.cmp{margin-top:24px;border:1px solid var(--line2);border-radius:20px;overflow:auto;-webkit-overflow-scrolling:touch;background:rgba(9,11,24,.62)}
+.cmp table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0;font-size:13.5px}
+.cmp th,.cmp td{padding:15px 13px;border-bottom:1px solid var(--line);vertical-align:middle}
+.cmp thead th{position:sticky;top:0;z-index:2;background:#0a0d1e;text-align:center;border-bottom:1px solid var(--line2);padding:17px 12px 15px}
+.cmp thead th .ttl{font-family:var(--display);font-weight:700;font-size:13.5px;letter-spacing:-.01em;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:7px;line-height:1.2}
+.cmp thead th .cdot{width:8px;height:8px;border-radius:50%;flex:none}
+.cmp thead th .sub{display:block;font-family:var(--mono);font-size:9.5px;color:var(--dim2);margin-top:7px;font-weight:400;line-height:1.55;letter-spacing:.02em}
+.cmp thead th.cap-h{text-align:left}
+.cmp thead th.cap-h .ttl{justify-content:flex-start}
+.cmp thead th.own{background:linear-gradient(180deg,#0f1c36,#0b1327);border-bottom:2px solid var(--cyan)}
+.cmp thead th.own .ttl{color:#fff}
+.cmp th.own .logo img{width:16px;height:16px;vertical-align:-3px;margin-right:5px}
+.cmp tbody th{text-align:left;font-weight:600;color:var(--ink);font-family:var(--sans);font-size:13.5px;min-width:280px;line-height:1.35}
 .cmp td{text-align:center}
-.cmp tbody tr:hover td,.cmp tbody tr:hover th{background:rgba(255,255,255,.022)}
-.cmp col.own,.cmp .own{background:linear-gradient(180deg,rgba(34,211,238,.09),rgba(139,92,246,.07))}
-.cmp thead th.own{background:linear-gradient(180deg,#0e1630,#0b1226);color:#fff;border-bottom:1px solid rgba(34,211,238,.5);box-shadow:inset 0 -2px 0 var(--cyan)}
-.cmp th.own .logo{display:inline-flex;align-items:center;gap:7px;justify-content:center}
-.cmp th.own .logo img{width:17px;height:17px}
-.cmp .mk{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:50%;font-size:12px;font-weight:700}
-.cmp .mk.yes{background:rgba(52,211,153,.16);color:#5ee9b5;box-shadow:0 0 0 1px rgba(52,211,153,.3) inset}
-.cmp .own .mk.yes{background:rgba(34,211,238,.2);color:#7df0ff;box-shadow:0 0 0 1px rgba(34,211,238,.45) inset}
-.cmp .mk.par{background:rgba(251,191,36,.14);color:#fcd34d;box-shadow:0 0 0 1px rgba(251,191,36,.28) inset;font-size:15px}
-.cmp .mk.no{color:var(--dim2);background:rgba(255,255,255,.04)}
-.cmp sup{font-size:9.5px;color:var(--dim2);margin-left:2px;font-family:var(--mono)}
+.cmp td.own{background:linear-gradient(180deg,rgba(34,211,238,.08),rgba(139,92,246,.055))}
+.cmp tbody tr:hover td,.cmp tbody tr:hover th{background:rgba(255,255,255,.028)}
+.cmp tbody tr:hover td.own{background:linear-gradient(180deg,rgba(34,211,238,.14),rgba(139,92,246,.1))}
 .cmp tbody tr:last-child td,.cmp tbody tr:last-child th{border-bottom:0}
-.cmp-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--dim2)}
-.cmp-legend span{display:inline-flex;align-items:center;gap:7px}
-.cmp-legend i{width:15px;height:15px;border-radius:50%;display:inline-block}
-.cmp-legend .yes{background:rgba(52,211,153,.2)}.cmp-legend .par{background:rgba(251,191,36,.2)}.cmp-legend .no{background:rgba(255,255,255,.06)}
-.fnote{margin-top:14px;font-size:12px;color:var(--dim2);line-height:1.7}
-.fnote b{color:var(--dim);font-family:var(--mono);font-size:11px;margin-right:3px}
+.cmp .cell{display:inline-flex;align-items:flex-start;gap:4px;justify-content:center}
+.cmp .mk{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px}
+.cmp .mk svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.cmp .mk.yes{background:rgba(52,211,153,.14);color:#5ee9b5;box-shadow:inset 0 0 0 1px rgba(52,211,153,.32)}
+.cmp td.own .mk.yes{background:rgba(34,211,238,.2);color:#8bf2ff;box-shadow:inset 0 0 0 1px rgba(34,211,238,.5)}
+.cmp .mk.par svg{fill:currentColor;stroke:none}
+.cmp .mk.par{background:rgba(251,191,36,.15);color:#fcd34d;box-shadow:inset 0 0 0 1px rgba(251,191,36,.3)}
+.cmp .mk.no{background:rgba(255,255,255,.04);color:#5b6486;box-shadow:inset 0 0 0 1px var(--line)}
+.cmp .fnb{display:inline-grid;place-items:center;min-width:15px;height:15px;padding:0 3px;border-radius:5px;background:rgba(255,255,255,.09);color:var(--dim);font-family:var(--mono);font-size:9px;font-weight:600;margin-top:-9px}
+.cmp-legend{display:flex;flex-wrap:wrap;gap:20px;margin-top:16px;font-family:var(--mono);font-size:11px;color:var(--dim2)}
+.cmp-legend span{display:inline-flex;align-items:center;gap:9px}
+.cmp-legend i{width:22px;height:22px;border-radius:7px;display:inline-grid;place-items:center}
+.cmp-legend i svg{width:12px;height:12px;stroke:currentColor;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.cmp-legend i.par svg{fill:currentColor;stroke:none}
+.cmp-legend .yes{background:rgba(52,211,153,.14);color:#5ee9b5}
+.cmp-legend .par{background:rgba(251,191,36,.15);color:#fcd34d}
+.cmp-legend .no{background:rgba(255,255,255,.04);color:#5b6486}
+.fnote-grid{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px 28px}
+@media(max-width:760px){.fnote-grid{grid-template-columns:1fr}}
+.fnote-grid div{font-size:11.5px;color:var(--dim2);line-height:1.55;display:grid;grid-template-columns:18px 1fr;gap:8px}
+.fnote-grid b{color:var(--dim);font-family:var(--mono);font-size:9.5px;font-weight:700;background:rgba(255,255,255,.08);border-radius:5px;height:16px;display:grid;place-items:center;margin-top:1px}
 /* pricing reality */
-.prow{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px}
-.pr{display:grid;grid-template-columns:220px 1fr auto;gap:18px;align-items:center;padding:16px 20px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
-.pr.own{border-color:rgba(34,211,238,.4);background:linear-gradient(120deg,rgba(34,211,238,.09),rgba(139,92,246,.08))}
-.pr .pl{font-family:var(--display);font-weight:700;font-size:15px;color:#fff}
+.prow{display:grid;grid-template-columns:1fr;gap:12px;margin-top:18px}
+.pr{display:grid;grid-template-columns:230px 1fr auto;gap:18px;align-items:center;padding:17px 22px;border-radius:15px;border:1px solid var(--line);background:rgba(255,255,255,.02);transition:border-color .18s,background .18s}
+.pr:hover{border-color:var(--line2);background:rgba(255,255,255,.035)}
+.pr.own{border-color:rgba(34,211,238,.45);background:linear-gradient(120deg,rgba(34,211,238,.11),rgba(139,92,246,.09))}
+.pr .pl{font-family:var(--display);font-weight:700;font-size:15px;color:#fff;display:flex;align-items:center;gap:9px}
+.pr .pl .pdot{width:9px;height:9px;border-radius:50%;flex:none}
 .pr .pd{font-size:13px;color:var(--dim);line-height:1.55}
 .pr .pp{font-family:var(--mono);font-size:13px;color:var(--cyan);white-space:nowrap;text-align:right}
-.pr.own .pp{color:#7df0ff}
-@media(max-width:640px){.pr{grid-template-columns:1fr;gap:6px}.pr .pp{text-align:left}}
+.pr.own .pp{color:#8bf2ff;font-weight:600}
+@media(max-width:640px){.pr{grid-template-columns:1fr;gap:7px}.pr .pp{text-align:left}}
 /* lead / concede spotlight */
 .lead-rows{display:flex;flex-direction:column;gap:14px;margin-top:20px}
-.lr{display:grid;grid-template-columns:46px 1fr;gap:16px;align-items:start;padding:18px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.022)}
+.lr{display:grid;grid-template-columns:46px 1fr;gap:16px;align-items:start;padding:20px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.022)}
 .lr .lri{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.22)}
 .lr .lri svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .lr h4{font-family:var(--display);font-weight:700;font-size:15.5px;color:#fff;margin:2px 0 6px}
@@ -1447,110 +1476,208 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 {% elif page == 'why' %}
   <div class="wrap sectionpad">
     <div class="reveal in why-lede"><span class="pill-eye"><span class="dt"></span> Why Intelligence · an honest comparison</span>
-      <h1 class="h-hero">Most tools tell you what to do.<br>We tell you, then we <span class="ital grad">do it.</span></h1>
-      <p class="lead">The SEO and AI content market is full of genuinely good point tools, plus agencies that execute by hand. Intelligence by Position2 is the layer that joins them: an SEO, content and AI answer visibility agent suite, wired to live buying signals and first party visitor data, run by a team that ships the work. Below is a fair, sourced look at how it compares, including where the incumbents are honestly ahead.</p>
+      <h1 class="h-hero">See who's in-market. Own the AI answers.<br>Then go <span class="ital grad">win the work.</span></h1>
+      <p class="lead">Most tools in this space do one slice well. They track your visibility in AI answers, or generate content, or audit a site. Intelligence by Position2 connects the whole motion: it surfaces the accounts showing real buying intent, de-anonymizes the companies already on your site, tracks how you show up across ChatGPT, Gemini and Perplexity, then runs the SEO and content that captures that demand, executed by a team. Below is a fair, sourced look at how it compares, including where the incumbents are honestly ahead.</p>
     </div>
 
-    <div class="sec-head reveal" style="margin-top:58px"><span class="pill-eye"><span class="dt"></span> The alternatives today</span><h2 class="h-sec">Four ways teams do this now. Each stops <span class="ital grad">somewhere.</span></h2></div>
+    <div class="sec-head reveal" style="margin-top:60px"><span class="pill-eye"><span class="dt"></span> The alternatives today</span><h2 class="h-sec">Four ways teams do this now. Each stops <span class="ital grad">somewhere.</span></h2></div>
     <div class="kind">
-      <div class="kcard glass reveal" style="--kc:#8b5cf6">
-        <div class="kk">SEO &amp; content suites</div>
-        <h4>The data is deep. The doing is yours.</h4>
-        <p>Rich keyword, backlink and audit data, and now AI answer tracking. You still have to turn all of it into work, and then do that work.</p>
-        <div class="who">Semrush, Ahrefs, Surfer, Clearscope, MarketMuse<br><span class="gap">No buying signals. No visitor de-anonymization. No execution.</span></div>
+      <div class="kcard reveal" style="--kc:#38bdf8">
+        <div class="kc-h">
+          <div class="kk">AI visibility monitors</div>
+          <h4>They watch the AI answers. Few act on them.</h4>
+        </div>
+        <div class="kc-b">
+          <p>Purpose-built to track how your brand shows up in ChatGPT, Perplexity and AI Overviews. A couple can draft content, but none surface buying intent, de-anonymize visitors or execute.</p>
+          <ul class="kpts">
+            <li class="good"><span class="ki"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span>Track brand mentions and citations across AI answer engines</span></li>
+            <li class="bad"><span class="ki"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span><span>No account intent, no visitor data, no team to execute</span></li>
+          </ul>
+          <div class="who"><span class="wc">Profound</span><span class="wc">AthenaHQ</span><span class="wc">Otterly</span><span class="wc">Peec</span></div>
+        </div>
       </div>
-      <div class="kcard glass reveal" style="--kc:#fbbf24;transition-delay:70ms">
-        <div class="kk">AI content &amp; SEO agents</div>
-        <h4>Great at producing content. That is where it stops.</h4>
-        <p>They draft, and sometimes publish, at volume. The word agent mostly means content generation, not technical SEO or multi channel work.</p>
-        <div class="who">Jasper, Writesonic, SEO.ai, Byword<br><span class="gap">No account intent. No de-anonymization. No human team.</span></div>
+      <div class="kcard reveal" style="--kc:#fbbf24;transition-delay:70ms">
+        <div class="kc-h">
+          <div class="kk">AI content &amp; SEO agents</div>
+          <h4>They generate content. Mostly, that is where it stops.</h4>
+        </div>
+        <div class="kc-b">
+          <p>They draft, optimize and sometimes auto-publish at volume. Here the word agent means content production, plus some AI-answer tracking, not multi-channel go-to-market.</p>
+          <ul class="kpts">
+            <li class="good"><span class="ki"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span>Produce and publish SEO and AI-optimized content fast</span></li>
+            <li class="bad"><span class="ki"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span><span>No account intent, no visitor de-anonymization, no human execution team</span></li>
+          </ul>
+          <div class="who"><span class="wc">Jasper</span><span class="wc">Writesonic</span><span class="wc">SEO.ai</span><span class="wc">Byword</span></div>
+        </div>
       </div>
-      <div class="kcard glass reveal" style="--kc:#22d3ee;transition-delay:140ms">
-        <div class="kk">AI visibility monitors</div>
-        <h4>They watch the AI answers. Nothing behind them.</h4>
-        <p>Purpose built to track brand mentions in ChatGPT, Perplexity and AI Overviews. Most create nothing and act on nothing.</p>
-        <div class="who">Profound, AthenaHQ, Otterly, Peec<br><span class="gap">Monitoring only. No content, no signals, no execution.</span></div>
+      <div class="kcard reveal" style="--kc:#8b5cf6;transition-delay:140ms">
+        <div class="kc-h">
+          <div class="kk">SEO &amp; content suites</div>
+          <h4>The data is deep. The doing is yours.</h4>
+        </div>
+        <div class="kc-b">
+          <p>Rich keyword, backlink, audit and now AI-answer data. Semrush even adds a visitor pixel and ad research. You still turn all of it into work, and then do the work.</p>
+          <ul class="kpts">
+            <li class="good"><span class="ki"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span>Deep SEO data, audits and AI-answer tracking to inform decisions</span></li>
+            <li class="bad"><span class="ki"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span><span>No buying-signal feed, no unified worklist, no team that executes</span></li>
+          </ul>
+          <div class="who"><span class="wc">Semrush</span><span class="wc">Ahrefs</span><span class="wc">Surfer</span><span class="wc">Clearscope</span><span class="wc">MarketMuse</span></div>
+        </div>
       </div>
-      <div class="kcard glass reveal" style="--kc:#34d399;transition-delay:210ms">
-        <div class="kk">Traditional agency / manual</div>
-        <h4>Real execution, but slow, costly and half blind.</h4>
-        <p>A team does the work, by the hour. Results usually take months, and most are not instrumented for AI answers or for who is already on your site.</p>
-        <div class="who">A typical SEO retainer<br><span class="gap">$2,500 to $5,000 a month. 3 to 6 months to results.</span></div>
+      <div class="kcard reveal" style="--kc:#34d399;transition-delay:210ms">
+        <div class="kc-h">
+          <div class="kk">Traditional agency / manual</div>
+          <h4>Real execution, but slow, costly and half blind.</h4>
+        </div>
+        <div class="kc-b">
+          <p>A team does the work, by the hour. Results usually take three to six months, and most engagements are not instrumented for AI answers or for who is already on your site.</p>
+          <ul class="kpts">
+            <li class="good"><span class="ki"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span>Real humans who actually execute strategy and content</span></li>
+            <li class="bad"><span class="ki"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span><span>Slow, priced by the hour, rarely wired to AI-answer or first-party signals</span></li>
+          </ul>
+          <div class="who"><span class="wc">A typical SEO retainer · $2,500 to $5,000 / mo</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="sec-head reveal" style="margin-top:74px"><span class="pill-eye"><span class="dt"></span> Side by side</span><h2 class="h-sec">Find, decide and act, in <span class="ital grad">one layer.</span></h2></div>
-    <p class="lead reveal" style="max-width:680px">The tools above are strong inside their lane. The difference is how much of the journey from signal to revenue each one actually covers.</p>
+    <div class="sec-head reveal" style="margin-top:76px"><span class="pill-eye"><span class="dt"></span> Side by side</span><h2 class="h-sec">Find, decide and act, in <span class="ital grad">one layer.</span></h2></div>
+    <p class="lead reveal" style="max-width:700px">The tools below are strong inside their lane. The real question is how much of the journey from AI-era signal to revenue each one actually covers. We lead with the go-to-market and AI work, then the SEO and content underneath it.</p>
     <div class="cmp reveal">
       <table>
         <thead>
           <tr>
-            <th style="text-align:left">Capability</th>
-            <th class="own"><span class="logo"><img src="/static/logo-mark.svg?v=3" alt="">Intelligence</span></th>
-            <th>SEO &amp; content suites<span class="sub">Semrush, Ahrefs, Surfer, Clearscope, MarketMuse</span></th>
-            <th>AI content &amp; SEO agents<span class="sub">Jasper, Writesonic, SEO.ai, Byword</span></th>
-            <th>AI visibility monitors<span class="sub">Profound, AthenaHQ, Otterly, Peec</span></th>
-            <th>Agency / manual<span class="sub">Traditional SEO retainer</span></th>
+            <th class="cap-h"><span class="ttl">Capability</span></th>
+            <th class="own"><span class="ttl"><span class="logo"><img src="/static/logo-mark.svg?v=3" alt=""></span>Intelligence</span><span class="sub">by Position2</span></th>
+            <th><span class="ttl"><span class="cdot" style="background:#38bdf8"></span>AI visibility monitors</span><span class="sub">Profound · AthenaHQ · Otterly · Peec</span></th>
+            <th><span class="ttl"><span class="cdot" style="background:#fbbf24"></span>AI content &amp; SEO agents</span><span class="sub">Jasper · Writesonic · SEO.ai · Byword</span></th>
+            <th><span class="ttl"><span class="cdot" style="background:#8b5cf6"></span>SEO &amp; content suites</span><span class="sub">Semrush · Ahrefs · Surfer · Clearscope · MarketMuse</span></th>
+            <th><span class="ttl"><span class="cdot" style="background:#34d399"></span>Agency / manual</span><span class="sub">Traditional SEO retainer</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr><th>Keyword research &amp; search strategy</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk yes">&check;</span></td><td><span class="mk par">~</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk yes">&check;</span></td></tr>
-          <tr><th>Content briefs &amp; on-page optimization</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk yes">&check;</span></td><td><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk yes">&check;</span></td></tr>
-          <tr><th>AI content generation</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk par">~</span><sup>1</sup></td><td><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk yes">&check;</span></td></tr>
-          <tr><th>Technical SEO &amp; site auditing</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk yes">&check;</span></td><td><span class="mk par">~</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk yes">&check;</span></td></tr>
-          <tr><th>AI answer engine (GEO) visibility tracking</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk yes">&check;</span><sup>2</sup></td><td><span class="mk par">~</span><sup>3</sup></td><td><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td></tr>
-          <tr><th>Account buying-signal &amp; intent detection</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk par">~</span><sup>4</sup></td></tr>
-          <tr><th>Website visitor de-anonymization</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td></tr>
-          <tr><th>LinkedIn buying-committee engagement</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk par">~</span><sup>4</sup></td></tr>
-          <tr><th>Competitor ad intelligence</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk par">~</span><sup>5</sup></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk par">~</span><sup>4</sup></td></tr>
-          <tr><th>Unified intent scoring &amp; prioritized worklist</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td></tr>
-          <tr><th>Done-for-you execution by a human team</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk par">~</span><sup>6</sup></td><td><span class="mk no">&ndash;</span></td><td><span class="mk yes">&check;</span></td></tr>
-          <tr><th>All of the above, in one platform</th><td class="own"><span class="mk yes">&check;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td><td><span class="mk no">&ndash;</span></td></tr>
+          <tr><th>AI answer engine (GEO) visibility tracking</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">1</span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span class="fnb">2</span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td></tr>
+          <tr><th>Account buying-signal &amp; intent detection</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">3</span></span></td></tr>
+          <tr><th>Website visitor de-anonymization</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">4</span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td></tr>
+          <tr><th>LinkedIn buying-committee engagement</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">3</span></span></td></tr>
+          <tr><th>Competitor ad intelligence</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">5</span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><span class="fnb">6</span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">3</span></span></td></tr>
+          <tr><th>Unified intent scoring &amp; prioritized worklist</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td></tr>
+          <tr><th>Managed execution across channels</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">7</span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">8</span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td></tr>
+          <tr><th>Keyword research &amp; search strategy</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td></tr>
+          <tr><th>Content briefs &amp; on-page optimization</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td></tr>
+          <tr><th>AI content generation</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">9</span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span><span class="fnb">10</span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td></tr>
+          <tr><th>Technical SEO &amp; site auditing</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td></tr>
+          <tr><th>Everything above, in one connected platform</th>
+            <td class="own"><span class="cell"><span class="mk yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td>
+            <td><span class="cell"><span class="mk no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></span></span></td></tr>
         </tbody>
       </table>
     </div>
     <div class="cmp-legend">
-      <span><i class="yes"></i> Built in</span><span><i class="par"></i> Partial or varies by product</span><span><i class="no"></i> Not offered</span>
+      <span><i class="yes"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></i> Built in</span>
+      <span><i class="par"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0 0 20z"/></svg></i> Partial or varies by product</span>
+      <span><i class="no"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></i> Not offered</span>
     </div>
-    <div class="fnote reveal">
-      <div><b>1</b>Semrush includes AI content generation (ContentShake). The other suites focus on optimizing content you write.</div>
-      <div><b>2</b>Native in Semrush, Ahrefs (Brand Radar), Surfer and Clearscope. MarketMuse does not offer AI answer visibility tracking.</div>
-      <div><b>3</b>Writesonic and Jasper track AI answer visibility. Byword and SEO.ai do not.</div>
-      <div><b>4</b>An agency can do this by hand, account by account. That is human effort, not an always-on feed.</div>
-      <div><b>5</b>Semrush offers competitor ad and product-listing research. The content and visibility tools do not.</div>
-      <div><b>6</b>Some tools auto-publish AI-generated articles (for example SEO.ai). That is automated content, not a team executing across channels.</div>
+    <div class="fnote-grid reveal">
+      <div><b>1</b><span>Jasper and Writesonic track AI answer visibility. SEO.ai and Byword do not.</span></div>
+      <div><b>2</b><span>Native to Semrush, Ahrefs (Brand Radar), Surfer and Clearscope. MarketMuse does not offer it.</span></div>
+      <div><b>3</b><span>An agency can do this manually, account by account. That is human effort, not an always-on data feed.</span></div>
+      <div><b>4</b><span>Semrush offers a Website Visitor ID pixel app that identifies a share of visitors. The other suites do not.</span></div>
+      <div><b>5</b><span>Writesonic tracks ads shown inside AI answers only, not paid search, shopping or display.</span></div>
+      <div><b>6</b><span>Semrush (full ad research) and Ahrefs (paid-search reports, organic-first). Surfer, Clearscope and MarketMuse do not.</span></div>
+      <div><b>7</b><span>SEO.ai auto-publishes AI content and Writesonic Enterprise adds a strategist. Automated or advisory, not a team running the work.</span></div>
+      <div><b>8</b><span>MarketMuse sells human-made content briefs. Semrush and Ahrefs refer you to third-party agency partners.</span></div>
+      <div><b>9</b><span>Profound and AthenaHQ can draft content. Otterly and Peec do not.</span></div>
+      <div><b>10</b><span>Semrush includes AI content generation (ContentShake). The other suites optimize content you write.</span></div>
     </div>
 
-    <div class="sec-head reveal" style="margin-top:74px"><span class="pill-eye"><span class="dt"></span> Where they lead</span><h2 class="h-sec">The honest part: where the <span class="ital grad">incumbents win.</span></h2></div>
+    <div class="sec-head reveal" style="margin-top:76px"><span class="pill-eye"><span class="dt"></span> What only we do</span><h2 class="h-sec">The go-to-market work the tools <span class="ital grad">leave on the table.</span></h2></div>
+    <div class="feat">
+      <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Buying signals, scored to one worklist</h4><p>Funding, leadership moves, M&amp;A and launches across 26 signal types, weighted into a single intent score. No tool on this page offers account-level buying signals.</p></div>
+      <div class="fcard glass reveal" style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>AI answer visibility you act on</h4><p>Plenty of tools chart where you show up in ChatGPT, Gemini and Perplexity. We fix the content behind the gaps, and our team ships the changes.</p></div>
+      <div class="fcard glass reveal" style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>Visitors, wired into the same engine</h4><p>See the companies on your site before they fill in a form, recovering 95%+ of lost visitors, then feed them straight into intent scoring. A pixel alone is not the point. The connection is.</p></div>
+      <div class="fcard glass reveal" style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><h4>One platform, one team that executes</h4><p>Signals, visitors, AI visibility, SEO and content in one place, run by a full-service Position2 team. Not five subscriptions and a to-do list.</p></div>
+    </div>
+
+    <div class="sec-head reveal" style="margin-top:76px"><span class="pill-eye"><span class="dt"></span> Where they lead</span><h2 class="h-sec">The honest part: where the <span class="ital grad">incumbents win.</span></h2></div>
     <div class="lead-rows">
-      <div class="lr reveal"><div class="lri"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div><h4>The deepest SEO datasets are theirs</h4><p>Ahrefs and Semrush have spent over a decade building backlink and keyword indexes larger than anything we run. If your single need is raw index depth, that is genuinely their strength, and we will say so.</p></div></div>
-      <div class="lr reveal" style="transition-delay:70ms"><div class="lri"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><div><h4>AI answer visibility is a real, crowded category</h4><p>Dedicated tools like Profound and AthenaHQ, plus modules inside Ahrefs and Semrush, track AI answer visibility well. We are an early mover here, not the only one. Our difference is everything we connect around it.</p></div></div>
-      <div class="lr reveal" style="transition-delay:140ms"><div class="lri"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H7l-3 3z"/></svg></div><div><h4>Pure content tools produce fast and cheap</h4><p>If all you need is a high volume of optimized drafts, Surfer, Jasper and Writesonic do that quickly, from about $49 to $79 a month. Volume is not the same as pipeline, but for volume alone they are efficient.</p></div></div>
+      <div class="lr reveal"><div class="lri"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><div><h4>AI answer visibility is a real, crowded category</h4><p>Dedicated monitors like Profound and AthenaHQ, plus modules inside Ahrefs and Semrush, track AI answer visibility well. We are an early mover here, not the only one. Our edge is connecting it to signals and execution, not the tracking alone.</p></div></div>
+      <div class="lr reveal" style="transition-delay:70ms"><div class="lri"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div><h4>The deepest SEO datasets are theirs</h4><p>Ahrefs and Semrush have spent over a decade building backlink and keyword indexes larger than anything we run. If your single need is raw index depth, that is genuinely their strength, and we will say so.</p></div></div>
+      <div class="lr reveal" style="transition-delay:140ms"><div class="lri"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><div><h4>Some go broader than you would expect</h4><p>Semrush ships a visitor-ID pixel and full ad research. Profound and AthenaHQ can draft content. They are not one-trick tools. What none of them do is tie signals, visitors and AI visibility into one scored worklist that a team then acts on.</p></div></div>
     </div>
     <div class="note reveal">We would rather tell you this up front than have you find it later. The case for Intelligence is not that the others are bad. It is that none of them connect the finding, the deciding and the doing in one place, on your own accounts.</div>
 
-    <div class="sec-head reveal" style="margin-top:74px"><span class="pill-eye"><span class="dt"></span> What only we do</span><h2 class="h-sec">The four things the tools <span class="ital grad">leave on the table.</span></h2></div>
-    <div class="feat">
-      <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg></div><h4>AI answer visibility as a motion</h4><p>We do not just chart where you show up in ChatGPT, Gemini and Perplexity. We fix the content behind the gaps, and our team ships the changes.</p></div>
-      <div class="fcard glass reveal" style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>Buying signals, scored to one worklist</h4><p>Funding, leadership moves, M&amp;A and launches across 26 signal types, weighted into a single intent score so your team knows who to reach first.</p></div>
-      <div class="fcard glass reveal" style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><h4>The visitors you already have</h4><p>See the companies browsing your site before they ever fill in a form. Recovers 95%+ of lost visitors, and hands them to the same signal engine.</p></div>
-      <div class="fcard glass reveal" style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><h4>A team that runs the plays</h4><p>Position2 is a full-service growth agency. SEO, paid, content and RevOps, run by people, tied directly to the signals the platform surfaces.</p></div>
-    </div>
-
-    <div class="sec-head reveal" style="margin-top:74px"><span class="pill-eye"><span class="dt"></span> The cost picture</span><h2 class="h-sec">What each model actually <span class="ital grad">costs.</span></h2></div>
+    <div class="sec-head reveal" style="margin-top:76px"><span class="pill-eye"><span class="dt"></span> The cost picture</span><h2 class="h-sec">What each model actually <span class="ital grad">costs.</span></h2></div>
     <div class="prow">
-      <div class="pr reveal"><div class="pl">SEO &amp; content suites</div><div class="pd">Self-serve subscriptions you operate yourself.</div><div class="pp">from $29 to $550 / mo<sup>a</sup></div></div>
-      <div class="pr reveal" style="transition-delay:60ms"><div class="pl">AI content &amp; SEO agents</div><div class="pd">AI drafts content. You still edit, publish and act on it.</div><div class="pp">from $59 to $999 / mo<sup>a</sup></div></div>
-      <div class="pr reveal" style="transition-delay:120ms"><div class="pl">AI visibility monitors</div><div class="pd">Dashboards that watch AI answers, before enterprise tiers.</div><div class="pp">from $29 to $399 / mo<sup>a</sup></div></div>
-      <div class="pr reveal" style="transition-delay:180ms"><div class="pl">Traditional SEO agency</div><div class="pd">A team executes, but by the hour and over months.</div><div class="pp">$2,500 to $5,000 / mo<sup>b</sup></div></div>
-      <div class="pr own reveal" style="transition-delay:240ms"><div class="pl">Intelligence by Position2</div><div class="pd">The platform and the team that runs it, on your accounts.</div><div class="pp">Custom · request access</div></div>
+      <div class="pr reveal"><div class="pl"><span class="pdot" style="background:#38bdf8"></span>AI visibility monitors</div><div class="pd">Dashboards that watch AI answers, before enterprise tiers.</div><div class="pp">from $29 to $399 / mo<sup>a</sup></div></div>
+      <div class="pr reveal" style="transition-delay:60ms"><div class="pl"><span class="pdot" style="background:#fbbf24"></span>AI content &amp; SEO agents</div><div class="pd">AI drafts and publishes content. You still steer and act on it.</div><div class="pp">from $59 to $999 / mo<sup>a</sup></div></div>
+      <div class="pr reveal" style="transition-delay:120ms"><div class="pl"><span class="pdot" style="background:#8b5cf6"></span>SEO &amp; content suites</div><div class="pd">Self-serve subscriptions you operate yourself.</div><div class="pp">from $29 to $550 / mo<sup>a</sup></div></div>
+      <div class="pr reveal" style="transition-delay:180ms"><div class="pl"><span class="pdot" style="background:#34d399"></span>Traditional SEO agency</div><div class="pd">A team executes, but by the hour and over months.</div><div class="pp">$2,500 to $5,000 / mo<sup>b</sup></div></div>
+      <div class="pr own reveal" style="transition-delay:240ms"><div class="pl"><span class="pdot" style="background:#22d3ee"></span>Intelligence by Position2</div><div class="pd">The platform and the team that runs it, on your accounts.</div><div class="pp">Custom · request access</div></div>
     </div>
-    <p class="fnote reveal"><b>a</b>Published starting prices from each vendor's own pricing page, verified July 2026. Prices in this category change often, so check the linked source for the current figure. <b>b</b>Typical US small and mid-market SEO retainer, per industry pricing surveys.</p>
+    <p class="fnote-grid reveal" style="grid-template-columns:1fr"><span style="display:grid;grid-template-columns:18px 1fr;gap:8px"><b>a</b><span>Published starting prices from each vendor's own pricing page, verified July 2026. Prices in this category change often, so check the linked source for the current figure.</span></span><span style="display:grid;grid-template-columns:18px 1fr;gap:8px"><b>b</b><span>Typical US small and lower-mid-market SEO retainer per industry pricing surveys; larger programs run higher.</span></span></p>
 
     <div class="srcs reveal">
       <h5>Sources &amp; method</h5>
-      Every figure reflects each vendor's own published pricing and feature pages, checked in July 2026, or the cited industry survey. AI answer visibility tracking is a fast-moving, competitive category, so we make no claim to be first or only. Where a competitor leads, we say so above.<br><br>
-      Pricing and features:
+      Every claim here was checked against each vendor's own pricing, feature and documentation pages, then re-verified against independent sources (G2, Capterra, product docs and reputable reviews) in July 2026. AI answer visibility tracking is a fast-moving, competitive category, so we make no claim to be first or only. Where a competitor leads, or reaches beyond its lane, we say so above.<br><br>
+      Vendor pricing and features:
       <a href="https://www.semrush.com/pricing/" target="_blank" rel="noopener nofollow">Semrush</a> ·
       <a href="https://ahrefs.com/pricing" target="_blank" rel="noopener nofollow">Ahrefs</a> ·
       <a href="https://surferseo.com/pricing/" target="_blank" rel="noopener nofollow">Surfer</a> ·
@@ -1563,14 +1690,20 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <a href="https://athenahq.ai/plans" target="_blank" rel="noopener nofollow">AthenaHQ</a> ·
       <a href="https://www.tryprofound.com/pricing" target="_blank" rel="noopener nofollow">Profound</a> ·
       <a href="https://otterly.ai/pricing/" target="_blank" rel="noopener nofollow">Otterly</a><br>
-      Agency retainer and content cost:
-      <a href="https://backlinko.com/seo-pricing" target="_blank" rel="noopener nofollow">Backlinko SEO pricing survey</a> ·
-      <a href="https://seranking.com/blog/seo-pricing/" target="_blank" rel="noopener nofollow">SE Ranking</a> ·
-      <a href="https://surgegraph.io/content/how-much-to-charge-for-a-blog-post" target="_blank" rel="noopener nofollow">per-article rates</a>. Time to SEO results:
-      <a href="https://www.searchengineland.com/guide/how-long-does-seo-take-to-work" target="_blank" rel="noopener nofollow">Search Engine Land</a>.
+      Capability checks:
+      <a href="https://www.semrush.com/apps/website-visitor-id-x-ray-pixel/" target="_blank" rel="noopener nofollow">Semrush Visitor ID pixel</a> ·
+      <a href="https://ahrefs.com/brand-radar" target="_blank" rel="noopener nofollow">Ahrefs Brand Radar</a> ·
+      <a href="https://surferseo.com/ai-tracker/" target="_blank" rel="noopener nofollow">Surfer AI Tracker</a> ·
+      <a href="https://www.jasper.ai/geo" target="_blank" rel="noopener nofollow">Jasper GEO</a> ·
+      <a href="https://writesonic.com/ai-visibility-tracker" target="_blank" rel="noopener nofollow">Writesonic AI Visibility</a><br>
+      Agency retainer, content cost and timelines:
+      <a href="https://ahrefs.com/blog/seo-pricing/" target="_blank" rel="noopener nofollow">Ahrefs SEO pricing poll</a> ·
+      <a href="https://backlinko.com/seo-pricing" target="_blank" rel="noopener nofollow">Backlinko</a> ·
+      <a href="https://www.webfx.com/seo/learn/how-long-does-it-take-to-see-seo-results/" target="_blank" rel="noopener nofollow">WebFX</a> ·
+      <a href="https://www.siegemedia.com/creation/content-marketing-cost" target="_blank" rel="noopener nofollow">Siege Media</a>.
     </div>
 
-    <div class="band reveal"><h3>See it on your own accounts.</h3><p>Book a walkthrough and watch the signals, the AI answer gaps and the visitors light up on your real market, not a demo dataset.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Why Intelligence comparison" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>See it on your own accounts.</h3><p>Book a walkthrough and watch the buying signals, the AI answer gaps and the de-anonymized visitors light up on your real market, not a demo dataset.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Why Intelligence comparison" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'home' %}
