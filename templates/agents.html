@@ -484,8 +484,14 @@ main::before{content:'';position:absolute;top:-30px;left:50%;width:min(1040px,94
 .note code{font-family:var(--mono);font-size:12.5px;color:#c4b5fd;background:rgba(255,255,255,.07);padding:3px 9px;border-radius:7px}
 
 /* ===== why / compare page ===== */
-.why-hero{display:grid;grid-template-columns:1.15fr .85fr;gap:50px;align-items:center}
-@media (max-width:960px){.why-hero{grid-template-columns:1fr;gap:26px}.why-hero-vis{display:none}}
+.why-hero{display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center;min-height:82vh;padding-top:8px}
+@media (max-width:960px){.why-hero{grid-template-columns:1fr;gap:26px;min-height:0;padding-top:0}.why-hero-vis{display:none}}
+.why-hero .h-hero{font-size:clamp(36px,4.4vw,62px);line-height:1.02;letter-spacing:-.028em;margin:20px 0 22px}
+.why-hero .why-lede{max-width:none}
+.why-hero .why-lede .lead{font-size:16.5px;line-height:1.66;max-width:none}
+.why-hero-vis{display:flex;justify-content:center;align-items:center}
+.why-hero-vis .orbit{width:min(520px,100%);max-width:520px}
+.why-hero-vis .orbit::before{content:'';position:absolute;inset:-8%;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(139,92,246,.20),rgba(34,211,238,.08) 45%,transparent 68%);filter:blur(8px);z-index:0;pointer-events:none}
 .why-lede{max-width:1120px}
 .why-lede .lead{font-size:17px;line-height:1.66;max-width:900px}
 /* alternative-kind cards: category -> heading -> description -> does / doesn't -> names */
