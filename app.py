@@ -2458,7 +2458,7 @@ def ppc_anonymous_visitors_redirect():
 
 @app.route("/ppc/linkedin-scraper")
 def ppc_linkedin_scraper_redirect():
-    return redirect("/p2/gtm/linkedin-scraper", code=301)
+    return redirect("/p2/gtm/linkedin-intelligence", code=301)
 
 @app.route("/p2/seo")
 @position2_required
@@ -4193,12 +4193,24 @@ def _fetch_linkedin_intel_data(force: bool = False) -> dict:
 
 @app.route("/p2/gtm/linkedin-scraper")
 @position2_required
+def linkedin_scraper_old_redirect():
+    return redirect("/p2/gtm/linkedin-intelligence", code=301)
+
+
+@app.route("/p2/gtm/linkedin-intelligence")
+@position2_required
 def linkedin_scraper():
     """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
     return render_template("linkedin_scraper.html", user=_get_user())
 
 
 @app.route("/p2/gtm/linkedin-scraper/data")
+@position2_required
+def linkedin_scraper_data_old_redirect():
+    return redirect("/p2/gtm/linkedin-intelligence/data", code=301)
+
+
+@app.route("/p2/gtm/linkedin-intelligence/data")
 @position2_required
 def linkedin_scraper_data():
     """JSON data endpoint for the LinkedIn Intelligence dashboard (gzipped, cached).
