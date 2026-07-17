@@ -25,6 +25,36 @@ def test_gate():
     ct, _ = classify_connection("Foo", None, None, 256, ipinfo_type="isp")
     ck("ipinfo type=isp respected", ct == "isp")
 
+def test_gate_indian_isps():
+    """Regression: 'Tata Teleservices Limited' (and similar regional carriers
+    our hardcoded list doesn't name) was being classified 'business' and shown
+    to reps as the visitor's employer -- it's the ISP, not a lead."""
+    for org in ("Tata Teleservices Limited", "Bharti Airtel Limited",
+                "Reliance Jio Infocomm Limited", "Vodafone Idea Limited",
+                "Bharat Sanchar Nigam Limited (BSNL)", "Hathway Cable and Datacom",
+                "Atria Convergence Technologies (ACT Fibernet)"):
+        # small per-region sub-block, as ISPs commonly register
+        ct, _ = classify_connection(org, None, None, 4096)
+        ck("small-block %s -> not business" % org, ct != "business")
+        # large country-wide netblock
+        ct2, _ = classify_connection(org, None, None, 2_000_000)
+        ck("large-block %s -> not business" % org, ct2 != "business")
+    # an org our hint list has never heard of, but whose name still reads as
+    # a telecom operator, must not be inferred as a business purely because
+    # it happens to sit in a small netblock.
+    ct, _ = classify_connection("Some Regional Communications Networks Pvt Ltd",
+                                None, None, 4096)
+    ck("unrecognized telecom-sounding org -> not business", ct != "business")
+    # a real small/regional business whose name has no telecom signal should
+    # still be classified business off the small-netblock fallback.
+    ct, _ = classify_connection("Acme Robotics Pvt Ltd", None, None, 4096)
+    ck("non-telecom small-block org -> business", ct == "business")
+    # our own keyword evidence overrides a conflicting ipinfo.asn.type=business
+    # claim for a name that clearly reads as a carrier.
+    ct, _ = classify_connection("Tata Teleservices Limited", None, None, None,
+                                ipinfo_type="business")
+    ck("keyword veto over ipinfo_type=business", ct != "business")
+
 def test_domain_extraction():
     ck("corp PTR", domain_from_host("smtp.acme-robotics.com") == "acme-robotics.com")
     ck("ISP PTR None", domain_from_host("pool-71-1-2-3.bstnma.fios.verizon.net") is None)
@@ -126,7 +156,7 @@ def test_resolve_visitor_no_apollo_by_default():
 
 
 if __name__ == "__main__":
-    for t in [test_gate, test_domain_extraction, test_gate_blocks_scoring,
+    for t in [test_gate, test_gate_indian_isps, test_domain_extraction, test_gate_blocks_scoring,
             test_corroboration, test_org_to_domain, test_intent, test_identity_graph,
             test_free_enrich_offline, test_team_page_title_filter,
             test_resolve_visitor_no_apollo_by_default]:

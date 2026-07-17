@@ -71,13 +71,27 @@ class Resolution:
 # Connection-type classification (the gate)
 # --------------------------------------------------------------------------- #
 _ISP_HINTS = ("comcast", "verizon", "spectrum", "charter", "at&t", "att-",
-              "cox communications", "centurylink", "telecom", "broadband",
-              "fibernet", "cable", "dsl", " isp", "residential", "bell canada",
-              "telus", "rogers", "sky broadband", "virgin media", "bt group",
-              "deutsche telekom", "vodafone", "jio", "airtel b, ", "frontier")
+              "cox communications", "centurylink", "telecom", "telecommunications",
+              "teleservices", "telecom services", "broadband", "broadband services",
+              "fibernet", "cable", "cable network", "dsl", " isp", "isp ltd",
+              "internet services", "internet service provider", "residential",
+              "bell canada", "telus", "rogers", "sky broadband", "virgin media",
+              "bt group", "deutsche telekom", "vodafone", "vodafone idea",
+              "vi (vodafone idea)", "jio", "reliance jio", "bharti airtel",
+              "airtel", "frontier communications", "frontier",
+              # India-specific ISPs/telcos: the platform's own traffic is
+              # India-heavy, and a naive US/EU-centric keyword list quietly
+              # promotes these to "business" and hands a rep the carrier's
+              # name as if it were the visitor's employer.
+              "tata teleservices", "tata docomo", "tata play fiber",
+              "tata communications", "vsnl", "bsnl", "mtnl", "hathway",
+              "act fibernet", "atria convergence", "you broadband", "railwire",
+              "excitel", "tikona", "netplus", "gtpl", "alliance broadband",
+              "spectra", "den networks", "siti networks", "connect broadband",
+              "ortel communications")
 _MOBILE_HINTS = ("t-mobile", "sprint", "cellular", "wireless", " mobile",
                  "mobile ", "orange s.a", "telefonica", "vivo", "claro",
-                 "mtn ", "airtel")
+                 "mtn ", "airtel", "jio", "vodafone idea")
 _HOSTING_HINTS = ("amazon", "aws", "azure", "microsoft azure", "google cloud",
                   "gcp", "digitalocean", "linode", "ovh", "hetzner", "hosting",
                   "datacenter", "data center", "cloud", "vpn", "colo",
@@ -87,6 +101,16 @@ _EDU_HINTS = ("university", "college", "institute of technology", " school",
               "univ.", "univ ", ".edu", "education", "académ", "polytechnic")
 _GOV_HINTS = ("government", " gov ", "ministry", "department of", "county of",
               "city of", "military", "gov.", "state of", "u.s. ", "national ")
+# A weaker, broader net than _ISP_HINTS: words that show up in telecom/ISP
+# legal names generally (not just the specific carriers hardcoded above). Not
+# strong enough on its own to assert "isp", but strong enough to veto the
+# risky "small netblock -> business" inference below -- carriers routinely
+# register small per-city/per-exchange sub-blocks under their own name, so a
+# small allocation does not imply a single corporate tenant when the org name
+# itself reads as a telecom operator our hardcoded list doesn't happen to name.
+_TELECOM_SOFT_HINTS = ("tele", "telecom", "communications", "networks", "network",
+                       "cellular", "wireless", "cable", "broadband", "fiber",
+                       "fibre", "connectivity", "internet service")
 
 
 def classify_connection(asn_org: Optional[str], domain: Optional[str],
@@ -103,31 +127,51 @@ def classify_connection(asn_org: Optional[str], domain: Optional[str],
         reasons.append("ipinfo.privacy flags hosting/vpn/proxy")
         return "hosting", reasons
 
-    # 2) Explicit ASN type from IPinfo (paid): isp|hosting|education|government|business
+    hay = " ".join(x for x in [asn_org, domain, rdns] if x).lower()
+
+    # 2) Our own keyword evidence is checked before trusting an external
+    # ipinfo.asn.type "business"/"education"/"government" claim. A regional
+    # carrier mistagged upstream (or one whose ASN type data is stale/coarse)
+    # would otherwise short-circuit past every other signal below and hand a
+    # rep the carrier's name as if it were the visitor's employer -- so a
+    # clear carrier-name match in our own list can veto that claim.
+    keyword_type: Optional[str] = None
+    if hay:
+        if any(h in hay for h in _EDU_HINTS): keyword_type = "education"
+        elif any(h in hay for h in _GOV_HINTS): keyword_type = "government"
+        elif any(h in hay for h in _MOBILE_HINTS): keyword_type = "mobile"
+        elif any(h in hay for h in _HOSTING_HINTS): keyword_type = "hosting"
+        elif any(h in hay for h in _ISP_HINTS): keyword_type = "isp"
+
+    if keyword_type in ("isp", "mobile", "hosting"):
+        reasons.append("keyword: %s" % keyword_type); return keyword_type, reasons
+
+    # 3) Explicit ASN type from IPinfo (paid): isp|hosting|education|government|business
     if ipinfo_type:
         t = ipinfo_type.strip().lower()
-        if t in ("isp", "hosting", "education", "government", "business"):
+        if t in ("isp", "hosting"):
+            reasons.append("ipinfo.asn.type=%s" % t)
+            return t, reasons
+        if t in ("education", "government", "business"):
             reasons.append("ipinfo.asn.type=%s" % t)
             return t, reasons
 
-    hay = " ".join(x for x in [asn_org, domain, rdns] if x).lower()
+    if keyword_type:
+        reasons.append("keyword: %s" % keyword_type); return keyword_type, reasons
+
     if not hay:
         reasons.append("no signals -> unknown")
         return "unknown", reasons
 
-    if any(h in hay for h in _EDU_HINTS):
-        reasons.append("keyword: education"); return "education", reasons
-    if any(h in hay for h in _GOV_HINTS):
-        reasons.append("keyword: government"); return "government", reasons
-    if any(h in hay for h in _MOBILE_HINTS):
-        reasons.append("keyword: mobile carrier"); return "mobile", reasons
-    if any(h in hay for h in _HOSTING_HINTS):
-        reasons.append("keyword: hosting/cloud/vpn"); return "hosting", reasons
-    if any(h in hay for h in _ISP_HINTS):
-        reasons.append("keyword: residential ISP"); return "isp", reasons
-
-    # 3) Netblock-size fallback: a small named allocation is almost always a
-    # single corporate tenant; a huge one is an ISP pool.
+    # 4) Netblock-size fallback: a small named allocation is usually a single
+    # corporate tenant -- UNLESS the org name itself reads as a telecom/ISP,
+    # since carriers commonly register small per-region sub-blocks under their
+    # own name. A soft telecom-word match blocks the "business" inference even
+    # when the hardcoded carrier list above doesn't happen to name this one.
+    telecom_soft = any(h in hay for h in _TELECOM_SOFT_HINTS)
+    if telecom_soft:
+        reasons.append("org name reads as telecom/ISP (unrecognized carrier) -> unknown, not treated as a business")
+        return "unknown", reasons
     if netblock_size is not None and netblock_size <= 65536:
         reasons.append("small named netblock (<=/16) -> business")
         return "business", reasons
@@ -146,7 +190,17 @@ _GENERIC_RDNS = ("comcast.net", "rr.com", "cox.net", "amazonaws.com",
                  "your-server.de", "ip-", "-dsl", ".dyn", "pool-", ".cust",
                  "broadband", "res.", "static.", "dynamic.", "cable.",
                  "t-mobile.com", "verizon.net", "charter.com", "sbcglobal",
-                 "hinet.net", "telecom", "compute.amazonaws", "bc.googleusercontent")
+                 "hinet.net", "telecom", "teleservices", "compute.amazonaws",
+                 "bc.googleusercontent",
+                 # Indian ISP/telecom PTR domains -- same false-positive class
+                 # as the US-centric entries above (a carrier's own hostname,
+                 # not a lead's corporate domain).
+                 "ttsl.co.in", "tatateleservices", "vsnl.net.in", "vsnl.co.in",
+                 "airtel.in", "airtelbroadband", "jio.com", "relianceada.com",
+                 "bsnl.co.in", "bsnl.in", "hathway.com", "actcorp.in",
+                 "youbroadband.co.in", "railwire.co.in", "tikona.in",
+                 "gtpl.net.in", "spectra.co", "dennetworks.com",
+                 "sitinetworks.com", "vodafoneidea.com", "myvi.in")
 _TWO_LABEL_TLDS = {"co.uk", "com.au", "co.jp", "co.in", "com.br", "co.nz",
                    "co.za", "com.sg", "com.mx", "co.kr", "com.tr"}
 
