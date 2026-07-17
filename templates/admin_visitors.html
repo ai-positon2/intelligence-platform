@@ -377,9 +377,11 @@ var CUR_VISITOR=null;
 function fmtRev(r){if(!r)return'';var m=String(r).match(/([\d,.]+)/);return m?('$'+m[1]):r;}
 function enrichPanel(v){
   if(!v||!v.ip||!v.domain)return'';
+  var desc=v.description?'<p class="kdesc" style="margin-top:0">'+esc(v.description)+'</p>':'';
   if(v.enrichment_source==='apollo'){
     var bc=(v.buying_committee||[]);
     return '<div class="ksect"><h4>Firmographics <span class="muted" style="font-weight:400;font-size:11px">· Apollo-deepened</span></h4>'+
+      desc+
       '<div class="kstats">'+
         (v.employees?'<div class="kstat"><b>'+esc(v.employees)+'</b><span>Employees</span></div>':'')+
         (v.revenue?'<div class="kstat"><b>'+esc(fmtRev(v.revenue))+'</b><span>Revenue</span></div>':'')+
@@ -392,10 +394,15 @@ function enrichPanel(v){
       }).join('')+'</div></div>':'')+
     '</div>';
   }
-  return '<div class="ksect"><h4>Firmographics</h4><p class="kdesc" style="margin-top:0">'+
-    'Free-tier data only'+(v.industry?' — industry: '+esc(v.industry):'')+
+  // not yet Apollo-deepened -- either never enriched, or free-tier only
+  // (e.g. a prior click ran before APOLLO_API_KEY was configured).
+  return '<div class="ksect"><h4>Firmographics'+
+    (v.enrichment_source==='free'?' <span class="muted" style="font-weight:400;font-size:11px">· free-tier</span>':'')+
+    '</h4>'+desc+
+    '<p class="kdesc" style="margin-top:0">'+
+    (v.enrichment_source==='free'?'Free-tier data only'+(v.industry?' — industry: '+esc(v.industry):''):'Not enriched yet')+
     '. Precise employee count, revenue, and a real buying committee require an Apollo lookup.</p>'+
-    '<button class="btn" id="deepenBtn" onclick="deepenVisitor()">💎 Enrich further (spends 1 Apollo credit)</button>'+
+    '<button class="btn" id="deepenBtn" onclick="deepenVisitor()">💎 Enrich further</button>'+
     '<div id="deepenStatus" style="margin-top:8px;font-size:12px;color:var(--dim2)"></div>'+
   '</div>';
 }
@@ -445,7 +452,7 @@ function closeDrawer(){document.getElementById('overlay').classList.remove('open
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
 function load(force){
   var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
-  fetch('/p2/admin/anonymous-traffic/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+  fetch('/p2/admin/anonymous-traffic/data'+(force?'?fresh=1':''),{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(btn)btn.textContent='↻ Refresh';
     LAST_DATA=d;
     var k=d.kpis||{};

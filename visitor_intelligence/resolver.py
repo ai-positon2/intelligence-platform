@@ -449,7 +449,12 @@ def resolve_ip(ip: str, ipinfo_token: Optional[str] = None,
     r.method = win_method
     r.methods = methods
     r.reasons.extend(score_reasons)
-    r.company = r.asn_org if r.connection_type not in ("isp", "mobile", "hosting") else None
+    # Explicit allowlist, not a denylist: "unknown" means exactly that -- we
+    # never confirmed this is a business at all -- so it must not carry a
+    # company name either, the same as isp/mobile/hosting. A denylist here
+    # silently grows stale every time a new non-identifying connection_type is
+    # added (this is precisely how the ISP-name-as-company bug slipped in).
+    r.company = r.asn_org if r.connection_type in ("business", "education", "government") else None
     r.identifiable = bool(win_domain) and conf > 0
     r.signals = signals
     return r
