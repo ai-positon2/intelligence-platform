@@ -18,10 +18,15 @@ raw visitor IP + on-site pages
         |        RDAP (RIR netblock owner + size)
         v
  classify_connection()  -- HARD GATE
-        |   isp / mobile / hosting / vpn  -> not identifiable (return empty)
+        |   isp / mobile / hosting / cloud (incl. hyperscalers by name) /
+        |   proxy-SASE-VPN (Zscaler, Netskope, ...)  -> not identifiable
         |   business / education / government -> proceed
         v
- confidence score  (noisy-OR over agreeing methods, netblock-size adjusted)
+ name sanitizer  (reject RDAP maintainer/netname/handle strings like *-MNT, MSFT)
+        |
+        v
+ confidence floor  (noisy-OR; only "sure" matches: real domain, or >=2 agreeing
+        |            signals, or a clean registrant org on a dedicated block)
         |
         v
  enrich_company_free(domain)  -- FREE, always runs: the company's own
@@ -37,11 +42,21 @@ raw visitor IP + on-site pages
  deepen_with_apollo(rec)  -- precise revenue/headcount + real buying committee
 ```
 
-The connection-type gate is the whole game: residential, mobile, and cloud/VPN
-IPs name the carrier, not a company, so they are marked not-identifiable rather
-than mislabelled. This is why honest company-level match rates are ~20-40% of
-traffic, and the engine is explicit about *why* each visitor did or didn't
-resolve (`reasons` / `intent_reasons`).
+The connection-type gate is the whole game: residential, mobile, cloud/hosting
+(incl. hyperscalers), and security-proxy/SASE/VPN IPs name infrastructure or a
+security vendor, not the visitor's employer, so they are marked
+not-identifiable rather than mislabelled. Security proxies (Zscaler, Netskope,
+Cato, ...) are their own gated class: a whole company routes outbound traffic
+through the vendor, so the egress IP resolves to the vendor. This is why honest
+company-level match rates are ~20-40% of traffic, and the engine is explicit
+about *why* each visitor did or didn't resolve (`reasons`).
+
+Precision over recall, on purpose: a company name is shown ONLY when we're sure
+-- a real domain (reverse-DNS PTR or IPinfo Company), two agreeing signals, or a
+clean registrant org on a dedicated netblock. A lone org-name->domain guess is
+not enough. RDAP bookkeeping strings (maintainer objects `*-MNT`/`*-MAINT`,
+netnames like `MSFT`, role handles) are never shown as a company. A wrong or
+garbage name erodes trust in the whole feature, so we'd rather show nothing.
 
 ## Cost model: free by default, paid only on request
 
