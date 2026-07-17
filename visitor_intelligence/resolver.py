@@ -609,8 +609,20 @@ def resolve_ip(ip: str, ipinfo_token: Optional[str] = None,
         r.rdns = reverse_dns(ip)
     signals["rdns"] = r.rdns
 
-    # 3) RDAP (authoritative netblock + size)
-    if online:
+    # 3) RDAP (authoritative netblock + size) -- but only when it can actually
+    # change the outcome. classify_connection's gate (steps 0-3: operator
+    # exclusions, privacy flags, keyword hints, explicit ipinfo.asn.type) never
+    # looks at netblock_size; only the business/unknown netblock-size fallback
+    # (step 4) does. So a cheap preliminary classification from IPinfo/keyword
+    # signals alone already tells us whether RDAP's answer could matter. For
+    # the majority of traffic -- residential ISP, mobile, hosting/cloud,
+    # security proxy/VPN -- it can't, and skipping the RDAP round-trip
+    # (rdap.org bootstrap chain, up to ~3s, sequential over hundreds of unique
+    # visitor IPs) is what turns a multi-minute dashboard load back into a fast
+    # one without changing a single classification.
+    prelim_type, _ = classify_connection(
+        r.asn_org, None, r.rdns, None, ipinfo_type, privacy)
+    if online and prelim_type not in ("isp", "mobile", "hosting", "proxy"):
         rd = rdap_lookup(ip)
         if rd:
             signals["rdap"] = True
@@ -620,7 +632,8 @@ def resolve_ip(ip: str, ipinfo_token: Optional[str] = None,
             if not r.asn_org and rd.get("org"):
                 r.asn_org = rd.get("org")
 
-    # Classify (the gate)
+    # Classify (the gate) -- final pass, informed by RDAP's netblock size when
+    # we actually fetched it.
     dom_from_asn = None  # ASN org domain only from IPinfo company/hostname, handled below
     r.connection_type, cls_reasons = classify_connection(
         r.asn_org, None, r.rdns, r.netblock_size, ipinfo_type, privacy)
