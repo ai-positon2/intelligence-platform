@@ -188,6 +188,10 @@ def _log_login_to_sheet(user: dict) -> None:
             body={"values": [row]},
         ).execute()
 
+        # Retro-stitch: link this vid's prior anonymous sessions to the person.
+        _graph_identify(vid, email=user.get("email", ""),
+                        name=user.get("name", ""), source="staff_login")
+
     except Exception as e:
         log.warning("Login sheet log failed: %s", e)
 
@@ -236,6 +240,9 @@ def _log_member_signin(user: dict) -> None:
                 range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_MS_HEADER]}).execute()
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+        # Retro-stitch this member's prior anonymous sessions to their identity.
+        _graph_identify(vid, email=user.get("email", ""),
+                        name=user.get("name", ""), source="member_login")
     except Exception as e:
         log.warning("member signin log failed: %s", e)
 
@@ -2725,13 +2732,65 @@ def _va_sheets_service():
     return build("sheets","v4",credentials=creds,cache_discovery=False)
 
 _IP_CACHE = {}
+_IP_RESOLVE_CACHE = {}
+
+# The real de-anonymization engine (multi-signal resolve + gate + confidence +
+# Apollo firmographics + intent). Imported lazily-safe: if the package is missing
+# the surface degrades to the legacy IPinfo-only path below.
+try:
+    from visitor_intelligence import resolve_ip as _vi_resolve_ip
+    from visitor_intelligence import resolve_visitor as _vi_resolve_visitor
+    from visitor_intelligence import score_intent as _vi_score_intent
+    _VI_OK = True
+except Exception as _vi_e:  # pragma: no cover
+    _VI_OK = False
+    log.warning("visitor_intelligence unavailable, using legacy reverse-IP: %s", _vi_e)
+
+
+def _ip_resolve(ip: str) -> dict:
+    """Full multi-signal resolution for one IP (cached per IP). Returns the
+    engine's flat record: company/domain/confidence/connection_type/identifiable
+    plus firmographics + intent-ready fields. Empty dict for local/unknown."""
+    if not ip or ip in ("127.0.0.1", "::1", "localhost"):
+        return {}
+    if ip in _IP_RESOLVE_CACHE:
+        return _IP_RESOLVE_CACHE[ip]
+    rec = {}
+    if _VI_OK:
+        try:
+            # Free path always: IP -> domain/company/confidence/connection_type.
+            # Apollo firmographic enrichment (1 credit/company) only when
+            # VI_ENRICH_ON_VIEW is set, so a dashboard load never silently burns
+            # Apollo credits. Batch/scheduled enrichment can set it explicitly.
+            apollo_key = os.environ.get("APOLLO_API_KEY", "") \
+                if os.environ.get("VI_ENRICH_ON_VIEW", "") in ("1", "true", "yes") else ""
+            rec = _vi_resolve_visitor(ip, apollo_key=apollo_key,
+                                    ipinfo_token=os.environ.get("IPINFO_TOKEN", ""),
+                                    online=True)
+        except Exception as e:
+            log.warning("ip_resolve failed for %s: %s", ip, e)
+            rec = {}
+    _IP_RESOLVE_CACHE[ip] = rec
+    return rec
+
+
 def _ip_company(ip: str) -> str:
-    """Best-effort reverse-IP -> organization. Requires IPINFO_TOKEN; '' otherwise. Cached per IP."""
+    """Best-effort reverse-IP -> organization NAME. Now backed by the
+    visitor_intelligence engine: residential/mobile/hosting IPs are gated to ''
+    (they name the carrier, not a lead), and business IPs get the canonical
+    Apollo company name when available. Backward-compatible return (a string).
+    Falls back to the legacy IPinfo-only lookup if the engine is unavailable."""
     if not ip or ip in ("127.0.0.1", "::1", "localhost"):
         return ""
     if ip in _IP_CACHE:
         return _IP_CACHE[ip]
     out = ""
+    if _VI_OK:
+        rec = _ip_resolve(ip)
+        out = (rec.get("company") or "") if rec.get("identifiable") else ""
+        _IP_CACHE[ip] = out
+        return out
+    # ---- legacy fallback (engine unavailable) ----
     token = os.environ.get("IPINFO_TOKEN", "")
     if token:
         try:
@@ -2746,6 +2805,62 @@ def _ip_company(ip: str) -> str:
             out = ""
     _IP_CACHE[ip] = out
     return out
+
+# --------------------------------------------------------------------------- #
+# Identity graph (person-level resolution)
+# --------------------------------------------------------------------------- #
+# Resolves an anonymous p2_vid to a named person via: first-party deterministic
+# clusters (login/form retro-stitch), Apollo person enrichment, and any external
+# co-op/graph provider configured. Populated by the login paths + /api/identify.
+_ID_GRAPH = None
+
+def _identity_graph():
+    global _ID_GRAPH
+    if _ID_GRAPH is None:
+        if not _VI_OK:
+            _ID_GRAPH = False
+        else:
+            try:
+                from visitor_intelligence import build_identity_graph
+                # Apollo person enrichment (spends credits) only when
+                # VI_ENRICH_ON_VIEW is set; the co-op file provider (free) always
+                # loads if VI_COOP_FILE points at a real feed.
+                akey = os.environ.get("APOLLO_API_KEY", "") \
+                    if os.environ.get("VI_ENRICH_ON_VIEW", "") in ("1", "true", "yes") else ""
+                _ID_GRAPH = build_identity_graph(apollo_key=akey)
+            except Exception as e:
+                log.warning("identity graph init failed: %s", e)
+                _ID_GRAPH = False
+    return _ID_GRAPH or None
+
+
+def _graph_identify(vid, email="", name="", title="", company="",
+                    crm_id="", source="login"):
+    """Feed a deterministic person anchor into the graph (retro-stitches all of
+    this vid's prior anonymous sessions). Safe/no-op on any failure."""
+    g = _identity_graph()
+    if not (g and vid):
+        return
+    try:
+        g.identify(vid[:64], email=email or None, name=name or None,
+                title=title or None, company=company or None,
+                crm_id=crm_id or None, source=source)
+    except Exception as e:
+        log.warning("graph identify failed: %s", e)
+
+
+def _graph_resolve_person(vid) -> dict:
+    """Resolve a vid to a person via the graph. {} if anonymous. Never fabricates."""
+    g = _identity_graph()
+    if not (g and vid):
+        return {}
+    try:
+        pm = g.resolve_person(vid[:64])
+        return pm.to_dict() if pm.resolved else {}
+    except Exception as e:
+        log.warning("graph resolve_person failed: %s", e)
+        return {}
+
 
 def _va_identity_map() -> dict:
     """visitor_id -> {name,email,company,source}. Merges access-form conversions + provider identifies."""
@@ -2865,6 +2980,11 @@ def api_identify():
     except Exception as e:
         log.warning("identify failed: %s", e)
         return jsonify({"ok": False}), 500
+    # Feed the identity graph too (deterministic person anchor + retro-stitch).
+    _graph_identify(vid, email=str(data.get("email", "")),
+                    name=str(data.get("name", "")), title=str(data.get("title", "")),
+                    company=str(data.get("company", "")),
+                    source=str(data.get("source", "provider")))
     return jsonify({"ok": True})
 
 @app.route("/api/atrack", methods=["POST"])
@@ -3120,6 +3240,18 @@ def _fetch_visitor_analytics() -> dict:
         email = idn.get("email") or (lg or {}).get("email", "")
         name = idn.get("name") or (lg or {}).get("name", "")
         source = idn.get("source") or ("reverse-IP" if co else "")
+        # identity graph: resolve the person behind this vid (retro-stitched
+        # login / form / provider / co-op). Fills gaps; never fabricates.
+        person_conf = 0.0; person_method = ""; title = idn.get("title", "")
+        gp = _graph_resolve_person(v)
+        if gp:
+            name = name or gp.get("full_name") or ""
+            email = email or gp.get("email") or ""
+            title = title or gp.get("title") or ""
+            co = co or gp.get("company") or ""
+            person_conf = gp.get("confidence") or 0.0
+            person_method = gp.get("method") or ""
+            source = source or person_method
         rs_sorted = sorted(va_by_vid.get(v, []), key=lambda r: c(r,"Timestamp (IST)"))
         tl = []
         for r in rs_sorted:
@@ -3134,11 +3266,33 @@ def _fetch_visitor_analytics() -> dict:
                        "label": (r[5] if len(r)>5 else "") or (r[6] if len(r)>6 else "") or "Page view",
                        "meta": r[8] if len(r)>8 else ""})
         tl.sort(key=lambda x: x["t"] or "")
+        # ---- engine enrichment: confidence + connection type + firmographics + intent ----
+        ip_v = vid_ip.get(v, "")
+        res = _ip_resolve(ip_v) if (ip_v and _VI_OK) else {}
+        view_pages = [x["label"] for x in tl if x.get("kind") == "view"]
+        if _VI_OK:
+            i_score, i_stage, _ = _vi_score_intent(
+                view_pages, pageviews=vid_pages.get(v, 0),
+                sessions=1 + sum(1 for x in tl if x.get("kind") == "signin"))
+        else:
+            i_score, i_stage = 0.0, "awareness"
         all_visitors.append({"vid": v[:8], "name": name, "email": email,
+            "title": title,
             "company": co, "source": source, "pages": vid_pages.get(v,0),
             "device": c(rs_sorted[0],"Device") if rs_sorted else "",
             "first_ts": tl[0]["t"] if tl else "", "last_ts": tl[-1]["t"] if tl else "",
             "status": (lg or {}).get("type", ""), "converted": bool(lg),
+            # person-level identity graph fields
+            "person_confidence": person_conf, "person_method": person_method,
+            # de-anonymization engine fields
+            "domain": res.get("domain") or "",
+            "confidence": res.get("confidence") or 0.0,
+            "connection_type": res.get("connection_type") or "",
+            "industry": res.get("industry") or "",
+            "employees": res.get("employee_range") or res.get("employees") or "",
+            "revenue": res.get("revenue") or "",
+            "linkedin_url": res.get("linkedin_url") or "",
+            "intent_score": i_score, "intent_stage": i_stage,
             "timeline": tl[:60]})
     all_visitors.sort(key=lambda x: (x["last_ts"] or x["first_ts"] or ""), reverse=True)
 

@@ -38,3 +38,9 @@ data/*.bak
 data/*.tmp
 data/*.db-journal
 data/.fuse_hidden*
+
+# Visitor identity graph — runtime store of real visitor PII, must never be committed
+data/identity_graph.db
+data/identity_graph.db-wal
+data/identity_graph.db-shm
+data/identity_graph.db-journal
