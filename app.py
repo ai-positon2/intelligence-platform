@@ -2739,9 +2739,9 @@ _IP_RESOLVE_CACHE = {}
 # the surface degrades to the legacy IPinfo-only path below.
 try:
     from visitor_intelligence import resolve_ip as _vi_resolve_ip
-    from visitor_intelligence import resolve_visitor as _vi_resolve_visitor
     from visitor_intelligence import deepen_with_apollo as _vi_deepen_with_apollo
     from visitor_intelligence import score_intent as _vi_score_intent
+    from visitor_intelligence import enrich_company_free as _vi_enrich_company_free
     _VI_OK = True
 except Exception as _vi_e:  # pragma: no cover
     _VI_OK = False
@@ -2749,11 +2749,16 @@ except Exception as _vi_e:  # pragma: no cover
 
 
 def _ip_resolve(ip: str) -> dict:
-    """Full multi-signal resolution for one IP (cached per IP): company/domain/
-    confidence/connection_type/identifiable plus FREE firmographics (the
-    company's own published data, self-built tech fingerprinting, SEC EDGAR for
-    public filers) + intent. No Apollo credits are spent here -- this runs on
-    every visitor. Empty dict for local/unknown."""
+    """Fast per-IP resolution (cached per IP): company/domain/confidence/
+    connection_type/identifiable from IPinfo + reverse DNS + RDAP only. No
+    Apollo credits are spent here, and -- deliberately -- no free-tier company
+    homepage fetch either: this is called once per unique visitor IP for a
+    dashboard that can carry hundreds of them in one page load, and a
+    homepage fetch per visitor made that load take minutes (see
+    _fetch_visitor_analytics, which resolves every unique IP on the page).
+    Firmographics (industry/employees/revenue/description) stay empty here;
+    they're filled in on demand by _ip_deepen_with_apollo when a rep asks for
+    one specific lead, not eagerly for every row. Empty dict for local/unknown."""
     if not ip or ip in ("127.0.0.1", "::1", "localhost"):
         return {}
     if ip in _IP_RESOLVE_CACHE:
@@ -2761,8 +2766,25 @@ def _ip_resolve(ip: str) -> dict:
     rec = {}
     if _VI_OK:
         try:
-            rec = _vi_resolve_visitor(ip, ipinfo_token=os.environ.get("IPINFO_TOKEN", ""),
-                                    online=True)
+            res = _vi_resolve_ip(ip, ipinfo_token=os.environ.get("IPINFO_TOKEN", ""),
+                                online=True)
+            d = res.to_dict()
+            rec = {
+                "ip": d.get("ip"), "identifiable": d.get("identifiable"),
+                "connection_type": d.get("connection_type"),
+                "confidence": d.get("confidence"), "company": d.get("company"),
+                "domain": d.get("domain"), "asn": d.get("asn"),
+                "asn_org": d.get("asn_org"), "country": d.get("country"),
+                "city": d.get("city"), "method": d.get("method"),
+                "methods": d.get("methods"), "is_vpn": d.get("is_vpn"),
+                "is_proxy": d.get("is_proxy"), "is_hosting": d.get("is_hosting"),
+                "reasons": d.get("reasons"),
+                # not resolved on this fast path -- see _ip_deepen_with_apollo
+                "industry": None, "employees": None, "employee_range": None,
+                "revenue": None, "hq_country": d.get("country"), "hq_city": None,
+                "linkedin_url": None, "technologies": [], "description": None,
+                "social_links": [], "buying_committee": [], "enrichment_source": None,
+            }
         except Exception as e:
             log.warning("ip_resolve failed for %s: %s", ip, e)
             rec = {}
@@ -2771,19 +2793,41 @@ def _ip_resolve(ip: str) -> dict:
 
 
 def _ip_deepen_with_apollo(ip: str, with_committee: bool = True) -> dict:
-    """EXPLICIT, human-triggered Apollo enrichment (spends ~1 credit) for one
-    already-resolved IP/company. Call this ONLY from a deliberate rep action
-    (e.g. an "Enrich further" button), never automatically from a page load or
-    the bulk anon-traffic builder. Returns the deepened record; {} if the
-    engine, an Apollo key, or a resolvable domain is unavailable."""
+    """EXPLICIT, human-triggered enrichment for one already-resolved IP/company.
+    Call this ONLY from a deliberate rep action (e.g. an "Enrich further"
+    button), never automatically from a page load or the bulk anon-traffic
+    builder -- that bulk path (_ip_resolve) deliberately stays IP-only (no
+    homepage fetch) so it can run on hundreds of visitors without the page
+    taking minutes to load. This on-demand, single-visitor path is exactly
+    where the homepage fetch belongs: first the free tier (schema.org/
+    OpenGraph/tech-stack off the company's own site, zero cost), then Apollo
+    on top of it (spends ~1 credit) if APOLLO_API_KEY is configured. Returns
+    the enriched record; {} if the engine is unavailable or there's no
+    resolvable domain to enrich."""
     if not _VI_OK:
         return {}
     rec = _ip_resolve(ip)
     if not rec.get("domain"):
         return {}
+    rec = dict(rec)
+    if rec.get("enrichment_source") != "free":
+        try:
+            free = _vi_enrich_company_free(rec["domain"])
+            if free:
+                rec["company"] = free.get("name") or rec.get("company")
+                rec["description"] = free.get("description")
+                rec["hq_city"] = free.get("hq_city")
+                rec["hq_country"] = free.get("hq_country") or rec.get("hq_country")
+                rec["linkedin_url"] = free.get("linkedin_url")
+                rec["social_links"] = free.get("social_links") or []
+                rec["technologies"] = free.get("technologies") or []
+                rec["enrichment_source"] = "free"
+        except Exception as e:
+            log.warning("free enrich failed for domain=%s: %s", rec["domain"], e)
     apollo_key = os.environ.get("APOLLO_API_KEY", "")
     if not apollo_key:
-        return {}
+        _IP_RESOLVE_CACHE[ip] = rec
+        return rec
     try:
         deepened = _vi_deepen_with_apollo(dict(rec), apollo_key=apollo_key,
                                         with_committee=with_committee)
@@ -3085,7 +3129,23 @@ def atrack():
         log.warning("atrack failed: %s", e)
     return jsonify({"ok": True})
 
-def _fetch_visitor_analytics() -> dict:
+_VISITOR_ANALYTICS_CACHE = {"data": None, "ts": 0.0}
+_VISITOR_ANALYTICS_CACHE_TTL = 300  # seconds — this aggregation resolves hundreds of
+                                    # visitor IPs and re-reads two Sheets tabs; too
+                                    # slow to redo on every page view/auto-refresh.
+
+def _fetch_visitor_analytics(force: bool = False) -> dict:
+    """Aggregate the 'Visitor Analytics' tab for the admin dashboard (TTL-cached)."""
+    now = time.time()
+    if not force and _VISITOR_ANALYTICS_CACHE["data"] is not None and \
+            (now - _VISITOR_ANALYTICS_CACHE["ts"]) < _VISITOR_ANALYTICS_CACHE_TTL:
+        return _VISITOR_ANALYTICS_CACHE["data"]
+    data = _fetch_visitor_analytics_uncached()
+    _VISITOR_ANALYTICS_CACHE["data"] = data
+    _VISITOR_ANALYTICS_CACHE["ts"] = now
+    return data
+
+def _fetch_visitor_analytics_uncached() -> dict:
     """Aggregate the 'Visitor Analytics' tab for the admin dashboard."""
     from collections import Counter, defaultdict
     rows = []
@@ -3367,20 +3427,22 @@ def admin_visitors():
 @app.route("/p2/admin/anonymous-traffic/data")
 @admin_required
 def admin_visitors_data():
-    """JSON aggregates for the visitor analytics dashboard."""
-    return jsonify(_fetch_visitor_analytics())
+    """JSON aggregates for the visitor analytics dashboard (TTL-cached; pass
+    ?fresh=1 to force a live re-pull, e.g. from the page's Refresh button)."""
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return jsonify(_fetch_visitor_analytics(force=force))
 
 @app.route("/p2/admin/anonymous-traffic/deepen", methods=["POST"])
 @admin_required
 def admin_visitor_deepen():
     """Explicit, human-triggered 'Enrich further' action for one visitor's
-    company (spends ~1 Apollo credit). Only reachable by clicking the button
-    on a single visitor's record in the Anonymous Traffic dashboard -- never
-    called automatically."""
+    company. Only reachable by clicking the button on a single visitor's
+    record in the Anonymous Traffic dashboard -- never called automatically.
+    Always layers in free-tier company data (zero cost); additionally spends
+    ~1 Apollo credit for firmographics/buying-committee if APOLLO_API_KEY is
+    configured -- if not, the free-tier fields are still returned."""
     if not _VI_OK:
         return jsonify({"error": "enrichment engine unavailable"}), 503
-    if not os.environ.get("APOLLO_API_KEY"):
-        return jsonify({"error": "Apollo is not configured (APOLLO_API_KEY missing)"}), 400
     ip = (request.get_json(silent=True) or {}).get("ip", "").strip()
     if not ip:
         return jsonify({"error": "ip required"}), 400
@@ -3390,12 +3452,13 @@ def admin_visitor_deepen():
     return jsonify({"ok": True, "record": {
         "domain": rec.get("domain") or "",
         "company": rec.get("company") or "",
+        "description": rec.get("description") or "",
         "industry": rec.get("industry") or "",
         "employees": rec.get("employee_range") or rec.get("employees") or "",
         "revenue": rec.get("revenue") or "",
         "linkedin_url": rec.get("linkedin_url") or "",
         "confidence": rec.get("confidence") or 0.0,
-        "enrichment_source": rec.get("enrichment_source") or "apollo",
+        "enrichment_source": rec.get("enrichment_source") or "free",
         "buying_committee": rec.get("buying_committee") or [],
     }})
 

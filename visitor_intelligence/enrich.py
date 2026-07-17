@@ -34,6 +34,8 @@ except Exception:  # pragma: no cover - keeps engine importable in isolation
 _CO_CACHE: Dict[str, tuple] = {}
 _PPL_CACHE: Dict[str, tuple] = {}
 _TTL = 7 * 86400
+_NEG_TTL = 3600  # a failed/empty lookup retries within the hour, not the week --
+                 # a transient API/network blip must not poison a domain for 7 days
 
 
 def _fresh(cache: Dict[str, tuple], key: str) -> Optional[Any]:
@@ -41,6 +43,11 @@ def _fresh(cache: Dict[str, tuple], key: str) -> Optional[Any]:
     if hit and hit[0] > time.time():
         return hit[1]
     return None
+
+
+def _store(cache: Dict[str, tuple], key: str, value: Any) -> Any:
+    cache[key] = (time.time() + (_TTL if value else _NEG_TTL), value)
+    return value
 
 
 def enrich_company(domain: str, api_key: str) -> Dict[str, Any]:
@@ -59,8 +66,7 @@ def enrich_company(domain: str, api_key: str) -> Dict[str, Any]:
         except Exception as e:  # pragma: no cover
             log.warning("apollo enrich_company failed domain=%s: %s", domain, e)
             out = {}
-    _CO_CACHE[key] = (time.time() + _TTL, out)
-    return out
+    return _store(_CO_CACHE, key, out)
 
 
 def buying_committee(apollo_org_id: str, api_key: str,
@@ -78,8 +84,7 @@ def buying_committee(apollo_org_id: str, api_key: str,
     except Exception as e:  # pragma: no cover
         log.warning("apollo buying_committee failed org=%s: %s", apollo_org_id, e)
         people = []
-    _PPL_CACHE[key] = (time.time() + _TTL, people)
-    return people
+    return _store(_PPL_CACHE, key, people)
 
 
 def enrich_person(api_key: str, email: Optional[str] = None,
@@ -125,8 +130,7 @@ def enrich_person(api_key: str, email: Optional[str] = None,
     except Exception as e:  # pragma: no cover
         log.warning("apollo enrich_person failed: %s", e)
         out = {}
-    _PPL_CACHE[cache_key] = (time.time() + _TTL, out)
-    return out
+    return _store(_PPL_CACHE, cache_key, out)
 
 
 def _normalize_org(org: Dict[str, Any]) -> Dict[str, Any]:

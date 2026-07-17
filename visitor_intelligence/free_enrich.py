@@ -47,6 +47,8 @@ _UA = "Mozilla/5.0 (compatible; visitor-intel-research/1.0; +free-tier enrichmen
 _SEC_UA = "Position2 Intelligence Platform %s" % \
     __import__("os").environ.get("SEC_EDGAR_CONTACT", "reporting@position2.com")
 _TTL = 7 * 86400
+_NEG_TTL = 3600  # a fetch failure (dead site, transient network blip, DNS hiccup)
+                 # retries within the hour, not the week
 _CACHE: Dict[str, tuple] = {}
 
 
@@ -274,8 +276,9 @@ def enrich_company_free(domain: str, check_sec: bool = False) -> Dict[str, Any]:
         sec = sec_edgar_lookup(out["name"])
         out.update(sec)
 
+    fetch_failed = bool(out.get("fetch_failed"))
     out = {k: v for k, v in out.items() if v not in (None, "", [])}
-    _CACHE[key] = (time.time() + _TTL, out)
+    _CACHE[key] = (time.time() + (_NEG_TTL if fetch_failed else _TTL), out)
     return out
 
 
