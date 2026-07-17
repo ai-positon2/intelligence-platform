@@ -3,7 +3,8 @@
 Run:  python3 -m visitor_intelligence.tests
 """
 from visitor_intelligence.resolver import (classify_connection, domain_from_host,
-                                        _score, _org_to_domain)
+                                        _score, _org_to_domain, _looks_like_handle,
+                                        _clean_org_name, _best_rdap_org)
 from visitor_intelligence.intent import score_intent
 
 P = F = 0
@@ -54,6 +55,96 @@ def test_gate_indian_isps():
     ct, _ = classify_connection("Tata Teleservices Limited", None, None, None,
                                 ipinfo_type="business")
     ck("keyword veto over ipinfo_type=business", ct != "business")
+
+def test_gate_proxy_and_hosting():
+    """Security proxies/SASE (Zscaler, Netskope, ...) egress a whole company's
+    traffic, and web hosts front thousands of unrelated sites -- neither names
+    the visitor. Both must be gated out. These are the exact names that reached
+    the UI as 'companies' (Zscaler, Inc. / HostPapa / Webair / Beanfield)."""
+    for org, exp in [
+        ("Zscaler, Inc.", "proxy"), ("Netskope Inc", "proxy"),
+        ("Cato Networks Ltd", "proxy"), ("iboss inc", "proxy"),
+        ("Forcepoint LLC", "proxy"), ("NordVPN", "proxy"),
+        ("HostPapa Inc.", "hosting"), ("GoDaddy.com LLC", "hosting"),
+        ("Webair Internet Development Company Inc.", "hosting"),
+        ("Hostinger International", "hosting"),
+        ("Beanfield Technologies Inc.", "isp"),
+        ("Cogent Communications", "isp"), ("Lumen Technologies", "isp"),
+        ("Hurricane Electric", "isp"),
+        # hyperscalers: their IP space is overwhelmingly cloud tenancy, so a
+        # hit is almost always a hosted service, not an employee. Gate like AWS.
+        ("Google LLC", "hosting"), ("Microsoft Corporation", "hosting"),
+        ("Oracle Corporation", "hosting"), ("Alibaba Cloud LLC", "hosting"),
+        ("Amazon.com, Inc.", "hosting"),
+    ]:
+        ct, _ = classify_connection(org, None, None, 4096)
+        ck("classify %s -> %s" % (org, exp), ct == exp)
+    # a proxy/hosting/isp org must never be identifiable, at any block size
+    for ct in ("proxy",):
+        conf, dom, *_ = _score(ct, [("ipinfo_org", "zscaler.com")], 256)
+        ck("gate blocks %s (conf 0)" % ct, conf == 0.0 and dom is None)
+
+def test_confirmed_host_and_operator_override():
+    """Aventice LLC (verified dedicated-server host, name carries no hosting
+    word) is now gated. And the operator exclusion knob gates the long tail
+    without a code change."""
+    ck("aventice gated", classify_connection("Aventice LLC", None, None, 4096)[0] == "hosting")
+    import visitor_intelligence.resolver as R
+    saved = R._EXTRA_NONBUSINESS
+    try:
+        R._EXTRA_NONBUSINESS = ("obscurehost", "weirdreseller")
+        ck("operator-excluded org gated",
+        R.classify_connection("Obscurehost Pvt Ltd", None, None, 4096)[0] == "hosting")
+        ck("non-excluded real biz still business",
+        R.classify_connection("Acme Robotics", None, None, 4096)[0] == "business")
+    finally:
+        R._EXTRA_NONBUSINESS = saved
+
+def test_handle_and_netname_rejected():
+    """RDAP maintainer/handle/netname strings are NOT company names. These are
+    the literal values that showed in the screenshot."""
+    for h in ["BLUEWINNET-MNT", "NS1212-mnt", "MICROSOFT-MAINT", "RIPE-NCC-HM-MNT",
+            "meta-mnt", "MSFT", "ZSCALER-WAS1", "IE-FACEBOOK-20140612",
+            "NET-165-225-8-0-1", "ORG-FIL7-RIPE", "APNIC-HM", ""]:
+        ck("handle rejected: %r" % h, _looks_like_handle(h) is True)
+        ck("clean_org_name drops handle: %r" % h, _clean_org_name(h) is None)
+    for real in ["Meta Platforms Ireland Limited", "Microsoft Corporation",
+                "Zscaler, Inc.", "GitHub, Inc.", "Cloudflare", "Stripe, Inc."]:
+        ck("real name kept: %r" % real, _looks_like_handle(real) is False)
+        ck("clean_org_name keeps real: %r" % real, _clean_org_name(real) == real)
+
+def test_best_rdap_org_prefers_real_org_over_maintainer():
+    """Reproduces the Meta/RIPE case: multiple registrant entities, one of which
+    is the RIPE hostmaster maintainer. Must pick the real org, not the -MNT."""
+    data = {"entities": [
+        {"handle": "meta-mnt", "roles": ["registrant"],
+        "vcardArray": ["vcard", [["fn", {}, "text", "meta-mnt"]]]},
+        {"handle": "RIPE-NCC-HM-MNT", "roles": ["registrant"],
+        "vcardArray": ["vcard", [["fn", {}, "text", "RIPE-NCC-HM-MNT"]]]},
+        {"handle": "ORG-FIL7-RIPE", "roles": ["registrant"],
+        "vcardArray": ["vcard", [["kind", {}, "text", "org"],
+                                    ["fn", {}, "text", "Meta Platforms Ireland Limited"]]]},
+    ]}
+    ck("picks real org over -MNT maintainers",
+    _best_rdap_org(data) == "Meta Platforms Ireland Limited")
+    # a block that exposes ONLY maintainer/handle objects -> honest None
+    only_handles = {"entities": [
+        {"handle": "BLUEWINNET-MNT", "roles": ["registrant"],
+        "vcardArray": ["vcard", [["fn", {}, "text", "BLUEWINNET-MNT"]]]}]}
+    ck("only-handles block -> None", _best_rdap_org(only_handles) is None)
+
+def test_identification_requires_confidence():
+    """'Only give a company name when very sure.' A single guessed-domain signal
+    (org-name -> domain) on a non-dedicated block is not enough."""
+    # single ipinfo_org guess, large block -> below the bar
+    conf, dom, method, methods, _ = _score("business", [("ipinfo_org", "acme.com")], 5_000_000)
+    ck("single weak guess conf < identify floor", conf < 0.6)
+    # strong reverse-DNS domain clears the bar comfortably
+    conf2, *_ = _score("business", [("reverse_dns", "acme.com")], 4096)
+    ck("reverse_dns clears floor", conf2 >= 0.6)
+    # two agreeing methods clear the bar
+    conf3, *_ = _score("business", [("ipinfo_org", "acme.com"), ("reverse_dns", "acme.com")], 4096)
+    ck("corroborated clears floor", conf3 >= 0.6)
 
 def test_domain_extraction():
     ck("corp PTR", domain_from_host("smtp.acme-robotics.com") == "acme-robotics.com")
@@ -156,7 +247,12 @@ def test_resolve_visitor_no_apollo_by_default():
 
 
 if __name__ == "__main__":
-    for t in [test_gate, test_gate_indian_isps, test_domain_extraction, test_gate_blocks_scoring,
+    for t in [test_gate, test_gate_indian_isps, test_gate_proxy_and_hosting,
+            test_confirmed_host_and_operator_override,
+            test_handle_and_netname_rejected,
+            test_best_rdap_org_prefers_real_org_over_maintainer,
+            test_identification_requires_confidence,
+            test_domain_extraction, test_gate_blocks_scoring,
             test_corroboration, test_org_to_domain, test_intent, test_identity_graph,
             test_free_enrich_offline, test_team_page_title_filter,
             test_resolve_visitor_no_apollo_by_default]:
