@@ -2792,6 +2792,25 @@ def _ip_resolve(ip: str) -> dict:
     return rec
 
 
+def _resolve_ips_bulk(ips, max_workers: int = 16) -> None:
+    """Warm _IP_RESOLVE_CACHE for many unique IPs CONCURRENTLY. Each _ip_resolve
+    call is one or two blocking network round-trips (IPinfo, sometimes RDAP);
+    resolving a dashboard's worth of unique visitor IPs one at a time in a
+    Python for-loop is exactly what made the Anonymous Traffic page take
+    minutes to load. This is pure I/O-bound fan-out, so a small thread pool
+    turns that into wall-clock roughly (count / max_workers) round-trips
+    instead of (count). Call this once with every IP the page is about to
+    look up, before any code calls _ip_resolve/_ip_company in a loop."""
+    todo = [ip for ip in dict.fromkeys(ips)
+            if ip and ip not in ("127.0.0.1", "::1", "localhost")
+            and ip not in _IP_RESOLVE_CACHE]
+    if not todo:
+        return
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(todo))) as ex:
+        list(ex.map(_ip_resolve, todo))
+
+
 def _ip_deepen_with_apollo(ip: str, with_committee: bool = True) -> dict:
     """EXPLICIT, human-triggered enrichment for one already-resolved IP/company.
     Call this ONLY from a deliberate rep action (e.g. an "Enrich further"
@@ -3272,12 +3291,6 @@ def _fetch_visitor_analytics_uncached() -> dict:
     for r in human:
         v = c(r,"Visitor ID"); ipv = c(r,"IP")
         if v and ipv and v not in vid_ip: vid_ip[v] = ipv
-    vid_company = {}; _ipc = {}
-    for v, ipv in list(vid_ip.items())[:150]:
-        co = _ipc.get(ipv)
-        if co is None:
-            co = _ip_company(ipv); _ipc[ipv] = co
-        if co: vid_company[v] = co
     vid_pages = defaultdict(int)
     va_by_vid = defaultdict(list)
     for r in human:
@@ -3285,6 +3298,21 @@ def _fetch_visitor_analytics_uncached() -> dict:
         if v:
             vid_pages[v] += 1
             va_by_vid[v].append(r)
+    # Rank once, up front, so we know the exact (bounded) set of IPs this page
+    # load needs -- then resolve all of them CONCURRENTLY in one pool instead
+    # of one-by-one inside each loop below. This is the fix for the multi-
+    # minute load: same IPs, same caps, just fetched in parallel.
+    visitor_ids_ranked = sorted(visitors, key=lambda v: vid_pages.get(v,0), reverse=True)[:500]
+    _ip_pool = {vid_ip[v] for v in visitor_ids_ranked if vid_ip.get(v)}
+    _ip_pool.update(ipv for _, ipv in list(vid_ip.items())[:150])
+    if _VI_OK:
+        _resolve_ips_bulk(_ip_pool)
+    vid_company = {}; _ipc = {}
+    for v, ipv in list(vid_ip.items())[:150]:
+        co = _ipc.get(ipv)
+        if co is None:
+            co = _ip_company(ipv); _ipc[ipv] = co
+        if co: vid_company[v] = co
     companies = Counter()
     for v in visitors:
         co = ((idmap.get(v,{}) or {}).get("company") or vid_company.get(v) or "").strip()
@@ -3312,7 +3340,6 @@ def _fetch_visitor_analytics_uncached() -> dict:
     # "Unique visitors"/"Signed in later" KPI cards can drill into real people, not just charts.
     # Capped by page-activity to bound timeline-building cost on very large visitor counts.
     all_visitors = []
-    visitor_ids_ranked = sorted(visitors, key=lambda v: vid_pages.get(v,0), reverse=True)[:500]
     for v in visitor_ids_ranked:
         idn = idmap.get(v) or {}
         co = idn.get("company") or vid_company.get(v) or ""
