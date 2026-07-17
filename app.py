@@ -3305,6 +3305,7 @@ def _fetch_visitor_analytics() -> dict:
             # person-level identity graph fields
             "person_confidence": person_conf, "person_method": person_method,
             # de-anonymization engine fields
+            "ip": ip_v,
             "domain": res.get("domain") or "",
             "confidence": res.get("confidence") or 0.0,
             "connection_type": res.get("connection_type") or "",
@@ -3312,6 +3313,8 @@ def _fetch_visitor_analytics() -> dict:
             "employees": res.get("employee_range") or res.get("employees") or "",
             "revenue": res.get("revenue") or "",
             "linkedin_url": res.get("linkedin_url") or "",
+            "enrichment_source": res.get("enrichment_source") or "",
+            "buying_committee": [],
             "intent_score": i_score, "intent_stage": i_stage,
             "timeline": tl[:60]})
     all_visitors.sort(key=lambda x: (x["last_ts"] or x["first_ts"] or ""), reverse=True)
@@ -3366,6 +3369,35 @@ def admin_visitors():
 def admin_visitors_data():
     """JSON aggregates for the visitor analytics dashboard."""
     return jsonify(_fetch_visitor_analytics())
+
+@app.route("/p2/admin/anonymous-traffic/deepen", methods=["POST"])
+@admin_required
+def admin_visitor_deepen():
+    """Explicit, human-triggered 'Enrich further' action for one visitor's
+    company (spends ~1 Apollo credit). Only reachable by clicking the button
+    on a single visitor's record in the Anonymous Traffic dashboard -- never
+    called automatically."""
+    if not _VI_OK:
+        return jsonify({"error": "enrichment engine unavailable"}), 503
+    if not os.environ.get("APOLLO_API_KEY"):
+        return jsonify({"error": "Apollo is not configured (APOLLO_API_KEY missing)"}), 400
+    ip = (request.get_json(silent=True) or {}).get("ip", "").strip()
+    if not ip:
+        return jsonify({"error": "ip required"}), 400
+    rec = _ip_deepen_with_apollo(ip, with_committee=True)
+    if not rec or not rec.get("domain"):
+        return jsonify({"error": "nothing to enrich for this visitor"}), 200
+    return jsonify({"ok": True, "record": {
+        "domain": rec.get("domain") or "",
+        "company": rec.get("company") or "",
+        "industry": rec.get("industry") or "",
+        "employees": rec.get("employee_range") or rec.get("employees") or "",
+        "revenue": rec.get("revenue") or "",
+        "linkedin_url": rec.get("linkedin_url") or "",
+        "confidence": rec.get("confidence") or 0.0,
+        "enrichment_source": rec.get("enrichment_source") or "apollo",
+        "buying_committee": rec.get("buying_committee") or [],
+    }})
 
 
 def _fetch_member_analytics() -> dict:

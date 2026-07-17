@@ -90,9 +90,11 @@ rec = deepen_with_apollo(rec, apollo_key=APOLLO_API_KEY, with_committee=True)
   keeping its old string return for backward compatibility.
 - `_ip_resolve(ip)` returns the full FREE record (cached per IP). This is what
   the Anonymous Traffic builder calls for every visitor -- zero Apollo cost.
-- `_ip_deepen_with_apollo(ip)` is the explicit opt-in function. It is defined
-  but not wired to any automatic path; connect it to a rep-facing "Enrich
-  further" action when you want it.
+- `_ip_deepen_with_apollo(ip)` is the explicit opt-in function. Its only call
+  site is `POST /p2/admin/anonymous-traffic/deepen`, hit by the "Enrich
+  further" button in a visitor's drawer on the Anonymous Traffic dashboard
+  (`templates/admin_visitors.html`) -- a human has to open one visitor's
+  record and click the button before a credit is spent.
 
 ## Config (env)
 
