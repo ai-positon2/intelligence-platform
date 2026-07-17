@@ -14,7 +14,8 @@ import os as _os
 
 from .resolver import resolve_ip, Resolution, classify_connection, domain_from_host
 from .intent import score_intent
-from .pipeline import resolve_visitor
+from .pipeline import resolve_visitor, deepen_with_apollo
+from .free_enrich import enrich_company_free, detect_technologies, fetch_team_page
 from .identity_graph import (IdentityGraph, GraphStore, PersonMatch, sha256_email,
                             IdentityProvider, ApolloPersonProvider, CoopFileProvider)
 
@@ -35,8 +36,10 @@ def build_identity_graph(apollo_key=None, coop_file=None, db_path=None):
     return IdentityGraph(store=GraphStore(db_path), providers=providers)
 
 
-__all__ = ["resolve_visitor", "resolve_ip", "Resolution", "classify_connection",
-        "domain_from_host", "score_intent", "IdentityGraph", "GraphStore",
-        "PersonMatch", "sha256_email", "IdentityProvider", "ApolloPersonProvider",
-        "CoopFileProvider", "build_identity_graph"]
-__version__ = "1.1.0"
+__all__ = ["resolve_visitor", "deepen_with_apollo", "resolve_ip", "Resolution",
+        "classify_connection", "domain_from_host", "score_intent",
+        "enrich_company_free", "detect_technologies", "fetch_team_page",
+        "IdentityGraph", "GraphStore", "PersonMatch", "sha256_email",
+        "IdentityProvider", "ApolloPersonProvider", "CoopFileProvider",
+        "build_identity_graph"]
+__version__ = "1.2.0"

@@ -75,9 +75,61 @@ def test_identity_graph():
     os.unlink(tf.name)
 
 
+def test_free_enrich_offline():
+    from visitor_intelligence.free_enrich import (
+        _extract_jsonld_org, _extract_og, detect_technologies)
+
+    html = '''<html><head>
+    <title>Acme Robotics | Industrial Automation</title>
+    <meta property="og:description" content="Acme builds robots.">
+    <meta property="og:site_name" content="Acme Robotics">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Organization","name":"Acme Robotics",
+     "legalName":"Acme Robotics, Inc.","description":"We build robots.",
+     "sameAs":["https://www.linkedin.com/company/acme-robotics","https://twitter.com/acme"],
+     "address":{"addressLocality":"Boston","addressCountry":"US"}}
+    </script>
+    <script src="https://cdn.segment.com/analytics.js/v1/x/analytics.min.js"></script>
+    </head><body><div id="app"></div>
+    <script src="/_next/static/chunks/main.js"></script>
+    </body></html>'''
+
+    org = _extract_jsonld_org(html)
+    ck("jsonld org name", org.get("legalName") == "Acme Robotics, Inc.")
+    ck("jsonld sameAs has linkedin", any("linkedin.com" in u for u in org.get("sameAs", [])))
+
+    og = _extract_og(html)
+    ck("og description extracted", og.get("description") == "Acme builds robots.")
+
+    techs = detect_technologies(html)
+    ck("detects Segment from script src", "Segment" in techs)
+    ck("detects React from _next/static asset path", "React" in techs)
+    ck("does not hallucinate unrelated tech", "Shopify" not in techs)
+
+
+def test_team_page_title_filter():
+    from visitor_intelligence.free_enrich import _TITLE_KEYWORDS
+    ck("real title matches", bool(_TITLE_KEYWORDS.search("VP of Engineering")))
+    ck("real title matches (CEO)", bool(_TITLE_KEYWORDS.search("Co-founder & CEO")))
+    ck("marketing copy does not match", not _TITLE_KEYWORDS.search("500M+ API requests per day"))
+    ck("generic heading does not match", not _TITLE_KEYWORDS.search("See the latest from Acme"))
+
+
+def test_resolve_visitor_no_apollo_by_default():
+    """resolve_visitor must never accept/require an apollo_key -- that call is
+    a completely separate, explicit function (deepen_with_apollo)."""
+    import inspect
+    from visitor_intelligence.pipeline import resolve_visitor, deepen_with_apollo
+    sig = inspect.signature(resolve_visitor)
+    ck("resolve_visitor has no apollo_key param", "apollo_key" not in sig.parameters)
+    ck("deepen_with_apollo exists as a separate opt-in function", callable(deepen_with_apollo))
+
+
 if __name__ == "__main__":
     for t in [test_gate, test_domain_extraction, test_gate_blocks_scoring,
-            test_corroboration, test_org_to_domain, test_intent, test_identity_graph]:
+            test_corroboration, test_org_to_domain, test_intent, test_identity_graph,
+            test_free_enrich_offline, test_team_page_title_filter,
+            test_resolve_visitor_no_apollo_by_default]:
         print(t.__name__); t()
     print("\n%d passed, %d failed" % (P, F))
     raise SystemExit(1 if F else 0)

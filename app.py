@@ -2735,11 +2735,12 @@ _IP_CACHE = {}
 _IP_RESOLVE_CACHE = {}
 
 # The real de-anonymization engine (multi-signal resolve + gate + confidence +
-# Apollo firmographics + intent). Imported lazily-safe: if the package is missing
+# free firmographics + intent). Imported lazily-safe: if the package is missing
 # the surface degrades to the legacy IPinfo-only path below.
 try:
     from visitor_intelligence import resolve_ip as _vi_resolve_ip
     from visitor_intelligence import resolve_visitor as _vi_resolve_visitor
+    from visitor_intelligence import deepen_with_apollo as _vi_deepen_with_apollo
     from visitor_intelligence import score_intent as _vi_score_intent
     _VI_OK = True
 except Exception as _vi_e:  # pragma: no cover
@@ -2748,9 +2749,11 @@ except Exception as _vi_e:  # pragma: no cover
 
 
 def _ip_resolve(ip: str) -> dict:
-    """Full multi-signal resolution for one IP (cached per IP). Returns the
-    engine's flat record: company/domain/confidence/connection_type/identifiable
-    plus firmographics + intent-ready fields. Empty dict for local/unknown."""
+    """Full multi-signal resolution for one IP (cached per IP): company/domain/
+    confidence/connection_type/identifiable plus FREE firmographics (the
+    company's own published data, self-built tech fingerprinting, SEC EDGAR for
+    public filers) + intent. No Apollo credits are spent here -- this runs on
+    every visitor. Empty dict for local/unknown."""
     if not ip or ip in ("127.0.0.1", "::1", "localhost"):
         return {}
     if ip in _IP_RESOLVE_CACHE:
@@ -2758,20 +2761,37 @@ def _ip_resolve(ip: str) -> dict:
     rec = {}
     if _VI_OK:
         try:
-            # Free path always: IP -> domain/company/confidence/connection_type.
-            # Apollo firmographic enrichment (1 credit/company) only when
-            # VI_ENRICH_ON_VIEW is set, so a dashboard load never silently burns
-            # Apollo credits. Batch/scheduled enrichment can set it explicitly.
-            apollo_key = os.environ.get("APOLLO_API_KEY", "") \
-                if os.environ.get("VI_ENRICH_ON_VIEW", "") in ("1", "true", "yes") else ""
-            rec = _vi_resolve_visitor(ip, apollo_key=apollo_key,
-                                    ipinfo_token=os.environ.get("IPINFO_TOKEN", ""),
+            rec = _vi_resolve_visitor(ip, ipinfo_token=os.environ.get("IPINFO_TOKEN", ""),
                                     online=True)
         except Exception as e:
             log.warning("ip_resolve failed for %s: %s", ip, e)
             rec = {}
     _IP_RESOLVE_CACHE[ip] = rec
     return rec
+
+
+def _ip_deepen_with_apollo(ip: str, with_committee: bool = True) -> dict:
+    """EXPLICIT, human-triggered Apollo enrichment (spends ~1 credit) for one
+    already-resolved IP/company. Call this ONLY from a deliberate rep action
+    (e.g. an "Enrich further" button), never automatically from a page load or
+    the bulk anon-traffic builder. Returns the deepened record; {} if the
+    engine, an Apollo key, or a resolvable domain is unavailable."""
+    if not _VI_OK:
+        return {}
+    rec = _ip_resolve(ip)
+    if not rec.get("domain"):
+        return {}
+    apollo_key = os.environ.get("APOLLO_API_KEY", "")
+    if not apollo_key:
+        return {}
+    try:
+        deepened = _vi_deepen_with_apollo(dict(rec), apollo_key=apollo_key,
+                                        with_committee=with_committee)
+        _IP_RESOLVE_CACHE[ip] = deepened  # cache the richer record going forward
+        return deepened
+    except Exception as e:
+        log.warning("apollo deepen failed for %s: %s", ip, e)
+        return {}
 
 
 def _ip_company(ip: str) -> str:
