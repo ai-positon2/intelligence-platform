@@ -373,8 +373,48 @@ function vrowList(pairs,opener,backKey,limit){
 }
 function openVisitorDrawer(i,backKey){renderVisitorInto(IDENTIFIED[i],backKey);}
 function openAllVisitorDrawer(i,backKey){renderVisitorInto(ALL_VISITORS[i],backKey);}
+var CUR_VISITOR=null;
+function fmtRev(r){if(!r)return'';var m=String(r).match(/([\d,.]+)/);return m?('$'+m[1]):r;}
+function enrichPanel(v){
+  if(!v||!v.ip||!v.domain)return'';
+  if(v.enrichment_source==='apollo'){
+    var bc=(v.buying_committee||[]);
+    return '<div class="ksect"><h4>Firmographics <span class="muted" style="font-weight:400;font-size:11px">· Apollo-deepened</span></h4>'+
+      '<div class="kstats">'+
+        (v.employees?'<div class="kstat"><b>'+esc(v.employees)+'</b><span>Employees</span></div>':'')+
+        (v.revenue?'<div class="kstat"><b>'+esc(fmtRev(v.revenue))+'</b><span>Revenue</span></div>':'')+
+      '</div>'+
+      (bc.length?'<div class="ksect"><h4>Buying committee</h4><div class="vlist">'+bc.map(function(p){
+        return '<div class="vrow" style="cursor:default"><div class="va">'+esc(initials(p.full_name||''))+'</div>'+
+          '<div class="vmain"><b>'+esc(p.full_name||'Unknown')+'</b><small>'+esc(p.title||'')+'</small></div>'+
+          (p.linkedin_url?'<a class="vmeta" href="'+esc(p.linkedin_url)+'" target="_blank" onclick="event.stopPropagation()">↗</a>':'')+
+        '</div>';
+      }).join('')+'</div></div>':'')+
+    '</div>';
+  }
+  return '<div class="ksect"><h4>Firmographics</h4><p class="kdesc" style="margin-top:0">'+
+    'Free-tier data only'+(v.industry?' — industry: '+esc(v.industry):'')+
+    '. Precise employee count, revenue, and a real buying committee require an Apollo lookup.</p>'+
+    '<button class="btn" id="deepenBtn" onclick="deepenVisitor()">💎 Enrich further (spends 1 Apollo credit)</button>'+
+    '<div id="deepenStatus" style="margin-top:8px;font-size:12px;color:var(--dim2)"></div>'+
+  '</div>';
+}
+function deepenVisitor(){
+  var v=CUR_VISITOR;if(!v||!v.ip)return;
+  var btn=document.getElementById('deepenBtn'),st=document.getElementById('deepenStatus');
+  if(btn){btn.disabled=true;btn.textContent='Enriching…';}
+  fetch('/p2/admin/anonymous-traffic/deepen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:v.ip})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){if(st)st.textContent='⚠ '+d.error;if(btn){btn.disabled=false;btn.textContent='💎 Enrich further (spends 1 Apollo credit)';}return;}
+      Object.assign(v,d.record||{});
+      renderVisitorInto(v);
+    })
+    .catch(function(){if(st)st.textContent='⚠ Request failed.';if(btn){btn.disabled=false;btn.textContent='💎 Enrich further (spends 1 Apollo credit)';}});
+}
 function renderVisitorInto(v,backKey){
   if(!v)return;
+  CUR_VISITOR=v;
   var statusChip=v.status?('<span class="chip '+v.status+'">'+(v.status==='staff'?'@position2.com staff':'Public member')+'</span>'):'';
   var back=backKey?('<a class="klink" onclick="openKpiDrawer(\''+backKey+'\')">← Back</a>'):'';
   document.getElementById('drawerHead').innerHTML=
@@ -389,7 +429,7 @@ function renderVisitorInto(v,backKey){
       (v.source?'<span class="chip">↗ '+esc(v.source)+'</span>':'')+
     '</div>';
   var tl=v.timeline||[];
-  document.getElementById('drawerTline').innerHTML=tl.length?tl.map(function(e){
+  var tlHtml=tl.length?tl.map(function(e){
     var kl=e.kind==='signin'?'signin':(e.kind==='post'?'post':'view');
     var kt=e.kind==='signin'?'sign-in':(e.kind==='post'?'after login':'pre-login');
     var ic=e.kind==='signin'?'★':(e.kind==='post'?'●':'○');
@@ -397,6 +437,7 @@ function renderVisitorInto(v,backKey){
       '<b><span class="k '+kl+'">'+kt+'</span>'+esc(e.label)+'</b>'+
       '<small>'+esc(e.t)+(e.meta?' · '+esc(e.meta):'')+'</small></div></div>';
   }).join(''):'<div class="empty">No tracked activity found for this visitor.</div>';
+  document.getElementById('drawerTline').innerHTML=enrichPanel(v)+'<div class="ksect"><h4>Journey</h4>'+tlHtml+'</div>';
   document.getElementById('overlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
 }
