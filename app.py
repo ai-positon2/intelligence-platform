@@ -4982,6 +4982,64 @@ CHATBOT_FUNCTIONS = [
 _PPC_CTX_CACHE: dict = {"data": None, "ts": 0.0}
 _PPC_CTX_TTL = 60    # seconds — refresh every 60s; keeps data fresh without hammering APIs
 
+# Static ground truth about the platform itself, so Vimi can answer questions about
+# how a feature/number/term works precisely instead of guessing. Keep this in sync
+# with CONTEXT_FOR_NEW_CHAT_V17.md when that doc changes; it is intentionally short
+# (cheap to inject on every request) and internal-only (this prompt only reaches
+# @position2_required routes).
+_VIMI_PLATFORM_KNOWLEDGE = """=== ABOUT THIS PLATFORM (ground truth for questions about the platform itself) ===
+Intelligence by Position2 (intelligence.position2.com) is Position2's internal B2B revenue-intelligence
+platform. Position2 is a B2B digital-marketing agency (SEO/organic growth, paid media, paid social,
+content, brand & website, RevOps). The platform surfaces buying signals, de-anonymises website visitors,
+tracks competitor ads and AI-answer-engine brand visibility, and runs a suite of SEO/GEO tools.
+
+THREE SURFACES: (1) public marketing site, logged out; (2) /app member workspace, any signed-in Google
+account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com only
+(this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/Signal Tracker, Admin dashboards.
+
+ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/gtm/anonymous-visitors):
+Identifies which COMPANIES (not usually individual people) visit the Position2 site, by fusing three
+signals per visitor IP: IPinfo (org/ASN/hostname/privacy), reverse DNS, and RDAP registrant/netblock.
+Each visitor gets a connection_type: "business" (a real company network — the only type that gets
+identified), or "isp"/"mobile"/"hosting"/"proxy"/"education"/"government" (residential, cellular, cloud,
+VPN, school, or government traffic — deliberately left unidentified to avoid false positives). Only
+"business" traffic above a confidence floor is attributed to a real company name. Individual PERSON-level
+identification only happens when the visitor has logged in, submitted a form, or matched a licensed data
+co-op — anonymous browsing is never matched to a named person. Company firmographics come first from free
+sources (the company's own homepage schema.org/meta data, tech-stack fingerprinting, SEC EDGAR for public
+filers); a paid Apollo.io lookup only runs on explicit request (the "Enrich further" button) to control cost.
+
+SIGNAL TRACKER (Accounts / Signal Tracker dashboards, /p2/accounts, /p2/signal-tracker/<account>):
+Monitors named company lists per client account (Healthcare and CSG) for buying signals: funding rounds,
+leadership changes, M&A, IPO activity, product launches, partnerships, hiring surges, and general news.
+Each signal has a severity (HIGH/MEDIUM/LOW) and an importance score = signal type weight x severity x
+recency (signals decay after about 90 days). Sourced from Apollo.io + news feeds (GDELT/SerpAPI/RSS),
+refreshed weekly via a GitHub Actions pipeline. Exact company/signal counts per account are in the LIVE
+DATA section below when available — use those numbers, never a memorised figure.
+
+AD INTELLIGENCE (/p2/gtm/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
+keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
+
+SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
+Generator, Content Enhancer, Technical SEO & GEO Auditor, Generative Search Visibility, AI Readiness
+Auditor, Competitor SEO Intelligence, Local Visibility Builder, and more). Some are fully live and
+connected; others are request-access only.
+
+SENTIMENT PULSE (/p2/gtm/sentiment-pulse) — be transparent if asked: this dashboard is an interactive UI
+MOCKUP with seeded/proxy data (a fictional "Cedar Valley Health" network), not a real data pipeline. If
+asked whether its numbers are real, say plainly that it is a demo/proxy dataset, not live call/patient data.
+
+ADMIN DASHBOARDS (/p2/admin/*, admin-only): Internal Usage, Anonymous Traffic (the visitor de-anon
+dashboard above), Public Page Analytics, Public Agent Usage, Agent Runs, Access Requests.
+
+Auth: Google Sign-In is open to any Google account; only @position2.com reaches /p2/* internal pages; a
+small admin allowlist reaches /p2/admin/*.
+
+Ground rule: answer questions about how a platform feature/number/term works from the facts above, precisely
+and without guessing. If something asked is genuinely outside both this and the LIVE DATA section, say so
+plainly rather than inventing an answer, and use web search for public information neither one covers.
+"""
+
 
 def _build_ppc_context() -> str:
     """
@@ -5104,14 +5162,15 @@ def _build_ppc_context() -> str:
     except Exception as e:
         parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Could not fetch: {e}")
 
-    # ── 2. Signal Tracker — ALL signals, no limit ─────────────────────────
-    try:
-        import sqlite3 as _sql
+    # ── 2. Signal Tracker — ALL signals, no limit, BOTH accounts ──────────
+    import sqlite3 as _sql
+    for _acct_label, _db_name in (("Healthcare", "tracker.db"), ("CSG", "tracker_csg_v2.db")):
+        try:
+            db_path = Path(__file__).parent / "data" / _db_name
+            if not db_path.exists():
+                parts.append(f"=== SIGNAL TRACKER ({_acct_label}) ===\n⚠ Database not on Railway — commit data/{_db_name} to git")
+                continue
 
-        db_path = Path(__file__).parent / "data" / "tracker.db"
-        if not db_path.exists():
-            parts.append("=== SIGNAL TRACKER ===\n⚠ Database not on Railway — commit data/tracker.db to git")
-        else:
             conn = _sql.connect(str(db_path))
             conn.row_factory = _sql.Row
             try:
@@ -5142,15 +5201,15 @@ def _build_ppc_context() -> str:
                 )
 
             parts.append(
-                f"=== SIGNAL TRACKER (Healthcare — 1,251 companies monitored) ===\n"
-                f"Total signals: {len(all_sigs)} across {comp_count} companies\n"
+                f"=== SIGNAL TRACKER ({_acct_label} — {comp_count} companies with signals) ===\n"
+                f"Total signals: {len(all_sigs)}\n"
                 f"By type: {sig_counts}\n\n"
                 f"--- ALL SIGNALS (newest first) ---\n"
                 + "\n".join(sig_lines)
             )
 
-    except Exception as e:
-        parts.append(f"=== SIGNAL TRACKER ===\n⚠ Could not fetch: {e}")
+        except Exception as e:
+            parts.append(f"=== SIGNAL TRACKER ({_acct_label}) ===\n⚠ Could not fetch: {e}")
 
     # ── 3. Ad Intelligence — ALL ads ─────────────────────────────────────
     try:
@@ -5281,7 +5340,7 @@ def ppc_chat():
         }
         fmt_instruction = f"\n\nOUTPUT FORMAT REQUIRED: {fmt_map.get(export_fmt, f'Format the output as {export_fmt}.')}\nDo NOT include any explanation before or after the data."
 
-    system_prompt = f"""You are the PPC Intelligence Assistant for Position2, a B2B marketing agency.
+    system_prompt = f"""You are Vimi, the Intelligence Assistant for Position2, a B2B marketing agency.
 You are highly intelligent, direct, and always give complete answers in one response — no follow-up questions.
 
 TODAY: {today} | THIS WEEK: {week_start} to {today} | YESTERDAY: {(now_ist - timedelta(days=1)).strftime('%Y-%m-%d')}
@@ -5294,11 +5353,18 @@ INSTRUCTIONS:
 - If a data section shows ⚠ Error, say that source is unavailable but answer from what's available.
 - Be analytical: bold **key numbers**, use bullets for lists, lead with the most useful insight.
 - For general PPC/marketing questions, answer from knowledge directly.
+- PRECISION RULE: never guess or invent a number, company, or fact. Ground every claim in the LIVE DATA
+  or PLATFORM KNOWLEDGE below; for anything else (public company news, general knowledge, definitions not
+  covered below) use web search. If, after checking all three, something is genuinely unknown, say so
+  plainly instead of making it up.
+- Questions about how a FEATURE of this platform works, what a term/metric means, or what a dashboard does
+  are answered from the PLATFORM KNOWLEDGE section below, precisely — not from the raw data rows.
 
 DATA SECTION RULES — NEVER MIX THESE:
 - Asked about COMPANIES → use SECTION A only. Columns: Company Name, Website, Industry, Location, Employees, Revenue. Never include individual people names.
 - Asked about VISITORS/PEOPLE → use SECTION B only. Columns: Name, Title, Company Website, Industry, Location, Date Visited.
 - "last 10 companies" = first 10 rows of SECTION A. "last 10 visitors" = first 10 rows of SECTION B.
+- Signal Tracker data is per client account (Healthcare, CSG) — never mix companies from one account into the other.
 
 CSV/EXCEL EXPORT RULES:
 - Output ONLY the CSV rows. No intro text, no explanation, no markdown fences, no code blocks.
@@ -5306,6 +5372,7 @@ CSV/EXCEL EXPORT RULES:
 - Include ONLY the columns that make sense for the query (e.g. company query = 6 columns, no extra).
 - Replace em-dashes (—) with a hyphen or leave blank. Quote values that contain commas.{fmt_instruction}
 
+{_VIMI_PLATFORM_KNOWLEDGE}
 ══════════════════════════ LIVE DATA ══════════════════════════
 {ppc_context}
 ═══════════════════════════════════════════════════════════════
@@ -5344,13 +5411,28 @@ CSV/EXCEL EXPORT RULES:
     else:
         messages.append({"role": "user", "content": user_message})
 
+    _max_out = 2800 if (has_file or export_fmt) else 1600
     try:
-        answer, _m = _vimi_completion(oai, messages, 2000, temperature=0.1)
+        if file_is_image and file_base64:
+            # Vision path: web search + images don't combine reliably, mirror /api/vimi-chat's
+            # approach and keep this on plain chat completions.
+            answer, _m = _vimi_completion(oai, messages, _max_out, temperature=0.1)
+            web_used = False
+        else:
+            model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+            answer, web_used = _responses_web_search(oai, model, messages, _max_out)
+            if not answer:
+                answer, web_used = _responses_web_search(
+                    oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), messages, _max_out)
+            if not answer:
+                answer, _m = _vimi_completion(oai, messages, _max_out, temperature=0.1)
+                web_used = False
         return jsonify({
             "answer":          answer,
             "detected_format": export_fmt or "",
             "is_export":       bool(export_fmt and not source_text),
             "is_csv":          export_fmt in ("csv", "excel"),
+            "web_search_used": web_used,
         })
     except Exception as e:
         log.warning("PPC chat error: %s", e)
@@ -6346,8 +6428,13 @@ def vimi_chat(account_id):
             "If the user asks for output as a file or specific format (CSV, Excel/XLSX, Word/DOCX, PDF, "
             "PowerPoint/PPTX, or a table), produce the COMPLETE content in clean markdown: a proper markdown table "
             "for tabular data, headings (#, ##) to structure documents and slides. The platform converts your "
-            "markdown into the requested file, so never refuse a format and never truncate with placeholders.\n\n"
-            "ACCOUNT OVERVIEW: %s\n\nRELEVANT SIGNAL DATA:\n%s%s" % (overview, ctx_str, att_ctx))
+            "markdown into the requested file, so never refuse a format and never truncate with placeholders. "
+            "If asked how a feature of this platform works or what a term/metric means, answer from the PLATFORM "
+            "KNOWLEDGE below, precisely; never guess. If something is outside both the signal data and platform "
+            "knowledge, use web search, and if still unknown say so plainly rather than inventing an answer.\n\n"
+            "%s\n"
+            "ACCOUNT OVERVIEW: %s\n\nRELEVANT SIGNAL DATA:\n%s%s" % (
+                _VIMI_PLATFORM_KNOWLEDGE, overview, ctx_str, att_ctx))
 
         msgs = [{"role": "system", "content": system}]
         for m in history[-8:]:
