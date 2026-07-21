@@ -24,9 +24,9 @@
 <!-- eyebrow pill -->
 <g>
   <rect x="358" y="52" width="484" height="42" rx="21" fill="#10162e" fill-opacity=".75" stroke="#39406b" stroke-width="1"/>
-  <circle cx="386" cy="73" r="4.5" fill="#22d3ee"/>
-  <circle cx="386" cy="73" r="8.5" fill="none" stroke="#22d3ee" stroke-opacity=".35"/>
-  <text x="402" y="79" font-family="JBMono SB" font-size="15" fill="#c7d0f0" letter-spacing="3.4">B2B REVENUE INTELLIGENCE &#183; POSITION2</text>
+  <circle cx="406" cy="73" r="4.5" fill="#22d3ee"/>
+  <circle cx="406" cy="73" r="8.5" fill="none" stroke="#22d3ee" stroke-opacity=".35"/>
+  <text x="422" y="79" font-family="JBMono SB, ui-monospace, monospace" font-size="15" fill="#c7d0f0" letter-spacing="3.4">AGENTIC AI PLATFORM &#183; POSITION2</text>
 </g>
 
 <!-- headline -->
