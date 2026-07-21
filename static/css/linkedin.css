@@ -19,7 +19,7 @@ body::before{
 ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
 
 /* SHELL */
-.shell{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 28px 100px}
+.shell{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 var(--margin-app) 100px}
 
 /* NAV removed — breadcrumb in topbar */
 /* PAGE HEADER */

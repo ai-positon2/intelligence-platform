@@ -26,6 +26,12 @@
   --r:8px;--rl:12px;--rxl:16px;--r2xl:22px;--rpill:100px;
   /* spacing */
   --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;--sp5:24px;--sp6:32px;--sp7:48px;
+  /* responsive grid (Arena spec): page side-margin + column gutter scale by
+     viewport. content = min(viewport,--maxw) − 2×--margin. Mobile-first base. */
+  --gutter:16px;--margin:20px;--maxw:1920px;
+  /* dashboards keep their own max-width (dense tables/charts), so their side
+     margin follows the Arena scale only up to the 48px laptop step, then holds. */
+  --margin-app:min(var(--margin),48px);
   /* type scale */
   --fs-2xs:9.5px;--fs-xs:11px;--fs-sm:12.5px;--fs-md:14px;--fs-lg:17px;--fs-xl:22px;--fs-2xl:30px;
   /* elevation */
@@ -37,6 +43,14 @@
   font-family:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   font-size:14px;color:var(--tx);
 }
+
+/* Arena responsive breakpoints: margin 20→32→48→80→120→160→200, gutter 16→24→32→40→48 */
+@media(min-width:428px){ :root{ --margin:32px } }
+@media(min-width:768px){ :root{ --margin:48px; --gutter:24px } }
+@media(min-width:1280px){ :root{ --margin:80px } }
+@media(min-width:1440px){ :root{ --margin:120px; --gutter:32px } }
+@media(min-width:1728px){ :root{ --margin:160px; --gutter:40px } }
+@media(min-width:1920px){ :root{ --margin:200px; --gutter:48px } }
 
 /* ════ LIGHT THEME (internal app) ════ */
 :root[data-theme="light"]{
