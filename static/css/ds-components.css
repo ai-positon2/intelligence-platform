@@ -18,7 +18,7 @@
 .ds-statrow{display:flex;gap:var(--sp4);flex-wrap:wrap;}
 .ds-stat{flex:1;min-width:140px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--rxl);padding:var(--sp4) var(--sp5);position:relative;}
 .ds-stat-label{font-size:var(--fs-xs);font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;}
-.ds-stat-val{font-size:var(--fs-2xl);font-weight:700;line-height:1;letter-spacing:-.02em;margin-top:var(--sp2);}
+.ds-stat-val{font-size:var(--fs-3xl);font-weight:700;line-height:1;letter-spacing:-.02em;margin-top:var(--sp2);}
 .ds-stat-val.is-accent{color:var(--accent)} .ds-stat-val.is-green{color:var(--green)}
 .ds-stat-val.is-amber{color:var(--amber)} .ds-stat-val.is-purple{color:var(--purple)} .ds-stat-val.is-cyan{color:var(--cyan)}
 
@@ -70,7 +70,7 @@
 
 /* ---- Empty state ---- */
 .ds-empty{text-align:center;padding:48px 18px;color:var(--tx3);}
-.ds-empty-ico{font-size:26px;opacity:.6;margin-bottom:8px;}
+.ds-empty-ico{font-size:24px;opacity:.6;margin-bottom:8px;}
 
 /* LIGHT THEME baseline */
 [data-theme="light"] body{background:var(--bg);color:var(--tx)}

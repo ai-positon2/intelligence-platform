@@ -5,7 +5,7 @@
   .dwrap{ width:100%; max-width:1180px; margin:0 auto; padding:34px 26px 96px; position:relative; z-index:1 }
 
   .crumb{ display:flex; align-items:center; gap:10px; font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;
-    font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--tx3) }
+    font-size:11.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tx3) }
   .crumb a{ color:var(--tx2); text-decoration:none } .crumb a:hover{ color:var(--tx) }
   .crumb .sep{ opacity:.45 }
 
@@ -54,8 +54,8 @@
     background:linear-gradient(145deg, var(--ac), var(--ac2));
     box-shadow:0 12px 28px -10px color-mix(in srgb, var(--ac) 65%, transparent) }
   .trip-ic svg{ width:20px; height:20px; stroke:#fff }
-  .trip h4{ margin:0 0 12px; font-size:16px; font-weight:700; letter-spacing:-.01em; color:#f2f6ff }
-  .trip p{ margin:0; font-size:13.5px; line-height:1.75; color:var(--tx2) }
+  .trip h4{ margin:0 0 12px; font-size:17px; font-weight:700; letter-spacing:-.01em; color:#f2f6ff }
+  .trip p{ margin:0; font-size:13px; line-height:1.75; color:var(--tx2) }
 
   .side{ display:flex; flex-direction:column; gap:20px }
   .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
@@ -68,11 +68,11 @@
   .use-card.disabled{ background:rgba(255,255,255,.05); box-shadow:none; cursor:default; pointer-events:none;
     border:1px solid var(--line) }
   .use-card .uc-title{ font-size:17px; font-weight:700; letter-spacing:-.01em; color:#05121b }
-  .use-card .uc-sub{ margin-top:3px; font-size:12.5px; font-weight:500; color:rgba(5,18,27,.72) }
+  .use-card .uc-sub{ margin-top:3px; font-size:13px; font-weight:500; color:rgba(5,18,27,.72) }
   .use-card.disabled .uc-title{ color:var(--tx) } .use-card.disabled .uc-sub{ color:var(--tx2) }
   .use-card .uc-arrow{ width:40px; height:40px; border-radius:50%; flex:none;
     display:flex; align-items:center; justify-content:center;
-    background:rgba(5,18,27,.16); color:#05121b; font-size:18px }
+    background:rgba(5,18,27,.16); color:#05121b; font-size:17px }
   .use-card.disabled .uc-arrow{ background:rgba(255,255,255,.06); color:var(--tx2) }
   button.use-card{ width:100%; border:0; font:inherit; text-align:left; -webkit-appearance:none }
   .use-card.requested{ background:rgba(255,255,255,.05); border:1px solid color-mix(in srgb, var(--ac) 35%, var(--line));
@@ -82,7 +82,7 @@
     color:color-mix(in srgb, var(--ac) 80%, #fff) }
   .use-card.pending{ opacity:.7; cursor:default }
   .scard{ background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius:20px; padding:24px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
-  .scard .lbl{ font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  .scard .lbl{ font-family:ui-monospace,monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
     color:var(--tx3); margin-bottom:15px }
   .builtby{ display:flex; align-items:center; gap:13px; padding:13px 15px;
     border:1px solid var(--line); border-radius:13px; background:rgba(255,255,255,.04) }
@@ -92,17 +92,17 @@
   .builtby b{ font-size:15px; color:var(--tx) }
   .tags{ display:flex; flex-wrap:wrap; gap:9px }
   .tag{ padding:8px 14px; border-radius:999px; border:1px solid var(--line);
-    background:rgba(255,255,255,.03); font-size:12.5px; color:var(--tx2);
+    background:rgba(255,255,255,.03); font-size:13px; color:var(--tx2);
     transition:border-color .2s ease, color .2s ease }
   .tag:hover{ border-color:color-mix(in srgb, var(--ac) 45%, transparent); color:var(--tx) }
 
   .runs-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px }
-  .runs-row b{ font-family:var(--display,inherit); font-size:26px; font-weight:800; color:var(--tx); letter-spacing:-.02em }
-  .runs-row span{ font-size:12px; color:var(--tx3) }
+  .runs-row b{ font-family:var(--display,inherit); font-size:24px; font-weight:800; color:var(--tx); letter-spacing:-.02em }
+  .runs-row span{ font-size:11.5px; color:var(--tx3) }
   .runs-track{ height:7px; border-radius:5px; background:rgba(255,255,255,.08); overflow:hidden }
   .runs-fill{ height:100%; border-radius:5px; background:linear-gradient(90deg,var(--ac),var(--ac2)) }
   .runs-fill.at-cap{ background:linear-gradient(90deg,#fb7185,#f472b6) }
-  .runs-note{ margin:12px 0 0; font-size:12px; color:var(--tx3); line-height:1.55 }
+  .runs-note{ margin:12px 0 0; font-size:11.5px; color:var(--tx3); line-height:1.55 }
   .runs-note.at-cap{ color:#fb7185 }
 
   @media (max-width:900px){ .dgrid{ grid-template-columns:1fr } .trips{ grid-template-columns:1fr } }
@@ -118,21 +118,21 @@
     background:linear-gradient(145deg, var(--ac), var(--ac2)) }
   .reqmodal-icon svg{ width:20px; height:20px; stroke:#fff }
   .reqmodal-head h3{ margin:0 0 4px; font-size:17px; font-weight:700; color:#f2f6ff; letter-spacing:-.01em }
-  .reqmodal-head p{ margin:0; font-size:12.5px; color:var(--tx2); line-height:1.5 }
+  .reqmodal-head p{ margin:0; font-size:13px; color:var(--tx2); line-height:1.5 }
   .reqmodal-close{ position:absolute; top:-8px; right:-8px; width:28px; height:28px; border-radius:50%; border:0;
-    background:rgba(255,255,255,.06); color:var(--tx2); font-size:16px; line-height:1; cursor:pointer;
+    background:rgba(255,255,255,.06); color:var(--tx2); font-size:17px; line-height:1; cursor:pointer;
     display:flex; align-items:center; justify-content:center; transition:.2s }
   .reqmodal-close:hover{ background:rgba(255,255,255,.12); color:var(--tx) }
   .reqmodal textarea{ width:100%; resize:vertical; min-height:96px; border-radius:13px; border:1px solid var(--line);
-    background:rgba(255,255,255,.03); color:var(--tx); font:inherit; font-size:13.5px; padding:14px; outline:none;
+    background:rgba(255,255,255,.03); color:var(--tx); font:inherit; font-size:13px; padding:14px; outline:none;
     transition:border-color .2s ease; box-sizing:border-box }
   .reqmodal textarea:focus{ border-color:color-mix(in srgb, var(--ac) 55%, var(--line)) }
   .reqmodal textarea::placeholder{ color:var(--tx3) }
   .reqmodal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px }
   .reqmodal-cancel{ padding:11px 18px; border-radius:11px; border:1px solid var(--line); background:rgba(255,255,255,.03);
-    color:var(--tx2); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; transition:.2s }
+    color:var(--tx2); font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:.2s }
   .reqmodal-cancel:hover{ color:var(--tx); background:rgba(255,255,255,.06) }
-  .reqmodal-send{ padding:11px 20px; border-radius:11px; border:0; font:inherit; font-size:13.5px; font-weight:700;
+  .reqmodal-send{ padding:11px 20px; border-radius:11px; border:0; font:inherit; font-size:13px; font-weight:700;
     color:#05121b; cursor:pointer; background:linear-gradient(135deg, var(--ac), var(--ac2)); transition:transform .2s ease, opacity .2s ease }
   .reqmodal-send:hover{ transform:translateY(-1px) }
   .reqmodal-send:disabled{ opacity:.6; cursor:default; transform:none }
