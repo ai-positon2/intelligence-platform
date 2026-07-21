@@ -31,7 +31,7 @@
     /* ── Topbar ── */
     .topbar {
       position: relative; z-index: 10;
-      height: 62px; padding: 0 32px;
+      height: 62px; padding: 0 var(--margin-app);
       display: flex; align-items: center; justify-content: space-between;
       background: rgba(7,9,16,0.8); backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -137,7 +137,7 @@
     .hub-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(380px, 460px));
-      gap: 24px; justify-content: center; width: 100%; max-width: 980px;
+      gap: var(--gutter); justify-content: center; width: 100%; max-width: 980px;
     }
 
     .hub-card {
