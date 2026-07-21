@@ -13,7 +13,7 @@
 --card:rgba(255,255,255,.025);--cyan:#22d3ee;--violet:#8b5cf6;--indigo:#6366f1;--lime:#a3e635;--amber:#fbbf24;--pink:#e879f9;--emerald:#34d399;--rose:#fb7185;
 --display:'Bricolage Grotesque',sans-serif;--serif:'Instrument Serif',serif;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 body::before{content:'';position:fixed;inset:0;z-index:-1;background:
 radial-gradient(60% 50% at 15% 0%,rgba(139,92,246,.16),transparent 60%),
 radial-gradient(50% 45% at 90% 10%,rgba(34,211,238,.12),transparent 60%),
@@ -21,7 +21,7 @@ radial-gradient(55% 50% at 70% 100%,rgba(163,230,53,.10),transparent 60%)}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:1240px;margin:0 auto;padding:0 22px 90px}
 .hero{padding:6px 0 22px}
-.hero h1{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:34px;margin:0 0 6px}
+.hero h1{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:30px;margin:0 0 6px}
 .hero h1 em{font-family:var(--serif);font-style:italic;font-weight:400;background:linear-gradient(120deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero p{color:var(--dim);margin:0;max-width:820px}
 .note{margin:14px 0;padding:14px 16px;border:1px dashed var(--line2);border-radius:14px;color:var(--dim);font-size:13px;background:rgba(255,255,255,.02)}
@@ -29,27 +29,27 @@ a{color:inherit;text-decoration:none}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
 .kpi b{display:block;font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;line-height:1.05}
-.kpi span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2);margin-top:9px}
-.kpi small{display:block;color:var(--dim);font-size:12px;margin-top:5px}
+.kpi span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2);margin-top:9px}
+.kpi small{display:block;color:var(--dim);font-size:11.5px;margin-top:5px}
 .kpi{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease}
 .kpi:hover{border-color:var(--line2);transform:translateY(-2px);background:rgba(255,255,255,.045)}
 .drawer .kdesc{color:var(--dim);font-size:13px;line-height:1.55;margin:14px 0 0}
 .drawer .kstats{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .drawer .kstat{flex:1;min-width:100px;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:rgba(255,255,255,.02)}
 .drawer .kstat b{display:block;font-family:var(--display);font-weight:800;font-size:20px}
-.drawer .kstat span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-top:4px}
+.drawer .kstat span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-top:4px}
 .drawer .ksect{margin-top:22px}
 .drawer .ksect h4{font-family:var(--display);font-weight:700;font-size:13px;margin:0 0 10px;color:var(--ink)}
 .sect{margin-top:30px}
-.sect h2{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.01em;margin:0 0 13px;display:flex;align-items:center;gap:9px}
+.sect h2{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.01em;margin:0 0 13px;display:flex;align-items:center;gap:9px}
 .sect h2::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 9px var(--violet)}
 .bars{display:flex;flex-direction:column;gap:9px}
 .bar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
 .bar .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink)}
 .bar .track{grid-column:1/-1;height:7px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
 .bar .fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--violet),var(--cyan))}
-.bar .n{font-family:var(--mono);font-size:12px;color:var(--dim)}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.bar .n{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--dim);vertical-align:middle}
 tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
@@ -59,12 +59,12 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .muted{color:var(--dim2)}
 .who{display:flex;align-items:center;gap:9px;min-width:0}
 .mavatar{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
-  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:11px;font-weight:800;font-family:var(--display)}
+  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:11.5px;font-weight:800;font-family:var(--display)}
 .mavatar img{width:100%;height:100%;object-fit:cover}
 .who .nm{min-width:0}.who .nm b{display:block;color:var(--ink);font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis}
-.who .nm small{display:block;color:var(--dim2);font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.who .nm small{display:block;color:var(--dim2);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
 .agpills{display:flex;flex-wrap:wrap;gap:6px;max-width:360px}
-.agpill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;padding:3px 8px 3px 4px;border-radius:20px;border:1px solid var(--line2);white-space:nowrap}
+.agpill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;padding:3px 8px 3px 4px;border-radius:20px;border:1px solid var(--line2);white-space:nowrap}
 .agpill .dot{width:6px;height:6px;border-radius:50%}
 .agpill.at-cap{color:var(--rose);border-color:rgba(251,113,133,.45);background:rgba(251,113,133,.08)}
 .pill.cap{color:var(--rose);border-color:rgba(251,113,133,.4)}
@@ -79,15 +79,15 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 .drawer .dh{padding:22px 22px 18px;border-bottom:1px solid var(--line);position:relative}
 .drawer .dh .top{display:flex;align-items:center;gap:13px}
 .drawer .dh .mavatar{width:46px;height:46px;font-size:17px}
-.drawer .dh h3{margin:0;font-family:var(--display);font-weight:700;font-size:19px}
-.drawer .dh .em{color:var(--dim2);font-size:12.5px;font-family:var(--mono)}
+.drawer .dh h3{margin:0;font-family:var(--display);font-weight:700;font-size:20px}
+.drawer .dh .em{color:var(--dim2);font-size:13px;font-family:var(--mono)}
 .drawer .close{position:absolute;top:16px;right:18px;font-size:20px;color:var(--dim2);cursor:pointer;background:none;border:0}
 .drawer .close:hover{color:#fff}
 .tline{padding:20px 22px;overflow:auto;flex:1}
 .dagrow{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
 .dagrow .top2{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
-.dagrow .top2 b{font-size:14px;color:var(--ink);font-weight:600}
-.dagrow .top2 span{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.dagrow .top2 b{font-size:15px;color:var(--ink);font-weight:600}
+.dagrow .top2 span{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 .dagrow .top2 span.cap{color:var(--rose)}
 .dagrow .track{height:7px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
 .dagrow .fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--violet),var(--cyan))}
@@ -142,7 +142,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
   <div class="sect"><h2>Runs by agent</h2>
     <div class="card"><div class="bars" id="agentBars"></div></div></div>
 
-  <div class="sect"><h2>Usage by user <span class="muted" style="font-weight:400;font-size:12px">· click a row for the full per-agent breakdown</span></h2>
+  <div class="sect"><h2>Usage by user <span class="muted" style="font-weight:400;font-size:11.5px">· click a row for the full per-agent breakdown</span></h2>
     <div class="card" style="padding:6px"><div class="tbl-wrap"><table id="users">
       <thead><tr><th>User</th><th>Agents used</th><th>Total runs</th><th>Last run</th></tr></thead>
       <tbody></tbody></table></div></div>

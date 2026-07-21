@@ -4580,7 +4580,7 @@ _ACCOUNTS_HTML_UNUSED = """
     .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
     .brand-icon{width:34px;height:34px;border-radius:9px;
       background:linear-gradient(135deg,#6366f1,#8b5cf6);
-      display:flex;align-items:center;justify-content:center;font-size:16px;
+      display:flex;align-items:center;justify-content:center;font-size:17px;
       box-shadow:0 0 14px rgba(99,102,241,.3)}
     .brand-name{font-size:15px;font-weight:700;color:#f1f5f9}
     .bc{display:flex;align-items:center;gap:8px;margin-left:18px;padding-left:18px;
@@ -4589,18 +4589,18 @@ _ACCOUNTS_HTML_UNUSED = """
     .bc a:hover{color:#64748b}
     .bc-sep{font-size:13px;color:#1a1d27}
     .bc-cur{font-size:13px;font-weight:600;color:#818cf8}
-    .sign-out{font-size:12px;color:#3d4460;text-decoration:none;
+    .sign-out{font-size:11.5px;color:#3d4460;text-decoration:none;
       padding:6px 14px;border:1px solid rgba(255,255,255,.07);border-radius:8px;
       transition:all .15s}
     .sign-out:hover{color:#ef4444;border-color:rgba(239,68,68,.4)}
     .main{flex:1;position:relative;z-index:1;
       display:flex;flex-direction:column;align-items:center;padding:72px 24px 48px}
-    .label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    .label{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
       color:#6366f1;margin-bottom:10px;display:flex;align-items:center;gap:8px}
     .label::before,.label::after{content:'';display:block;width:20px;height:1px;background:rgba(99,102,241,.4)}
-    .heading{font-size:32px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
+    .heading{font-size:30px;font-weight:700;color:#f1f5f9;letter-spacing:-.02em;
       margin-bottom:6px;text-align:center}
-    .sub{font-size:14px;color:#64748b;margin-bottom:52px}
+    .sub{font-size:15px;color:#64748b;margin-bottom:52px}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,360px));
       gap:20px;justify-content:center;width:100%;max-width:780px}
     .card{background:rgba(13,15,23,.9);border:1px solid rgba(255,255,255,.07);
@@ -4612,11 +4612,11 @@ _ACCOUNTS_HTML_UNUSED = """
     .card-band{height:3px;background:var(--accent)}
     .card-thumb{height:110px;background:var(--thumb);position:relative;
       display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .card-thumb-icon{font-size:44px;opacity:.45;filter:drop-shadow(0 0 20px rgba(255,255,255,.15))}
+    .card-thumb-icon{font-size:40px;opacity:.45;filter:drop-shadow(0 0 20px rgba(255,255,255,.15))}
     .card-thumb::after{content:'';position:absolute;inset:0;
       background:linear-gradient(to bottom,transparent 30%,rgba(13,15,23,.95) 100%)}
     .card-badge{position:absolute;top:10px;right:10px;z-index:1;
-      font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+      font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
       padding:3px 9px;border-radius:999px;display:flex;align-items:center;gap:4px;
       background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399}
     .badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor;
@@ -4628,11 +4628,11 @@ _ACCOUNTS_HTML_UNUSED = """
     .card-desc{font-size:13px;color:#94a3b8;line-height:1.65;flex:1;margin-bottom:20px}
     .card-footer{display:flex;align-items:center;justify-content:space-between;
       border-top:1px solid rgba(255,255,255,.07);padding-top:16px}
-    .stat{font-size:12px;color:#64748b}
+    .stat{font-size:11.5px;color:#64748b}
     .stat span{color:var(--accent-text);font-weight:600}
-    .arrow{font-size:16px;color:var(--accent-text);opacity:0;transition:opacity .15s,transform .15s}
+    .arrow{font-size:17px;color:var(--accent-text);opacity:0;transition:opacity .15s,transform .15s}
     .card:hover .arrow{opacity:1;transform:translateX(3px)}
-    .foot{margin-top:48px;font-size:12px;color:#13151f}
+    .foot{margin-top:48px;font-size:11.5px;color:#13151f}
   </style>
 </head>
 <body>
@@ -5894,7 +5894,7 @@ def ppc_chat_debug():
     """Shows exactly what data the chatbot sees — use to diagnose blank/wrong answers."""
     _PPC_CTX_CACHE["ts"] = 0   # force refresh
     ctx = _build_ppc_context()
-    return f"<pre style='font-size:12px;padding:20px'>{ctx}</pre>", 200
+    return f"<pre style='font-size:11.5px;padding:20px'>{ctx}</pre>", 200
 
 
 # ── Ad Intelligence data helper (for chatbot) ────────────────────────────────
