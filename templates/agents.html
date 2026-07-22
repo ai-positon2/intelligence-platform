@@ -2248,6 +2248,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   <script>
   function handleCredentialResponse(response){
     var c=document.getElementById('gerr');
+    /* Never honor an AUTOMATICALLY selected credential. Chrome/FedCM can silently
+       re-authenticate a returning Google user right after logout (select_by:'auto'),
+       which would recreate the session with no click. Only proceed when the user
+       explicitly acted (button/tap), so a signed-out user stays signed out until
+       they choose to sign back in. */
+    if(response && response.select_by === 'auto'){ try{ google.accounts.id.disableAutoSelect(); }catch(e){} return; }
     fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})})
     .then(function(r){return r.json();})
     .then(function(d){ if(d.success){ window.location.href=d.redirect||'/app'; } else { if(c){ c.textContent='\u26A0 '+(d.error||'Sign-in failed.'); c.style.display='flex'; } } })
