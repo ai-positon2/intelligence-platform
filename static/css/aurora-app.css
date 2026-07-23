@@ -74,7 +74,7 @@
 
 /* ════ 4 · Numbers — the product's signature (tabular, glowing) ════ */
 .lx-stats2 b,.kpi-val,.stat-val,.ds-stat-val,.cs-kpi .kv,.card-stat span{
-  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;letter-spacing: var(--ls-tight);
 }
 .lx-stats2 b,.hero-stat b{color:var(--au-brand2);filter:drop-shadow(0 2px 14px rgba(76,191,146,.22))}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
@@ -94,7 +94,7 @@
 .au-ic{width:22px;height:22px;display:block;stroke:currentColor;fill:none;
   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .au-icbox{display:inline-flex;align-items:center;justify-content:center;
-  width:46px;height:46px;border-radius:14px;
+  width:46px;height:46px;border-radius: var(--radius-md);
   color:var(--card-accent,var(--au-brand));
   background:color-mix(in srgb,var(--card-accent,var(--au-brand)) 14%,transparent);
   border:1px solid color-mix(in srgb,var(--card-accent,var(--au-brand)) 30%,transparent);
@@ -113,14 +113,14 @@
 /* ════ 7 · Tables — quiet zebra + row hover + tabular figures ════ */
 table td{transition:background .12s ease}
 tbody tr:hover td{background:color-mix(in srgb,var(--au-brand) 7%,transparent)!important}
-table th{letter-spacing:.04em}
+table th{letter-spacing: var(--ls-caps)}
 td.num,.num td,td[data-num]{font-variant-numeric:tabular-nums;text-align:right}
 
 /* ════ 8 · Focus-visible — accessible + on-brand ════ */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
 [tabindex]:focus-visible,.hub-card:focus-visible,.dash-card:focus-visible{
   outline:none!important;box-shadow:var(--au-ring),0 10px 30px -12px var(--au-glow)!important;
-  border-radius:12px;
+  border-radius: var(--radius-md);
 }
 
 /* ════ 9 · Selection ════ */
@@ -183,7 +183,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
 h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 .lx-kinetic-done em,.lx-kinetic-done .ital{
   font-family:var(--au-serif)!important;font-style:italic!important;
-  font-weight:400!important;letter-spacing:.005em;
+  font-weight:400!important;letter-spacing: var(--ls-label);
   background:linear-gradient(100deg,#5fd8cd,#9fb6ec 48%,#b78bfa)!important;
   -webkit-background-clip:text!important;background-clip:text!important;
   -webkit-text-fill-color:transparent!important;color:transparent!important;
@@ -196,9 +196,9 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 /* ---- 2 · Eyebrow pill (mono kicker, matches public .pill-eye) ---- */
 .au-eyebrow{display:inline-flex;align-items:center;gap:9px;
   font-family:'JetBrains Mono',ui-monospace,'Space Grotesk',monospace;
-  font-size:10px;letter-spacing:.22em;text-transform:uppercase;font-weight:600;
+  font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;font-weight:600;
   color:var(--tx2);background:var(--s2);border:1px solid var(--b2);
-  border-radius:999px;padding:7px 15px;margin-bottom:16px}
+  border-radius: var(--radius-pill);padding:7px 15px;margin-bottom:16px}
 .au-eyebrow .d{width:7px;height:7px;border-radius:50%;
   background:var(--au-brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--au-brand) 22%,transparent);
   animation:au-pulse 2.4s ease-in-out infinite}
@@ -222,7 +222,7 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 
 /* ---- 4 · Gradient primary CTA (match public .btn-grad) ---- */
 .ds-btn--primary,.btn-grad,.au-cta,.refresh-btn.primary{
-  border:0!important;color:#fff!important;border-radius:999px!important;
+  border:0!important;color:#fff!important;border-radius: var(--radius-pill)!important;
   background:linear-gradient(110deg,#22d3ee,#6366f1 42%,#a855f7 80%,#e879f9)!important;
   background-size:220% 100%!important;background-position:0% 50%!important;
   box-shadow:0 10px 30px -10px rgba(99,102,241,.6),inset 0 0 0 1px rgba(255,255,255,.18)!important;
@@ -240,7 +240,7 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 
 /* ---- 8 · Scrollbar (internal shows a slim branded one now) ---- */
 .main::-webkit-scrollbar,.content::-webkit-scrollbar{width:10px}
-::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--au-brand) 45%,transparent);border-radius:99px;
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--au-brand) 45%,transparent);border-radius: var(--radius-pill);
   border:3px solid transparent;background-clip:content-box}
 
 /* ---- 9 · Light-theme aurora field warmth ---- */

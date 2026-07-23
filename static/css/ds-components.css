@@ -17,8 +17,8 @@
 /* ---- Stat tile ---- */
 .ds-statrow{display:flex;gap:var(--sp4);flex-wrap:wrap;}
 .ds-stat{flex:1;min-width:140px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--rxl);padding:var(--sp4) var(--sp5);position:relative;}
-.ds-stat-label{font-size:var(--fs-xs);font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;}
-.ds-stat-val{font-size:var(--fs-3xl);font-weight:700;line-height:1;letter-spacing:-.02em;margin-top:var(--sp2);}
+.ds-stat-label{font-size:var(--fs-xs);font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing: var(--ls-caps);}
+.ds-stat-val{font-size:var(--fs-3xl);font-weight:700;line-height:1;letter-spacing: var(--ls-tight);margin-top:var(--sp2);}
 .ds-stat-val.is-accent{color:var(--accent)} .ds-stat-val.is-green{color:var(--green)}
 .ds-stat-val.is-amber{color:var(--amber)} .ds-stat-val.is-purple{color:var(--purple)} .ds-stat-val.is-cyan{color:var(--cyan)}
 
@@ -44,12 +44,12 @@
 
 /* ---- Avatar (gradient base + optional photo overlay) ---- */
 .ds-avatar{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;color:#fff;font-weight:700;border-radius:50%;}
-.ds-avatar--sq{border-radius:12px;}
+.ds-avatar--sq{border-radius: var(--radius-md);}
 .ds-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;}
 
 /* ---- Filter bar ---- */
 .ds-fbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp2);padding:10px 14px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);}
-.ds-fbar__label{font-size:var(--fs-xs);font-weight:700;color:var(--tx);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;}
+.ds-fbar__label{font-size:var(--fs-xs);font-weight:700;color:var(--tx);text-transform:uppercase;letter-spacing: var(--ls-caps);white-space:nowrap;}
 .ds-select{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rpill);color:var(--tx2);font-size:var(--fs-sm);font-weight:600;padding:5px 11px;font-family:inherit;cursor:pointer;transition:var(--dur-fast);}
 .ds-select:hover,.ds-select:focus{border-color:var(--accent);color:var(--tx);outline:none;}
 .ds-select option{background:#0f1119;color:var(--tx);}
@@ -60,7 +60,7 @@
 /* ---- Modal + backdrop ---- */
 .ds-overlay{position:fixed;inset:0;z-index:4000;display:none;align-items:flex-start;justify-content:center;padding:42px 18px;overflow-y:auto;background:radial-gradient(1100px 500px at 50% -8%,var(--accent-d),transparent 60%),rgba(3,5,14,.86);}
 .ds-overlay.is-open{display:flex;animation:ds-fade var(--dur) ease both;}
-.ds-modal{width:100%;max-width:720px;background:linear-gradient(180deg,#10162b,#0a0e1d);border:1px solid var(--accent-g);border-radius:var(--r2xl);box-shadow:var(--shadow-lg);overflow:hidden;animation:ds-pop .26s var(--ease) both;}
+.ds-modal{width:100%;max-width:720px;background:linear-gradient(180deg,#10162b,#0a0e1d);border:1px solid var(--accent-g);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);overflow:hidden;animation:ds-pop .26s var(--ease) both;}
 @keyframes ds-fade{from{opacity:0}to{opacity:1}}
 @keyframes ds-pop{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
 
