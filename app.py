@@ -2093,8 +2093,13 @@ def _app_embed_url(agent):
 @app.context_processor
 def _inject_app_agents():
     """Make the /app agent list available to every template (app_base.html's
-    sidebar needs it regardless of which child page is rendering)."""
-    return {"app_agents": APP_AGENTS}
+    sidebar needs it regardless of which child page is rendering).
+
+    Also expose google_client_id template-wide: the marketing pages carry a
+    one-click Google "Sign up" pop-up, so every pre-login page (not just
+    /login) needs the client id to render the Google button. The explicit
+    kwarg on the /login route still takes precedence where it is passed."""
+    return {"app_agents": APP_AGENTS, "google_client_id": GOOGLE_CLIENT_ID}
 
 @app.route("/app")
 @login_required

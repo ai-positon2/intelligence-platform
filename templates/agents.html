@@ -162,7 +162,7 @@ body[data-page="iagent"] #scene{opacity:.42}
 .btn-ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(129,140,248,.6);transform:translateY(-2px)}
 .nv-demo{font-size:15px;padding:11px 22px}
 /* Uniform CTA height: every button sharing a hero or band CTA row renders at
-   the same 52px pill height, so paired buttons (Request access / Watch the
+   the same 52px pill height, so paired buttons (Sign up / Watch the
    walkthrough / Explore) always line up exactly. */
 .hero-cta .btn-grad,.hero-cta .btn-video,.hero-cta .btn-ghost,
 .band-cta .btn-grad,.band-cta .btn-video,.band-cta .btn-ghost{height:52px;min-height:52px;white-space:nowrap;flex:0 0 auto}
@@ -832,6 +832,21 @@ body[data-page="login"] .mesh i{opacity:.16}
 .nv-fhead .nv-orb{width:40px;height:40px}
 .nv-fhead h3{font-family:var(--display);font-size:24px;font-weight:700;color:#fff}
 .nv-fhead p{font-size:13px;color:var(--dim2);margin-top:2px}
+/* ===== Sign-up pop-up (one-click Google) — reuses .nv-fov / .nv-form / .gbtn /
+   .login-secure so it shares the contact modal's frame and the login card's
+   Google button treatment; only the centered, single-action layout differs. */
+#suFov .nv-form{width:min(440px,100%);text-align:center}
+#suFov .nv-fhead{flex-direction:column;gap:14px;margin-bottom:6px}
+.su-orb{width:54px;height:54px;filter:drop-shadow(0 0 16px rgba(99,102,241,.8))}
+.su-orb .spin{transform-origin:50% 50%;animation:spin 14s linear infinite}
+#suFov .nv-fhead h3{font-size:26px}
+.su-sub{font-size:14px;color:var(--dim);line-height: var(--lh-body);max-width:322px;margin:2px auto 0}
+#suFov .gbtn{margin:26px auto 6px}
+.su-fallback{display:none;width:max-content;max-width:100%;margin:26px auto 2px;padding:13px 30px;border-radius: var(--radius-pill);background:linear-gradient(110deg,#22d3ee,#6366f1 45%,#a855f7 85%);color:#fff;font-size:15px;font-weight:700;text-decoration:none;box-shadow:0 14px 40px -10px rgba(99,102,241,.6)}
+.su-fallback:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.su-foot{margin-top:20px;font-size:13px;color:var(--dim2)}
+.su-foot a{color:#a5b4fc;font-weight:600}
+#suFov .login-secure{margin-top:16px}
 .nv-pills{display:flex;gap:8px;margin:20px 0 4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius: var(--radius-md);padding:5px}
 .nv-pill{flex:1;border:0;background:none;color:var(--dim);font-family:var(--sans);font-size:13px;font-weight:600;padding:11px;border-radius: var(--radius-sm);transition:.25s}
 .nv-pill.on{color:#fff;background:linear-gradient(110deg,rgba(34,211,238,.9),rgba(168,85,247,.9));box-shadow:0 6px 18px rgba(99,102,241,.35)}
@@ -1241,9 +1256,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     {# <a class="nv-link {% if page=='industries' or page=='industry' or page=='iagent' %}active{% endif %}" href="/industries" data-cursor>Industries</a> #}
   </div>{% endif %}
   <div class="nv-cta">
-    {% if page!='login' %}<a class="nv-signin" href="/login" data-cursor>Sign in</a>{% endif %}
-    <button class="btn-grad nv-demo mag" data-demo data-cursor>Request access</button>
-    {% if page!='login' %}<button class="nv-burger" id="nvBurger" aria-label="Open menu"><span></span><span></span><span></span></button>{% endif %}
+    {% if page!='login' %}<a class="nv-signin" href="/login" data-cursor>Log in</a>
+    <button class="btn-grad nv-demo mag" data-signup data-cursor>Sign up</button>
+    <button class="nv-burger" id="nvBurger" aria-label="Open menu"><span></span><span></span><span></span></button>{% endif %}
   </div>
 </nav>
 {% if page!='login' %}<div class="nv-scrim" id="nvScrim"></div>{% endif %}
@@ -1257,7 +1272,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <h1 class="h-hero reveal in" style="transition-delay:80ms">Meet the agents<br>that <span class="ital grad">never sleep.</span></h1>
         <p class="lead reveal in" style="transition-delay:160ms">A team of always-on AI agents spanning intent, SEO, content, GEO and paid, they find the moment, name the buyer, and hand your team the next move. Browse what we’ve built, or have us build one just for you.</p>
         <div class="hero-cta reveal in" style="transition-delay:240ms">
-          <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15px">Request access</button>
+          <button class="btn-grad mag" data-signup data-cursor style="padding:15px 30px;font-size:15px">Sign up</button>
           <a class="btn-ghost" href="#dir" data-cursor>Explore agents &darr;</a>
         </div>
       </div>
@@ -1373,7 +1388,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="card cta-card reveal in" style="transition-delay:140ms">
           <b>Want this agent?</b>
           <p>See it live on your accounts, or have us tailor it to your stack.</p>
-          <button class="btn-grad mag" data-demo data-interest="Request access" data-prefill="I'd like a demo of the {{ agent.name }} agent." data-cursor>Request access</button>
+          <button class="btn-grad mag" data-signup data-cursor>Sign up</button>
           <button class="ghost" data-demo data-interest="Build a custom agent" data-prefill="I'd like a version of {{ agent.name }} customised for us." data-cursor>Build a custom version</button>
         </div>
       </aside>
@@ -1429,7 +1444,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="spot-art"><div class="vnote"><div class="vnote-h"><span class="mv-orb"></span>Vimi</div><p>&ldquo;Acme just closed a Series B, here&rsquo;s a 3-line intro to their new VP Marketing.&rdquo;</p></div></div>
       </div>
     </section>
-    <div class="band reveal"><h3>See your market, live.</h3><p>Book a walkthrough on your own target accounts and watch the signal layer light up.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>See your market, live.</h3><p>Book a walkthrough on your own target accounts and watch the signal layer light up.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'signals' %}
@@ -1466,7 +1481,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       {% endfor %}
     </div>
     <div class="snull" id="sigNull">No signals match that search.</div>
-    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these into your target list and surface who’s moving, all in one prioritized view.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Put every signal on your accounts.</h3><p>We’ll wire these into your target list and surface who’s moving, all in one prioritized view.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'solutions' %}
@@ -1496,7 +1511,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="icard glass reveal" style="transition-delay:140ms"><div class="ir">By industry &middot; Financial &amp; Pro services</div><h4>Financial &amp; professional services</h4><p>Spot M&amp;A, leadership change and growth signals that open a high-value conversation.</p></div>
     </div>
 
-    <div class="band reveal"><h3>Let’s turn signal into pipeline.</h3><p>Tell us your goals and we’ll show you the plays, and the agents, to get there.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Let’s turn signal into pipeline.</h3><p>Tell us your goals and we’ll show you the plays, and the agents, to get there.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 {% elif page == 'why' %}
   <div class="wrap sectionpad">
@@ -1725,7 +1740,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <div class="pr reveal" style="transition-delay:60ms"><div class="pl"><span class="pdot" style="background:#fbbf24"></span>AI content &amp; SEO agents</div><div class="pd">AI drafts and publishes content. You still steer and act on it.</div><div class="pp">from $59 to $999 / mo<sup>a</sup></div></div>
       <div class="pr reveal" style="transition-delay:120ms"><div class="pl"><span class="pdot" style="background:#8b5cf6"></span>SEO &amp; content suites</div><div class="pd">Self-serve subscriptions you operate yourself.</div><div class="pp">from $29 to $550 / mo<sup>a</sup></div></div>
       <div class="pr reveal" style="transition-delay:180ms"><div class="pl"><span class="pdot" style="background:#34d399"></span>Traditional SEO agency</div><div class="pd">A team executes, but by the hour and over months.</div><div class="pp">$2,500 to $5,000 / mo<sup>b</sup></div></div>
-      <div class="pr own reveal" style="transition-delay:240ms"><div class="pl"><span class="pdot" style="background:#22d3ee"></span>Intelligence by Position2</div><div class="pd">The platform and the team that runs it, on your accounts.</div><div class="pp">Custom · request access</div></div>
+      <div class="pr own reveal" style="transition-delay:240ms"><div class="pl"><span class="pdot" style="background:#22d3ee"></span>Intelligence by Position2</div><div class="pd">The platform and the team that runs it, on your accounts.</div><div class="pp">Custom · talk to us</div></div>
     </div>
     <p class="fnote-grid reveal" style="grid-template-columns:1fr"><span style="display:grid;grid-template-columns:18px 1fr;gap:8px"><b>a</b><span>Published starting prices from each vendor's own pricing page, verified July 2026. Prices in this category change often, so check the linked source for the current figure.</span></span><span style="display:grid;grid-template-columns:18px 1fr;gap:8px"><b>b</b><span>Typical US small and lower-mid-market SEO retainer per industry pricing surveys; larger programs run higher.</span></span></p>
 
@@ -1758,7 +1773,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <a href="https://www.siegemedia.com/creation/content-marketing-cost" target="_blank" rel="noopener nofollow">Siege Media</a>.
     </div>
 
-    <div class="band reveal"><h3>See it on your own accounts.</h3><p>Book a walkthrough and watch the buying signals, the AI answer gaps and the de-anonymized visitors light up on your real market, not a demo dataset.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Why Intelligence comparison" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>See it on your own accounts.</h3><p>Book a walkthrough and watch the buying signals, the AI answer gaps and the de-anonymized visitors light up on your real market, not a demo dataset.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'home' %}
@@ -1768,7 +1783,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <h1 class="h-hero reveal in" style="transition-delay:80ms;font-size:clamp(40px,6.6vw,84px)">Know who’s ready to buy<br><span class="ital grad">before they raise a hand.</span></h1>
       <p class="lead reveal in" style="transition-delay:160ms;margin:0 auto;text-align:center">We watch the open web, your site and social for the moments that signal intent, then hand your team the exact account to reach, and why.</p>
       <div class="hero-cta reveal in" style="transition-delay:240ms;justify-content:center">
-        <button class="btn-grad mag" data-demo data-cursor style="padding:15px 30px;font-size:15px">Request access</button>
+        <button class="btn-grad mag" data-signup data-cursor style="padding:15px 30px;font-size:15px">Sign up</button>
         <button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button>
       </div>
     </header>
@@ -1916,7 +1931,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       </div>
     </section>
 
-    <div class="band reveal"><h3>See it on your accounts.</h3><p>Request access and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>See it on your accounts.</h3><p>Sign up and watch the signal layer light up on the companies you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'privacy' %}
@@ -1990,9 +2005,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>How intent scoring works</h4><p>How type, severity, recency and signal-stacking combine into one number that ranks your worklist.</p><span class="more">See the platform &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/security" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Privacy &amp; de-anonymization, explained</h4><p>How visitor identification works responsibly, opt-outs, CCPA/CPRA, GDPR and your controls.</p><span class="more">Read the approach &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/solutions" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3 3 7-8"/><path d="M16 7h4v4"/></svg></div><h4>From signal to pipeline</h4><p>The plays Position2 runs, SEO, paid, content and RevOps, the moment intent fires.</p><span class="more">See solutions &rarr;</span></a>
-      <a class="fcard glass tilt reveal" href="#" data-demo data-interest="Request access" data-prefill="I'd like the State of Buying Signals 2026 report." data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><h4>The State of Buying Signals &middot; 2026</h4><p>Our upcoming report on how B2B teams turn intent into pipeline. Request early access.</p><span class="more">Request the report &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="#" data-demo data-interest="The 2026 report" data-prefill="I'd like the State of Buying Signals 2026 report." data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><h4>The State of Buying Signals &middot; 2026</h4><p>Our upcoming report on how B2B teams turn intent into pipeline. Request early access.</p><span class="more">Request the report &rarr;</span></a>
     </div>
-    <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO, no spam, just the good stuff.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO, no spam, just the good stuff.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'security' %}
@@ -2016,7 +2031,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <h3>Sub-processors &amp; access</h3><p>Data is encrypted in transit and at rest, access is least-privilege, and handling is logged and reviewed. We work with vetted sub-processors under appropriate agreements, available on request.</p>
       <h3>Request a DPA</h3><p>Need our Data Processing Agreement or a security overview for your review? We&rsquo;ll share them on request, <a href="mailto:privacy@position2.com">privacy@position2.com</a>.</p>
     </div>
-    <div class="band reveal"><h3>Need our security overview or a DPA?</h3><p>We&rsquo;ll walk your team through how data is handled, and provide the documents your security review needs.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Request access" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>Need our security overview or a DPA?</h3><p>We&rsquo;ll walk your team through how data is handled, and provide the documents your security review needs.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Security / DPA" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'industries' %}
@@ -2064,7 +2079,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <h1 class="h-hero">{{ industry.headline }}<br><span class="ital grad">{{ industry.headline_ital }}</span></h1>
         <p class="lead">{{ industry.lead }}</p>
         <div class="hero-cta reveal in" style="transition-delay:200ms">
-          <button class="btn-grad mag" data-demo data-interest="{{ industry.name }}" data-cursor style="padding:15px 30px;font-size:15px">Request access</button>
+          <button class="btn-grad mag" data-signup data-cursor style="padding:15px 30px;font-size:15px">Sign up</button>
           <button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button>
         </div>
       </div>
@@ -2174,7 +2189,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     </div>
     {% endif %}
 
-    <div class="band reveal"><h3>See it on your {{ industry.short|lower }} accounts.</h3><p>Request access and watch the signal layer light up on the {{ industry.short|lower }} organizations you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="{{ industry.name }}" data-cursor>Request access</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
+    <div class="band reveal"><h3>See it on your {{ industry.short|lower }} accounts.</h3><p>Sign up and watch the signal layer light up on the {{ industry.short|lower }} organizations you actually care about.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'iagent' %}
@@ -2211,7 +2226,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="card cta-card reveal in" style="transition-delay:140ms">
           <b>Want this agent?</b>
           <p>See it live on your accounts, or have us tailor it to your stack.</p>
-          <button class="btn-grad mag" data-demo data-interest="{{ agent.name }}" data-prefill="I'd like a demo of the {{ agent.name }} agent for {{ industry.short }}." data-cursor>Request access</button>
+          <button class="btn-grad mag" data-signup data-cursor>Sign up</button>
           <button class="ghost" data-demo data-interest="Build a custom agent" data-prefill="I'd like a version of {{ agent.name }} customised for us." data-cursor>Build a custom version</button>
         </div>
       </aside>
@@ -2245,14 +2260,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <svg class="login-orb" viewBox="0 0 40 40" fill="none" aria-hidden="true"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
       <span class="pill-eye" style="margin:8px auto 0"><span class="dt"></span> Secure sign-in</span>
       <h1 class="h-sec" style="margin:16px 0 8px">{% if returning %}Welcome back.{% else %}Welcome.{% endif %}</h1>
-      <p class="login-sub">Sign in with your Google account to continue.</p>
-      {% if logged_out %}<div class="gok" id="gok">&#10003; You&rsquo;ve been signed out. Sign in with Google to continue.</div>{% endif %}
+      <p class="login-sub">{% if returning %}Log in with your Google account to continue.{% else %}Log in or sign up with Google, one click and you&rsquo;re in.{% endif %}</p>
+      {% if logged_out %}<div class="gok" id="gok">&#10003; You&rsquo;ve been signed out. Log in with Google to continue.</div>{% endif %}
       <div class="gerr" id="gerr" style="display:{% if error %}flex{% else %}none{% endif %}">&#9888; {{ error or '' }}</div>
       <div class="gbtn">
         <div id="gsiBtn" data-cid="{{ google_client_id }}"></div>
       </div>
       <div class="login-secure"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Secure sign-in with Google</div>
-      <div class="login-foot">Not on the team? <a href="#" data-demo data-cursor>Request access &rarr;</a></div>
+      <div class="login-foot">New to Intelligence? The button above creates your account automatically.</div>
     </div>
   </div>
   <script>
@@ -2292,13 +2307,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     <div class="foot-brand">
       <a class="nv-brand" href="/" data-cursor><img class="nv-orb" src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="width:auto;height:38px;background:none;border-radius:0;padding:0;box-sizing:border-box;filter:drop-shadow(0 0 8px rgba(76,191,146,.35))"></a>
       <p class="foot-tag">Know who&rsquo;s ready to buy, before they raise a hand.</p>
-      {% if page!='login' %}<button class="btn-grad mag foot-cta" data-demo data-cursor>Request access</button>{% endif %}
+      {% if page!='login' %}<button class="btn-grad mag foot-cta" data-signup data-cursor>Sign up</button>{% endif %}
     </div>
     {% if page!='login' %}
     <div class="foot-cols">
       <div class="foot-col"><h5>Product</h5><a href="/platform" data-cursor>Platform</a><a href="/agents" data-cursor>Agents</a><a href="/signals" data-cursor>Signals</a><a href="/integrations" data-cursor>Integrations</a></div>
       <div class="foot-col"><h5>Company</h5><a href="/solutions" data-cursor>Solutions</a><a href="/security" data-cursor>Security</a></div>
-      <div class="foot-col"><h5>Resources</h5><a href="/resources" data-cursor>Insights</a><a href="/privacy" data-cursor>Privacy</a><a href="/terms" data-cursor>Terms</a><a href="/login" data-cursor>Sign in</a></div>
+      <div class="foot-col"><h5>Resources</h5><a href="/resources" data-cursor>Insights</a><a href="/privacy" data-cursor>Privacy</a><a href="/terms" data-cursor>Terms</a><a href="/login" data-cursor>Log in</a></div>
     </div>
     {% else %}
     <div class="foot-links"><a href="/privacy" data-cursor>Privacy</a><a href="/terms" data-cursor>Terms</a></div>
@@ -2309,18 +2324,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   </div>
 </footer>
 
-<div class="nv-fov" id="nvfov" role="dialog" aria-modal="true" aria-label="Request access">
+<div class="nv-fov" id="nvfov" role="dialog" aria-modal="true" aria-label="Get in touch">
   <div class="nv-fbg" data-close></div>
   <div class="nv-form">
     <button class="nv-close" id="nvFormClose" aria-label="Close" data-cursor>&#10005;</button>
     <div id="nvFormBody">
       <div class="nv-fhead">
         <img class="nv-orb" src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="width:auto;height:38px;background:none;border-radius:0;padding:0;box-sizing:border-box;filter:drop-shadow(0 0 8px rgba(76,191,146,.35))">
-        <div><h3>Request access</h3><p>Tell us where to send it, and we’ll get in touch.</p></div>
+        <div><h3>Get in touch</h3><p>Tell us where to send it, and we’ll get in touch.</p></div>
       </div>
       <form id="nvDemoForm" autocomplete="on" novalidate>
         <div class="nv-pills">
-          <button type="button" class="nv-pill on" data-interest="Request access" data-cursor>Request access</button>
+          <button type="button" class="nv-pill on" data-interest="Talk to us" data-cursor>Talk to us</button>
           <button type="button" class="nv-pill" data-interest="Build a custom agent" data-cursor>Custom agent</button>
         </div>
         <div class="nv-row">
@@ -2329,7 +2344,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         </div>
         <div class="nv-field" id="f-email"><label for="nvE">Work email</label><div class="nv-inp"><span class="fi"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 5 8-5"/></svg></span><input id="nvE" name="email" type="email" placeholder="jane@company.com" maxlength="160" autocomplete="email"><svg class="nv-tick" viewBox="0 0 24 24"><path d="M5 13l4 4 10-11"/></svg></div></div>
         <div class="nv-field" id="f-msg"><label for="nvM">What are you hoping to do? <span class="opt">optional</span></label><div class="nv-inp area"><span class="fi"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/></svg></span><textarea id="nvM" name="message" rows="3" placeholder="e.g. We want live funding signals on our target accounts." maxlength="2000"></textarea></div></div>
-        <button type="submit" class="nv-submit" id="nvSubmit" data-cursor><span class="nv-spin"></span><span id="nvSubmitTx">Request access</span></button>
+        <button type="submit" class="nv-submit" id="nvSubmit" data-cursor><span class="nv-spin"></span><span id="nvSubmitTx">Send message</span></button>
         <div class="nv-formerr" id="nvFormErr"></div>
         <div class="nv-priv">&#128274; We’ll only use your details to reach out about Intelligence by Position2. No spam, ever.</div>
       </form>
@@ -2341,6 +2356,28 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <p id="nvSuccessMsg">Thanks, our team will get in touch to get you set up.</p>
       <button type="button" class="nv-submit" id="nvSuccessClose" data-cursor><span>Done</span></button>
     </div>
+  </div>
+</div>
+
+<!-- Sign-up pop-up: one-click account creation with Google. Same OAuth flow as
+     /login (first-time Google users get an account, returning users log in),
+     but framed for sign-up. GSI loads lazily on first open. -->
+<div class="nv-fov" id="suFov" role="dialog" aria-modal="true" aria-label="Sign up">
+  <div class="nv-fbg" data-suclose></div>
+  <div class="nv-form">
+    <button class="nv-close" id="suClose" aria-label="Close" data-cursor>&#10005;</button>
+    <div class="nv-fhead">
+      <svg class="su-orb" viewBox="0 0 40 40" fill="none" aria-hidden="true"><g class="spin"><circle cx="20" cy="20" r="15" stroke="#67e8f9" stroke-width="1.2" opacity=".5"/><circle cx="20" cy="20" r="9" stroke="#a5b4fc" stroke-width="1.2" opacity=".7"/></g><circle cx="20" cy="20" r="3.6" fill="#67e8f9"/><circle cx="20" cy="5" r="1.6" fill="#c4b5fd"/></svg>
+      <div>
+        <h3>Create your account</h3>
+        <p class="su-sub">Sign up in one click with your Google account. No forms, no waiting, you&rsquo;re in.</p>
+      </div>
+    </div>
+    <div class="gbtn"><div id="suGsiBtn" data-cid="{{ google_client_id }}"></div></div>
+    <a class="su-fallback" id="suFallback" href="/login" data-cursor>Continue with Google &rarr;</a>
+    <div class="gerr" id="suErr" style="display:none;margin-top:14px">&#9888; </div>
+    <div class="login-secure"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Secure sign-up with Google</div>
+    <div class="su-foot">Already have an account? <a href="/login" data-cursor>Log in &rarr;</a></div>
   </div>
 </div>
 
@@ -2541,10 +2578,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   }
 
   // ===== demo form =====
-  var fov=document.getElementById('nvfov'), interest='Request access';
+  var fov=document.getElementById('nvfov'), interest='Talk to us';
   document.querySelectorAll('.nv-pill').forEach(function(p){ p.addEventListener('click',function(){
     document.querySelectorAll('.nv-pill').forEach(function(x){ x.classList.remove('on'); }); p.classList.add('on'); interest=p.getAttribute('data-interest'); }); });
-  function setPill(v){ document.querySelectorAll('.nv-pill').forEach(function(p){ var on=p.getAttribute('data-interest')===v; p.classList.toggle('on',on); if(on) interest=v; }); }
+  function setPill(v){ if(v) interest=v; document.querySelectorAll('.nv-pill').forEach(function(p){ p.classList.toggle('on', p.getAttribute('data-interest')===v); }); }
   function openForm(o){ o=o||{};
     document.getElementById('nvFormBody').style.display=''; document.getElementById('nvSuccess').classList.remove('on');
     ['f-name','f-email'].forEach(function(id){ var x=document.getElementById(id); if(x) x.classList.remove('ok','bad'); });
@@ -2586,14 +2623,102 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     fetch('/api/demo-request',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:name,email:email,company:company,interest:interest,message:message,vid:(function(){try{return localStorage.getItem('p2_vid')||''}catch(e){return ''}})()})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
-      .then(function(res){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access';
+      .then(function(res){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Send message';
         if(res.ok&&res.d&&res.d.ok){ document.getElementById('nvSuccessMsg').textContent = interest==='Build a custom agent'
             ? 'Thanks, our team will get in touch to scope your custom agent.'
-            : 'Thanks, our team will get in touch to get you set up with access.';
+            : 'Thanks, our team will be in touch shortly.';
           document.getElementById('nvFormBody').style.display='none'; document.getElementById('nvSuccess').classList.add('on'); confetti(); try{document.dispatchEvent(new CustomEvent('p2:lead_submit',{detail:{interest:interest}}));}catch(e){}
         } else { errEl.textContent=(res.d&&res.d.error)?res.d.error:'Something went wrong. Please try again.'; } })
-      .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Request access'; errEl.textContent='Network error. Please try again.'; });
+      .catch(function(){ submit.classList.remove('loading'); submit.disabled=false; submitTx.textContent='Send message'; errEl.textContent='Network error. Please try again.'; });
   });
+})();
+</script>
+<script>
+/* ===== Sign-up pop-up: one-click Google account creation =====
+   Opened by any [data-signup] control. Google Identity Services (GSI) is loaded
+   lazily the first time the pop-up opens, so marketing pages don't ship the
+   Google script until it's actually needed. On success we POST the credential
+   to /auth/google (same endpoint as the login page) and redirect. If GSI can't
+   load or render (blocked script, unauthorised origin), we reveal a plain
+   "Continue with Google" link to /login so the button never dead-ends. */
+(function(){
+  "use strict";
+  var fov=document.getElementById('suFov');
+  if(!fov) return;
+  var host=document.getElementById('suGsiBtn');
+  var fallback=document.getElementById('suFallback');
+  var errEl=document.getElementById('suErr');
+  var cid=host?(host.getAttribute('data-cid')||''):'';
+  var gsiReady=false, gsiTried=false;
+
+  function showErr(m){ if(errEl){ errEl.innerHTML='⚠ '+m; errEl.style.display='flex'; } }
+  function showFallback(){
+    /* GSI couldn't draw its button (script blocked, or origin not authorised):
+       hide the empty gradient host and reveal a self-styled Google button so the
+       pop-up always has a working, good-looking primary action. */
+    if(fallback) fallback.style.display='block';
+    var g=fov.querySelector('.gbtn'); if(g) g.style.display='none';
+  }
+
+  function onCredential(response){
+    /* Ignore silent/auto credential selection (FedCM can re-auth without a
+       click); only proceed on an explicit user action. Mirrors /login. */
+    if(response && response.select_by==='auto'){ try{ google.accounts.id.disableAutoSelect(); }catch(e){} return; }
+    fetch('/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d.success){ window.location.href=d.redirect||'/app'; } else { showErr((d.error||'Sign-up failed.')); } })
+      .catch(function(){ showErr('Network error. Please try again.'); });
+  }
+
+  var gsiPolls=0;
+  function renderGsi(){
+    if(gsiReady) return;
+    if(!cid){ showFallback(); return; }
+    /* The GSI global can lag a tick behind the script's load event, so poll for
+       it (bounded ~2.4s) exactly like the /login page does, instead of bailing
+       once. Without this the pop-up would wrongly fall back even when GSI is
+       about to be ready. */
+    if(!(window.google && google.accounts && google.accounts.id)){
+      if(gsiPolls++ < 20){ setTimeout(renderGsi,120); } else { showFallback(); }
+      return;
+    }
+    try{
+      google.accounts.id.initialize({ client_id:cid, callback:onCredential, auto_select:false, itp_support:true, cancel_on_tap_outside:true });
+      try{ google.accounts.id.disableAutoSelect(); }catch(e){}
+      google.accounts.id.renderButton(host, { type:'standard', shape:'pill', theme:'filled_black', text:'signup_with', size:'large', logo_alignment:'left', width:300 });
+      gsiReady=true;
+      /* If, shortly after, GSI still hasn't drawn a button (blocked/unauthorised
+         origin), surface the fallback link so the action is never a dead end. */
+      setTimeout(function(){ if(host && !host.querySelector('iframe, div[role=button], div')){ showFallback(); } },1600);
+    }catch(e){ showFallback(); }
+  }
+
+  function loadGsi(){
+    if(gsiTried) { renderGsi(); return; }
+    gsiTried=true;
+    if(window.google && google.accounts && google.accounts.id){ renderGsi(); return; }
+    var s=document.createElement('script');
+    s.src='https://accounts.google.com/gsi/client'; s.async=true; s.defer=true;
+    s.onload=renderGsi;
+    s.onerror=showFallback;
+    document.head.appendChild(s);
+    /* Safety net: if the script hangs, offer the fallback. */
+    setTimeout(function(){ if(!gsiReady) showFallback(); },2600);
+  }
+
+  function open(){
+    if(errEl){ errEl.style.display='none'; }
+    fov.classList.add('on'); document.documentElement.style.overflow='hidden';
+    loadGsi();
+  }
+  function close(){ fov.classList.remove('on'); document.documentElement.style.overflow=''; }
+
+  document.querySelectorAll('[data-signup]').forEach(function(b){
+    b.addEventListener('click',function(e){ e.preventDefault(); open(); });
+  });
+  var x=document.getElementById('suClose'); if(x) x.addEventListener('click',close);
+  fov.querySelectorAll('[data-suclose]').forEach(function(b){ b.addEventListener('click',close); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&fov.classList.contains('on')) close(); });
 })();
 </script>
 <script>
@@ -2699,7 +2824,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <span class="vph-note">Walkthrough video coming soon. To enable it, drop a YouTube/Loom embed URL into <code>DEMO_VIDEO_URL</code> in the script. Until then, the live animated preview on the homepage shows the product in motion.</span>
       </div>
     </div>
-    <div class="vmodal-f"><button class="btn-grad mag" type="button" data-demo data-interest="Request access" data-cursor style="padding:15px 38px;font-size:15px;font-weight:700">Request access</button></div>
+    <div class="vmodal-f"><button class="btn-grad mag" type="button" data-signup data-cursor style="padding:15px 38px;font-size:15px;font-weight:700">Sign up</button></div>
   </div>
 </div>
 <script>
@@ -2744,8 +2869,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   track('page_view', {path: location.pathname});
   document.addEventListener('click', function(e){
     if (e.target.closest('[data-video]')) { track('cta_watch_demo', {path: location.pathname}); return; }
+    if (e.target.closest('[data-signup]')) { track('cta_signup_open', {path: location.pathname}); return; }
     var a = e.target.closest('[data-demo]');
-    if (a) { track('lead_form_open', {interest: a.getAttribute('data-interest') || 'Request access', path: location.pathname}); return; }
+    if (a) { track('lead_form_open', {interest: a.getAttribute('data-interest') || 'Talk to us', path: location.pathname}); return; }
     var nav = e.target.closest('nav a');
     if (nav) { track('nav_click', {to: nav.getAttribute('href') || ''}); }
   }, true);
