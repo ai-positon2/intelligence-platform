@@ -1,0 +1,21 @@
+/* Arena responsive grid tokens — page side-margin + column gutter that scale by
+   viewport, matching ds-tokens.css. Loaded by internal pages that carry their
+   own inline styles and don't already pull in ds-tokens.css, so their top bars,
+   content containers and card grids get the same responsive gutter/margin as
+   the public site. Defines custom properties only — no element rules — so it
+   never restyles a page it's added to.
+
+   content = min(viewport,--maxw) − 2×--margin. Mobile-first base.
+   margin scale: 20 → 32 → 48 → 80 → 120 → 160 → 200
+   gutter scale: 16 → 24 → 32 → 40 → 48
+   --margin-app caps at the 48px laptop step so dense dashboards never widen. */
+:root{
+  --gutter:16px; --margin:20px; --maxw:1920px;
+  --margin-app:min(var(--margin),48px);
+}
+@media(min-width:428px){  :root{ --margin:32px } }
+@media(min-width:768px){  :root{ --margin:48px;  --gutter:24px } }
+@media(min-width:1280px){ :root{ --margin:80px } }
+@media(min-width:1440px){ :root{ --margin:120px; --gutter:32px } }
+@media(min-width:1728px){ :root{ --margin:160px; --gutter:40px } }
+@media(min-width:1920px){ :root{ --margin:200px; --gutter:48px } }
