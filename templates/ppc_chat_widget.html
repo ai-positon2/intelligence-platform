@@ -689,7 +689,6 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
     if(/funding|m&a|acquisition|launch|signal/.test(lower)){
       acts.appendChild(act('📣 Send to Slack','k-act-slk',function(){ confirmWrite('Slack','Post this summary to your team Slack channel.',text,'slack'); }));
     }
-    acts.appendChild(act('🖼 Slide','',function(){ confirmWrite('Deck','Generate a Position²-branded slide from this content.',text,'deck'); }));
     if(acts.children.length){ bub.parentNode.appendChild(acts); }
   }
   function act(label,cls,fn){ var b=document.createElement('button'); b.className='k-act '+(cls||''); b.textContent=label; b.onclick=fn; return b; }
