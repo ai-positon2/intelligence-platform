@@ -2439,7 +2439,13 @@ def gtm():
 @app.route("/p2/gtm/sentiment-pulse/")
 @position2_required
 def call_sentiment():
-    return render_template("call_sentiment.html", user=_get_user())
+    # HIDDEN 2026-07-23: Sentiment Pulse was a demo/proxy dashboard (seeded
+    # "Cedar Valley Health" data), not a real data pipeline, so it is pulled from
+    # the live surface. Endpoint is kept registered (legacy redirects still resolve
+    # to it) but no longer serves the page. To restore, remove the abort() and
+    # uncomment the render line below, then un-hide the card in templates/gtm.html.
+    abort(404)
+    return render_template("call_sentiment.html", user=_get_user())  # noqa: retained for restore
 
 
 @app.route("/gtm/call-sentiment")
@@ -5024,10 +5030,6 @@ SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keywo
 Generator, Content Enhancer, Technical SEO & GEO Auditor, Generative Search Visibility, AI Readiness
 Auditor, Competitor SEO Intelligence, Local Visibility Builder, and more). Some are fully live and
 connected; others are request-access only.
-
-SENTIMENT PULSE (/p2/gtm/sentiment-pulse) — be transparent if asked: this dashboard is an interactive UI
-MOCKUP with seeded/proxy data (a fictional "Cedar Valley Health" network), not a real data pipeline. If
-asked whether its numbers are real, say plainly that it is a demo/proxy dataset, not live call/patient data.
 
 ADMIN DASHBOARDS (/p2/admin/*, admin-only): Internal Usage, Anonymous Traffic (the visitor de-anon
 dashboard above), Public Page Analytics, Public Agent Usage, Agent Runs, Access Requests.
