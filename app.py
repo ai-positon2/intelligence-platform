@@ -2964,7 +2964,7 @@ def _va_identity_map() -> dict:
             v = (req.get("vid") or "").strip()
             if v:
                 m[v] = {"name": req.get("name", ""), "email": req.get("email", ""),
-                        "company": req.get("company", ""), "source": "Request access"}
+                        "company": req.get("company", ""), "source": "Lead form"}
     except Exception:
         pass
     svc = _va_sheets_service()
@@ -3254,6 +3254,40 @@ def _fetch_visitor_analytics_uncached() -> dict:
                 cta_counts[lbl] += to_int(n)
     cta_top = cta_counts.most_common(15)
 
+    # ---- CTA breakdown, aligned to the live public-page CTAs ----------------
+    # After the auth rework the primary CTA is "Sign up" (one-click Google), the
+    # contextual "data-demo" CTAs open the contact/lead form, and the secondary
+    # auth link is "Log in". Legacy labels from before the rework
+    # (request_access:*, sign_in) are folded in so historical rows still count.
+    signup_clicks = cta_counts.get("signup", 0)
+    login_clicks  = cta_counts.get("log_in", 0) + cta_counts.get("sign_in", 0)
+    watch_clicks  = cta_counts.get("watch_walkthrough", 0)
+    lead_interest_counts = Counter()
+    agentcard_clicks = 0
+    outbound_clicks = 0
+    for lbl, n in cta_counts.items():
+        if lbl.startswith("lead:"):
+            lead_interest_counts[lbl.split(":", 1)[1] or "Talk to us"] += n
+        elif lbl.startswith("request_access:"):            # legacy → lead
+            it = lbl.split(":", 1)[1] or "Talk to us"
+            lead_interest_counts["Talk to us" if it == "Request access" else it] += n
+        elif lbl.startswith("agent_card:"):
+            agentcard_clicks += n
+        elif lbl.startswith("outbound:"):
+            outbound_clicks += n
+    lead_clicks = sum(lead_interest_counts.values())
+    lead_interests = lead_interest_counts.most_common(12)
+    cta_groups = sorted(
+        [g for g in (
+            ("Sign up", signup_clicks),
+            ("Log in", login_clicks),
+            ("Watch walkthrough", watch_clicks),
+            ("Lead form", lead_clicks),
+            ("Agent cards", agentcard_clicks),
+            ("Outbound links", outbound_clicks),
+        ) if g[1]],
+        key=lambda x: x[1], reverse=True)
+
     order = {"":0,"open":1,"started":2,"submitted":3}
     sid_form = {}
     for r in human:
@@ -3334,6 +3368,11 @@ def _fetch_visitor_analytics_uncached() -> dict:
     login_map = _login_events_by_vid()
     signed_in = sum(1 for v in visitors if v in login_map)
     signed_in_rate = round(signed_in/unique_visitors*100, 1) if unique_visitors else 0
+
+    # Sign-up funnel: the "Sign up" pop-up hands off to Google, so its bottom is
+    # the same signed-in signal we already stitch server-side (no form submit).
+    signup_funnel = {"clicked": signup_clicks, "signed_in": signed_in}
+    signup_cvr = round(signed_in/signup_clicks*100, 1) if signup_clicks else 0
 
     pv_rows = []
     if svc:
@@ -3446,11 +3485,16 @@ def _fetch_visitor_analytics_uncached() -> dict:
             "video_sessions": video_sessions, "total_rage": total_rage,
             "identified": len(identified), "companies": len(companies),
             "signed_in": signed_in, "signed_in_rate": signed_in_rate,
+            "signup_clicks": signup_clicks, "login_clicks": login_clicks,
+            "watch_clicks": watch_clicks, "lead_clicks": lead_clicks,
+            "signup_cvr": signup_cvr,
         },
         "series": series, "top_pages": top_pages, "top_landing": top_landing,
         "referrers": referrers, "utm_source": utm_source, "utm_campaign": utm_campaign,
         "devices": devices, "oses": oses, "browsers": browsers, "langs": langs,
-        "scroll": sb, "cta": cta_top, "form_funnel": form_funnel,
+        "scroll": sb, "cta": cta_top, "cta_groups": cta_groups,
+        "lead_interests": lead_interests, "signup_funnel": signup_funnel,
+        "form_funnel": form_funnel,
         "search": search_top, "rage": rage_top, "cwv": cwv, "recent": recent,
         "top_companies": top_companies, "identified": identified,
         "all_visitors": all_visitors, "video_pages": video_pages,

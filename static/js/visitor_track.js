@@ -104,9 +104,12 @@
 
     var t = e.target;
     if (t.closest("[data-video]")) { video = video || "opened"; bumpCta("watch_walkthrough"); return; }
+    // Primary CTA: "Sign up" (one-click Google sign-up pop-up). Checked before the
+    // /login link so the modal's fallback link doesn't steal the attribution.
+    if (t.closest("[data-signup]")) { bumpCta("signup"); logEvent("signup", location.pathname); return; }
     var demo = t.closest("[data-demo]");
-    if (demo) { stage("open"); bumpCta("request_access:" + (demo.getAttribute("data-interest") || "Request access")); return; }
-    if (t.closest(".g_id_signin, [data-signin], a[href='/login']")) { bumpCta("sign_in"); return; }
+    if (demo) { stage("open"); bumpCta("lead:" + (demo.getAttribute("data-interest") || "Talk to us")); return; }
+    if (t.closest(".g_id_signin, [data-signin], .nv-signin, .nv-drawer-login, a[href='/login']")) { bumpCta("log_in"); return; }
     var card = t.closest(".acard");
     if (card) { bumpCta("agent_card:" + ((card.getAttribute("data-name") || "").slice(0, 40))); return; }
     var a = t.closest("a[href]");

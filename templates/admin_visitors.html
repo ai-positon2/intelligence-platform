@@ -63,6 +63,10 @@ border-radius: var(--radius-sm);padding:8px 13px;background:var(--card);cursor:p
 .funnel .step{flex:1;text-align:center;padding:16px 8px;border-radius: var(--radius-md);border:1px solid var(--line);background:rgba(255,255,255,.02)}
 .funnel .step b{display:block;font-family:var(--display);font-size:24px;font-weight:800}
 .funnel .step span{font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;color:var(--dim2)}
+.funnel .step.win{border-color:rgba(129,140,248,.5);background:rgba(129,140,248,.08)}
+.funnel .step.win b{color:#a5b4fc}
+.funnel-note{margin:12px 2px 0;font-size:12px;line-height:1.5;color:var(--dim2)}
+.funnel-note b{color:var(--ink)}
 .cwv{display:flex;gap:12px;flex-wrap:wrap}
 .cwv .m{flex:1;min-width:120px;text-align:center;padding:14px;border-radius: var(--radius-md);border:1px solid var(--line);background:rgba(255,255,255,.02)}
 .cwv .m b{font-family:var(--display);font-size:24px;font-weight:800;display:block}
@@ -213,12 +217,25 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
   </div>
 
   <div class="sect grid two">
-    <div class="card"><h2 style="margin-top:0">CTA &amp; clicks</h2><div class="bars" id="cta"></div></div>
-    <div class="card"><h2 style="margin-top:0">On-site searches</h2><div class="bars" id="search"></div></div>
+    <div class="card"><h2 style="margin-top:0">CTA clicks by type</h2><div class="bars" id="cta"></div></div>
+    <div class="card"><h2 style="margin-top:0">Lead-form interests</h2><div class="bars" id="leadInterests"></div></div>
   </div>
 
   <div class="sect grid two">
-    <div class="card"><h2 style="margin-top:0">Request-access funnel</h2><div class="funnel" id="funnel"></div></div>
+    <div class="card">
+      <h2 style="margin-top:0">Sign-up funnel</h2>
+      <div class="funnel" id="signupFunnel"></div>
+      <p class="funnel-note" id="signupNote"></p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Lead-form funnel</h2>
+      <div class="funnel" id="funnel"></div>
+      <p class="funnel-note">Contextual "Talk to us", custom-agent, report &amp; DPA requests that open the contact form.</p>
+    </div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">On-site searches</h2><div class="bars" id="search"></div></div>
     <div class="card"><h2 style="margin-top:0">Landing pages</h2><div class="bars" id="landing"></div></div>
   </div>
 
@@ -305,16 +322,30 @@ var KPI_INFO={
         '<div class="ksect"><h4>Scroll depth</h4>'+miniBars(d.scroll)+'</div>';
     }
   },
+  signup:{
+    title:'Sign-up clicks',
+    desc:'Clicks on the primary "Sign up" button, which opens the one-click Google sign-up pop-up. The funnel shows how many of those anonymous visitors went on to actually sign in.',
+    render:function(d){
+      var sf=d.signup_funnel||{};var k=d.kpis||{};
+      return '<div class="kstats"><div class="kstat"><b>'+(k.signup_cvr||0)+'%</b><span>Click → sign-in</span></div></div>'+
+        '<div class="ksect"><h4>Sign-up funnel</h4><div class="funnel" style="margin-top:2px">'+
+          '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
+          '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>'+
+        '</div></div>'+
+        '<div class="ksect"><h4>All CTA clicks by type</h4>'+miniBars(d.cta_groups)+'</div>';
+    }
+  },
   conversions:{
-    title:'Access requests',
-    desc:'Visitors who submitted the "Request access" form, as a share of all visitors. The funnel below shows where people drop off before submitting.',
+    title:'Lead requests',
+    desc:'Visitors who submitted the contact / lead form — the contextual "Talk to us", custom-agent, report and DPA requests — as a share of all visitors. The funnel below shows where people drop off before submitting.',
     render:function(d){
       var f=d.form_funnel||{};
-      return '<div class="ksect"><h4>Request-access funnel</h4><div class="funnel" style="margin-top:2px">'+
+      return '<div class="ksect"><h4>Lead-form funnel</h4><div class="funnel" style="margin-top:2px">'+
           '<div class="step"><b>'+(f.opened||0)+'</b><span>Opened</span></div>'+
           '<div class="step"><b>'+(f.started||0)+'</b><span>Started</span></div>'+
-          '<div class="step"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>'+
-        '</div></div>';
+          '<div class="step win"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>'+
+        '</div></div>'+
+        '<div class="ksect"><h4>By interest</h4>'+miniBars(d.lead_interests)+'</div>';
     }
   },
   video_sessions:{
@@ -466,7 +497,8 @@ function load(force){
       kcard('visitors',k.visitors||0,'Unique visitors',(k.new||0)+' new · '+(k.returning||0)+' returning')+
       kcard('sessions',k.sessions||0,'Sessions','Bounce '+(k.bounce_rate||0)+'%')+
       kcard('avg_engaged',k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
-      kcard('conversions',(k.conversions||0),'Access requests',(k.conv_rate||0)+'% of visitors')+
+      kcard('signup',(k.signup_clicks||0),'Sign-up clicks',(k.signup_cvr||0)+'% → sign-in')+
+      kcard('conversions',(k.conversions||0),'Lead requests',(k.conv_rate||0)+'% of visitors')+
       kcard('video_sessions',k.video_sessions||0,'Watched walkthrough')+
       kcard('signed_in',k.signed_in||0,'Signed in later',(k.signed_in_rate||0)+'% of visitors')+
       kcard('identified',k.identified||0,'Identified visitors')+
@@ -483,20 +515,28 @@ function load(force){
     bars('topPages',d.top_pages);bars('referrers',d.referrers);
     bars('utmSource',d.utm_source);bars('utmCampaign',d.utm_campaign);
     bars('devices',d.devices);bars('oses',d.oses);bars('browsers',d.browsers);
-    bars('scroll',d.scroll);bars('cta',d.cta);bars('search',d.search);
+    bars('scroll',d.scroll);bars('cta',d.cta_groups);bars('search',d.search);
+    bars('leadInterests',d.lead_interests);
     bars('landing',d.top_landing);bars('rage',d.rage);bars('companies',d.top_companies);
     var idb=document.querySelector('#identified tbody');var idr=d.identified||[];
     IDENTIFIED=idr;ALL_VISITORS=d.all_visitors||[];
     idb.innerHTML=idr.length?idr.map(function(x,i){
       var status=x.status?'<span class="status-pill '+x.status+'">'+(x.status==='staff'?'→ Staff':'→ Member')+'</span>':'<span class="status-pill">—</span>';
-      return '<tr onclick="openVisitorDrawer('+i+')"><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Request access'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+status+'</td><td>'+esc(x.pages)+'</td></tr>';
+      return '<tr onclick="openVisitorDrawer('+i+')"><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Lead form'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+status+'</td><td>'+esc(x.pages)+'</td></tr>';
     }).join(''):'<tr><td colspan="6" class="empty">No identified visitors yet — they appear when reverse-IP is enabled, someone submits the access form, signs in later, or a provider posts to /api/identify.</td></tr>';
-    // funnel
+    // lead-form funnel
     var f=d.form_funnel||{};
     document.getElementById('funnel').innerHTML=
       '<div class="step"><b>'+(f.opened||0)+'</b><span>Opened</span></div>'+
       '<div class="step"><b>'+(f.started||0)+'</b><span>Started</span></div>'+
-      '<div class="step"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>';
+      '<div class="step win"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>';
+    // sign-up funnel (primary CTA → Google sign-in)
+    var sf=d.signup_funnel||{};
+    document.getElementById('signupFunnel').innerHTML=
+      '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
+      '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>';
+    document.getElementById('signupNote').innerHTML=
+      'Primary CTA across the marketing pages. <b>'+(k.signup_cvr||0)+'%</b> of Sign-up clickers went on to sign in with Google.';
     // cwv
     var v=d.cwv||{};
     function rate(metric,val){
