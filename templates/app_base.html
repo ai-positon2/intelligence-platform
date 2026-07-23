@@ -100,7 +100,7 @@
     /* ---- topbar ---- */
     .tb{
       display:flex; align-items:center; gap:16px;
-      padding:14px 28px; position:sticky; top:0; z-index:20;
+      padding:14px var(--margin-app); position:sticky; top:0; z-index:20;
       border-bottom:1px solid var(--line);
       background:rgba(4,5,16,.55); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     }
@@ -193,6 +193,7 @@
     }
   </style>
   {% block styles %}{% endblock %}
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
 </head>
 <body data-email="{{ user.email }}">
   <div class="appshell">
