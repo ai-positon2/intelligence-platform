@@ -41,6 +41,13 @@
      same kind of text is the same size everywhere. Raw px are snapped to these.
      10 → 11.5 → 13 → 15 → 17 → 20 → 24 → 30 → 40 → 56 */
   --fs-2xs:10px;--fs-xs:11.5px;--fs-sm:13px;--fs-md:15px;--fs-lg:17px;--fs-xl:20px;--fs-2xl:24px;--fs-3xl:30px;--fs-4xl:40px;--fs-5xl:56px;
+  /* rhythm (Arena Component Scale): one value per role so line-height and
+     tracking read the same everywhere. Headings keep a slight tighten; body is
+     the spec 1.5; labels/caps follow the spec letter-spacing (0.25px / 7%). */
+  --lh-tight:1.15;--lh-snug:1.35;--lh-body:1.5;
+  --ls-tight:-0.01em;--ls-normal:0;--ls-label:0.02em;--ls-caps:0.07em;
+  /* radius (Arena spec scale: 4/8/12/16/28/pill/full) */
+  --radius-xs:4px;--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:28px;--radius-pill:80px;--radius-full:9999px;
   /* elevation */
   --shadow-sm:0 4px 12px -4px rgba(0,0,0,.5);
   --shadow-md:0 12px 32px -8px rgba(0,0,0,.6);
