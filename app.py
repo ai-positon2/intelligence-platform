@@ -4988,6 +4988,32 @@ CHATBOT_FUNCTIONS = [
 _PPC_CTX_CACHE: dict = {"data": None, "ts": 0.0}
 _PPC_CTX_TTL = 60    # seconds — refresh every 60s; keeps data fresh without hammering APIs
 
+# ── Context size guards ────────────────────────────────────────────────────────
+# The live-data context is injected into Vimi's system prompt. Left unbounded it
+# grew past the model's input-token limit (272k), so EVERY chat — even "hi" —
+# failed with context_length_exceeded. These caps keep the newest / most relevant
+# rows per section and enforce a hard overall character budget as a backstop.
+# Data is newest-first, so trimming the tail drops only the oldest rows.
+_CTX_MAX_ROWS = {          # per-section row caps (newest first)
+    "companies": 400,
+    "people":    400,
+    "signals":   400,      # per account
+    "ads":       400,
+}
+# Hard ceiling on the whole context string. ~4 chars/token, so 480k chars is
+# roughly 120k tokens — comfortably under the 272k input limit once the base
+# prompt, platform knowledge, chat history and response headroom are added.
+_CTX_CHAR_BUDGET = 480_000
+
+
+def _cap_rows(lines: list, key: str) -> tuple:
+    """Return (kept_lines, total_count). Keeps the first N (newest) rows."""
+    n = _CTX_MAX_ROWS.get(key, 400)
+    total = len(lines)
+    if total <= n:
+        return lines, total
+    return lines[:n], total
+
 # Static ground truth about the platform itself, so Vimi can answer questions about
 # how a feature/number/term works precisely instead of guessing. Keep this in sync
 # with CONTEXT_FOR_NEW_CHAT_V17.md when that doc changes; it is intentionally short
@@ -5045,7 +5071,9 @@ plainly rather than inventing an answer, and use web search for public informati
 
 def _build_ppc_context() -> str:
     """
-    Fetch ALL data from every source — no row limits.
+    Fetch live data from every source, newest first, capped per section
+    (_CTX_MAX_ROWS) with an overall character backstop (_CTX_CHAR_BUDGET) so the
+    injected context can never exceed the model's input-token limit.
     Cached for _PPC_CTX_TTL seconds so repeated chat messages are instant.
     """
     import time as _time
@@ -5148,15 +5176,21 @@ def _build_ppc_context() -> str:
 
         industry_counts = dict(Counter(p["industry"] for p in people_out if p["industry"]).most_common(8))
 
+        # Cap to newest rows so the context stays within the model's token limit.
+        c_lines, c_total = _cap_rows(c_lines, "companies")
+        p_lines, p_total = _cap_rows(p_lines, "people")
+        c_note = f" — showing newest {len(c_lines)} of {c_total}" if len(c_lines) < c_total else ""
+        p_note = f" — showing newest {len(p_lines)} of {p_total}" if len(p_lines) < p_total else ""
+
         # COMPANIES block comes FIRST so GPT reads it first for "company" queries
         parts.append(
             f"=== VISITOR DATA ===\n"
             f"Summary: {len(people_out)} individual visitors from {len(companies_out)} unique companies\n"
             f"Top industries: {industry_counts}\n\n"
-            f"--- SECTION A: COMPANIES THAT VISITED ({len(companies_out)} unique companies) ---\n"
+            f"--- SECTION A: COMPANIES THAT VISITED ({len(companies_out)} unique companies{c_note}) ---\n"
             f"USE THIS SECTION when asked about COMPANIES. Columns: Company, Website, Industry, Location, Employees, Revenue\n"
             + "\n".join(c_lines)
-            + f"\n\n--- SECTION B: INDIVIDUAL VISITORS ({len(people_out)} people, newest first) ---\n"
+            + f"\n\n--- SECTION B: INDIVIDUAL VISITORS ({len(people_out)} people, newest first{p_note}) ---\n"
             f"USE THIS SECTION when asked about VISITORS or PEOPLE. Columns: Name, Title, CompanyWebsite, Industry, Location, DateVisited\n"
             + "\n".join(p_lines)
         )
@@ -5202,11 +5236,14 @@ def _build_ppc_context() -> str:
                     f"{r['signal_type']} [{r['severity']}] | {date} | {detail}"
                 )
 
+            sig_lines, sig_total = _cap_rows(sig_lines, "signals")
+            sig_note = f" — showing newest {len(sig_lines)} of {sig_total}" if len(sig_lines) < sig_total else ""
+
             parts.append(
                 f"=== SIGNAL TRACKER ({_acct_label} — {comp_count} companies with signals) ===\n"
                 f"Total signals: {len(all_sigs)}\n"
                 f"By type: {sig_counts}\n\n"
-                f"--- ALL SIGNALS (newest first) ---\n"
+                f"--- ALL SIGNALS (newest first{sig_note}) ---\n"
                 + "\n".join(sig_lines)
             )
 
@@ -5226,6 +5263,8 @@ def _build_ppc_context() -> str:
                     f"angle: {ad['messaging_angle'][:60]} | "
                     f"first: {ad['first_shown']} | last: {ad['last_shown']}"
                 )
+            ad_lines, ad_total = _cap_rows(ad_lines, "ads")
+            ad_note = f" (showing newest {len(ad_lines)} of {ad_total})" if len(ad_lines) < ad_total else ""
             parts.append(
                 f"=== AD INTELLIGENCE ===\n"
                 f"Total ads tracked: {a['total_in_sheet']}\n"
@@ -5234,7 +5273,7 @@ def _build_ppc_context() -> str:
                 f"By status: {a['by_status']}\n"
                 f"Top CTAs: {a['top_ctas']}\n"
                 f"Top keywords: {a['top_keywords']}\n\n"
-                f"--- ALL ADS ---\n"
+                f"--- ALL ADS{ad_note} ---\n"
                 + "\n".join(ad_lines)
             )
         else:
@@ -5247,6 +5286,15 @@ def _build_ppc_context() -> str:
         parts.append(f"=== AD INTELLIGENCE ===\n⚠ Could not fetch: {e}")
 
     ctx = "\n\n" + "\n\n".join(parts)
+
+    # Hard backstop: never let the context blow past the model input limit,
+    # regardless of row sizes. Trim the tail (oldest data) and flag it.
+    if len(ctx) > _CTX_CHAR_BUDGET:
+        ctx = (ctx[:_CTX_CHAR_BUDGET]
+               + "\n\n⚠ LIVE DATA truncated to fit the model's context limit; "
+                 "oldest rows were dropped. Ask for a narrower slice (e.g. a specific "
+                 "company, account, or date range) for full detail.")
+
     _PPC_CTX_CACHE["data"] = ctx
     _PPC_CTX_CACHE["ts"] = now
     return ctx
