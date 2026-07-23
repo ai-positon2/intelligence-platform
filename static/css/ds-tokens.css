@@ -29,9 +29,14 @@
   /* responsive grid (Arena spec): page side-margin + column gutter scale by
      viewport. content = min(viewport,--maxw) − 2×--margin. Mobile-first base. */
   --gutter:16px;--margin:20px;--maxw:1920px;
-  /* dashboards keep their own max-width (dense tables/charts), so their side
-     margin follows the Arena scale only up to the 48px laptop step, then holds. */
-  --margin-app:min(var(--margin),48px);
+  /* Internal pages follow the SAME responsive margin as the public site (full
+     Arena scale, not capped), so their topbar + content share the spec grid.
+     --margin-app is kept as an alias of --margin for existing call sites. */
+  --margin-app:var(--margin);
+  /* Side padding for a FULL-WIDTH bar (topbar) so its content lines up with the
+     --maxw-capped, centered content container at every viewport width:
+     below --maxw it equals --margin; above it, it grows by the centering offset. */
+  --bleed:max(var(--margin), calc((100vw - var(--maxw)) / 2 + var(--margin)));
   /* type scale (canonical, followed platform-wide). One value per tier so the
      same kind of text is the same size everywhere. Raw px are snapped to these.
      10 → 11.5 → 13 → 15 → 17 → 20 → 24 → 30 → 40 → 56 */

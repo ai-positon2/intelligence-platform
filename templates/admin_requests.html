@@ -34,7 +34,7 @@
     @keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.08)}66%{transform:translate(-30px,25px) scale(.95)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     /* ===== topbar ===== */
-    .topbar{position:sticky;top:0;z-index:20;height:64px;padding:0 var(--margin-app);display:flex;align-items:center;justify-content:space-between;background:rgba(6,8,18,.72);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+    .topbar{position:sticky;top:0;z-index:20;height:64px;padding:0 var(--bleed);display:flex;align-items:center;justify-content:space-between;background:rgba(6,8,18,.72);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
     .lhs{display:flex;align-items:center}
     .brand{display:flex;align-items:center;gap:11px}
     .brand .orb{width:34px;height:34px}
@@ -46,7 +46,7 @@
     .top-link{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--dim);padding:9px 16px;border:1px solid var(--line2);border-radius:999px;background:rgba(255,255,255,.04);transition:.2s}
     .top-link:hover{color:#fff;border-color:rgba(99,102,241,.55);background:rgba(99,102,241,.12);transform:translateY(-1px)}
     /* ===== layout ===== */
-    .wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:54px var(--margin-app) 90px}
+    .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:54px var(--margin) 90px}
     .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#c7d0f0;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:999px;padding:7px 14px}
     .eyebrow .dt{width:7px;height:7px;border-radius:50%;background:var(--page);box-shadow:0 0 10px var(--page);animation:pulse 2.4s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}

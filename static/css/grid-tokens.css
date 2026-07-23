@@ -11,7 +11,11 @@
    --margin-app caps at the 48px laptop step so dense dashboards never widen. */
 :root{
   --gutter:16px; --margin:20px; --maxw:1920px;
-  --margin-app:min(var(--margin),48px);
+  /* Alias kept for existing call sites; internal pages use the full margin scale. */
+  --margin-app:var(--margin);
+  /* Side padding for a full-width bar (topbar) so it aligns with the --maxw-capped
+     centered content container at every width. */
+  --bleed:max(var(--margin), calc((100vw - var(--maxw)) / 2 + var(--margin)));
 }
 @media(min-width:428px){  :root{ --margin:32px } }
 @media(min-width:768px){  :root{ --margin:48px;  --gutter:24px } }
