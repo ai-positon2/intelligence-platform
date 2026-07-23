@@ -14,7 +14,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   outline:none!important;
   box-shadow:0 0 0 2px rgba(5,7,20,.9),0 0 0 4px rgba(76,191,146,.85),
              0 12px 34px -12px rgba(76,191,146,.6)!important;
-  border-radius:14px;
+  border-radius: var(--radius-md);
 }
 
 /* refined scrollbar */
@@ -22,7 +22,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-thumb{
   background:linear-gradient(180deg,rgba(124,140,220,.4),rgba(124,140,220,.22));
-  border-radius:100px;border:3px solid transparent;background-clip:content-box}
+  border-radius: var(--radius-pill);border:3px solid transparent;background-clip:content-box}
 *::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(76,191,146,.7),rgba(34,211,238,.5));background-clip:content-box}
 
 /* CTA buttons: a touch more life on press */
