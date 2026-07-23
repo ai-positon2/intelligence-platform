@@ -152,15 +152,20 @@ body[data-page="iagent"] #scene{opacity:.42}
 .nv-cta{margin-left:auto;display:flex;align-items:center;gap:12px}
 .nv-signin{color:var(--ink);font-size:15px;font-weight:600;padding:9px 13px;border-radius: var(--radius-sm);transition:.2s;opacity:.92}
 .nv-signin:hover{opacity:1;background:rgba(255,255,255,.06)}
-.btn-grad{position:relative;border:0;color:#fff;font-family:var(--sans);font-weight:700;border-radius: var(--radius-pill);overflow:hidden;
+.btn-grad{position:relative;display:inline-flex;align-items:center;justify-content:center;line-height:1;min-height:52px;box-sizing:border-box;border:0;color:#fff;font-family:var(--sans);font-weight:700;border-radius: var(--radius-pill);overflow:hidden;
   background:linear-gradient(110deg,#22d3ee,#6366f1 42%,#a855f7 80%,#e879f9);background-size:220% 100%;background-position:0% 50%;
   box-shadow:0 8px 26px rgba(99,102,241,.45),inset 0 0 0 1px rgba(255,255,255,.18);transition:background-position .6s,transform .2s,box-shadow .25s}
 .btn-grad:hover{background-position:100% 50%;transform:translateY(-2px);box-shadow:0 14px 40px rgba(168,85,247,.55),inset 0 0 0 1px rgba(255,255,255,.3)}
 .btn-grad::before{content:'';position:absolute;top:0;left:-60%;width:42%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg);transition:left .6s}
 .btn-grad:hover::before{left:135%}
-.btn-ghost{display:inline-flex;align-items:center;gap:9px;color:var(--ink);font-weight:600;font-size:15px;padding:14px 24px;border-radius: var(--radius-pill);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:.25s}
+.btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:52px;box-sizing:border-box;color:var(--ink);font-weight:600;font-size:15px;padding:0 24px;border-radius: var(--radius-pill);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:.25s}
 .btn-ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(129,140,248,.6);transform:translateY(-2px)}
 .nv-demo{font-size:15px;padding:11px 22px}
+/* Uniform CTA height: every button sharing a hero or band CTA row renders at
+   the same 52px pill height, so paired buttons (Request access / Watch the
+   walkthrough / Explore) always line up exactly. */
+.hero-cta .btn-grad,.hero-cta .btn-video,.hero-cta .btn-ghost,
+.band-cta .btn-grad,.band-cta .btn-video,.band-cta .btn-ghost{height:52px;min-height:52px;white-space:nowrap;flex:0 0 auto}
 .nv-burger{display:none;flex-direction:column;gap:4px;background:none;border:0;padding:8px}
 .nv-burger span{width:20px;height:2px;background:var(--ink);border-radius: var(--radius-xs);transition:.25s}
 @media (max-width:900px){ #nv{gap:10px}
@@ -985,7 +990,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 .ic-play{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round;vertical-align:-4px;margin-right:6px}
 .ic-play path{fill:currentColor;stroke:none}
 .band-cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;align-items:center}
-.btn-video{display:inline-flex;align-items:center;gap:11px;font-family:var(--sans);font-weight:700;font-size:15px;color:#fff;padding:11px 22px 11px 12px;border-radius: var(--radius-pill);border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));box-shadow:0 14px 34px -18px #000;cursor:pointer;transition:transform .2s,border-color .25s,box-shadow .3s}
+.btn-video{display:inline-flex;align-items:center;justify-content:center;gap:11px;min-height:52px;box-sizing:border-box;font-family:var(--sans);font-weight:700;font-size:15px;color:#fff;padding:0 22px 0 10px;border-radius: var(--radius-pill);border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));box-shadow:0 14px 34px -18px #000;cursor:pointer;transition:transform .2s,border-color .25s,box-shadow .3s}
 .btn-video:hover{transform:translateY(-2px);border-color:rgba(129,140,248,.6);box-shadow:0 20px 46px -18px rgba(99,102,241,.6)}
 .btn-video .vp{width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#22d3ee,#a855f7);box-shadow:0 0 18px -2px rgba(99,102,241,.75)}
 .btn-video .vp svg{width:15px;height:15px;fill:#fff;stroke:none;margin-left:2px}
