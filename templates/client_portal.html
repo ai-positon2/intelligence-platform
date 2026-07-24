@@ -18,7 +18,7 @@
   <div class="sect">
     <div class="eyebrow">Your agents</div>
     <h2>Open an agent</h2>
-    <p class="sub">Each one is configured for {{ client.short }}. Open it to see what it does, then run it.</p>
+    <p class="sub">Pick one to see what it does, then run it.</p>
     <div class="cards">
       {% for a in agents %}
       <a class="card" href="/{{ client.slug }}/agents/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
