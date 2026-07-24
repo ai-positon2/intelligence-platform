@@ -23,7 +23,7 @@
       </a>
       <div class="sb-client">
         <span class="st">✦</span>
-        <span class="nm"><b>{{ client.name }}</b><span>Private workspace</span></span>
+        <span class="nm"><b>{{ client.name }}</b></span>
       </div>
       <div class="sb-div"></div>
       <nav class="sb-nav">
@@ -82,7 +82,6 @@
         </div>
         <div class="tb-spacer"></div>
         <div class="tb-right">
-          <span class="tb-chip hide-sm"><span class="dot"></span> Workspace live</span>
           <div class="user-menu" id="userMenu">
             <div class="user-pill" onclick="toggleMenu(event)">
               {% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
