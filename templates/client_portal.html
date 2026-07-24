@@ -4,14 +4,22 @@
 <div class="dash">
 
   <div class="hero">
-    <div class="eyebrow"><span class="st">✦</span> Private workspace</div>
-    <h1>Welcome{% if user.given_name %}, {{ user.given_name }}{% endif %}.<br><span class="g">{{ client.tagline }}</span></h1>
-    <p>{{ client.blurb }}</p>
-    <div class="hero-meta">
-      <span class="chip"><b>{{ agents|length }}</b> agents configured</span>
-      <span class="chip"><span class="dot"></span> {{ agents|selectattr('connected')|list|length }} live now</span>
-      <span class="chip">Curated for {{ client.short }}</span>
+    <div class="hero-main">
+      <div class="eyebrow"><span class="st">✦</span> Private workspace</div>
+      <h1>Welcome{% if user.given_name %}, {{ user.given_name }}{% endif %}.<br><span class="g">{{ client.tagline }}</span></h1>
+      <p>{{ client.blurb }}</p>
+      <div class="hero-meta">
+        <span class="chip"><b>{{ agents|length }}</b> agents configured</span>
+        <span class="chip"><span class="dot"></span> {{ agents|selectattr('connected')|list|length }} live now</span>
+        <span class="chip">Curated for {{ client.short }}</span>
+      </div>
     </div>
+    {% if client.logo %}
+    <div class="hero-brand">
+      <span class="pf">Prepared for</span>
+      <img class="cl-logo" src="{{ client.logo }}" alt="{{ client.name }}">
+    </div>
+    {% endif %}
   </div>
 
   <div class="sect">
