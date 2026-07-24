@@ -2398,8 +2398,11 @@ def _client_home(client_slug):
     if gate is not None:
         return gate
     agents = _client_agents(client)
+    user = _get_user()
+    run_counts = _agent_run_counts((user or {}).get("email", ""))
     return render_template("client_portal.html", client=client,
-                           agents=agents, nav_agents=agents, user=_get_user())
+                           agents=agents, nav_agents=agents, user=user,
+                           run_counts=run_counts, run_cap=AGENT_RUN_CAP)
 
 def _client_agent_detail(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)
@@ -2415,8 +2418,11 @@ def _client_agent_detail(client_slug, agent_slug):
         return redirect("/" + client_slug)
     agents = _client_agents(client)
     related = [v for v in agents if v["slug"] != agent_slug][:3]
+    user = _get_user()
+    runs_used = _agent_run_counts((user or {}).get("email", "")).get(agent_slug, 0)
     return render_template("client_agent.html", client=client, agent=agent,
-                           related=related, nav_agents=agents, user=_get_user())
+                           related=related, nav_agents=agents, user=user,
+                           runs_used=runs_used, run_cap=AGENT_RUN_CAP)
 
 def _client_agent_use(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)
@@ -2430,18 +2436,116 @@ def _client_agent_use(client_slug, agent_slug):
     agent = _client_agent_view(agent_slug)
     if not agent:
         return redirect("/" + client_slug)
-    embed_url = _app_embed_url(agent) if agent.get("connected") else ""
+    user = _get_user()
+    email = (user or {}).get("email", "")
+    # Same per-agent, per-account run cap as /app (Agent Runs sheet is shared, so a
+    # user's runs count identically no matter which surface they ran the agent on).
+    runs_used = _agent_run_counts(email).get(agent_slug, 0)
+    limit_reached = bool(agent.get("connected")) and runs_used >= AGENT_RUN_CAP
+    embed_url = "" if limit_reached else (_app_embed_url(agent) if agent.get("connected") else "")
     return render_template("client_embed.html", client=client, agent=agent,
-                           embed_url=embed_url, serp_origin=_SERP_BASE, user=_get_user())
+                           embed_url=embed_url, serp_origin=_SERP_BASE, user=user,
+                           runs_used=runs_used, run_cap=AGENT_RUN_CAP, limit_reached=limit_reached)
+
+def _client_agent_log_run(client_slug, agent_slug):
+    """Logs one real run of a client-portal agent, cap-enforced. Called client-side
+    only after the embedded tool reports a genuine run start (same postMessage
+    contract as /app). Feeds the shared 'Agent Runs' sheet, so these show up on the
+    internal /p2 'Public Agent Usage' admin dashboard alongside /app runs."""
+    client = CLIENTS.get(client_slug)
+    if not client:
+        return jsonify({"logged": False, "error": "unknown client"}), 404
+    gate = _client_gate(client)
+    if gate is not None:
+        return jsonify({"logged": False, "error": "forbidden"}), 403
+    if agent_slug not in client.get("agents", []):
+        return jsonify({"logged": False, "error": "unknown agent"}), 404
+    agent = _client_agent_view(agent_slug)
+    if not agent or not agent.get("connected"):
+        return jsonify({"logged": False, "error": "agent not connected"}), 400
+    user = _get_user()
+    email = (user or {}).get("email", "")
+    runs_used = _agent_run_counts(email).get(agent_slug, 0)
+    if runs_used >= AGENT_RUN_CAP:
+        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP, "at_cap": True})
+    _log_agent_run(user, agent)
+    runs_used += 1
+    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP,
+                    "at_cap": runs_used >= AGENT_RUN_CAP})
+
+def _client_agent_finish_run(client_slug, agent_slug):
+    """Saves one finished run's full output to the shared Postgres history, so it
+    appears both in this client's History page and the internal /p2 'Agent Runs'
+    admin dashboard. Same contract as /app's finish-run."""
+    client = CLIENTS.get(client_slug)
+    if not client:
+        return jsonify({"saved": False, "error": "unknown client"}), 404
+    gate = _client_gate(client)
+    if gate is not None:
+        return jsonify({"saved": False, "error": "forbidden"}), 403
+    if agent_slug not in client.get("agents", []):
+        return jsonify({"saved": False, "error": "unknown agent"}), 404
+    agent = _client_agent_view(agent_slug)
+    if not agent:
+        return jsonify({"saved": False, "error": "unknown agent"}), 404
+    data = request.get_json(silent=True) or {}
+    output = data.get("output")
+    if not isinstance(output, dict):
+        return jsonify({"saved": False, "error": "missing output"}), 400
+    run_id = _save_agent_run(_get_user(), agent, output)
+    return jsonify({"saved": run_id is not None, "id": run_id})
+
+def _client_history(client_slug):
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    user = _get_user()
+    slugs = set(client.get("agents", []))
+    runs = [r for r in _list_agent_runs((user or {}).get("email", "")) if r["slug"] in slugs]
+    for r in runs:
+        meta = APP_AGENTS_BY_SLUG.get(r["slug"], {})
+        r["ac"] = meta.get("ac", "#5b9dff")
+        r["ac2"] = meta.get("ac2", "#8b5cf6")
+        r["icon"] = meta.get("icon", "")
+        r["display_ts"] = _fmt_run_ts(r["created_at"])
+    return render_template("client_history.html", client=client, runs=runs,
+                           nav_agents=_client_agents(client), user=user)
+
+def _client_history_detail(client_slug, run_id):
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    user = _get_user()
+    run = _get_agent_run((user or {}).get("email", ""), run_id)
+    if not run or run["slug"] not in set(client.get("agents", [])):
+        return redirect("/" + client_slug + "/history")
+    run["display_ts"] = _fmt_run_ts(run["created_at"])
+    agent = APP_AGENTS_BY_SLUG.get(run["slug"], {})
+    return render_template("client_history_detail.html", client=client, run=run,
+                           agent=agent, nav_agents=_client_agents(client), user=user)
 
 # Register explicit routes for each known client slug (no top-level catch-all).
 for _cslug in CLIENTS:
     app.add_url_rule("/" + _cslug, "client_home__" + _cslug,
                      (lambda cs=_cslug: _client_home(cs)))
+    app.add_url_rule("/" + _cslug + "/history", "client_history__" + _cslug,
+                     (lambda cs=_cslug: _client_history(cs)))
+    app.add_url_rule("/" + _cslug + "/history/<int:run_id>", "client_history_detail__" + _cslug,
+                     (lambda run_id, cs=_cslug: _client_history_detail(cs, run_id)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>", "client_agent__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_detail(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use", "client_use__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_use(cs, agent_slug)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/log-run", "client_logrun__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_agent_log_run(cs, agent_slug)), methods=["POST"])
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/finish-run", "client_finishrun__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_agent_finish_run(cs, agent_slug)), methods=["POST"])
 
 
 # ── v16: internal app relocated to /p2/* ─────────────────────────────────────────
