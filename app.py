@@ -2397,8 +2397,9 @@ def _client_home(client_slug):
     gate = _client_gate(client)
     if gate is not None:
         return gate
+    agents = _client_agents(client)
     return render_template("client_portal.html", client=client,
-                           agents=_client_agents(client), user=_get_user())
+                           agents=agents, nav_agents=agents, user=_get_user())
 
 def _client_agent_detail(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)
@@ -2412,9 +2413,10 @@ def _client_agent_detail(client_slug, agent_slug):
     agent = _client_agent_view(agent_slug)
     if not agent:
         return redirect("/" + client_slug)
-    related = [v for v in _client_agents(client) if v["slug"] != agent_slug][:3]
+    agents = _client_agents(client)
+    related = [v for v in agents if v["slug"] != agent_slug][:3]
     return render_template("client_agent.html", client=client, agent=agent,
-                           related=related, user=_get_user())
+                           related=related, nav_agents=agents, user=_get_user())
 
 def _client_agent_use(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)

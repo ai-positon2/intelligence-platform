@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ client.name }} · Intelligence by Position2{% endblock %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#040510">
+  <link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <link rel="stylesheet" href="/static/css/client-portal.css?v=2">
+  {% block styles %}{% endblock %}
+</head>
+<body data-email="{{ user.email }}" style="--brand:{{ client.accent }}; --brand2:{{ client.accent2 }}">
+  <div class="appshell">
+    <div class="sb-overlay" id="sbOverlay" onclick="toggleSidebar(false)"></div>
+    <aside class="sidebar" id="sidebar">
+      <a class="sb-brand" href="/{{ client.slug }}">
+        <img src="/static/logo-lockup.svg?v=1" alt="Intelligence by Position2">
+      </a>
+      <div class="sb-client">
+        <span class="st">✦</span>
+        <span class="nm"><b>{{ client.name }}</b><span>Private workspace</span></span>
+      </div>
+      <div class="sb-div"></div>
+      <nav class="sb-nav">
+        <div class="sb-group">
+          <div class="sb-eyebrow">Overview</div>
+          <a class="sb-item{{ ' active' if request.path == '/' + client.slug }}" href="/{{ client.slug }}">
+            <span class="si"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/>
+              <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg></span>
+            <span class="lbl">Dashboard</span>
+          </a>
+        </div>
+        <div class="sb-group">
+          <div class="sb-eyebrow">Your agents</div>
+          {% for a in nav_agents %}
+          <a class="sb-item ag{{ ' active' if request.path.startswith('/' + client.slug + '/agents/' + a.slug) }}"
+             href="/{{ client.slug }}/agents/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
+            <span class="si">{{ a.icon|safe }}</span>
+            <span class="lbl">{{ a.name }}</span>
+            <span class="sdot{{ '' if a.connected else ' soon' }}" title="{{ 'Live' if a.connected else 'In setup' }}"></span>
+          </a>
+          {% endfor %}
+        </div>
+      </nav>
+      <div class="sb-foot">
+        <div class="sfa">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+          {% else %}{{ (user.name or user.email or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <div class="sft">
+          <b>{{ user.given_name or user.name or 'User' }}</b>
+          <span>{{ user.email }}</span>
+        </div>
+        <a class="sfo" href="/logout" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M13 21H6a2 2 0 01-2-2V5a2 2 0 012-2h7"/></svg>
+        </a>
+      </div>
+    </aside>
+
+    <div class="maincol">
+      <header class="tb">
+        <div class="sb-toggle" onclick="toggleSidebar()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </div>
+        <div class="tb-search" id="tbSearch">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="tbSearchInput" placeholder="Search your agents…" autocomplete="off">
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="tb-right">
+          <span class="tb-chip hide-sm"><span class="dot"></span> Workspace live</span>
+          <div class="user-menu" id="userMenu">
+            <div class="user-pill" onclick="toggleMenu(event)">
+              {% if user.picture %}<img src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+              {% else %}{{ (user.name or user.email or 'U')[:2]|upper }}{% endif %}
+            </div>
+            <div class="user-dropdown">
+              <div class="dd-header">
+                <div class="dd-name">{{ user.name or 'User' }}</div>
+                <div class="dd-email">{{ user.email }}</div>
+              </div>
+              <div class="dd-items">
+                <a href="/{{ client.slug }}" class="dd-item"><span class="dd-item-icon">&#9632;</span> All agents</a>
+                <a href="/logout" class="dd-item danger"><span class="dd-item-icon">&rarr;</span> Sign out</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+  <script>
+    function toggleMenu(e){ if(e) e.stopPropagation(); document.getElementById('userMenu').classList.toggle('open'); }
+    function toggleSidebar(force){
+      var sb=document.getElementById('sidebar'), ov=document.getElementById('sbOverlay');
+      var open = (typeof force==='boolean') ? force : !sb.classList.contains('open');
+      sb.classList.toggle('open', open); ov.classList.toggle('show', open);
+    }
+    document.addEventListener('click', function(e){
+      var m = document.getElementById('userMenu');
+      if (m && !m.contains(e.target)) m.classList.remove('open');
+    });
+    (function(){
+      var input = document.getElementById('tbSearchInput'); if(!input) return;
+      var grp = Array.prototype.slice.call(document.querySelectorAll('.sidebar .sb-group'))
+        .filter(function(g){ var e=g.querySelector('.sb-eyebrow'); return e && e.textContent.trim()==='Your agents'; })[0];
+      var links = grp ? Array.prototype.slice.call(grp.querySelectorAll('.sb-item')) : [];
+      input.addEventListener('input', function(){
+        var q = input.value.trim().toLowerCase();
+        links.forEach(function(a){ a.style.display = (!q || a.textContent.toLowerCase().indexOf(q)!==-1) ? '' : 'none'; });
+      });
+      input.addEventListener('keydown', function(e){
+        if(e.key!=='Enter') return; var q=input.value.trim().toLowerCase(); if(!q) return;
+        var hit = links.filter(function(a){ return a.style.display!=='none'; })[0];
+        if(hit) location.href = hit.getAttribute('href');
+      });
+    })();
+  </script>
+  <script>
+    (function(){if(window.__mtrk)return;window.__mtrk=1;var _s=Date.now(),_d=false;
+      function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);
+        try{fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({page:location.pathname,title:document.title,seconds:s,email:(document.body.dataset.email||'')}),
+          keepalive:true}).catch(function(){});}catch(e){}}
+      document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});
+      window.addEventListener('beforeunload',f);})();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

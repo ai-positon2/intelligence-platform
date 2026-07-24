@@ -1,33 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ agent.name }} · {{ client.short }} · Intelligence by Position2</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#05070f">
+<meta name="theme-color" content="#040510">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/client-portal.css?v=1">
-<style>html,body{height:100%}body{overflow:hidden}</style>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/grid-tokens.css">
+<link rel="stylesheet" href="/static/css/client-portal.css?v=2">
+{% if agent.connected and embed_url %}<style>html,body{height:100%}body{overflow:hidden}</style>{% endif %}
 </head>
-<body style="--acc:{{ client.accent }}; --acc2:{{ client.accent2 }}">
+<body style="--brand:{{ client.accent }}; --brand2:{{ client.accent2 }}">
 
-<div class="embed-bar" style="--ca:{{ agent.ac }}; --ca2:{{ agent.ac2 }}">
-  <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}" style="padding:8px 12px">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+<div class="embed-bar" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
+  <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
     Back
   </a>
-  <span class="ico">{{ agent.icon|safe }}</span>
+  <span class="cicon">{{ agent.icon|safe }}</span>
   <span>
     <span class="en">{{ agent.name }}</span>
     <span class="er">{{ agent.pill1 }} · {{ client.name }}</span>
   </span>
-  <span class="sp" style="flex:1"></span>
+  <span style="flex:1"></span>
   {% if agent.connected %}<span class="status live"><span class="dot"></span> Live</span>
-  {% else %}<span class="status soon"><span class="dot warnd"></span> In setup</span>{% endif %}
+  {% else %}<span class="status soon"><span class="dot"></span> In setup</span>{% endif %}
   <a class="btn-ghost" href="/{{ client.slug }}">All agents</a>
 </div>
 
@@ -35,11 +36,11 @@
   <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
           allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
 {% else %}
-  <div class="setup" style="--ca:{{ agent.ac }}; --ca2:{{ agent.ac2 }}">
+  <div class="setup" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
     <div class="setup-card">
-      <span class="ico">{{ agent.icon|safe }}</span>
+      <span class="cicon">{{ agent.icon|safe }}</span>
       <h2>{{ agent.name }}</h2>
-      <div class="sub">Dashboard in setup for {{ client.short }}</div>
+      <div class="subx">Dashboard in setup for {{ client.short }}</div>
       <p>This agent is configured for {{ client.name }} and we're connecting its live dashboard to your data now. Here's what it will do the moment it goes live:</p>
       <div class="mini">
         {% for tr in agent.trips %}
@@ -54,6 +55,7 @@
       </div>
     </div>
   </div>
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
 {% endif %}
 
 </body>
