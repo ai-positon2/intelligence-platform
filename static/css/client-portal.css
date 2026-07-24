@@ -130,7 +130,19 @@ svg{display:block}
     radial-gradient(720px 320px at 6% 0%, color-mix(in srgb,var(--brand) 20%,transparent), transparent 65%),
     radial-gradient(620px 320px at 96% 10%, color-mix(in srgb,var(--brand2) 16%,transparent), transparent 65%),
     rgba(12,15,30,.55);
-  backdrop-filter:blur(8px); position:relative; overflow:hidden }
+  backdrop-filter:blur(8px); position:relative; overflow:hidden;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:32px }
+.hero-main{ flex:1; min-width:0 }
+.hero-brand{ flex:none; display:flex; flex-direction:column; align-items:center; gap:12px;
+  padding:20px 24px; border-radius: var(--radius-lg); border:1px solid var(--line);
+  background:rgba(255,255,255,.03); backdrop-filter:blur(6px) }
+.hero-brand .pf{ font-size:10px; font-weight:700; letter-spacing: var(--ls-caps); text-transform:uppercase; color:var(--tx3) }
+.hero-brand .cl-logo{ height:56px; width:auto; max-width:180px; display:block }
+@media (max-width:820px){
+  .hero{ flex-direction:column-reverse; align-items:stretch; gap:22px }
+  .hero-brand{ flex-direction:row; align-items:center; justify-content:center; gap:16px; padding:14px 18px }
+  .hero-brand .cl-logo{ height:44px }
+}
 .hero .eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; letter-spacing: var(--ls-caps); text-transform:uppercase; color:color-mix(in srgb,var(--brand) 72%,#fff); margin-bottom:12px }
 .hero .eyebrow .st{ filter:drop-shadow(0 0 6px color-mix(in srgb,var(--brand) 70%,transparent)) }
 .hero h1{ margin:0 0 12px; font-size:clamp(28px,3.6vw,42px); font-weight:700; letter-spacing: var(--ls-tight); color:#fff; line-height:1.06 }

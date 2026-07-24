@@ -2338,6 +2338,10 @@ CLIENTS = {
         "name":     "NorthStar Anesthesia",
         "short":    "NorthStar",
         "website":  "https://northstaranesthesia.com/",
+        # Client's own logo (their white wordmark, for the dark dashboard). Served
+        # locally from /static rather than hotlinked, and rendered via <img> so the
+        # SVG can't execute script. Sourced from northstaranesthesia.com.
+        "logo":     "/static/clients/northstaranesthesia/logo-white.svg",
         # Email domains allowed in addition to @position2.com (always allowed).
         "domains":  ["northstaranesthesia.com"],
         "accent":   "#5b9dff",
