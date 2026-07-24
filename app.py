@@ -2335,16 +2335,16 @@ def logout():
 CLIENTS = {
     "northstaranesthesia": {
         "slug":     "northstaranesthesia",
-        "name":     "North Star Anesthesia",
-        "short":    "North Star",
+        "name":     "NorthStar Anesthesia",
+        "short":    "NorthStar",
         "website":  "https://northstaranesthesia.com/",
         # Email domains allowed in addition to @position2.com (always allowed).
         "domains":  ["northstaranesthesia.com"],
         "accent":   "#5b9dff",
         "accent2":  "#8b5cf6",
-        "tagline":  "Go-to-market intelligence, tuned for North Star Anesthesia.",
+        "tagline":  "Go-to-market intelligence, tuned for NorthStar Anesthesia.",
         "blurb":    ("Your private Position2 Intelligence workspace. Every agent below is "
-                     "configured for North Star Anesthesia. Open one to see what it "
+                     "configured for NorthStar Anesthesia. Open one to see what it "
                      "watches, then run it whenever you need it."),
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
         "agents":   ["signal-tracker", "linkedin-intelligence", "ad-intelligence",
