@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Private workspace · Intelligence by Position2</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#05070f">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/client-portal.css?v=1">
+</head>
+<body style="--acc:{{ client.accent }}; --acc2:{{ client.accent2 }}">
+  <div class="denied">
+    <div class="denied-card">
+      <img class="mk" src="/static/logo-mark.svg" alt="">
+      <h1>This workspace is private</h1>
+      <p>The {{ client.name }} workspace is limited to {{ client.name }} and Position2 accounts. Your account doesn't have access.</p>
+      {% if user %}<span class="who">Signed in as {{ user.email }}</span>{% endif %}
+      <div class="acts">
+        <a class="btn-primary" style="font-size:14px; padding:12px 20px" href="/logout">Sign in with a different account</a>
+        <a class="btn-ghost" href="/">Go to Intelligence</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

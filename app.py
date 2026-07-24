@@ -2323,6 +2323,125 @@ def logout():
     return resp
 
 
+# ── Client workspaces (private, co-branded portals) ──────────────────────────────
+# A per-client front door at /<client-slug> (e.g. /northstaranesthesia). Each client
+# gets a curated subset of agents, gated so only that client's own email domain(s)
+# plus @position2.com staff can sign in. Agents reuse the APP_AGENTS registry: the
+# three with a "seo_slug" are live (their "Use Agent" embeds the real SERP tool, same
+# as /app/<slug>/use); the rest render an "in setup" dashboard shell until wired.
+#
+# Routes are registered explicitly per known client slug (see the loop below), so an
+# unknown top-level path never resolves here -- there is no catch-all "/<anything>".
+CLIENTS = {
+    "northstaranesthesia": {
+        "slug":     "northstaranesthesia",
+        "name":     "North Star Anesthesia",
+        "short":    "North Star",
+        "website":  "https://northstaranesthesia.com/",
+        # Email domains allowed in addition to @position2.com (always allowed).
+        "domains":  ["northstaranesthesia.com"],
+        "accent":   "#5b9dff",
+        "accent2":  "#8b5cf6",
+        "tagline":  "Go-to-market intelligence, tuned for North Star Anesthesia.",
+        "blurb":    ("Your private Position2 Intelligence workspace. Every agent below is "
+                     "configured for North Star Anesthesia. Open one to see what it "
+                     "watches, then run it whenever you need it."),
+        # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
+        "agents":   ["signal-tracker", "linkedin-intelligence", "ad-intelligence",
+                     "keyword-finder", "content-brief-generator", "content-enhancer"],
+    },
+}
+
+@app.template_filter("nodash")
+def _nodash(s):
+    """Strip em/en dashes from copy rendered on the client portals. The shared
+    APP_AGENTS product blurbs use em dashes, but client-facing Position2 copy
+    never does (house style), so we normalise at render time without touching the
+    shared source strings that the internal /app pages also use."""
+    if not isinstance(s, str):
+        return s
+    return (s.replace(" — ", ", ").replace("—", ", ")
+             .replace(" – ", ", ").replace("–", "-"))
+
+def _client_agent_view(slug):
+    """APP_AGENTS entry for a slug, enriched with a `connected` flag (True when it
+    has a live tool wired via seo_slug). Returns None for unknown slugs."""
+    a = APP_AGENTS_BY_SLUG.get(slug)
+    if not a:
+        return None
+    return dict(a, connected=bool(a.get("seo_slug")))
+
+def _client_agents(client):
+    return [v for v in (_client_agent_view(s) for s in client.get("agents", [])) if v]
+
+def _client_allowed(client, email):
+    email = (email or "").lower()
+    if email.endswith("@position2.com"):
+        return True
+    return any(email.endswith("@" + d.lower()) for d in client.get("domains", []))
+
+def _client_gate(client):
+    """Return a response to short-circuit with (login redirect or 403 denial), or
+    None when the current user is allowed into this client's workspace."""
+    user = _get_user()
+    if not user:
+        return _login_redirect()
+    if not _client_allowed(client, user.get("email", "")):
+        return render_template("client_denied.html", client=client, user=user), 403
+    return None
+
+def _client_home(client_slug):
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    return render_template("client_portal.html", client=client,
+                           agents=_client_agents(client), user=_get_user())
+
+def _client_agent_detail(client_slug, agent_slug):
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    if agent_slug not in client.get("agents", []):
+        return redirect("/" + client_slug)
+    agent = _client_agent_view(agent_slug)
+    if not agent:
+        return redirect("/" + client_slug)
+    related = [v for v in _client_agents(client) if v["slug"] != agent_slug][:3]
+    return render_template("client_agent.html", client=client, agent=agent,
+                           related=related, user=_get_user())
+
+def _client_agent_use(client_slug, agent_slug):
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    if agent_slug not in client.get("agents", []):
+        return redirect("/" + client_slug)
+    agent = _client_agent_view(agent_slug)
+    if not agent:
+        return redirect("/" + client_slug)
+    embed_url = _app_embed_url(agent) if agent.get("connected") else ""
+    return render_template("client_embed.html", client=client, agent=agent,
+                           embed_url=embed_url, serp_origin=_SERP_BASE, user=_get_user())
+
+# Register explicit routes for each known client slug (no top-level catch-all).
+for _cslug in CLIENTS:
+    app.add_url_rule("/" + _cslug, "client_home__" + _cslug,
+                     (lambda cs=_cslug: _client_home(cs)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>", "client_agent__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_agent_detail(cs, agent_slug)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use", "client_use__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_agent_use(cs, agent_slug)))
+
+
 # ── v16: internal app relocated to /p2/* ─────────────────────────────────────────
 # The entire logged-in surface now lives under /p2. These stubs 301-redirect the old
 # internal URLs to their /p2 equivalents (query strings preserved) so bookmarks and

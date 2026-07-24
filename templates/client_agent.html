@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ agent.name }} · {{ client.name }} · Intelligence by Position2</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#05070f">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/client-portal.css?v=1">
+</head>
+<body style="--acc:{{ client.accent }}; --acc2:{{ client.accent2 }}">
+
+{% set uname = (user.name or user.email or '') %}
+<header class="pbar">
+  <div class="pbar-in">
+    <a class="brand" href="/{{ client.slug }}">
+      <img class="mk" src="/static/logo-mark.svg" alt="">
+      <span class="bt">Intelligence<small>by Position2</small></span>
+    </a>
+    <span class="cobrand"><span class="star">✦</span> {{ client.name }}</span>
+    <span class="sp"></span>
+    <span class="userchip">
+      {% if user.picture %}<img class="av" src="{{ user.picture }}" alt="" referrerpolicy="no-referrer">
+      {% else %}<span class="av">{{ uname[:1]|upper }}</span>{% endif %}
+      <span class="who">{{ user.email }}</span>
+    </span>
+    <a class="btn-ghost" href="/logout">Sign out</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <a class="back" href="/{{ client.slug }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    All agents
+  </a>
+
+  <section class="det" style="--ca:{{ agent.ac }}; --ca2:{{ agent.ac2 }}">
+    <div class="det-head">
+      <span class="ico">{{ agent.icon|safe }}</span>
+      <div style="flex:1; min-width:260px">
+        {% if agent.connected %}<span class="status live"><span class="dot"></span> Live now</span>
+        {% else %}<span class="status soon"><span class="dot warnd"></span> Dashboard in setup</span>{% endif %}
+        <h1 style="margin-top:12px">{{ agent.name }}</h1>
+        <div class="role">{{ agent.pill1 }} · {{ agent.pill2 }}</div>
+      </div>
+    </div>
+
+    <p class="lead">{{ agent.lead|nodash }}</p>
+
+    <div class="trips">
+      {% for tr in agent.trips %}
+      <div class="trip">
+        <p class="t">{{ tr.t }}</p>
+        <p class="d">{{ tr.d|nodash }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="tagrow">
+      {% for t in agent.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+    </div>
+
+    <div class="cta-row">
+      <a class="btn-primary" href="/{{ client.slug }}/agents/{{ agent.slug }}/use">
+        Use agent
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      {% if agent.connected %}
+      <span class="cta-note">Opens the live dashboard, configured for {{ client.short }}.</span>
+      {% else %}
+      <span class="cta-note">Preview the dashboard. We're wiring it to your data now.</span>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if related %}
+  <h2 class="section-h">More agents in your workspace</h2>
+  <section class="grid" style="padding-top:0">
+    {% for a in related %}
+    <a class="card" href="/{{ client.slug }}/agents/{{ a.slug }}" style="--ca:{{ a.ac }}; --ca2:{{ a.ac2 }}">
+      <div class="top">
+        <span class="ico">{{ a.icon|safe }}</span>
+        {% if a.connected %}<span class="status live"><span class="dot"></span> Live</span>
+        {% else %}<span class="status soon"><span class="dot warnd"></span> In setup</span>{% endif %}
+      </div>
+      <div>
+        <h3>{{ a.name }}</h3>
+        <div class="role">{{ a.pill1 }}</div>
+      </div>
+      <p>{{ a.lead|nodash }}</p>
+      <span class="go">View agent
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </span>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+</main>
+
+<footer class="pfoot">
+  <div class="wrap">
+    <span>Intelligence by Position2, private workspace for {{ client.name }}.</span>
+    <span><a href="/{{ client.slug }}">All agents</a> · <a href="/logout">Sign out</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
