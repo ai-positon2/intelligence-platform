@@ -1,0 +1,52 @@
+{% extends "client_base.html" %}
+{% block title %}History · {{ client.name }} · Intelligence by Position2{% endblock %}
+{% block content %}
+<div class="hwrap">
+  <h1>Execution History</h1>
+  <p class="sub">Every agent run from your {{ client.short }} workspace, with its full result, saved here so you can reopen it any time, on any device.</p>
+  {% if runs %}
+  <div class="hsearch">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input type="text" id="hSearch" placeholder="Search across your run history…" autocomplete="off">
+  </div>
+  <div class="hbox" id="hBox">
+    {% for r in runs %}
+    <a class="h-row" href="/{{ client.slug }}/history/{{ r.id }}" style="--ac:{{ r.ac }};--ac2:{{ r.ac2 }}" data-s="{{ (r.title ~ ' ' ~ r.agent_name) | lower }}">
+      <div class="aic">{{ r.icon|safe }}</div>
+      <div class="at"><b>{{ r.title or r.agent_name }}</b><span>{{ r.agent_name }}</span></div>
+      <div class="ats">{{ r.display_ts }}</div>
+      <span class="go">&rarr;</span>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="hnote" id="hCount"></div>
+  {% else %}
+  <div class="hbox hbox--empty">
+    <div class="h-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+      <span>No agent runs yet.<br><a href="/{{ client.slug }}">Open an agent</a> to build your history.</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if runs %}
+<script>
+  (function(){
+    var box = document.getElementById('hBox'), search = document.getElementById('hSearch'), count = document.getElementById('hCount');
+    var rows = Array.prototype.slice.call(box.querySelectorAll('.h-row'));
+    function note(n){ count.textContent = n + ' of ' + rows.length + (rows.length === 1 ? ' run' : ' runs'); }
+    note(rows.length);
+    search.addEventListener('input', function(){
+      var v = search.value.trim().toLowerCase(), shown = 0;
+      rows.forEach(function(r){
+        var ok = !v || (r.getAttribute('data-s') || '').indexOf(v) !== -1;
+        r.style.display = ok ? '' : 'none'; if(ok) shown++;
+      });
+      note(shown);
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

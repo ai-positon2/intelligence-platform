@@ -47,6 +47,14 @@
           </a>
           {% endfor %}
         </div>
+        <div class="sb-group">
+          <div class="sb-eyebrow">Workspace</div>
+          <a class="sb-item{{ ' active' if request.path == '/' + client.slug + '/history' }}" href="/{{ client.slug }}/history">
+            <span class="si"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.2 2"/></svg></span>
+            <span class="lbl">History</span>
+          </a>
+        </div>
       </nav>
       <div class="sb-foot">
         <div class="sfa">

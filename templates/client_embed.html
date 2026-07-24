@@ -27,14 +27,55 @@
     <span class="er">{{ agent.pill1 }} · {{ client.name }}</span>
   </span>
   <span style="flex:1"></span>
-  {% if agent.connected %}<span class="status live"><span class="dot"></span> Live</span>
+  {% if agent.connected %}
+    {% if limit_reached %}<span class="eruns at-cap">Run limit reached · {{ runs_used }}/{{ run_cap }}</span>
+    {% else %}<span class="eruns" id="eRunsBadge">{{ runs_used }} / {{ run_cap }} used</span>
+    <span class="status live"><span class="dot"></span> Live</span>{% endif %}
   {% else %}<span class="status soon"><span class="dot"></span> In setup</span>{% endif %}
   <a class="btn-ghost" href="/{{ client.slug }}">All agents</a>
 </div>
 
-{% if agent.connected and embed_url %}
+{% if agent.connected and limit_reached %}
+  <div class="limit">
+    <div class="limit-card">
+      <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+      <h2>Run limit reached</h2>
+      <p>You've used all {{ run_cap }} runs available for {{ agent.name }}. This limit is per agent, per account, so your other agents are unaffected.</p>
+      <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">Back to {{ agent.name }}</a>
+    </div>
+  </div>
+{% elif agent.connected and embed_url %}
   <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
           allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <script>
+    (function(){
+      var EXPECTED_ORIGIN = {{ serp_origin|tojson }}, EXPECTED_TOOL = {{ agent.seo_slug|tojson }};
+      var logged = false, finished = false;
+      function logRun(){
+        if(logged) return; logged = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/log-run', {method:'POST'})
+          .then(function(r){return r.json();}).then(function(d){
+            if(!d || !d.logged) return;
+            var b = document.getElementById('eRunsBadge');
+            if(b) b.textContent = d.runs_used + ' / ' + d.runs_cap + ' used';
+          }).catch(function(){});
+      }
+      function finishRun(output){
+        if(finished) return; finished = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/finish-run', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({output:output})
+        }).catch(function(){});
+      }
+      window.addEventListener('message', function(e){
+        if(e.origin !== EXPECTED_ORIGIN) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-seo-tool' || d.tool !== EXPECTED_TOOL) return;
+        if(d.type === 'agent-run-started') logRun();
+        else if(d.type === 'agent-run-finished' && d.output && typeof d.output === 'object') finishRun(d.output);
+      });
+    })();
+  </script>
 {% else %}
   <div class="setup" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
     <div class="setup-card">
