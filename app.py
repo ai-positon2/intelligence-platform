@@ -2346,7 +2346,7 @@ CLIENTS = {
         "domains":  ["northstaranesthesia.com"],
         "accent":   "#5b9dff",
         "accent2":  "#8b5cf6",
-        "tagline":  "Go-to-market intelligence, tuned for NorthStar Anesthesia.",
+        "tagline":  "Your agents, all in one place.",
         "blurb":    ("This is your shared workspace with the Position2 team. The agents below "
                      "keep an eye on your buying signals, your competitors, and how NorthStar "
                      "shows up in search. Open any one to see what it has found."),
