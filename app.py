@@ -2347,9 +2347,8 @@ CLIENTS = {
         "accent":   "#5b9dff",
         "accent2":  "#8b5cf6",
         "tagline":  "Your agents, all in one place.",
-        "blurb":    ("This is your shared workspace with the Position2 team. The agents below "
-                     "keep an eye on your buying signals, your competitors, and how NorthStar "
-                     "shows up in search. Open any one to see what it has found."),
+        "blurb":    ("Everything is set up and ready for you. Take a look around, and open "
+                     "any agent below whenever you're ready."),
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
         "agents":   ["signal-tracker", "linkedin-intelligence", "ad-intelligence",
                      "keyword-finder", "content-brief-generator", "content-enhancer"],
