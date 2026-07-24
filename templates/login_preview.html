@@ -274,8 +274,6 @@ main{position:relative;z-index:10;pointer-events:none}
     var IS_MOBILE = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
     var FORMS=9;
 
-    function tickClock(){ var el=document.getElementById('clock'); if(!el) return; var now=new Date(); var ist=new Date(now.getTime()+(now.getTimezoneOffset()+330)*60000); var p=function(n){return (n<10?'0':'')+n;}; el.textContent=p(ist.getHours())+':'+p(ist.getMinutes())+':'+p(ist.getSeconds())+' IST'; }
-    setInterval(tickClock,1000); tickClock();
 
     var CHARS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&/<>*+=';
     function scramble(el,dur){ var target=el.getAttribute('data-final')||el.textContent; el.setAttribute('data-final',target); var start=performance.now(); dur=dur||820;

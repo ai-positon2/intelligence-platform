@@ -480,14 +480,8 @@ window.__LUX_CFG={kinetic:'.page-title',ghost:'GTM',marquee:'SIGNAL TRACKER ✦ 
     var slot=document.querySelector(CFG.statusHost||'.topbar-right');
     if(slot){
       var p=document.createElement('div');p.className='lx-status';
-      p.innerHTML='<span class="d"></span><span id="lx-clk">--:--</span><em>live</em>';
+      p.innerHTML='<span class="d"></span><em>live</em>';
       slot.insertBefore(p,slot.firstChild);
-      function tick(){
-        var el=document.getElementById('lx-clk');if(!el)return;
-        try{el.textContent=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'})+' IST';}
-        catch(e){el.textContent=new Date().toLocaleTimeString();}
-      }
-      tick();setInterval(tick,30000);
     }
   }
 
