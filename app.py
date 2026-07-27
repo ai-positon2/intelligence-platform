@@ -2969,6 +2969,27 @@ def _va_sheets_service():
         sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
     return build("sheets","v4",credentials=creds,cache_discovery=False)
 
+
+def _va_sheets_service_st():
+    """Same as _va_sheets_service() but forces static (bundled) discovery so
+    building a fresh service does no network round-trip. Used to build one
+    service PER THREAD when reading several tabs concurrently -- googleapiclient's
+    httplib2 transport is not safe to share a single service across threads."""
+    import json as _j
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+    if not sa_str or not LOGIN_LOG_SHEET_ID:
+        return None
+    try:
+        creds = service_account.Credentials.from_service_account_info(
+            _j.loads(sa_str), scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        return build("sheets", "v4", credentials=creds,
+                     cache_discovery=False, static_discovery=True)
+    except Exception as e:
+        log.warning("static sheets service build failed: %s", e)
+        return None
+
 _IP_CACHE = {}
 _IP_RESOLVE_CACHE = {}
 
@@ -3801,25 +3822,34 @@ def _fetch_member_analytics_uncached() -> dict:
     Analytics journey (by p2_vid) and post-login Page Views (by email). This is the
     'sync' dashboard: the same person, before and after they signed in."""
     from collections import Counter, defaultdict
-    svc = _va_sheets_service()
-    # All five ranges live on the same spreadsheet, so pull them in ONE batchGet
-    # instead of five back-to-back get() calls. Each get() is a full network
-    # round-trip (TLS + auth + latency); doing them serially was the bulk of the
-    # remaining ~10-15s load. batchGet returns every range in a single response,
-    # in the order requested.
+    from concurrent.futures import ThreadPoolExecutor
+    svc = _va_sheets_service()   # also the "is Sheets configured?" probe (see return)
+
+    # These are the exact same values().get() reads the dashboard has always
+    # used -- just issued CONCURRENTLY instead of one-after-another, which was
+    # the bulk of the remaining ~10-15s load (five serial network round-trips).
+    # googleapiclient's httplib2 transport is NOT thread-safe when a single
+    # service object is shared across threads, so each worker builds its own
+    # service (static discovery = bundled doc, no extra network round-trip).
+    def _read(rng):
+        s = _va_sheets_service_st()
+        if not s:
+            return []
+        try:
+            return s.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+        except Exception as e:
+            log.warning("member analytics read failed (%s): %s", rng, e)
+            return []
+
     _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AM", "Page Views!A:M",
                "A1:U5000",             # internal login log -- real names + p2_vid for @position2.com
                "Visitor Identities!A1:G5000"]
-    _vranges = []
     if svc:
-        try:
-            _vranges = svc.spreadsheets().values().batchGet(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, ranges=_RANGES).execute().get("valueRanges", [])
-        except Exception as e:
-            log.warning("member analytics batchGet failed: %s", e)
-    def _vals(i):
-        return _vranges[i].get("values", []) if i < len(_vranges) else []
-    ms_rows, va_rows, pv_rows, login_rows, vi_rows = (_vals(0), _vals(1), _vals(2), _vals(3), _vals(4))
+        with ThreadPoolExecutor(max_workers=len(_RANGES)) as _ex:
+            ms_rows, va_rows, pv_rows, login_rows, vi_rows = list(_ex.map(_read, _RANGES))
+    else:
+        ms_rows = va_rows = pv_rows = login_rows = vi_rows = []
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
     va = va_rows[1:] if len(va_rows) > 1 else []
     pv = pv_rows[1:] if len(pv_rows) > 1 else []
