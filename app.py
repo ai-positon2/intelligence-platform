@@ -4190,8 +4190,15 @@ def admin_members_data():
     return jsonify(_fetch_member_analytics(force=force))
 
 
-def _fetch_usage_data() -> dict:
-    """Fetch login + page view data from Sheets. Shared by shell and data endpoints."""
+def _fetch_usage_data(internal: bool = True) -> dict:
+    """Fetch login + page view data from Sheets. Shared by shell and data endpoints.
+
+    internal=True  -> Internal Usage: @position2.com staff only.
+    internal=False -> External Usage: everyone signing in with a non-@position2.com
+                      email (leads, prospects, client users). Same rich per-user
+                      journey PLUS agent-run activity and email-domain (company)
+                      breakdowns, so we see who these people are, when they first
+                      and last showed up, and what they actually did on the platform."""
     def _fetch(tab_range):
         try:
             import json as _j
@@ -4226,11 +4233,16 @@ def _fetch_usage_data() -> dict:
     page_data  = page_rows[1:]  if len(page_rows)  > 1 else []
     va_data    = va_rows[1:]    if len(va_rows)    > 1 else []
 
-    # Internal Usage is INTERNAL only: keep @position2.com sign-ins & activity,
-    # drop public members (they live in Public Page Analytics instead).
+    # Internal Usage keeps @position2.com only; External Usage keeps everyone
+    # else (any real non-P2 email). One predicate, inverted by mode.
     def _is_p2(e): return (e or "").lower().endswith("@position2.com")
-    login_data = [r for r in login_data if _is_p2(col(r, 5))]
-    page_data  = [r for r in page_data  if _is_p2(col(r, 4))]
+    def keep(e):
+        e = (e or "").strip()
+        if not e:
+            return False
+        return _is_p2(e) if internal else (not _is_p2(e))
+    login_data = [r for r in login_data if keep(col(r, 5))]
+    page_data  = [r for r in page_data  if keep(col(r, 4))]
 
     from collections import Counter, defaultdict
 
@@ -4322,6 +4334,13 @@ def _fetch_usage_data() -> dict:
         u["linked"] = bool(pre)
         u["first_seen"] = vc(pre[0], "Timestamp (IST)") if pre else u["first_login"]
         u["source"] = (vc(pre[0], "UTM Source") or vc(pre[0], "Referrer Host") or "direct") if pre else ""
+        # Company (from email domain) + last-active across every signal we have.
+        u["domain"] = (u["email"].split("@", 1)[1].lower() if "@" in u["email"] else "")
+        _last_pv = max((col(r, 0) for r in pv_by_email.get(u["email"], [])), default="")
+        u["last_active"] = max([x for x in (u.get("last_seen", ""), _last_pv) if x] or [""])
+        u.setdefault("agent_runs", 0)
+        u.setdefault("agents", [])
+        u.setdefault("last_run", "")
 
         tl = []
         for r in pre:
@@ -4343,8 +4362,81 @@ def _fetch_usage_data() -> dict:
         total_pre_pages += u["prelogin_pages"]
         if u["linked"]: linked_users += 1
 
-    user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
     avg_pre_pages = round(total_pre_pages/linked_users, 1) if linked_users else 0
+
+    # ── External-only enrichment: agent runs + company (email domain) ──────────
+    # For External Usage we also join the 'Agent Runs' tab so each external person
+    # carries what they actually ran, and we surface company-level (email-domain)
+    # rollups. Skipped entirely for Internal Usage (extra Sheets read avoided).
+    agent_runs_total = 0; agent_users = 0
+    agent_breakdown = []; agent_runs_table = []; domain_breakdown = []
+    if not internal:
+        agent_meta = {a["slug"]: a for a in APP_AGENTS}
+        ar_rows = _fetch("%s!A:F" % _AR_TAB)
+        ar_rows = ar_rows[1:] if len(ar_rows) > 1 else []
+        um_by_lower = {k.lower(): v for k, v in user_map.items()}
+        ar_by_email: dict = {}
+        agent_totals: dict = {}
+        for r in ar_rows:
+            e = col(r, 2)
+            if not keep(e):        # external only, non-empty
+                continue
+            el = e.lower()
+            slug = _canonical_agent_slug(col(r, 4) or "?")
+            ts = col(r, 0)
+            aname = col(r, 5) or agent_meta.get(slug, {}).get("name", slug)
+            d = ar_by_email.setdefault(el, {"email": e, "name": col(r, 3),
+                                            "total": 0, "agents": {}, "last_run": "", "events": []})
+            d["total"] += 1
+            d["agents"][slug] = d["agents"].get(slug, 0) + 1
+            if ts > d["last_run"]:
+                d["last_run"] = ts
+            d["events"].append({"t": ts, "kind": "run", "label": "Ran " + aname, "meta": ""})
+            agent_totals[slug] = agent_totals.get(slug, 0) + 1
+            agent_runs_table.append({"ts": ts, "email": e, "name": col(r, 3), "agent": aname})
+        agent_runs_total = sum(agent_totals.values())
+        agent_users = len(ar_by_email)
+        agent_breakdown = sorted(([agent_meta.get(s, {}).get("name", s), c]
+                                  for s, c in agent_totals.items()), key=lambda x: -x[1])
+        agent_runs_table.reverse()   # rows are oldest→newest → show newest first
+
+        for el, d in ar_by_email.items():
+            u = um_by_lower.get(el)
+            if not u:                # ran an agent but no login row captured → synthesize
+                u = {"email": d["email"], "name": d["name"] or d["email"], "logins": 0,
+                     "last_seen": "", "first_login": "", "total_secs": 0, "time_fmt": "—",
+                     "prelogin_pages": 0, "linked": False, "first_seen": "", "source": "",
+                     "timeline": [], "domain": (el.split("@", 1)[1] if "@" in el else ""),
+                     "last_active": ""}
+                user_map[el] = u
+                um_by_lower[el] = u
+            alist = []
+            for s, c in sorted(d["agents"].items(), key=lambda x: -x[1]):
+                m = agent_meta.get(s, {})
+                alist.append({"slug": s, "name": m.get("name", s), "count": c,
+                              "ac": m.get("ac", "#8b5cf6"), "ac2": m.get("ac2", "#22d3ee")})
+            u["agent_runs"] = d["total"]
+            u["agents"] = alist
+            u["last_run"] = d["last_run"]
+            if d["last_run"] and d["last_run"] > (u.get("last_active") or ""):
+                u["last_active"] = d["last_run"]
+            if not u.get("first_seen"):
+                u["first_seen"] = min([e["t"] for e in d["events"] if e["t"]] or [""])
+            tl = (u.get("timeline") or []) + d["events"]
+            tl.sort(key=lambda x: x.get("t") or "")
+            u["timeline"] = tl[:120]
+
+        dom = Counter(u["domain"] for u in user_map.values() if u.get("domain"))
+        domain_breakdown = dom.most_common(12)
+
+    if not internal:
+        user_activity = sorted(user_map.values(),
+                               key=lambda x: (x.get("agent_runs", 0), x.get("logins", 0),
+                                              x.get("last_active", "")), reverse=True)
+    else:
+        user_activity = sorted(user_map.values(), key=lambda x: x["logins"], reverse=True)
+
+    unique_users = len(user_map)   # external adds run-only users → recount
 
     # Full tables, newest first — no cap (return every login and page view).
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
@@ -4362,7 +4454,10 @@ def _fetch_usage_data() -> dict:
                 device_breakdown=device_breakdown, os_breakdown=os_breakdown,
                 busiest_day=busiest_day, avg_view_fmt=avg_view_fmt,
                 views_per_user=views_per_user,
-                linked_users=linked_users, avg_pre_pages=avg_pre_pages)
+                linked_users=linked_users, avg_pre_pages=avg_pre_pages,
+                agent_runs_total=agent_runs_total, agent_users=agent_users,
+                agent_breakdown=agent_breakdown, agent_runs_table=agent_runs_table,
+                domain_breakdown=domain_breakdown)
 
 
 
@@ -4406,6 +4501,20 @@ def admin_usage_data():
     """JSON data endpoint called by the admin usage shell page."""
     data = _fetch_usage_data()
     return jsonify(data)
+
+@app.route("/p2/admin/external-usage")
+@admin_required
+def admin_external_usage():
+    """Shell page — everyone signing in with a non-@position2.com email. JS fetches
+    /admin/external-usage/data async."""
+    return render_template("admin_external_usage.html", user=_get_user())
+
+@app.route("/p2/admin/external-usage/data")
+@admin_required
+def admin_external_usage_data():
+    """JSON data endpoint for the External Usage dashboard (non-P2 sign-ins,
+    enriched with agent runs and company/email-domain rollups)."""
+    return jsonify(_fetch_usage_data(internal=False))
 
 @app.route("/p2/admin/access-requests")
 @admin_required
