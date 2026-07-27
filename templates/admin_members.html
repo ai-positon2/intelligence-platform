@@ -459,7 +459,8 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer(
 
 function load(force){
   var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
-  fetch('/p2/admin/public-page-analytics/data',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+  var url='/p2/admin/public-page-analytics/data'+(force?'?fresh=1':'');
+  fetch(url,{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(btn)btn.textContent='↻ Refresh';
     LAST_DATA=d;
     var k=d.kpis||{};
