@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/grid-tokens.css">
 <link rel="stylesheet" href="/static/css/client-portal.css?v=3">
-{% if agent.connected and embed_url %}<style>html,body{height:100%}body{overflow:hidden}</style>{% endif %}
+{% if (agent.connected and embed_url) or is_dashboard %}<style>html,body{height:100%}body{overflow:hidden}</style>{% endif %}
 </head>
 <body style="--brand:{{ client.accent }}; --brand2:{{ client.accent2 }}">
 
@@ -27,7 +27,8 @@
     <span class="er">{{ agent.pill1 }} · {{ client.name }}</span>
   </span>
   <span style="flex:1"></span>
-  {% if agent.connected %}
+  {% if is_dashboard %}<span class="status live"><span class="dot"></span> Live</span>
+  {% elif agent.connected %}
     {% if limit_reached %}<span class="eruns at-cap">Run limit reached · {{ runs_used }}/{{ run_cap }}</span>
     {% else %}<span class="eruns" id="eRunsBadge">{{ runs_used }} / {{ run_cap }} used</span>
     <span class="status live"><span class="dot"></span> Live</span>{% endif %}
@@ -35,7 +36,10 @@
   <a class="btn-ghost" href="/{{ client.slug }}">All agents</a>
 </div>
 
-{% if agent.connected and limit_reached %}
+{% if is_dashboard %}
+  <iframe class="embed-frame" src="{{ dashboard_url }}" title="{{ agent.name }}"
+          allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+{% elif agent.connected and limit_reached %}
   <div class="limit">
     <div class="limit-card">
       <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>

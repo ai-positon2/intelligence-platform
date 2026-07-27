@@ -1204,6 +1204,13 @@ ACCOUNTS = {
         "accent":      "#8b5cf6",
         "dashboard":   Path(__file__).parent / "reports" / "dashboard_csg.html",
     },
+    "northstar": {
+        "name":        "NorthStar Anesthesia",
+        "description": "NorthStar Anesthesia ABM universe — health systems, hospitals, and anesthesia/ASC groups tracked for funding, M&A, C-suite moves, and news signals.",
+        "icon":        "🩺",
+        "accent":      "#5b9dff",
+        "dashboard":   Path(__file__).parent / "reports" / "dashboard_northstar.html",
+    },
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
@@ -2351,6 +2358,12 @@ CLIENTS = {
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
         "agents":   ["signal-tracker", "linkedin-intelligence", "ad-intelligence",
                      "keyword-finder", "content-brief-generator", "content-enhancer"],
+        # Per-agent live dashboards wired to this client's data. An agent listed
+        # here renders its co-branded dashboard (internal-ops chrome hidden) inside
+        # the portal instead of the generic "in setup" shell, and shows as Live.
+        "dashboards": {
+            "signal-tracker": Path(__file__).parent / "reports" / "dashboard_northstar_client.html",
+        },
     },
 }
 
@@ -2365,16 +2378,28 @@ def _nodash(s):
     return (s.replace(" — ", ", ").replace("—", ", ")
              .replace(" – ", ", ").replace("–", "-"))
 
-def _client_agent_view(slug):
-    """APP_AGENTS entry for a slug, enriched with a `connected` flag (True when it
-    has a live tool wired via seo_slug). Returns None for unknown slugs."""
+def _client_dashboard_path(client, agent_slug):
+    """Path to this client's wired dashboard for an agent, or None. Returns None if
+    the file hasn't been generated yet so the agent falls back to the setup shell."""
+    p = (client.get("dashboards") or {}).get(agent_slug)
+    if not p:
+        return None
+    p = Path(p)
+    return p if p.exists() else None
+
+def _client_agent_view(slug, client=None):
+    """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface)
+    and `is_dashboard` (backed by a co-branded dashboard file for this client, so it
+    renders the dashboard rather than a SERP tool and is not run-metered). Returns
+    None for unknown slugs."""
     a = APP_AGENTS_BY_SLUG.get(slug)
     if not a:
         return None
-    return dict(a, connected=bool(a.get("seo_slug")))
+    has_dash = bool(client and _client_dashboard_path(client, slug))
+    return dict(a, connected=bool(a.get("seo_slug")) or has_dash, is_dashboard=has_dash)
 
 def _client_agents(client):
-    return [v for v in (_client_agent_view(s) for s in client.get("agents", [])) if v]
+    return [v for v in (_client_agent_view(s, client) for s in client.get("agents", [])) if v]
 
 def _client_allowed(client, email):
     email = (email or "").lower()
@@ -2415,7 +2440,7 @@ def _client_agent_detail(client_slug, agent_slug):
         return gate
     if agent_slug not in client.get("agents", []):
         return redirect("/" + client_slug)
-    agent = _client_agent_view(agent_slug)
+    agent = _client_agent_view(agent_slug, client)
     if not agent:
         return redirect("/" + client_slug)
     agents = _client_agents(client)
@@ -2435,10 +2460,18 @@ def _client_agent_use(client_slug, agent_slug):
         return gate
     if agent_slug not in client.get("agents", []):
         return redirect("/" + client_slug)
-    agent = _client_agent_view(agent_slug)
+    agent = _client_agent_view(agent_slug, client)
     if not agent:
         return redirect("/" + client_slug)
     user = _get_user()
+    # Dashboard-backed agent: serve the co-branded dashboard in the portal shell.
+    # These are not run-metered (a dashboard has no "runs"), so no cap logic applies.
+    if agent.get("is_dashboard"):
+        return render_template("client_embed.html", client=client, agent=agent,
+                               embed_url="", serp_origin=_SERP_BASE, user=user,
+                               is_dashboard=True,
+                               dashboard_url="/%s/agents/%s/dashboard" % (client_slug, agent_slug),
+                               runs_used=0, run_cap=AGENT_RUN_CAP, limit_reached=False)
     email = (user or {}).get("email", "")
     # Same per-agent, per-account run cap as /app (Agent Runs sheet is shared, so a
     # user's runs count identically no matter which surface they ran the agent on).
@@ -2447,7 +2480,29 @@ def _client_agent_use(client_slug, agent_slug):
     embed_url = "" if limit_reached else (_app_embed_url(agent) if agent.get("connected") else "")
     return render_template("client_embed.html", client=client, agent=agent,
                            embed_url=embed_url, serp_origin=_SERP_BASE, user=user,
+                           is_dashboard=False,
                            runs_used=runs_used, run_cap=AGENT_RUN_CAP, limit_reached=limit_reached)
+
+def _client_agent_dashboard(client_slug, agent_slug):
+    """Serve this client's co-branded dashboard HTML for a dashboard-backed agent.
+    Gated by the same access rules as the rest of the portal. The file is the
+    client variant (internal-ops chrome hidden), generated by the per-client build
+    script. Rendered inside the portal's embed shell via an iframe."""
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    if agent_slug not in client.get("agents", []):
+        abort(404)
+    path = _client_dashboard_path(client, agent_slug)
+    if not path:
+        abort(404)
+    resp = make_response(send_file(str(path)))
+    resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
+                         "Pragma": "no-cache", "Expires": "0"})
+    return resp
 
 def _client_agent_log_run(client_slug, agent_slug):
     """Logs one real run of a client-portal agent, cap-enforced. Called client-side
@@ -2544,6 +2599,8 @@ for _cslug in CLIENTS:
                      (lambda agent_slug, cs=_cslug: _client_agent_detail(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use", "client_use__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_use(cs, agent_slug)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard", "client_dashboard__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_agent_dashboard(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/log-run", "client_logrun__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_log_run(cs, agent_slug)), methods=["POST"])
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/finish-run", "client_finishrun__" + _cslug,

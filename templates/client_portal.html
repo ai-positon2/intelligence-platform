@@ -30,7 +30,7 @@
         <h3>{{ a.name }}</h3>
         <div class="role">{{ a.pill1 }}</div>
         <p>{{ a.lead|nodash }}</p>
-        {% if a.connected %}
+        {% if a.connected and not a.is_dashboard %}
         {% set used = run_counts.get(a.slug, 0) %}
         {% set at_cap = used >= run_cap %}
         <div class="cruns">
@@ -41,7 +41,7 @@
           <div class="cruns-track"><div class="cruns-fill{{ ' at-cap' if at_cap }}" style="width:{{ (used / run_cap * 100) if run_cap else 0 }}%"></div></div>
         </div>
         {% endif %}
-        <div class="more">{% if a.connected %}{% if run_counts.get(a.slug, 0) >= run_cap %}Run limit reached{% else %}Open agent &rarr;{% endif %}{% else %}View agent &rarr;{% endif %}</div>
+        <div class="more">{% if a.is_dashboard %}Open dashboard &rarr;{% elif a.connected %}{% if run_counts.get(a.slug, 0) >= run_cap %}Run limit reached{% else %}Open agent &rarr;{% endif %}{% else %}View agent &rarr;{% endif %}</div>
       </a>
       {% endfor %}
     </div>
