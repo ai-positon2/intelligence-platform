@@ -1314,7 +1314,10 @@ def auth_google():
     session.permanent = True
     nxt = session.pop("next_url", None)
     if not (isinstance(nxt, str) and nxt.startswith("/") and not nxt.startswith("//")):
-        nxt = "/app"
+        # No deep link: @position2.com staff land on the internal hub (/p2/hub);
+        # everyone else lands on the public signed-in home (/app). An explicit
+        # next_url (e.g. a shared /p2/admin/... link) still takes precedence.
+        nxt = "/p2/hub" if email.lower().endswith("@position2.com") else "/app"
     # Route sign-in logging: @position2.com -> always Internal Usage,
     # PLUS Public Page Analytics too when landing on the public /app surface (not
     # deep-linking straight into /p2). Everyone else -> Public Page Analytics only.
@@ -1350,8 +1353,10 @@ def favicon():
 
 @app.route("/")
 def index():
-    if _get_user():
-        return redirect("/app")
+    u = _get_user()
+    if u:
+        # Staff go straight to the internal hub; everyone else to the public home.
+        return redirect("/p2/hub" if u.get("email", "").lower().endswith("@position2.com") else "/app")
     return render_template("agents.html", page="home", agents=AGENTS, agent=None,
                            related=[], signals_list=SIGNALS)
 
