@@ -2105,8 +2105,15 @@ def _inject_app_agents():
     Also expose google_client_id template-wide: the marketing pages carry a
     one-click Google "Sign up" pop-up, so every pre-login page (not just
     /login) needs the client id to render the Google button. The explicit
-    kwarg on the /login route still takes precedence where it is passed."""
-    return {"app_agents": APP_AGENTS, "google_client_id": GOOGLE_CLIENT_ID}
+    kwarg on the /login route still takes precedence where it is passed.
+
+    Also expose `is_admin` template-wide (single source of truth = ADMIN_EMAILS),
+    so pages that conditionally show the admin analytics menu use one check that
+    can never drift from the server-side admin_required gate."""
+    _u = _get_user() or {}
+    _is_admin = (_u.get("email", "").lower() in ADMIN_EMAILS)
+    return {"app_agents": APP_AGENTS, "google_client_id": GOOGLE_CLIENT_ID,
+            "is_admin": _is_admin}
 
 @app.route("/app")
 @login_required
