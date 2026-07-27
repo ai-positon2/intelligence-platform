@@ -1,201 +1,201 @@
 rank,company,domain,industry,total_score,signal_types,top_signal,top_signal_date
-1,ClearSky Health,http://www.clearskyhealth.com,hospital & health care,517.5,C-Suite Exit + C-Suite Join,Raun Craven — Appointed as Chief Executive Officer,2026-06-18
-2,Hippocratic AI,http://www.hippocraticai.com,hospital & health care,302.8,C-Suite Join + Funding Round + Product Launch,Kashif Rashid — Appointed as Chief Legal Officer,2026-05-14
-3,GoodRx,http://www.goodrx.com,hospital & health care,294.0,C-Suite Exit + C-Suite Join,Amit Pandey — Appointed as Chief Technology Officer,2026-05-01
-4,"ProgenyHealth, LLC",http://www.progenyhealth.com,hospital & health care,275.8,C-Suite Join + Product Launch,Mark Sprague — Appointed as Chief Financial Officer,2026-04-29
-5,Mary Rutan Health,http://www.maryrutan.org,hospital & health care,192.0,C-Suite Join,Tammy Gump — Retired as Chief Operating Officer of Mary Rutan Foundation; Chief Operating Officer of the Logan County Ca,2026-05-31
-6,Cape Fear Valley Harnett Health,http://www.harnetthealth.org,hospital & health care,180.7,C-Suite Join + Funding Round + News Mention,Michael Nagowski — Retired as Chief Executive Officer,2026-07-01
-7,Los Alamos Medical Center,http://www.losalamosmedicalcenter.com,hospital & health care,174.7,C-Suite Join + News Mention,Michael Covert — Appointed as Chief Executive Officer,2026-06-15
-8,Carrum Health Inc,http://www.carrumhealth.com,hospital & health care,165.0,C-Suite Join,"[Two unnamed executives] — Appointed as Chief Technology Officer, Chief Data Officer (exact titles pending clarification",2026-04-29
-9,American Hospital Association,http://www.aha.org,hospital & health care,157.5,Acquisition / M&A + Funding Round,"Funding: Accelerator/Initiative Funding — $12,000,000",2026-04-29
-10,Mesa View Regional Hospital,http://www.mesaviewhospital.com,hospital & health care,147.7,C-Suite Join + News Mention,Matt Lutz — Appointed as Chief Executive Officer,2026-04-21
-11,Bicycle Health Inc,http://www.bicyclehealth.com,hospital & health care,132.0,C-Suite Join,"Travis Schamber, MD — Promoted as Chief Medical Officer",2026-05-05
-12,Strive Health,http://www.strivehealth.com,hospital & health care,132.0,C-Suite Join,"Jamie Sharp, M.D. — Appointed as Chief Medical Officer",2026-06-16
-13,Rehoboth McKinley Christian Health Care Services,http://www.rmch.org,hospital & health care,128.8,C-Suite Join + Partnership,Ned Kiser — Appointed as Chief Executive Officer,2026-06-15
-14,Harbor Regional Health,http://www.ghcares.org,hospital & health care,122.8,C-Suite Exit + C-Suite Join,Tom Jensen — Retired as Chief Executive Officer,2026-08-07
-15,"Grady Memorial Hospital, Oklahoma",http://www.gradymem.org,hospital & health care,120.0,C-Suite Join,Anthony Saul — Appointed as President and Chief Executive Officer,2027-01-01
-16,Greystone Health Network,http://www.greystonehealthcareers.com,hospital & health care,120.0,C-Suite Join,Nicholas M. Gesue — Appointed as Chief Operating Officer,2026-06-15
-17,Lakeland Regional Health,http://www.spectrumhealthlakeland.org,hospital & health care,117.0,C-Suite Join,Unknown — Appointed as Chief Marketing Officer,2026-05-06
-18,Glooko,http://www.glooko.com,hospital & health care,113.8,C-Suite Join + Partnership,Vinayak Hegde — Appointed as Chief Executive Officer,2026-05-02
-19,Eastern New Mexico Medical Center,http://www.enmmc.com,hospital & health care,112.5,C-Suite Join,Michael Covert — Appointed as Chief Executive Officer,2026-06-15
-20,DMC Huron Valley-Sinai Hospital,http://www.hvsh.org,hospital & health care,111.7,C-Suite Join + News Mention, — Appointed as Chief Executive Officer,2026-06-01
-21,"St. Joseph Regional Medical Center, Inc.",http://www.sjrmc.org,hospital & health care,111.0,C-Suite Join,Angela Green — Appointed as Chief Nursing Officer and Chief Operating Officer,2026-04-21
-22,Mammoth Hospital,http://www.mammothhospital.org,hospital & health care,96.7,C-Suite Join + News Mention,Tom Parker — Retired as Chief Executive Officer,2026-10-02
-23,SKYGEN,http://www.skygenusa.com,hospital & health care,95.8,C-Suite Join + Product Launch,Jeff Spahr — Appointed as Chief Client Success Officer,2026-05-06
-24,Bartlett Regional Hospital,http://www.bartletthospital.org,hospital & health care,90.0,Funding Round,"Funding: Capital Project / Federal Grant — $13,500,000",2026-04-14
-25,The CORE Institute,http://www.thecoreinstitute.com,medical practice,90.0,C-Suite Join,"Ashley Vertuno — Appointed as Chief Executive Officer, Arizona Market",2026-06-30
-26,Neosho Memorial Regional Medical Center,http://www.neoshomemorial.com,hospital & health care,85.5,Acquisition / M&A + Funding Round,Funding: Federal Grant — ~$1.9 million,2026-06-11
-27,Raleigh General Hospital,http://www.raleighgeneral.com,hospital & health care,82.5,C-Suite Join,Eric Flynn — Appointed as Chief Nursing Officer,2026-06-21
-28,LifeLink Foundation,http://www.lifelinkfoundation.org,hospital & health care,81.0,C-Suite Join,Dr. Clark Kensinger — Appointed as Chief Medical Officer,2026-04-16
-29,Community Health Center of Branch County,http://www.chcbc.com,hospital & health care,79.5,C-Suite Join,Justin Doss — Promoted as Chief Operating Officer,2026-07-05
-30,Lane Regional Medical Center,http://www.lanermc.org,hospital & health care,78.0,C-Suite Join,Allyson Bennett — Promoted as Chief Nursing Officer,Unknown
-31,Duke Cancer Institute,http://www.dukecancerinstitute.org,hospital & health care,75.0,C-Suite Join,David Zaas — Appointed as Chief Executive Officer,2026-05-01
-32,West Calcasieu Cameron Hospital,http://www.wcch.com,hospital & health care,75.0,C-Suite Join,Robert Peltzer — Appointed as Chief Executive Officer,2026-05-20
-33,New Jersey Urology,http://www.njurology.com,hospital & health care,73.3,Acquisition / M&A + C-Suite Join + Partnership,M&A: IR Centers® and Prostate Centers USA® announced a strategic partnership with New,2026-04-21
-34,Presbyterian St Lukes,http://www.pslmc.com,hospital & health care,72.0,C-Suite Join,Casey Guber — Appointed as President and Chief Executive Officer,2026-07-20
-35,UNC Physicians Network,http://www.uncpn.com,hospital & health care,72.0,C-Suite Join,"Min Lee — Appointed as President, UNC Hospitals",2026-07-20
-36,"Healix, LLC",http://www.healix.net,hospital & health care,71.9,Acquisition / M&A + C-Suite Join,Alan Channing — Appointed as Chief Executive Officer,2026-06-16
-37,Doctors Hospital of Laredo,http://www.doctorshosplaredo.com,hospital & health care,69.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
-38,Huntsville Memorial Hospital,http://www.huntsvillememorial.com,hospital & health care,67.5,C-Suite Join,Terry Scoggin — Appointed as Chief Executive Officer,2026-06-15
-39,Barstow Community Hospital,http://www.barstowhospital.com,hospital & health care,66.0,C-Suite Exit + C-Suite Join,Drew Hartmann — Appointed as Chief Financial Officer,2026-06-01
-40,Karyopharm Therapeutics Inc.,http://www.karyopharm.com,pharmaceuticals,63.0,C-Suite Join + Funding Round,Funding: Public Offering / ATM — $400M shelf / $100M ATM,2026-05-04
-41,Aspen Valley Health,http://www.aspenvalleyhealth.org,hospital & health care,63.0,C-Suite Join,Michelle Gelroth — Promoted as Chief Transformation Officer,2026-04-24
-42,The Medical Center of Southeast Texas,http://www.medicalcentersetexas.org,hospital & health care,60.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
-43,Stellar Health Group,http://www.stellarnursinghomes.com,hospital & health care,60.0,C-Suite Join,Falko Buttler — Appointed as Chief Technology Officer,2026-05-28
-44,HealthHelp,http://www.healthhelp.com,hospital & health care,60.0,C-Suite Join,"Katherine Dallow, MD — Appointed as Chief Medical Officer",2026-05-13
-45,MCKENZIE-WILLAMETTE MEDICAL CENTER,http://www.mckweb.com,hospital & health care,60.0,C-Suite Join,Mark Robinson — Appointed as Chief Executive Officer,2026-07-20
-46,Saline Memorial Hospital,http://www.salinememorial.org,hospital & health care,60.0,C-Suite Join,Josh Orzel — Appointed as Chief Nursing Officer,2026-07-09
-47,Onvida Health,http://www.onvidahealth.org,hospital & health care,59.8,Funding Round + Partnership,"Funding: Grant — $500,000",2026-04-16
-48,Wilson Medical Center,http://www.wilsonmedical.com,hospital & health care,57.7,C-Suite Join + News Mention,Jason L. Kimbrell — Appointed as Chief Executive Officer,2026-05-18
-49,Nutex Health,http://www.nutexhealth.com,hospital & health care,57.7,Funding Round + News Mention,Funding: Public Company – Share Buyback / Expansion Capital — N/A,2026-04-30
-50,Nomad Health,http://www.nomadhealth.com,hospital & health care,57.7,Funding Round + News Mention,Funding: Strategic Pivot / Business Model Transformation — Undisclosed,2026-04-24
-51,"Integrated Home Care Services, Inc.",http://www.ihcscorp.com,hospital & health care,57.7,C-Suite Join + News Mention,Ashish V. Shah — Appointed as Chief Product & Technology Officer,2026-05-20
-52,TriStar StoneCrest Medical Center,http://www.tristarstonecrest.com,hospital & health care,57.7,C-Suite Join + News Mention,Ryan LeMasters — Appointed as Chief Executive Officer,Unknown
-53,Somatus,http://www.somatus.com,hospital & health care,57.7,C-Suite Join + News Mention,"Taris Osborne, PhD — Appointed as Chief Science Officer",2026-04-18
-54,Tennessee Oncology,http://www.tnoncology.com,hospital & health care,57.0,C-Suite Join,"Johnetta Blakely, MD — Appointed as Chief Medical Officer",2026-05-07
-55,Cancer Care Northwest,http://www.cancercarenorthwest.com,medical practice,57.0,C-Suite Join,Elizabeth Passmore — Appointed as Executive Director,2026-06-15
-56,Accuray,http://www.accuray.com,medical devices,57.0,C-Suite Exit + C-Suite Join,Paul Miele — Appointed as Chief Commercial Officer,2026-05-06
-57,Sonoma Valley Hospital,http://www.sonomavalleyhospital.org,hospital & health care,54.0,C-Suite Join,Dr. Patrick Okolo — Role change as Chief Medical Officer,2026-04-28
-58,CADUCEUSHEALTH®,http://www.caduceushealth.com,hospital & health care,50.1,Acquisition / M&A + News Mention,M&A: Innovaccer announced the acquisition of CaduceusHealth to strengthen its revenue,2026-06-25
-59,CENTRAL MONTANA MEDICAL CENTER,http://www.cmmc.health,hospital & health care,49.4,C-Suite Exit + C-Suite Join,Unknown — exited as Chief Executive Officer,2026-06-16
-60,Mad River Community Hospital,http://www.madriverhospital.com,hospital & health care,48.7,C-Suite Join + News Mention, — Retired,Unknown
-61,eventuswh.com,http://www.eventuswholehealth.com,hospital & health care,48.0,C-Suite Join,Eric Litz — Appointed as Chief Technology Officer,2026-06-02
-62,AngioDynamics,http://www.angiodynamics.com,medical devices,45.0,Funding Round,Funding: SEC Filing / Corporate Event — N/A,2026-04-23
-63,Omada Health,http://www.omadahealth.com,hospital & health care,45.0,Funding Round,Funding: Public Company — Q1 2026 Earnings — $322M–$330M 2026 revenue guidance (public company),2026-05-07
-64,Catapult Health,http://www.catapulthealth.com,hospital & health care,45.0,C-Suite Join,John D. Arnold — Appointed as Chief Executive Officer,2026-04-15
-65,AHIP,http://www.ahip.org,hospital & health care,45.0,C-Suite Join,Laurie Brady — Appointed as Board Director,2026-04-15
-66,"Cranial Technologies, Inc.",http://www.cranialtech.com,medical devices,45.0,C-Suite Join,Catherine Dederick — Appointed as Chief Operating Officer,2026-04-22
-67,Genova Diagnostics,http://www.gdx.net,hospital & health care,45.0,C-Suite Join,Keith Meadors — Appointed as Chief Commercial Officer,2026-04-20
-68,WinnMed,http://www.winnmed.org,hospital & health care,45.0,Funding Round,"Funding: Debt Financing — $35,000,000",2026-05-11
-69,Kearney Regional Medical Center,http://www.kearneyregional.com,hospital & health care,45.0,C-Suite Exit + C-Suite Join,"Scott Smith, MD — Interim appointment as Interim President and Chief Executive Officer",Unknown
-70,Humboldt Park Health,http://www.hph.care,hospital & health care,45.0,C-Suite Join,Jose R. Sanchez — Retired as Chief Executive Officer,2026-05-31
-71,NantHealth Inc,http://www.nanthealth.com,hospital & health care,45.0,C-Suite Join,"Deepak Dubey, PhD, MBA — Appointed as President and Chief Operating Officer",2026-04-30
-72,El Paso Children's Hospital,http://www.elpasochildrens.org,hospital & health care,45.0,C-Suite Join,Maria Zampini — Appointed as Chief Executive Officer,2026-04-17
-73,MIMEDX Group Inc,http://www.mimedx.com,medical devices,45.0,Funding Round,Funding: N/A — $40M restructuring/cost reduction initiative,2026-04-16
-74,Hannibal Regional,http://www.hannibalregional.org,hospital & health care,45.0,Funding Round,Funding: Grant — Unknown,2026-04-23
-75,Mozaic Senior Life,http://www.mozaicsl.org,hospital & health care,45.0,Funding Round,"Funding: Grant/State Award — $630,000+",2026-04-15
-76,NMC Health,http://www.mynmchealth.org,hospital & health care,45.0,Funding Round,Funding: Interim Financing / Restructuring — $250 million,2026-04-17
-77,Quartz Health Solutions,http://www.quartzbenefits.com,insurance,45.0,C-Suite Join,"Laura Berndt, PharmD, MBA — Appointed as Chief Pharmacy Officer",2026-05-06
-78,Newman Regional Health,http://www.newmanrh.org,hospital & health care,45.0,Funding Round,Funding: Capital Campaign / Bond Financing — $46M–$57M (total campaign target),2026-04-29
-79,Clinton Memorial Hospital,http://www.cmhregional.com,hospital & health care,45.0,C-Suite Join,Mark Clement — Retired as President and Chief Executive Officer,2026-06-30
-80,"Southeast Mississippi Rural Health Initiative, Inc. (SEMRHI)",http://www.semrhi.com,hospital & health care,45.0,C-Suite Join,"Dr. Rozell Chapman, MD — Appointed as Chief Medical Officer",2026-04-21
-81,UAB Callahan Eye,http://www.uabcallahaneye.org,hospital & health care,45.0,C-Suite Join,Dustin Diggs — Promoted as Chief Nursing Officer,2026-06-17
-82,EnableComp,http://www.enablecomp.com,hospital & health care,45.0,C-Suite Join,Maureen Ladouceur — Appointed as Chief Commercial Officer,2026-06-30
-83,Montefiore,http://www.menorahpark.org,hospital & health care,45.0,Funding Round,Funding: Capital Grant — $41 million (state grant portion; ~$45M total project),2026-06-26
-84,Sherman Medical Center,http://www.ahssmc.org,hospital & health care,45.0,C-Suite Join,Michelle Waller — Appointed as Chief Executive Officer,2026-06-15
-85,ST ALPHONSUS REGIONAL MEDICAL CENTER INC,http://www.saintalphonsus.com,hospital & health care,45.0,Funding Round,"Funding: Capital Raise / Expansion — Undisclosed (capital raise for 260,000 sq ft expansion)",2026-06-25
-86,McKenzie Health,http://www.mckenziehealth.com,hospital & health care,45.0,Funding Round,"Funding: Municipal Grant — $1,000,000",2026-06-25
-87,Lakewood Ranch Medical Center,http://www.lakewoodranchmedicalcenter.com,hospital & health care,45.0,C-Suite Join,Jason Madsen — Appointed as Chief Executive Officer,2026-07-01
-88,Permian Regional Medical Center,http://www.permianregional.com,hospital & health care,42.0,C-Suite Exit + C-Suite Join,Adiel Alvarado — Interim appointment as Interim Chief Executive Officer,Unknown
-89,Central Carolina Hospital,http://www.centralcarolinahosp.com,hospital & health care,42.0,C-Suite Join,Regina Williams — Appointed as Chief Nursing Officer,2026-06-08
-90,LabConnect,http://www.labconnect.com,pharmaceuticals,41.8,C-Suite Join + Product Launch,Richard Harris — Appointed as Chief Executive Officer,2026-04-30
-91,Monarch Healthcare Management,http://www.monarchmn.com,hospital & health care,41.8,C-Suite Join + Partnership,Anna Lohrfink — Appointed as Chief Executive Officer,Unknown
-92,Olean General Hospital,http://www.brmc-ogh.org,hospital & health care,40.5,Acquisition / M&A,"M&A: NAPA Anesthesia (North American Partners in Anesthesia) announced on May 13, 202",2026-05-13
-93,National Research Corporation,http://www.nrchealth.com,hospital & health care,40.5,Acquisition / M&A,M&A: National Research Corporation officially changed its corporate name to NRC Healt,2026-04-20
-94,Access TeleCare,http://www.accesstelecare.com,hospital & health care,40.5,Acquisition / M&A,M&A: Access TeleCare is repositioning following a $400 million take-private deal. The,2026-05-01
-95,Witham Health Services,http://www.witham.org,hospital & health care,40.5,Acquisition / M&A,M&A: Boone County Government and Witham Health Services jointly affirmed their commit,2026-05-08
-96,Angelica,http://www.angelica.com,hospital & health care,40.5,Acquisition / M&A,M&A: Note: This signal is for Angelini Pharma (not Angelica the healthcare linen/serv,2026-05-07
-97,Haven Health Group,http://www.havenhealthaz.com,hospital & health care,40.5,Acquisition / M&A,M&A: MKH Capital Partners acquired Haven Health Management (part of Haven Health Grou,2026-04-15
-98,"Guardian Flight, LLC",http://www.guardianflight.com,hospital & health care,40.5,IPO Signal,IPO: Guardian Flight is a core operating brand of GMR Solutions Inc. (parent: Global ,2026-05-12
-99,AMC Health,http://www.amchealth.com,hospital & health care,39.7,C-Suite Join + News Mention,Keith Tode — Appointed as Executive Vice President of Decentralized Clinical Trials,2026-04-21
-100,Mankato Clinic,http://www.mankatoclinic.com,medical practice,39.7,C-Suite Join + News Mention,Brandon Janike — Appointed as Chief Financial Officer,2026-06-01
-101,Soleo Health,http://www.soleohealth.com,hospital & health care,39.7,C-Suite Join + News Mention,Joy Rowan — Appointed as Senior Vice President of Sales,2026-04-16
-102,Kittitas Valley Healthcare,http://www.kvhealthcare.org,hospital & health care,36.0,C-Suite Join,Unknown — Retired as Chief Executive Officer,Unknown
-103,Collective Health Inc,http://www.collectivehealth.com,hospital & health care,36.0,C-Suite Join,"Kaushik Bhaumik, PhD — Appointed as Chief Revenue Officer",2026-04-14
-104,Littleton Regional Healthcare,http://www.littletonhealthcare.org,hospital & health care,36.0,C-Suite Join,Dr. Richard McKenzie — Promoted as Chief Medical Officer,Unknown
-105,Touchette Regional Hospital,http://www.touchette.org,hospital & health care,36.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-106,TRIA Orthopedics,http://www.tria.com,medical practice,36.0,C-Suite Join,Blake Berquist — Appointed as Executive Vice President and Chief Financial Officer,Unknown
-107,Consensus Health,http://www.consensushealth.com,hospital & health care,34.5,C-Suite Join,Doug Sechrist — Appointed as Chief Marketing Officer,2026-06-25
-108,"White-Wilson Medical Center, P.A.",http://www.white-wilson.com,medical practice,30.7,C-Suite Join + News Mention,Brad Logan — Appointed as Chief Executive Officer,Unknown
-109,Providence Medical Center,http://www.providencekc.com,hospital & health care,30.0,C-Suite Join,"Elizabeth ""Beth"" Harden — Appointed as Chief Nursing Officer",Unknown
-110,Ottumwa Regional Health Center,http://www.ottumwaregionalhealth.com,hospital & health care,30.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-111,West Anaheim Medical Center,http://www.westanaheimmedctr.com,hospital & health care,30.0,C-Suite Join,Drew Hartmann — Appointed as Chief Financial Officer,2026-06-01
-112,Home Care Delivered Inc,http://www.hcd.com,hospital & health care,30.0,C-Suite Join,Frank Segura — Appointed as Senior Vice President of Payer Strategy and Access,2026-05-22
-113,Redington-Fairview General Hospital,http://www.rfgh.net,hospital & health care,30.0,C-Suite Exit + C-Suite Join,Tiffany Comis — Appointed as Chief Executive Officer,Unknown
-114,ImagineSoftware,http://www.imagineteam.com,hospital & health care,30.0,C-Suite Join,Mike Ritzenthaler — Appointed as Chief Financial Officer,2026-06-09
-115,Sodalis Senior Living,http://www.sodalissenior.com,hospital & health care,30.0,C-Suite Join,Anton Nikodemus — Appointed as Chief Operating Officer,2026-06-01
-116,Laurel Ridge Treatment Center,http://www.laurelridgetc.com,mental health care,30.0,C-Suite Exit + C-Suite Join,Chris Barela — Interim appointment as Acting Chief Executive Officer,Unknown
-117,Lakeview Medical Center,http://www.lakeviewmed.org,hospital & health care,30.0,C-Suite Join,Robert Peltzer — Appointed as Chief Executive Officer,2026-05-20
-118,Tidewater Physicians Multispecialty Group,http://www.mytpmg.com,hospital & health care,30.0,C-Suite Join,"Eric M. Byman, MD — Retired as Managing Physician",2026-05-31
-119,Children's Healthcare of Atlanta Cardiology,http://www.kidsheart.com,hospital & health care,30.0,C-Suite Exit + C-Suite Join,"William Mahle, MD — Appointed as Chief of Cardiology",Unknown
-120,Spring Valley Hospital,http://www.springvalleyhospital.com,hospital & health care,30.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
-121,North Florida Surgeons,http://www.nflsurgeons.com,hospital & health care,30.0,C-Suite Join,Perry Clark — Interim appointment as Interim Chief Executive Officer,2026-07-06
-122,American Radiology Services,http://www.americanradiology.com,hospital & health care,30.0,C-Suite Join,David Grau — Appointed as Chief Executive Officer,2026-05-01
-123,Mary Bridge Children's Hospital,http://www.marybridge.org,hospital & health care,30.0,C-Suite Join,William (Bill) Robertson — Retired as Chief Executive Officer,2026-12-31
-124,University Orthopedics,http://www.universityorthopedics.com,hospital & health care,30.0,C-Suite Join,"Julia A. Katarincic, MD — Appointed as President",2026-07-09
-125,Shenandoah Medical Center,http://www.smchospital.com,hospital & health care,27.0,C-Suite Join,Karen Cole — Appointed as Chief Executive Officer,2026-05-18
-126,Freedom Fertility | VFP Pharmacy Group by Evernorth,http://www.freedomfertility.com,hospital & health care,24.0,C-Suite Join,Boris Kapeller — Appointed as Chief Risk Officer,Unknown
-127,Navarro Regional Hospital,http://www.navarrohospital.com,hospital & health care,24.0,C-Suite Join,Fallon Phillips — Role change as Assistant Chief Executive Officer,Unknown
-128,Sunshine Health,http://www.sunshinehealth.com,hospital & health care,24.0,C-Suite Join,"Daniel Finke — Appointed as Group President, Markets and Commercial",Unknown
-129,"Orthopedic Associates of Lancaster, LTD.",http://www.fixbones.com,hospital & health care,24.0,C-Suite Join,Ryan Albrecht — Appointed as Chief Executive Officer,Unknown
-130,Minnesota Masonic Home,http://www.mnmasonichomes.org,hospital & health care,24.0,C-Suite Join,Unknown — Promoted as Chief Executive Officer,Unknown
-131,Amberwell Health,http://www.amberwellhealth.org,hospital & health care,23.6,C-Suite Exit + Partnership, — exited,Unknown
-132,Perry County Memorial Hospital,http://www.pchospital.org,hospital & health care,18.0,C-Suite Join,Nick Harley — Appointed as Chief Executive Officer,Unknown
-133,Gila Regional Medical Center,http://www.grmc.org,hospital & health care,18.0,C-Suite Join,Drew H. Dostal — Appointed as Chief Executive Officer,Unknown
-134,Olympia Medical Center,http://www.olympiamc.com,hospital & health care,18.0,C-Suite Join,Robert Allen — Retired as Chief Executive Officer,Unknown
-135,Chesapeake Urology Associates,http://www.unitedurology.com,hospital & health care,18.0,C-Suite Join,Russ Adkins — Appointed as Chief Legal Officer,Unknown
-136,Athens Orthopedic Clinic,http://www.athensorthopedicclinic.com,hospital & health care,18.0,C-Suite Join,Michael Boblitz — Appointed as Chief Executive Officer,Unknown
-137,Aspire Indiana Health,http://www.aspireindiana.org,hospital & health care,18.0,C-Suite Join,Barbara Scott — Retired as Chief Executive Officer,Unknown
-138,RefleXion Medical,http://www.reflexion.com,medical devices,18.0,C-Suite Join,Todd Powell — Appointed as President and Chief Executive Officer,Unknown
-139,Risas Dental and Braces,http://www.risasdental.com,hospital & health care,15.0,C-Suite Exit,Nick Gardner — exited as Unknown,2026-05-07
-140,UP Health System – Bell,http://www.bellhospital.org,hospital & health care,15.0,C-Suite Join,Dave Caspers — Appointed as President and Chief Executive Officer,2026-06-02
-141,EPOCH Senior Living,http://www.epochsl.com,hospital & health care,12.7,C-Suite Join + News Mention,Adele Pepin — Promoted as Senior Vice President of Marketing and Communications,Unknown
-142,Chicago Family Health Center,http://www.chicagofamilyhealth.org,hospital & health care,12.0,C-Suite Join,"Jared M. Williams, DBA — Appointed as Chief Financial Officer",Unknown
-143,TransCare,http://www.trans-care.com,hospital & health care,12.0,C-Suite Join,Anjali Jameson — Appointed as Chief Product Officer,Unknown
-144,Whitman Hospital and Medical Clinics,http://www.whmc.org,hospital & health care,12.0,C-Suite Join,Bill Bryant — Appointed as Chief Executive Officer,Unknown
-145,Marianjoy Rehabilitation Hospital,http://www.marianjoy.org,hospital & health care,12.0,C-Suite Join,Jennifer K. Webster — Appointed as Chief Executive Officer,Unknown
-146,Civitas Senior Living,http://www.civitasseniorliving.com,hospital & health care,12.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-147,CenterPointe Hospital,http://www.centerpointehospital.com,hospital & health care,12.0,C-Suite Join,Mary Williamson — Appointed as Chief Financial Officer,Unknown
-148,Our Lady of Lourdes RMC,http://www.lourdes.net,hospital & health care,12.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-149,HealthSource Saginaw,http://www.healthsourcesaginaw.org,hospital & health care,12.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
-150,Monroe Community Hospital,http://www.monroehosp.org,hospital & health care,12.0,C-Suite Join,Kristen Schulmerich — Retired as Director of Nursing,2026-06
-151,Powell Valley Healthcare,http://www.pvhc.org,hospital & health care,12.0,C-Suite Join,Lisa Wooten — Promoted as Chief Financial Officer,Unknown
-152,Guidehealth,http://www.guidehealth.com,hospital & health care,12.0,C-Suite Join,Doug Wenners — Appointed as Chief Executive Officer,Unknown
-153,ComplexCare Solutions,http://www.complexcaresolutions.com,hospital & health care,12.0,C-Suite Join,Virgil Wong — Appointed as Chief Product Officer,Unknown
-154,Quincy Medical Group,http://www.quincymedgroup.com,hospital & health care,6.0,C-Suite Exit,Carol Brockmiller — exited as President,Unknown
-155,Twin County Regional Healthcare - Duke LifePoint Healthcare,http://www.tcrh.org,hospital & health care,6.0,C-Suite Exit,Chris Lumsden — exited as Chief Executive Officer,Unknown
-156,"Methodist Hospital of Henderson, Kentucky",http://www.methodisthospital.net,hospital & health care,6.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
-157,Midwest Orthopaedics at RUSH,http://www.rushortho.com,hospital & health care,6.0,C-Suite Join,Dr. Omar Lateef — Retired as Chief Executive Officer,Unknown
-158,MGMA,http://www.mgma.com,hospital & health care,6.0,C-Suite Join, — Appointed,Unknown
-159,Wilson Senior Care,http://www.wilsonseniorcare.com,hospital & health care,6.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
-160,Lakeside Behavioral Health System,http://www.lakesidebhs.com,hospital & health care,6.0,C-Suite Join,Danny Milam — Appointed as Chief Financial Officer,Unknown
-161,Memorial Hospital and Manor,http://www.mh-m.org,hospital & health care,5.6,Product Launch,In the news: Bainbridge hospital launches program to cut ER wait times in half - WTXL ABC 27 ,"Mon, 16 Mar 2026 07:00:00 GMT"
-162,Vera Whole Health,http://www.verawholehealth.com,hospital & health care,2.8,Partnership,In the news: Cobb County Overhauls Employee Healthcare with Vera Partnership - BriefGlance,"Wed, 29 Apr 2026 17:07:02 GMT"
-163,Impact Advisors,http://www.impact-advisors.com,hospital & health care,2.8,Partnership,In the news: Impact Advisors Announces Acquisition of Canopii Collaborative | Carlyle Acquire,"Fri, 15 May 2026 07:00:00 GMT"
-164,Correctional Healthcare Companies,http://www.correctioncare.com,hospital & health care,2.8,Product Launch,In the news: Blackstone Trial Group Launches as the Nation's Premier Law Firm Dedicated Exclu,"Thu, 12 Mar 2026 07:00:00 GMT"
-165,Vicar's Landing,http://www.vicarslanding.com,hospital & health care,2.8,Product Launch,"In the news: Vicar’s Landing launching $318 million eTown senior living, its third area commu","Fri, 17 Apr 2026 07:00:00 GMT"
-166,County of Santa Clara Health System,http://www.sccgov.org,hospital & health care,2.8,Partnership,In the news: County of Santa Clara and VTA Launch Affordable Housing Partnership - Santa Clar,"Fri, 29 May 2026 12:00:00 GMT"
-167,Imperial Health,http://www.imperialhealth.com,hospital & health care,2.8,Partnership,In the news: Imperial Health Charity and the Trust launch bold new partnership to improve pop,"Wed, 29 Apr 2026 07:00:00 GMT"
-168,Helen Hayes Hospital,http://www.helenhayeshospital.org,hospital & health care,2.8,Product Launch,"In the news: Nyack Awarded $200,000 Technical Assistance Grant; RCC Launches Renovation for N","Thu, 05 Mar 2026 08:00:00 GMT"
-169,Vitality,http://www.vitalitygroup.com,hospital & health care,2.8,Partnership,In the news: ASUS ROG Computex 2026: New Ace Esports Gear & Partnerships - ASUS Pressroom,"Mon, 01 Jun 2026 09:36:24 GMT"
-170,National Healthcareer Association (NHA),http://www.nhanow.com,hospital & health care,2.8,Product Launch,"In the news: Mansfield U launches clinical medical assistant, phlebotomy programs - Northcent","Sat, 30 May 2026 22:00:00 GMT"
-171,BeneCard PBF,http://www.benecardpbf.com,hospital & health care,2.8,Partnership,"In the news: BeneCard PBF Reappointed by DVHCC, Extending Trusted PBM Partnership - Yahoo Fin","Thu, 05 Mar 2026 08:00:00 GMT"
-172,Centre for Neuro Skills,http://www.neuroskills.com,hospital & health care,2.8,Partnership,"In the news: Centre for Neuro Skills Expands Employer Partnerships Strategy, Appoints Jay Var","Wed, 18 Mar 2026 07:00:00 GMT"
-173,ProPath,http://www.propath.com,hospital & health care,2.8,Partnership,In the news: Paschal Air Plumbing & Electric Announces NIL Partnership with Hagen Smith to Pr,"Sat, 14 Mar 2026 07:00:00 GMT"
-174,Carrot Fertility Inc,http://www.get-carrot.com,hospital & health care,2.8,Product Launch,In the news: Carrot Unveils Carrot Intelligence: A Proprietary Global AI Platform for Fertili,"Thu, 16 Apr 2026 07:00:00 GMT"
-175,Vida Health,http://www.vida.com,hospital & health care,2.8,Partnership,In the news: Oura takes ring data into the doctor’s office with its latest partnership - Andr,"Tue, 14 Apr 2026 07:00:00 GMT"
-176,Calvary Hospital,http://www.calvaryhospital.org,hospital & health care,2.8,Product Launch,In the news: Calvary Hospital Unveils New Lobby and Family Care Center at Bronx Campus - The ,"Mon, 18 May 2026 07:00:00 GMT"
-177,Rocky Mountain Cancer Centers,http://www.rockymountaincancercenters.com,hospital & health care,2.8,Partnership,In the news: West Cancer Center and IDEOlogy Health Announce Strategic Partnership to Advance,"Tue, 07 Apr 2026 07:00:00 GMT"
-178,Oncology Consultants,http://www.oncologyconsultants.com,hospital & health care,2.8,Partnership,In the news: South Texas cancer patients gain bigger network in new AON partnership - Stock T,"Thu, 05 Mar 2026 08:00:00 GMT"
-179,Grace Health Care,http://www.gracehc.com,hospital & health care,2.8,Partnership,In the news: Partnership helping health care in the region - CTV News,"Sat, 23 May 2026 07:00:00 GMT"
-180,City Ambulance Service,http://www.cityambu.com,hospital & health care,2.8,Product Launch,In the news: Evansville Fire Department prepares to launch city-run ambulance service July 1 ,"Thu, 12 Mar 2026 07:00:00 GMT"
-181,"RQI Partners, LLC",http://www.rqipartners.com,hospital & health care,2.8,Product Launch,"In the news: Resuscitation science, training and technology leaders launch new self-guided re","Wed, 04 Mar 2026 08:00:00 GMT"
-182,Family Dental Health,http://www.fdhonline.com,hospital & health care,2.8,Product Launch,In the news: Sun Life introduces Kid Smile Complete and expands Lifetime of Smiles® to suppor,"Mon, 06 Apr 2026 07:00:00 GMT"
-183,Ryan Health,http://www.ryanhealth.org,hospital & health care,2.8,Partnership,In the news: Molecule Science Foundation Announces Partnership with O'Ryan Hea - The National,"Tue, 26 May 2026 14:26:35 GMT"
-184,Charter Senior Living,http://www.charterseniorliving.com,hospital & health care,2.8,Partnership,"In the news: Senior Living Operators Eke Out Partnerships, Projects to Grow Amid Development ","Mon, 27 Apr 2026 07:00:00 GMT"
-185,Fair Acres Geriatric Center,http://www.fairacres.org,hospital & health care,2.8,Product Launch,In the news: Delaware County unveils $5.6 million kitchen at Fair Acres Geriatric Center - De,"Fri, 22 May 2026 11:41:26 GMT"
-186,Watertown Regional Medical Center,http://www.watertownregional.com,hospital & health care,2.8,Partnership,In the news: New ER Partnership Aims to Improve Care in Watertown - Daily Dodge,"Mon, 11 May 2026 07:00:00 GMT"
-187,SSTAR,http://www.sstar.org,hospital & health care,2.8,Product Launch,In the news: Dongfeng Forthing'sStar Sea V6 was successfully launched on stage in Beijing Mot,"Mon, 27 Apr 2026 07:00:00 GMT"
-188,The Urology Group,http://www.urologygroup.com,hospital & health care,2.8,Partnership,In the news: Dykema Congratulates The Urology Group of Virginia on its Strategic Partnership ,"Wed, 18 Mar 2026 07:00:00 GMT"
-189,Revecore,http://www.revecore.com,hospital & health care,2.8,Product Launch,In the news: Revecore Launches AI-Powered Underpayment Recovery and Denial Appeals Capabiliti,"Tue, 28 Apr 2026 07:00:00 GMT"
-190,XSOLIS,http://www.xsolis.com,hospital & health care,2.8,Partnership,In the news: HTEC and Xsolis’ Strategic Partnership to Tackle Inefficiencies in Healthcare De,"Tue, 02 Jun 2026 12:38:00 GMT"
-191,Shields Health,http://www.shields.com,hospital & health care,2.8,Partnership,In the news: UMass Improved Diabetes Outcomes With Specialty Pharmacy Partnership - Specialty,"Thu, 30 Apr 2026 07:00:00 GMT"
-192,Frankfort Regional Medical Center,http://www.frankfortregional.com,hospital & health care,2.8,Product Launch,In the news: Frankfort Regional Medical Center unveils new transport ambulance - State-Journa,"Tue, 02 Jun 2026 02:43:47 GMT"
-193,CareBridge,http://www.carebridgehealth.com,hospital & health care,2.8,Product Launch,In the news: The CareBridge Group Announces $91 Million Corporate Master Grant to Launch the ,"Mon, 01 Jun 2026 14:05:00 GMT"
-194,Palmetto Primary Care Physicians,http://www.palmettoprimarycare.com,hospital & health care,1.4,News Mention,In the news: Medical University of South Carolina acquires Palmetto Primary Care Physicians -,"Thu, 05 Mar 2026 08:00:00 GMT"
-195,Ohio Valley Surgical Hospital,http://www.ovsurgical.com,hospital & health care,1.4,News Mention,In the news: Ohio Valley Surgical Hospital names new CEO - Springfield News-Sun,"Thu, 02 Apr 2026 07:00:00 GMT"
-196,The Villages Health,http://www.thevillageshealth.com,hospital & health care,1.4,News Mention,In the news: Deals tracker: HCA to acquire Texas college - Modern Healthcare,"Wed, 27 May 2026 22:02:00 GMT"
-197,Titus Regional Medical Center,http://www.titusregional.com,hospital & health care,0.7,News Mention,In the news: Titus Regional Medical Center rebrands as CHRISTUS Health takes over operations ,"Sat, 02 May 2026 07:00:00 GMT"
-198,Athelas,http://www.athelas.com,hospital & health care,0.7,News Mention,In the news: Commure Raises $70M at $7B Valuation to Transform Healthcare Operations Using AI,"Tue, 19 May 2026 07:00:00 GMT"
-199,Fellowship Community,http://www.fellowshipcommunity.com,hospital & health care,0.7,News Mention,"In the news: Fellowship Community, Whitehall, appoints Director of Rehabilitation - Lehigh Va","Mon, 25 May 2026 12:50:42 GMT"
-200,Borland Groover,http://www.borlandgroover.com,hospital & health care,0.7,News Mention,"In the news: Borland Groover 5K raises $100,000 for cancer screenings and awareness - The Flo","Wed, 01 Apr 2026 20:39:23 GMT"
+1,ClearSky Health,http://www.clearskyhealth.com,hospital & health care,696.0,C-Suite Exit + C-Suite Join,Darby Brockette — Role change as Chief Executive Officer,2026-05-01
+2,Hippocratic AI,http://www.hippocraticai.com,hospital & health care,419.8,C-Suite Join + Funding Round + Product Launch,Kashif Rashid — Appointed as Chief Legal Officer,2026-05-14
+3,"ProgenyHealth, LLC",http://www.progenyhealth.com,hospital & health care,383.8,C-Suite Join + Product Launch,Mark Sprague — Appointed as Chief Financial Officer,2026-04-29
+4,Mary Rutan Health,http://www.maryrutan.org,hospital & health care,237.0,C-Suite Join,Tammy Gump — Retired as Chief Operating Officer of Mary Rutan Foundation; Chief Operating Officer of the Logan County Ca,2026-05-31
+5,GoodRx,http://www.goodrx.com,hospital & health care,225.0,C-Suite Exit + C-Suite Join,Amit Pandey — Appointed as Chief Technology Officer,2026-05-01
+6,Carrum Health Inc,http://www.carrumhealth.com,hospital & health care,225.0,C-Suite Join,"[Two unnamed executives] — Appointed as Chief Technology Officer, Chief Data Officer (exact titles pending clarification",2026-04-29
+7,American Hospital Association,http://www.aha.org,hospital & health care,225.0,Acquisition / M&A + C-Suite Exit + C-Suite Join + Funding Round,"Funding: Accelerator/Initiative Funding — $12,000,000",2026-04-29
+8,Cape Fear Valley Harnett Health,http://www.harnetthealth.org,hospital & health care,215.2,C-Suite Join + Funding Round + News Mention,Michael Nagowski — Retired as Chief Executive Officer,2026-07-01
+9,Los Alamos Medical Center,http://www.losalamosmedicalcenter.com,hospital & health care,207.7,C-Suite Join + News Mention,Chris Emond — Appointed as Chief Financial Officer,2026-08-10
+10,Partners Health Management,http://www.partnersbhm.org,hospital & health care,201.7,C-Suite Join + News Mention,Libby McCraw — Role change as Senior Deputy Chief Executive Officer,2026-10-01
+11,Lakeland Regional Health,http://www.spectrumhealthlakeland.org,hospital & health care,195.0,C-Suite Join,Unknown — Appointed as Chief Marketing Officer,2026-05-06
+12,Harbor Regional Health,http://www.ghcares.org,hospital & health care,195.0,C-Suite Exit + C-Suite Join,Tom Jensen — Retired as Chief Executive Officer,2026-08-07
+13,Bicycle Health Inc,http://www.bicyclehealth.com,hospital & health care,186.0,C-Suite Join,"Travis Schamber, MD — Promoted as Chief Medical Officer",2026-05-05
+14,"Grady Memorial Hospital, Oklahoma",http://www.gradymem.org,hospital & health care,180.0,C-Suite Join,Anthony Saul — Appointed as President and Chief Executive Officer,2027-01-01
+15,Rehoboth McKinley Christian Health Care Services,http://www.rmch.org,hospital & health care,167.8,C-Suite Join + Partnership,Maridel Acosta-Cruz — Appointed as Chief Executive Officer,2026-05-27
+16,DMC Huron Valley-Sinai Hospital,http://www.hvsh.org,hospital & health care,165.7,C-Suite Join + News Mention, — Appointed as Chief Executive Officer,2026-06-01
+17,Greystone Health Network,http://www.greystonehealthcareers.com,hospital & health care,165.0,C-Suite Join,Nicholas M. Gesue — Appointed as Chief Operating Officer,2026-06-15
+18,The CORE Institute,http://www.thecoreinstitute.com,medical practice,157.5,C-Suite Join,"Ashley Vertuno — Appointed as Chief Executive Officer, Arizona Market",2026-06-30
+19,Strive Health,http://www.strivehealth.com,hospital & health care,156.0,C-Suite Join,"Jamie Sharp, M.D. — Appointed as Chief Medical Officer",2026-06-16
+20,Thyme Care,http://www.thymecare.com,hospital & health care,150.0,C-Suite Join,"Brad Diephuis, M.D. — Appointed as Chief Executive Officer",2026-09-01
+21,Glooko,http://www.glooko.com,hospital & health care,149.8,C-Suite Join + Partnership,Vinayak Hegde — Appointed as Chief Executive Officer,2026-05-02
+22,Mesa View Regional Hospital,http://www.mesaviewhospital.com,hospital & health care,147.7,C-Suite Join + News Mention,Kelly Adam — Retired as Chief Executive Officer,2026-05-01
+23,Mammoth Hospital,http://www.mammothhospital.org,hospital & health care,138.7,C-Suite Join + News Mention,Tom Parker — Retired as Chief Executive Officer,2026-10-02
+24,SKYGEN,http://www.skygenusa.com,hospital & health care,131.8,C-Suite Join + Product Launch,Jeff Spahr — Appointed as Chief Client Success Officer,2026-05-06
+25,Presbyterian St Lukes,http://www.pslmc.com,hospital & health care,129.0,C-Suite Join,Casey Guber — Appointed as President and Chief Executive Officer,2026-07-20
+26,Neosho Memorial Regional Medical Center,http://www.neoshomemorial.com,hospital & health care,120.0,Acquisition / M&A + Funding Round,Funding: Federal Grant — ~$1.9 million,2026-06-11
+27,Lane Regional Medical Center,http://www.lanermc.org,hospital & health care,120.0,C-Suite Join,Allyson Bennett — Promoted as Chief Nursing Officer,Unknown
+28,West Calcasieu Cameron Hospital,http://www.wcch.com,hospital & health care,120.0,C-Suite Join,Robert Peltzer — Appointed as Chief Executive Officer,2026-05-20
+29,Raleigh General Hospital,http://www.raleighgeneral.com,hospital & health care,120.0,C-Suite Join,Unknown — Appointed as Chief Nursing Officer,2026-06-08
+30,Doctors Hospital of Laredo,http://www.doctorshosplaredo.com,hospital & health care,114.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
+31,Barstow Community Hospital,http://www.barstowhospital.com,hospital & health care,112.5,C-Suite Exit + C-Suite Join,Drew Hartmann — Appointed as Chief Financial Officer,2026-06-01
+32,Duke Cancer Institute,http://www.dukecancerinstitute.org,hospital & health care,111.0,C-Suite Join,David Zaas — Appointed as Chief Executive Officer,2026-05-01
+33,Community Health Center of Branch County,http://www.chcbc.com,hospital & health care,108.0,C-Suite Join,Justin Doss — Promoted as Chief Operating Officer,2026-07-05
+34,UNC Physicians Network,http://www.uncpn.com,hospital & health care,108.0,C-Suite Join,"Min Lee — Appointed as President, UNC Hospitals",2026-07-20
+35,Eastern New Mexico Medical Center,http://www.enmmc.com,hospital & health care,105.0,C-Suite Join,Michael Covert — Appointed as Chief Executive Officer,2026-06-15
+36,Karyopharm Therapeutics Inc.,http://www.karyopharm.com,pharmaceuticals,90.0,C-Suite Join + Funding Round,Funding: Public Offering / ATM — $400M shelf / $100M ATM,2026-05-04
+37,The Medical Center of Southeast Texas,http://www.medicalcentersetexas.org,hospital & health care,90.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
+38,Stellar Health Group,http://www.stellarnursinghomes.com,hospital & health care,90.0,C-Suite Join,Falko Buttler — Appointed as Chief Technology Officer,2026-05-28
+39,MCKENZIE-WILLAMETTE MEDICAL CENTER,http://www.mckweb.com,hospital & health care,90.0,C-Suite Join,Mark Robinson — Appointed as Chief Executive Officer,2026-07-20
+40,Saline Memorial Hospital,http://www.salinememorial.org,hospital & health care,90.0,C-Suite Join,Josh Orzel — Appointed as Chief Nursing Officer,2026-07-09
+41,Lakewood Ranch Medical Center,http://www.lakewoodranchmedicalcenter.com,hospital & health care,90.0,C-Suite Join,Jason Madsen — Appointed as Chief Executive Officer,2026-07-01
+42,Esperanza Health Centers,http://www.esperanzachicago.org,hospital & health care,90.0,C-Suite Join,Dr. Nicole Kazee — Appointed as President and Chief Executive Officer,2026-07-01
+43,"Healix, LLC",http://www.healix.net,hospital & health care,85.5,Acquisition / M&A + C-Suite Join,Alan Channing — Appointed as Chief Executive Officer,2026-06-16
+44,"Integrated Home Care Services, Inc.",http://www.ihcscorp.com,hospital & health care,84.7,C-Suite Join + News Mention,Ashish V. Shah — Appointed as Chief Product & Technology Officer,2026-05-20
+45,TriStar StoneCrest Medical Center,http://www.tristarstonecrest.com,hospital & health care,84.7,C-Suite Join + News Mention,Ryan LeMasters — Appointed as Chief Executive Officer,Unknown
+46,eventuswh.com,http://www.eventuswholehealth.com,hospital & health care,84.0,C-Suite Join,Eric Litz — Appointed as Chief Technology Officer,2026-06-02
+47,Tennessee Oncology,http://www.tnoncology.com,hospital & health care,78.0,C-Suite Join,"Johnetta Blakely, MD — Appointed as Chief Medical Officer",2026-05-07
+48,Central Carolina Hospital,http://www.centralcarolinahosp.com,hospital & health care,78.0,C-Suite Join,Regina Williams — Appointed as Chief Nursing Officer,2026-06-08
+49,LabConnect,http://www.labconnect.com,pharmaceuticals,77.8,C-Suite Join + Product Launch,Richard Harris — Appointed as Chief Executive Officer,2026-04-30
+50,Wilson Medical Center,http://www.wilsonmedical.com,hospital & health care,75.7,C-Suite Join + News Mention,Jason L. Kimbrell — Appointed as Chief Executive Officer,2026-05-18
+51,Nutex Health,http://www.nutexhealth.com,hospital & health care,75.7,Funding Round + News Mention,Funding: Public Company – Share Buyback / Expansion Capital — N/A,2026-04-30
+52,Huntsville Memorial Hospital,http://www.huntsvillememorial.com,hospital & health care,75.0,C-Suite Join,Terry Scoggin — Appointed as Chief Executive Officer,2026-06-15
+53,Clinton Memorial Hospital,http://www.cmhregional.com,hospital & health care,67.5,C-Suite Join,Mark Clement — Retired as President and Chief Executive Officer,2026-06-30
+54,CENTRAL MONTANA MEDICAL CENTER,http://www.cmmc.health,hospital & health care,67.5,C-Suite Exit + C-Suite Join,Unknown — exited as Chief Executive Officer,2026-06-16
+55,EnableComp,http://www.enablecomp.com,hospital & health care,67.5,C-Suite Join,Maureen Ladouceur — Appointed as Chief Commercial Officer,2026-06-30
+56,Mad River Community Hospital,http://www.madriverhospital.com,hospital & health care,66.7,C-Suite Join + News Mention, — Retired,Unknown
+57,Sonoma Valley Hospital,http://www.sonomavalleyhospital.org,hospital & health care,66.0,C-Suite Join,Dr. Patrick Okolo — Role change as Chief Medical Officer,2026-04-28
+58,PillPack,http://www.pillpack.com,hospital & health care,65.2,C-Suite Exit + C-Suite Join,"Roy Schoenberg — Appointed as Senior Vice President, Amazon Health Services",2026-07-01
+59,Permian Regional Medical Center,http://www.permianregional.com,hospital & health care,63.0,C-Suite Exit + C-Suite Join,Adiel Alvarado — Interim appointment as Interim Chief Executive Officer,Unknown
+60,Cancer Care Northwest,http://www.cancercarenorthwest.com,medical practice,63.0,C-Suite Join,Elizabeth Passmore — Appointed as Executive Director,2026-06-15
+61,Omada Health,http://www.omadahealth.com,hospital & health care,60.0,Funding Round,Funding: Public Company — Q1 2026 Earnings — $322M–$330M 2026 revenue guidance (public company),2026-05-07
+62,WinnMed,http://www.winnmed.org,hospital & health care,60.0,Funding Round,"Funding: Debt Financing — $35,000,000",2026-05-11
+63,Kearney Regional Medical Center,http://www.kearneyregional.com,hospital & health care,60.0,C-Suite Exit + C-Suite Join,"Scott Smith, MD — Interim appointment as Interim President and Chief Executive Officer",Unknown
+64,Humboldt Park Health,http://www.hph.care,hospital & health care,60.0,C-Suite Join,Jose R. Sanchez — Retired as Chief Executive Officer,2026-05-31
+65,NantHealth Inc,http://www.nanthealth.com,hospital & health care,60.0,C-Suite Join,"Deepak Dubey, PhD, MBA — Appointed as President and Chief Operating Officer",2026-04-30
+66,Quartz Health Solutions,http://www.quartzbenefits.com,insurance,60.0,C-Suite Join,"Laura Berndt, PharmD, MBA — Appointed as Chief Pharmacy Officer",2026-05-06
+67,Newman Regional Health,http://www.newmanrh.org,hospital & health care,60.0,Funding Round,Funding: Capital Campaign / Bond Financing — $46M–$57M (total campaign target),2026-04-29
+68,LifeLink Foundation,http://www.lifelinkfoundation.org,hospital & health care,60.0,C-Suite Join,"Kelly Cullen, RN, MBA — Appointed as Chief Operating Officer",Unknown
+69,Tidewater Physicians Multispecialty Group,http://www.mytpmg.com,hospital & health care,60.0,C-Suite Join,"Eric M. Byman, MD — Retired as Managing Physician",2026-05-31
+70,Accuray,http://www.accuray.com,medical devices,60.0,C-Suite Join,Paul Miele — Appointed as Chief Commercial Officer,2026-05-06
+71,American Radiology Services,http://www.americanradiology.com,hospital & health care,60.0,C-Suite Join,David Grau — Appointed as Chief Executive Officer,2026-05-01
+72,Mary Bridge Children's Hospital,http://www.marybridge.org,hospital & health care,60.0,C-Suite Join,William (Bill) Robertson — Retired as Chief Executive Officer,2026-12-31
+73,Cass Health,http://www.casshealth.org,hospital & health care,60.0,C-Suite Join,Jonathan Moe — Appointed as Chief Executive Officer,2026-09-21
+74,Monarch Healthcare Management,http://www.monarchmn.com,hospital & health care,59.8,C-Suite Join + Partnership,Anna Lohrfink — Appointed as Chief Executive Officer,Unknown
+75,Mankato Clinic,http://www.mankatoclinic.com,medical practice,57.7,C-Suite Join + News Mention,Brandon Janike — Appointed as Chief Financial Officer,2026-06-01
+76,Olean General Hospital,http://www.brmc-ogh.org,hospital & health care,54.0,Acquisition / M&A,"M&A: NAPA Anesthesia (North American Partners in Anesthesia) announced on May 13, 202",2026-05-13
+77,Access TeleCare,http://www.accesstelecare.com,hospital & health care,54.0,Acquisition / M&A,M&A: Access TeleCare is repositioning following a $400 million take-private deal. The,2026-05-01
+78,Witham Health Services,http://www.witham.org,hospital & health care,54.0,Acquisition / M&A,M&A: Boone County Government and Witham Health Services jointly affirmed their commit,2026-05-08
+79,Angelica,http://www.angelica.com,hospital & health care,54.0,Acquisition / M&A,M&A: Note: This signal is for Angelini Pharma (not Angelica the healthcare linen/serv,2026-05-07
+80,"Guardian Flight, LLC",http://www.guardianflight.com,hospital & health care,54.0,IPO Signal,IPO: Guardian Flight is a core operating brand of GMR Solutions Inc. (parent: Global ,2026-05-12
+81,Littleton Regional Healthcare,http://www.littletonhealthcare.org,hospital & health care,54.0,C-Suite Join,Dr. Richard McKenzie — Promoted as Chief Medical Officer,Unknown
+82,Touchette Regional Hospital,http://www.touchette.org,hospital & health care,54.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+83,TRIA Orthopedics,http://www.tria.com,medical practice,54.0,C-Suite Join,Blake Berquist — Appointed as Executive Vice President and Chief Financial Officer,Unknown
+84,CADUCEUSHEALTH®,http://www.caduceushealth.com,hospital & health care,53.2,Acquisition / M&A + News Mention,M&A: Innovaccer announced the acquisition of CaduceusHealth to strengthen its revenue,2026-06-25
+85,Kittitas Valley Healthcare,http://www.kvhealthcare.org,hospital & health care,48.0,C-Suite Join,Unknown — Retired as Chief Executive Officer,Unknown
+86,Aspire Indiana Health,http://www.aspireindiana.org,hospital & health care,48.0,C-Suite Join,Barbara Scott — Retired as Chief Executive Officer,Unknown
+87,Shenandoah Medical Center,http://www.smchospital.com,hospital & health care,48.0,C-Suite Join,Karen Cole — Appointed as Chief Executive Officer,2026-05-18
+88,Consensus Health,http://www.consensushealth.com,hospital & health care,48.0,C-Suite Join,Doug Sechrist — Appointed as Chief Marketing Officer,2026-06-25
+89,West Anaheim Medical Center,http://www.westanaheimmedctr.com,hospital & health care,45.0,C-Suite Join,Drew Hartmann — Appointed as Chief Financial Officer,2026-06-01
+90,Home Care Delivered Inc,http://www.hcd.com,hospital & health care,45.0,C-Suite Join,Frank Segura — Appointed as Senior Vice President of Payer Strategy and Access,2026-05-22
+91,Redington-Fairview General Hospital,http://www.rfgh.net,hospital & health care,45.0,C-Suite Exit + C-Suite Join,Tiffany Comis — Appointed as Chief Executive Officer,Unknown
+92,ImagineSoftware,http://www.imagineteam.com,hospital & health care,45.0,C-Suite Join,Mike Ritzenthaler — Appointed as Chief Financial Officer,2026-06-09
+93,Sodalis Senior Living,http://www.sodalissenior.com,hospital & health care,45.0,C-Suite Join,Anton Nikodemus — Appointed as Chief Operating Officer,2026-06-01
+94,HealthHelp,http://www.healthhelp.com,hospital & health care,45.0,C-Suite Join,"Katherine Dallow, MD — Appointed as Chief Medical Officer",2026-05-13
+95,Laurel Ridge Treatment Center,http://www.laurelridgetc.com,mental health care,45.0,C-Suite Exit + C-Suite Join,Chris Barela — Interim appointment as Acting Chief Executive Officer,Unknown
+96,Lakeview Medical Center,http://www.lakeviewmed.org,hospital & health care,45.0,C-Suite Join,Robert Peltzer — Appointed as Chief Executive Officer,2026-05-20
+97,UAB Callahan Eye,http://www.uabcallahaneye.org,hospital & health care,45.0,C-Suite Join,Dustin Diggs — Promoted as Chief Nursing Officer,2026-06-17
+98,Children's Healthcare of Atlanta Cardiology,http://www.kidsheart.com,hospital & health care,45.0,C-Suite Exit + C-Suite Join,"William Mahle, MD — Appointed as Chief of Cardiology",Unknown
+99,Montefiore,http://www.menorahpark.org,hospital & health care,45.0,Funding Round,Funding: Capital Grant — $41 million (state grant portion; ~$45M total project),2026-06-26
+100,Sherman Medical Center,http://www.ahssmc.org,hospital & health care,45.0,C-Suite Join,Michelle Waller — Appointed as Chief Executive Officer,2026-06-15
+101,Spring Valley Hospital,http://www.springvalleyhospital.com,hospital & health care,45.0,C-Suite Join,"Gina Temple, PhD — Appointed as Chief Executive Officer",2026-05-26
+102,ST ALPHONSUS REGIONAL MEDICAL CENTER INC,http://www.saintalphonsus.com,hospital & health care,45.0,Funding Round,"Funding: Capital Raise / Expansion — Undisclosed (capital raise for 260,000 sq ft expansion)",2026-06-25
+103,McKenzie Health,http://www.mckenziehealth.com,hospital & health care,45.0,Funding Round,"Funding: Municipal Grant — $1,000,000",2026-06-25
+104,North Florida Surgeons,http://www.nflsurgeons.com,hospital & health care,45.0,C-Suite Join,Perry Clark — Interim appointment as Interim Chief Executive Officer,2026-07-06
+105,University Orthopedics,http://www.universityorthopedics.com,hospital & health care,45.0,C-Suite Join,"Julia A. Katarincic, MD — Appointed as President",2026-07-09
+106,MedReview Inc.,http://www.medreview.us,hospital & health care,45.0,C-Suite Join,Caryn Van Buskirk — Appointed as Chief Human Resources Officer,2026-06-30
+107,Providence Medical Center,http://www.providencekc.com,hospital & health care,42.0,C-Suite Join,"Elizabeth ""Beth"" Harden — Appointed as Chief Nursing Officer",Unknown
+108,Ottumwa Regional Health Center,http://www.ottumwaregionalhealth.com,hospital & health care,42.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+109,Minnesota Masonic Home,http://www.mnmasonichomes.org,hospital & health care,42.0,C-Suite Join,Unknown — Promoted as Chief Executive Officer,Unknown
+110,"White-Wilson Medical Center, P.A.",http://www.white-wilson.com,medical practice,39.7,C-Suite Join + News Mention,Brad Logan — Appointed as Chief Executive Officer,Unknown
+111,Legent Health,http://www.legenthealth.com,hospital & health care,39.7,C-Suite Join + News Mention,Brad Stoltz — Appointed as Chief Operating Officer,2026-05-04
+112,Aspen Valley Health,http://www.aspenvalleyhealth.org,hospital & health care,36.0,C-Suite Join,Michelle Gelroth — Role change as Chief Information Officer,Unknown
+113,Freedom Fertility | VFP Pharmacy Group by Evernorth,http://www.freedomfertility.com,hospital & health care,36.0,C-Suite Join,Boris Kapeller — Appointed as Chief Risk Officer,Unknown
+114,Navarro Regional Hospital,http://www.navarrohospital.com,hospital & health care,36.0,C-Suite Join,Fallon Phillips — Role change as Assistant Chief Executive Officer,Unknown
+115,Sunshine Health,http://www.sunshinehealth.com,hospital & health care,36.0,C-Suite Join,"Daniel Finke — Appointed as Group President, Markets and Commercial",Unknown
+116,"Orthopedic Associates of Lancaster, LTD.",http://www.fixbones.com,hospital & health care,36.0,C-Suite Join,Ryan Albrecht — Appointed as Chief Executive Officer,Unknown
+117,RefleXion Medical,http://www.reflexion.com,medical devices,36.0,C-Suite Join,Todd Powell — Appointed as President and Chief Executive Officer,Unknown
+118,New Jersey Urology,http://www.njurology.com,hospital & health care,32.8,C-Suite Join + Partnership,"Chidebelu Ufodike, MD — Appointed as Chief Operating Officer",Unknown
+119,Center for Family Health,http://www.centerforfamilyhealth.org,hospital & health care,30.7,C-Suite Join + News Mention,Sara Benedetto — Promoted as Chief Executive Officer,2026-05-01
+120,San Ramon Regional Medical Center,http://www.sanramonmedctr.com,hospital & health care,30.7,C-Suite Join + News Mention,Unknown — Appointed as Chief Financial Officer,2026-05-26
+121,UP Health System – Bell,http://www.bellhospital.org,hospital & health care,30.0,C-Suite Join,Dave Caspers — Appointed as President and Chief Executive Officer,2026-06-02
+122,"St. Joseph Regional Medical Center, Inc.",http://www.sjrmc.org,hospital & health care,30.0,C-Suite Join,Angela Green — Appointed as Chief Nursing Officer / Chief Operating Officer,Unknown
+123,NMS Labs,http://www.nmslabs.com,hospital & health care,30.0,C-Suite Join,Gregory Schuh — Promoted as Chief Financial Officer,2026-07-22
+124,IHI,http://www.ihi.org,hospital & health care,30.0,C-Suite Join,"Ronald Wyatt, MD, MHA — Appointed as Chief Medical Officer",2026-07-20
+125,North Okaloosa Medical Center,http://www.northokaloosa.com,hospital & health care,30.0,C-Suite Join,David Whalen — Retired as Chief Executive Officer,2026-06-24
+126,Amberwell Health,http://www.amberwellhealth.org,hospital & health care,29.6,C-Suite Exit + Partnership, — exited,Unknown
+127,Titus Regional Medical Center,http://www.titusregional.com,hospital & health care,29.2,C-Suite Join + News Mention,Unknown — Appointed as Chief Executive Officer,2026-06-30
+128,Health Management Associates,http://www.healthmanagement.com,hospital & health care,29.2,C-Suite Join + News Mention,Arda Ural — Appointed as Chief Operating Officer,2026-07-06
+129,Orange City Area Health System,http://www.ochealthsystem.org,hospital & health care,28.5,C-Suite Join,Chris Sietstra — Appointed as Chief Executive Officer,2026-07-06
+130,Perry County Memorial Hospital,http://www.pchospital.org,hospital & health care,24.0,C-Suite Join,Nick Harley — Appointed as Chief Executive Officer,Unknown
+131,Gila Regional Medical Center,http://www.grmc.org,hospital & health care,24.0,C-Suite Join,Drew H. Dostal — Appointed as Chief Executive Officer,Unknown
+132,Olympia Medical Center,http://www.olympiamc.com,hospital & health care,24.0,C-Suite Join,Robert Allen — Retired as Chief Executive Officer,Unknown
+133,Chesapeake Urology Associates,http://www.unitedurology.com,hospital & health care,24.0,C-Suite Join,Russ Adkins — Appointed as Chief Legal Officer,Unknown
+134,Athens Orthopedic Clinic,http://www.athensorthopedicclinic.com,hospital & health care,24.0,C-Suite Join,Michael Boblitz — Appointed as Chief Executive Officer,Unknown
+135,CenterPointe Hospital,http://www.centerpointehospital.com,hospital & health care,24.0,C-Suite Join,Mary Williamson — Appointed as Chief Financial Officer,Unknown
+136,ComplexCare Solutions,http://www.complexcaresolutions.com,hospital & health care,24.0,C-Suite Join,Virgil Wong — Appointed as Chief Product Officer,Unknown
+137,Risas Dental and Braces,http://www.risasdental.com,hospital & health care,22.5,C-Suite Exit,Nick Gardner — exited as Unknown,2026-05-07
+138,"Tucson Orthopaedic Institute, P.C",http://www.tucsonortho.com,medical practice,22.5,C-Suite Join,Ashley Vertuno — Appointed as Chief Executive Officer,2026-06-30
+139,EPOCH Senior Living,http://www.epochsl.com,hospital & health care,21.7,C-Suite Join + News Mention,Adele Pepin — Promoted as Senior Vice President of Marketing and Communications,Unknown
+140,YAKIMA NEIGHBORHOOD HEALTH SERVICES,http://www.ynhs.org,hospital & health care,21.7,C-Suite Join + News Mention,Dr. Daniel Dunbar — Appointed as Chief Medical Officer,Unknown
+141,Hilco Vision,http://www.hilcovision.com,hospital & health care,21.7,C-Suite Join + News Mention,John Lakey — Appointed as Chief Executive Officer,2026-05-12
+142,Seton Medical Center Harker Heights,http://www.setonharkerheights.net,hospital & health care,21.0,C-Suite Join,Unknown — Appointed as Chief Operating Officer,2026-05-26
+143,Chicago Family Health Center,http://www.chicagofamilyhealth.org,hospital & health care,18.0,C-Suite Join,"Jared M. Williams, DBA — Appointed as Chief Financial Officer",Unknown
+144,TransCare,http://www.trans-care.com,hospital & health care,18.0,C-Suite Join,Anjali Jameson — Appointed as Chief Product Officer,Unknown
+145,Whitman Hospital and Medical Clinics,http://www.whmc.org,hospital & health care,18.0,C-Suite Join,Bill Bryant — Appointed as Chief Executive Officer,Unknown
+146,Marianjoy Rehabilitation Hospital,http://www.marianjoy.org,hospital & health care,18.0,C-Suite Join,Jennifer K. Webster — Appointed as Chief Executive Officer,Unknown
+147,Civitas Senior Living,http://www.civitasseniorliving.com,hospital & health care,18.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+148,Our Lady of Lourdes RMC,http://www.lourdes.net,hospital & health care,18.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+149,HealthSource Saginaw,http://www.healthsourcesaginaw.org,hospital & health care,18.0,C-Suite Join,Unknown — Appointed as Chief Executive Officer,Unknown
+150,Monroe Community Hospital,http://www.monroehosp.org,hospital & health care,18.0,C-Suite Join,Kristen Schulmerich — Retired as Director of Nursing,2026-06
+151,Powell Valley Healthcare,http://www.pvhc.org,hospital & health care,18.0,C-Suite Join,Lisa Wooten — Promoted as Chief Financial Officer,Unknown
+152,Guidehealth,http://www.guidehealth.com,hospital & health care,18.0,C-Suite Join,Doug Wenners — Appointed as Chief Executive Officer,Unknown
+153,Aurora Behavioral Health System,http://www.auroraarizona.com,hospital & health care,15.0,C-Suite Join,Danny Milam — Appointed as Chief Financial Officer,2026-05-25
+154,Baptist Memorial Hospital-Oktibbeha County,http://www.och.org,hospital & health care,12.7,C-Suite Join + News Mention, — Appointed as Chief Operating Officer,Unknown
+155,Intellivo,http://www.intellivo.com,hospital & health care,12.7,C-Suite Join + News Mention,J.P. Fingado — Appointed as Chief Executive Officer,Unknown
+156,"Methodist Hospital of Henderson, Kentucky",http://www.methodisthospital.net,hospital & health care,12.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
+157,Midwest Orthopaedics at RUSH,http://www.rushortho.com,hospital & health care,12.0,C-Suite Join,Dr. Omar Lateef — Retired as Chief Executive Officer,Unknown
+158,MGMA,http://www.mgma.com,hospital & health care,12.0,C-Suite Join, — Appointed,Unknown
+159,Wilson Senior Care,http://www.wilsonseniorcare.com,hospital & health care,12.0,C-Suite Join,Unknown — Appointed as Chief Financial Officer,Unknown
+160,Collective Health Inc,http://www.collectivehealth.com,hospital & health care,12.0,C-Suite Join,"Kaushik Bhaumik, PhD — Appointed as Chief Revenue Officer",Unknown
+161,Lakeside Behavioral Health System,http://www.lakesidebhs.com,hospital & health care,12.0,C-Suite Join,Danny Milam — Appointed as Chief Financial Officer,Unknown
+162,Quincy Medical Group,http://www.quincymedgroup.com,hospital & health care,9.0,C-Suite Exit,Carol Brockmiller — exited as President,Unknown
+163,Twin County Regional Healthcare - Duke LifePoint Healthcare,http://www.tcrh.org,hospital & health care,9.0,C-Suite Exit,Chris Lumsden — exited as Chief Executive Officer,Unknown
+164,Mile Bluff Medical Center,http://www.milebluff.com,hospital & health care,6.0,C-Suite Join,Dara Bartels — Promoted as Chief Executive Officer,Unknown
+165,Genova Diagnostics,http://www.gdx.net,hospital & health care,6.0,C-Suite Join,Keith Meadors — Appointed as Chief Commercial Officer,Unknown
+166,Vivant Health,http://www.vivanthealth.com,hospital & health care,6.0,C-Suite Join, — Appointed,Unknown
+167,Arkansas Valley Regional Medical Center,http://www.avrmc.org,hospital & health care,6.0,C-Suite Join, — Promoted as Chief Operating Officer,Unknown
+168,El Paso Children's Hospital,http://www.elpasochildrens.org,hospital & health care,6.0,C-Suite Join,Maria Zampini — Appointed as Chief Executive Officer,Unknown
+169,Dallas Regional Medical Center,http://www.dallasregionalmedicalcenter.com,hospital & health care,6.0,C-Suite Join,Josiah De La Garza — Appointed as Chief Executive Officer,Unknown
+170,Saint Francis Healthcare Memphis-Bartlett,http://www.saintfrancishosp.com,hospital & health care,6.0,C-Suite Join, — Appointed,Unknown
+171,Memorial Hospital and Manor,http://www.mh-m.org,hospital & health care,5.6,Product Launch,In the news: Bainbridge hospital launches program to cut ER wait times in half - WTXL ABC 27 ,"Mon, 16 Mar 2026 07:00:00 GMT"
+172,Vera Whole Health,http://www.verawholehealth.com,hospital & health care,2.8,Partnership,In the news: Cobb County Overhauls Employee Healthcare with Vera Partnership - BriefGlance,"Wed, 29 Apr 2026 17:07:02 GMT"
+173,Impact Advisors,http://www.impact-advisors.com,hospital & health care,2.8,Partnership,In the news: Impact Advisors Announces Acquisition of Canopii Collaborative | Carlyle Acquire,"Fri, 15 May 2026 07:00:00 GMT"
+174,Correctional Healthcare Companies,http://www.correctioncare.com,hospital & health care,2.8,Product Launch,In the news: Blackstone Trial Group Launches as the Nation's Premier Law Firm Dedicated Exclu,"Thu, 12 Mar 2026 07:00:00 GMT"
+175,Vicar's Landing,http://www.vicarslanding.com,hospital & health care,2.8,Product Launch,"In the news: Vicar’s Landing launching $318 million eTown senior living, its third area commu","Fri, 17 Apr 2026 07:00:00 GMT"
+176,County of Santa Clara Health System,http://www.sccgov.org,hospital & health care,2.8,Partnership,In the news: County of Santa Clara and VTA Launch Affordable Housing Partnership - Santa Clar,"Fri, 29 May 2026 12:00:00 GMT"
+177,Imperial Health,http://www.imperialhealth.com,hospital & health care,2.8,Partnership,In the news: Imperial Health Charity and the Trust launch bold new partnership to improve pop,"Wed, 29 Apr 2026 07:00:00 GMT"
+178,Helen Hayes Hospital,http://www.helenhayeshospital.org,hospital & health care,2.8,Product Launch,"In the news: Nyack Awarded $200,000 Technical Assistance Grant; RCC Launches Renovation for N","Thu, 05 Mar 2026 08:00:00 GMT"
+179,Vitality,http://www.vitalitygroup.com,hospital & health care,2.8,Partnership,In the news: ASUS ROG Computex 2026: New Ace Esports Gear & Partnerships - ASUS Pressroom,"Mon, 01 Jun 2026 09:36:24 GMT"
+180,National Healthcareer Association (NHA),http://www.nhanow.com,hospital & health care,2.8,Product Launch,"In the news: Mansfield U launches clinical medical assistant, phlebotomy programs - Northcent","Sat, 30 May 2026 22:00:00 GMT"
+181,BeneCard PBF,http://www.benecardpbf.com,hospital & health care,2.8,Partnership,"In the news: BeneCard PBF Reappointed by DVHCC, Extending Trusted PBM Partnership - Yahoo Fin","Thu, 05 Mar 2026 08:00:00 GMT"
+182,Centre for Neuro Skills,http://www.neuroskills.com,hospital & health care,2.8,Partnership,"In the news: Centre for Neuro Skills Expands Employer Partnerships Strategy, Appoints Jay Var","Wed, 18 Mar 2026 07:00:00 GMT"
+183,ProPath,http://www.propath.com,hospital & health care,2.8,Partnership,In the news: Paschal Air Plumbing & Electric Announces NIL Partnership with Hagen Smith to Pr,"Sat, 14 Mar 2026 07:00:00 GMT"
+184,Carrot Fertility Inc,http://www.get-carrot.com,hospital & health care,2.8,Product Launch,In the news: Carrot Unveils Carrot Intelligence: A Proprietary Global AI Platform for Fertili,"Thu, 16 Apr 2026 07:00:00 GMT"
+185,Vida Health,http://www.vida.com,hospital & health care,2.8,Partnership,In the news: Oura takes ring data into the doctor’s office with its latest partnership - Andr,"Tue, 14 Apr 2026 07:00:00 GMT"
+186,Calvary Hospital,http://www.calvaryhospital.org,hospital & health care,2.8,Product Launch,In the news: Calvary Hospital Unveils New Lobby and Family Care Center at Bronx Campus - The ,"Mon, 18 May 2026 07:00:00 GMT"
+187,Rocky Mountain Cancer Centers,http://www.rockymountaincancercenters.com,hospital & health care,2.8,Partnership,In the news: West Cancer Center and IDEOlogy Health Announce Strategic Partnership to Advance,"Tue, 07 Apr 2026 07:00:00 GMT"
+188,Oncology Consultants,http://www.oncologyconsultants.com,hospital & health care,2.8,Partnership,In the news: South Texas cancer patients gain bigger network in new AON partnership - Stock T,"Thu, 05 Mar 2026 08:00:00 GMT"
+189,Grace Health Care,http://www.gracehc.com,hospital & health care,2.8,Partnership,In the news: Partnership helping health care in the region - CTV News,"Sat, 23 May 2026 07:00:00 GMT"
+190,City Ambulance Service,http://www.cityambu.com,hospital & health care,2.8,Product Launch,In the news: Evansville Fire Department prepares to launch city-run ambulance service July 1 ,"Thu, 12 Mar 2026 07:00:00 GMT"
+191,"RQI Partners, LLC",http://www.rqipartners.com,hospital & health care,2.8,Product Launch,"In the news: Resuscitation science, training and technology leaders launch new self-guided re","Wed, 04 Mar 2026 08:00:00 GMT"
+192,Family Dental Health,http://www.fdhonline.com,hospital & health care,2.8,Product Launch,In the news: Sun Life introduces Kid Smile Complete and expands Lifetime of Smiles® to suppor,"Mon, 06 Apr 2026 07:00:00 GMT"
+193,Ryan Health,http://www.ryanhealth.org,hospital & health care,2.8,Partnership,In the news: Molecule Science Foundation Announces Partnership with O'Ryan Hea - The National,"Tue, 26 May 2026 14:26:35 GMT"
+194,Charter Senior Living,http://www.charterseniorliving.com,hospital & health care,2.8,Partnership,"In the news: Senior Living Operators Eke Out Partnerships, Projects to Grow Amid Development ","Mon, 27 Apr 2026 07:00:00 GMT"
+195,Fair Acres Geriatric Center,http://www.fairacres.org,hospital & health care,2.8,Product Launch,In the news: Delaware County unveils $5.6 million kitchen at Fair Acres Geriatric Center - De,"Fri, 22 May 2026 11:41:26 GMT"
+196,Watertown Regional Medical Center,http://www.watertownregional.com,hospital & health care,2.8,Partnership,In the news: New ER Partnership Aims to Improve Care in Watertown - Daily Dodge,"Mon, 11 May 2026 07:00:00 GMT"
+197,Onvida Health,http://www.onvidahealth.org,hospital & health care,2.8,Partnership,"In the news: Siemens Healthineers, Onvida Health Sign 10-Year 'Value Partnership' - Imaging T","Thu, 09 Apr 2026 07:00:00 GMT"
+198,SSTAR,http://www.sstar.org,hospital & health care,2.8,Product Launch,In the news: Dongfeng Forthing'sStar Sea V6 was successfully launched on stage in Beijing Mot,"Mon, 27 Apr 2026 07:00:00 GMT"
+199,The Urology Group,http://www.urologygroup.com,hospital & health care,2.8,Partnership,In the news: Dykema Congratulates The Urology Group of Virginia on its Strategic Partnership ,"Wed, 18 Mar 2026 07:00:00 GMT"
+200,Revecore,http://www.revecore.com,hospital & health care,2.8,Product Launch,In the news: Revecore Launches AI-Powered Underpayment Recovery and Denial Appeals Capabiliti,"Tue, 28 Apr 2026 07:00:00 GMT"
