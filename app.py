@@ -3183,8 +3183,12 @@ def _graph_resolve_person(vid) -> dict:
         return {}
 
 
-def _va_identity_map() -> dict:
-    """visitor_id -> {name,email,company,source}. Merges access-form conversions + provider identifies."""
+def _va_identity_map(vi_rows=None) -> dict:
+    """visitor_id -> {name,email,company,source}. Merges access-form conversions + provider identifies.
+
+    Pass vi_rows (the raw 'Visitor Identities' sheet values, header included) to
+    reuse an already-fetched read instead of issuing another Sheets round-trip --
+    the member analytics page batch-fetches that tab alongside its others."""
     m = {}
     try:
         for req in _read_access_requests(limit=2000):
@@ -3194,19 +3198,20 @@ def _va_identity_map() -> dict:
                         "company": req.get("company", ""), "source": "Lead form"}
     except Exception:
         pass
-    svc = _va_sheets_service()
-    if svc:
-        try:
-            r = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute()
-            for x in (r.get("values", [])[1:] or []):
-                def cc(i): return x[i] if len(x) > i else ""
-                v = (cc(1) or "").strip()
-                if v:
-                    m[v] = {"name": cc(2), "email": cc(3), "company": cc(4),
-                            "source": cc(6) or "provider"}
-        except Exception:
-            pass
+    if vi_rows is None:
+        svc = _va_sheets_service()
+        if svc:
+            try:
+                vi_rows = svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Identities!A1:G5000").execute().get("values", [])
+            except Exception:
+                vi_rows = []
+    for x in ((vi_rows or [])[1:] or []):
+        def cc(i): return x[i] if len(x) > i else ""
+        v = (cc(1) or "").strip()
+        if v:
+            m[v] = {"name": cc(2), "email": cc(3), "company": cc(4),
+                    "source": cc(6) or "provider"}
     return m
 
 
@@ -3797,20 +3802,24 @@ def _fetch_member_analytics_uncached() -> dict:
     'sync' dashboard: the same person, before and after they signed in."""
     from collections import Counter, defaultdict
     svc = _va_sheets_service()
-    def read(rng):
-        if not svc:
-            return []
+    # All five ranges live on the same spreadsheet, so pull them in ONE batchGet
+    # instead of five back-to-back get() calls. Each get() is a full network
+    # round-trip (TLS + auth + latency); doing them serially was the bulk of the
+    # remaining ~10-15s load. batchGet returns every range in a single response,
+    # in the order requested.
+    _RANGES = ["%s!A:T" % _MEMBER_TAB, "Visitor Analytics!A:AM", "Page Views!A:M",
+               "A1:U5000",             # internal login log -- real names + p2_vid for @position2.com
+               "Visitor Identities!A1:G5000"]
+    _vranges = []
+    if svc:
         try:
-            return svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
+            _vranges = svc.spreadsheets().values().batchGet(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, ranges=_RANGES).execute().get("valueRanges", [])
         except Exception as e:
-            log.warning("member analytics read failed (%s): %s", rng, e)
-            return []
-
-    ms_rows = read("%s!A:T" % _MEMBER_TAB)
-    va_rows = read("Visitor Analytics!A:AM")
-    pv_rows = read("Page Views!A:M")
-    login_rows = read("A1:U5000")   # internal login log -- has real names + p2_vid for @position2.com
+            log.warning("member analytics batchGet failed: %s", e)
+    def _vals(i):
+        return _vranges[i].get("values", []) if i < len(_vranges) else []
+    ms_rows, va_rows, pv_rows, login_rows, vi_rows = (_vals(0), _vals(1), _vals(2), _vals(3), _vals(4))
     ms = ms_rows[1:] if len(ms_rows) > 1 else []
     va = va_rows[1:] if len(va_rows) > 1 else []
     pv = pv_rows[1:] if len(pv_rows) > 1 else []
@@ -3836,7 +3845,7 @@ def _fetch_member_analytics_uncached() -> dict:
     for r in va:
         vid = vc(r, "Visitor ID")
         if vid: va_by_vid[vid].append(r)
-    idmap = _va_identity_map()
+    idmap = _va_identity_map(vi_rows=vi_rows)
 
     # Page Views has no name/picture/vid columns, so for members we only see via
     # page-view activity (no Member Signins row yet), backfill name/picture/p2_vid
