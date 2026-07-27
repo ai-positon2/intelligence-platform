@@ -22,8 +22,8 @@
   --slack:#36c5f0;--linkedin:#0a66c2;
   /* logo circular background (theme-aware) */
   --logo-bg:#151b2e;
-  /* radius */
-  --r:8px;--rl:12px;--rxl:16px;--r2xl:22px;--rpill:100px;
+  /* radius (Arena spec: legacy aliases snapped to the 4/8/12/16/28/80 scale) */
+  --r:8px;--rl:12px;--rxl:16px;--r2xl:28px;--rpill:80px;
   /* spacing */
   --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;--sp5:24px;--sp6:32px;--sp7:48px;
   /* responsive grid (Arena spec): page side-margin + column gutter scale by
@@ -52,8 +52,8 @@
   --shadow-sm:0 4px 12px -4px rgba(0,0,0,.5);
   --shadow-md:0 12px 32px -8px rgba(0,0,0,.6);
   --shadow-lg:0 40px 120px -20px rgba(0,0,0,.8);
-  /* motion */
-  --dur-fast:.14s;--dur:.2s;--dur-slow:.32s;--ease:cubic-bezier(.16,1,.3,1);
+  /* motion (Arena durations: fast 100 / normal 200 / slow 300 / slower 500ms) */
+  --dur-fast:.1s;--dur:.2s;--dur-slow:.3s;--dur-slower:.5s;--ease:cubic-bezier(.16,1,.3,1);
   font-family:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   font-size:var(--fs-md);color:var(--tx);
 }
