@@ -3772,7 +3772,26 @@ def admin_visitor_deepen():
     }})
 
 
-def _fetch_member_analytics() -> dict:
+_MEMBER_ANALYTICS_CACHE = {"data": None, "ts": 0.0}
+_MEMBER_ANALYTICS_CACHE_TTL = 300  # seconds — same as the sibling admin dashboards.
+                                   # This aggregation does several serial Sheets reads
+                                   # and resolves every member IP, so it's too slow to
+                                   # redo on every page view / auto-refresh.
+
+
+def _fetch_member_analytics(force: bool = False) -> dict:
+    """Public Page Analytics aggregation (TTL-cached; pass force=True to re-pull)."""
+    now = time.time()
+    if not force and _MEMBER_ANALYTICS_CACHE["data"] is not None and \
+            (now - _MEMBER_ANALYTICS_CACHE["ts"]) < _MEMBER_ANALYTICS_CACHE_TTL:
+        return _MEMBER_ANALYTICS_CACHE["data"]
+    data = _fetch_member_analytics_uncached()
+    _MEMBER_ANALYTICS_CACHE["data"] = data
+    _MEMBER_ANALYTICS_CACHE["ts"] = now
+    return data
+
+
+def _fetch_member_analytics_uncached() -> dict:
     """Public (non-Position2) Google sign-ins, joined to their pre-login Visitor
     Analytics journey (by p2_vid) and post-login Page Views (by email). This is the
     'sync' dashboard: the same person, before and after they signed in."""
@@ -3887,6 +3906,15 @@ def _fetch_member_analytics() -> dict:
             prof = profile_by_email.get(e, {})
             if prof.get("vid"):
                 mem["vids"] = {prof["vid"]}
+
+    # The per-member reverse-IP lookup below (_ip_company) is one blocking
+    # network round-trip per unique IP (IPinfo + reverse DNS + RDAP). Doing them
+    # one-at-a-time inside the member loop is exactly what made this page take
+    # 30-40s. Warm the cache for every member IP CONCURRENTLY first, so each
+    # _ip_company call in the loop is a cache hit -- same fix already applied to
+    # the Anonymous Traffic and Visitor Analytics dashboards.
+    if _VI_OK:
+        _resolve_ips_bulk({mem["ip"] for mem in members.values() if mem.get("ip")})
 
     out_members = []
     signup_by_day = Counter(); src_counter = Counter(); utm_counter = Counter()
@@ -4062,7 +4090,8 @@ def admin_members():
 @app.route("/p2/admin/public-page-analytics/data")
 @admin_required
 def admin_members_data():
-    return jsonify(_fetch_member_analytics())
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return jsonify(_fetch_member_analytics(force=force))
 
 
 def _fetch_usage_data() -> dict:
