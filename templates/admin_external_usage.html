@@ -211,28 +211,63 @@
     .ua-seen{font-size:10.5px;color:#5d6890;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ua-seen .dotsep{margin:0 6px;color:#3b4763}
     /* ── rich People table ── */
-    #ppl-wrap .tbl-wrap{max-height:560px;overflow:auto}
-    .ppl-table{width:100%;border-collapse:collapse;min-width:960px}
-    .ppl-table thead th{position:sticky;top:0;z-index:2;background:#0c0f1a}
-    .ppl-table td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.045);font-size:12.5px;color:#cbd5e1;vertical-align:middle;white-space:nowrap}
-    .ppl-table tbody tr:last-child td{border-bottom:none}
-    .pt-row{cursor:pointer;transition:background .13s}
-    .pt-row:hover td{background:rgba(129,140,248,.07)}
-    .pt-person{display:flex;align-items:center;gap:11px;min-width:0}
-    .pt-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
-    .pt-name{font-size:13px;font-weight:600;color:#eef2ff;display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
-    .pt-email{font-size:11px;color:#64748b;font-family:var(--mono,monospace);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
-    .pt-badge{font-size:9.5px;font-weight:600;color:#a5b4fc;background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.28);border-radius:20px;padding:1px 7px;flex-shrink:0}
-    .pt-co{font-family:var(--mono,monospace);font-size:11.5px;color:#94a3b8;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:3px 8px}
-    .pt-n{font-size:15px;font-weight:700}
-    .pt-agents{font-size:10px;color:#5eead4;margin-left:4px}
-    .pt-ts{color:#8792ad;font-size:11.5px;font-family:var(--mono,monospace)}
-    .pt-dev{color:#94a3b8}
-    .pt-src{font-size:11px;color:#c4b5fd;background:rgba(139,92,246,.12);border-radius:6px;padding:2px 8px}
-    [data-theme="light"] .ppl-table thead th{background:#f3f5fb}
-    [data-theme="light"] .ppl-table td{color:#334155;border-color:rgba(18,26,54,.07)}
-    [data-theme="light"] .pt-name{color:#17213a}
+    #ppl-wrap{padding:6px 8px 10px}
+    #ppl-wrap .tbl-wrap{max-height:600px;overflow:auto}
+    .ppl-table{width:100%;border-collapse:separate;border-spacing:0 6px;min-width:1020px}
+    .ppl-table thead th{position:sticky;top:0;z-index:3;background:rgba(10,13,24,.92);backdrop-filter:blur(8px);
+      padding:6px 16px 10px;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#5a6488;text-align:left;white-space:nowrap}
+    .ppl-table thead th.r{text-align:right}
+    /* each row is a floating "card" via cells with matching bg + rounded ends */
+    .pt-row{cursor:pointer}
+    .pt-row td{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+      border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.045);
+      padding:13px 16px;font-size:12.5px;color:#cbd5e1;vertical-align:middle;white-space:nowrap;
+      transition:background .16s,box-shadow .16s,transform .16s}
+    .pt-row td:first-child{border-left:1px solid rgba(255,255,255,.06);border-radius:14px 0 0 14px;position:relative;overflow:hidden}
+    .pt-row td:last-child{border-right:1px solid rgba(255,255,255,.06);border-radius:0 14px 14px 0}
+    /* left accent bar that grows on hover */
+    .pt-row td:first-child::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+      background:linear-gradient(180deg,var(--rc,#818cf8),color-mix(in srgb,var(--rc,#818cf8) 40%,#22d3ee));
+      transform:scaleY(0);transform-origin:center;transition:transform .2s}
+    .pt-row:hover td{background:linear-gradient(180deg,rgba(129,140,248,.13),rgba(129,140,248,.05));box-shadow:0 10px 26px -16px rgba(0,0,0,.7)}
+    .pt-row:hover td:first-child::before{transform:scaleY(1)}
+    /* staggered entrance */
+    @keyframes ptIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .pt-row{animation:ptIn .38s cubic-bezier(.16,1,.3,1) both}
+    .pt-person{display:flex;align-items:center;gap:12px;min-width:0}
+    .pt-avw{position:relative;flex-shrink:0}
+    .pt-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:#fff;
+      box-shadow:0 0 0 2px rgba(255,255,255,.08),0 4px 12px -3px rgba(0,0,0,.6)}
+    .pt-dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2.5px solid #0b0e1a;background:#3b4763}
+    .pt-dot.on{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.7)}
+    .pt-name{font-size:13.5px;font-weight:600;color:#eef2ff;display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+    .pt-email{font-size:11px;color:#647089;font-family:var(--mono,monospace);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+    .pt-badge{font-size:9.5px;font-weight:600;color:#a5b4fc;background:rgba(129,140,248,.15);border:1px solid rgba(129,140,248,.3);border-radius:20px;padding:1px 7px;flex-shrink:0}
+    .pt-co{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono,monospace);font-size:11.5px;color:#aeb8d0;
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:4px 11px 4px 8px}
+    .pt-co i{width:16px;height:16px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0b0e1a;font-style:normal;flex-shrink:0}
+    /* metric chips */
+    .pt-metric{display:inline-flex;flex-direction:column;align-items:flex-end;gap:4px}
+    .pt-chip{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:700;line-height:1;padding:4px 9px;border-radius:9px;min-width:42px;justify-content:center}
+    .pt-chip svg{width:13px;height:13px;opacity:.85}
+    .pt-chip.zero{color:#4c566f;background:rgba(255,255,255,.03)}
+    .pt-chip.c-log{color:#c7d2fe;background:rgba(129,140,248,.14)}
+    .pt-chip.c-run{color:#6ee7b7;background:rgba(52,211,153,.13)}
+    .pt-chip.c-view{color:#67e8f9;background:rgba(34,211,238,.12)}
+    .pt-bar{width:52px;height:4px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+    .pt-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#22d3ee,#818cf8)}
+    .pt-time{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#a5b4fc}
+    .pt-agents{font-size:9.5px;color:#5eead4;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+    .pt-ts{color:#8792ad;font-size:12px;line-height:1.35}
+    .pt-ts small{display:block;font-size:10.5px;color:#556}
+    .pt-dev{display:inline-flex;align-items:center;gap:7px;color:#aeb8d0;font-size:12px}
+    .pt-dev .di{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+    .pt-src{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#c4b5fd;background:rgba(139,92,246,.13);border:1px solid rgba(139,92,246,.22);border-radius:20px;padding:3px 10px}
+    [data-theme="light"] .ppl-table thead th{background:rgba(243,245,251,.92)}
+    [data-theme="light"] .pt-row td{background:#fff;border-color:rgba(18,26,54,.08);color:#334155}
     [data-theme="light"] .pt-row:hover td{background:rgba(99,102,241,.06)}
+    [data-theme="light"] .pt-name{color:#17213a}
+    [data-theme="light"] .pt-dot{border-color:#fff}
     .overlay{position:fixed;inset:0;background:rgba(2,3,10,.6);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:.22s;z-index:60}
     .overlay.open{opacity:1;visibility:visible}
     .drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,94vw);background:#080a17;border-left:1px solid rgba(255,255,255,.16);
@@ -605,35 +640,63 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       if(d.indexOf('tablet')>=0)return '📟';
       return '🖥';
     }
+    var ICO={
+      log:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h5v18h-5"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>',
+      run:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>',
+      view:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+      clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>'
+    };
+    function relTime(ts){
+      var m=String(ts||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);if(!m)return '';
+      var d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]),df=(Date.now()-d.getTime())/1000;
+      if(df<90)return 'just now';
+      if(df<3600)return Math.floor(df/60)+'m ago';
+      if(df<86400)return Math.floor(df/3600)+'h ago';
+      if(df<2592000)return Math.floor(df/86400)+'d ago';
+      return Math.floor(df/2592000)+'mo ago';
+    }
+    function isRecent(ts){var m=String(ts||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);if(!m)return false;var d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);return (Date.now()-d.getTime())<2*86400*1000;}
+    function metric(v,cls,ico,bar){
+      var z=(!v)?' zero':'';
+      var h='<span class="pt-chip '+cls+z+'">'+ico+(v||0)+'</span>';
+      if(bar!=null){h+='<span class="pt-bar"><i style="width:'+Math.max(v?6:0,Math.round(bar*100))+'%"></i></span>';}
+      return '<div class="pt-metric">'+h+'</div>';
+    }
     function renderUsers(users) {
       USERS = users || [];
       var cnt=document.getElementById('ppl-count');
       if(cnt) cnt.textContent=(users?users.length:0)+' '+((users&&users.length===1)?'person':'people');
-      if (!users || !users.length) return '<div class="empty" style="padding:40px;text-align:center;color:#5a6488">No external people yet</div>';
+      if (!users || !users.length) return '<div class="empty" style="padding:44px;text-align:center;color:#5a6488">No external people yet</div>';
+      var maxV=Math.max.apply(null,users.map(function(u){return u.page_views||0;}).concat([1]));
       var head='<thead><tr>'
         +'<th>Person</th><th>Company</th>'
-        +'<th style="text-align:right">Logins</th><th style="text-align:right">Agent runs</th>'
-        +'<th style="text-align:right">Page views</th><th style="text-align:right">Time on site</th>'
+        +'<th class="r">Logins</th><th class="r">Agent runs</th>'
+        +'<th class="r">Page views</th><th class="r">Time on site</th>'
         +'<th>First seen</th><th>Last active</th><th>Device</th><th>Source</th>'
         +'</tr></thead>';
       var body=users.map(function(u,i){
         var col=palette(u.email||u.name);
-        var init=initials(u.name||u.email);
-        var av='<span class="pt-av" style="background:linear-gradient(135deg,'+col+',color-mix(in srgb,'+col+' 45%,#1b2036))">'+esc(init)+'</span>';
-        var badge=u.linked?'<span class="pt-badge">🔗 '+u.prelogin_pages+'</span>':'';
+        var dcol=palette(u.domain||'x');
+        var av='<span class="pt-av" style="background:linear-gradient(135deg,'+col+',color-mix(in srgb,'+col+' 42%,#141a2e))">'+esc(initials(u.name||u.email))+'</span>';
+        var dot='<span class="pt-dot'+(isRecent(u.last_active||u.last_seen)?' on':'')+'"></span>';
+        var badge=u.linked?'<span class="pt-badge" title="'+(u.prelogin_pages)+' pages before signing up">🔗 '+u.prelogin_pages+'</span>':'';
         var agentsMini='';
-        if(u.agents&&u.agents.length){agentsMini=' <span class="pt-agents">'+u.agents.slice(0,2).map(function(a){return esc(a.name.split(/\s/)[0]);}).join(', ')+(u.agents.length>2?' +'+(u.agents.length-2):'')+'</span>';}
-        var dev=(u.device||u.browser||u.os)?('<span title="'+esc([u.browser,u.os,u.device].filter(Boolean).join(' · '))+'">'+devIcon(u)+' '+esc(u.browser||u.device||'—')+'</span>'):'—';
-        return '<tr class="pt-row" onclick="openUserDrawer('+i+')">'
-          +'<td><div class="pt-person">'+av+'<div style="min-width:0"><div class="pt-name">'+esc(u.name||u.email)+badge+'</div><div class="pt-email">'+esc(u.email)+'</div></div></div></td>'
-          +'<td><span class="pt-co">'+esc(u.domain||'—')+'</span></td>'
-          +'<td style="text-align:right"><b class="pt-n" style="color:#c7d2fe">'+(u.logins||0)+'</b></td>'
-          +'<td style="text-align:right"><b class="pt-n" style="color:#6ee7b7">'+(u.agent_runs||0)+'</b>'+agentsMini+'</td>'
-          +'<td style="text-align:right"><b class="pt-n" style="color:#67e8f9">'+(u.page_views||0)+'</b></td>'
-          +'<td style="text-align:right;color:#a5b4fc;font-weight:600">'+esc(u.time_fmt||'—')+'</td>'
-          +'<td class="pt-ts">'+esc(shortTs(u.first_seen)||'—')+'</td>'
-          +'<td class="pt-ts">'+esc(shortTs(u.last_active||u.last_seen)||'—')+'</td>'
-          +'<td class="pt-dev">'+dev+'</td>'
+        if(u.agents&&u.agents.length){agentsMini='<span class="pt-agents">'+u.agents.slice(0,2).map(function(a){return esc(a.name.split(/\s/)[0]);}).join(' · ')+(u.agents.length>2?' +'+(u.agents.length-2):'')+'</span>';}
+        var co=u.domain?('<span class="pt-co"><i style="background:'+dcol+'">'+esc(u.domain[0].toUpperCase())+'</i>'+esc(u.domain)+'</span>'):'<span style="color:#475569">—</span>';
+        var devTxt=u.browser||u.device||u.os;
+        var dev=devTxt?('<span class="pt-dev" title="'+esc([u.browser,u.os,u.device].filter(Boolean).join(' · '))+'"><span class="di">'+devIcon(u)+'</span>'+esc(devTxt)+'</span>'):'<span style="color:#475569">—</span>';
+        var fs=shortTs(u.first_seen), la=shortTs(u.last_active||u.last_seen);
+        var runsCell='<div class="pt-metric"><span class="pt-chip c-run'+(u.agent_runs?'':' zero')+'">'+ICO.run+(u.agent_runs||0)+'</span>'+(agentsMini||'')+'</div>';
+        return '<tr class="pt-row" style="--rc:'+col+';animation-delay:'+Math.min(i*32,480)+'ms" onclick="openUserDrawer('+i+')">'
+          +'<td><div class="pt-person"><span class="pt-avw">'+av+dot+'</span><div style="min-width:0"><div class="pt-name">'+esc(u.name||u.email)+badge+'</div><div class="pt-email">'+esc(u.email)+'</div></div></div></td>'
+          +'<td>'+co+'</td>'
+          +'<td style="text-align:right">'+metric(u.logins,'c-log',ICO.log)+'</td>'
+          +'<td style="text-align:right">'+runsCell+'</td>'
+          +'<td style="text-align:right">'+metric(u.page_views,'c-view',ICO.view,(u.page_views||0)/maxV)+'</td>'
+          +'<td style="text-align:right"><span class="pt-time">'+ICO.clock+esc(u.time_fmt&&u.time_fmt!=='—'?u.time_fmt:'—')+'</span></td>'
+          +'<td class="pt-ts">'+(fs?(relTime(u.first_seen)+'<small>'+esc(fs)+'</small>'):'—')+'</td>'
+          +'<td class="pt-ts">'+(la?(relTime(u.last_active||u.last_seen)+'<small>'+esc(la)+'</small>'):'—')+'</td>'
+          +'<td>'+dev+'</td>'
           +'<td>'+(u.source?'<span class="pt-src">↗ '+esc(u.source)+'</span>':'<span style="color:#475569">—</span>')+'</td>'
           +'</tr>';
       }).join('');
