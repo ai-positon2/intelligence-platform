@@ -4377,12 +4377,18 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         if e not in user_map:
             user_map[e] = {"email": e, "name": col(r, 6), "logins": 0,
                            "last_seen": col(r, 0), "first_login": col(r, 0),
-                           "total_secs": 0, "vids": set(), "login_rows": []}
+                           "total_secs": 0, "vids": set(), "login_rows": [],
+                           "browser": "", "os": "", "device": "", "page_views": 0}
         user_map[e]["logins"] += 1
         user_map[e]["last_seen"] = col(r, 0)   # rows are oldest→newest; last row = most recent
         user_map[e]["login_rows"].append(r)
         v = col(r, LC["vid"])
         if v: user_map[e]["vids"].add(v)
+        # Latest login wins (rows oldest→newest) for the person's device fingerprint.
+        _br, _os, _dev = col(r, LC["br"]), col(r, LC["os"]), col(r, LC["dev"])
+        if _br: user_map[e]["browser"] = _br
+        if _os: user_map[e]["os"] = _os
+        if _dev: user_map[e]["device"] = _dev
     for r in page_data:
         e = col(r, 4)
         if e in user_map and col(r, 7).isdigit():
@@ -4404,6 +4410,13 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         u["source"] = (vc(pre[0], "UTM Source") or vc(pre[0], "Referrer Host") or "direct") if pre else ""
         # Company (from email domain) + last-active across every signal we have.
         u["domain"] = (u["email"].split("@", 1)[1].lower() if "@" in u["email"] else "")
+        _pv = pv_by_email.get(u["email"], [])
+        u["page_views"] = len(_pv)
+        # Device fingerprint fallback from page views if logins didn't carry it.
+        if _pv:
+            if not u.get("browser"): u["browser"] = col(_pv[-1], 10)
+            if not u.get("os"):      u["os"] = col(_pv[-1], 11)
+            if not u.get("device"):  u["device"] = col(_pv[-1], 12)
         _last_pv = max((col(r, 0) for r in pv_by_email.get(u["email"], [])), default="")
         u["last_active"] = max([x for x in (u.get("last_seen", ""), _last_pv) if x] or [""])
         u.setdefault("agent_runs", 0)
@@ -4475,7 +4488,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
                      "last_seen": "", "first_login": "", "total_secs": 0, "time_fmt": "—",
                      "prelogin_pages": 0, "linked": False, "first_seen": "", "source": "",
                      "timeline": [], "domain": (el.split("@", 1)[1] if "@" in el else ""),
-                     "last_active": ""}
+                     "last_active": "", "browser": "", "os": "", "device": "", "page_views": 0}
                 user_map[el] = u
                 um_by_lower[el] = u
             alist = []
