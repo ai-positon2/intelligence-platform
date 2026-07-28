@@ -4238,7 +4238,17 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     # past the cap, i.e. all the most-recent activity once the sheet grew.
     # A:U (not A:T) so column U -- the p2_vid visitor ID -- is actually read;
     # it's been written on every login since v17 but was silently dropped here.
-    login_rows = _fetch("A:U")
+    # Login source depends on mode. @position2.com staff sign-ins land in the main
+    # Login Log; PUBLIC (non-P2) sign-ins are recorded ONLY in the 'Member Signins'
+    # tab (see _log_member_signin) — _log_login_to_sheet is never called for them.
+    # So External Usage must read Member Signins or it would show almost nobody.
+    # The two tabs put browser/os/device/visitor-id in different columns; LC maps them.
+    if internal:
+        login_rows = _fetch("A:U")
+        LC = {"br": 10, "os": 12, "dev": 13, "vid": 20}
+    else:
+        login_rows = _fetch("%s!A:T" % _MEMBER_TAB)
+        LC = {"br": 11, "os": 13, "dev": 14, "vid": 9}
     page_rows  = _fetch("Page Views!A:N")
     va_rows    = _fetch("Visitor Analytics!A:AM")
     login_data = login_rows[1:] if len(login_rows) > 1 else []
@@ -4296,7 +4306,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     sorted_days = sorted(login_days.items())[-14:]
 
     # Browser breakdown (from logins)
-    browser_counts = Counter(col(r, 10) for r in login_data if col(r, 10))
+    browser_counts = Counter(col(r, LC["br"]) for r in login_data if col(r, LC["br"]))
     browser_breakdown = browser_counts.most_common(5)
 
     # Device / OS breakdown + quick facts (from page views)
@@ -4325,7 +4335,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         user_map[e]["logins"] += 1
         user_map[e]["last_seen"] = col(r, 0)   # rows are oldest→newest; last row = most recent
         user_map[e]["login_rows"].append(r)
-        v = col(r, 20)
+        v = col(r, LC["vid"])
         if v: user_map[e]["vids"].add(v)
     for r in page_data:
         e = col(r, 4)
@@ -4452,7 +4462,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
 
     # Full tables, newest first — no cap (return every login and page view).
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
-                    "browser": col(r,10), "os": col(r,12), "device": col(r,13)}
+                    "browser": col(r,LC["br"]), "os": col(r,LC["os"]), "device": col(r,LC["dev"])}
                    for r in reversed(login_data)]
     page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
                     "url": col(r,6), "duration": col(r,8)}
