@@ -4741,16 +4741,29 @@ def _fetch_client_usage(slug, force=False):
                  "picture": name_map.get(email.lower(), {}).get("picture", ""),
                  "segment": seg, "views": 0, "seconds": 0,
                  "pages": {}, "first_seen": ts, "last_seen": ts,
-                 "browser": browser, "device": device}
+                 "browser": browser, "device": device, "_events": []}
             people[email.lower()] = p
         p["views"] += 1
         p["seconds"] += secs
         p["pages"][url] = p["pages"].get(url, 0) + 1
+        p["_events"].append({"kind": "view", "ts": ts, "title": title, "url": url,
+                             "seconds": secs, "duration": _fmt_secs(secs)})
         if ts:
             p["first_seen"] = min(p["first_seen"], ts) if p["first_seen"] else ts
             p["last_seen"] = max(p["last_seen"], ts)
         if browser and not p["browser"]:
             p["browser"] = browser
+
+    # Login events: who signed in and when. Sign-ins aren't scoped to a portal, so
+    # we attach each person's global login timestamps as 'login' events to enrich
+    # their activity timeline (both tabs carry timestamp @0, email @5).
+    login_map = {}   # email(lower) -> [ts, ...]
+    for rng in ("A:U", "%s!A:T" % _MEMBER_TAB):
+        for r in _cu_read_tab(rng)[1:]:
+            e = (r[5].strip().lower() if len(r) > 5 else "")
+            t = (r[0].strip() if len(r) > 0 else "")
+            if e and t:
+                login_map.setdefault(e, []).append(t)
 
     def finalize(p):
         top = sorted(p["pages"].items(), key=lambda kv: -kv[1])
@@ -4758,15 +4771,36 @@ def _fetch_client_usage(slug, force=False):
         p["top_pages"] = [{"url": u, "views": n} for u, n in top[:6]]
         del p["pages"]
         p["duration"] = _fmt_secs(p["seconds"])
+        logins = login_map.get(p["email"].lower(), [])
+        p["logins"] = len(logins)
+        ev = p.pop("_events")
+        for t in logins:
+            ev.append({"kind": "login", "ts": t, "title": "Signed in", "url": "", "duration": ""})
+        ev.sort(key=lambda x: x["ts"] or "", reverse=True)
+        p["events"] = ev[:80]
+        if logins:
+            p["last_login"] = max(logins)
         return p
 
     ppl = [finalize(p) for p in people.values()]
     ppl.sort(key=lambda x: (-x["views"], x["name"]))
     seg_people = {k: [p for p in ppl if p["segment"] == k] for k in ("p2", "client", "other")}
 
+    # Global recent-activity feed: every event across everyone, newest first, tagged
+    # with the person. Powers the "all activity" view and per-page viewer drilldowns.
+    recent = []
+    for p in ppl:
+        for e in p["events"]:
+            recent.append({"name": p["name"], "email": p["email"], "segment": p["segment"],
+                           "picture": p["picture"], "kind": e["kind"], "ts": e["ts"],
+                           "title": e["title"], "url": e["url"], "duration": e.get("duration", "")})
+    recent.sort(key=lambda x: x["ts"] or "", reverse=True)
+    recent = recent[:400]
+
     top_pages = sorted(pages.values(), key=lambda x: -x["views"])[:12]
     for pg in top_pages:
         pg["duration"] = _fmt_secs(pg["seconds"])
+        pg["viewers"] = len({e["email"] for e in recent if e["kind"] == "view" and e["url"] == pg["url"]})
     tl = [{"date": d, "p2": v["p2"], "client": v["client"], "other": v["other"]}
           for d, v in sorted(timeline.items())]
 
@@ -4798,6 +4832,7 @@ def _fetch_client_usage(slug, force=False):
         },
         "timeline": tl,
         "top_pages": top_pages,
+        "recent": recent,
         "browsers": dict(browsers.most_common(6)),
         "devices": dict(devices.most_common()),
         "fetched_at": now,

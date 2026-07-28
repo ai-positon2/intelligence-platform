@@ -59,6 +59,54 @@
     [data-theme="light"] .seg{background:#fff;border-color:rgba(18,26,54,.10)}
     [data-theme="light"] .seg-title,[data-theme="light"] .pname,[data-theme="light"] .pmeta b{color:#17213a}
     [data-theme="light"] .prow:hover{background:rgba(18,26,54,.04)}
+    /* clickable affordance */
+    .prow,.clik{cursor:pointer}
+    .prow{position:relative}
+    .prow::after{content:"›";position:absolute;right:8px;color:#475569;opacity:0;transition:opacity .15s,transform .15s;transform:translateX(-4px)}
+    .prow:hover::after{opacity:1;transform:translateX(0)}
+    .stat-card.clik{transition:transform .2s cubic-bezier(.16,1,.3,1),border-color .2s,box-shadow .2s}
+    .stat-card.clik:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ac) 45%,rgba(255,255,255,.14));box-shadow:0 18px 40px -22px rgba(0,0,0,.75)}
+    tr.clik{cursor:pointer}
+    tr.clik:hover td{background:rgba(255,255,255,.04)}
+    /* drawer */
+    .cu-ovl{position:fixed;inset:0;background:rgba(4,6,16,.62);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s;z-index:80}
+    .cu-ovl.on{opacity:1;pointer-events:auto}
+    .cu-dr{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);z-index:81;display:flex;flex-direction:column;
+      background:linear-gradient(180deg,#0d1120,#0a0d18);border-left:1px solid rgba(255,255,255,.09);
+      box-shadow:-30px 0 80px -30px rgba(0,0,0,.8);transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1)}
+    .cu-dr.on{transform:translateX(0)}
+    .dr-head{padding:20px 22px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:flex-start;gap:14px;flex-shrink:0}
+    .dr-av{width:46px;height:46px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--sc,#818cf8),color-mix(in srgb,var(--sc,#818cf8) 40%,#6366f1))}
+    .dr-av img{width:100%;height:100%;object-fit:cover}
+    .dr-ic{width:46px;height:46px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.28);color:#a5b4fc}
+    .dr-name{font-size:16px;font-weight:600;color:#f1f5f9;line-height:1.25}
+    .dr-mail{font-size:12px;color:#5a6488;font-family:var(--mono,monospace);margin-top:2px;word-break:break-all}
+    .dr-x{margin-left:auto;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#94a3b8;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:15px;flex-shrink:0}
+    .dr-x:hover{background:rgba(255,255,255,.1);color:#fff}
+    .dr-badge{display:inline-block;font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;margin-top:8px;border:1px solid}
+    .dr-mini{display:flex;gap:8px;padding:14px 22px;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;flex-shrink:0}
+    .dr-m{flex:1;min-width:72px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:9px 11px}
+    .dr-m b{display:block;font-size:17px;font-weight:700;color:#fff;line-height:1}
+    .dr-m small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#5a6488;margin-top:5px}
+    .dr-body{flex:1;overflow-y:auto;padding:16px 22px 30px}
+    .dr-sec{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#5a6488;margin:4px 0 14px}
+    /* timeline */
+    .tml{position:relative;padding-left:26px}
+    .tml::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:linear-gradient(180deg,rgba(129,140,248,.4),rgba(129,140,248,.05))}
+    .tev{position:relative;padding:0 0 18px}
+    .tev:last-child{padding-bottom:0}
+    .tev::before{content:"";position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%;background:#0d1120;border:2px solid var(--evc,#818cf8);box-shadow:0 0 0 3px rgba(129,140,248,.12)}
+    .tev.login{--evc:#f5a623}
+    .tev-top{display:flex;align-items:baseline;gap:8px}
+    .tev-ttl{font-size:13px;font-weight:600;color:#e6ebf5;line-height:1.3}
+    .tev-time{margin-left:auto;font-size:11px;color:#64748b;white-space:nowrap;font-family:var(--mono,monospace)}
+    .tev-url{font-size:11px;color:#64748b;font-family:var(--mono,monospace);margin-top:3px;word-break:break-all}
+    .tev-dur{display:inline-block;font-size:10px;color:#a5b4fc;background:rgba(129,140,248,.12);border-radius:6px;padding:2px 7px;margin-top:6px}
+    .tev-who{font-size:11.5px;color:#94a3b8;margin-top:2px}
+    .dr-empty{padding:40px 10px;text-align:center;color:#5a6488;font-size:12.5px}
+    [data-theme="light"] .cu-dr{background:linear-gradient(180deg,#fff,#f6f8fc);border-color:rgba(18,26,54,.1)}
+    [data-theme="light"] .dr-name,[data-theme="light"] .tev-ttl,[data-theme="light"] .dr-m b{color:#17213a}
+    [data-theme="light"] .tev::before{background:#fff}
   </style>
 </head>
 <body data-slug="{{ client_slug }}" data-ac="{{ client.accent }}" data-ac2="{{ client.accent2 }}">
@@ -107,8 +155,8 @@
     </div>
 
     <div class="stats-row">
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Total Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">People</div><div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div><div class="stat-small" id="k-people-sub"></div></div>
+      <div class="stat-card clik" onclick="openFeed()" title="See the full activity feed"><div class="sc-glow"></div><div class="stat-label">Total Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div><div class="stat-small" style="color:#a5b4fc">View all activity →</div></div>
+      <div class="stat-card clik" onclick="openPeople()" title="See everyone"><div class="sc-glow"></div><div class="stat-label">People</div><div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div><div class="stat-small" id="k-people-sub"></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Time on Portal</div><div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">First Activity</div><div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Last Activity</div><div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
@@ -138,6 +186,12 @@
     </div>
   </div>
 
+  <div class="cu-ovl" id="cuOvl" onclick="closeDrawer()"></div>
+  <div class="cu-dr" id="cuDr" role="dialog" aria-modal="true">
+    <div id="drHead"></div>
+    <div class="dr-body" id="drBody"></div>
+  </div>
+
   <script>
     function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
     document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
@@ -150,7 +204,7 @@
 
     function personRow(p){
       var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
-      return '<div class="prow">'
+      return '<div class="prow" onclick="openPerson(\''+esc(p.email)+'\')">'
         +'<div class="pav">'+av+'</div>'
         +'<div style="min-width:0;flex:1">'
           +'<div class="pname">'+esc(p.name)+'</div>'
@@ -199,16 +253,20 @@
     function pagesTable(pg){
       if(!pg||!pg.length)return '<div class="seg-empty">No page views yet.</div>';
       var b=pg.map(function(p){
-        return '<tr><td style="font-weight:600;color:#e2e8f0">'+esc(p.title||p.url)+'</td>'
+        return '<tr class="clik" onclick="openPage(\''+esc(p.url).replace(/'/g,"\\'")+'\')"><td style="font-weight:600;color:#e2e8f0">'+esc(p.title||p.url)+'</td>'
           +'<td style="font-family:var(--mono,monospace);font-size:11px;color:#64748b">'+esc(p.url)+'</td>'
           +'<td style="text-align:right">'+p.views+'</td>'
+          +'<td style="text-align:right;color:#94a3b8">'+(p.viewers||0)+'</td>'
           +'<td style="text-align:right;color:#94a3b8">'+esc(p.duration||'')+'</td></tr>';
       }).join('');
-      return '<div class="tbl-wrap"><table><thead><tr><th>Page</th><th>URL</th><th style="text-align:right">Views</th><th style="text-align:right">Time</th></tr></thead><tbody>'+b+'</tbody></table></div>';
+      return '<div class="tbl-wrap"><table><thead><tr><th>Page</th><th>URL</th><th style="text-align:right">Views</th><th style="text-align:right">People</th><th style="text-align:right">Time</th></tr></thead><tbody>'+b+'</tbody></table></div>';
     }
 
     function setK(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+    var DATA={}, PEOPLE={};
     function render(D){
+      DATA=D||{}; PEOPLE={};
+      ((D.segments&&['p2','client','other'])||[]).forEach(function(s){((D.segments[s]||{}).people||[]).forEach(function(p){PEOPLE[(p.email||'').toLowerCase()]=p;});});
       var k=D.kpis||{};
       setK('k-views',(k.total_views||0).toLocaleString());
       setK('k-people',k.total_people||0);
@@ -230,6 +288,84 @@
       document.getElementById('bd-wrap').innerHTML=bd||'<div class="seg-empty">No data yet.</div>';
       document.getElementById('pages-wrap').innerHTML=pagesTable(D.top_pages);
     }
+    /* ── activity drawer ── */
+    var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtTs(ts){
+      if(!ts)return '';
+      var m=String(ts).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+      if(!m)return String(ts).slice(0,16);
+      return MON[(+m[2])-1]+' '+(+m[3])+', '+m[4]+':'+m[5];
+    }
+    function segColor(s){return s==='p2'?'#818cf8':(s==='other'?'#94a3b8':AC);}
+    function segLabel(s){return s==='p2'?'Position2':(s==='other'?'Other':(DATA.client&&DATA.client.short)||'Client');}
+    function badge(s){var c=segColor(s);return '<span class="dr-badge" style="color:'+c+';border-color:'+c+'55;background:'+c+'1a">'+esc(segLabel(s))+' team</span>';}
+    function evItem(e){
+      var login=e.kind==='login';
+      return '<div class="tev '+(login?'login':'')+'">'
+        +'<div class="tev-top"><span class="tev-ttl">'+esc(login?'Signed in':(e.title||e.url||'Page view'))+'</span><span class="tev-time">'+fmtTs(e.ts)+'</span></div>'
+        +(e.url&&!login?'<div class="tev-url">'+esc(e.url)+'</div>':'')
+        +(e.who?'<div class="tev-who">'+e.who+'</div>':'')
+        +(e.duration&&!login?'<span class="tev-dur">⏱ '+esc(e.duration)+' on page</span>':'')
+        +'</div>';
+    }
+    function openDrawer(headHtml, bodyHtml){
+      document.getElementById('drHead').innerHTML=headHtml;
+      document.getElementById('drBody').innerHTML=bodyHtml;
+      document.getElementById('cuDr').classList.add('on');
+      document.getElementById('cuOvl').classList.add('on');
+    }
+    function closeDrawer(){document.getElementById('cuDr').classList.remove('on');document.getElementById('cuOvl').classList.remove('on');}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
+
+    function openPerson(email){
+      var p=PEOPLE[(email||'').toLowerCase()];if(!p)return;
+      var c=segColor(p.segment);
+      var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
+      var head='<div class="dr-head" style="--sc:'+c+'">'
+        +'<div class="dr-av">'+av+'</div>'
+        +'<div style="min-width:0;flex:1"><div class="dr-name">'+esc(p.name)+'</div><div class="dr-mail">'+esc(p.email)+'</div>'+badge(p.segment)+'</div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>'
+        +'<div class="dr-mini">'
+          +'<div class="dr-m"><b>'+(p.logins||0)+'</b><small>Logins</small></div>'
+          +'<div class="dr-m"><b>'+(p.views||0)+'</b><small>Page views</small></div>'
+          +'<div class="dr-m"><b>'+esc(p.duration||'0s')+'</b><small>Time</small></div>'
+          +'<div class="dr-m"><b>'+(p.pages_count||0)+'</b><small>Pages</small></div>'
+        +'</div>';
+      var ev=(p.events||[]);
+      var body='<div class="dr-sec">Activity timeline · '+ev.length+' events</div>'
+        +(ev.length?'<div class="tml">'+ev.map(evItem).join('')+'</div>':'<div class="dr-empty">No recorded activity.</div>');
+      openDrawer(head, body);
+    }
+    function openPage(url){
+      var evs=(DATA.recent||[]).filter(function(e){return e.kind==='view'&&e.url===url;});
+      var title=(evs[0]&&evs[0].title)||url;
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 18v-5M13 18V8M18 18v-8"/></svg></div>'
+        +'<div style="min-width:0;flex:1"><div class="dr-name">'+esc(title)+'</div><div class="dr-mail">'+esc(url)+'</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var body='<div class="dr-sec">'+evs.length+' views · who viewed &amp; when</div>'
+        +(evs.length?'<div class="tml">'+evs.map(function(e){return evItem({kind:'view',ts:e.ts,title:e.name,url:'',duration:e.duration,who:esc(e.email)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No views recorded.</div>');
+      openDrawer(head, body);
+    }
+    function openFeed(){
+      var evs=(DATA.recent||[]);
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>'
+        +'<div style="flex:1"><div class="dr-name">All activity</div><div class="dr-mail">'+((DATA.client&&DATA.client.name)||'')+' portal</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var body='<div class="dr-sec">'+evs.length+' events · newest first</div>'
+        +(evs.length?'<div class="tml">'+evs.map(function(e){return evItem({kind:e.kind,ts:e.ts,title:(e.kind==='login'?'Signed in':(e.title||e.url)),url:(e.kind==='login'?'':e.url),duration:e.duration,who:esc(e.name)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No activity yet.</div>');
+      openDrawer(head, body);
+    }
+    function openPeople(){
+      var all=[];['p2','client','other'].forEach(function(s){(((DATA.segments||{})[s])||{}).people&&DATA.segments[s].people.forEach(function(p){all.push(p);});});
+      all.sort(function(a,b){return b.views-a.views;});
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7.5" r="3"/><path d="M22 19v-1a4 4 0 0 0-3-3.87M16 4.63a4 4 0 0 1 0 7.75"/></svg></div>'
+        +'<div style="flex:1"><div class="dr-name">Everyone</div><div class="dr-mail">'+all.length+' people on this portal</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var body='<div class="dr-sec">Tap anyone to see their timeline</div>'
+        +(all.length?all.map(personRow).join(''):'<div class="dr-empty">No one yet.</div>');
+      openDrawer(head, body);
+    }
+
     function loadData(fresh){
       var ic=document.getElementById('refreshIcon');if(ic)ic.style.animation='spin 1s linear infinite';
       fetch('/p2/admin/client-usage/'+SLUG+'/data'+(fresh?'?fresh=1':''))
