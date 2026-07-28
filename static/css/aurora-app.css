@@ -31,6 +31,26 @@
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .dd-item,.tb-dd-item{transition:background .14s,color .14s,padding-left .14s!important}
 .dd-item:hover,.tb-dd-item:hover{padding-left:16px!important}
+/* Consistent SVG menu icons across every page (each page ships its own .dd-item
+   text styling; this locks the shared icon box so the glyphs line up and match). */
+.dd-item-icon,.tb-dd-item .dd-item-icon{width:20px!important;height:20px;display:inline-flex!important;
+  align-items:center;justify-content:center;flex-shrink:0;opacity:.85}
+.dd-item-icon svg{width:17px;height:17px;display:block}
+.dd-item:hover .dd-item-icon{opacity:1}
+/* Canonical menu baseline. Pages that ship their own (near-identical) .dd-item
+   rules override this harmlessly by load order; pages without one (e.g. the
+   LinkedIn dashboard) get a correct, consistent menu from here. */
+.dd-items{padding:6px}
+.dd-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+  font-size:13px;color:#94a3b8;text-decoration:none;cursor:pointer;line-height:1.2}
+.dd-item:hover{background:rgba(255,255,255,.05);color:#e6ebf5}
+.dd-item.active{background:rgba(124,92,255,.18);color:#fff}
+.dd-item.danger{color:#f87171}
+.dd-item.danger:hover{background:rgba(239,68,68,.09);color:#f87171}
+.dd-divider{height:1px;background:rgba(255,255,255,.07);margin:6px 6px}
+[data-theme="light"] .dd-item{color:#4d5680}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06);color:#17213a}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10)}
 
 /* ════ 3 · Cards — depth, top-light, cursor spotlight, hover glow ════ */
 .hub-card,.dash-card,.ds-card,.workspace-card,.lx-card{

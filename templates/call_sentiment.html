@@ -214,7 +214,7 @@
 [data-theme="light"] .cs-loc-tbl tr:hover td{background:rgba(18,26,54,.03) !important}
 </style>
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/aurora-app.css?v=1">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <script src="/static/js/aurora.js?v=1" defer></script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -252,19 +252,7 @@
             <div class="dd-name">{{ user.name or 'User' }}</div>
             <div class="dd-email">{{ user.email }}</div>
           </div>
-          <div class="dd-items"><button type="button" class="dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span class="dd-item-icon" id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/playbook" class="dd-item"><span class="dd-item-icon">🧭</span> Platform Playbook</a><div class="dd-divider"></div>
-            {% if is_admin %}
-            <a href="/p2/admin/internal-usage" class="dd-item"><span class="dd-item-icon">⚙</span> Internal Usage</a>
-            <a href="/p2/admin/external-usage" class="dd-item"><span class="dd-item-icon">🪪</span> External Usage</a>
-            <a href="/p2/admin/anonymous-traffic" class="dd-item"><span class="dd-item-icon">🌐</span> Anonymous Traffic</a>
-          <a href="/p2/admin/public-page-analytics" class="dd-item"><span class="dd-item-icon">👥</span> Public Page Analytics</a>
-          <a href="/p2/admin/public-agent-usage" class="dd-item"><span class="dd-item-icon">🤖</span> Public Agent Usage</a>
-            <a href="/p2/admin/access-requests" class="dd-item"><span class="dd-item-icon">📥</span> Access Requests</a>
-            <div class="dd-divider"></div>
-            {% endif %}
-            <a href="/p2/gtm" class="dd-item"><span class="dd-item-icon">◎</span> GTM Dashboards</a>
-            <a href="/logout" class="dd-item danger"><span class="dd-item-icon">→</span> Sign out</a>
-          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
         </div>
       </div>
     </div>

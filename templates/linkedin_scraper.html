@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin.css') }}?v=6">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/aurora-app.css?v=1">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <script src="/static/js/aurora.js?v=1" defer></script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -49,17 +49,7 @@
           <div class="tb-dd-name">{{ user.name or 'User' }}</div>
           <div class="tb-dd-email">{{ user.email }}</div>
         </div>
-        <div class="tb-dd-items"><button type="button" class="tb-dd-item" onclick="P2toggleTheme(event)" style="width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left"><span id="p2ThemeIcon">☀</span> <span id="p2ThemeLabel">Light mode</span></button><a href="/p2/playbook" class="tb-dd-item"><span>🧭</span> Platform Playbook</a>
-          {% if is_admin %}
-          <a href="/p2/admin/internal-usage" class="tb-dd-item"><span>⚙</span> Internal Usage</a>
-          <a href="/p2/admin/anonymous-traffic" class="tb-dd-item"><span>🌐</span> Anonymous Traffic</a>
-          <a href="/p2/admin/public-page-analytics" class="tb-dd-item"><span>👥</span> Public Page Analytics</a>
-          <a href="/p2/admin/public-agent-usage" class="tb-dd-item"><span>🤖</span> Public Agent Usage</a>
-          <a href="/p2/admin/access-requests" class="tb-dd-item"><span>📥</span> Access Requests</a>
-          <div class="tb-dd-divider"></div>
-          {% endif %}
-          <a href="/logout" class="tb-dd-item danger"><span>→</span> Sign out</a>
-        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
       </div>
     </div>
   </div>
