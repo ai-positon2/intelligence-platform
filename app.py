@@ -2525,9 +2525,15 @@ def _client_agent_dashboard(client_slug, agent_slug):
     # mode (internal chrome hidden), pointed at this client's gated data endpoint.
     if _client_live_dashboard(client, agent_slug):
         data_url = "/%s/agents/%s/dashboard/data" % (client_slug, agent_slug)
+        # The dashboard's target company is this client, so "Employee" (relative to
+        # target) must be labelled as the client, not Position². Token feeds the
+        # employee-detection fallback (see linkedin.js isEmployee).
+        emp = client.get("short") or client.get("name") or "Client"
+        li_cfg = {"employer": emp, "employerShort": emp,
+                  "employerTokens": [emp.lower()]}
         resp = make_response(render_template(
             "linkedin_scraper.html", user=_get_user(),
-            data_url=data_url, client_mode=True, client=client))
+            data_url=data_url, client_mode=True, client=client, li_cfg=li_cfg))
         resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
                              "Pragma": "no-cache", "Expires": "0"})
         return resp
@@ -4866,6 +4872,14 @@ def _li_yes(s):
     return (s or "").strip().lower() == "yes"
 
 
+def _li_company_key(name):
+    """Identity key for grouping company rows. We key on the normalised company
+    *name*, not the sheet's 'Current Company ID', because the same company often
+    appears with the ID on some rows and blank on others (e.g. NorthStar Anesthesia:
+    44 rows with an ID, 7 blank) — keying on ID would split it into two cards."""
+    return re.sub(r"\s+", " ", (name or "").strip()).lower() or "(unknown)"
+
+
 def _empty_linkedin_result():
     return {"posts": [], "people": [], "companies": [], "company_lb": [], "stats": {
         "total_people": 0, "total_posts": 0, "total_companies": 0, "total_engagements": 0,
@@ -4902,7 +4916,7 @@ def _transform_linkedin_rows(rows):
 
         person_id = g(row, "Person ID") or name.lower()
         company_name = g(row, "Current Company Name") or "(Unknown)"
-        company_id = g(row, "Current Company ID") or company_name
+        company_id = _li_company_key(company_name)
         post_id = g(row, "Post ID") or g(row, "Post URL") or g(row, "Post Snippet")[:60]
         seniority = g(row, "Seniority Bucket")
         bucket = _li_bucket(seniority)
@@ -5120,7 +5134,9 @@ def linkedin_scraper_old_redirect():
 def linkedin_scraper():
     """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
     return render_template("linkedin_scraper.html", user=_get_user(),
-                           data_url=url_for("linkedin_scraper_data"), client_mode=False)
+                           data_url=url_for("linkedin_scraper_data"), client_mode=False,
+                           li_cfg={"employer": "Position²", "employerShort": "P²",
+                                   "employerTokens": ["position"]})
 
 
 @app.route("/p2/gtm/linkedin-scraper/data")
