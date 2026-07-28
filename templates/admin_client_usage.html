@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client Usage — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <style>
+    .cu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:24px}
+    .cu-card{position:relative;display:block;text-decoration:none;border:1px solid rgba(255,255,255,.07);
+      border-radius:16px;padding:22px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+      transition:transform .25s cubic-bezier(.16,1,.3,1),border-color .25s,box-shadow .25s}
+    .cu-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.16);box-shadow:0 22px 50px -20px rgba(0,0,0,.7)}
+    .cu-accent{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+    .cu-top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+    .cu-logo{width:52px;height:52px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 30% 25%,color-mix(in srgb,var(--ac) 34%,transparent),transparent 70%),#0f1424;
+      border:1px solid rgba(255,255,255,.08)}
+    .cu-logo img{max-width:34px;max-height:30px;object-fit:contain}
+    .cu-logo span{font-size:19px;font-weight:700;color:#e6ebf5}
+    .cu-name{font-size:16px;font-weight:600;color:#f1f5f9;line-height:1.2}
+    .cu-dom{font-size:11.5px;color:#5a6488;margin-top:3px;font-family:var(--mono,monospace)}
+    .cu-stats{display:flex;gap:10px}
+    .cu-stat{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:11px 12px}
+    .cu-stat b{display:block;font-size:21px;font-weight:700;color:#fff;line-height:1}
+    .cu-stat small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin-top:5px}
+    .cu-foot{display:flex;align-items:center;justify-content:space-between;margin-top:16px;font-size:11.5px;color:#64748b}
+    .cu-open{color:#a5b4fc;font-weight:600}
+    .cu-empty{margin-top:40px;padding:44px;text-align:center;color:#64748b;border:1px dashed rgba(255,255,255,.1);border-radius:16px}
+    [data-theme="light"] .cu-card{background:#fff;border-color:rgba(18,26,54,.10)}
+    [data-theme="light"] .cu-name{color:#17213a}
+    [data-theme="light"] .cu-stat{background:rgba(18,26,54,.03);border-color:rgba(18,26,54,.07)}
+    [data-theme="light"] .cu-stat b{color:#17213a}
+    [data-theme="light"] .cu-logo{background:#f1f4fb}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Client Usage</span>
+      </div>
+    </div>
+    <div class="tr">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="eyebrow">Admin · Platform Intelligence</div>
+        <h1>Client Usage</h1>
+        <p style="margin:8px 0 0;max-width:640px;font-size:13px;line-height:1.55;color:#64748b">Every co-branded client portal we run. Open one to see how its two audiences, the Position2 team and the client's own people, are using their workspace.</p>
+      </div>
+      <a class="refresh-btn" href="/p2/admin/client-usage?fresh=1"><span class="refresh-icon">↻</span> Refresh</a>
+    </div>
+
+    {% if clients %}
+    <div class="cu-grid">
+      {% for c in clients %}
+      <a class="cu-card" href="/p2/admin/client-usage/{{ c.slug }}" style="--ac:{{ c.accent }};--ac2:{{ c.accent2 }}">
+        <div class="cu-accent"></div>
+        <div class="cu-top">
+          <div class="cu-logo">
+            {% if c.logo %}<img src="{{ c.logo }}" alt="{{ c.short }}">{% else %}<span>{{ c.short[:2]|upper }}</span>{% endif %}
+          </div>
+          <div style="min-width:0">
+            <div class="cu-name">{{ c.name }}</div>
+            <div class="cu-dom">{{ c.domains|join(', ') if c.domains else c.slug }}</div>
+          </div>
+        </div>
+        <div class="cu-stats">
+          <div class="cu-stat"><b>{{ '{:,}'.format(c.views) }}</b><small>Page views</small></div>
+          <div class="cu-stat"><b>{{ c.people }}</b><small>People</small></div>
+        </div>
+        <div class="cu-foot">
+          <span>{% if c.last_active %}Last active {{ c.last_active }}{% else %}No activity yet{% endif %}</span>
+          <span class="cu-open">Open →</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="cu-empty">No client portals configured yet.</div>
+    {% endif %}
+  </div>
+
+  <script>
+    function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
+    document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+  </script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Client Usage',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

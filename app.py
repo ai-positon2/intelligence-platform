@@ -4584,6 +4584,294 @@ def admin_external_usage_data():
     enriched with agent runs and company/email-domain rollups)."""
     return jsonify(_fetch_usage_data(internal=False))
 
+# ── Client Usage (per-client-portal analytics) ───────────────────────────────
+# For each client we run a co-branded portal at /<slug>. This aggregates every
+# tracked page view on that portal (Page Views tab, filtered by URL path) and
+# splits it into TWO audiences by email domain: Position² staff (@position2.com)
+# vs the client's own people (the client's configured domains). Everything else
+# (rare) is bucketed as "Other". Names/pictures are enriched from the two sign-in
+# tabs (internal Login Log + Member Signins), both of which carry email @5, name @6.
+_CU_CACHE = {}          # slug -> {"data": dict, "ts": float}
+_CU_ALL_CACHE = {"data": None, "ts": 0.0}
+_CU_TTL = 300
+
+
+def _fmt_secs(s):
+    """Seconds -> compact human duration: 45s, 12m 3s, 2h 14m."""
+    s = int(s or 0)
+    if s < 60:
+        return "%ds" % s
+    m, sec = divmod(s, 60)
+    if m < 60:
+        return "%dm %ds" % (m, sec) if sec else "%dm" % m
+    h, m = divmod(m, 60)
+    return "%dh %dm" % (h, m) if m else "%dh" % h
+
+
+def _cu_read_tab(tab_range):
+    """One Sheets read from the login-log spreadsheet; [] on any failure."""
+    try:
+        import json as _j
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+        if not sa_str or not LOGIN_LOG_SHEET_ID:
+            return []
+        sa_info = _j.loads(sa_str)
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        svc = build("sheets", "v4", credentials=creds, cache_discovery=False)
+        r = svc.spreadsheets().values().get(
+            spreadsheetId=LOGIN_LOG_SHEET_ID, range=tab_range).execute()
+        return r.get("values", [])
+    except Exception as e:
+        log.warning("client-usage sheet read failed (%s): %s", tab_range, e)
+        return []
+
+
+def _cu_name_map():
+    """email(lower) -> {'name':.., 'picture':..} from both sign-in tabs."""
+    m = {}
+    for rng, pic_i in (("A:U", None), ("%s!A:T" % _MEMBER_TAB, 8)):
+        rows = _cu_read_tab(rng)
+        for r in rows[1:] if len(rows) > 1 else []:
+            email = (r[5].strip().lower() if len(r) > 5 else "")
+            if not email:
+                continue
+            name = (r[6].strip() if len(r) > 6 else "")
+            pic = (r[pic_i].strip() if pic_i is not None and len(r) > pic_i else "")
+            cur = m.setdefault(email, {"name": "", "picture": ""})
+            if name and not cur["name"]:
+                cur["name"] = name
+            if pic and not cur["picture"]:
+                cur["picture"] = pic
+    return m
+
+
+def _cu_pretty_name(email, name_map):
+    info = name_map.get((email or "").lower(), {})
+    if info.get("name"):
+        return info["name"]
+    local = (email or "").split("@")[0]
+    return " ".join(w.capitalize() for w in re.split(r"[.\-_]+", local) if w) or email
+
+
+def _cu_url_belongs(url, slug):
+    """True if a Page-Views URL path is inside this client's portal (/<slug>...)."""
+    u = (url or "").split("?")[0].rstrip("/").lower()
+    s = "/" + slug.lower()
+    return u == s or u.startswith(s + "/")
+
+
+def _cu_client_of_url(url):
+    """First path segment of a URL if it maps to a known client slug, else None."""
+    seg = (url or "").split("?")[0].strip("/").split("/")[0].lower()
+    return seg if seg in CLIENTS else None
+
+
+def _fetch_client_usage(slug, force=False):
+    """Per-client portal analytics, split Position² team vs client team."""
+    client = CLIENTS.get(slug)
+    if not client:
+        return None
+    now = time.time()
+    cached = _CU_CACHE.get(slug)
+    if not force and cached and (now - cached["ts"]) < _CU_TTL:
+        return cached["data"]
+
+    name_map = _cu_name_map()
+    pv = _cu_read_tab("Page Views!A:N")
+    rows = pv[1:] if len(pv) > 1 else []
+
+    def col(r, i, d=""):
+        return r[i] if len(r) > i else d
+
+    p2_dom = "@position2.com"
+    cli_doms = ["@" + d.lower() for d in client.get("domains", [])]
+
+    def seg_of(email):
+        e = (email or "").lower()
+        if e.endswith(p2_dom):
+            return "p2"
+        if any(e.endswith(d) for d in cli_doms):
+            return "client"
+        return "other"
+
+    people = {}         # email -> person record
+    seg_stats = {k: {"views": 0, "seconds": 0} for k in ("p2", "client", "other")}
+    timeline = {}       # date -> {"p2":n,"client":n,"other":n}
+    pages = {}          # url -> {"title","views","seconds"}
+    browsers, devices = Counter(), Counter()
+    first_activity, last_activity = "", ""
+
+    for r in rows:
+        url = col(r, 6)
+        if not _cu_url_belongs(url, slug):
+            continue
+        email = (col(r, 4) or "").strip()
+        if not email:
+            continue
+        seg = seg_of(email)
+        ts = col(r, 0); date = col(r, 1); title = col(r, 5) or url
+        try:
+            secs = int(float(col(r, 7) or 0))
+        except (TypeError, ValueError):
+            secs = 0
+        browser = col(r, 10); device = col(r, 12)
+
+        seg_stats[seg]["views"] += 1
+        seg_stats[seg]["seconds"] += secs
+        if browser:
+            browsers[browser] += 1
+        if device:
+            devices[device] += 1
+        if date:
+            t = timeline.setdefault(date, {"p2": 0, "client": 0, "other": 0})
+            t[seg] += 1
+        pg = pages.setdefault(url, {"title": title, "url": url, "views": 0, "seconds": 0})
+        pg["views"] += 1
+        pg["seconds"] += secs
+        if ts:
+            first_activity = min(first_activity, ts) if first_activity else ts
+            last_activity = max(last_activity, ts)
+
+        p = people.get(email.lower())
+        if p is None:
+            p = {"email": email, "name": _cu_pretty_name(email, name_map),
+                 "picture": name_map.get(email.lower(), {}).get("picture", ""),
+                 "segment": seg, "views": 0, "seconds": 0,
+                 "pages": {}, "first_seen": ts, "last_seen": ts,
+                 "browser": browser, "device": device}
+            people[email.lower()] = p
+        p["views"] += 1
+        p["seconds"] += secs
+        p["pages"][url] = p["pages"].get(url, 0) + 1
+        if ts:
+            p["first_seen"] = min(p["first_seen"], ts) if p["first_seen"] else ts
+            p["last_seen"] = max(p["last_seen"], ts)
+        if browser and not p["browser"]:
+            p["browser"] = browser
+
+    def finalize(p):
+        top = sorted(p["pages"].items(), key=lambda kv: -kv[1])
+        p["pages_count"] = len(p["pages"])
+        p["top_pages"] = [{"url": u, "views": n} for u, n in top[:6]]
+        del p["pages"]
+        p["duration"] = _fmt_secs(p["seconds"])
+        return p
+
+    ppl = [finalize(p) for p in people.values()]
+    ppl.sort(key=lambda x: (-x["views"], x["name"]))
+    seg_people = {k: [p for p in ppl if p["segment"] == k] for k in ("p2", "client", "other")}
+
+    top_pages = sorted(pages.values(), key=lambda x: -x["views"])[:12]
+    for pg in top_pages:
+        pg["duration"] = _fmt_secs(pg["seconds"])
+    tl = [{"date": d, "p2": v["p2"], "client": v["client"], "other": v["other"]}
+          for d, v in sorted(timeline.items())]
+
+    total_views = sum(s["views"] for s in seg_stats.values())
+    total_secs = sum(s["seconds"] for s in seg_stats.values())
+    data = {
+        "client": {"slug": slug, "name": client["name"], "short": client.get("short", client["name"]),
+                   "logo": client.get("logo", ""), "website": client.get("website", ""),
+                   "domains": client.get("domains", []),
+                   "accent": client.get("accent", "#5b9dff"), "accent2": client.get("accent2", "#8b5cf6")},
+        "kpis": {
+            "total_views": total_views, "total_people": len(ppl),
+            "total_seconds": total_secs, "total_time": _fmt_secs(total_secs),
+            "p2_people": len(seg_people["p2"]), "client_people": len(seg_people["client"]),
+            "other_people": len(seg_people["other"]),
+            "p2_views": seg_stats["p2"]["views"], "client_views": seg_stats["client"]["views"],
+            "p2_time": _fmt_secs(seg_stats["p2"]["seconds"]),
+            "client_time": _fmt_secs(seg_stats["client"]["seconds"]),
+            "first_activity": first_activity[:10], "last_activity": last_activity[:10],
+        },
+        "segments": {
+            "p2": {"label": "Position² team", "people": seg_people["p2"],
+                   "views": seg_stats["p2"]["views"], "time": _fmt_secs(seg_stats["p2"]["seconds"])},
+            "client": {"label": "%s team" % client.get("short", client["name"]),
+                       "people": seg_people["client"], "views": seg_stats["client"]["views"],
+                       "time": _fmt_secs(seg_stats["client"]["seconds"])},
+            "other": {"label": "Other", "people": seg_people["other"],
+                      "views": seg_stats["other"]["views"], "time": _fmt_secs(seg_stats["other"]["seconds"])},
+        },
+        "timeline": tl,
+        "top_pages": top_pages,
+        "browsers": dict(browsers.most_common(6)),
+        "devices": dict(devices.most_common()),
+        "fetched_at": now,
+    }
+    _CU_CACHE[slug] = {"data": data, "ts": now}
+    return data
+
+
+def _fetch_all_client_summaries(force=False):
+    """Lightweight per-client rollup for the Client Usage landing cards."""
+    now = time.time()
+    if not force and _CU_ALL_CACHE["data"] is not None and (now - _CU_ALL_CACHE["ts"]) < _CU_TTL:
+        return _CU_ALL_CACHE["data"]
+    pv = _cu_read_tab("Page Views!A:N")
+    rows = pv[1:] if len(pv) > 1 else []
+    summ = {s: {"views": 0, "people": set(), "last": ""} for s in CLIENTS}
+    for r in rows:
+        url = r[6] if len(r) > 6 else ""
+        cslug = _cu_client_of_url(url)
+        if not cslug:
+            continue
+        email = (r[4].strip().lower() if len(r) > 4 else "")
+        if not email:
+            continue
+        summ[cslug]["views"] += 1
+        summ[cslug]["people"].add(email)
+        ts = r[0] if len(r) > 0 else ""
+        if ts:
+            summ[cslug]["last"] = max(summ[cslug]["last"], ts)
+    out = []
+    for slug, c in CLIENTS.items():
+        s = summ[slug]
+        out.append({
+            "slug": slug, "name": c["name"], "short": c.get("short", c["name"]),
+            "logo": c.get("logo", ""), "website": c.get("website", ""),
+            "accent": c.get("accent", "#5b9dff"), "accent2": c.get("accent2", "#8b5cf6"),
+            "domains": c.get("domains", []),
+            "views": s["views"], "people": len(s["people"]), "last_active": s["last"][:10],
+        })
+    out.sort(key=lambda x: -x["views"])
+    _CU_ALL_CACHE["data"] = out
+    _CU_ALL_CACHE["ts"] = now
+    return out
+
+
+@app.route("/p2/admin/client-usage")
+@admin_required
+def admin_client_usage():
+    """Landing page: one card per client portal we run."""
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    clients = _fetch_all_client_summaries(force=force)
+    return render_template("admin_client_usage.html", user=_get_user(), clients=clients)
+
+
+@app.route("/p2/admin/client-usage/<client_slug>")
+@admin_required
+def admin_client_detail(client_slug):
+    """Per-client portal analytics dashboard (Position² team vs client team)."""
+    if client_slug not in CLIENTS:
+        abort(404)
+    return render_template("admin_client_detail.html", user=_get_user(),
+                           client=CLIENTS[client_slug], client_slug=client_slug)
+
+
+@app.route("/p2/admin/client-usage/<client_slug>/data")
+@admin_required
+def admin_client_detail_data(client_slug):
+    if client_slug not in CLIENTS:
+        abort(404)
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    data = _fetch_client_usage(client_slug, force=force)
+    return jsonify(data or {})
+
+
 @app.route("/p2/admin/access-requests")
 @admin_required
 def admin_requests():

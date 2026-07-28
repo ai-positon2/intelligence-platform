@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ client.name }} · Client Usage — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <style>
+    .cd-hero{display:flex;align-items:center;gap:16px}
+    .cd-logo{width:56px;height:56px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 30% 25%,color-mix(in srgb,var(--ac) 34%,transparent),transparent 70%),#0f1424;border:1px solid rgba(255,255,255,.08)}
+    .cd-logo img{max-width:38px;max-height:32px;object-fit:contain}
+    .cd-logo span{font-size:20px;font-weight:700;color:#e6ebf5}
+    /* segment split */
+    .seg-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
+    @media(max-width:840px){.seg-grid{grid-template-columns:1fr}}
+    .seg{border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+    .seg-head{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px}
+    .seg-dot{width:11px;height:11px;border-radius:50%;background:var(--sc);box-shadow:0 0 0 4px color-mix(in srgb,var(--sc) 20%,transparent)}
+    .seg-title{font-size:14px;font-weight:600;color:#f1f5f9}
+    .seg-sub{font-size:11.5px;color:#5a6488;margin-top:1px}
+    .seg-metrics{margin-left:auto;display:flex;gap:18px;text-align:right}
+    .seg-metrics b{display:block;font-size:18px;font-weight:700;color:#fff;line-height:1}
+    .seg-metrics small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin-top:4px}
+    .seg-body{padding:8px 8px 10px;max-height:440px;overflow-y:auto}
+    .prow{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;transition:background .12s}
+    .prow:hover{background:rgba(255,255,255,.04)}
+    .pav{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--sc),color-mix(in srgb,var(--sc) 40%,#6366f1))}
+    .pav img{width:100%;height:100%;object-fit:cover}
+    .pname{font-size:13px;font-weight:600;color:#e6ebf5;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pmail{font-size:11px;color:#5a6488;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono,monospace)}
+    .pmeta{margin-left:auto;text-align:right;flex-shrink:0}
+    .pmeta b{font-size:14px;font-weight:700;color:#fff}
+    .pmeta small{display:block;font-size:10px;color:#64748b;margin-top:2px}
+    .seg-empty{padding:34px;text-align:center;color:#5a6488;font-size:12.5px}
+    /* timeline bars */
+    .tl-wrap{display:flex;align-items:flex-end;gap:5px;height:120px;padding-top:8px}
+    .tl-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0}
+    .tl-bar{width:100%;border-radius:3px 3px 0 0}
+    .tl-p2{background:linear-gradient(180deg,#818cf8,#6366f1)}
+    .tl-cli{background:linear-gradient(180deg,var(--ac),color-mix(in srgb,var(--ac) 55%,#000))}
+    .tl-lbl{font-size:9px;color:#475569;text-align:center;margin-top:6px;white-space:nowrap;overflow:hidden}
+    .lgd{display:flex;gap:16px;font-size:11px;color:#94a3b8;margin-top:12px}
+    .lgd i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+    .barlist{display:flex;flex-direction:column;gap:9px}
+    .brow{display:flex;align-items:center;gap:10px;font-size:12px}
+    .brow .bn{width:96px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .brow .bt{flex:1;height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+    .brow .bf{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+    .brow .bv{width:34px;text-align:right;color:#94a3b8;font-weight:600}
+    [data-theme="light"] .seg{background:#fff;border-color:rgba(18,26,54,.10)}
+    [data-theme="light"] .seg-title,[data-theme="light"] .pname,[data-theme="light"] .pmeta b{color:#17213a}
+    [data-theme="light"] .prow:hover{background:rgba(18,26,54,.04)}
+  </style>
+</head>
+<body data-slug="{{ client_slug }}" data-ac="{{ client.accent }}" data-ac2="{{ client.accent2 }}">
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/client-usage">Client Usage</a><span class="bc-sep">›</span>
+        <span class="bc-cur">{{ client.short }}</span>
+      </div>
+    </div>
+    <div class="tr">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">{% if user.picture %}<img src="{{ user.picture }}" alt="" />{% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}</div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="eyebrow">Admin · Client Portal Analytics</div>
+        <div class="cd-hero" style="--ac:{{ client.accent }}">
+          <div class="cd-logo">{% if client.logo %}<img src="{{ client.logo }}" alt="{{ client.short }}">{% else %}<span>{{ client.short[:2]|upper }}</span>{% endif %}</div>
+          <div>
+            <h1 style="margin:0">{{ client.name }}</h1>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#64748b">Portal activity at <b style="color:#94a3b8">/{{ client_slug }}</b>, split by who's using it.</p>
+          </div>
+        </div>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)"><span class="refresh-icon" id="refreshIcon">↻</span> Refresh</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Total Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">People</div><div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div><div class="stat-small" id="k-people-sub"></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Time on Portal</div><div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">First Activity</div><div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Last Activity</div><div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
+    </div>
+
+    <div class="seg-grid" id="segGrid">
+      <div class="seg" style="--sc:#818cf8"><div class="seg-body"><div class="skel" style="height:200px"></div></div></div>
+      <div class="seg" style="--sc:{{ client.accent }}"><div class="seg-body"><div class="skel" style="height:200px"></div></div></div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="card-title-icon">📈</span> Activity per Day</div><span class="card-meta">Position2 vs {{ client.short }}</span></div>
+        <div class="card-body"><div id="timeline-wrap"><div class="skel" style="height:120px"></div></div>
+          <div class="lgd"><span><i style="background:#6366f1"></i>Position2 team</span><span><i style="background:{{ client.accent }}"></i>{{ client.short }} team</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="card-title-icon">🌐</span> Browsers &amp; Devices</div></div>
+        <div class="card-body"><div id="bd-wrap"><div class="skel" style="height:120px"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-head"><div class="card-title"><span class="card-title-icon">📊</span> Top Pages</div><span class="card-meta">most-visited pages in this portal</span></div>
+      <div class="card-body"><div id="pages-wrap"><div class="skel" style="height:120px"></div></div></div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
+    document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+
+    var SLUG=document.body.getAttribute('data-slug');
+    var AC=document.body.getAttribute('data-ac')||'#5b9dff', AC2=document.body.getAttribute('data-ac2')||'#8b5cf6';
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function ini(n){return (n||'?').trim().split(/\s+/).map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);}
+    function shortDate(s){if(!s)return '—';var m=String(s).slice(5,10);return m||s;}
+
+    function personRow(p){
+      var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
+      return '<div class="prow">'
+        +'<div class="pav">'+av+'</div>'
+        +'<div style="min-width:0;flex:1">'
+          +'<div class="pname">'+esc(p.name)+'</div>'
+          +'<div class="pmail">'+esc(p.email)+'</div>'
+        +'</div>'
+        +'<div class="pmeta"><b>'+p.views+'</b><small>'+esc(p.duration||'')+' · '+shortDate(p.last_seen)+'</small></div>'
+        +'</div>';
+    }
+    function segPanel(seg, color, subtitle){
+      var ppl=(seg&&seg.people)||[];
+      var rows=ppl.length?ppl.map(personRow).join(''):'<div class="seg-empty">No activity from this group yet.</div>';
+      return '<div class="seg" style="--sc:'+color+'">'
+        +'<div class="seg-head">'
+          +'<span class="seg-dot"></span>'
+          +'<div><div class="seg-title">'+esc(seg.label)+'</div><div class="seg-sub">'+subtitle+'</div></div>'
+          +'<div class="seg-metrics">'
+            +'<div><b>'+ppl.length+'</b><small>People</small></div>'
+            +'<div><b>'+(seg.views||0)+'</b><small>Views</small></div>'
+            +'<div><b>'+esc(seg.time||'0s')+'</b><small>Time</small></div>'
+          +'</div>'
+        +'</div>'
+        +'<div class="seg-body">'+rows+'</div>'
+        +'</div>';
+    }
+    function renderTimeline(tl){
+      if(!tl||!tl.length)return '<div class="seg-empty">No activity yet.</div>';
+      var days=tl.slice(-24);
+      var max=1;days.forEach(function(d){max=Math.max(max,d.p2+d.client+d.other);});
+      var H=104;
+      return '<div class="tl-wrap">'+days.map(function(d){
+        var tot=d.p2+d.client+d.other;
+        var h2=Math.round(d.p2/max*H), hc=Math.round((d.client+d.other)/max*H);
+        return '<div class="tl-col" title="'+d.date+' · P2 '+d.p2+' · '+esc(SLUG)+' '+(d.client+d.other)+'">'
+          +(hc?'<div class="tl-bar tl-cli" style="height:'+hc+'px"></div>':'')
+          +(h2?'<div class="tl-bar tl-p2" style="height:'+h2+'px"></div>':'')
+          +'<div class="tl-lbl">'+shortDate(d.date)+'</div></div>';
+      }).join('')+'</div>';
+    }
+    function barList(obj){
+      var ks=Object.keys(obj||{});if(!ks.length)return '<div class="seg-empty">No data.</div>';
+      var max=Math.max.apply(null,ks.map(function(k){return obj[k];}));
+      return '<div class="barlist" style="--ac:'+AC+';--ac2:'+AC2+'">'+ks.map(function(k){
+        return '<div class="brow"><span class="bn">'+esc(k)+'</span><span class="bt"><span class="bf" style="width:'+Math.round(obj[k]/max*100)+'%"></span></span><span class="bv">'+obj[k]+'</span></div>';
+      }).join('')+'</div>';
+    }
+    function pagesTable(pg){
+      if(!pg||!pg.length)return '<div class="seg-empty">No page views yet.</div>';
+      var b=pg.map(function(p){
+        return '<tr><td style="font-weight:600;color:#e2e8f0">'+esc(p.title||p.url)+'</td>'
+          +'<td style="font-family:var(--mono,monospace);font-size:11px;color:#64748b">'+esc(p.url)+'</td>'
+          +'<td style="text-align:right">'+p.views+'</td>'
+          +'<td style="text-align:right;color:#94a3b8">'+esc(p.duration||'')+'</td></tr>';
+      }).join('');
+      return '<div class="tbl-wrap"><table><thead><tr><th>Page</th><th>URL</th><th style="text-align:right">Views</th><th style="text-align:right">Time</th></tr></thead><tbody>'+b+'</tbody></table></div>';
+    }
+
+    function setK(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+    function render(D){
+      var k=D.kpis||{};
+      setK('k-views',(k.total_views||0).toLocaleString());
+      setK('k-people',k.total_people||0);
+      setK('k-time',k.total_time||'0s');
+      setK('k-first',k.first_activity||'—');
+      setK('k-last',k.last_activity||'—');
+      var sub=document.getElementById('k-people-sub');
+      if(sub)sub.textContent=(k.p2_people||0)+' Position2 · '+(k.client_people||0)+' '+(D.client&&D.client.short||'client');
+      var seg=D.segments||{};
+      var html=segPanel(seg.p2||{label:'Position2 team',people:[]},'#818cf8','@position2.com')
+              +segPanel(seg.client||{label:'Client team',people:[]},AC,(D.client&&D.client.domains||[]).join(', '));
+      if(seg.other&&seg.other.people&&seg.other.people.length)
+        html+=segPanel(seg.other,'#94a3b8','Other email domains');
+      document.getElementById('segGrid').innerHTML=html;
+      document.getElementById('timeline-wrap').innerHTML=renderTimeline(D.timeline);
+      var bd='';
+      if(D.browsers&&Object.keys(D.browsers).length)bd+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin:2px 0 10px">Browsers</div>'+barList(D.browsers);
+      if(D.devices&&Object.keys(D.devices).length)bd+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin:16px 0 10px">Devices</div>'+barList(D.devices);
+      document.getElementById('bd-wrap').innerHTML=bd||'<div class="seg-empty">No data yet.</div>';
+      document.getElementById('pages-wrap').innerHTML=pagesTable(D.top_pages);
+    }
+    function loadData(fresh){
+      var ic=document.getElementById('refreshIcon');if(ic)ic.style.animation='spin 1s linear infinite';
+      fetch('/p2/admin/client-usage/'+SLUG+'/data'+(fresh?'?fresh=1':''))
+        .then(function(r){return r.json();}).then(function(j){render(j||{});})
+        .catch(function(){})
+        .then(function(){if(ic)ic.style.animation='';});
+    }
+    loadData(false);
+  </script>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}.refresh-icon{display:inline-block}</style>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Client Usage · {{ client.short }}',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>
