@@ -18,6 +18,7 @@
   <script src="/static/js/pfx_bg.js?v=3" defer></script>
 </head>
 <body>
+{% if not client_mode %}
 <!-- Topbar -->
 <div class="topbar">
   <div class="topbar-left">
@@ -63,6 +64,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <div class="shell">
 
@@ -133,10 +135,11 @@ document.addEventListener('click',function(e){
   }
 });
 </script>
-{% include 'ppc_chat_widget.html' %}
+{% if not client_mode %}{% include 'ppc_chat_widget.html' %}{% endif %}
 <div class="li-toast" id="liToast"></div>
-<script>window.__LI_DATA_URL__ = "{{ url_for('linkedin_scraper_data') }}";</script>
+<script>window.__LI_DATA_URL__ = "{{ data_url }}";</script>
 <script src="{{ url_for('static', filename='js/linkedin.js') }}?v=6"></script>
+{% if not client_mode %}
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */
 (function(){
@@ -233,6 +236,7 @@ document.addEventListener('click',function(e){
   }catch(e){}
 })();
 </script>
+{% endif %}
 
 <script>
 /* ===== CINEMA kit — inertia smooth scroll, progress, parallax, reveals ===== */

@@ -2376,6 +2376,10 @@ CLIENTS = {
         "dashboards": {
             "signal-tracker": Path(__file__).parent / "reports" / "dashboard_northstar_client.html",
         },
+        # LinkedIn Intelligence is a *live* co-branded dashboard (same UI as /p2),
+        # rendered from this client's own engagement sheet. Presence of this key
+        # makes the linkedin-intelligence agent render its live dashboard in-portal.
+        "linkedin_sheet": "13V-W-yG5O-OoLJHjxsPKLjrpRyRdk647GgkIGw823oE",
     },
 }
 
@@ -2399,15 +2403,24 @@ def _client_dashboard_path(client, agent_slug):
     p = Path(p)
     return p if p.exists() else None
 
+def _client_live_dashboard(client, agent_slug):
+    """True if this agent renders a *live* (Flask-rendered) co-branded dashboard for
+    the client, rather than a pre-built static HTML file. Currently: LinkedIn
+    Intelligence, when the client has its own engagement sheet configured. Same UI
+    as the internal /p2 dashboard, just pointed at the client's sheet."""
+    return bool(client and agent_slug == "linkedin-intelligence"
+                and client.get("linkedin_sheet"))
+
 def _client_agent_view(slug, client=None):
     """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface)
-    and `is_dashboard` (backed by a co-branded dashboard file for this client, so it
-    renders the dashboard rather than a SERP tool and is not run-metered). Returns
-    None for unknown slugs."""
+    and `is_dashboard` (backed by a co-branded dashboard — static file or live route
+    — for this client, so it renders the dashboard rather than a SERP tool and is not
+    run-metered). Returns None for unknown slugs."""
     a = APP_AGENTS_BY_SLUG.get(slug)
     if not a:
         return None
-    has_dash = bool(client and _client_dashboard_path(client, slug))
+    has_dash = bool(client and (_client_dashboard_path(client, slug)
+                                or _client_live_dashboard(client, slug)))
     return dict(a, connected=bool(a.get("seo_slug")) or has_dash, is_dashboard=has_dash)
 
 def _client_agents(client):
@@ -2508,6 +2521,16 @@ def _client_agent_dashboard(client_slug, agent_slug):
         return gate
     if agent_slug not in client.get("agents", []):
         abort(404)
+    # Live LinkedIn Intelligence: render the exact /p2 dashboard template in client
+    # mode (internal chrome hidden), pointed at this client's gated data endpoint.
+    if _client_live_dashboard(client, agent_slug):
+        data_url = "/%s/agents/%s/dashboard/data" % (client_slug, agent_slug)
+        resp = make_response(render_template(
+            "linkedin_scraper.html", user=_get_user(),
+            data_url=data_url, client_mode=True, client=client))
+        resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
+                             "Pragma": "no-cache", "Expires": "0"})
+        return resp
     path = _client_dashboard_path(client, agent_slug)
     if not path:
         abort(404)
@@ -2515,6 +2538,21 @@ def _client_agent_dashboard(client_slug, agent_slug):
     resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
                          "Pragma": "no-cache", "Expires": "0"})
     return resp
+
+def _client_linkedin_data(client_slug, agent_slug):
+    """Gated JSON data endpoint for a client's live LinkedIn Intelligence dashboard.
+    Same shape/response as the internal /p2 endpoint, read from this client's sheet.
+    ?fresh=1 forces a live re-pull (the dashboard's Refresh button)."""
+    client = CLIENTS.get(client_slug)
+    if not client:
+        abort(404)
+    gate = _client_gate(client)
+    if gate is not None:
+        return gate
+    if not _client_live_dashboard(client, agent_slug):
+        abort(404)
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    return _linkedin_data_response(client["linkedin_sheet"], force)
 
 def _client_agent_log_run(client_slug, agent_slug):
     """Logs one real run of a client-portal agent, cap-enforced. Called client-side
@@ -2613,6 +2651,8 @@ for _cslug in CLIENTS:
                      (lambda agent_slug, cs=_cslug: _client_agent_use(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard", "client_dashboard__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_dashboard(cs, agent_slug)))
+    app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/dashboard/data", "client_dashboard_data__" + _cslug,
+                     (lambda agent_slug, cs=_cslug: _client_linkedin_data(cs, agent_slug)))
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/log-run", "client_logrun__" + _cslug,
                      (lambda agent_slug, cs=_cslug: _client_agent_log_run(cs, agent_slug)), methods=["POST"])
     app.add_url_rule("/" + _cslug + "/agents/<agent_slug>/use/finish-run", "client_finishrun__" + _cslug,
@@ -4990,39 +5030,83 @@ def _transform_linkedin_rows(rows):
             "company_lb": company_lb, "stats": stats}
 
 
-_LI_CACHE = {"data": None, "ts": 0.0}
-_LI_GZ = {"ts": None, "raw": b"", "gz": b""}
+# Per-sheet caches, keyed by spreadsheet ID, so multiple LinkedIn Intelligence
+# surfaces (the internal /p2 dashboard and each client portal) each read their own
+# sheet with an independent TTL cache and gzip buffer.
+_LI_CACHES = {}   # sheet_id -> {"data": dict|None, "ts": float}
+_LI_GZS = {}      # sheet_id -> {"ts": float|None, "raw": bytes, "gz": bytes}
+_LI_TABS = {}     # sheet_id -> resolved first-tab title (memoized)
 _LI_CACHE_TTL = 300  # seconds — served from cache between refreshes; the button forces a live pull
 
 
-def _fetch_linkedin_intel_data(force: bool = False) -> dict:
-    """Fetch + transform the LinkedIn Intelligence Google Sheet (TTL-cached)."""
+def _li_first_tab(svc, sheet_id: str) -> str:
+    """Title of the first (leftmost) worksheet, so we never assume it's 'Sheet1'.
+    Memoized per sheet; falls back to 'Sheet1' if metadata can't be read."""
+    if sheet_id in _LI_TABS:
+        return _LI_TABS[sheet_id]
+    title = "Sheet1"
+    try:
+        meta = svc.spreadsheets().get(
+            spreadsheetId=sheet_id, fields="sheets.properties.title").execute()
+        sheets = meta.get("sheets", [])
+        if sheets:
+            title = sheets[0]["properties"]["title"] or "Sheet1"
+    except Exception as e:
+        log.warning("linkedin intel tab lookup failed (%s): %s", sheet_id, e)
+    _LI_TABS[sheet_id] = title
+    return title
+
+
+def _fetch_linkedin_intel_data(force: bool = False,
+                               sheet_id: str = LINKEDIN_INTEL_SHEET_ID) -> dict:
+    """Fetch + transform a LinkedIn Intelligence Google Sheet (TTL-cached, per sheet)."""
+    cache = _LI_CACHES.setdefault(sheet_id, {"data": None, "ts": 0.0})
     now = time.time()
-    if not force and _LI_CACHE["data"] is not None and (now - _LI_CACHE["ts"]) < _LI_CACHE_TTL:
-        return _LI_CACHE["data"]
+    if not force and cache["data"] is not None and (now - cache["ts"]) < _LI_CACHE_TTL:
+        return cache["data"]
     rows = None
     try:
         svc = _sheets_service()
         resp = svc.spreadsheets().values().get(
-            spreadsheetId=LINKEDIN_INTEL_SHEET_ID, range="Sheet1").execute()
+            spreadsheetId=sheet_id, range=_li_first_tab(svc, sheet_id)).execute()
         rows = resp.get("values", [])
     except Exception as e:
-        log.warning("linkedin intel sheet read failed: %s", e)
+        log.warning("linkedin intel sheet read failed (%s): %s", sheet_id, e)
     if rows:
         try:
             result = _transform_linkedin_rows(rows)
             result["synced_ok"] = True
         except Exception as e:
-            log.warning("linkedin intel transform failed: %s", e)
-            result = _LI_CACHE["data"] or _empty_linkedin_result()
+            log.warning("linkedin intel transform failed (%s): %s", sheet_id, e)
+            result = cache["data"] or _empty_linkedin_result()
             result["synced_ok"] = False
     else:
-        result = _LI_CACHE["data"] or _empty_linkedin_result()
+        result = cache["data"] or _empty_linkedin_result()
         result["synced_ok"] = False
     result["fetched_at"] = now
-    _LI_CACHE["data"] = result
-    _LI_CACHE["ts"] = now
+    cache["data"] = result
+    cache["ts"] = now
     return result
+
+
+def _linkedin_data_response(sheet_id: str, force: bool):
+    """Build the gzipped JSON response for a LinkedIn Intelligence sheet (per-sheet
+    gzip buffer, rebuilt only when the underlying cache timestamp changes)."""
+    data = _fetch_linkedin_intel_data(force=force, sheet_id=sheet_id)
+    cache = _LI_CACHES[sheet_id]
+    gz = _LI_GZS.setdefault(sheet_id, {"ts": None, "raw": b"", "gz": b""})
+    if gz["ts"] != cache["ts"]:
+        gz["raw"] = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        gz["gz"] = gzip.compress(gz["raw"], 6)
+        gz["ts"] = cache["ts"]
+    use_gz = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    resp = make_response(gz["gz"] if use_gz else gz["raw"])
+    resp.headers["Content-Type"] = "application/json"
+    resp.headers["Cache-Control"] = "private, max-age=30"
+    resp.headers["Vary"] = "Accept-Encoding"
+    if use_gz:
+        resp.headers["Content-Encoding"] = "gzip"
+    return resp
 
 
 @app.route("/p2/gtm/linkedin-scraper")
@@ -5035,7 +5119,8 @@ def linkedin_scraper_old_redirect():
 @position2_required
 def linkedin_scraper():
     """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
-    return render_template("linkedin_scraper.html", user=_get_user())
+    return render_template("linkedin_scraper.html", user=_get_user(),
+                           data_url=url_for("linkedin_scraper_data"), client_mode=False)
 
 
 @app.route("/p2/gtm/linkedin-scraper/data")
@@ -5051,19 +5136,7 @@ def linkedin_scraper_data():
     ?fresh=1 bypasses the cache and re-pulls the sheet live — this is what the
     dashboard's Refresh button calls."""
     force = request.args.get("fresh") in ("1", "true", "yes")
-    data = _fetch_linkedin_intel_data(force=force)
-    if _LI_GZ["ts"] != _LI_CACHE["ts"]:
-        _LI_GZ["raw"] = json.dumps(data, separators=(",", ":")).encode("utf-8")
-        _LI_GZ["gz"] = gzip.compress(_LI_GZ["raw"], 6)
-        _LI_GZ["ts"] = _LI_CACHE["ts"]
-    use_gz = "gzip" in request.headers.get("Accept-Encoding", "").lower()
-    resp = make_response(_LI_GZ["gz"] if use_gz else _LI_GZ["raw"])
-    resp.headers["Content-Type"] = "application/json"
-    resp.headers["Cache-Control"] = "private, max-age=30"
-    resp.headers["Vary"] = "Accept-Encoding"
-    if use_gz:
-        resp.headers["Content-Encoding"] = "gzip"
-    return resp
+    return _linkedin_data_response(LINKEDIN_INTEL_SHEET_ID, force)
 
 @app.route("/health")
 def health():
