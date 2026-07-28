@@ -137,8 +137,8 @@ document.addEventListener('click',function(e){
 </script>
 {% if not client_mode %}{% include 'ppc_chat_widget.html' %}{% endif %}
 <div class="li-toast" id="liToast"></div>
-<script>window.__LI_DATA_URL__ = "{{ data_url }}";</script>
-<script src="{{ url_for('static', filename='js/linkedin.js') }}?v=6"></script>
+<script>window.__LI_DATA_URL__ = "{{ data_url }}"; window.__LI_CFG__ = {{ (li_cfg or {})|tojson }};</script>
+<script src="{{ url_for('static', filename='js/linkedin.js') }}?v=7"></script>
 {% if not client_mode %}
 <script>
 /* ════ Platform command palette — Ctrl/Cmd+K ════ */

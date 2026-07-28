@@ -17,7 +17,15 @@ const SCLS=s=>!s?'bic':s.includes('C-Level')||s.includes('Founder')?'bcs':s.incl
 const SLBL=s=>(s||'Unknown').replace('IC / Individual Contributor','IC').replace('C-Level / Founder','C-Level');
 const DLBL=d=>d?d.replace('SECOND_DEGREE','2nd').replace('THIRD_DEGREE','3rd').replace('FIRST_DEGREE','1st'):'';
 const fmtN=n=>{n=+n||0;return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':String(n);};
-const isEmployee=p=>p&&(p.relationship==='Employee'||(p.company||'').toLowerCase().includes('position'));
+/* Target-company labels (per surface): /p2 = Position², a client portal = that
+   client, e.g. NorthStar. Set by the template via window.__LI_CFG__. "Employee"
+   in the sheet's Relationship-to-Target column means an employee of the *target*
+   company, so the badge must name that company, not always Position². */
+const LI_CFG=(window.__LI_CFG__)||{};
+const EMP_FULL=LI_CFG.employer||'Position²';
+const EMP_SHORT=LI_CFG.employerShort||'P²';
+const EMP_TOKENS=(LI_CFG.employerTokens&&LI_CFG.employerTokens.length?LI_CFG.employerTokens:['position']).map(t=>String(t).toLowerCase());
+const isEmployee=p=>p&&(p.relationship==='Employee'||EMP_TOKENS.some(t=>(p.company||'').toLowerCase().includes(t)));
 
 /* ── state ── */
 let PF={sen:'all',deg:'all',react:'all',q:'',comp:'',dFrom:'',dTo:'',sort:'none'};
@@ -315,7 +323,7 @@ function applyPF(){
     return`<div class="pcard" id="pc-${pi}" onclick="openPostModal(${pi})" style="animation-delay:${pi*.05}s">
       <div class="ptop">
         <div class="pdot"></div>
-        <div class="pauth">${esc(p.author||'Position²')}</div>
+        <div class="pauth">${esc(p.author||EMP_FULL)}</div>
         <div class="pdate">${esc(p.date)}</div>
       </div>
       <div class="psnip">${esc(p.snippet)}</div>
@@ -400,7 +408,7 @@ function buildPeopleTab(){
         <input type="date" class="lkf-date" onchange="PLF.dTo=this.value;applyPLF()">
       </div>
       <button class="chip" id="plf-dm" onclick="PLF.dm=!PLF.dm;this.classList.toggle('on',PLF.dm);applyPLF()">🎯 Decision Makers</button>
-      <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide Position²</button>
+      <button class="chip p2-exclude-btn" id="plf-p2" onclick="PLF.excludeP2=!PLF.excludeP2;this.classList.toggle('on',PLF.excludeP2);applyPLF()">🚫 Hide ${esc(EMP_SHORT)}</button>
       <button class="lkf-reset" onclick="resetPLF()">↺ Reset</button>
     </div>
   </div>
@@ -531,7 +539,7 @@ function applyPLF(){
               <div class="pcbdg">
                 ${p.seniority?`<span class="b ${SCLS(p.seniority)}">${esc(SLBL(p.seniority))}</span>`:''}
                 ${p.dm==='Yes'?`<span class="b bdm">🎯 DM</span>`:''}
-                ${isEmployee(p)?`<span class="b brel-emp">🏢 P² Employee</span>`:''}
+                ${isEmployee(p)?`<span class="b brel-emp">🏢 ${esc(EMP_SHORT)} Employee</span>`:''}
                 ${p.degree?`<span class="b bdeg">${DLBL(p.degree)}</span>`:''}
                 ${p.country?`<span class="b bic">🌏 ${esc(p.country)}</span>`:''}
                 ${p.industry?`<span class="b bic" style="background:rgba(79,70,229,0.18);border-color:rgba(79,70,229,0.35)">${esc(p.industry)}</span>`:''}
@@ -630,7 +638,7 @@ function openEngDrawer(pi,ei){
     <button class="dclose" onclick="closeDrawer()">✕</button>`;
   const badges=[
     e.seniority?`<span class="b ${SCLS(e.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(e.seniority))}</span>`:'',
-    isEmployee(e)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 Position² Employee</span>`:'',
+    isEmployee(e)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 ${esc(EMP_FULL)} Employee</span>`:'',
     e.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(e.degree)} degree</span>`:'',
     e.reaction?`<span class="b ${RCLS[e.reaction]||'bic'}" style="font-size:12px;padding:4px 11px">${RICO[e.reaction]||''} ${e.reaction.charAt(0)+e.reaction.slice(1).toLowerCase()}</span>`:'',
     e.commented?`<span class="b blike" style="font-size:12px;padding:4px 11px">💬 Commented</span>`:'',
@@ -667,7 +675,7 @@ function openPersonDrawer(idx){
   const badges=[
     p.seniority?`<span class="b ${SCLS(p.seniority)}" style="font-size:12px;padding:4px 11px">${esc(SLBL(p.seniority))}</span>`:'',
     p.dm==='Yes'?`<span class="b bdm" style="font-size:12px;padding:4px 11px">🎯 Decision Maker</span>`:'',
-    isEmployee(p)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 Position² Employee</span>`:'',
+    isEmployee(p)?`<span class="b brel-emp" style="font-size:12px;padding:4px 11px">🏢 ${esc(EMP_FULL)} Employee</span>`:'',
     p.degree?`<span class="b bdeg" style="font-size:12px;padding:4px 11px">${DLBL(p.degree)} degree</span>`:'',
     p.posts_engaged>0?`<span class="b bmg" style="font-size:12px;padding:4px 11px">⚡ ${p.posts_engaged} post${p.posts_engaged!==1?'s':''}</span>`:'',
   ].filter(Boolean);
@@ -767,7 +775,7 @@ function openPostModal(pi){
   const ori=D.posts.indexOf(p);
   document.getElementById('modal-ptop').innerHTML=
     '<div class="pdot"></div>'+
-    '<div class="pauth">'+esc(p.author||'Position²')+'</div>'+
+    '<div class="pauth">'+esc(p.author||EMP_FULL)+'</div>'+
     '<div class="pdate">'+esc(p.date)+'</div>'+
     (p.url?'<a href="'+esc(p.url)+'" target="_blank" class="post-view-btn" onclick="event.stopPropagation()">View Post ↗</a>':'');
   document.getElementById('modal-snip').textContent=p.snippet||'';
