@@ -4857,6 +4857,43 @@ def _fetch_client_usage(slug, force=False):
             if e and t:
                 login_map.setdefault(e, []).append(t)
 
+    # Agent runs by this portal's users. The 'Agent Runs' tab is global (email +
+    # agent slug, no client column), so we scope to the agents configured for THIS
+    # client: accurate for client-team members (they only reach this one portal) and
+    # a sensible best-effort for Position² staff.
+    client_run_slugs = {_canonical_agent_slug(s) for s in client.get("agents", [])}
+    runs_by_email = {}   # email(lower) -> {total, by_agent{name:n}, last, events[]}
+    _ARIDX = {n: i for i, n in enumerate(_AR_HEADER)}
+    def _arv(r, n, d=""):
+        i = _ARIDX.get(n, -1)
+        return r[i] if 0 <= i < len(r) else d
+    for r in _cu_read_tab("%s!A:F" % _AR_TAB)[1:]:
+        e = (_arv(r, "Email") or "").strip().lower()
+        if not e:
+            continue
+        slug = _canonical_agent_slug(_arv(r, "Agent Slug") or "")
+        if client_run_slugs and slug not in client_run_slugs:
+            continue
+        ts = _arv(r, "Timestamp (IST)")
+        aname = _arv(r, "Agent Name") or APP_AGENTS_BY_SLUG.get(slug, {}).get("name", slug)
+        rec = runs_by_email.setdefault(e, {"total": 0, "by_agent": {}, "last": "", "events": []})
+        rec["total"] += 1
+        rec["by_agent"][aname] = rec["by_agent"].get(aname, 0) + 1
+        rec["events"].append({"ts": ts, "name": aname})
+        if ts and ts > rec["last"]:
+            rec["last"] = ts
+
+    # Fold in anyone who ran an agent but has no tracked page views in-window, so the
+    # Agent Runs view never silently drops them.
+    for e, rec in runs_by_email.items():
+        if e in people or seg_of(e) == "other":
+            continue
+        people[e] = {"email": e, "name": _cu_pretty_name(e, name_map),
+                     "picture": name_map.get(e, {}).get("picture", ""),
+                     "segment": seg_of(e), "views": 0, "seconds": 0, "pages": {},
+                     "first_seen": rec["last"], "last_seen": rec["last"],
+                     "browser": "", "device": "", "_events": []}
+
     def finalize(p):
         top = sorted(p["pages"].items(), key=lambda kv: -kv[1])
         p["pages_count"] = len(p["pages"])
@@ -4865,18 +4902,30 @@ def _fetch_client_usage(slug, force=False):
         p["duration"] = _fmt_secs(p["seconds"])
         logins = login_map.get(p["email"].lower(), [])
         p["logins"] = len(logins)
+        rr = runs_by_email.get(p["email"].lower(), {})
+        p["agent_runs"] = rr.get("total", 0)
+        p["agent_breakdown"] = sorted(
+            [{"name": k, "count": v} for k, v in rr.get("by_agent", {}).items()],
+            key=lambda x: -x["count"])
         ev = p.pop("_events")
         for t in logins:
             ev.append({"kind": "login", "ts": t, "title": "Signed in", "url": "", "duration": ""})
+        for rv in rr.get("events", []):
+            ev.append({"kind": "run", "ts": rv["ts"], "title": "Ran " + rv["name"], "url": "", "duration": ""})
         ev.sort(key=lambda x: x["ts"] or "", reverse=True)
         p["events"] = ev[:80]
         if logins:
             p["last_login"] = max(logins)
+        if rr.get("last"):
+            p["last_run"] = rr["last"]
         return p
 
     ppl = [finalize(p) for p in people.values()]
-    ppl.sort(key=lambda x: (-x["views"], x["name"]))
+    ppl.sort(key=lambda x: (-x["views"], -x.get("agent_runs", 0), x["name"]))
     seg_people = {k: [p for p in ppl if p["segment"] == k] for k in ("p2", "client", "other")}
+
+    def _seg_sum(seg, key):
+        return sum(p.get(key, 0) for p in seg_people[seg])
 
     # Global recent-activity feed: every event across everyone, newest first, tagged
     # with the person. Powers the "all activity" view and per-page viewer drilldowns.
@@ -4906,6 +4955,8 @@ def _fetch_client_usage(slug, force=False):
         "kpis": {
             "total_views": total_views, "total_people": len(ppl),
             "total_seconds": total_secs, "total_time": _fmt_secs(total_secs),
+            "total_logins": sum(p["logins"] for p in ppl),
+            "total_runs": sum(p["agent_runs"] for p in ppl),
             "p2_people": len(seg_people["p2"]), "client_people": len(seg_people["client"]),
             "other_people": len(seg_people["other"]),
             "p2_views": seg_stats["p2"]["views"], "client_views": seg_stats["client"]["views"],
@@ -4915,12 +4966,15 @@ def _fetch_client_usage(slug, force=False):
         },
         "segments": {
             "p2": {"label": "Position² team", "people": seg_people["p2"],
-                   "views": seg_stats["p2"]["views"], "time": _fmt_secs(seg_stats["p2"]["seconds"])},
+                   "views": seg_stats["p2"]["views"], "time": _fmt_secs(seg_stats["p2"]["seconds"]),
+                   "logins": _seg_sum("p2", "logins"), "runs": _seg_sum("p2", "agent_runs")},
             "client": {"label": "%s team" % client.get("short", client["name"]),
                        "people": seg_people["client"], "views": seg_stats["client"]["views"],
-                       "time": _fmt_secs(seg_stats["client"]["seconds"])},
+                       "time": _fmt_secs(seg_stats["client"]["seconds"]),
+                       "logins": _seg_sum("client", "logins"), "runs": _seg_sum("client", "agent_runs")},
             "other": {"label": "Other", "people": seg_people["other"],
-                      "views": seg_stats["other"]["views"], "time": _fmt_secs(seg_stats["other"]["seconds"])},
+                      "views": seg_stats["other"]["views"], "time": _fmt_secs(seg_stats["other"]["seconds"]),
+                      "logins": _seg_sum("other", "logins"), "runs": _seg_sum("other", "agent_runs")},
         },
         "timeline": tl,
         "top_pages": top_pages,
