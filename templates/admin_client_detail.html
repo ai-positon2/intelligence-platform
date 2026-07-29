@@ -41,6 +41,30 @@
     .pmeta b{font-size:14px;font-weight:700;color:#fff}
     .pmeta small{display:block;font-size:10px;color:#64748b;margin-top:2px}
     .seg-empty{padding:34px;text-align:center;color:#5a6488;font-size:12.5px}
+    /* segment metric tabs (Logins / Page views / Agent runs): the tab is also the total */
+    .seg-tabs{display:flex;gap:6px;padding:12px 12px 4px}
+    .seg-tab{flex:1;padding:9px 11px;border-radius:11px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .08s;font-family:inherit}
+    .seg-tab:hover{background:rgba(255,255,255,.055)}
+    .seg-tab:active{transform:scale(.98)}
+    .seg-tab b{display:block;font-size:17px;font-weight:700;color:#e6ebf5;line-height:1;font-variant-numeric:tabular-nums}
+    .seg-tab small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#5a6488;margin-top:5px}
+    .seg-tab.on{border-color:color-mix(in srgb,var(--sc) 55%,transparent);background:color-mix(in srgb,var(--sc) 15%,transparent)}
+    .seg-tab.on b{color:var(--sc)}
+    .seg-tab.on small{color:color-mix(in srgb,var(--sc) 72%,#5a6488)}
+    /* richer person row: ranked proportional bar under name */
+    .pinfo{min-width:0;flex:1}
+    .pbar{height:4px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:7px;overflow:hidden}
+    .pbar span{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--sc,#818cf8),color-mix(in srgb,var(--sc,#818cf8) 40%,#fff));transition:width .35s cubic-bezier(.16,1,.3,1)}
+    .pmeta b{font-variant-numeric:tabular-nums}
+    .pmeta b.zero{color:#3d4763}
+    /* agent breakdown in the person drawer */
+    .ab-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;color:#cbd5e1}
+    .ab-row:last-child{border-bottom:none}
+    .ab-row b{color:#fff;font-variant-numeric:tabular-nums}
+    .tev.run{--evc:#34d399}
+    [data-theme="light"] .seg-tab:not(.on) b{color:#17213a}
+    [data-theme="light"] .pbar{background:rgba(18,26,54,.08)}
+    [data-theme="light"] .ab-row{color:#3a4566}
     /* timeline bars */
     .tl-wrap{display:flex;align-items:flex-end;gap:5px;height:120px;padding-top:8px}
     .tl-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0}
@@ -154,9 +178,11 @@
       <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)"><span class="refresh-icon" id="refreshIcon">↻</span> Refresh</button>
     </div>
 
-    <div class="stats-row">
-      <div class="stat-card clik" onclick="openFeed()" title="See the full activity feed"><div class="sc-glow"></div><div class="stat-label">Total Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div><div class="stat-small" style="color:#a5b4fc">View all activity →</div></div>
+    <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div class="stat-card clik" onclick="openFeed()" title="See the full activity feed"><div class="sc-glow"></div><div class="stat-label">Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div><div class="stat-small" style="color:#a5b4fc">View all activity →</div></div>
       <div class="stat-card clik" onclick="openPeople()" title="See everyone"><div class="sc-glow"></div><div class="stat-label">People</div><div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div><div class="stat-small" id="k-people-sub"></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Logins</div><div class="stat-value" id="k-logins"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div></div>
+      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Agent Runs</div><div class="stat-value" id="k-runs"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Time on Portal</div><div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">First Activity</div><div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
       <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Last Activity</div><div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
@@ -202,32 +228,67 @@
     function ini(n){return (n||'?').trim().split(/\s+/).map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);}
     function shortDate(s){if(!s)return '—';var m=String(s).slice(5,10);return m||s;}
 
-    function personRow(p){
+    /* Each segment table has three tabs: Logins, Page views, Agent runs. The tab is
+       ALSO the segment total; picking one re-ranks the list by that metric and swaps
+       each row's headline number + caption. Tab choice is per-segment. */
+    var METRICS=[
+      {id:'logins',key:'logins',label:'Logins',
+       cap:function(p){return p.last_login?('last seen '+shortDate(p.last_login)):(p.logins?'signed in':'never signed in');}},
+      {id:'views',key:'views',label:'Page views',
+       cap:function(p){return (p.duration||'0s')+' · '+shortDate(p.last_seen);}},
+      {id:'runs',key:'agent_runs',label:'Agent runs',
+       cap:function(p){return (p.agent_breakdown&&p.agent_breakdown.length)?('mostly '+p.agent_breakdown[0].name):'no runs yet';}}
+    ];
+    function metricById(id){for(var i=0;i<METRICS.length;i++)if(METRICS[i].id===id)return METRICS[i];return METRICS[1];}
+    var TAB_STATE={p2:'views',client:'views',other:'views'};
+    var SEGREFS={};
+
+    function personRow2(p,m,max,color){
       var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
-      return '<div class="prow" onclick="openPerson(\''+esc(p.email)+'\')">'
+      var val=p[m.key]||0;
+      var w=max>0?(val>0?Math.max(6,Math.round(val/max*100)):0):0;
+      return '<div class="prow" style="--sc:'+color+'" onclick="openPerson(\''+esc(p.email).replace(/'/g,"\\'")+'\')">'
         +'<div class="pav">'+av+'</div>'
-        +'<div style="min-width:0;flex:1">'
+        +'<div class="pinfo">'
           +'<div class="pname">'+esc(p.name)+'</div>'
           +'<div class="pmail">'+esc(p.email)+'</div>'
+          +'<div class="pbar"><span style="width:'+w+'%"></span></div>'
         +'</div>'
-        +'<div class="pmeta"><b>'+p.views+'</b><small>'+esc(p.duration||'')+' · '+shortDate(p.last_seen)+'</small></div>'
+        +'<div class="pmeta"><b'+(val?'':' class="zero"')+'>'+val+'</b><small>'+esc(m.cap(p))+'</small></div>'
         +'</div>';
     }
-    function segPanel(seg, color, subtitle){
+    function segPanel(segKey, seg, color, subtitle){
+      SEGREFS[segKey]={seg:seg,color:color,subtitle:subtitle};
       var ppl=(seg&&seg.people)||[];
-      var rows=ppl.length?ppl.map(personRow).join(''):'<div class="seg-empty">No activity from this group yet.</div>';
-      return '<div class="seg" style="--sc:'+color+'">'
+      var tabId=TAB_STATE[segKey]||'views', m=metricById(tabId);
+      var totals={logins:seg.logins||0,views:seg.views||0,runs:seg.runs||0};
+      var tabs=METRICS.map(function(x){
+        return '<button class="seg-tab'+(x.id===tabId?' on':'')+'" style="--sc:'+color+'" '
+          +'onclick="event.stopPropagation();setTab(\''+segKey+'\',\''+x.id+'\')">'
+          +'<b>'+(totals[x.id]||0)+'</b><small>'+x.label+'</small></button>';
+      }).join('');
+      var sorted=ppl.slice().sort(function(a,b){return (b[m.key]||0)-(a[m.key]||0);});
+      var max=sorted.reduce(function(mx,p){return Math.max(mx,p[m.key]||0);},0);
+      var rows=sorted.length?sorted.map(function(p){return personRow2(p,m,max,color);}).join('')
+                            :'<div class="seg-empty">No activity from this group yet.</div>';
+      return '<div class="seg" id="seg-'+segKey+'" style="--sc:'+color+'">'
         +'<div class="seg-head">'
           +'<span class="seg-dot"></span>'
           +'<div><div class="seg-title">'+esc(seg.label)+'</div><div class="seg-sub">'+subtitle+'</div></div>'
-          +'<div class="seg-metrics">'
-            +'<div><b>'+ppl.length+'</b><small>People</small></div>'
-            +'<div><b>'+(seg.views||0)+'</b><small>Views</small></div>'
-            +'<div><b>'+esc(seg.time||'0s')+'</b><small>Time</small></div>'
-          +'</div>'
+          +'<div class="seg-metrics"><div><b>'+ppl.length+'</b><small>People</small></div>'
+            +'<div><b>'+esc(seg.time||'0s')+'</b><small>Time</small></div></div>'
         +'</div>'
+        +'<div class="seg-tabs">'+tabs+'</div>'
         +'<div class="seg-body">'+rows+'</div>'
         +'</div>';
+    }
+    function setTab(segKey,id){
+      TAB_STATE[segKey]=id;
+      var ref=SEGREFS[segKey], el=document.getElementById('seg-'+segKey);
+      if(!ref||!el)return;
+      var tmp=document.createElement('div');
+      tmp.innerHTML=segPanel(segKey,ref.seg,ref.color,ref.subtitle);
+      el.replaceWith(tmp.firstElementChild);
     }
     function renderTimeline(tl){
       if(!tl||!tl.length)return '<div class="seg-empty">No activity yet.</div>';
@@ -270,16 +331,18 @@
       var k=D.kpis||{};
       setK('k-views',(k.total_views||0).toLocaleString());
       setK('k-people',k.total_people||0);
+      setK('k-logins',(k.total_logins||0).toLocaleString());
+      setK('k-runs',(k.total_runs||0).toLocaleString());
       setK('k-time',k.total_time||'0s');
       setK('k-first',k.first_activity||'—');
       setK('k-last',k.last_activity||'—');
       var sub=document.getElementById('k-people-sub');
       if(sub)sub.textContent=(k.p2_people||0)+' Position2 · '+(k.client_people||0)+' '+(D.client&&D.client.short||'client');
       var seg=D.segments||{};
-      var html=segPanel(seg.p2||{label:'Position2 team',people:[]},'#818cf8','@position2.com')
-              +segPanel(seg.client||{label:'Client team',people:[]},AC,(D.client&&D.client.domains||[]).join(', '));
+      var html=segPanel('p2',seg.p2||{label:'Position2 team',people:[]},'#818cf8','@position2.com')
+              +segPanel('client',seg.client||{label:'Client team',people:[]},AC,(D.client&&D.client.domains||[]).join(', '));
       if(seg.other&&seg.other.people&&seg.other.people.length)
-        html+=segPanel(seg.other,'#94a3b8','Other email domains');
+        html+=segPanel('other',seg.other,'#94a3b8','Other email domains');
       document.getElementById('segGrid').innerHTML=html;
       document.getElementById('timeline-wrap').innerHTML=renderTimeline(D.timeline);
       var bd='';
@@ -300,12 +363,13 @@
     function segLabel(s){return s==='p2'?'Position2':(s==='other'?'Other':(DATA.client&&DATA.client.short)||'Client');}
     function badge(s){var c=segColor(s);return '<span class="dr-badge" style="color:'+c+';border-color:'+c+'55;background:'+c+'1a">'+esc(segLabel(s))+' team</span>';}
     function evItem(e){
-      var login=e.kind==='login';
-      return '<div class="tev '+(login?'login':'')+'">'
-        +'<div class="tev-top"><span class="tev-ttl">'+esc(login?'Signed in':(e.title||e.url||'Page view'))+'</span><span class="tev-time">'+fmtTs(e.ts)+'</span></div>'
-        +(e.url&&!login?'<div class="tev-url">'+esc(e.url)+'</div>':'')
+      var login=e.kind==='login', run=e.kind==='run', noUrl=login||run;
+      var ttl=login?'Signed in':(e.title||e.url||'Page view');
+      return '<div class="tev '+(login?'login':(run?'run':''))+'">'
+        +'<div class="tev-top"><span class="tev-ttl">'+esc(ttl)+'</span><span class="tev-time">'+fmtTs(e.ts)+'</span></div>'
+        +(e.url&&!noUrl?'<div class="tev-url">'+esc(e.url)+'</div>':'')
         +(e.who?'<div class="tev-who">'+e.who+'</div>':'')
-        +(e.duration&&!login?'<span class="tev-dur">⏱ '+esc(e.duration)+' on page</span>':'')
+        +(e.duration&&!noUrl?'<span class="tev-dur">⏱ '+esc(e.duration)+' on page</span>':'')
         +'</div>';
     }
     function openDrawer(headHtml, bodyHtml){
@@ -328,11 +392,16 @@
         +'<div class="dr-mini">'
           +'<div class="dr-m"><b>'+(p.logins||0)+'</b><small>Logins</small></div>'
           +'<div class="dr-m"><b>'+(p.views||0)+'</b><small>Page views</small></div>'
+          +'<div class="dr-m"><b>'+(p.agent_runs||0)+'</b><small>Agent runs</small></div>'
           +'<div class="dr-m"><b>'+esc(p.duration||'0s')+'</b><small>Time</small></div>'
           +'<div class="dr-m"><b>'+(p.pages_count||0)+'</b><small>Pages</small></div>'
         +'</div>';
+      var ab=(p.agent_breakdown||[]);
+      var abHtml=ab.length?('<div class="dr-sec" style="margin-top:20px">Agents used</div>'
+        +ab.map(function(a){return '<div class="ab-row"><span>'+esc(a.name)+'</span><b>'+a.count+'</b></div>';}).join('')):'';
       var ev=(p.events||[]);
-      var body='<div class="dr-sec">Activity timeline · '+ev.length+' events</div>'
+      var body=abHtml
+        +'<div class="dr-sec"'+(ab.length?' style="margin-top:22px"':'')+'>Activity timeline · '+ev.length+' events</div>'
         +(ev.length?'<div class="tml">'+ev.map(evItem).join('')+'</div>':'<div class="dr-empty">No recorded activity.</div>');
       openDrawer(head, body);
     }
@@ -352,7 +421,7 @@
         +'<div style="flex:1"><div class="dr-name">All activity</div><div class="dr-mail">'+((DATA.client&&DATA.client.name)||'')+' portal</div></div>'
         +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
       var body='<div class="dr-sec">'+evs.length+' events · newest first</div>'
-        +(evs.length?'<div class="tml">'+evs.map(function(e){return evItem({kind:e.kind,ts:e.ts,title:(e.kind==='login'?'Signed in':(e.title||e.url)),url:(e.kind==='login'?'':e.url),duration:e.duration,who:esc(e.name)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No activity yet.</div>');
+        +(evs.length?'<div class="tml">'+evs.map(function(e){var noUrl=(e.kind==='login'||e.kind==='run');return evItem({kind:e.kind,ts:e.ts,title:(e.kind==='login'?'Signed in':(e.title||e.url)),url:(noUrl?'':e.url),duration:e.duration,who:esc(e.name)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No activity yet.</div>');
       openDrawer(head, body);
     }
     function openPeople(){
@@ -361,8 +430,10 @@
       var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7.5" r="3"/><path d="M22 19v-1a4 4 0 0 0-3-3.87M16 4.63a4 4 0 0 1 0 7.75"/></svg></div>'
         +'<div style="flex:1"><div class="dr-name">Everyone</div><div class="dr-mail">'+all.length+' people on this portal</div></div>'
         +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var mv=metricById('views');
+      var mx=all.reduce(function(m,p){return Math.max(m,p.views||0);},0);
       var body='<div class="dr-sec">Tap anyone to see their timeline</div>'
-        +(all.length?all.map(personRow).join(''):'<div class="dr-empty">No one yet.</div>');
+        +(all.length?all.map(function(p){return personRow2(p,mv,mx,segColor(p.segment));}).join(''):'<div class="dr-empty">No one yet.</div>');
       openDrawer(head, body);
     }
 
