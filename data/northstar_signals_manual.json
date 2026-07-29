@@ -2,7 +2,8 @@
   "_readme": "Manually researched signals for the NorthStar Anesthesia ABM Signal Tracker, gathered via real web research (batch-by-batch, 5 companies at a time) while the permanent Sheets-based signal pipeline is being wired up. Each entry becomes one row in the 'alerts_sent' table via seed_northstar_signals.py. signal_type must be one of the canonical strings tracker/signal_score.py and tracker/dashboard_builder.py expect: 'Funding Round', 'Acquisition / M&A', 'IPO Signal', 'C-Suite Join', 'C-Suite Exit', 'News Mention', 'Product Launch', 'Partnership', 'Creative Hiring' (this last one is displayed to NorthStar as 'Anesthesiologists' via the hiring_opts override in build_northstar_dashboard.py -- the stored key stays 'Creative Hiring' so the shared scoring engine needs only one constant). confidence (HIGH/MEDIUM/LOW, from the research pass) is written straight into the 'severity' column -- it is the closest available proxy for alert importance and is what actually drives the dashboard's H/M/L counts.",
   "batches_loaded": [
     1,
-    2
+    2,
+    3
   ],
   "companies_covered": [
     "Banner Health",
@@ -10,7 +11,12 @@
     "HEALTH FIRST",
     "Southwest Surgical Associates",
     "Kelsey Seybold",
-    "Baptist Health South Florida"
+    "Baptist Health South Florida",
+    "AdventHealth",
+    "Wyandot Memorial Hospital",
+    "United Surgical Partners International",
+    "TEXAS ORTHOPEDIC HOSPITAL",
+    "GRAND VIEW HEALTH"
   ],
   "signals": [
     {
@@ -492,6 +498,342 @@
       "signal_date": "2025-01-01",
       "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-awarded-on-fortunes-list-of-americas-most-innovative-companies-2025",
       "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Completed a $265M acquisition of ShorePoint Health Port Charlotte and Punta Gorda from Community Health Systems, renamed AdventHealth Port Charlotte.",
+      "signal_date": "2025-03-01",
+      "source_url": "https://www.adventhealth.com/news/shorepoint-health-port-charlotte-now-adventhealth-port-charlotte",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Took over management of St. Luke's Hospital in Columbus, NC, renaming it AdventHealth Polk (deal closed just after Hurricane Helene).",
+      "signal_date": "2024-10-01",
+      "source_url": "https://www.adventhealth.com/news/st-lukes-hospital-will-soon-be-adventhealth-polk",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "David Banks named President and CEO systemwide, replacing retiring CEO Terry Shaw.",
+      "signal_date": "2025-04-03",
+      "source_url": "https://www.adventhealth.com/news/david-banks-named-president-ceo-adventhealth",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Todd Goodman named systemwide Chief Financial Officer, effective February 1, 2026.",
+      "signal_date": "2025-11-05",
+      "source_url": "https://www.adventhealth.com/news/todd-goodman-named-chief-financial-officer-adventhealth",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Abel Biri named CEO of AdventHealth Orlando, the system's flagship hospital.",
+      "signal_date": "2025-06-30",
+      "source_url": "https://www.adventhealth.com/news/abel-biri-named-chief-executive-officer-adventhealth-orlando",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Caitlin Lewis promoted from COO to CEO of AdventHealth East Orlando.",
+      "signal_date": "2026-02-02",
+      "source_url": "https://www.adventhealth.com/news/caitlin-lewis-named-ceo-adventhealth-east-orlando",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Longtime President/CEO Terry Shaw announced retirement after 8 years in the role and 40 years with the organization.",
+      "signal_date": "2024-12-01",
+      "source_url": "https://www.adventhealth.com/news/adventhealth-announces-retirement-its-president-ceo",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "News Mention",
+      "signal_detail": "AdventHealth Orlando named to the 2025-2026 U.S. News Best Hospitals Honor Roll, ranked #1 in Florida.",
+      "signal_date": "2025-07-29",
+      "source_url": "https://www.wusf.org/health-news-florida/2025-07-29/adventhealth-orlando-earns-top-florida-spot-in-annual-hospital-rankings-by-u-s-news",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "News Mention",
+      "signal_detail": "Announced plans to build a new 80-bed hospital in The Villages, FL amid rapid regional population growth (opening ~2030).",
+      "signal_date": "2026-05-01",
+      "source_url": "https://www.wusf.org/health-news-florida/2026-07-23/adventhealth-plans-to-build-hospital-in-rapidly-growing-the-villages-region",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Product Launch",
+      "signal_detail": "Became the first in Florida to deploy Intuitive's next-generation da Vinci 5 surgical robot.",
+      "signal_date": "2025-04-01",
+      "source_url": "https://www.adventhealth.com/md/news/adventhealth-first-florida-deploy-next-generation-surgical-robot",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Product Launch",
+      "signal_detail": "AdventHealth Celebration performed the first FDA-approved human trial of U.S.-based transcontinental robotic telesurgery, operating on a patient in Angola from Florida.",
+      "signal_date": "2025-06-01",
+      "source_url": "https://www.adventhealth.com/news/expanding-access-care-through-record-setting-remote-robotic-surgery-adventhealth-celebration",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Product Launch",
+      "signal_detail": "Opened a new 80-bed hospital in Minneola, FL, expanding inpatient/outpatient services to South Lake County.",
+      "signal_date": "2025-12-01",
+      "source_url": "https://www.fox35orlando.com/news/adventhealth-opens-new-minneola-hospital-location-expanding-services-south-lake-county",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Partnership",
+      "signal_detail": "Signed a letter of intent with Intermountain Health to form a Denver-area joint venture combining 5 AdventHealth and 3 Intermountain hospitals, expected to close early 2027.",
+      "signal_date": "2026-07-22",
+      "source_url": "https://www.healthcaredive.com/news/intermountain-health-adventhealth-joint-venture-denver-colorado/825867/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Partnership",
+      "signal_detail": "NorthStar Anesthesia is already the CRNA/anesthesia staffing partner at multiple AdventHealth sites (e.g. AdventHealth Central Texas/Killeen, AdventHealth Bolingbrook IL) -- an existing account relationship, not a new prospect target.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://northstaranesthesia.com/job/adventhealth-central-full-time-crna/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "AdventHealth Port Charlotte actively recruiting Board-Certified General Anesthesiologists and a Cardiac Anesthesiologist for its expanding anesthesia department following the 2025 acquisition.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://jobs.adventhealth.com/job/23177894/port-charlotte-fl-general-anesthesiologist-job-with-adventhealth/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "AdventHealth Daytona Beach has an open CRNA position on its own careers site for its growing anesthesia team at the 367-bed hospital.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://jobs.adventhealth.com/job/22998680/crna-anesthesiology-practice-daytona-beach-fl-daytona-beach-fl/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "NorthStar Anesthesia (the client itself) is recruiting a Chief CRNA at AdventHealth Bolingbrook IL -- an open leadership vacancy in NorthStar's own team at this account.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://northstaranesthesia.com/job/adventhealth-bolingbrook-full-time-chief-crna/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "AdventHealth University (Orlando) has an open Faculty Nurse Anesthesia position, signaling continued investment in its CRNA training pipeline.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://jobs.adventhealth.com/orlando-fl/faculty-nurse-anesthesia-ahu/798525D60C234E74B67F0F4F216038A0/job/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Wyandot Memorial Hospital",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Kendra Noyes (previously COO) became President & CEO.",
+      "signal_date": "2026-01-01",
+      "source_url": "https://www.wyandotmemorial.org/kendra-noyes-president-ceo/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Wyandot Memorial Hospital",
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Longtime CEO Ty Shaull (with the hospital since 1992) transitioned to President & CEO Emeritus / Board Advisor as Kendra Noyes took over as CEO.",
+      "signal_date": "2026-01-01",
+      "source_url": "https://www.wyandotmemorial.org/ty-shaull-president-ceo-emeritus/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Wyandot Memorial Hospital",
+      "signal_type": "News Mention",
+      "signal_detail": "Opened 'Wyandot Medical Providers at Carey,' a new two-story medical office building (physician offices, drive-thru pharmacy, lab services) in Carey, Ohio.",
+      "signal_date": "2024-06-01",
+      "source_url": "https://wktn.com/wyandot-memorial-hospital-hosts-public-tour-of-newest-expansion-at-recent-open-house/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Wyandot Memorial Hospital",
+      "signal_type": "Product Launch",
+      "signal_detail": "Wyandot MedSpa added new laser treatment offerings and a GLP-1 medical weight-management program.",
+      "signal_date": "2025-02-01",
+      "source_url": "https://www.wyandotmemorial.org/wp-content/uploads/2025/02/WMH_Publications_The-Link_Issue-5_DIGITAL.pdf",
+      "severity": "LOW"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Invested nearly $350M in M&A and de novo development in 2025, adding 35 facilities to end the year with interests in 533 ASCs and 26 surgical hospitals across 37 states; targeting $250M for 2026 M&A.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://www.beckersasc.com/asc-transactions-and-valuation-issues/uspi-splashed-350m-added-35-facilities-in-2025/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Parent Tenet Healthcare acquired Baylor Scott & White Health's remaining 5% equity stake in USPI for $406M, giving Tenet full 100% ownership.",
+      "signal_date": "2022-06-30",
+      "source_url": "https://www.beckersasc.com/asc-transactions-and-valuation-issues/tenet-pays-baylor-406m-to-acquire-full-ownership-of-uspi/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Partnership",
+      "signal_detail": "Choice Care Surgery Center, a physician-owned ASC in Midland, Texas, entered a strategic partnership with USPI.",
+      "signal_date": "2025-01-29",
+      "source_url": "https://www.ascfocus.org/ascfocus/content/articles-content/articles/2025/business-news/choice-care-surgery-center-enters-into-strategic-partnership-with-uspi",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Matt Stone named CEO of USPI, previously Tenet's Group CEO for Central, South and West Texas.",
+      "signal_date": "2025-03-28",
+      "source_url": "https://www.beckersasc.com/leadership/uspi-names-new-ceo/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "News Mention",
+      "signal_detail": "Net operating revenue reached roughly $5.2B in FY2025 with EBITDA margins near 40%; Tenet's 2026 outlook projects USPI revenue of $5.5-5.7B.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://investor.tenethealth.com/press-releases/press-release-details/2026/Tenet-Reports-Strong-Fourth-Quarter-and-FY-2025-Results-Provides-2026-Financial-Outlook/default.aspx",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Product Launch",
+      "signal_detail": "Shifting its ASC portfolio toward higher-acuity service lines (robotics-assisted total joint replacement, spine, urology), moving away from lower-acuity, high-volume cases.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.beckersasc.com/orthopedics-tjr/why-uspi-is-doubling-down-on-ortho-heavy-ascs/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Multiple live CRNA and anesthesia-support job postings across its careers site: Dover DE, Tucson AZ (Arizona Digestive Institute), Lake City and Summerfield FL, plus anesthesia techs in Dallas, San Antonio, Fort Worth, Waco, Arlington, Fresno, Tampa, and The Woodlands.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.uspi.com/job/dover/certified-registered-nurse-anesthetist-crna/35934/93928407792",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "News Mention",
+      "signal_detail": "A Harris County jury awarded Fondren Orthopedic Group (co-owner) $25.6M against co-owner HCA Healthcare, finding HCA breached the 1993 partnership's noncompete by opening 10 competing Houston-area hospitals.",
+      "signal_date": "2024-09-03",
+      "source_url": "https://texaslawbook.net/houston-jury-finds-hca-healthcare-owes-doctors-25-6m/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Fondren Orthopedic Group (co-owner of the hospital) is now organized as a division under OrthoLoneStar, a multi-practice orthopedic MSO formed from six Texas practices.",
+      "signal_date": "2021-01-01",
+      "source_url": "https://www.ortholonestar.com/about/leadership-team/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Anthony Brooks promoted to CEO of OrthoLoneStar, the physician-group MSO housing Fondren Orthopedic Group (the hospital's co-owner) -- an MSO-level change, not the hospital's own administrator.",
+      "signal_date": "2025-02-17",
+      "source_url": "https://www.txortho.com/ortholonestar-announces-executive-leadership-changes/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "News Mention",
+      "signal_detail": "Celebrated its 30th anniversary and was named a 2025 Modern Healthcare Best Place to Work in Healthcare, its 14th consecutive year receiving the recognition.",
+      "signal_date": "2025-02-01",
+      "source_url": "https://texasorthopedic.com/about/newsroom/texas-orthopedic-hospital-recognized-as-one-of-the-best-places-to-work-in-healthcare-in-2025",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "News Mention",
+      "signal_detail": "Healthgrades named it a 2026 leader in specialty care: #1 in Texas for Joint Replacement for the 5th consecutive year, #2 in Texas for Spine Surgery, four Specialty Excellence Awards.",
+      "signal_date": "2025-10-01",
+      "source_url": "https://texasorthopedic.com/about/newsroom/healthgrades-names-texas-orthopedic-hospital-a-2026-leader-in-specialty-care",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
+      "signal_type": "News Mention",
+      "signal_detail": "Received the Healthgrades 2026 Patient Safety Excellence Award, top 5% of hospitals nationally for patient safety for the 14th consecutive year.",
+      "signal_date": "2025-11-01",
+      "source_url": "https://www.texasorthopedic.com/about-us/newsroom/texas-orthopedic-hospital-achieves-healthgrades-2026-patient-safety-excellence-award",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Completed its full merger into St. Luke's University Health Network on July 1, 2025, becoming St. Luke's 16th hospital campus.",
+      "signal_date": "2025-07-01",
+      "source_url": "https://www.prnewswire.com/news-releases/grand-view-health-joins-st-lukes-university-health-network-302495851.html",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "Funding Round",
+      "signal_detail": "Rep. Brian Fitzpatrick secured a $1M federal Community Project Funding grant for the emergency department/behavioral health expansion.",
+      "signal_date": "2024-10-01",
+      "source_url": "https://fitzpatrick.house.gov/2024/10/1-million-secured-by-fitzpatrick-for-transformative-grand-view-health-expansion",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "News Mention",
+      "signal_detail": "Closed its maternity/labor-and-delivery ward on December 1, 2025 after multiple OB physicians resigned, redirecting patients to St. Luke's Upper Bucks.",
+      "signal_date": "2025-11-18",
+      "source_url": "https://www.yahoo.com/news/articles/grand-view-closing-maternity-ward-172105446.html",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "News Mention",
+      "signal_detail": "Earned Healthgrades recognitions including America's 100 Best Hospitals for Gastrointestinal Surgery and for Pulmonary Care, 2025/2026.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.healthgrades.com/hospital/grand-view-health-73ac83",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "Product Launch",
+      "signal_detail": "Opened 'the Pavilion,' a 190,000 sq-ft, $198M expansion with 10 new ORs including Mako SmartRobotics joint-replacement suites, da Vinci Xi robotic suites, and a hybrid interventional OR.",
+      "signal_date": "2023-04-01",
+      "source_url": "https://www.ballinger.com/design/the-pavilion/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "St. Luke's University Health Network (now Grand View's Sellersville campus owner) is actively recruiting CRNAs network-wide with Sellersville, PA explicitly listed as a covered practice site.",
+      "signal_date": "2025-07-10",
+      "source_url": "https://anesthesiabethlehem.com/nurse-anesthetist-jobs/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "GRAND VIEW HEALTH",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "St. Luke's University Health Network separately recruiting full-time and critical-care Anesthesiologists network-wide (partnership track, $590K+ total comp, $50K sign-on) across the network Grand View now belongs to.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://anesthesiabethlehem.com/anesthesiologist-jobs/",
+      "severity": "LOW"
     }
   ],
   "companies_removed_from_universe": [
