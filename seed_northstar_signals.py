@@ -11,8 +11,15 @@ then this script loads it. Re-running is safe -- it skips any (company,
 signal_type, signal_detail) combination already in the database, so appending
 a new batch to the JSON file and re-running only inserts what's new.
 
+The JSON is the source of truth, so curation (removing a weak signal, rewording
+one, or changing its severity) happens there and is applied with --prune, which
+deletes any alerts_sent row that no longer matches a JSON entry. Without --prune
+the script is insert-only and a removed or reworded signal would linger in the
+database and keep counting toward the KPI tiles.
+
 Usage:
-    python seed_northstar_signals.py            # load signals, then rebuild
+    python seed_northstar_signals.py             # insert new signals, then rebuild
+    python seed_northstar_signals.py --prune     # also delete DB rows no longer in the JSON
     python seed_northstar_signals.py --no-build  # load signals only
 """
 
@@ -45,6 +52,43 @@ def _already_recorded(apollo_id: str, signal_type: str, signal_detail: str) -> b
         con.close()
 
 
+def _reconcile(desired: dict) -> tuple[int, int]:
+    """Delete alerts_sent rows absent from the JSON, and re-sync changed fields.
+
+    `desired` maps (apollo_id, signal_type, signal_detail) -> the JSON entry.
+    The dedup key deliberately excludes severity, so a severity-only edit in the
+    JSON is invisible to the insert path -- it is applied here instead.
+
+    Returns (deleted, updated).
+    """
+    con = sqlite3.connect(str(DB_PATH))
+    deleted = updated = 0
+    try:
+        rows = con.execute(
+            "SELECT id, apollo_id, signal_type, signal_detail, severity, signal_date, source_url FROM alerts_sent"
+        ).fetchall()
+        for rid, apollo_id, stype, detail, sev, sdate, surl in rows:
+            entry = desired.get((apollo_id, stype, detail))
+            if entry is None:
+                con.execute("DELETE FROM alerts_sent WHERE id=?", (rid,))
+                print("  - dropped: %s | %s" % (stype, detail[:78]))
+                deleted += 1
+                continue
+            want = (entry["severity"], entry["signal_date"], entry.get("source_url", ""))
+            if (sev, sdate, surl) != want:
+                con.execute(
+                    "UPDATE alerts_sent SET severity=?, signal_date=?, source_url=? WHERE id=?",
+                    (*want, rid),
+                )
+                if sev != entry["severity"]:
+                    print("  ~ severity %s -> %s: %s" % (sev, entry["severity"], detail[:62]))
+                updated += 1
+        con.commit()
+    finally:
+        con.close()
+    return deleted, updated
+
+
 def main() -> None:
     if not SIGNALS_JSON.exists():
         print("ERROR: %s not found." % SIGNALS_JSON)
@@ -58,6 +102,18 @@ def main() -> None:
 
     store = SnapshotStore(DB_PATH)
     name_to_id = {c["name"]: c["apollo_id"] for c in store.get_all_companies()}
+
+    if "--prune" in sys.argv:
+        desired = {}
+        for sig in signals:
+            apollo_id = name_to_id.get(sig["company_name"])
+            if apollo_id:
+                desired[(apollo_id, sig["signal_type"], sig["signal_detail"])] = sig
+        print("Reconciling %s against the JSON (%d entries)..." % (DB_PATH.name, len(desired)))
+        deleted, updated = _reconcile(desired)
+        print("  Deleted (no longer in JSON): %d" % deleted)
+        print("  Re-synced (field changed):   %d" % updated)
+        print()
 
     inserted, skipped_dupe, skipped_unmatched = 0, 0, 0
     unmatched_names = set()
