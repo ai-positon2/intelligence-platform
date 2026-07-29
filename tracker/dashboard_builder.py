@@ -51,12 +51,28 @@ def build_dashboard(
     output_path: str | Path,
     max_signal_age_days: int = 90,
     refresh_opts: list[dict] | None = None,
+    hiring_opts: dict | None = None,
 ) -> Path:
     """
     refresh_opts: optional list of dicts that override the Refresh Dashboard modal.
     Each dict: {id, icon, title, desc, cmd}
     Defaults to healthcare commands if not provided.
+
+    hiring_opts: optional dict overriding the display text of the "Creative Hiring"
+    KPI tile for accounts where that signal category means something else (e.g. a
+    healthcare account tracking anesthesiologist/CRNA hiring instead of 3D/creative
+    hiring). Keys: icon, label, tooltip, badge, empty_msg. The underlying stored
+    signal_type ("Creative Hiring") and its scoring weight are UNCHANGED — this only
+    swaps the text and icon a human sees, so Healthcare/CSG output is untouched when
+    hiring_opts is omitted, and the fetch/scoring pipeline keeps working per-account
+    without a second signal-type constant to keep in sync everywhere.
     """
+    hiring_opts = {
+        "icon": "🎨", "label": "Creative Hiring",
+        "tooltip": "3D / creative hiring signals",
+        "badge": "Hiring", "empty_msg": "No creative-hiring signals detected yet.",
+        **(hiring_opts or {}),
+    }
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -304,7 +320,7 @@ def build_dashboard(
     </div>
 """
 
-    html = _render_html(data_obj, refresh_opts_html)
+    html = _render_html(data_obj, refresh_opts_html, hiring_opts)
     output_path.write_text(html, encoding="utf-8")
     return output_path
 
@@ -313,12 +329,18 @@ def build_dashboard(
 # HTML renderer
 # ---------------------------------------------------------------------------
 
-def _render_html(data_obj: dict, refresh_opts_html: str = "") -> str:
+def _render_html(data_obj: dict, refresh_opts_html: str = "", hiring_opts: dict | None = None) -> str:
     data_json = _safe_json(data_obj)
+    hiring_opts = hiring_opts or {}
     return (
         _HTML_TEMPLATE
         .replace("__DATA_JSON__", data_json)
         .replace("__REFRESH_OPTS_HTML__", refresh_opts_html)
+        .replace("__HIRING_ICON__", hiring_opts.get("icon", "🎨"))
+        .replace("__HIRING_LABEL__", hiring_opts.get("label", "Creative Hiring"))
+        .replace("__HIRING_TOOLTIP__", hiring_opts.get("tooltip", "3D / creative hiring signals"))
+        .replace("__HIRING_BADGE__", hiring_opts.get("badge", "Hiring"))
+        .replace("__HIRING_EMPTY_MSG__", hiring_opts.get("empty_msg", "No creative-hiring signals detected yet."))
     )
 
 
@@ -2170,11 +2192,11 @@ function renderKPIs() {
       trend:_weeklySignalTrend('Partnership'),
       action:'kpartner', cls:'', chip:'',
       tooltip:`<div class="kpi-tooltip"><p>Partnership signals (last 90d) <span>${k.partnership_signals}</span></p></div>` },
-    { id:'ksp10', icon:'🎨', num:k.hiring_signals,     label:'Creative Hiring',
+    { id:'ksp10', icon:'__HIRING_ICON__', num:k.hiring_signals,     label:'__HIRING_LABEL__',
       hex:'#f97316', bg:'rgba(249,115,22,0.15)',
       trend:_weeklySignalTrend('Creative Hiring'),
       action:'khiring', cls:'', chip:'',
-      tooltip:`<div class="kpi-tooltip"><p>3D / creative hiring signals (last 90d) <span>${k.hiring_signals}</span></p></div>` },
+      tooltip:`<div class="kpi-tooltip"><p>__HIRING_TOOLTIP__ (last 90d) <span>${k.hiring_signals}</span></p></div>` },
   ];
 
   const row = document.getElementById('kpi-row');
@@ -2475,7 +2497,7 @@ function renderCharts() {
   }
 
   // ── Signals by Category bar chart ──
-  const catLabels = ['Funding','M&A','IPO','C-Suite Join','C-Suite Exit','News Mention','Product Launch','Partnership','Creative Hiring','Other'];
+  const catLabels = ['Funding','M&A','IPO','C-Suite Join','C-Suite Exit','News Mention','Product Launch','Partnership','__HIRING_LABEL__','Other'];
   const catMap    = {
     'Funding':       'Funding Round',
     'M&A':           'Acquisition / M&A',
@@ -2485,7 +2507,7 @@ function renderCharts() {
     'News Mention':  'News Mention',
     'Product Launch':'Product Launch',
     'Partnership':   'Partnership',
-    'Creative Hiring':'Creative Hiring',
+    '__HIRING_LABEL__':'Creative Hiring',
   };
   const catColors = ['#f59e0b','#10b981','#06b6d4','#8b5cf6','#a78bfa','#6b7280','#ec4899','#14b8a6','#f97316','#374151'];
   const catCounts = catLabels.map(lbl => {
@@ -3034,7 +3056,7 @@ function buildSignalTypeFilter() {
     { value: 'Subsidiary Change',  label: 'Subsidiary Change' },
     { value: 'Product Launch',     label: 'Product Launch' },
     { value: 'Partnership',        label: 'Partnership' },
-    { value: 'Creative Hiring',    label: 'Creative Hiring' },
+    { value: 'Creative Hiring',    label: '__HIRING_LABEL__' },
   ];
   // Also add any signal types present in data but not in the canonical list above
   const canonical = new Set(SIGNAL_TYPES.map(t => t.value));
@@ -3385,13 +3407,13 @@ function openKpiModal(type) {
     })) : [{ _empty: true, _msg: 'No partnership signals detected yet.' }];
   } else if (type === 'khiring') {
     const rows = DATA.signals.filter(s => s.signal_type === 'Creative Hiring');
-    titleEl.textContent = 'Creative Hiring (' + rows.length + ')';
+    titleEl.textContent = '__HIRING_LABEL__ (' + rows.length + ')';
     _kpiRows = rows.length ? rows.map(s => ({
       id: s.apollo_id, name: s.company_name || '—',
       meta: (s.signal_detail || '').substring(0, 80) + (s.sent_at ? ' · ' + relTime(s.sent_at) : ''),
-      badge: `<span class="sev-badge sev-MEDIUM" style="font-size:10px">🎨 Hiring</span>`,
+      badge: `<span class="sev-badge sev-MEDIUM" style="font-size:10px">__HIRING_ICON__ __HIRING_BADGE__</span>`,
       action: () => { closeKpiModal(); openSigDetail(s); },
-    })) : [{ _empty: true, _msg: 'No creative-hiring signals detected yet.' }];
+    })) : [{ _empty: true, _msg: '__HIRING_EMPTY_MSG__' }];
   } else if (type === 'funding') {
     const ageDays = (DATA.kpis && DATA.kpis.max_signal_age_days) || 90;
     const cutoff  = Date.now() - ageDays * 86400000;

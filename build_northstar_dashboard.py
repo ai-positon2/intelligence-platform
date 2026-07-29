@@ -105,12 +105,27 @@ def build_northstar():
         },
     ]
 
+    # NorthStar is an anesthesia group, so its "Creative Hiring" KPI tracks
+    # anesthesiologist / CRNA / anesthesia-provider hiring instead of the
+    # 3D/creative hiring this tile means for Healthcare and CSG. Only the
+    # display text changes here (icon/label/tooltip/badge/empty state) — the
+    # underlying stored signal_type stays "Creative Hiring" so scoring and the
+    # (future) fetch script need only one constant to agree on.
+    northstar_hiring_opts = {
+        "icon": "🩺",
+        "label": "Anesthesiologists",
+        "tooltip": "Anesthesiologist / CRNA hiring signals",
+        "badge": "Anesthesia Hiring",
+        "empty_msg": "No anesthesiologist-hiring signals detected yet.",
+    }
+
     out = build_dashboard(
         companies_from_csv=companies,
         store=store,
         output_path=OUT_PATH,
         max_signal_age_days=90,
         refresh_opts=northstar_refresh_opts,
+        hiring_opts=northstar_hiring_opts,
     )
 
     # Client-facing variant: same dashboard, internal-ops chrome hidden.
