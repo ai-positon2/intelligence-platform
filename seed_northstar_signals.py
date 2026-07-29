@@ -85,7 +85,7 @@ def main() -> None:
         )
         inserted += 1
 
-    print("Signals loaded from %s (batch %s):" % (SIGNALS_JSON.name, data.get("batch", "?")))
+    print("Signals loaded from %s (batches %s):" % (SIGNALS_JSON.name, data.get("batches_loaded", data.get("batch", "?"))))
     print("  Inserted:            %d" % inserted)
     print("  Already in DB:       %d" % skipped_dupe)
     print("  Unmatched company:   %d" % skipped_unmatched)
