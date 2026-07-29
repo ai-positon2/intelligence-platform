@@ -1564,6 +1564,20 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "GTM", "CRM"],
     },
     {
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher",
+        "tagline": "Competitive LinkedIn content analysis",
+        "ac": "#3b82f6", "ac2": "#a855f7",
+        "icon": _asvg("<path d=\"M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z\"/><path d=\"M12 7v12.8\"/>"),
+        "pill1": "Competitive LinkedIn Analysis", "pill2": "Messaging · creative · cadence · AI playbook",
+        "lead": ("Decode any company's organic LinkedIn strategy in one report. Point it at a company and it reads a year of their posts, then breaks down the messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run."),
+        "trips": [
+            {"t": "What it does", "d": "Turns any company's public LinkedIn presence into a full strategy report: messaging themes, content categories, creative formats, engagement benchmarks, top posts and a 30/60/90 AI playbook."},
+            {"t": "How it works", "d": "Pick the exact company page and it pulls the last 12 months of organic posts, analyses the copy, creative and reactions, scores the account, and writes a prioritised set of recommendations."},
+            {"t": "Best for", "d": "Marketing and demand-gen teams benchmarking their own LinkedIn against competitors and planning what to post next."},
+        ],
+        "tags": ["LinkedIn", "Competitive", "Content", "Engagement", "AI"],
+    },
+    {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence",
         "tagline": "Competitive Creative",
         "ac": "#a855f7", "ac2": "#e879f9", "icon": _asvg("<path d=\"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>"),
@@ -2368,8 +2382,9 @@ CLIENTS = {
         "tagline":  "Your agents, all in one place.",
         "blurb":    "",
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
-        "agents":   ["signal-tracker", "linkedin-intelligence", "ad-intelligence",
-                     "keyword-finder", "content-brief-generator", "content-enhancer"],
+        "agents":   ["signal-tracker", "linkedin-intelligence", "linkedin-strategy-researcher",
+                     "ad-intelligence", "keyword-finder", "content-brief-generator",
+                     "content-enhancer"],
         # Per-agent live dashboards wired to this client's data. An agent listed
         # here renders its co-branded dashboard (internal-ops chrome hidden) inside
         # the portal instead of the generic "in setup" shell, and shows as Live.
@@ -2380,6 +2395,14 @@ CLIENTS = {
         # rendered from this client's own engagement sheet. Presence of this key
         # makes the linkedin-intelligence agent render its live dashboard in-portal.
         "linkedin_sheet": "13V-W-yG5O-OoLJHjxsPKLjrpRyRdk647GgkIGw823oE",
+        # Agents whose "Use" surface embeds an external, Position2-hosted tool
+        # (its own host masked behind this portal's path). The tool loads inside the
+        # portal's embed shell via an iframe, so the address bar stays on
+        # intelligence.position2.com/<slug>/agents/<agent>/use — the external host is
+        # never shown. Treated like a live dashboard (shows Live, not run-metered).
+        "external_tools": {
+            "linkedin-strategy-researcher": "https://watchtower-by-position2.vercel.app/linkedin.html",
+        },
     },
 }
 
@@ -2411,17 +2434,29 @@ def _client_live_dashboard(client, agent_slug):
     return bool(client and agent_slug == "linkedin-intelligence"
                 and client.get("linkedin_sheet"))
 
+def _client_external_tool(client, agent_slug):
+    """External, Position2-hosted tool URL for an agent in this client's portal, or
+    None. An external-tool agent embeds a third-party-hosted tool (its own host masked
+    behind the portal path) in the embed shell, rather than a SERP tool or a
+    Flask-rendered dashboard. Treated like a live dashboard: shown as Live and not
+    run-metered (the external tool doesn't implement our run-metering postMessage
+    contract)."""
+    return (client.get("external_tools") or {}).get(agent_slug) if client else None
+
 def _client_agent_view(slug, client=None):
-    """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface)
-    and `is_dashboard` (backed by a co-branded dashboard — static file or live route
-    — for this client, so it renders the dashboard rather than a SERP tool and is not
-    run-metered). Returns None for unknown slugs."""
+    """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface),
+    `is_dashboard` (backed by a co-branded dashboard — static file or live route — OR
+    an external hosted tool — for this client, so it renders in the embed shell rather
+    than a SERP tool and is not run-metered) and `is_external` (the embed is a
+    Position2-hosted external tool). Returns None for unknown slugs."""
     a = APP_AGENTS_BY_SLUG.get(slug)
     if not a:
         return None
     has_dash = bool(client and (_client_dashboard_path(client, slug)
                                 or _client_live_dashboard(client, slug)))
-    return dict(a, connected=bool(a.get("seo_slug")) or has_dash, is_dashboard=has_dash)
+    is_ext = bool(_client_external_tool(client, slug))
+    return dict(a, connected=bool(a.get("seo_slug")) or has_dash or is_ext,
+                is_dashboard=has_dash or is_ext, is_external=is_ext)
 
 def _client_agents(client):
     return [v for v in (_client_agent_view(s, client) for s in client.get("agents", [])) if v]
@@ -2491,11 +2526,16 @@ def _client_agent_use(client_slug, agent_slug):
     user = _get_user()
     # Dashboard-backed agent: serve the co-branded dashboard in the portal shell.
     # These are not run-metered (a dashboard has no "runs"), so no cap logic applies.
+    # For an external-tool agent the iframe points straight at the hosted tool, so the
+    # tool's own host stays hidden behind this portal path (only the address bar's
+    # /<slug>/agents/<agent>/use is shown).
     if agent.get("is_dashboard"):
+        dash_url = (_client_external_tool(client, agent_slug)
+                    or "/%s/agents/%s/dashboard" % (client_slug, agent_slug))
         return render_template("client_embed.html", client=client, agent=agent,
                                embed_url="", serp_origin=_SERP_BASE, user=user,
                                is_dashboard=True,
-                               dashboard_url="/%s/agents/%s/dashboard" % (client_slug, agent_slug),
+                               dashboard_url=dash_url,
                                runs_used=0, run_cap=AGENT_RUN_CAP, limit_reached=False)
     email = (user or {}).get("email", "")
     # Same per-agent, per-account run cap as /app (Agent Runs sheet is shared, so a
@@ -2521,6 +2561,11 @@ def _client_agent_dashboard(client_slug, agent_slug):
         return gate
     if agent_slug not in client.get("agents", []):
         abort(404)
+    # External-tool agent: the embed shell iframes the hosted tool directly, but if
+    # this route is hit on its own, send it to the tool.
+    ext = _client_external_tool(client, agent_slug)
+    if ext:
+        return redirect(ext)
     # Live LinkedIn Intelligence: render the exact /p2 dashboard template in client
     # mode (internal chrome hidden), pointed at this client's gated data endpoint.
     if _client_live_dashboard(client, agent_slug):
