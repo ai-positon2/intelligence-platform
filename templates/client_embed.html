@@ -48,6 +48,12 @@
       <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">Back to {{ agent.name }}</a>
     </div>
   </div>
+{% elif is_external and embed_url %}
+  {# External Position2-hosted tool: iframe only (its host stays masked behind the
+     portal path). Run-metering is handled server-side on page load, so this branch
+     carries none of the SERP postMessage plumbing. #}
+  <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
+          allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
 {% elif agent.connected and embed_url %}
   <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
           allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
