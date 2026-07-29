@@ -2383,7 +2383,7 @@ CLIENTS = {
         "blurb":    "",
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
         "agents":   ["signal-tracker", "linkedin-intelligence", "linkedin-strategy-researcher",
-                     "ad-intelligence", "keyword-finder", "content-brief-generator",
+                     "keyword-finder", "content-brief-generator",
                      "content-enhancer"],
         # Per-agent live dashboards wired to this client's data. An agent listed
         # here renders its co-branded dashboard (internal-ops chrome hidden) inside
