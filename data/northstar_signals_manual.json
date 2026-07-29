@@ -1,89 +1,517 @@
 {
   "_readme": "Manually researched signals for the NorthStar Anesthesia ABM Signal Tracker, gathered via real web research (batch-by-batch, 5 companies at a time) while the permanent Sheets-based signal pipeline is being wired up. Each entry becomes one row in the 'alerts_sent' table via seed_northstar_signals.py. signal_type must be one of the canonical strings tracker/signal_score.py and tracker/dashboard_builder.py expect: 'Funding Round', 'Acquisition / M&A', 'IPO Signal', 'C-Suite Join', 'C-Suite Exit', 'News Mention', 'Product Launch', 'Partnership', 'Creative Hiring' (this last one is displayed to NorthStar as 'Anesthesiologists' via the hiring_opts override in build_northstar_dashboard.py -- the stored key stays 'Creative Hiring' so the shared scoring engine needs only one constant). confidence (HIGH/MEDIUM/LOW, from the research pass) is written straight into the 'severity' column -- it is the closest available proxy for alert importance and is what actually drives the dashboard's H/M/L counts.",
-  "batches_loaded": [1, 2],
-  "companies_covered": ["Banner Health", "Texas Back Institute", "Orlando Health Jewett Orthopedic Institute", "HEALTH FIRST", "Southwest Surgical Associates", "Kelsey Seybold", "Axion Spine Outpatient Surgery Center", "Lecanto Surgery Center (researched, genuinely no public signal)", "Us Oral Surgery Management", "Baptist Health South Florida"],
+  "batches_loaded": [
+    1,
+    2
+  ],
+  "companies_covered": [
+    "Banner Health",
+    "Orlando Health Jewett Orthopedic Institute",
+    "HEALTH FIRST",
+    "Southwest Surgical Associates",
+    "Kelsey Seybold",
+    "Baptist Health South Florida"
+  ],
   "signals": [
-    {"company_name": "Banner Health", "signal_type": "Creative Hiring", "signal_detail": "Actively and broadly recruiting anesthesiologists and CRNAs across Arizona and Colorado, with sign-on bonuses up to $100K.", "signal_date": "2026-07-01", "source_url": "https://careers.asahq.org/job/anesthesiologist-banner-university-medicine-tucson-530k-year/68972096/", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Creative Hiring", "signal_detail": "Banner Gateway Medical Center (Gilbert, AZ) offering CRNAs a $50K sign-on bonus and $260K+ annual comp for an employed practice opportunity.", "signal_date": "2026-07-01", "source_url": "https://careers.asahq.org/job/crnas-50k-sign-on-bonus-260k-annually-employed-practice-opportunity-with-banner-health-at-banner-gateway-medical-center/73970880/", "severity": "MEDIUM"},
-    {"company_name": "Banner Health", "signal_type": "Creative Hiring", "signal_detail": "Banner University Medicine Tucson (w/ U. of Arizona) actively interviewing anesthesiologists at $530K+/yr, plus recruiting a CRNA Manager at $275K+.", "signal_date": "2026-07-01", "source_url": "https://careers.asahq.org/job/anesthesiologist-community-practice-opportunity-banner-university-medical-center-tucson-az/75130429/", "severity": "MEDIUM"},
-    {"company_name": "Banner Health", "signal_type": "Creative Hiring", "signal_detail": "Banner Health Community Hospital (Torrington, CO) recruiting CRNAs for an independent rural-hospital anesthesia practice at ~$375K.", "signal_date": "2026-07-01", "source_url": "https://thecrna.com/crna-banner-health-community-hospital-in-torrington-375k-independent-practice-rural-hospital/", "severity": "MEDIUM"},
-    {"company_name": "Banner Health", "signal_type": "Product Launch", "signal_detail": "Upgrading its entire surgical robot fleet to 49 Intuitive da Vinci 5 systems across AZ/CO/WY -- one of the largest such investments by any US health system.", "signal_date": "2026-02-18", "source_url": "https://www.modernhealthcare.com/medical-devices/mh-banner-health-intuitive-surgical-robots-da-vinci-5/", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Product Launch", "signal_detail": "Expanded its AI-powered OR scheduling/automation platform (with Qventus) system-wide after a pilot added 2.1 cases per OR per month.", "signal_date": "2025-08-27", "source_url": "https://www.fiercehealthcare.com/ai-and-machine-learning/banner-health-doubles-down-ai-powered-automation-tech-modernize-its-or", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Product Launch", "signal_detail": "Opened Banner Cardiovascular Center - Arcadia, a new outpatient heart-care surgery center in Phoenix.", "signal_date": "2025-07-01", "source_url": "https://www.bannerhealth.com/newsroom/press-releases/arcadia-surgery-center", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Product Launch", "signal_detail": "Broke ground on a new 384,000 sq-ft Banner Scottsdale Medical Center (cardiovascular, orthopedics, neuroscience), opening 2026.", "signal_date": "2025-05-01", "source_url": "https://ascnews.com/2025/05/asc-pipeline-banner-health-breaks-ground-on-scottsdale-campus-nyu-langone-expands-with-new-ambulatory-facility/", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Product Launch", "signal_detail": "Banner Estrella Medical Center completed a $35M expansion adding hospital beds, surgical suites and obstetric suites.", "signal_date": "2025-10-01", "source_url": "https://www.bannerhealth.com/newsroom/press-releases/estrella-expansion-oct-2025", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "Partnership", "signal_detail": "Banner Health / Atlas Healthcare Partners ambulatory surgery center JV continues expanding across Phoenix and Tucson, targeting 50+ ASCs.", "signal_date": "2025-01-01", "source_url": "https://www.prnewswire.com/news-releases/banner-health--atlas-healthcare-partners-joint-venture-partner-with-advanced-spine-and-pain-llc-to-announce-21st-ambulatory-surgery-center-serving-central-phoenix-area-301408627.html", "severity": "MEDIUM"},
-    {"company_name": "Banner Health", "signal_type": "C-Suite Join", "signal_detail": "Amy Perry became President and CEO effective June 30, 2024, succeeding longtime CEO Peter Fine.", "signal_date": "2024-06-30", "source_url": "https://www.healthcaredive.com/news/banner-health-names-new-ceo-amy-perry-peter-fine/712766/", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "C-Suite Exit", "signal_detail": "Longtime CEO Peter Fine retired after 24 years effective June 30, 2024, remaining as CEO Emeritus/advisor through 2025.", "signal_date": "2024-04-09", "source_url": "https://www.chiefhealthcareexecutive.com/view/banner-health-ceo-plans-to-retire-new-leader-named", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "C-Suite Join", "signal_detail": "Named Ryan Koos as new SVP and Chief Supply Chain Officer, effective June 16, 2025.", "signal_date": "2025-06-16", "source_url": "https://www.globenewswire.com/news-release/2025/06/16/3100121/0/en/Banner-Health-names-new-chief-supply-chain-officer.html", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "C-Suite Join", "signal_detail": "Dr. Benjamin Schwartz joined in 2025 as President of Academic Delivery, leading its academic medicine division.", "signal_date": "2025-01-01", "source_url": "https://www.bannerhealth.com/about/leadership/executive/ben-schwartz", "severity": "MEDIUM"},
-    {"company_name": "Banner Health", "signal_type": "News Mention", "signal_detail": "Banner - University Medical Center Phoenix and Tucson named among U.S. News 2025-26 Best Regional Hospitals in Arizona.", "signal_date": "2025-01-01", "source_url": "https://www.bannerhealth.com/about/glance/us-news-and-world-report-rankings", "severity": "HIGH"},
-    {"company_name": "Banner Health", "signal_type": "News Mention", "signal_detail": "CEO Amy Perry named to Modern Healthcare's 100 Most Influential People in Healthcare for the second consecutive year.", "signal_date": "2025-12-01", "source_url": "https://www.bannerhealth.com/newsroom/press-releases/most-influential-2025", "severity": "HIGH"},
-
-    {"company_name": "Texas Back Institute", "signal_type": "C-Suite Join", "signal_detail": "Deborah Lief, RN, named COO in Oct 2016; Lise McConnell named CFO in 2016.", "signal_date": "2016-10-01", "source_url": "https://www.beckersspine.com/orthopedic-spine-practices-improving-profits/fast-facts-on-texas-back-institute-s-executive-team/", "severity": "MEDIUM"},
-    {"company_name": "Texas Back Institute", "signal_type": "Product Launch", "signal_detail": "Texas Health Plano and Texas Back Institute began offering the SpineAssist surgical robot (one of only three in the US at the time).", "signal_date": "2010-07-28", "source_url": "https://www.prnewswire.com/news-releases/texas-health-plano-texas-back-institute-offer-spineassist-surgical-robot-for-spine-surgeries-99457374.html", "severity": "HIGH"},
-    {"company_name": "Texas Back Institute", "signal_type": "Partnership", "signal_detail": "Listed as an affiliated location/provider within Southwestern Health Resources, the UT Southwestern / Texas Health Resources clinically integrated network.", "signal_date": "2026-07-01", "source_url": "https://www.southwesternhealth.org/find-a-provider/location/texas-back-institute/0012e00002pkvvfqaf", "severity": "LOW"},
-    {"company_name": "Texas Back Institute", "signal_type": "News Mention", "signal_detail": "Dr. Richard D. Guyer received D Magazine's 'Best Doctors' recognition for 2025 and 2026.", "signal_date": "2025-06-01", "source_url": "https://texasback.com/physician/richard-d-guyer/", "severity": "MEDIUM"},
-
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "Creative Hiring", "signal_detail": "Orlando Health actively and repeatedly recruiting BE/BC anesthesiologists dedicated exclusively to Jewett Orthopedic Institute, live on multiple physician job boards.", "signal_date": "2026-07-01", "source_url": "https://careers.jamanetwork.com/job/110259555/anesthesiologist-for-orlando-health-jewett-orthopedic-institute/", "severity": "HIGH"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "Creative Hiring", "signal_detail": "Separate posting seeks a full team of anesthesiologists for Jewett, M-F schedule with no call/nights/weekends and a starting bonus -- sustained recruitment need, not one vacancy.", "signal_date": "2026-07-01", "source_url": "https://careers.aahks.net/jobs/20929068/orlando-health-jewett-orthopedic-team-is-seeking-anesthesiologists", "severity": "MEDIUM"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "Acquisition / M&A", "signal_detail": "Orlando Health completed a $439M acquisition of Steward Health Care's 3 East Central Florida hospitals and affiliated physician practices, folding the orthopedic physicians into Jewett Orthopedic Institute.", "signal_date": "2024-10-24", "source_url": "https://www.orlandohealth.com/content-hub/orlando-health-completes-purchase-of-hospitals-and-physician-practices-in-east-central-florida", "severity": "HIGH"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "News Mention", "signal_detail": "Statewide expansion integrating 26 new ortho/sports-med physicians, bringing the Institute to 24 clinics, 94 physicians and 118 APPs statewide.", "signal_date": "2025-07-14", "source_url": "https://www.prnewswire.com/news-releases/orlando-health-jewett-orthopedic-institute-expands-coast-to-coast-in-florida-302503687.html", "severity": "HIGH"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "News Mention", "signal_detail": "Plans a new 27,000 sq-ft, two-story Winter Park campus (ortho care, rehab, imaging, walk-in clinic), approved by the Winter Park Planning & Zoning Board.", "signal_date": "2025-10-08", "source_url": "https://www.growthspotter.com/2025/10/08/orlando-health-jewett-orthopedic-institute-plans-new-winter-park-campus/", "severity": "HIGH"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "News Mention", "signal_detail": "Received a 2025 Human Experience Guardian of Excellence Award from Press Ganey for patient experience.", "signal_date": "2025-01-01", "source_url": "https://www.beckersspine.com/orthopedic/orlando-health-jewett-orthopedic-institute-earns-2025-press-ganey-award/", "severity": "MEDIUM"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "Partnership", "signal_detail": "The Innovation Center at Jewett Orthopedic Institute made a strategic investment in Orthopedic Driven Imaging (ODI) to advance a patient-specific surgery imaging ecosystem.", "signal_date": "2025-08-01", "source_url": "https://ryortho.com/2025/08/orthopedic-driven-imaging-secures-new-strategic-funding-from-the-innovation-center-at-orlando-health-jewett-orthopedic-institute-to-advance-the-patient-specific-surgery-ecosystem/", "severity": "MEDIUM"},
-    {"company_name": "Orlando Health Jewett Orthopedic Institute", "signal_type": "C-Suite Join", "signal_detail": "Dr. Michael V. Jablonski now serves as SVP of Orlando Health and President of both Jewett Orthopedic Institute and Orlando Health Neuroscience Institute (confirmed in role as of July 2025).", "signal_date": "2025-07-01", "source_url": "https://www.orlandohealth.com/about-us/leadership/michael-v-jablonski", "severity": "MEDIUM"},
-
-    {"company_name": "HEALTH FIRST", "signal_type": "C-Suite Join", "signal_detail": "Terry Forde, former President/CEO of Adventist HealthCare, became President and CEO, officially starting August 2024.", "signal_date": "2024-08-01", "source_url": "https://spacecoastdaily.com/2024/08/first-day-president-and-ceo-terry-forde-and-community-health-services-president-dr-drew-fink-welcomed-to-health-first/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "C-Suite Join", "signal_detail": "Kristen Pulio joined as Executive VP and CFO after leaving Adventist HealthCare, around September 2024.", "signal_date": "2024-09-01", "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/4-cfo-exits-in-2024/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "C-Suite Exit", "signal_detail": "Matt Gerrell, President and CEO of Health First Health Plans, departed abruptly after 19 years; COO Jamie Forrest named interim president.", "signal_date": "2025-08-01", "source_url": "https://thespacecoastrocket.com/health-first-ceo-ousted-after-19-years-in-sudden-leadership-shake-up/", "severity": "MEDIUM"},
-    {"company_name": "HEALTH FIRST", "signal_type": "Partnership", "signal_detail": "Health First and Parrish Healthcare signed agreements integrating health-plan networks and transferring the Health First Cancer Institute building in Titusville to Parrish, resolving prior legal disputes.", "signal_date": "2024-07-01", "source_url": "https://www.parrishhealthcare.com/news/2024/september/health-first-and-parrish-healthcare-sign-health-/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "Product Launch", "signal_detail": "Broke ground on a new 268,000 sq-ft Cape Canaveral Hospital, 120 beds, six ORs, plus Brevard County's first freestanding ER.", "signal_date": "2025-01-01", "source_url": "https://spacecoastdaily.com/2025/01/health-first-has-epic-year-in-2024-from-new-hospital-to-new-choppers-and-lots-of-stars-and-top-rankings/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "Product Launch", "signal_detail": "Board authorized a master plan to expand Viera Hospital to 214 beds, adding two new ORs and a cardiac catheterization lab.", "signal_date": "2025-09-01", "source_url": "https://spacecoastdaily.com/2025/09/health-first-announces-master-plan-to-expand-viera-hospital-will-double-capacity-to-214-beds-enhance-emergency-care/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "News Mention", "signal_detail": "Announced a $230M, five-floor patient tower expansion of Palm Bay Hospital, construction slated for summer 2026.", "signal_date": "2026-01-01", "source_url": "https://www.hf.org/news/health-first-announces-230-million-palm-bay-hospital-expansions", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "News Mention", "signal_detail": "Expanded emergency care capacity and fast-tracked new ER access across Brevard County following the closure of Orlando Health Rockledge Hospital in April 2025.", "signal_date": "2025-04-01", "source_url": "https://spacecoastdaily.com/2026/01/watch-health-first-grows-emergency-care-network-will-be-staffed-24-7-by-emergency-physicians-and-clinical-team/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "News Mention", "signal_detail": "Multiple 2024 accolades: Newsweek World's Best Hospitals (Cape Canaveral, 4th year running), U.S. News #1 Brevard/#17 Florida (Holmes Regional), CMS 5-Star (Viera Hospital), Leapfrog 'A' grade (Cape Canaveral).", "signal_date": "2025-01-01", "source_url": "https://spacecoastdaily.com/2025/01/health-first-has-epic-year-in-2024-from-new-hospital-to-new-choppers-and-lots-of-stars-and-top-rankings/", "severity": "HIGH"},
-    {"company_name": "HEALTH FIRST", "signal_type": "Creative Hiring", "signal_detail": "Open Director of Perioperative Services role for Holmes Regional Medical Center (515-bed, 16-OR facility) in Melbourne, FL, listed via Whitman Partners.", "signal_date": "2026-07-01", "source_url": "https://whitmanpartners.com/job/director-of-perioperative-services-21524-health-first-holmes-regional-medical-center/", "severity": "MEDIUM"},
-
-    {"company_name": "Southwest Surgical Associates", "signal_type": "News Mention", "signal_detail": "Colorectal surgeon Dr. Bidhan Das joined as a new partner.", "signal_date": "2024-10-01", "source_url": "https://southwestsurgical.com/welcome-dr-das-new-colorectal-surgeon/", "severity": "HIGH"},
-    {"company_name": "Southwest Surgical Associates", "signal_type": "News Mention", "signal_detail": "Surgeon Dr. Buckminster J. Farrow awarded Memorial Hermann's 2025 Charlotte Alexander Exemplary Physician Award for medical mission work.", "signal_date": "2025-01-01", "source_url": "https://southwestsurgical.com/personnel/buckminster-farrow-md/", "severity": "MEDIUM"},
-    {"company_name": "Southwest Surgical Associates", "signal_type": "News Mention", "signal_detail": "Paid $65,000 to HHS OCR to settle a HIPAA Right of Access violation for failing to provide a patient timely access to their records.", "signal_date": "2022-07-15", "source_url": "https://www.hhs.gov/hipaa/for-professionals/compliance-enforcement/agreements/southwest-surgical/index.html", "severity": "HIGH"},
-
-    {"company_name": "Kelsey Seybold", "signal_type": "Acquisition / M&A", "signal_detail": "Optum (UnitedHealth Group) completed its acquisition of Kelsey-Seybold Clinic Partners from TPG for approximately $2 billion.", "signal_date": "2022-04-01", "source_url": "https://www.beckerspayer.com/executive-moves/5-things-to-know-about-unitedhealth-groups-ownership-of-kelsey-seybold/", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Funding Round", "signal_detail": "TPG Capital made a non-controlling strategic equity investment in Kelsey-Seybold Management Services (the MSO), later superseded by the 2022 Optum acquisition.", "signal_date": "2020-01-21", "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-clinic-partners-with-tpg", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "C-Suite Join", "signal_detail": "Azam Kundi, M.D. (previously Medical Director for M&A and Vice Chairman of the Board) was elevated to Chairman and CEO of Kelsey-Seybold Clinic.", "signal_date": "2025-01-01", "source_url": "https://houston.org/people/azam-kundi/", "severity": "MEDIUM"},
-    {"company_name": "Kelsey Seybold", "signal_type": "News Mention", "signal_detail": "Broke ground on a new 34,000 sq-ft clinic in Missouri City (Fort Bend Town Center), its seventh Fort Bend County location, opening summer 2026.", "signal_date": "2025-10-30", "source_url": "https://communityimpact.com/houston/sugar-land-missouri-city/health-care/2025/10/30/kelsey-seybold-clinic-breaks-ground-on-missouri-city-location/", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "News Mention", "signal_detail": "New five-story, 135,000 sq-ft Lake Houston Campus (up to 51 providers) opened and began accepting patients.", "signal_date": "2025-09-30", "source_url": "https://communityimpact.com/lake-houston-humble-kingwood/healthcare/kelsey-seybold-clinic-expands-specialty-care-with-opening-of-lake-houston-campus/", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "News Mention", "signal_detail": "Opened a new 36,000 sq-ft clinic in Houston's Upper Kirby District.", "signal_date": "2025-02-03", "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-opens-new-clinic-in-upper-kirby-district", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Product Launch", "signal_detail": "Added a da Vinci Xi Surgical System at its Springwoods Village Campus ASC for general, gynecologic, and urologic minimally-invasive procedures.", "signal_date": "2025-01-01", "source_url": "https://www.kelsey-seybold.com/newsroom-landing/photo-captions/springwoods-village-now-offers-even-greater-innovations-in-surgical-care", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Product Launch", "signal_detail": "Memorial Villages Campus Surgery Center uses Mako SmartRobotics for robotic-guided partial knee replacement procedures.", "signal_date": "2026-07-01", "source_url": "https://www.kelsey-seybold.com/medical-services-and-specialties/surgery/surgery-center/robotic-surgery", "severity": "MEDIUM"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Creative Hiring", "signal_detail": "Own careers site has an open, actively-recruiting CRNA - Anesthesiology role at Springwoods Village (salary $191,500-$261,500).", "signal_date": "2026-07-01", "source_url": "https://kelsey-seyboldproviders.com/job/crna-anesthesiology-kelsey-seybold-clinic-2320168/", "severity": "HIGH"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Creative Hiring", "signal_detail": "Separately recruiting a Physician - Anesthesiologist (MD/CRNA Anesthesia Care Team lead model, no call/weekends/holidays) for its Houston ambulatory surgery practice.", "signal_date": "2026-07-01", "source_url": "https://www.nejmcareercenter.org/job/994988/physician-anesthesiology-kelsey-seybold-clinic/", "severity": "MEDIUM"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Creative Hiring", "signal_detail": "Multiple additional CRNA/anesthesiologist listings (Main Campus and Springwoods Village) cross-posted on UnitedHealth Group's careers portal, indicating multi-site ongoing anesthesia hiring need.", "signal_date": "2026-04-01", "source_url": "https://careers.unitedhealthgroup.com/job/houston/crna-kelsey-seybold-clinic-main-campus/34088/93972020944", "severity": "MEDIUM"},
-    {"company_name": "Kelsey Seybold", "signal_type": "Partnership", "signal_detail": "Expanding its value-based Medicare Advantage coordinated-care model with plans including Aetna, UnitedHealthcare, and WellCare across Greater Houston.", "signal_date": "2025-01-01", "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-expands-access-to-coordinated-health-care-for-seniors", "severity": "MEDIUM"},
-
-    {"company_name": "Axion Spine Outpatient Surgery Center", "signal_type": "Partnership", "signal_detail": "Axion Spine & Neurosurgery's physicians operate as clinical partners within the Wellstar Health System network, with multiple Axion locations listed under Wellstar's physician directory.", "signal_date": "2026-07-01", "source_url": "https://www.wellstar.org/locations/medical-practice/axion-spine-neurosurgery-alpharetta-4100-old-milton-parkway-suite-101", "severity": "MEDIUM"},
-    {"company_name": "Axion Spine Outpatient Surgery Center", "signal_type": "News Mention", "signal_detail": "Expanding its North Atlanta footprint, adding Sandy Springs and Riverdale locations alongside its original Alpharetta practice and surgery center.", "signal_date": "2022-05-01", "source_url": "https://www.atlantamagazine.com/article/axion-spine-neurosurgery/", "severity": "MEDIUM"},
-
-    {"company_name": "Us Oral Surgery Management", "signal_type": "Funding Round", "signal_detail": "Closed a $175 million credit expansion to fund continued growth through 2026.", "signal_date": "2024-12-19", "source_url": "https://www.globenewswire.com/news-release/2024/12/19/2999982/0/en/U-S-Oral-Surgery-Management-Secures-175-Million-Credit-Expansion.html", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "Acquisition / M&A", "signal_detail": "Current PE sponsor is Oak Hill Capital, which recapitalized the company in November 2021, succeeding original backer Thurston Group.", "signal_date": "2021-11-01", "source_url": "https://www.usosm.com/oak-hill-capital-to-partner-with-u-s-oral-surgery-management/", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "C-Suite Join", "signal_detail": "Named Doug Drew (former Global President of Mars Veterinary Health) as new CEO, effective July 1, 2025.", "signal_date": "2025-07-01", "source_url": "https://www.globenewswire.com/news-release/2025/07/02/3109255/0/en/U-S-Oral-Surgery-Management-Names-Doug-Drew-CEO.html", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "C-Suite Exit", "signal_detail": "Longtime CEO Richard Hall stepped down effective July 1, 2025, transitioning to Chairman of the Board.", "signal_date": "2025-07-01", "source_url": "https://www.globenewswire.com/news-release/2025/07/02/3109255/0/en/U-S-Oral-Surgery-Management-Names-Doug-Drew-CEO.html", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "News Mention", "signal_detail": "Named by Becker's Healthcare to its 2025 'DSOs to Know' list.", "signal_date": "2025-01-01", "source_url": "https://www.usosm.com/beckers-healthcare-names-u-s-oral-surgery-management-to-2025-dsos-to-know-list/", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "News Mention", "signal_detail": "Named 'Top Oral Surgery Practice Management Service' for 2025 by Healthcare Business Review.", "signal_date": "2025-01-01", "source_url": "https://www.healthcarebusinessreview.com/u-s-oral-surgery-management-usosm", "severity": "MEDIUM"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "Partnership", "signal_detail": "Added Northern Virginia Oral, Maxillofacial & Implant Surgery (4 surgeons, 3 sites) as a new partner practice.", "signal_date": "2025-12-04", "source_url": "https://www.globenewswire.com/news-release/2025/12/04/3199939/0/en/USOSM-Secures-Partnership-with-Northern-Virginia-Oral-Maxillofacial-Implant-Surgery.html", "severity": "HIGH"},
-    {"company_name": "Us Oral Surgery Management", "signal_type": "Partnership", "signal_detail": "Secured three new partner practices in Maryland, New York, and Oregon, reaching a network spanning 31 states.", "signal_date": "2025-11-13", "source_url": "https://www.globenewswire.com/news-release/2025/11/13/3187520/0/en/U-S-Oral-Surgery-Management-Secures-New-Partner-Practices-in-Three-States.html", "severity": "HIGH"},
-
-    {"company_name": "Baptist Health South Florida", "signal_type": "Creative Hiring", "signal_detail": "Envision Physician Services / Kendall Anesthesia Associates (exclusive anesthesia group at Baptist Hospital of Miami since 1960) is actively recruiting General Anesthesiologists, a Cardiac Anesthesiologist, CRNAs, and a Certified Anesthesiologist Assistant, with sign-on bonuses up to $100,000.", "signal_date": "2026-07-01", "source_url": "https://www.envisionhealth.com/find-a-career/clinical-job-search/certified-anesthesiology-asst.-miami-fl/jo000012848", "severity": "MEDIUM"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "Creative Hiring", "signal_detail": "Own careers portal lists open Anesthesia Tech positions in Miami and at the new Boca Raton Regional tower, signaling anesthesia-department staffing growth tied to facility expansion.", "signal_date": "2026-07-01", "source_url": "https://careers.baptisthealth.net/us/en/job/158394/Anesthesia-Tech-Anesthesiology-NEW-TOWER-FT-8-30A-7P", "severity": "MEDIUM"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "C-Suite Join", "signal_detail": "Carlos Hernandez named CEO of Baptist Health Doctors Hospital and head of Baptist Health Orthopedics, effective May 1, 2026.", "signal_date": "2026-03-23", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "C-Suite Join", "signal_detail": "Nathaniel Ortiz named CEO of Baptist Health West Kendall Baptist Hospital, effective May 1, 2026.", "signal_date": "2026-03-23", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "Partnership", "signal_detail": "Baptist Health and Lifepoint Health began construction on a joint-venture Rehabilitation Hospital in South Miami, opening August 2026, creating 200+ jobs.", "signal_date": "2026-01-01", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-and-lifepoint-begin-construction-on-rehabilitation-hospital-in-south-miami", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "Product Launch", "signal_detail": "Opened a new freestanding emergency room (Dr. Harry Richard Nateman Center) in Palmetto Bay, operating as a department of Baptist Health Doctors Hospital.", "signal_date": "2025-12-01", "source_url": "https://southfloridahospitalnews.com/baptist-health-celebrates-ribbon-cutting-and-unveiling-ceremony-for-new-freestanding-emergency-room-in-palmetto-bay/", "severity": "MEDIUM"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "Product Launch", "signal_detail": "Center for Robotic Heart & Vascular Surgery added AI-powered 'digital twin' 3D heart-modeling software to plan cardiac surgeries in advance.", "signal_date": "2026-02-01", "source_url": "https://baptisthealth.net/baptist-health-news/rise-of-ai-in-heart-care-how-robotic-and-minimally-invasive-surgery-is-getting-smarter", "severity": "MEDIUM"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "News Mention", "signal_detail": "Broke ground on its first Broward County hospital, Baptist Health Sunrise Hospital (340,000 sq-ft).", "signal_date": "2026-01-27", "source_url": "https://www.wlrn.org/health/2026-02-02/baptist-health-breaks-ground-on-hospital-in-west-broward-county", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "News Mention", "signal_detail": "Broke ground on a new Medical Center in Pembroke Pines (60,865 sq-ft, ER and outpatient services), opening early 2027.", "signal_date": "2026-07-01", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-breaks-ground-on-new-medical-center-in-pembroke-pines", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "News Mention", "signal_detail": "Named the most-awarded healthcare system in South Florida for the 15th consecutive year, earning 63 high-performing honors in U.S. News & World Report's 2025-2026 Best Hospitals rankings.", "signal_date": "2025-07-29", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-is-the-most-awarded-healthcare-system-in-south-florida-based-on-us-news", "severity": "HIGH"},
-    {"company_name": "Baptist Health South Florida", "signal_type": "News Mention", "signal_detail": "Named to Fortune's 2025 list of America's Most Innovative Companies.", "signal_date": "2025-01-01", "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-awarded-on-fortunes-list-of-americas-most-innovative-companies-2025", "severity": "HIGH"}
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Actively and broadly recruiting anesthesiologists and CRNAs across Arizona and Colorado, with sign-on bonuses up to $100K.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.asahq.org/job/anesthesiologist-banner-university-medicine-tucson-530k-year/68972096/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner Gateway Medical Center (Gilbert, AZ) offering CRNAs a $50K sign-on bonus and $260K+ annual comp for an employed practice opportunity.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.asahq.org/job/crnas-50k-sign-on-bonus-260k-annually-employed-practice-opportunity-with-banner-health-at-banner-gateway-medical-center/73970880/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner University Medicine Tucson (w/ U. of Arizona) actively interviewing anesthesiologists at $530K+/yr, plus recruiting a CRNA Manager at $275K+.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.asahq.org/job/anesthesiologist-community-practice-opportunity-banner-university-medical-center-tucson-az/75130429/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner Health Community Hospital (Torrington, CO) recruiting CRNAs for an independent rural-hospital anesthesia practice at ~$375K.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://thecrna.com/crna-banner-health-community-hospital-in-torrington-375k-independent-practice-rural-hospital/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Upgrading its entire surgical robot fleet to 49 Intuitive da Vinci 5 systems across AZ/CO/WY -- one of the largest such investments by any US health system.",
+      "signal_date": "2026-02-18",
+      "source_url": "https://www.modernhealthcare.com/medical-devices/mh-banner-health-intuitive-surgical-robots-da-vinci-5/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Expanded its AI-powered OR scheduling/automation platform (with Qventus) system-wide after a pilot added 2.1 cases per OR per month.",
+      "signal_date": "2025-08-27",
+      "source_url": "https://www.fiercehealthcare.com/ai-and-machine-learning/banner-health-doubles-down-ai-powered-automation-tech-modernize-its-or",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Opened Banner Cardiovascular Center - Arcadia, a new outpatient heart-care surgery center in Phoenix.",
+      "signal_date": "2025-07-01",
+      "source_url": "https://www.bannerhealth.com/newsroom/press-releases/arcadia-surgery-center",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Broke ground on a new 384,000 sq-ft Banner Scottsdale Medical Center (cardiovascular, orthopedics, neuroscience), opening 2026.",
+      "signal_date": "2025-05-01",
+      "source_url": "https://ascnews.com/2025/05/asc-pipeline-banner-health-breaks-ground-on-scottsdale-campus-nyu-langone-expands-with-new-ambulatory-facility/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Banner Estrella Medical Center completed a $35M expansion adding hospital beds, surgical suites and obstetric suites.",
+      "signal_date": "2025-10-01",
+      "source_url": "https://www.bannerhealth.com/newsroom/press-releases/estrella-expansion-oct-2025",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Partnership",
+      "signal_detail": "Banner Health / Atlas Healthcare Partners ambulatory surgery center JV continues expanding across Phoenix and Tucson, targeting 50+ ASCs.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.prnewswire.com/news-releases/banner-health--atlas-healthcare-partners-joint-venture-partner-with-advanced-spine-and-pain-llc-to-announce-21st-ambulatory-surgery-center-serving-central-phoenix-area-301408627.html",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Amy Perry became President and CEO effective June 30, 2024, succeeding longtime CEO Peter Fine.",
+      "signal_date": "2024-06-30",
+      "source_url": "https://www.healthcaredive.com/news/banner-health-names-new-ceo-amy-perry-peter-fine/712766/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Longtime CEO Peter Fine retired after 24 years effective June 30, 2024, remaining as CEO Emeritus/advisor through 2025.",
+      "signal_date": "2024-04-09",
+      "source_url": "https://www.chiefhealthcareexecutive.com/view/banner-health-ceo-plans-to-retire-new-leader-named",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Named Ryan Koos as new SVP and Chief Supply Chain Officer, effective June 16, 2025.",
+      "signal_date": "2025-06-16",
+      "source_url": "https://www.globenewswire.com/news-release/2025/06/16/3100121/0/en/Banner-Health-names-new-chief-supply-chain-officer.html",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Dr. Benjamin Schwartz joined in 2025 as President of Academic Delivery, leading its academic medicine division.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.bannerhealth.com/about/leadership/executive/ben-schwartz",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "News Mention",
+      "signal_detail": "Banner - University Medical Center Phoenix and Tucson named among U.S. News 2025-26 Best Regional Hospitals in Arizona.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.bannerhealth.com/about/glance/us-news-and-world-report-rankings",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "News Mention",
+      "signal_detail": "CEO Amy Perry named to Modern Healthcare's 100 Most Influential People in Healthcare for the second consecutive year.",
+      "signal_date": "2025-12-01",
+      "source_url": "https://www.bannerhealth.com/newsroom/press-releases/most-influential-2025",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Orlando Health actively and repeatedly recruiting BE/BC anesthesiologists dedicated exclusively to Jewett Orthopedic Institute, live on multiple physician job boards.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.jamanetwork.com/job/110259555/anesthesiologist-for-orlando-health-jewett-orthopedic-institute/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Separate posting seeks a full team of anesthesiologists for Jewett, M-F schedule with no call/nights/weekends and a starting bonus -- sustained recruitment need, not one vacancy.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.aahks.net/jobs/20929068/orlando-health-jewett-orthopedic-team-is-seeking-anesthesiologists",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Orlando Health completed a $439M acquisition of Steward Health Care's 3 East Central Florida hospitals and affiliated physician practices, folding the orthopedic physicians into Jewett Orthopedic Institute.",
+      "signal_date": "2024-10-24",
+      "source_url": "https://www.orlandohealth.com/content-hub/orlando-health-completes-purchase-of-hospitals-and-physician-practices-in-east-central-florida",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "News Mention",
+      "signal_detail": "Statewide expansion integrating 26 new ortho/sports-med physicians, bringing the Institute to 24 clinics, 94 physicians and 118 APPs statewide.",
+      "signal_date": "2025-07-14",
+      "source_url": "https://www.prnewswire.com/news-releases/orlando-health-jewett-orthopedic-institute-expands-coast-to-coast-in-florida-302503687.html",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "News Mention",
+      "signal_detail": "Plans a new 27,000 sq-ft, two-story Winter Park campus (ortho care, rehab, imaging, walk-in clinic), approved by the Winter Park Planning & Zoning Board.",
+      "signal_date": "2025-10-08",
+      "source_url": "https://www.growthspotter.com/2025/10/08/orlando-health-jewett-orthopedic-institute-plans-new-winter-park-campus/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "News Mention",
+      "signal_detail": "Received a 2025 Human Experience Guardian of Excellence Award from Press Ganey for patient experience.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.beckersspine.com/orthopedic/orlando-health-jewett-orthopedic-institute-earns-2025-press-ganey-award/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "Partnership",
+      "signal_detail": "The Innovation Center at Jewett Orthopedic Institute made a strategic investment in Orthopedic Driven Imaging (ODI) to advance a patient-specific surgery imaging ecosystem.",
+      "signal_date": "2025-08-01",
+      "source_url": "https://ryortho.com/2025/08/orthopedic-driven-imaging-secures-new-strategic-funding-from-the-innovation-center-at-orlando-health-jewett-orthopedic-institute-to-advance-the-patient-specific-surgery-ecosystem/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Dr. Michael V. Jablonski now serves as SVP of Orlando Health and President of both Jewett Orthopedic Institute and Orlando Health Neuroscience Institute (confirmed in role as of July 2025).",
+      "signal_date": "2025-07-01",
+      "source_url": "https://www.orlandohealth.com/about-us/leadership/michael-v-jablonski",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Terry Forde, former President/CEO of Adventist HealthCare, became President and CEO, officially starting August 2024.",
+      "signal_date": "2024-08-01",
+      "source_url": "https://spacecoastdaily.com/2024/08/first-day-president-and-ceo-terry-forde-and-community-health-services-president-dr-drew-fink-welcomed-to-health-first/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Kristen Pulio joined as Executive VP and CFO after leaving Adventist HealthCare, around September 2024.",
+      "signal_date": "2024-09-01",
+      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/4-cfo-exits-in-2024/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Matt Gerrell, President and CEO of Health First Health Plans, departed abruptly after 19 years; COO Jamie Forrest named interim president.",
+      "signal_date": "2025-08-01",
+      "source_url": "https://thespacecoastrocket.com/health-first-ceo-ousted-after-19-years-in-sudden-leadership-shake-up/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "Partnership",
+      "signal_detail": "Health First and Parrish Healthcare signed agreements integrating health-plan networks and transferring the Health First Cancer Institute building in Titusville to Parrish, resolving prior legal disputes.",
+      "signal_date": "2024-07-01",
+      "source_url": "https://www.parrishhealthcare.com/news/2024/september/health-first-and-parrish-healthcare-sign-health-/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "Product Launch",
+      "signal_detail": "Broke ground on a new 268,000 sq-ft Cape Canaveral Hospital, 120 beds, six ORs, plus Brevard County's first freestanding ER.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://spacecoastdaily.com/2025/01/health-first-has-epic-year-in-2024-from-new-hospital-to-new-choppers-and-lots-of-stars-and-top-rankings/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "Product Launch",
+      "signal_detail": "Board authorized a master plan to expand Viera Hospital to 214 beds, adding two new ORs and a cardiac catheterization lab.",
+      "signal_date": "2025-09-01",
+      "source_url": "https://spacecoastdaily.com/2025/09/health-first-announces-master-plan-to-expand-viera-hospital-will-double-capacity-to-214-beds-enhance-emergency-care/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "News Mention",
+      "signal_detail": "Announced a $230M, five-floor patient tower expansion of Palm Bay Hospital, construction slated for summer 2026.",
+      "signal_date": "2026-01-01",
+      "source_url": "https://www.hf.org/news/health-first-announces-230-million-palm-bay-hospital-expansions",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "News Mention",
+      "signal_detail": "Expanded emergency care capacity and fast-tracked new ER access across Brevard County following the closure of Orlando Health Rockledge Hospital in April 2025.",
+      "signal_date": "2025-04-01",
+      "source_url": "https://spacecoastdaily.com/2026/01/watch-health-first-grows-emergency-care-network-will-be-staffed-24-7-by-emergency-physicians-and-clinical-team/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "News Mention",
+      "signal_detail": "Multiple 2024 accolades: Newsweek World's Best Hospitals (Cape Canaveral, 4th year running), U.S. News #1 Brevard/#17 Florida (Holmes Regional), CMS 5-Star (Viera Hospital), Leapfrog 'A' grade (Cape Canaveral).",
+      "signal_date": "2025-01-01",
+      "source_url": "https://spacecoastdaily.com/2025/01/health-first-has-epic-year-in-2024-from-new-hospital-to-new-choppers-and-lots-of-stars-and-top-rankings/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Open Director of Perioperative Services role for Holmes Regional Medical Center (515-bed, 16-OR facility) in Melbourne, FL, listed via Whitman Partners.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://whitmanpartners.com/job/director-of-perioperative-services-21524-health-first-holmes-regional-medical-center/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Southwest Surgical Associates",
+      "signal_type": "News Mention",
+      "signal_detail": "Colorectal surgeon Dr. Bidhan Das joined as a new partner.",
+      "signal_date": "2024-10-01",
+      "source_url": "https://southwestsurgical.com/welcome-dr-das-new-colorectal-surgeon/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Southwest Surgical Associates",
+      "signal_type": "News Mention",
+      "signal_detail": "Surgeon Dr. Buckminster J. Farrow awarded Memorial Hermann's 2025 Charlotte Alexander Exemplary Physician Award for medical mission work.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://southwestsurgical.com/personnel/buckminster-farrow-md/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Southwest Surgical Associates",
+      "signal_type": "News Mention",
+      "signal_detail": "Paid $65,000 to HHS OCR to settle a HIPAA Right of Access violation for failing to provide a patient timely access to their records.",
+      "signal_date": "2022-07-15",
+      "source_url": "https://www.hhs.gov/hipaa/for-professionals/compliance-enforcement/agreements/southwest-surgical/index.html",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Optum (UnitedHealth Group) completed its acquisition of Kelsey-Seybold Clinic Partners from TPG for approximately $2 billion.",
+      "signal_date": "2022-04-01",
+      "source_url": "https://www.beckerspayer.com/executive-moves/5-things-to-know-about-unitedhealth-groups-ownership-of-kelsey-seybold/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Funding Round",
+      "signal_detail": "TPG Capital made a non-controlling strategic equity investment in Kelsey-Seybold Management Services (the MSO), later superseded by the 2022 Optum acquisition.",
+      "signal_date": "2020-01-21",
+      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-clinic-partners-with-tpg",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Azam Kundi, M.D. (previously Medical Director for M&A and Vice Chairman of the Board) was elevated to Chairman and CEO of Kelsey-Seybold Clinic.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://houston.org/people/azam-kundi/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "News Mention",
+      "signal_detail": "Broke ground on a new 34,000 sq-ft clinic in Missouri City (Fort Bend Town Center), its seventh Fort Bend County location, opening summer 2026.",
+      "signal_date": "2025-10-30",
+      "source_url": "https://communityimpact.com/houston/sugar-land-missouri-city/health-care/2025/10/30/kelsey-seybold-clinic-breaks-ground-on-missouri-city-location/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "News Mention",
+      "signal_detail": "New five-story, 135,000 sq-ft Lake Houston Campus (up to 51 providers) opened and began accepting patients.",
+      "signal_date": "2025-09-30",
+      "source_url": "https://communityimpact.com/lake-houston-humble-kingwood/healthcare/kelsey-seybold-clinic-expands-specialty-care-with-opening-of-lake-houston-campus/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "News Mention",
+      "signal_detail": "Opened a new 36,000 sq-ft clinic in Houston's Upper Kirby District.",
+      "signal_date": "2025-02-03",
+      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-opens-new-clinic-in-upper-kirby-district",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Product Launch",
+      "signal_detail": "Added a da Vinci Xi Surgical System at its Springwoods Village Campus ASC for general, gynecologic, and urologic minimally-invasive procedures.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/photo-captions/springwoods-village-now-offers-even-greater-innovations-in-surgical-care",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Product Launch",
+      "signal_detail": "Memorial Villages Campus Surgery Center uses Mako SmartRobotics for robotic-guided partial knee replacement procedures.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.kelsey-seybold.com/medical-services-and-specialties/surgery/surgery-center/robotic-surgery",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Own careers site has an open, actively-recruiting CRNA - Anesthesiology role at Springwoods Village (salary $191,500-$261,500).",
+      "signal_date": "2026-07-01",
+      "source_url": "https://kelsey-seyboldproviders.com/job/crna-anesthesiology-kelsey-seybold-clinic-2320168/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Separately recruiting a Physician - Anesthesiologist (MD/CRNA Anesthesia Care Team lead model, no call/weekends/holidays) for its Houston ambulatory surgery practice.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.nejmcareercenter.org/job/994988/physician-anesthesiology-kelsey-seybold-clinic/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Multiple additional CRNA/anesthesiologist listings (Main Campus and Springwoods Village) cross-posted on UnitedHealth Group's careers portal, indicating multi-site ongoing anesthesia hiring need.",
+      "signal_date": "2026-04-01",
+      "source_url": "https://careers.unitedhealthgroup.com/job/houston/crna-kelsey-seybold-clinic-main-campus/34088/93972020944",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Partnership",
+      "signal_detail": "Expanding its value-based Medicare Advantage coordinated-care model with plans including Aetna, UnitedHealthcare, and WellCare across Greater Houston.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-expands-access-to-coordinated-health-care-for-seniors",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Envision Physician Services / Kendall Anesthesia Associates (exclusive anesthesia group at Baptist Hospital of Miami since 1960) is actively recruiting General Anesthesiologists, a Cardiac Anesthesiologist, CRNAs, and a Certified Anesthesiologist Assistant, with sign-on bonuses up to $100,000.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.envisionhealth.com/find-a-career/clinical-job-search/certified-anesthesiology-asst.-miami-fl/jo000012848",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Own careers portal lists open Anesthesia Tech positions in Miami and at the new Boca Raton Regional tower, signaling anesthesia-department staffing growth tied to facility expansion.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.baptisthealth.net/us/en/job/158394/Anesthesia-Tech-Anesthesiology-NEW-TOWER-FT-8-30A-7P",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Carlos Hernandez named CEO of Baptist Health Doctors Hospital and head of Baptist Health Orthopedics, effective May 1, 2026.",
+      "signal_date": "2026-03-23",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Nathaniel Ortiz named CEO of Baptist Health West Kendall Baptist Hospital, effective May 1, 2026.",
+      "signal_date": "2026-03-23",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Partnership",
+      "signal_detail": "Baptist Health and Lifepoint Health began construction on a joint-venture Rehabilitation Hospital in South Miami, opening August 2026, creating 200+ jobs.",
+      "signal_date": "2026-01-01",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-and-lifepoint-begin-construction-on-rehabilitation-hospital-in-south-miami",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Product Launch",
+      "signal_detail": "Opened a new freestanding emergency room (Dr. Harry Richard Nateman Center) in Palmetto Bay, operating as a department of Baptist Health Doctors Hospital.",
+      "signal_date": "2025-12-01",
+      "source_url": "https://southfloridahospitalnews.com/baptist-health-celebrates-ribbon-cutting-and-unveiling-ceremony-for-new-freestanding-emergency-room-in-palmetto-bay/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Product Launch",
+      "signal_detail": "Center for Robotic Heart & Vascular Surgery added AI-powered 'digital twin' 3D heart-modeling software to plan cardiac surgeries in advance.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://baptisthealth.net/baptist-health-news/rise-of-ai-in-heart-care-how-robotic-and-minimally-invasive-surgery-is-getting-smarter",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "News Mention",
+      "signal_detail": "Broke ground on its first Broward County hospital, Baptist Health Sunrise Hospital (340,000 sq-ft).",
+      "signal_date": "2026-01-27",
+      "source_url": "https://www.wlrn.org/health/2026-02-02/baptist-health-breaks-ground-on-hospital-in-west-broward-county",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "News Mention",
+      "signal_detail": "Broke ground on a new Medical Center in Pembroke Pines (60,865 sq-ft, ER and outpatient services), opening early 2027.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-breaks-ground-on-new-medical-center-in-pembroke-pines",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "News Mention",
+      "signal_detail": "Named the most-awarded healthcare system in South Florida for the 15th consecutive year, earning 63 high-performing honors in U.S. News & World Report's 2025-2026 Best Hospitals rankings.",
+      "signal_date": "2025-07-29",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-is-the-most-awarded-healthcare-system-in-south-florida-based-on-us-news",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "News Mention",
+      "signal_detail": "Named to Fortune's 2025 list of America's Most Innovative Companies.",
+      "signal_date": "2025-01-01",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-awarded-on-fortunes-list-of-americas-most-innovative-companies-2025",
+      "severity": "HIGH"
+    }
+  ],
+  "companies_removed_from_universe": [
+    "Axion Spine Outpatient Surgery Center",
+    "BLANCHARD VALLEY HEALTH SYSTEM",
+    "Baucom & Mina Derm Surgery",
+    "Central Ohio Surgical Inst",
+    "Compass Surgical Partners",
+    "Greater Dayton Surgery Center",
+    "Grove Hill Memorial Hospital",
+    "LasikPlus (AKA LCA - Vision Inc)",
+    "Lecanto Surgery Center",
+    "Lone Star Surgery Pllc",
+    "Midwest Vision Surgery Center - Mvp",
+    "Ohio Surgery Center",
+    "Oral & Facial Surgery",
+    "Rothman Orthopaedic Institute",
+    "Texas Back Institute",
+    "The Ambulatory Surgery Center at St Mary",
+    "Turk'S Head Surgery Center, L.L.C.",
+    "Us Oral Surgery Management"
   ]
 }
