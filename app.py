@@ -2840,6 +2840,27 @@ def gtm():
     return render_template("gtm.html", user=_get_user())
 
 
+# LinkedIn Strategy Researcher — external Position2-hosted tool (watchtower), embedded
+# behind this internal path so the .vercel.app host stays masked in the address bar.
+# Internal GTM tool: @position2 staff only, no run cap and no metering (unlike the
+# co-branded client-portal copy of this agent, which is capped).
+LINKEDIN_RESEARCHER_URL = "https://watchtower-by-position2.vercel.app/linkedin.html"
+
+@app.route("/p2/gtm/linkedin-strategy-researcher")
+@app.route("/p2/gtm/linkedin-strategy-researcher/")
+@position2_required
+def linkedin_strategy_researcher():
+    """Competitive LinkedIn analysis tool, embedded from watchtower. Uncapped."""
+    return render_template("embed.html",
+        user=_get_user(),
+        title="LinkedIn Strategy Researcher",
+        embed_url=LINKEDIN_RESEARCHER_URL,
+        breadcrumb=[("Hub", "/p2/hub"), ("GTM", "/p2/gtm")],
+        current="LinkedIn Strategy Researcher",
+        accent="#a855f7",
+    )
+
+
 @app.route("/p2/gtm/sentiment-pulse")
 @app.route("/p2/gtm/sentiment-pulse/")
 @position2_required

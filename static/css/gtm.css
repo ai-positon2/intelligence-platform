@@ -232,6 +232,14 @@
       --card-glow: 0 0 40px rgba(14,165,233,0.10);
       --arrow-color: #38bdf8;
     }
+    .c-lir {
+      --band: linear-gradient(90deg,#6366f1,#a855f7,#d946ef);
+      --thumb: linear-gradient(135deg,#160b33 0%,#2a0f4a 100%);
+      --icon-glow: rgba(168,85,247,0.5);
+      --card-border: rgba(168,85,247,0.4);
+      --card-glow: 0 0 40px rgba(168,85,247,0.12);
+      --arrow-color: #c084fc;
+    }
     .c-job {
       --band: linear-gradient(90deg,#ec4899,#f43f5e,#fb923c);
       --thumb: linear-gradient(135deg,#1f0015 0%,#2d0a1a 100%);
