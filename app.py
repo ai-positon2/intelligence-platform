@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from functools import wraps
+from urllib.parse import urlsplit
 
 # deploy-touch: 2026-06-15T14:13:06Z
 from flask import (
@@ -2438,9 +2439,9 @@ def _client_external_tool(client, agent_slug):
     """External, Position2-hosted tool URL for an agent in this client's portal, or
     None. An external-tool agent embeds a third-party-hosted tool (its own host masked
     behind the portal path) in the embed shell, rather than a SERP tool or a
-    Flask-rendered dashboard. Treated like a live dashboard: shown as Live and not
-    run-metered (the external tool doesn't implement our run-metering postMessage
-    contract)."""
+    Flask-rendered dashboard. Shown as Live and IS run-metered, capped at
+    AGENT_RUN_CAP per user: the tool reports a real run via the same postMessage
+    contract as a SERP tool (source 'p2-agent'), handled in client_embed.html."""
     return (client.get("external_tools") or {}).get(agent_slug) if client else None
 
 def _client_agent_view(slug, client=None):
@@ -2534,20 +2535,21 @@ def _client_agent_use(client_slug, agent_slug):
                                dashboard_url="/%s/agents/%s/dashboard" % (client_slug, agent_slug),
                                runs_used=0, run_cap=AGENT_RUN_CAP, limit_reached=False)
     # External-tool agent: iframes the hosted tool (its host masked behind this portal
-    # path). Run-metered like a SERP tool and capped at AGENT_RUN_CAP per user, but the
-    # external tool doesn't implement our postMessage run contract, so a run = one load
-    # of this Use page: log it server-side (cap-enforced) before rendering the embed.
+    # path). Run-metered like a SERP tool and capped at AGENT_RUN_CAP per user. The tool
+    # now emits the same postMessage run contract as a SERP tool (source 'p2-agent'
+    # instead of 'p2-seo-tool', no per-tool slug since one external tool = one embed),
+    # so a run counts only when client_embed.html's listener sees a real
+    # 'agent-run-started' message, not on page load — see log-run/finish-run below.
     ext = _client_external_tool(client, agent_slug)
     if ext:
         email = (user or {}).get("email", "")
         runs_used = _agent_run_counts(email).get(agent_slug, 0)
         limit_reached = runs_used >= AGENT_RUN_CAP
-        if not limit_reached:
-            _log_agent_run(user, agent)
-            runs_used += 1
+        ext_origin = "{0.scheme}://{0.netloc}".format(urlsplit(ext))
         return render_template("client_embed.html", client=client, agent=agent,
                                embed_url=("" if limit_reached else ext),
-                               serp_origin=_SERP_BASE, user=user, is_dashboard=False,
+                               serp_origin=_SERP_BASE, ext_origin=ext_origin,
+                               user=user, is_dashboard=False,
                                is_external=True,
                                runs_used=runs_used, run_cap=AGENT_RUN_CAP,
                                limit_reached=limit_reached)
@@ -2631,7 +2633,11 @@ def _client_agent_log_run(client_slug, agent_slug):
         return jsonify({"logged": False, "error": "forbidden"}), 403
     if agent_slug not in client.get("agents", []):
         return jsonify({"logged": False, "error": "unknown agent"}), 404
-    agent = _client_agent_view(agent_slug)
+    # client=client matters here: an external-tool-only agent (no seo_slug, e.g.
+    # LinkedIn Strategy Researcher) only shows connected=True when _client_agent_view
+    # knows the client, since that's what resolves is_external. Omitting it silently
+    # marks the agent "not connected" and 400s every log-run call.
+    agent = _client_agent_view(agent_slug, client)
     if not agent or not agent.get("connected"):
         return jsonify({"logged": False, "error": "agent not connected"}), 400
     user = _get_user()
@@ -2656,7 +2662,7 @@ def _client_agent_finish_run(client_slug, agent_slug):
         return jsonify({"saved": False, "error": "forbidden"}), 403
     if agent_slug not in client.get("agents", []):
         return jsonify({"saved": False, "error": "unknown agent"}), 404
-    agent = _client_agent_view(agent_slug)
+    agent = _client_agent_view(agent_slug, client)
     if not agent:
         return jsonify({"saved": False, "error": "unknown agent"}), 404
     data = request.get_json(silent=True) or {}

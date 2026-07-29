@@ -49,11 +49,42 @@
     </div>
   </div>
 {% elif is_external and embed_url %}
-  {# External Position2-hosted tool: iframe only (its host stays masked behind the
-     portal path). Run-metering is handled server-side on page load, so this branch
-     carries none of the SERP postMessage plumbing. #}
-  <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
+  {# External, Position2-hosted tool: iframe only (its host stays masked behind the
+     portal path). Opening this page must NOT count as a run — only a real analysis
+     starting should. The tool reports that itself via postMessage, same contract
+     shape as a SERP tool but source 'p2-agent' (there's one external tool per embed,
+     so no per-tool slug is needed the way the SERP branch checks agent.seo_slug). #}
+  <iframe class="embed-frame" id="extFrame" src="{{ embed_url }}" title="{{ agent.name }}"
           allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <script>
+    (function(){
+      var EXPECTED_ORIGIN = {{ ext_origin|tojson }};
+      var logged = false, finished = false;
+      function logRun(){
+        if(logged) return; logged = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/log-run', {method:'POST'})
+          .then(function(r){return r.json();}).then(function(d){
+            if(!d || !d.logged) return;
+            var b = document.getElementById('eRunsBadge');
+            if(b) b.textContent = d.runs_used + ' / ' + d.runs_cap + ' used';
+          }).catch(function(){});
+      }
+      function finishRun(output){
+        if(finished) return; finished = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/finish-run', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({output:output})
+        }).catch(function(){});
+      }
+      window.addEventListener('message', function(e){
+        if(e.origin !== EXPECTED_ORIGIN) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-agent') return;
+        if(d.type === 'agent-run-started') logRun();
+        else if(d.type === 'agent-run-finished' && d.output && typeof d.output === 'object') finishRun(d.output);
+      });
+    })();
+  </script>
 {% elif agent.connected and embed_url %}
   <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
           allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
