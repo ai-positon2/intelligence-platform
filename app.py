@@ -2445,10 +2445,11 @@ def _client_external_tool(client, agent_slug):
 
 def _client_agent_view(slug, client=None):
     """APP_AGENTS entry for a slug, enriched with `connected` (has a live surface),
-    `is_dashboard` (backed by a co-branded dashboard — static file or live route — OR
-    an external hosted tool — for this client, so it renders in the embed shell rather
-    than a SERP tool and is not run-metered) and `is_external` (the embed is a
-    Position2-hosted external tool). Returns None for unknown slugs."""
+    `is_dashboard` (backed by a co-branded dashboard — static file or live route — for
+    this client, so it renders a dashboard in the embed shell and is NOT run-metered)
+    and `is_external` (the embed is a Position2-hosted external tool: it renders in the
+    embed shell but IS run-metered like a SERP tool, capped at AGENT_RUN_CAP per user).
+    Returns None for unknown slugs."""
     a = APP_AGENTS_BY_SLUG.get(slug)
     if not a:
         return None
@@ -2456,7 +2457,7 @@ def _client_agent_view(slug, client=None):
                                 or _client_live_dashboard(client, slug)))
     is_ext = bool(_client_external_tool(client, slug))
     return dict(a, connected=bool(a.get("seo_slug")) or has_dash or is_ext,
-                is_dashboard=has_dash or is_ext, is_external=is_ext)
+                is_dashboard=has_dash, is_external=is_ext)
 
 def _client_agents(client):
     return [v for v in (_client_agent_view(s, client) for s in client.get("agents", [])) if v]
@@ -2526,17 +2527,30 @@ def _client_agent_use(client_slug, agent_slug):
     user = _get_user()
     # Dashboard-backed agent: serve the co-branded dashboard in the portal shell.
     # These are not run-metered (a dashboard has no "runs"), so no cap logic applies.
-    # For an external-tool agent the iframe points straight at the hosted tool, so the
-    # tool's own host stays hidden behind this portal path (only the address bar's
-    # /<slug>/agents/<agent>/use is shown).
     if agent.get("is_dashboard"):
-        dash_url = (_client_external_tool(client, agent_slug)
-                    or "/%s/agents/%s/dashboard" % (client_slug, agent_slug))
         return render_template("client_embed.html", client=client, agent=agent,
                                embed_url="", serp_origin=_SERP_BASE, user=user,
                                is_dashboard=True,
-                               dashboard_url=dash_url,
+                               dashboard_url="/%s/agents/%s/dashboard" % (client_slug, agent_slug),
                                runs_used=0, run_cap=AGENT_RUN_CAP, limit_reached=False)
+    # External-tool agent: iframes the hosted tool (its host masked behind this portal
+    # path). Run-metered like a SERP tool and capped at AGENT_RUN_CAP per user, but the
+    # external tool doesn't implement our postMessage run contract, so a run = one load
+    # of this Use page: log it server-side (cap-enforced) before rendering the embed.
+    ext = _client_external_tool(client, agent_slug)
+    if ext:
+        email = (user or {}).get("email", "")
+        runs_used = _agent_run_counts(email).get(agent_slug, 0)
+        limit_reached = runs_used >= AGENT_RUN_CAP
+        if not limit_reached:
+            _log_agent_run(user, agent)
+            runs_used += 1
+        return render_template("client_embed.html", client=client, agent=agent,
+                               embed_url=("" if limit_reached else ext),
+                               serp_origin=_SERP_BASE, user=user, is_dashboard=False,
+                               is_external=True,
+                               runs_used=runs_used, run_cap=AGENT_RUN_CAP,
+                               limit_reached=limit_reached)
     email = (user or {}).get("email", "")
     # Same per-agent, per-account run cap as /app (Agent Runs sheet is shared, so a
     # user's runs count identically no matter which surface they ran the agent on).
@@ -2561,11 +2575,10 @@ def _client_agent_dashboard(client_slug, agent_slug):
         return gate
     if agent_slug not in client.get("agents", []):
         abort(404)
-    # External-tool agent: the embed shell iframes the hosted tool directly, but if
-    # this route is hit on its own, send it to the tool.
-    ext = _client_external_tool(client, agent_slug)
-    if ext:
-        return redirect(ext)
+    # External-tool agents have no dashboard route (they iframe the hosted tool from
+    # the run-metered Use page); a direct hit here is a 404, not a metering bypass.
+    if _client_external_tool(client, agent_slug):
+        abort(404)
     # Live LinkedIn Intelligence: render the exact /p2 dashboard template in client
     # mode (internal chrome hidden), pointed at this client's gated data endpoint.
     if _client_live_dashboard(client, agent_slug):
