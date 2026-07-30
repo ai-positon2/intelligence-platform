@@ -63,78 +63,6 @@
       "severity": "HIGH"
     },
     {
-      "company_name": "Banner Health",
-      "signal_type": "Product Launch",
-      "signal_detail": "Expanded its AI-powered OR scheduling/automation platform (with Qventus) system-wide after a pilot added 2.1 cases per OR per month.",
-      "signal_date": "2025-08-27",
-      "source_url": "https://www.fiercehealthcare.com/ai-and-machine-learning/banner-health-doubles-down-ai-powered-automation-tech-modernize-its-or",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "Product Launch",
-      "signal_detail": "Opened Banner Cardiovascular Center - Arcadia, a new outpatient heart-care surgery center in Phoenix.",
-      "signal_date": "2025-07-01",
-      "source_url": "https://www.bannerhealth.com/newsroom/press-releases/arcadia-surgery-center",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "Product Launch",
-      "signal_detail": "Broke ground on a new 384,000 sq-ft Banner Scottsdale Medical Center (cardiovascular, orthopedics, neuroscience), opening 2026.",
-      "signal_date": "2025-05-01",
-      "source_url": "https://ascnews.com/2025/05/asc-pipeline-banner-health-breaks-ground-on-scottsdale-campus-nyu-langone-expands-with-new-ambulatory-facility/",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "Product Launch",
-      "signal_detail": "Banner Estrella Medical Center completed a $35M expansion adding hospital beds, surgical suites and obstetric suites.",
-      "signal_date": "2025-10-01",
-      "source_url": "https://www.bannerhealth.com/newsroom/press-releases/estrella-expansion-oct-2025",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "Partnership",
-      "signal_detail": "Banner Health / Atlas Healthcare Partners ambulatory surgery center JV continues expanding across Phoenix and Tucson, targeting 50+ ASCs.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://www.prnewswire.com/news-releases/banner-health--atlas-healthcare-partners-joint-venture-partner-with-advanced-spine-and-pain-llc-to-announce-21st-ambulatory-surgery-center-serving-central-phoenix-area-301408627.html",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Amy Perry became President and CEO effective June 30, 2024, succeeding longtime CEO Peter Fine.",
-      "signal_date": "2024-06-30",
-      "source_url": "https://www.healthcaredive.com/news/banner-health-names-new-ceo-amy-perry-peter-fine/712766/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "C-Suite Exit",
-      "signal_detail": "Longtime CEO Peter Fine retired after 24 years effective June 30, 2024, remaining as CEO Emeritus/advisor through 2025.",
-      "signal_date": "2024-04-09",
-      "source_url": "https://www.chiefhealthcareexecutive.com/view/banner-health-ceo-plans-to-retire-new-leader-named",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Named Ryan Koos as new SVP and Chief Supply Chain Officer, effective June 16, 2025.",
-      "signal_date": "2025-06-16",
-      "source_url": "https://www.globenewswire.com/news-release/2025/06/16/3100121/0/en/Banner-Health-names-new-chief-supply-chain-officer.html",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Banner Health",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Dr. Benjamin Schwartz joined in 2025 as President of Academic Delivery, leading its academic medicine division.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://www.bannerhealth.com/about/leadership/executive/ben-schwartz",
-      "severity": "MEDIUM"
-    },
-    {
       "company_name": "Orlando Health Jewett Orthopedic Institute",
       "signal_type": "Creative Hiring",
       "signal_detail": "Recruiting anesthesiologists dedicated exclusively to Jewett Orthopedic Institute via multiple concurrent postings across physician job boards, one of them seeking a full team on an M-F schedule with no call/nights/weekends plus a starting bonus. Sustained team-level need, not a single vacancy, at a high-volume orthopedic facility.",
@@ -143,155 +71,11 @@
       "severity": "HIGH"
     },
     {
-      "company_name": "Orlando Health Jewett Orthopedic Institute",
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Orlando Health completed a $439M acquisition of Steward Health Care's 3 East Central Florida hospitals and affiliated physician practices, folding the orthopedic physicians into Jewett Orthopedic Institute.",
-      "signal_date": "2024-10-24",
-      "source_url": "https://www.orlandohealth.com/content-hub/orlando-health-completes-purchase-of-hospitals-and-physician-practices-in-east-central-florida",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Orlando Health Jewett Orthopedic Institute",
-      "signal_type": "News Mention",
-      "signal_detail": "Statewide expansion integrating 26 new ortho/sports-med physicians, bringing the Institute to 24 clinics, 94 physicians and 118 APPs statewide.",
-      "signal_date": "2025-07-14",
-      "source_url": "https://www.prnewswire.com/news-releases/orlando-health-jewett-orthopedic-institute-expands-coast-to-coast-in-florida-302503687.html",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Orlando Health Jewett Orthopedic Institute",
-      "signal_type": "News Mention",
-      "signal_detail": "Plans a new 27,000 sq-ft, two-story Winter Park campus (ortho care, rehab, imaging, walk-in clinic), approved by the Winter Park Planning & Zoning Board.",
-      "signal_date": "2025-10-08",
-      "source_url": "https://www.growthspotter.com/2025/10/08/orlando-health-jewett-orthopedic-institute-plans-new-winter-park-campus/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Terry Forde, former President/CEO of Adventist HealthCare, became President and CEO, officially starting August 2024.",
-      "signal_date": "2024-08-01",
-      "source_url": "https://spacecoastdaily.com/2024/08/first-day-president-and-ceo-terry-forde-and-community-health-services-president-dr-drew-fink-welcomed-to-health-first/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Kristen Pulio joined as Executive VP and CFO after leaving Adventist HealthCare, around September 2024.",
-      "signal_date": "2024-09-01",
-      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/4-cfo-exits-in-2024/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "C-Suite Exit",
-      "signal_detail": "Matt Gerrell, President and CEO of Health First Health Plans, departed abruptly after 19 years; COO Jamie Forrest named interim president.",
-      "signal_date": "2025-08-01",
-      "source_url": "https://thespacecoastrocket.com/health-first-ceo-ousted-after-19-years-in-sudden-leadership-shake-up/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "Partnership",
-      "signal_detail": "Health First and Parrish Healthcare signed agreements integrating health-plan networks and transferring the Health First Cancer Institute building in Titusville to Parrish, resolving prior legal disputes.",
-      "signal_date": "2024-07-01",
-      "source_url": "https://www.parrishhealthcare.com/news/2024/september/health-first-and-parrish-healthcare-sign-health-/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "Product Launch",
-      "signal_detail": "Broke ground on a new 268,000 sq-ft Cape Canaveral Hospital, 120 beds, six ORs, plus Brevard County's first freestanding ER.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://spacecoastdaily.com/2025/01/health-first-has-epic-year-in-2024-from-new-hospital-to-new-choppers-and-lots-of-stars-and-top-rankings/",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "Product Launch",
-      "signal_detail": "Board authorized a master plan to expand Viera Hospital to 214 beds, adding two new ORs and a cardiac catheterization lab.",
-      "signal_date": "2025-09-01",
-      "source_url": "https://spacecoastdaily.com/2025/09/health-first-announces-master-plan-to-expand-viera-hospital-will-double-capacity-to-214-beds-enhance-emergency-care/",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "News Mention",
-      "signal_detail": "Announced a $230M, five-floor patient tower expansion of Palm Bay Hospital, construction slated for summer 2026.",
-      "signal_date": "2026-01-01",
-      "source_url": "https://www.hf.org/news/health-first-announces-230-million-palm-bay-hospital-expansions",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "HEALTH FIRST",
-      "signal_type": "News Mention",
-      "signal_detail": "Expanded emergency care capacity and fast-tracked new ER access across Brevard County following the closure of Orlando Health Rockledge Hospital in April 2025.",
-      "signal_date": "2025-04-01",
-      "source_url": "https://spacecoastdaily.com/2026/01/watch-health-first-grows-emergency-care-network-will-be-staffed-24-7-by-emergency-physicians-and-clinical-team/",
-      "severity": "MEDIUM"
-    },
-    {
       "company_name": "HEALTH FIRST",
       "signal_type": "Creative Hiring",
       "signal_detail": "Open Director of Perioperative Services role for Holmes Regional Medical Center (515-bed, 16-OR facility) in Melbourne, FL, listed via Whitman Partners.",
       "signal_date": "2026-07-01",
       "source_url": "https://whitmanpartners.com/job/director-of-perioperative-services-21524-health-first-holmes-regional-medical-center/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Southwest Surgical Associates",
-      "signal_type": "News Mention",
-      "signal_detail": "Colorectal surgeon Dr. Bidhan Das joined as a new partner.",
-      "signal_date": "2024-10-01",
-      "source_url": "https://southwestsurgical.com/welcome-dr-das-new-colorectal-surgeon/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Optum (UnitedHealth Group) completed its acquisition of Kelsey-Seybold Clinic Partners from TPG for approximately $2 billion.",
-      "signal_date": "2022-04-01",
-      "source_url": "https://www.beckerspayer.com/executive-moves/5-things-to-know-about-unitedhealth-groups-ownership-of-kelsey-seybold/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Azam Kundi, M.D. (previously Medical Director for M&A and Vice Chairman of the Board) was elevated to Chairman and CEO of Kelsey-Seybold Clinic.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://houston.org/people/azam-kundi/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "News Mention",
-      "signal_detail": "Broke ground on a new 34,000 sq-ft clinic in Missouri City (Fort Bend Town Center), its seventh Fort Bend County location, opening summer 2026.",
-      "signal_date": "2025-10-30",
-      "source_url": "https://communityimpact.com/houston/sugar-land-missouri-city/health-care/2025/10/30/kelsey-seybold-clinic-breaks-ground-on-missouri-city-location/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "News Mention",
-      "signal_detail": "New five-story, 135,000 sq-ft Lake Houston Campus (up to 51 providers) opened and began accepting patients.",
-      "signal_date": "2025-09-30",
-      "source_url": "https://communityimpact.com/lake-houston-humble-kingwood/healthcare/kelsey-seybold-clinic-expands-specialty-care-with-opening-of-lake-houston-campus/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "News Mention",
-      "signal_detail": "Opened a new 36,000 sq-ft clinic in Houston's Upper Kirby District.",
-      "signal_date": "2025-02-03",
-      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/archive/kelsey-seybold-opens-new-clinic-in-upper-kirby-district",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Kelsey Seybold",
-      "signal_type": "Product Launch",
-      "signal_detail": "Added a da Vinci Xi Surgical System at its Springwoods Village Campus ASC for general, gynecologic, and urologic minimally-invasive procedures.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://www.kelsey-seybold.com/newsroom-landing/photo-captions/springwoods-village-now-offers-even-greater-innovations-in-surgical-care",
       "severity": "MEDIUM"
     },
     {
@@ -344,22 +128,6 @@
     },
     {
       "company_name": "Baptist Health South Florida",
-      "signal_type": "Partnership",
-      "signal_detail": "Baptist Health and Lifepoint Health began construction on a joint-venture Rehabilitation Hospital in South Miami, opening August 2026, creating 200+ jobs.",
-      "signal_date": "2026-01-01",
-      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-and-lifepoint-begin-construction-on-rehabilitation-hospital-in-south-miami",
-      "severity": "LOW"
-    },
-    {
-      "company_name": "Baptist Health South Florida",
-      "signal_type": "Product Launch",
-      "signal_detail": "Opened a new freestanding emergency room (Dr. Harry Richard Nateman Center) in Palmetto Bay, operating as a department of Baptist Health Doctors Hospital.",
-      "signal_date": "2025-12-01",
-      "source_url": "https://southfloridahospitalnews.com/baptist-health-celebrates-ribbon-cutting-and-unveiling-ceremony-for-new-freestanding-emergency-room-in-palmetto-bay/",
-      "severity": "LOW"
-    },
-    {
-      "company_name": "Baptist Health South Florida",
       "signal_type": "Product Launch",
       "signal_detail": "Center for Robotic Heart & Vascular Surgery added AI-powered 'digital twin' 3D heart-modeling software to plan cardiac surgeries in advance.",
       "signal_date": "2026-02-01",
@@ -369,57 +137,9 @@
     {
       "company_name": "Baptist Health South Florida",
       "signal_type": "News Mention",
-      "signal_detail": "Broke ground on its first Broward County hospital, Baptist Health Sunrise Hospital (340,000 sq-ft).",
-      "signal_date": "2026-01-27",
-      "source_url": "https://www.wlrn.org/health/2026-02-02/baptist-health-breaks-ground-on-hospital-in-west-broward-county",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "Baptist Health South Florida",
-      "signal_type": "News Mention",
       "signal_detail": "Broke ground on a new Medical Center in Pembroke Pines (60,865 sq-ft, ER and outpatient services), opening early 2027.",
       "signal_date": "2026-07-01",
       "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-breaks-ground-on-new-medical-center-in-pembroke-pines",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Completed a $265M acquisition of ShorePoint Health Port Charlotte and Punta Gorda from Community Health Systems, renamed AdventHealth Port Charlotte.",
-      "signal_date": "2025-03-01",
-      "source_url": "https://www.adventhealth.com/news/shorepoint-health-port-charlotte-now-adventhealth-port-charlotte",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Took over management of St. Luke's Hospital in Columbus, NC, renaming it AdventHealth Polk (deal closed just after Hurricane Helene).",
-      "signal_date": "2024-10-01",
-      "source_url": "https://www.adventhealth.com/news/st-lukes-hospital-will-soon-be-adventhealth-polk",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "David Banks named President and CEO systemwide, replacing retiring CEO Terry Shaw.",
-      "signal_date": "2025-04-03",
-      "source_url": "https://www.adventhealth.com/news/david-banks-named-president-ceo-adventhealth",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Todd Goodman named systemwide Chief Financial Officer, effective February 1, 2026.",
-      "signal_date": "2025-11-05",
-      "source_url": "https://www.adventhealth.com/news/todd-goodman-named-chief-financial-officer-adventhealth",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Abel Biri named CEO of AdventHealth Orlando, the system's flagship hospital.",
-      "signal_date": "2025-06-30",
-      "source_url": "https://www.adventhealth.com/news/abel-biri-named-chief-executive-officer-adventhealth-orlando",
       "severity": "MEDIUM"
     },
     {
@@ -432,35 +152,11 @@
     },
     {
       "company_name": "AdventHealth",
-      "signal_type": "C-Suite Exit",
-      "signal_detail": "Longtime President/CEO Terry Shaw announced retirement after 8 years in the role and 40 years with the organization.",
-      "signal_date": "2024-12-01",
-      "source_url": "https://www.adventhealth.com/news/adventhealth-announces-retirement-its-president-ceo",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "AdventHealth",
       "signal_type": "News Mention",
       "signal_detail": "Announced plans to build a new 80-bed hospital in The Villages, FL amid rapid regional population growth (opening ~2030).",
       "signal_date": "2026-05-01",
       "source_url": "https://www.wusf.org/health-news-florida/2026-07-23/adventhealth-plans-to-build-hospital-in-rapidly-growing-the-villages-region",
       "severity": "LOW"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "Product Launch",
-      "signal_detail": "Became the first in Florida to deploy Intuitive's next-generation da Vinci 5 surgical robot.",
-      "signal_date": "2025-04-01",
-      "source_url": "https://www.adventhealth.com/md/news/adventhealth-first-florida-deploy-next-generation-surgical-robot",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "AdventHealth",
-      "signal_type": "Product Launch",
-      "signal_detail": "Opened a new 80-bed hospital in Minneola, FL, expanding inpatient/outpatient services to South Lake County.",
-      "signal_date": "2025-12-01",
-      "source_url": "https://www.fox35orlando.com/news/adventhealth-opens-new-minneola-hospital-location-expanding-services-south-lake-county",
-      "severity": "HIGH"
     },
     {
       "company_name": "AdventHealth",
@@ -495,52 +191,12 @@
       "severity": "HIGH"
     },
     {
-      "company_name": "Wyandot Memorial Hospital",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Kendra Noyes (previously COO) became President & CEO.",
-      "signal_date": "2026-01-01",
-      "source_url": "https://www.wyandotmemorial.org/kendra-noyes-president-ceo/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Wyandot Memorial Hospital",
-      "signal_type": "C-Suite Exit",
-      "signal_detail": "Longtime CEO Ty Shaull (with the hospital since 1992) transitioned to President & CEO Emeritus / Board Advisor as Kendra Noyes took over as CEO.",
-      "signal_date": "2026-01-01",
-      "source_url": "https://www.wyandotmemorial.org/ty-shaull-president-ceo-emeritus/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "Wyandot Memorial Hospital",
-      "signal_type": "News Mention",
-      "signal_detail": "Opened 'Wyandot Medical Providers at Carey,' a new two-story medical office building (physician offices, drive-thru pharmacy, lab services) in Carey, Ohio.",
-      "signal_date": "2024-06-01",
-      "source_url": "https://wktn.com/wyandot-memorial-hospital-hosts-public-tour-of-newest-expansion-at-recent-open-house/",
-      "severity": "LOW"
-    },
-    {
       "company_name": "United Surgical Partners International",
       "signal_type": "Acquisition / M&A",
       "signal_detail": "Invested nearly $350M in M&A and de novo development in 2025, adding 35 facilities to end the year with interests in 533 ASCs and 26 surgical hospitals across 37 states; targeting $250M for 2026 M&A.",
       "signal_date": "2026-02-01",
       "source_url": "https://www.beckersasc.com/asc-transactions-and-valuation-issues/uspi-splashed-350m-added-35-facilities-in-2025/",
       "severity": "HIGH"
-    },
-    {
-      "company_name": "United Surgical Partners International",
-      "signal_type": "Partnership",
-      "signal_detail": "Choice Care Surgery Center, a physician-owned ASC in Midland, Texas, entered a strategic partnership with USPI.",
-      "signal_date": "2025-01-29",
-      "source_url": "https://www.ascfocus.org/ascfocus/content/articles-content/articles/2025/business-news/choice-care-surgery-center-enters-into-strategic-partnership-with-uspi",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "United Surgical Partners International",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Matt Stone named CEO of USPI, previously Tenet's Group CEO for Central, South and West Texas.",
-      "signal_date": "2025-03-28",
-      "source_url": "https://www.beckersasc.com/leadership/uspi-names-new-ceo/",
-      "severity": "MEDIUM"
     },
     {
       "company_name": "United Surgical Partners International",
@@ -552,75 +208,11 @@
     },
     {
       "company_name": "United Surgical Partners International",
-      "signal_type": "Product Launch",
-      "signal_detail": "Shifting its ASC portfolio toward higher-acuity service lines (robotics-assisted total joint replacement, spine, urology), moving away from lower-acuity, high-volume cases.",
-      "signal_date": "2025-01-01",
-      "source_url": "https://www.beckersasc.com/orthopedics-tjr/why-uspi-is-doubling-down-on-ortho-heavy-ascs/",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "United Surgical Partners International",
       "signal_type": "Creative Hiring",
       "signal_detail": "Multiple live CRNA and anesthesia-support job postings across its careers site: Dover DE, Tucson AZ (Arizona Digestive Institute), Lake City and Summerfield FL, plus anesthesia techs in Dallas, San Antonio, Fort Worth, Waco, Arlington, Fresno, Tampa, and The Woodlands.",
       "signal_date": "2026-07-01",
       "source_url": "https://careers.uspi.com/job/dover/certified-registered-nurse-anesthetist-crna/35934/93928407792",
       "severity": "HIGH"
-    },
-    {
-      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
-      "signal_type": "News Mention",
-      "signal_detail": "A Harris County jury awarded Fondren Orthopedic Group (co-owner) $25.6M against co-owner HCA Healthcare, finding HCA breached the 1993 partnership's noncompete by opening 10 competing Houston-area hospitals.",
-      "signal_date": "2024-09-03",
-      "source_url": "https://texaslawbook.net/houston-jury-finds-hca-healthcare-owes-doctors-25-6m/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "TEXAS ORTHOPEDIC HOSPITAL",
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Anthony Brooks promoted to CEO of OrthoLoneStar, the physician-group MSO housing Fondren Orthopedic Group (the hospital's co-owner) -- an MSO-level change, not the hospital's own administrator.",
-      "signal_date": "2025-02-17",
-      "source_url": "https://www.txortho.com/ortholonestar-announces-executive-leadership-changes/",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "GRAND VIEW HEALTH",
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Completed its full merger into St. Luke's University Health Network on July 1, 2025, becoming St. Luke's 16th hospital campus.",
-      "signal_date": "2025-07-01",
-      "source_url": "https://www.prnewswire.com/news-releases/grand-view-health-joins-st-lukes-university-health-network-302495851.html",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "GRAND VIEW HEALTH",
-      "signal_type": "Funding Round",
-      "signal_detail": "Rep. Brian Fitzpatrick secured a $1M federal Community Project Funding grant for the emergency department/behavioral health expansion.",
-      "signal_date": "2024-10-01",
-      "source_url": "https://fitzpatrick.house.gov/2024/10/1-million-secured-by-fitzpatrick-for-transformative-grand-view-health-expansion",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "GRAND VIEW HEALTH",
-      "signal_type": "News Mention",
-      "signal_detail": "Closed its maternity/labor-and-delivery ward on December 1, 2025 after multiple OB physicians resigned, redirecting patients to St. Luke's Upper Bucks.",
-      "signal_date": "2025-11-18",
-      "source_url": "https://www.yahoo.com/news/articles/grand-view-closing-maternity-ward-172105446.html",
-      "severity": "MEDIUM"
-    },
-    {
-      "company_name": "GRAND VIEW HEALTH",
-      "signal_type": "Product Launch",
-      "signal_detail": "Opened 'the Pavilion,' a 190,000 sq-ft, $198M expansion with 10 new ORs including Mako SmartRobotics joint-replacement suites, da Vinci Xi robotic suites, and a hybrid interventional OR.",
-      "signal_date": "2023-04-01",
-      "source_url": "https://www.ballinger.com/design/the-pavilion/",
-      "severity": "HIGH"
-    },
-    {
-      "company_name": "GRAND VIEW HEALTH",
-      "signal_type": "Creative Hiring",
-      "signal_detail": "St. Luke's University Health Network, which absorbed Grand View in the July 2025 merger, is recruiting both CRNAs and anesthesiologists network-wide (anesthesiologist partnership track at $590K+ total comp with a $50K sign-on), with Sellersville, PA explicitly listed as a covered practice site.",
-      "signal_date": "2025-07-10",
-      "source_url": "https://anesthesiabethlehem.com/nurse-anesthetist-jobs/",
-      "severity": "MEDIUM"
     },
     {
       "signal_type": "Partnership",
@@ -648,14 +240,6 @@
     },
     {
       "signal_type": "Partnership",
-      "signal_detail": "Atlas Healthcare Partners and ChristianaCare formed a joint venture to build an ASC network across Delaware and the mid-Atlantic (Delaware, Maryland, New Jersey, Pennsylvania), folding in ChristianaCare's existing Newark ASC and two partially-owned Delaware facilities. Distinct named partner from the already-logged Banner Health JV, though the announcement is roughly two years old, so any facilities from this JV likely already have anesthesia coverage arranged by now.",
-      "signal_date": "2024-08-13",
-      "source_url": "https://news.christianacare.org/2024/08/christianacare-and-atlas-healthcare-partners-to-develop-ambulatory-surgery-center-network/",
-      "severity": "MEDIUM",
-      "company_name": "Atlas Healthcare Partners"
-    },
-    {
-      "signal_type": "Partnership",
       "signal_detail": "Houston Methodist's Department of Anesthesiology & Critical Care states its anesthesiologists and CRNAs 'collaborate with U.S. Anesthesia Partners' to deliver anesthesia care on the day of surgery, identifying U.S. Anesthesia Partners (USAP) as the incumbent contracted anesthesia group at Houston Methodist Hospital / the Texas Medical Center flagship campus that NorthStar would need to displace.",
       "signal_date": "2026-07-30",
       "source_url": "https://www.houstonmethodist.org/for-health-professionals/department-programs/anesthesiology/",
@@ -668,30 +252,6 @@
       "signal_date": "2026-07-30",
       "source_url": "https://www.houstonmethodistcareers.org/jobs/crna/houston-methodist-specialty-physician-group/",
       "severity": "HIGH",
-      "company_name": "Houston Methodist"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Houston Methodist Cypress Hospital (opened March 2025) is undergoing an approximately 82,300 sq ft, $50M interior build-out adding operating rooms and a critical care unit, a dialysis area, and a new surgical inpatient floor, after seeing 'significant growth and desire for additional services' since opening; construction was slated to start November 2025 and finish by late February 2026.",
-      "signal_date": "2025-09-17",
-      "source_url": "https://communityimpact.com/houston/cypress/health-care/2025/09/17/houston-methodist-cypress-hospital-to-undergo-50m-expansion/",
-      "severity": "HIGH",
-      "company_name": "Houston Methodist"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Houston Methodist's $1.4B, 26-story Centennial Tower at the Texas Medical Center flagship campus topped out (reaching its full 511-foot height) around August 2025; the tower adds nine operating rooms (net new OR capacity), a larger 54-bed emergency department, and roughly 400 beds, with a phased opening beginning April 2027.",
-      "signal_date": "2025-06-09",
-      "source_url": "https://communityimpact.com/houston/bellaire-meyerland-west-university/health-care/2025/06/09/health-care-edition-6-health-care-updates-from-local-hospitals",
-      "severity": "HIGH",
-      "company_name": "Houston Methodist"
-    },
-    {
-      "signal_type": "News Mention",
-      "signal_detail": "Houston Methodist Willowbrook Hospital completed a $6.9M surgical suite addition adding 2 new operating rooms plus supporting sterile supply, IT closet and storage space (approx. 4,470 sq ft), per Texas Department of Licensing and Regulation project records; project closed/completed March 15, 2025.",
-      "signal_date": "2025-03-15",
-      "source_url": "https://www.tdlr.texas.gov/TABS/Search/Print/TABS2024009852",
-      "severity": "MEDIUM",
       "company_name": "Houston Methodist"
     },
     {
@@ -720,33 +280,9 @@
     },
     {
       "signal_type": "Acquisition / M&A",
-      "signal_detail": "AMSURG acquired Advanced Center for Surgery in Altoona, PA (4 ORs, 17 physicians, ortho/podiatry/ENT) - its first center in central Pennsylvania. The center is notable as the first ASC in the state to perform outpatient total joint replacements, indicating a shift toward higher-acuity orthopedic procedures requiring anesthesia coverage.",
-      "signal_date": "2025-12-09",
-      "source_url": "https://www.prnewswire.com/news-releases/amsurg-enters-central-pennsylvania-market-with-new-acquisition-302636118.html",
-      "severity": "MEDIUM",
-      "company_name": "AMSURG"
-    },
-    {
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "AMSURG acquired Pinnacle Surgery Center in Covington, LA (3 ORs plus 1 procedure room, 17 physicians specializing in spine, pain management, and eye procedures, with 23-hour overnight stay capability) - a new, higher-acuity ASC added to the platform in Louisiana.",
-      "signal_date": "2025-04-15",
-      "source_url": "https://www.prnewswire.com/news-releases/amsurg-continues-growth-with-acquisition-of-pinnacle-surgery-center-302428447.html",
-      "severity": "MEDIUM",
-      "company_name": "AMSURG"
-    },
-    {
-      "signal_type": "Acquisition / M&A",
       "signal_detail": "AMSURG expanded its North Carolina footprint by acquiring five GI/endoscopy centers (Wake Forest Endoscopy Center, Wake Endoscopy-Cary, Wake Endoscopy-Raleigh, Clayton Endoscopy Center, Wilson Endoscopy Center), staffed by 15 board-certified gastroenterologists/hepatologists. Lower anesthesia acuity than surgical ASCs (GI sedation vs. general anesthesia), but represents new centers added to the platform needing sedation/anesthesia coverage decisions.",
       "signal_date": "2026-07-14",
       "source_url": "https://www.prnewswire.com/news-releases/amsurg-expands-portfolio-with-acquisition-of-five-north-carolina-centers-302825019.html",
-      "severity": "MEDIUM",
-      "company_name": "AMSURG"
-    },
-    {
-      "signal_type": "Creative Hiring",
-      "signal_detail": "AMSURG operates its own internal self-staffing division, \"AMSURG Anesthesia,\" with more than 700 CRNAs and anesthesiologists across 55+ AMSURG ASCs nationwide (named facilities include Mid-South Endoscopy Center in Columbia, TN and Louisville Endoscopy Center). The division is actively recruiting on an ongoing basis via AnesRecruit@amsurg.com / 888.386.5524, confirming AMSURG is largely self-staffed for anesthesia - a direct displacement/supplement target rather than an outsourcer.",
-      "signal_date": "2026-01-20",
-      "source_url": "https://amsurg.com/blog/2026/01/20/amsurg-spotlights-our-skilled-anesthesia-network-teams/",
       "severity": "MEDIUM",
       "company_name": "AMSURG"
     },
@@ -765,22 +301,6 @@
       "source_url": "https://usanesthesiajobs.com/job/54010",
       "severity": "MEDIUM",
       "company_name": "AMSURG"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Texas Health Harris Methodist Southwest Fort Worth broke ground on a $223 million expansion: a new 5-story patient tower (64 additional beds) plus modernization of all six original operating rooms to accommodate robotic and other advanced surgical procedures. Two patient floors are expected to open in 2028.",
-      "signal_date": "2025-08-06",
-      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2025/Texas-Health-Southwest-Announces-New-Tower-Renovations",
-      "severity": "HIGH",
-      "company_name": "Texas Health Resources"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Texas Health Presbyterian Plano started construction on a $343 million, 8-story tower adding 168 beds, with expanded Neuroscience, Heart and Vascular, and Digestive Health service lines and an upgraded Emergency Department, driven by projected population growth in the Plano area.",
-      "signal_date": "2025-06-28",
-      "source_url": "https://www.texashealth.org/foundation/programs/Texas-Health-Plano-Expansion",
-      "severity": "MEDIUM",
-      "company_name": "Texas Health Resources"
     },
     {
       "signal_type": "Product Launch",
@@ -815,42 +335,10 @@
       "company_name": "Texas Health Resources"
     },
     {
-      "signal_type": "Product Launch",
-      "signal_detail": "Texas Health Harris Methodist Stephenville completed a $12.5 million, two-year renovation of its five operating rooms and performed its first robot-assisted procedure on a new da Vinci Xi surgical system.",
-      "signal_date": "2025-06-02",
-      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2025/Texas-Health-Stephenville-Adds-Surgical-Robot",
-      "severity": "MEDIUM",
-      "company_name": "Texas Health Resources"
-    },
-    {
-      "signal_type": "News Mention",
-      "signal_detail": "Broward Health terminated its 25+ year exclusive anesthesia services contract with incumbent group Anesco after Anesco breached contract terms amid financial distress (staff reportedly unpaid for three-plus weeks). The health system issued Anesco 150 days' notice. Anesthesiologist walkouts followed, forcing Broward Health to postpone elective surgeries, including hip replacements, across all four hospitals (Broward Health Medical Center, North, Imperial Point, Coral Springs) before a Feb. 14, 2025 emergency court ruling let Broward Health terminate the contract and voided Anesco's staff non-competes.",
-      "signal_date": "2025-02-04",
-      "source_url": "https://www.beckersasc.com/anesthesia/broward-health-ends-long-term-anesthesia-contract/",
-      "severity": "HIGH",
-      "company_name": "Broward Health"
-    },
-    {
-      "signal_type": "Partnership",
-      "signal_detail": "Following the Anesco contract termination and court ruling voiding Anesco's non-competes, Broward Health moved to partner with Envision Physician Services to take over anesthesia management and onboard former Anesco anesthesiologists/CRNAs who wished to stay. Envision Physician Services is now the identified anesthesia staffing/management vendor across all four Broward Health hospitals (Medical Center, North, Imperial Point, Coral Springs) - this is the incumbent NorthStar Anesthesia would need to displace.",
-      "signal_date": "2025-02-14",
-      "source_url": "https://www.beckersasc.com/anesthesia/broward-health-resumes-surgeries-following-anesthesia-contract-ruling.html",
-      "severity": "HIGH",
-      "company_name": "Broward Health"
-    },
-    {
       "signal_type": "Creative Hiring",
       "signal_detail": "Envision Physician Services, Broward Health's anesthesia partner since the Feb 2025 incumbent transition, is still actively recruiting anesthesiologists, CRNAs, and Certified Anesthesiologist Assistants across all four hospitals roughly 18 months later, including an open Chief CRNA (leadership) role at Imperial Point ($150K start bonus plus relocation, overseeing scheduling, staffing, and recruitment for a 6-physician/10-APP team), with $100K-$150K sign-on bonuses system-wide. Sustained multi-site openings this long after the transition indicate anesthesia staffing has not fully stabilized under the current vendor.",
       "signal_date": "2026-07-30",
       "source_url": "https://www.envisionhealth.com/broward-health-anesthesiology",
-      "severity": "HIGH",
-      "company_name": "Broward Health"
-    },
-    {
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Broward Health appointed Evan Boyar, M.D. as its new corporate (system-wide) Chief Medical Officer, announced September 10, 2025. Dr. Boyar, previously chief of staff and regional medical director of emergency services at Broward Health North, now provides system-wide clinical leadership under President/CEO Shane Strum - a relevant new stakeholder contact for perioperative/clinical vendor decisions.",
-      "signal_date": "2025-09-10",
-      "source_url": "https://www.caribbeannationalweekly.com/news/local-news/broward-health-names-dr-evan-boyar-as-new-corporate-chief-medical-officer/",
       "severity": "HIGH",
       "company_name": "Broward Health"
     },
@@ -879,34 +367,10 @@
       "company_name": "Novant Health"
     },
     {
-      "signal_type": "Product Launch",
-      "signal_detail": "Novant Health Forsyth Medical Center (Winston-Salem) opened a new five-story, 193,000-sq-ft south tower with 59 critical care rooms and 36 medical-surgical rooms; the hospital's operating rooms are being remodeled and expanded with the da Vinci 5 robotic surgical system, enhancing surgical, heart, and critical care capacity across the Triad region.",
-      "signal_date": "2025-01-10",
-      "source_url": "https://www.novanthealth.org/newsroom/novant-health-forsyth-medical-center-opens-new-five-story-tower-will-enhance-the-delivery-of-advanced-surgical-heart-and-critical-care-services-across-the-triad",
-      "severity": "HIGH",
-      "company_name": "Novant Health"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Novant Health broke ground on a new 16,000-sq-ft ambulatory surgery center on the U.S. 17 corridor in Leland, NC (fast-growing Wilmington-area market), with two operating rooms and two procedure rooms supporting general, urologic, and orthopedic surgery plus endoscopy; expected to open in 2026.",
-      "signal_date": "2025-04-29",
-      "source_url": "https://www.novanthealth.org/newsroom/releases-20250429",
-      "severity": "HIGH",
-      "company_name": "Novant Health"
-    },
-    {
       "signal_type": "Creative Hiring",
       "signal_detail": "Novant Health is directly recruiting CRNAs (self-staffing, not through its exclusive Charlotte-market anesthesia group) across multiple facilities and regions simultaneously, including a weekends-only CRNA III role in Winston-Salem plus open CRNA reqs in Wilmington, Huntersville, Matthews, and Kernersville, NC, indicating sustained multi-site anesthesia staffing need outside the Charlotte contract.",
       "signal_date": "2026-07-30",
       "source_url": "https://jobs.novanthealth.org/winston-salem-region/jobs/210456?lang=en-us",
-      "severity": "HIGH",
-      "company_name": "Novant Health"
-    },
-    {
-      "signal_type": "Partnership",
-      "signal_detail": "Providence Anesthesiology Associates (PAA) holds the exclusive contract for physician anesthesia services across Novant Health's Greater Charlotte market (Charlotte, Matthews, Mint Hill, Huntersville, and regional ambulatory centers) and expanded its footprint effective April 1, 2025 by absorbing Watauga Anesthesia Associates and Pinehurst Anesthesia Associates into its billing/practice structure. PAA is the incumbent NorthStar would need to displace in this market.",
-      "signal_date": "2025-04-01",
-      "source_url": "https://www.provanesthesiology.com/novant-health-partnership/",
       "severity": "HIGH",
       "company_name": "Novant Health"
     },
@@ -936,51 +400,11 @@
     },
     {
       "signal_type": "Product Launch",
-      "signal_detail": "UMC opened a new dedicated burn center on the third floor of its main hospital, funded by $24.4-24.5M from the 2024 bond, featuring two dedicated burn operating rooms integrated with the adjacent Level I trauma center (Scherr Legate). Nationally recruited trauma/burn surgeon Dr. Philip E. Fidler was named lead surgeon; a June 2026 follow-up report states the center is operational and running ahead of schedule, retaining ~70% of eligible referral patients who previously traveled out of the region.",
-      "signal_date": "2025-12-04",
-      "source_url": "https://kvia.com/health/2025/12/04/umc-of-el-paso-names-lead-surgeon-for-new-burn-center/",
-      "severity": "HIGH",
-      "company_name": "University Medical Center of El Paso (UMC)"
-    },
-    {
-      "signal_type": "Product Launch",
       "signal_detail": "UMC completed a fleet-wide upgrade to the da Vinci 5 robotic surgical system (Intuitive), becoming the first teaching hospital in Texas to do so, with the only da Vinci 5 platform in El Paso. The system supports cardiovascular, colorectal, gynecologic, thoracic, head & neck, and urology robotic procedures with a dual teaching console, signaling rising surgical volume/acuity and OR throughput investment beyond a single-unit deployment.",
       "signal_date": "2026-04-08",
       "source_url": "https://kvia.com/news/top-stories/2026/04/08/umc-el-paso-upgrades-surgical-fleet-with-da-vinci-5-robot/",
       "severity": "HIGH",
       "company_name": "University Medical Center of El Paso (UMC)"
-    },
-    {
-      "signal_type": "Funding Round",
-      "signal_detail": "El Paso voters approved a $396.6 million bond for UMC (65% support), the county's public hospital district. Roughly one-third of proceeds are earmarked for capacity needs including additional operating rooms, imaging technology, and critical care beds, plus a new ambulatory surgical center and emergency/urgent care center on the Westside, and the burn center build-out. This is the capital event underlying UMC's current wave of OR and trauma-adjacent capacity expansion.",
-      "signal_date": "2024-11-05",
-      "source_url": "https://elpasomatters.org/2024/11/05/election-results-umc-bond-county-commissioner-jackie-butler-claudia-rodriguez/",
-      "severity": "MEDIUM",
-      "company_name": "University Medical Center of El Paso (UMC)"
-    },
-    {
-      "signal_type": "C-Suite Join",
-      "signal_detail": "Optim Health System named Brian G. Evans, MBA, FACHE as System Chief Operating Officer. Evans previously served as VP of Surgical Services at Trident Medical Center (HCA), overseeing OR, Endoscopy, and PACU operations, a background directly relevant to perioperative/surgical strategy at Optim.",
-      "signal_date": "2025-03-24",
-      "source_url": "https://optimhealthsystem.com/optim-health-system-announces-brian-evans-fache-as-system-chief-operating-officer/",
-      "severity": "MEDIUM",
-      "company_name": "OPTIM HEALTH SYSTEM"
-    },
-    {
-      "signal_type": "Acquisition / M&A",
-      "signal_detail": "Optim Orthopedics (Savannah) merged with Southern Orthopaedics & Sports Medicine (Brunswick, GA), effective November 1, 2024. The combined entity operates under the Optim Orthopedics name, adding SOSM's physicians, physical therapy, MRI imaging, and orthopedic care in the Brunswick/Glynn County market to the Optim network.",
-      "signal_date": "2024-11-01",
-      "source_url": "https://ascnews.com/2024/10/optim-orthopedics-southern-orthopaedics-sports-medicine-announce-merger/",
-      "severity": "HIGH",
-      "company_name": "OPTIM HEALTH SYSTEM"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "Premier Surgery Center (an Optim Health System location in Brunswick, GA) performed its first Stryker Mako robotic-assisted total joint replacement surgery, expanding advanced/robotic orthopedic surgical capability at the ASC. Procedure performed by Kevin Brooks, MD of Optim Orthopedics.",
-      "signal_date": "2025-09-08",
-      "source_url": "https://www.optimorthopedics.com/optim-orthodedics/premier-surgery-center-first-mako-robotic-total-joint-brunswick-ga/",
-      "severity": "MEDIUM",
-      "company_name": "OPTIM HEALTH SYSTEM"
     },
     {
       "signal_type": "Creative Hiring",
@@ -989,14 +413,6 @@
       "source_url": "https://careers.napaanesthesia.com/us/en/job/JR9516/CAA-Optim-Medical-Center-Tattnall-Per-Diem",
       "severity": "HIGH",
       "company_name": "OPTIM HEALTH SYSTEM"
-    },
-    {
-      "signal_type": "Product Launch",
-      "signal_detail": "St Clair Health (AKA St Clair Hospital) launched Robotic Focal One HIFU (high-intensity focused ultrasound) for prostate cancer, performed by urologic surgeon Dr. Kevin Bordeau of St. Clair Medical Group, making St. Clair the first health system in the Pittsburgh region to offer this technology. The procedure is image-guided and requires anesthesia/sedation support during the probe-based treatment, representing a new procedure line for the OR/procedural suite.",
-      "signal_date": "2026-01-07",
-      "source_url": "https://www.stclair.org/st-clair-hospital-offering-non-invasive-focal-ones-robotic-hifu-procedure-for-prostate-cancer/",
-      "severity": "MEDIUM",
-      "company_name": "St Clair Health (AKA St Clair Hospital)"
     }
   ],
   "companies_removed_from_universe": [
