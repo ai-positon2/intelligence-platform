@@ -6,7 +6,8 @@
     3,
     4,
     5,
-    6
+    6,
+    7
   ],
   "companies_covered": [
     "AMSURG",
@@ -15,9 +16,12 @@
     "Banner Health",
     "Baptist Health South Florida",
     "Broward Health",
+    "Central Ohio Urology Group",
     "Cleveland Clinic Florida",
     "Cullman Regional Medical Center",
     "Doctors Hospital Of Augusta",
+    "FLOWERS HOSPITAL",
+    "Findlay Surgery Center",
     "GRAND VIEW HEALTH",
     "HEALTH FIRST",
     "HONORHEALTH",
@@ -39,6 +43,7 @@
     "Texas Health Resources",
     "United Surgical Partners International",
     "University Medical Center of El Paso (UMC)",
+    "Wilmington Surgical Associates",
     "Wyandot Memorial Hospital"
   ],
   "signals": [
@@ -577,6 +582,38 @@
       "signal_date": "2026-07-30",
       "source_url": "https://careers.asahq.org/job/physician-anesthesia-surgical-intensive-care-unit-sicu/84295401/",
       "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Flowers Hospital (Dothan, AL, 235-bed CHS-affiliated regional medical center) is directly recruiting a hospital-employed, full-time Board-Certified or Board-Eligible Anesthesiologist for its perioperative team under a CRNA Medical Direction model, covering cardiac, orthopedic, general, OB, spine, urology, plastic and ENT cases. Compensation offered is W-2 $550,000/year (48 hrs/week, 1 in-house 24-hour call shift plus three 8-hour shifts, 10 weeks vacation) or 1099 at $335/hour. This is self-staffing by the hospital itself, a displaceable/supplementable position for a NorthStar pitch.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.practicematch.com/physicians/job-details.cfm/1076560/anesthesiology/alabama/dothan/flowers-hospital/",
+      "company_name": "FLOWERS HOSPITAL"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Flowers Hospital in Dothan, AL is also actively recruiting CRNAs directly (both a full-time req and a separate PRN req), practicing under the CRNA Medical Direction model, new grads welcome, PRN rate around $150/hour, W-2 or 1099 available. The PRN listing was live on ZipRecruiter (posted roughly 3 weeks prior to this search) with recruiter contact Brooke Grosse, Anesthesia Recruiter for Community Health Systems (CHS), the parent system. Confirms Flowers Hospital is a CHS facility self-staffing its anesthesia department rather than using an outside group, a direct displacement/supplement opportunity for NorthStar.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.hospitalrecruiting.com/co/231/flowers-hospital/crna/all/",
+      "company_name": "FLOWERS HOSPITAL"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "NorthStar Anesthesia already holds the anesthesia staffing contract at Central Ohio Urology Surgery Center in Gahanna, OH, operating under a Medical Direction model. NorthStar is actively recruiting to fill both a Full-Time CRNA role (four 10-hour shifts per week, $300K+ base plus sign-on bonus) and a PRN CRNA role (2 to 3 days per week) at this facility, per live job postings open as of 2026-07-30. This is an existing account relationship, not a displacement opportunity, and should reframe outreach toward retention/expansion rather than a competitive pitch.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://northstaranesthesia.com/job/central-ohio-urology-surgery-center-prn-crna/",
+      "company_name": "Central Ohio Urology Group"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Central Ohio Urology Group announced on March 6, 2026 that it is the first provider in Ohio to offer the HYDROS Robotic System for Aquablation therapy (AI-powered, robotic-assisted waterjet treatment for BPH) inside its Central Ohio Urology Surgery Center ASC in Gahanna. This is a new procedural technology deployment that adds a robotic-assisted case type to the ASC's anesthesia caseload.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-06",
+      "source_url": "https://www.centralohiourology.com/central-ohio-urology-group-first-in-ohio-to-offer-hydros-robotic-system-a-cutting-edge-ai-powered-platform-for-aquablation-therapy-to-treat-bph-in-an-ambulatory-surgery-center/",
+      "company_name": "Central Ohio Urology Group"
     }
   ],
   "companies_removed_from_universe": [
