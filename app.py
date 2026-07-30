@@ -4892,15 +4892,22 @@ def _fetch_client_usage(slug, force=False):
         if browser and not p["browser"]:
             p["browser"] = browser
 
-    # Login events: who signed in and when. Sign-ins aren't scoped to a portal, so
-    # we attach each person's global login timestamps as 'login' events to enrich
-    # their activity timeline (both tabs carry timestamp @0, email @5).
+    # Login events: who signed in and when. Sign-ins are a global auth event, not
+    # scoped to a portal -- a Position² staffer signs in once and that same
+    # session covers /p2, /app and every client portal. Counting every one of
+    # their sign-ins here would overstate THIS portal's usage with unrelated
+    # internal-tool activity (both tabs carry timestamp @0, email @5). So a login
+    # only counts here if it falls on a calendar day the same person also viewed
+    # a page on THIS portal -- their page-view events above are already scoped
+    # to /<slug>, so this reuses that scoping rather than re-deriving it.
+    portal_days_by_email = {e: {ev["ts"][:10] for ev in p["_events"] if ev.get("ts")}
+                             for e, p in people.items()}
     login_map = {}   # email(lower) -> [ts, ...]
     for rng in ("A:U", "%s!A:T" % _MEMBER_TAB):
         for r in _cu_read_tab(rng)[1:]:
             e = (r[5].strip().lower() if len(r) > 5 else "")
             t = (r[0].strip() if len(r) > 0 else "")
-            if e and t:
+            if e and t and t[:10] in portal_days_by_email.get(e, ()):
                 login_map.setdefault(e, []).append(t)
 
     # Agent runs by this portal's users. The 'Agent Runs' tab is global (email +
