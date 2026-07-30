@@ -4,7 +4,8 @@
     1,
     2,
     3,
-    4
+    4,
+    5
   ],
   "companies_covered": [
     "AMSURG",
@@ -17,10 +18,15 @@
     "HEALTH FIRST",
     "Houston Methodist",
     "Kelsey Seybold",
+    "Miami Jewish Health",
     "Novant Health",
     "OPTIM HEALTH SYSTEM",
     "Orlando Health Jewett Orthopedic Institute",
     "Physicians Outpatient Surgery Center",
+    "Promedica",
+    "REGENCY HOSPITAL COMPANY",
+    "Riddle Surgical Center",
+    "South Texas Spine & Surgical Hospital",
     "Southwest Surgical Associates",
     "St Clair Health (AKA St Clair Hospital)",
     "TEXAS ORTHOPEDIC HOSPITAL",
@@ -413,6 +419,38 @@
       "source_url": "https://careers.napaanesthesia.com/us/en/job/JR9516/CAA-Optim-Medical-Center-Tattnall-Per-Diem",
       "severity": "HIGH",
       "company_name": "OPTIM HEALTH SYSTEM"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "United Anesthesia Services, P.C. (UAS), the physician-owned Philadelphia-area anesthesia group that staffs Riddle Surgical Center on a contracted basis, has an active CRNA opening specifically for Riddle Surgical Center in Media, PA, live on Glassdoor and cross-posted to ZipRecruiter and Indeed as of today. This confirms UAS as the incumbent anesthesia vendor at the account, the group NorthStar would need to displace or supplement, and shows an open staffing gap there.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.glassdoor.com/job-listing/crna-riddle-surgical-center-united-anesthesia-services-JV_IC1152642_KO0,27_KE28,54.htm?jl=1009746139863",
+      "company_name": "Riddle Surgical Center"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Select Medical Holdings Corporation, the parent company of Regency Hospital Company, was taken private in a $3.9 billion deal by a consortium led by Robert A. Ortenzio, Martin F. Jackson, and Welsh, Carson, Anderson & Stowe (WCAS). The deal was announced March 2, 2026 at $16.50/share, approved by stockholders June 26, 2026, and closed July 1, 2026, at which point Select Medical stock ceased trading on the NYSE. Current management is expected to remain in place, but new PE ownership of the parent is a reason to re-engage account leadership on contract terms across the Regency Hospital portfolio.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.prnewswire.com/news-releases/select-medical-holdings-corporation-announces-stockholder-approval-of-acquisition-by-consortium-led-by-robert-a-ortenzio-martin-f-jackson-and-wcas-302812357.html",
+      "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Regency Hospital of Minneapolis (Golden Valley, MN) has an active, open Chief Executive Officer search posted on LinkedIn (posted roughly late June 2026, salary $215,000 to $245,000), with Matt Campbell, J.D. serving only as interim CEO after transferring in from Select Specialty Hospital, Saginaw. The permanent facility CEO seat is vacant as of today.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.linkedin.com/jobs/view/chief-executive-officer-at-regency-hospital-company-4421871831",
+      "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "News Mention",
+      "signal_detail": "Regency Hospital in Meridian, Mississippi (a 40-bed critical illness recovery hospital on the second floor of Anderson Regional Medical Center South) closed around March 13, 2026, per Select Medical chief communication officer Shelly Eckenroth, who called it 'an operational business decision.' Patients were redirected to Ochsner Specialty Hospital in Meridian; this removes one facility from the Regency portfolio and signals possible footprint consolidation elsewhere.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-13",
+      "source_url": "https://meridianstar.com/2026/02/19/regency-hospital-to-close-next-month/",
+      "company_name": "REGENCY HOSPITAL COMPANY"
     }
   ],
   "companies_removed_from_universe": [
@@ -470,7 +508,8 @@
       "Facility growth is HIGH only when it adds operating rooms or surgical capacity. Outpatient clinics, freestanding ERs, rehab towers, and medical office buildings are footprint, not anesthesia demand.",
       "Calibrate severity to scale. A 49-robot fleet purchase and one da Vinci at one ASC are not the same signal; a 35-facility M&A year and one ASC joining a platform are not either.",
       "A CEO transition is legitimately two rows (C-Suite Exit for the outgoing person, C-Suite Join for the incoming one): they are two different contacts. That is not a duplicate.",
-      "Prune as well as add. Re-run the seed with --prune so the JSON stays the single source of truth."
+      "Prune as well as add. Re-run the seed with --prune so the JSON stays the single source of truth.",
+      "As of 2026-07-30, per explicit user instruction, this tracker only admits signals whose signal_date falls within the last 6 months (~180 days) of the most recent research/prune pass, not just ones that clear the relevance bar above. Exclude anything older at research time rather than logging and letting severity decay -- and periodically re-run the prune (see seed_northstar_signals.py --prune) so signals that age past the window get removed even if nothing new was added. This mostly supersedes the exec-change 12-18 month decay-to-MEDIUM rule above for admission purposes: anything past 6 months is dropped outright, not downgraded."
     ]
   }
 }
