@@ -4936,16 +4936,14 @@ def _fetch_client_usage(slug, force=False):
         if ts and ts > rec["last"]:
             rec["last"] = ts
 
-    # Fold in anyone who ran an agent but has no tracked page views in-window, so the
-    # Agent Runs view never silently drops them.
-    for e, rec in runs_by_email.items():
-        if e in people or seg_of(e) == "other":
-            continue
-        people[e] = {"email": e, "name": _cu_pretty_name(e, name_map),
-                     "picture": name_map.get(e, {}).get("picture", ""),
-                     "segment": seg_of(e), "views": 0, "seconds": 0, "pages": {},
-                     "first_seen": rec["last"], "last_seen": rec["last"],
-                     "browser": "", "device": "", "_events": []}
+    # Deliberately NOT folding in people who only appear in runs_by_email with no
+    # tracked page view here: client_run_slugs is often a handful of the shared
+    # /app agents (Keyword Finder, Content Brief Generator, Content Enhancer),
+    # which every client's roster can include -- so "ran an agent this client
+    # also happens to offer" does not mean "used THIS client's portal." Without
+    # a page view (or, per the login scoping above, a matching login) on
+    # /<slug>, a person has no actual footprint on this portal and shouldn't
+    # appear in its people list, even if their agent-run total looks nonzero.
 
     def finalize(p):
         top = sorted(p["pages"].items(), key=lambda kv: -kv[1])
