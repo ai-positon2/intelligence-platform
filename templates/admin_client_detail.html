@@ -23,7 +23,13 @@
     /* ══ KPI hero cards — each one gets its own accent (--kc), icon badge,
        breathing glow and a one-shot hover sheen instead of the flat generic
        indigo look every other admin page's .stat-card shares. ══ */
-    .stats-row{gap:18px}
+    /* 7 cards in a fixed-column grid strands a lonely, oversized-gap last row
+       (e.g. 6+1). Flexbox with grow instead: each row's cards stretch to
+       fill the full row width evenly, whatever the count in that row, so a
+       4+3 (or 5+2, 3+4 on a narrower screen) split always looks intentional
+       and evenly spaced instead of leaving dead space beside a stray card. */
+    .stats-row{display:flex !important;flex-wrap:wrap;gap:18px}
+    .stats-row .stat-card{flex:1 1 240px;min-width:0}
     .stat-card.kc{padding-top:24px !important}
     .stat-card.kc .kc-ico{position:absolute;top:18px;right:18px;width:32px;height:32px;border-radius:9px;
       display:flex;align-items:center;justify-content:center;z-index:2;
@@ -214,7 +220,7 @@
       <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)"><span class="refresh-icon" id="refreshIcon">↻</span> Refresh</button>
     </div>
 
-    <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(172px,1fr))">
+    <div class="stats-row">
       <div class="stat-card kc clik" style="--kc:#818cf8" onclick="openFeed()" title="See the full activity feed">
         <div class="sc-glow"></div>
         <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
