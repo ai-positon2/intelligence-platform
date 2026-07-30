@@ -2062,6 +2062,35 @@ def _list_agent_runs(email: str, limit: int = 200) -> list:
         except Exception:
             pass
 
+def _list_agent_run_titles(limit=5000) -> list:
+    """Every saved run's (email, agent_slug, title, created_at), oldest first --
+    used to enrich the Sheets-backed 'Agent Runs' log (which only knows WHO ran
+    WHICH AGENT) with WHAT THEY ACTUALLY RAN. Callers pair each Sheets run row
+    with the next not-yet-claimed row here for the same (email, agent_slug), in
+    chronological order -- both logs are append-ordered, so this lines them up
+    without a timestamp-matching heuristic. Best-effort: a run that never
+    finished (tool errored, tab closed before the postMessage handoff) has no
+    title here, so that Sheets row's detail is simply left blank."""
+    conn = _pg_conn()
+    if not conn:
+        return []
+    try:
+        _ensure_run_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT email, agent_slug, title, created_at FROM agent_run_history "
+                "ORDER BY created_at ASC LIMIT %s", (limit,))
+            rows = cur.fetchall()
+        return [{"email": r[0], "slug": r[1], "title": r[2]} for r in rows]
+    except Exception as e:
+        log.warning("list agent run titles failed: %s", e)
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 def _get_agent_run(email: str, run_id: int):
     """One saved run's full output, scoped to `email` so a user can only ever
     open their own runs (the id is a public URL param, not a secret)."""
@@ -4543,6 +4572,14 @@ def _fetch_usage_data(internal: bool = True) -> dict:
         um_by_lower = {k.lower(): v for k, v in user_map.items()}
         ar_by_email: dict = {}
         agent_totals: dict = {}
+        # (email, agent_slug) -> FIFO queue of saved-run titles from Postgres.
+        # Both logs are append-ordered, so popping one per matching Sheets row
+        # below pairs each run with what it actually was (see _list_agent_run_titles).
+        title_queue: dict = defaultdict(list)
+        for h in _list_agent_run_titles():
+            he = (h["email"] or "").lower()
+            if keep(he):
+                title_queue[(he, _canonical_agent_slug(h["slug"] or ""))].append(h["title"] or "")
         for r in ar_rows:
             e = col(r, 2)
             if not keep(e):        # external only, non-empty
@@ -4551,15 +4588,18 @@ def _fetch_usage_data(internal: bool = True) -> dict:
             slug = _canonical_agent_slug(col(r, 4) or "?")
             ts = col(r, 0)
             aname = col(r, 5) or agent_meta.get(slug, {}).get("name", slug)
+            q = title_queue.get((el, slug))
+            detail = q.pop(0) if q else ""
             d = ar_by_email.setdefault(el, {"email": e, "name": col(r, 3),
                                             "total": 0, "agents": {}, "last_run": "", "events": []})
             d["total"] += 1
             d["agents"][slug] = d["agents"].get(slug, 0) + 1
             if ts > d["last_run"]:
                 d["last_run"] = ts
-            d["events"].append({"t": ts, "kind": "run", "label": "Ran " + aname, "meta": ""})
+            label = "Ran " + aname + (": " + detail if detail else "")
+            d["events"].append({"t": ts, "kind": "run", "label": label, "meta": ""})
             agent_totals[slug] = agent_totals.get(slug, 0) + 1
-            agent_runs_table.append({"ts": ts, "email": e, "name": col(r, 3), "agent": aname})
+            agent_runs_table.append({"ts": ts, "email": e, "name": col(r, 3), "agent": aname, "detail": detail})
         agent_runs_total = sum(agent_totals.values())
         agent_users = len(ar_by_email)
         agent_breakdown = sorted(([agent_meta.get(s, {}).get("name", s), c]

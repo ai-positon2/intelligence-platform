@@ -623,11 +623,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
 
     function renderAgentTable(rows){
       if (!rows || !rows.length) return '<div class="empty">No agent runs recorded yet.</div>';
-      var h = '<thead><tr><th>Timestamp</th><th>Person</th><th>Email</th><th>Agent</th></tr></thead>';
+      var h = '<thead><tr><th>Timestamp</th><th>Person</th><th>Email</th><th>Agent</th><th>What they ran</th></tr></thead>';
       var b = '<tbody>'+rows.map(function(r,i){
         return '<tr style="animation-delay:'+(i*14)+'ms">' +
           '<td class="dim">'+esc(r.ts)+'</td><td>'+esc(r.name||'—')+'</td>' +
-          '<td class="hi">'+esc(r.email)+'</td><td>'+esc(r.agent||'—')+'</td></tr>';
+          '<td class="hi">'+esc(r.email)+'</td><td>'+esc(r.agent||'—')+'</td>' +
+          '<td class="dim">'+esc(r.detail||'—')+'</td></tr>';
       }).join('')+'</tbody>';
       return '<div class="tbl-wrap"><table>'+h+b+'</table></div>';
     }
