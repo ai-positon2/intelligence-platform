@@ -19,6 +19,42 @@
       background:radial-gradient(circle at 30% 25%,color-mix(in srgb,var(--ac) 34%,transparent),transparent 70%),#0f1424;border:1px solid rgba(255,255,255,.08)}
     .cd-logo img{max-width:38px;max-height:32px;object-fit:contain}
     .cd-logo span{font-size:20px;font-weight:700;color:#e6ebf5}
+
+    /* ══ KPI hero cards — each one gets its own accent (--kc), icon badge,
+       breathing glow and a one-shot hover sheen instead of the flat generic
+       indigo look every other admin page's .stat-card shares. ══ */
+    .stats-row{gap:18px}
+    .stat-card.kc{padding-top:24px !important}
+    .stat-card.kc .kc-ico{position:absolute;top:18px;right:18px;width:32px;height:32px;border-radius:9px;
+      display:flex;align-items:center;justify-content:center;z-index:2;
+      background:color-mix(in srgb,var(--kc) 16%,transparent);
+      border:1px solid color-mix(in srgb,var(--kc) 34%,transparent);color:var(--kc);
+      transition:transform .25s cubic-bezier(.16,1,.3,1),background .25s}
+    .stat-card.kc .kc-ico svg{width:16px;height:16px}
+    .stat-card.kc::before{background:linear-gradient(90deg,var(--kc),color-mix(in srgb,var(--kc) 45%,#fff)) !important}
+    .stat-card.kc .sc-glow{background:var(--kc) !important;opacity:.14;width:150px;height:150px;top:-48px;right:-36px;
+      animation:kcBreathe 6.5s ease-in-out infinite}
+    .stat-card.kc{background:
+        radial-gradient(130% 150% at 100% -10%,color-mix(in srgb,var(--kc) 9%,transparent),transparent 58%),
+        rgba(13,15,24,.85) !important;
+      isolation:isolate}
+    .stat-card.kc::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+      background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.07) 50%,transparent 60%);
+      transform:translateX(-120%);transition:transform .65s ease}
+    .stat-card.kc:hover::after{transform:translateX(120%)}
+    .stat-card.kc:hover{border-color:color-mix(in srgb,var(--kc) 55%,rgba(255,255,255,.14)) !important;
+      box-shadow:0 22px 54px -26px rgba(0,0,0,.85),0 0 46px -16px color-mix(in srgb,var(--kc) 55%,transparent) !important}
+    .stat-card.kc:hover .kc-ico{transform:scale(1.08) rotate(-4deg);background:color-mix(in srgb,var(--kc) 30%,transparent)}
+    .stat-card.kc:hover .stat-label{color:color-mix(in srgb,var(--kc) 55%,#93a0c6)}
+    .stat-card.kc .stat-value{position:relative;z-index:2;
+      background:linear-gradient(120deg,#fff 10%,color-mix(in srgb,var(--kc) 65%,#fff) 110%) !important;
+      -webkit-background-clip:text !important;background-clip:text !important;-webkit-text-fill-color:transparent !important}
+    .stat-card.kc .stat-label,.stat-card.kc .stat-small{position:relative;z-index:2}
+    @keyframes kcBreathe{0%,100%{opacity:.11}50%{opacity:.24}}
+    [data-theme="light"] .stat-card.kc .kc-ico{color:color-mix(in srgb,var(--kc) 70%,#17213a)}
+    [data-theme="light"] .stat-card.kc .stat-value{
+      background:linear-gradient(120deg,#17213a,color-mix(in srgb,var(--kc) 65%,#17213a)) !important;
+      -webkit-background-clip:text !important;background-clip:text !important;-webkit-text-fill-color:transparent !important}
     /* segment split */
     .seg-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
     @media(max-width:840px){.seg-grid{grid-template-columns:1fr}}
@@ -178,14 +214,51 @@
       <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)"><span class="refresh-icon" id="refreshIcon">↻</span> Refresh</button>
     </div>
 
-    <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-      <div class="stat-card clik" onclick="openFeed()" title="See the full activity feed"><div class="sc-glow"></div><div class="stat-label">Page Views</div><div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div><div class="stat-small" style="color:#a5b4fc">View all activity →</div></div>
-      <div class="stat-card clik" onclick="openPeople()" title="See everyone"><div class="sc-glow"></div><div class="stat-label">People</div><div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div><div class="stat-small" id="k-people-sub"></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Logins</div><div class="stat-value" id="k-logins"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Agent Runs</div><div class="stat-value" id="k-runs"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Time on Portal</div><div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">First Activity</div><div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
-      <div class="stat-card"><div class="sc-glow"></div><div class="stat-label">Last Activity</div><div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div></div>
+    <div class="stats-row" style="grid-template-columns:repeat(auto-fit,minmax(172px,1fr))">
+      <div class="stat-card kc clik" style="--kc:#818cf8" onclick="openFeed()" title="See the full activity feed">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <div class="stat-label">Page Views</div>
+        <div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div>
+        <div class="stat-small" style="color:#a5b4fc">View all activity →</div>
+      </div>
+      <div class="stat-card kc clik" style="--kc:#c084fc" onclick="openPeople()" title="See everyone">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="stat-label">People</div>
+        <div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div>
+        <div class="stat-small" id="k-people-sub"></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#f5a623">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3-3.5 3.5"/></svg></div>
+        <div class="stat-label">Logins</div>
+        <div class="stat-value" id="k-logins"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#34d399">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
+        <div class="stat-label">Agent Runs</div>
+        <div class="stat-value" id="k-runs"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#22d3ee">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+        <div class="stat-label">Time on Portal</div>
+        <div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#4ade80">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></div>
+        <div class="stat-label">First Activity</div>
+        <div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#fb7185">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <div class="stat-label">Last Activity</div>
+        <div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div>
+      </div>
     </div>
 
     <div class="seg-grid" id="segGrid">
