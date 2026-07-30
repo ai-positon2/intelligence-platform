@@ -5,7 +5,8 @@
     2,
     3,
     4,
-    5
+    5,
+    6
   ],
   "companies_covered": [
     "AMSURG",
@@ -14,10 +15,15 @@
     "Banner Health",
     "Baptist Health South Florida",
     "Broward Health",
+    "Cleveland Clinic Florida",
+    "Cullman Regional Medical Center",
+    "Doctors Hospital Of Augusta",
     "GRAND VIEW HEALTH",
     "HEALTH FIRST",
+    "HONORHEALTH",
     "Houston Methodist",
     "Kelsey Seybold",
+    "Magee-Womens Hospital Of Upmc",
     "Miami Jewish Health",
     "Novant Health",
     "OPTIM HEALTH SYSTEM",
@@ -451,6 +457,126 @@
       "signal_date": "2026-03-13",
       "source_url": "https://meridianstar.com/2026/02/19/regency-hospital-to-close-next-month/",
       "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Cullman Regional Medical Center is actively recruiting a Certified Registered Nurse Anesthetist (CRNA) for its own self-operated anesthesia service (Cullman Regional Anesthesia Services LLC), offering $165,000 to $250,000 annually plus a $25,000 sign-on bonus for a two-year commitment. The role covers a CRNA-only model in Endoscopy, Pain Clinic, MRI/CT Imaging and the Cardiac Lab, indicating the hospital self-staffs anesthesia rather than using an outsourced group, a displaceable/supplementable target for NorthStar.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.linkedin.com/jobs/view/crna-5681-at-cullman-regional-medical-center-3908826451",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Cullman Regional Medical Center named Kim Albright as Chief Financial Officer, returning to the hospital after serving as CFO of Baptist Health Walker Hospital in Jasper, Alabama. She previously held Assistant CFO and Executive Director of Decision Support roles at Cullman Regional. A new CFO is a fresh budget-cycle decision-maker for any anesthesia staffing contract discussion.",
+      "severity": "HIGH",
+      "signal_date": "2026-05-30",
+      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/alabama-hospital-taps-new-cfo-2/",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Cullman Regional partnered with Baptist Health's Cardiovascular Associates (CVA) to open a new Heart & Vascular Clinic on the Cullman Regional campus, which began seeing patients April 27, 2026 (partnership announced May 1, 2026). The clinic adds electrophysiology and vascular disease treatment locally, with the hospital and CVA physicians stating plans to add further cardiovascular and peripheral vascular procedural capabilities, a service line that typically carries anesthesia/sedation demand.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-05-01",
+      "source_url": "https://www.cullmantribune.com/2026/05/01/new-partnership-to-add-advanced-cardiovascular-care-at-cullman-regional/",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "UPMC's University of Pittsburgh Physicians Department of Anesthesiology and Perioperative Medicine is actively recruiting board-certified/eligible anesthesiologists with obstetric anesthesiology fellowship training or substantial OB anesthesia experience to staff Magee-Womens Hospital of UPMC, which delivers close to 10,000 births a year (45 percent of all Allegheny County births). The listing offers a lucrative incentive bonus, has been reposted across PracticeLink, ASA CareerCenter, AORN and NAPNAP job boards since at least April 12, 2026, and remains open as of late July 2026, pointing to a persistent, self-staffed OB anesthesia vacancy rather than a filled seat.",
+      "severity": "HIGH",
+      "signal_date": "2026-04-12",
+      "source_url": "https://jobs.practicelink.com/jobs/1392152/anesthesiology/physician/pennsylvania/upmc-magee-women-s-hospital/",
+      "company_name": "Magee-Womens Hospital Of Upmc"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "UPMC is directly recruiting several full-time CRNAs for Magee-Womens Hospital of UPMC through University of Pittsburgh Physicians' Anesthesiology Department, citing an expanding OB Service Line and preferring candidates with OB and regional anesthesia skills. The req offers a newly increased salary range, a substantial sign-on bonus and relocation assistance, and is live alongside a separate casual CRNA posting at the same facility as of July 2026, indicating UPMC's self-staffed anesthesia capacity is not keeping pace with OB volume growth.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://careers.upmc.com/job/21041348/crna-upmc-magee-womens-hospital-pittsburgh-pa/",
+      "company_name": "Magee-Womens Hospital Of Upmc"
+    },
+    {
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "HonorHealth announced CEO Todd LaPorte will step down after more than a decade leading the system, effective March 1, 2027, after which he will serve as a strategic advisor to the CEO. Announcement made June 16, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-16",
+      "source_url": "https://www.honorhealth.com/healthy-living/honorhealth-announces-ceo-transition-plan-evp-john-neil-md-mmm-named-successor-todd",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Dr. John Neil, MD, MMM, previously EVP, Chief Physician Executive and Chief Strategy Officer, was named CEO-designate and immediately assumed the newly created role of President at HonorHealth, ahead of becoming CEO on March 1, 2027. Announced June 16, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-16",
+      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/honorhealth-ceo-to-exit-role-new-leader-named/",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "HonorHealth completed a $170 million renovation and expansion at HonorHealth Deer Valley Medical Center (north Phoenix), adding a new four-story, 166,000-square-foot patient care pavilion with four new operating rooms and expanded pre/post-op areas, growing the hospital from 204 to 238 beds. Announced April 30, 2026, with a ribbon-cutting planned later in 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-04-30",
+      "source_url": "https://www.honorhealth.com/healthy-living/honorhealth-completes-170m-renovation-and-expansion-deer-valley-medical-center",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "HonorHealth unveiled major campus enhancements at HonorHealth Scottsdale Shea Medical Center as part of a roughly $60 million multi-phase project: a new Heart Care Center with cardiovascular ICU and a new outpatient ambulatory surgery facility for cardiovascular procedures, plus a new 400-space parking garage. Announced June 11, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-11",
+      "source_url": "https://azbigmedia.com/business/health-care/honorhealth-unveils-major-campus-enhancements-at-scottsdale-shea-medical-center/",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "News Mention",
+      "signal_detail": "Fitch downgraded HonorHealth's Issuer Default Rating and revenue bonds to A from A+ with a negative outlook on March 18, 2026, citing higher-than-expected strategic spending and weaker operating results during integration of the Steward Health Care assets, even as the system pursues a roughly $600 million further expansion.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-18",
+      "source_url": "https://www.abc15.com/news/business/fitch-downgrades-honorhealth-rating-as-nonprofit-system-pursues-600m-expansion",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Valley Anesthesiology Consultants (an Envision Physician Services practice) is confirmed as the exclusive anesthesia group under contract across multiple HonorHealth facilities, including Deer Valley, Sonoran Crossing, Thompson Peak, Scottsdale Shea, and John C. Lincoln North Mountain. As of today it has live open recruiting for a BE/BC anesthesiologist (up to $190K in bonuses) and CRNAs (e.g., $260K-266K base plus $50K start bonus) at Scottsdale Shea to fill its exclusive HonorHealth coverage, identifying the incumbent vendor NorthStar would need to displace.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.envisionhealth.com/find-a-career/clinical-job-search/anesthesiologist-scottsdale-az/jo000012604",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Doctors Hospital of Augusta (HCA) held a topping out ceremony on May 15, 2026, placing the final beam for two new floors as part of its $150 million capital campaign: one floor added to the burn tower (expanding care capacity for pediatric and adult burn patients, the hospital's signature high acuity service line and home to the nation's largest burn center) and one floor added to the South Tower for an expanded inpatient rehab unit. CEO Joanna Conley cited CSRA population growth as the driver. New floors are expected to open by spring 2027, adding 110+ new full time jobs. This is a leading indicator of continued perioperative and burn surgical capacity growth at the flagship facility, worth tracking ahead of the 2027 opening.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-05-15",
+      "source_url": "https://www.wrdw.com/2026/05/15/doctors-hospital-marks-progress-150m-community-campaign/",
+      "company_name": "Doctors Hospital Of Augusta"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Cleveland Clinic confirmed it will begin demolition and site preparation in Q3 2026 for a new 200 bed hospital in West Palm Beach (part of the Cleveland Clinic Florida region, Palm Beach County), plus a separate outpatient center and ambulatory surgery center at 15 CityPlace targeted to open November 2027. The capital campaign has raised over 180 million dollars toward a 500 million dollar goal. This is new surgical capacity being added inside the same Cleveland Clinic Florida region as Weston, Indian River, Tradition, and Martin Health, meaning new OR and perioperative demand a NorthStar rep should track from the ground up.",
+      "severity": "HIGH",
+      "signal_date": "2026-02-22",
+      "source_url": "https://newsroom.clevelandclinic.org/2026/02/22/cleveland-clinic-highlights-growth-and-strategic-momentum-in-palm-beach-county",
+      "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "The Orthopaedic Center of Vero Beach joined Cleveland Clinic Indian River Hospital (Vero Beach, FL) on February 2, 2026, bringing joint replacement, sports medicine, and spine surgery physicians in house along with existing robotic hip/knee and augmented reality shoulder navigation capability. This adds an employed surgical volume feeder at Indian River Hospital specifically, worth flagging even though it is a single practice roll-up rather than a hospital-level deal.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-02-02",
+      "source_url": "https://newsroom.clevelandclinic.org/2026/02/02/cleveland-clinic-indian-river-hospital-welcomes-leading-orthopaedic-practice-to-expand-care",
+      "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Cleveland Clinic Florida is self-staffing anesthesia across multiple concurrent open requisitions rather than relying solely on an outside group: Cleveland Clinic Weston Hospital currently has live postings for a General Anesthesiologist, a Cardiac Anesthesiology Physician, a Surgical Intensive Care Unit (SICU) Anesthesiologist, and a Liver Transplant Anesthesiologist, plus a CRNA PRN role advertising a sign on bonus and PSLF eligibility, and a separate CRNA PRN opening at Cleveland Clinic Indian River Hospital in Vero Beach. This is a multi-specialty, multi-facility in house anesthesia hiring push, a clear self-staffing/displaceable signal for a NorthStar pitch naming Weston and Indian River specifically.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://careers.asahq.org/job/physician-anesthesia-surgical-intensive-care-unit-sicu/84295401/",
+      "company_name": "Cleveland Clinic Florida"
     }
   ],
   "companies_removed_from_universe": [
