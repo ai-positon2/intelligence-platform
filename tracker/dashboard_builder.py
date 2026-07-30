@@ -1262,6 +1262,16 @@ mark{background:rgba(59,130,246,.2);color:var(--text);border-radius:2px;padding:
 .kpi-card::before,.panel::before{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(520px circle at var(--ev3-mx,50%) var(--ev3-my,50%),rgba(99,102,241,.14),transparent 45%);opacity:0;transition:opacity .35s ease;pointer-events:none;z-index:1}
 .kpi-card:hover::before,.panel:hover::before{opacity:1}
 .kpi-card>*,.panel>*{position:relative;z-index:2}
+/* ...but that rule has the SAME specificity as .kpi-tooltip's own
+   position:absolute and is declared later, so it silently pulled the tooltip
+   into normal flow. Revealing it on :hover then added its ~40px of height to
+   the card, and because the cards sit in a CSS grid row every card in that row
+   grew with it -- which reads as the hovered card "expanding". Re-pin the
+   tooltip out of flow with a more specific selector so hovering can never
+   change layout. Note it stays clipped by the overflow:hidden above (that rule
+   also overrode the original overflow:visible on .kpi-card), so these tooltips
+   render invisibly today either way; this only removes the layout shift. */
+.kpi-card>.kpi-tooltip,.panel>.kpi-tooltip{position:absolute;z-index:200}
 
 /* — D. (removed: conic-gradient rotating border on HIGH cards) — */
 
