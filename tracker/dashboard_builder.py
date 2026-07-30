@@ -3784,30 +3784,10 @@ window._showToast = function(msg, icon, durationMs) {
 
 // copy-to-clipboard toast removed
 
-// C ── 3D perspective tilt on KPI cards
-(function() {
-  function initTilt() {
-    document.querySelectorAll('.kpi-card').forEach(function(card) {
-      if (card._tiltInited) return;
-      card._tiltInited = true;
-      card.addEventListener('mousemove', function(e) {
-        var rect = card.getBoundingClientRect();
-        var x = (e.clientX - rect.left) / rect.width - 0.5;
-        var y = (e.clientY - rect.top) / rect.height - 0.5;
-        var tx = -y * 12, ty = x * 12;
-        card.style.transform = 'translateY(-5px) rotateX(' + tx + 'deg) rotateY(' + ty + 'deg) scale(1.02)';
-        card.style.boxShadow = '0 16px 40px rgba(59,130,246,' + (0.1 + Math.abs(x) * 0.12) + ')';
-        card.style.transition = 'box-shadow .1s';
-      });
-      card.addEventListener('mouseleave', function() {
-        card.style.transform = '';
-        card.style.boxShadow = '';
-        card.style.transition = 'transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s';
-      });
-    });
-  }
-  document.addEventListener('DOMContentLoaded', function() { setTimeout(initTilt, 350); });
-})();
+// C ── (removed) 3D perspective tilt on KPI cards -- the scale(1.02) + tilt
+// on mousemove read as the whole card "expanding" on hover, which the user
+// explicitly didn't want. The plain CSS .kpi-card:hover rule (translateY
+// lift + shadow, no scale) still applies on its own.
 
 // D ── Magnetic attraction on primary action buttons
 (function() {
@@ -3954,20 +3934,6 @@ document.addEventListener('click', function(e) {
     else tbl.classList.remove('tbl-header-stuck');
   };
   scrollParent.addEventListener('scroll', onTblScroll, { passive: true });
-})();
-
-// M ── Re-init tilt + magnetic after section switches
-(function() {
-  var origNavClick = window.showSection;
-  if (typeof origNavClick !== 'function') return;
-  var reinit = function() {
-    setTimeout(function() {
-      document.querySelectorAll('.kpi-card:not([data-tilt])').forEach(function(card) {
-        card._tiltInited = false;
-      });
-    }, 300);
-  };
-  window.addEventListener('hashchange', reinit);
 })();
 
 // N ── Filter panel open shows toast
