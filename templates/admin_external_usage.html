@@ -380,6 +380,25 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     .pm-src{position:absolute;bottom:14px;right:30px;font-family:monospace;font-size:9.5px;
       letter-spacing:.1em;text-transform:uppercase;color:#4d5878}
 
+    /* AI read band (OpenAI verdict), between the hero and the two columns */
+    .pm-ai{flex:none;padding:15px 30px 16px;border-bottom:1px solid rgba(255,255,255,.09);
+      background:linear-gradient(100deg,color-mix(in srgb, var(--pc) 9%,transparent),transparent 62%)}
+    .pm-ai-h{display:flex;align-items:center;gap:9px;margin-bottom:8px;flex-wrap:wrap}
+    .pm-ai-t{font-family:monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+      color:color-mix(in srgb, var(--pc) 70%,#fff);font-weight:600}
+    .pm-ai-hd{font-size:15px;font-weight:700;color:#f2f6fb;letter-spacing:-.01em}
+    .pm-int{font-family:monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+      padding:3px 9px;border-radius:var(--radius-pill,99px);font-weight:600;white-space:nowrap}
+    .pm-int.high{color:#6ee7b7;background:rgba(52,211,153,.13);border:1px solid rgba(52,211,153,.42)}
+    .pm-int.medium{color:#fcd34d;background:rgba(245,166,35,.13);border:1px solid rgba(245,166,35,.42)}
+    .pm-int.low{color:#94a3b8;background:rgba(148,163,184,.1);border:1px solid rgba(148,163,184,.3)}
+    .pm-ai-s{font-size:13.2px;line-height:1.62;color:#c3ccdf;max-width:104ch}
+    .pm-ai-n{display:flex;align-items:flex-start;gap:7px;margin-top:9px;font-size:12.3px;line-height:1.5;
+      color:color-mix(in srgb, var(--pc) 74%,#fff)}
+    .pm-ai-n i{font-style:normal;flex:none;opacity:.8}
+    .pm-ai-m{font-family:monospace;font-size:9px;color:#4d5878;margin-left:auto;letter-spacing:.06em}
+    .pm-ai-off{font-size:12.5px;color:#6b7699;line-height:1.55}
+
     /* Body: two independently-scrolling columns */
     .pm-body{display:grid;grid-template-columns:1.03fr .97fr;flex:1;min-height:0}
     .pm-col{overflow-y:auto;padding:22px 26px 26px;min-width:0}
@@ -652,6 +671,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     <div class="pmodal" id="pmodal" role="dialog" aria-modal="true" aria-label="Person profile">
       <button class="pm-x" onclick="closeUserDrawer()" aria-label="Close">✕</button>
       <div class="pm-hero" id="pmHero"></div>
+      <div class="pm-ai" id="pmAI"></div>
       <div class="pm-body">
         <div class="pm-col l" id="pmLeft"></div>
         <div class="pm-col" id="pmRight"></div>
@@ -1052,12 +1072,55 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         (p.matched?'<div class="pm-src">enriched via apollo</div>':'');
     }
 
+    /* The AI read. SUMM caches per email for the session so reopening a row is
+       instant; the server caches by fact fingerprint so an unchanged person is
+       never re-summarized. */
+    var SUMM = {};            /* email -> payload | null(failed) | undefined(unfetched) */
+    var SUMM_ON = true;       /* false once the server reports no OpenAI key */
+
+    function pmAiHtml(u){
+      var em=(u.email||'').toLowerCase(), s=SUMM[em];
+      if(s===undefined){
+        return '<div class="pm-ai-h"><span class="pm-ai-t">AI read</span></div>'+
+               '<div class="pm-sk" style="width:62%;height:13px;margin-bottom:7px"></div>'+
+               '<div class="pm-sk" style="width:88%;height:11px"></div>';
+      }
+      if(!s||!s.summary){
+        var msg = SUMM_ON
+          ? 'Could not generate a read for this person just now. Reopen the row to retry.'
+          : 'AI summaries are switched off on this environment because OPENAI_API_KEY is not set.';
+        return '<div class="pm-ai-h"><span class="pm-ai-t">AI read</span></div>'+
+               '<div class="pm-ai-off">'+esc(msg)+'</div>';
+      }
+      var chip = s.intent ? '<span class="pm-int '+esc(s.intent)+'">'+esc(s.intent)+' intent</span>' : '';
+      return '<div class="pm-ai-h"><span class="pm-ai-t">AI read</span>'+chip+
+               (s.headline?'<span class="pm-ai-hd">'+esc(s.headline)+'</span>':'')+
+               (s.model?'<span class="pm-ai-m">'+esc(s.model)+'</span>':'')+
+             '</div>'+
+             '<div class="pm-ai-s">'+esc(s.summary)+'</div>'+
+             (s.next_step?'<div class="pm-ai-n"><i>&#8594;</i><span>'+esc(s.next_step)+'</span></div>':'');
+    }
+
+    /* Ask the server for one person's read. Never rejects. */
+    function pmSummarize(u){
+      var em=(u.email||'').toLowerCase();
+      if(!em)return Promise.resolve();
+      return fetch('/p2/admin/external-usage/summary',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:em,activity:u})
+      }).then(function(r){return r.json();}).then(function(d){
+        if(d&&d.openai===false)SUMM_ON=false;
+        SUMM[em]=(d&&d.summary&&d.summary.summary)?d.summary:null;
+      }).catch(function(e){ console.warn('summary failed',e); SUMM[em]=null; });
+    }
+
     function pmPaint(i){
       var u=USERS[i]; if(!u)return;
       var p=ENRICH[(u.email||'').toLowerCase()];
       var mod=document.getElementById('pmodal');
       mod.style.setProperty('--pc',palette(u.email||u.name));
       document.getElementById('pmHero').innerHTML=pmHero(u,p);
+      document.getElementById('pmAI').innerHTML=pmAiHtml(u);
       document.getElementById('pmLeft').innerHTML=(p===undefined)?pmSkeleton():pmEnrichHtml(u,p);
       document.getElementById('pmRight').innerHTML=pmActivityHtml(u);
     }
@@ -1070,8 +1133,14 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       document.getElementById('pmWrap').classList.add('on');
       document.body.style.overflow='hidden';
       var em=(u.email||'').toLowerCase();
-      if(ENRICH[em]===undefined&&ENRICH_ON){
-        pmEnrich([em]).then(function(){ if(PM_I===i)pmPaint(i); });
+      var ready=(ENRICH[em]===undefined&&ENRICH_ON)
+        ? pmEnrich([em]).then(function(){ if(PM_I===i)pmPaint(i); })
+        : Promise.resolve();
+      // Summarize only after enrichment is known, so the model sees the person's
+      // title and company rather than just their email and clicks.
+      if(SUMM[em]===undefined){
+        ready.then(function(){ return pmSummarize(u); })
+             .then(function(){ if(PM_I===i)pmPaint(i); });
       }
     }
     function closeUserDrawer(){
