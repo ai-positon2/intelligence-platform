@@ -206,6 +206,10 @@ def _log_member_signin(user: dict) -> None:
     """Append one PUBLIC (non-Position2) Google sign-in to the 'Member Signins' tab.
     Records the anonymous visitor id (p2_vid cookie) so the member can be joined to
     their pre-login Visitor Analytics journey. Fails silently."""
+    # Resolve this person's Apollo profile now, detached, so the admin dashboards
+    # already have it before anyone opens them. Runs BEFORE the sheet-id guard so
+    # enrichment still happens on an environment with no Sheets configured.
+    _warm_person_enrichment(user.get("email", ""))
     if not LOGIN_LOG_SHEET_ID:
         return
     try:
@@ -2149,9 +2153,16 @@ def _pe_cache_read(emails: list) -> dict:
             rows = cur.fetchall()
         now = datetime.now(timezone.utc)
         for email, matched, payload, updated_at in rows:
+            payload = payload or {"matched": False, "email": email}
+            # A miss row written before the answered/pending split (i.e. by the
+            # first deploy, when APOLLO_API_KEY was unset) carries no `checked`
+            # flag and cannot be trusted. Ignoring it here re-enriches those
+            # people once, instead of stranding them for the negative TTL.
+            if not matched and not payload.get("checked"):
+                continue
             ttl = _PE_POS_TTL_DAYS if matched else _PE_NEG_TTL_DAYS
             if updated_at and (now - updated_at).days < ttl:
-                out[email] = payload or {"matched": False, "email": email}
+                out[email] = payload
         return out
     except Exception as e:
         log.warning("person enrich cache read failed: %s", e)
@@ -2316,29 +2327,36 @@ def _pe_year(s: str) -> int:
         return 0
 
 
-def _apollo_bulk_match(emails: list) -> dict:
-    """email -> normalized profile (matched ones only) via Apollo
-    people/bulk_match, 10 per call, chunks issued concurrently. {} if no API key
-    is configured or every call fails."""
+def _apollo_bulk_match(emails: list):
+    """(profiles, answered) via Apollo people/bulk_match, 10 per call, chunks
+    issued concurrently.
+
+    `profiles` maps email -> normalized profile for each real match. `answered`
+    is the set of emails Apollo actually returned a verdict on. The distinction
+    matters: "Apollo says there is no such person" is a durable fact worth
+    caching, while "we never reached Apollo" (no API key, network error, 5xx) is
+    not -- caching the latter as a miss would freeze everyone as unenriched for
+    the whole negative-TTL window, which is exactly what happened on the first
+    deploy when APOLLO_API_KEY was unset."""
     key = os.environ.get("APOLLO_API_KEY", "")
     if not (key and emails):
-        return {}
+        return {}, set()
     try:
         from tracker.apollo_client import _post as _apollo_post
     except Exception as e:
         log.warning("apollo client unavailable: %s", e)
-        return {}
+        return {}, set()
 
     chunks = [emails[i:i + 10] for i in range(0, len(emails), 10)]
 
-    def _one(chunk: list) -> dict:
+    def _one(chunk: list):
         out: dict = {}
         try:
             data = _apollo_post("people/bulk_match",
                                 {"details": [{"email": e} for e in chunk]}, key) or {}
         except Exception as e:
             log.warning("apollo bulk_match failed (%d emails): %s", len(chunk), e)
-            return out
+            return out, set()          # nothing in this chunk got an answer
         matches = data.get("matches") or []
         # `matches` is positionally aligned with the `details` we sent, with a
         # null for every email Apollo could not resolve.
@@ -2349,17 +2367,44 @@ def _apollo_bulk_match(emails: list) -> dict:
                     out[email] = _apollo_person_normalize(m, email)
                 except Exception as e:
                     log.warning("apollo normalize failed for one record: %s", e)
-        return out
+        return out, set(chunk)
 
     results: dict = {}
+    answered: set = set()
     if len(chunks) == 1:
-        results.update(_one(chunks[0]))
+        r, a = _one(chunks[0])
+        results.update(r); answered |= a
     else:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as ex:
-            for r in ex.map(_one, chunks):
-                results.update(r)
-    return results
+            for r, a in ex.map(_one, chunks):
+                results.update(r); answered |= a
+    return results, answered
+
+
+def _warm_person_enrichment(email: str) -> None:
+    """Enrich one member's profile in a detached background thread.
+
+    Called on every non-Position2 sign-in, which is what makes a brand-new
+    person show up already enriched instead of waiting for an admin to open the
+    dashboard. Safe to call on every sign-in, not just new ones: a known email
+    is a pure cache hit and costs no Apollo credit. Never blocks or breaks the
+    sign-in -- a failure here is logged and dropped."""
+    email = (email or "").strip().lower()
+    if not (email and "@" in email):
+        return
+    if not os.environ.get("APOLLO_API_KEY", ""):
+        return                      # nothing to warm without a key
+    def _run():
+        try:
+            _enrich_people([email])
+        except Exception as e:
+            log.warning("background enrich failed for %s: %s", email, e)
+    try:
+        import threading
+        threading.Thread(target=_run, name="enrich-member", daemon=True).start()
+    except Exception as e:
+        log.warning("could not start enrich thread: %s", e)
 
 
 def _enrich_people(emails: list, force: bool = False) -> dict:
@@ -2397,19 +2442,28 @@ def _enrich_people(emails: list, force: bool = False) -> dict:
             todo = [e for e in todo if e not in cached]
 
     if todo:
-        fresh = _apollo_bulk_match(todo)
-        # Every email we attempted gets a row, matched or not -- that's what
-        # stops unmatchable addresses from being retried on every page load.
+        fresh, answered = _apollo_bulk_match(todo)
         writeback = {}
         for e in todo:
-            prof = fresh.get(e) or {"matched": False, "email": e}
-            writeback[e] = prof
+            prof = fresh.get(e)
+            if prof:
+                writeback[e] = prof
+            elif e in answered:
+                # Apollo genuinely has no record: cache it so an unmatchable
+                # address is not re-looked-up on every page load.
+                prof = {"matched": False, "email": e, "checked": True}
+                writeback[e] = prof
+            else:
+                # Never reached Apollo. Report it as pending and cache NOTHING,
+                # so the next request retries instead of being stuck as a miss.
+                prof = {"matched": False, "email": e, "pending": True}
             out[e] = prof
         _pe_cache_write(writeback)
 
     exp = time.time() + _PE_MEM_TTL
     for e, prof in out.items():
-        _PE_MEM[e] = (exp, prof)
+        if not prof.get("pending"):
+            _PE_MEM[e] = (exp, prof)
     return out
 
 
@@ -5044,6 +5098,172 @@ def admin_external_usage_data():
     enriched with agent runs and company/email-domain rollups)."""
     return jsonify(_fetch_usage_data(internal=False))
 
+def _xl_people_columns():
+    """(header, extractor) pairs for the workbook's People sheet. `u` is one row
+    from _fetch_usage_data's user_activity, `p` that person's Apollo profile."""
+    def co(p, k, d=""):
+        return ((p.get("company") or {}).get(k) or d)
+    def pct(v):
+        try:
+            return round(float(v) * 100, 1)
+        except (TypeError, ValueError):
+            return ""
+    return [
+        # Identity + first-party activity (always present)
+        ("Name",                 lambda u, p: u.get("name") or ""),
+        ("Email",                lambda u, p: u.get("email") or ""),
+        ("Email domain",         lambda u, p: u.get("domain") or ""),
+        ("Logins",               lambda u, p: u.get("logins") or 0),
+        ("Agent runs",           lambda u, p: u.get("agent_runs") or 0),
+        ("Page views",           lambda u, p: u.get("page_views") or 0),
+        ("Time on site",         lambda u, p: u.get("time_fmt") or ""),
+        ("Pre-login pages",      lambda u, p: u.get("prelogin_pages") or 0),
+        ("Linked to pre-login",  lambda u, p: "Yes" if u.get("linked") else "No"),
+        ("First seen",           lambda u, p: u.get("first_seen") or ""),
+        ("Last active",          lambda u, p: u.get("last_active") or u.get("last_seen") or ""),
+        ("Browser",              lambda u, p: u.get("browser") or ""),
+        ("OS",                   lambda u, p: u.get("os") or ""),
+        ("Device",               lambda u, p: u.get("device") or ""),
+        ("First-touch source",   lambda u, p: u.get("source") or ""),
+        ("Agents used",          lambda u, p: ", ".join(
+            "%s (%d)" % (a.get("name", ""), a.get("count", 0)) for a in (u.get("agents") or []))),
+        # Apollo enrichment
+        ("Enrichment",           lambda u, p: ("Matched" if p.get("matched")
+                                               else ("Not run" if p.get("pending") else "No match"))),
+        ("Title",                lambda u, p: p.get("title") or ""),
+        ("Seniority",            lambda u, p: p.get("seniority") or ""),
+        ("Departments",          lambda u, p: ", ".join(p.get("departments") or [])),
+        ("Functions",            lambda u, p: ", ".join(p.get("functions") or [])),
+        ("Headline",             lambda u, p: p.get("headline") or ""),
+        ("Person location",      lambda u, p: p.get("location") or ""),
+        ("Time zone",            lambda u, p: p.get("time_zone") or ""),
+        ("LinkedIn",             lambda u, p: p.get("linkedin") or ""),
+        ("Twitter",              lambda u, p: p.get("twitter") or ""),
+        ("Company",              lambda u, p: co(p, "name")),
+        ("Company domain",       lambda u, p: co(p, "domain")),
+        ("Industry",             lambda u, p: co(p, "industry")),
+        ("Employees",            lambda u, p: co(p, "employees", "")),
+        ("Revenue",              lambda u, p: co(p, "revenue")),
+        ("Founded",              lambda u, p: co(p, "founded", "")),
+        ("Company HQ",           lambda u, p: co(p, "hq")),
+        ("Company phone",        lambda u, p: co(p, "phone")),
+        ("Company website",      lambda u, p: co(p, "website")),
+        ("Company LinkedIn",     lambda u, p: co(p, "linkedin")),
+        ("Headcount growth 6mo %",  lambda u, p: pct(co(p, "growth6", None))),
+        ("Headcount growth 12mo %", lambda u, p: pct(co(p, "growth12", None))),
+        ("Headcount growth 24mo %", lambda u, p: pct(co(p, "growth24", None))),
+        ("Company keywords",     lambda u, p: ", ".join(co(p, "keywords", []) or [])),
+        ("Current role since",   lambda u, p: next((h.get("start", "") for h in (p.get("history") or [])
+                                                    if h.get("current")), "")),
+        ("Past roles",           lambda u, p: " | ".join(
+            "%s at %s (%s to %s)" % (h.get("title", ""), h.get("org", ""),
+                                     h.get("start", "") or "?", h.get("end", "") or "?")
+            for h in (p.get("history") or []) if not h.get("current"))),
+        ("In CRM",               lambda u, p: "Yes" if (p.get("crm") or {}).get("in_crm") else "No"),
+        ("CRM record",           lambda u, p: (p.get("crm") or {}).get("url") or ""),
+    ]
+
+
+def _export_external_usage_xlsx() -> bytes:
+    """Everything this dashboard knows, as a 4-sheet .xlsx.
+
+    Sheets: People (one row per person, activity + full Apollo profile), Activity
+    timeline (every tracked event for every person), Agent runs, and Summary.
+    openpyxl is already a dependency (requirements.txt). Profiles come from the
+    enrichment cache, so exporting does not re-spend Apollo credits on anyone
+    already resolved."""
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    d = _fetch_usage_data(internal=False)
+    users = d.get("user_activity") or []
+    profiles = _enrich_people([u.get("email", "") for u in users])
+
+    wb = Workbook()
+    head_font = Font(bold=True, color="FFFFFF", size=10)
+    head_fill = PatternFill("solid", fgColor="1E293B")
+    head_align = Alignment(vertical="center", wrap_text=False)
+
+    def _finish(ws, ncols, nrows, widths=None):
+        """Header styling + freeze panes + autofilter + sane column widths."""
+        for c in range(1, ncols + 1):
+            cell = ws.cell(row=1, column=c)
+            cell.font = head_font
+            cell.fill = head_fill
+            cell.alignment = head_align
+            w = (widths or {}).get(c)
+            if not w:
+                longest = len(str(cell.value or ""))
+                for r in range(2, min(nrows + 2, 120)):
+                    longest = max(longest, len(str(ws.cell(row=r, column=c).value or "")))
+                w = min(max(longest + 2, 10), 52)
+            ws.column_dimensions[get_column_letter(c)].width = w
+        ws.freeze_panes = "A2"
+        if nrows:
+            ws.auto_filter.ref = "A1:%s%d" % (get_column_letter(ncols), nrows + 1)
+
+    # ── People ────────────────────────────────────────────────────────────────
+    cols = _xl_people_columns()
+    ws = wb.active
+    ws.title = "People"
+    ws.append([h for h, _ in cols])
+    for u in users:
+        p = profiles.get((u.get("email") or "").lower()) or {}
+        ws.append([fn(u, p) for _, fn in cols])
+    _finish(ws, len(cols), len(users))
+
+    # ── Activity timeline ─────────────────────────────────────────────────────
+    KIND = {"view": "Pre-login page view", "signin": "Sign-in",
+            "post": "Page view (after login)", "run": "Agent run"}
+    ws2 = wb.create_sheet("Activity timeline")
+    ws2.append(["Name", "Email", "Timestamp", "Event type", "What", "Detail"])
+    n = 0
+    for u in users:
+        for e in (u.get("timeline") or []):
+            ws2.append([u.get("name") or "", u.get("email") or "", e.get("t") or "",
+                        KIND.get(e.get("kind"), e.get("kind") or ""),
+                        e.get("label") or "", e.get("meta") or ""])
+            n += 1
+    _finish(ws2, 6, n, {1: 22, 2: 34, 3: 24, 4: 24, 5: 52, 6: 26})
+
+    # ── Agent runs ────────────────────────────────────────────────────────────
+    runs = d.get("agent_runs_table") or []
+    ws3 = wb.create_sheet("Agent runs")
+    ws3.append(["Timestamp", "Name", "Email", "Agent", "What they ran"])
+    for r in runs:
+        ws3.append([r.get("ts") or "", r.get("name") or "", r.get("email") or "",
+                    r.get("agent") or "", r.get("detail") or ""])
+    _finish(ws3, 5, len(runs), {1: 24, 2: 22, 3: 34, 4: 26, 5: 52})
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    matched = sum(1 for p in profiles.values() if p.get("matched"))
+    pending = sum(1 for p in profiles.values() if p.get("pending"))
+    ws4 = wb.create_sheet("Summary")
+    ws4.append(["Metric", "Value"])
+    for k, v in [
+        ("Exported at (IST)", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")),
+        ("External people", len(users)),
+        ("Total logins", d.get("total_logins") or 0),
+        ("Total page views", d.get("total_page_views") or 0),
+        ("Total time on site", d.get("total_time_fmt") or ""),
+        ("Total agent runs", d.get("agent_runs_total") or 0),
+        ("People who ran an agent", d.get("agent_users") or 0),
+        ("Linked to pre-login", d.get("linked_users") or 0),
+        ("Apollo enrichment configured", "Yes" if os.environ.get("APOLLO_API_KEY", "") else "No"),
+        ("Profiles matched", matched),
+        ("Profiles with no Apollo match", len(profiles) - matched - pending),
+        ("Profiles not yet enriched", pending),
+    ]:
+        ws4.append([k, v])
+    _finish(ws4, 2, 12, {1: 32, 2: 26})
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 @app.route("/p2/admin/external-usage/enrich", methods=["POST"])
 @admin_required
 def admin_external_usage_enrich():
@@ -5061,6 +5281,25 @@ def admin_external_usage_enrich():
     profiles = _enrich_people(emails, force=bool(body.get("force")))
     return jsonify({"profiles": profiles,
                     "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+
+@app.route("/p2/admin/external-usage/export")
+@admin_required
+def admin_external_usage_export():
+    """Download the whole dashboard as an .xlsx (People / Activity timeline /
+    Agent runs / Summary). Streams the bytes straight out, no temp file."""
+    try:
+        data = _export_external_usage_xlsx()
+    except Exception as e:
+        log.warning("external usage export failed: %s", e)
+        return jsonify({"error": "export failed"}), 500
+    fname = "external-usage-%s.xlsx" % datetime.now(IST).strftime("%Y-%m-%d-%H%M")
+    resp = make_response(data)
+    resp.headers["Content-Type"] = ("application/vnd.openxmlformats-officedocument"
+                                    ".spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s"' % fname
+    resp.headers["Content-Length"] = str(len(data))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 # ── Client Usage (per-client-portal analytics) ───────────────────────────────
 # For each client we run a co-branded portal at /<slug>. This aggregates every
