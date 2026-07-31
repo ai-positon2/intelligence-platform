@@ -5098,6 +5098,277 @@ def admin_external_usage_data():
     enriched with agent runs and company/email-domain rollups)."""
     return jsonify(_fetch_usage_data(internal=False))
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AI PERSON READ (OpenAI) -- the one-glance summary on the External Usage modal
+# ─────────────────────────────────────────────────────────────────────────────
+# Everything the dashboard knows about one person (identity, Apollo profile,
+# where they came from, pages, agent runs, agent access requests) is compressed
+# into a strict-JSON verdict: a headline, two sentences, an intent rating and a
+# suggested next step. Reuses Vimi's model chain and OpenAI key, no second
+# integration. Cached in Postgres keyed by a FINGERPRINT of the input facts, so
+# a summary is regenerated only when that person's data actually changes, not
+# once per page load.
+
+_PS_TABLE_READY = False
+_PS_MEM: dict = {}          # email -> (expiry, payload)
+_PS_MEM_TTL = 900
+_AAR_SUMMARY_CACHE = {"t": 0.0, "rows": []}
+_AAR_SUMMARY_TTL = 180      # only for the summary path; _agent_access_requested_slugs
+                            # deliberately stays uncached so "Request sent" is instant
+
+
+def _ensure_person_summary_table(conn) -> None:
+    global _PS_TABLE_READY
+    if _PS_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS person_summary (
+                email TEXT PRIMARY KEY,
+                fingerprint TEXT NOT NULL,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _PS_TABLE_READY = True
+
+
+def _ps_fingerprint(facts: dict) -> str:
+    """Stable hash of the facts we are about to summarize. Any change to the
+    person's activity or profile changes this, which is what invalidates the
+    cached summary without needing a TTL."""
+    import hashlib
+    blob = json.dumps(facts, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
+
+
+def _ps_cache_get(email: str, fingerprint: str):
+    """Cached summary for this exact fingerprint, else None."""
+    hit = _PS_MEM.get(email)
+    if hit and hit[0] > time.time() and hit[1].get("_fp") == fingerprint:
+        return hit[1]
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        _ensure_person_summary_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload, fingerprint FROM person_summary WHERE email = %s",
+                        (email,))
+            row = cur.fetchone()
+        if row and row[1] == fingerprint:
+            payload = row[0] or {}
+            payload["_fp"] = fingerprint
+            _PS_MEM[email] = (time.time() + _PS_MEM_TTL, payload)
+            return payload
+        return None
+    except Exception as e:
+        log.warning("person summary cache read failed: %s", e)
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _ps_cache_put(email: str, fingerprint: str, payload: dict) -> None:
+    _PS_MEM[email] = (time.time() + _PS_MEM_TTL, dict(payload, _fp=fingerprint))
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        from psycopg2.extras import Json
+        _ensure_person_summary_table(conn)
+        clean = {k: v for k, v in payload.items() if k != "_fp"}
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO person_summary (email, fingerprint, payload, updated_at) "
+                "VALUES (%s, %s, %s, now()) ON CONFLICT (email) DO UPDATE SET "
+                "fingerprint = EXCLUDED.fingerprint, payload = EXCLUDED.payload, updated_at = now()",
+                (email, fingerprint, Json(clean)))
+        conn.commit()
+    except Exception as e:
+        log.warning("person summary cache write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _aar_for_summary() -> list:
+    """Agent access requests with a short TTL cache. Read on the summary path
+    only, where a few minutes of staleness is irrelevant."""
+    now = time.time()
+    if _AAR_SUMMARY_CACHE["rows"] and (now - _AAR_SUMMARY_CACHE["t"]) < _AAR_SUMMARY_TTL:
+        return _AAR_SUMMARY_CACHE["rows"]
+    rows = _agent_access_requests_raw()
+    _AAR_SUMMARY_CACHE["rows"] = rows
+    _AAR_SUMMARY_CACHE["t"] = now
+    return rows
+
+
+def _ps_pages_from_timeline(timeline: list) -> tuple:
+    """(pre_login_pages, after_login_pages, ran_labels) as deduped title lists,
+    most recent first. This is the 'which pages did they visit' input."""
+    pre, post, runs = [], [], []
+    for e in reversed(timeline or []):
+        label = str(e.get("label") or "").strip()
+        if not label:
+            continue
+        kind = e.get("kind")
+        bucket = pre if kind == "view" else (post if kind == "post" else (runs if kind == "run" else None))
+        if bucket is None or label in bucket:
+            continue
+        if len(bucket) < 12:
+            bucket.append(label)
+    return pre, post, runs
+
+
+def _person_summary_facts(email: str, activity: dict, profile: dict) -> dict:
+    """Compact, whitelisted fact sheet for one person. Only known keys are read
+    out of `activity` (which may arrive from the browser), and every string is
+    length-capped, so nothing unbounded or unexpected reaches the prompt."""
+    def s(v, n=180):
+        return str(v or "")[:n]
+
+    pre, post, runs = _ps_pages_from_timeline(activity.get("timeline") or [])
+    co = (profile.get("company") or {}) if profile else {}
+    el = email.lower()
+
+    requested = []
+    for r in _aar_for_summary():
+        if (r.get("email") or "").lower() == el:
+            requested.append({"agent": s(r.get("agent_name") or r.get("slug"), 60),
+                              "reason": s(r.get("message"), 220)})
+        if len(requested) >= 8:
+            break
+
+    form = {}
+    try:
+        for r in _read_access_requests():
+            if (r.get("email") or "").lower() == el:
+                form = {"company": s(r.get("company"), 80), "interest": s(r.get("interest"), 120),
+                        "message": s(r.get("message"), 300)}
+                break
+    except Exception:
+        form = {}
+
+    facts = {
+        "identity": {
+            "name": s(activity.get("name"), 80),
+            "email": el,
+            "email_domain": s(activity.get("domain"), 80),
+            "title": s(profile.get("title") if profile else "", 120),
+            "seniority": s(profile.get("seniority") if profile else "", 40),
+            "linkedin_headline": s(profile.get("headline") if profile else "", 220),
+            "location": s(profile.get("location") if profile else "", 100),
+            "company": s(co.get("name"), 100),
+            "company_industry": s(co.get("industry"), 80),
+            "company_employees": co.get("employees") or "",
+            "company_revenue": s(co.get("revenue"), 40),
+            "already_in_crm": bool((profile.get("crm") or {}).get("in_crm")) if profile else False,
+            "enriched": bool(profile.get("matched")) if profile else False,
+        },
+        "acquisition": {
+            "first_seen": s(activity.get("first_seen"), 40),
+            "first_touch_source": s(activity.get("source"), 80) or "direct",
+            "pages_before_signup": activity.get("prelogin_pages") or 0,
+            "pages_viewed_before_signup": pre,
+        },
+        "engagement": {
+            "logins": activity.get("logins") or 0,
+            "page_views": activity.get("page_views") or 0,
+            "time_on_site": s(activity.get("time_fmt"), 20),
+            "last_active": s(activity.get("last_active") or activity.get("last_seen"), 40),
+            "pages_viewed_after_login": post,
+            "device": s(" ".join(x for x in [activity.get("browser"), activity.get("os"),
+                                             activity.get("device")] if x), 80),
+        },
+        "agents": {
+            "runs_total": activity.get("agent_runs") or 0,
+            "agents_run": [{"name": s(a.get("name"), 60), "count": a.get("count") or 0}
+                           for a in (activity.get("agents") or [])[:8]],
+            "what_they_ran": runs,
+            "agents_requested_access_to": requested,
+        },
+        "request_form": form,
+    }
+    return facts
+
+
+_PS_SYSTEM = (
+    "You are a B2B revenue-intelligence analyst for Position2, a B2B digital marketing "
+    "agency. You are given every fact a first-party analytics platform holds about ONE "
+    "person who signed in to it: who they are, how they arrived, what they read, which AI "
+    "agents they ran, and which agents they asked for access to.\n\n"
+    "Write a verdict a salesperson can act on in five seconds.\n\n"
+    "Rules:\n"
+    "1. Use ONLY the supplied facts. Never invent a title, company, intent or motive. If "
+    "identity is unknown, say so plainly and reason from behaviour instead.\n"
+    "2. Be specific over generic. Name the actual pages, agents and sources that matter. "
+    "Skip anything that carries no signal.\n"
+    "3. Insight, not restatement. Do not simply list the numbers back; say what the "
+    "pattern means (evaluating, researching a specific need, tyre-kicking, already a "
+    "client, a competitor looking around, an agency peer, and so on).\n"
+    "4. Never use an em dash. Use commas, colons or periods.\n"
+    "5. Plain professional English. No marketing adjectives, no hedging padding.\n\n"
+    "Return STRICT JSON only, with these keys:\n"
+    '{"headline": "at most 7 words, the person in a nutshell",\n'
+    ' "summary": "at most 2 sentences, at most 42 words total: who they are, where they '
+    'came from, what they actually did, what they seem to want",\n'
+    ' "intent": "high" | "medium" | "low",\n'
+    ' "next_step": "at most 14 words, the single most useful next action, or an empty '
+    'string if none is warranted"}'
+)
+
+
+def _person_ai_summary(email: str, facts: dict) -> dict:
+    """{headline, summary, intent, next_step, model} for one person, or {} when
+    OpenAI is not configured or the call fails. Cached by fact fingerprint."""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return {}
+    fp = _ps_fingerprint(facts)
+    cached = _ps_cache_get(email, fp)
+    if cached:
+        return cached
+    try:
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key, timeout=45.0, max_retries=1)
+        raw, model = _vimi_chat_json(oai, [
+            {"role": "system", "content": _PS_SYSTEM},
+            {"role": "user", "content": json.dumps(facts, default=str)[:12000]},
+        ], 420)
+        data = json.loads(raw)
+    except Exception as e:
+        log.warning("person summary generation failed for %s: %s", email, e)
+        return {}
+
+    intent = str(data.get("intent") or "").strip().lower()
+    if intent not in ("high", "medium", "low"):
+        intent = ""
+    out = {
+        "headline": str(data.get("headline") or "").strip()[:90],
+        # Belt and braces on house style: the model is told not to use em dashes,
+        # this guarantees it even if a model ignores the instruction.
+        "summary": str(data.get("summary") or "").strip().replace("—", ",")[:600],
+        "intent": intent,
+        "next_step": str(data.get("next_step") or "").strip().replace("—", ",")[:140],
+        "model": model,
+    }
+    if not out["summary"]:
+        return {}
+    _ps_cache_put(email, fp, out)
+    return out
+
+
 def _xl_people_columns():
     """(header, extractor) pairs for the workbook's People sheet. `u` is one row
     from _fetch_usage_data's user_activity, `p` that person's Apollo profile."""
@@ -5113,6 +5384,11 @@ def _xl_people_columns():
         ("Name",                 lambda u, p: u.get("name") or ""),
         ("Email",                lambda u, p: u.get("email") or ""),
         ("Email domain",         lambda u, p: u.get("domain") or ""),
+        # AI read (see _person_ai_summary); blank when OpenAI is not configured
+        ("AI headline",          lambda u, p: (u.get("_ai") or {}).get("headline") or ""),
+        ("AI intent",            lambda u, p: ((u.get("_ai") or {}).get("intent") or "").title()),
+        ("AI summary",           lambda u, p: (u.get("_ai") or {}).get("summary") or ""),
+        ("AI next step",         lambda u, p: (u.get("_ai") or {}).get("next_step") or ""),
         ("Logins",               lambda u, p: u.get("logins") or 0),
         ("Agent runs",           lambda u, p: u.get("agent_runs") or 0),
         ("Page views",           lambda u, p: u.get("page_views") or 0),
@@ -5180,6 +5456,22 @@ def _export_external_usage_xlsx() -> bytes:
     d = _fetch_usage_data(internal=False)
     users = d.get("user_activity") or []
     profiles = _enrich_people([u.get("email", "") for u in users])
+
+    # AI read for every person, concurrently. Cached by fact fingerprint, so a
+    # repeat export of unchanged people costs nothing. Capped so one click can
+    # never fan out into an unbounded number of model calls.
+    if os.environ.get("OPENAI_API_KEY", ""):
+        from concurrent.futures import ThreadPoolExecutor
+        def _one_summary(u):
+            em = (u.get("email") or "").lower()
+            try:
+                facts = _person_summary_facts(em, u, profiles.get(em) or {})
+                u["_ai"] = _person_ai_summary(em, facts)
+            except Exception as e:
+                log.warning("export summary failed for %s: %s", em, e)
+                u["_ai"] = {}
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            list(ex.map(_one_summary, users[:60]))
 
     wb = Workbook()
     head_font = Font(bold=True, color="FFFFFF", size=10)
@@ -5252,12 +5544,14 @@ def _export_external_usage_xlsx() -> bytes:
         ("People who ran an agent", d.get("agent_users") or 0),
         ("Linked to pre-login", d.get("linked_users") or 0),
         ("Apollo enrichment configured", "Yes" if os.environ.get("APOLLO_API_KEY", "") else "No"),
+        ("AI summaries configured", "Yes" if os.environ.get("OPENAI_API_KEY", "") else "No"),
+        ("AI summaries written", sum(1 for u in users if (u.get("_ai") or {}).get("summary"))),
         ("Profiles matched", matched),
         ("Profiles with no Apollo match", len(profiles) - matched - pending),
         ("Profiles not yet enriched", pending),
     ]:
         ws4.append([k, v])
-    _finish(ws4, 2, 12, {1: 32, 2: 26})
+    _finish(ws4, 2, 14, {1: 34, 2: 26})
 
     buf = BytesIO()
     wb.save(buf)
@@ -5281,6 +5575,28 @@ def admin_external_usage_enrich():
     profiles = _enrich_people(emails, force=bool(body.get("force")))
     return jsonify({"profiles": profiles,
                     "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+
+@app.route("/p2/admin/external-usage/summary", methods=["POST"])
+@admin_required
+def admin_external_usage_summary():
+    """AI read for one person, for the profile modal.
+
+    The caller sends that person's activity row, which it already has from
+    /external-usage/data, rather than the server re-reading the whole Sheet for
+    a single modal open (that read takes seconds). Only whitelisted keys are
+    used from it (see _person_summary_facts). Always 200: `summary` is {} when
+    OpenAI is not configured or the model call failed, and the UI says so."""
+    body = request.get_json(silent=True) or {}
+    email = str(body.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "bad email"}), 400
+    activity = body.get("activity") or {}
+    if not isinstance(activity, dict):
+        activity = {}
+    profile = (_enrich_people([email]) or {}).get(email) or {}
+    facts = _person_summary_facts(email, activity, profile)
+    return jsonify({"summary": _person_ai_summary(email, facts),
+                    "openai": bool(os.environ.get("OPENAI_API_KEY", ""))})
 
 @app.route("/p2/admin/external-usage/export")
 @admin_required
