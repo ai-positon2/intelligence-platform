@@ -471,6 +471,18 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       border-radius:var(--radius-md,12px);padding:16px 17px;line-height:1.6}
     .pm-empty b{display:block;color:#aab4d0;font-size:13px;margin-bottom:5px;font-weight:650}
 
+    /* Actions inside the "no match" panel */
+    .pm-acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+    .pm-act{font-family:monospace;font-size:10.5px;letter-spacing:.05em;color:#a8b2d1;cursor:pointer;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-pill,99px);
+      padding:5px 12px;transition:.16s}
+    .pm-act:hover:not(:disabled){background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.26)}
+    .pm-act:disabled{opacity:.55;cursor:default}
+    .pm-diag{margin-top:10px;font-family:monospace;font-size:11px;line-height:1.6;padding:10px 12px;
+      border-radius:var(--radius-md,12px);white-space:pre-wrap;word-break:break-word;display:none}
+    .pm-diag.ok{display:block;color:#6ee7b7;background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3)}
+    .pm-diag.bad{display:block;color:#fca5a5;background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.3)}
+
     /* Enrichment skeleton */
     .pm-sk{background:linear-gradient(90deg,rgba(255,255,255,.045),rgba(255,255,255,.1),rgba(255,255,255,.045));
       background-size:220% 100%;border-radius:8px;animation:pmsh 1.25s linear infinite}
@@ -934,7 +946,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           why='Apollo has no person record for this email address. That is normal for personal mailboxes (gmail, outlook) and for people at very small companies. Their activity on the right is still fully tracked.';
         }
         return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4>'+
-          '<div class="pm-empty"><b>'+esc(head)+'</b>'+esc(why)+'</div>'+
+          '<div class="pm-empty"><b>'+esc(head)+'</b>'+esc(why)+
+            '<div class="pm-acts">'+
+              '<button class="pm-act" id="pmRetry" onclick="pmForceEnrich()">Re-run enrichment</button>'+
+              '<button class="pm-act" id="pmCheck" onclick="pmApolloCheck()">Check Apollo connection</button>'+
+            '</div>'+
+            '<div class="pm-diag" id="pmDiag"></div>'+
+          '</div>'+
           '<div class="pm-kv" style="margin-top:11px">'+
             pmKV('Email domain',u.domain)+
             pmKV('Display name',u.name)+
@@ -1150,6 +1168,61 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       PM_I=-1;
     }
     document.addEventListener('keydown',function(e){if(e.key==='Escape')closeUserDrawer();});
+
+    /* Force a fresh Apollo lookup for the open person, bypassing every cache.
+       This is the escape hatch when a stale negative is suspected. */
+    function pmForceEnrich(){
+      var i=PM_I,u=USERS[i]; if(!u)return;
+      var b=document.getElementById('pmRetry'); if(b){b.disabled=true;b.textContent='Looking up...';}
+      var em=(u.email||'').toLowerCase();
+      fetch('/p2/admin/external-usage/enrich',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({emails:[em],force:true})})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d&&d.apollo===false)ENRICH_ON=false;
+          var pr=(d&&d.profiles)||{};
+          for(var k in pr){ if(Object.prototype.hasOwnProperty.call(pr,k))ENRICH[k.toLowerCase()]=pr[k]; }
+          if(PM_I===i)pmPaint(i);
+        })
+        .catch(function(e){
+          console.warn('force enrich failed',e);
+          var bb=document.getElementById('pmRetry');
+          if(bb){bb.disabled=false;bb.textContent='Re-run enrichment';}
+        });
+    }
+
+    /* Ask the server to prove the Apollo integration works, so "no match" can be
+       read as a real absence of data rather than a silent misconfiguration. */
+    function pmApolloCheck(){
+      var b=document.getElementById('pmCheck'), out=document.getElementById('pmDiag');
+      if(!b||!out)return;
+      b.disabled=true; b.textContent='Checking...';
+      fetch('/p2/admin/external-usage/apollo-check',{method:'POST'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          b.textContent='Check Apollo connection'; b.disabled=false;
+          var good=d&&d.configured&&d.http_ok&&d.shape_ok&&d.probe_matched;
+          out.className='pm-diag '+(good?'ok':'bad');
+          if(good){
+            out.textContent='Apollo is connected and working.\n'+
+              'Base URL: '+(d.base_url||'?')+'\n'+
+              'Test contact resolved correctly, so a "no match" here means Apollo genuinely '+
+              'has no record for this person.';
+          }else{
+            out.textContent='Apollo is not returning data.\n'+
+              'Key configured: '+(d.configured?'yes':'NO')+'\n'+
+              'Request reached Apollo: '+(d.http_ok?'yes':'NO')+'\n'+
+              'Valid response shape: '+(d.shape_ok?'yes':'NO')+'\n'+
+              'Test contact resolved: '+(d.probe_matched?'yes':'NO')+'\n'+
+              (d.error?('\n'+d.error):'');
+          }
+        })
+        .catch(function(e){
+          b.textContent='Check Apollo connection'; b.disabled=false;
+          out.className='pm-diag bad'; out.textContent='Could not run the check: '+e;
+        });
+    }
 
     /* Ask the server for profiles. Resolves once ENRICH is updated; never
        rejects, so a failed lookup just leaves those people unenriched. */
