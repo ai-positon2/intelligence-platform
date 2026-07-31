@@ -1012,6 +1012,39 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         legacy();
       }
     }
+    /* Company card. `tag` labels the source in the section's top-right corner:
+       "apollo" for a matched person's own employer, "by domain" when this is
+       the fallback attached to someone Apollo has no PERSON record for. */
+    function pmCompanyCard(c,tag){
+      var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\''+esc((c.name[0]||'?').toUpperCase())+'\'">'):esc((c.name[0]||'?').toUpperCase());
+      var grow='';
+      var rows=[['6 mo',c.growth6],['12 mo',c.growth12],['24 mo',c.growth24]].filter(function(r){return pmPct(r[1])!==null;});
+      if(rows.length){
+        grow='<div class="pm-grow">'+rows.map(function(r){
+          var pc=pmPct(r[1]), neg=pc<0, w=Math.min(50,Math.abs(pc)*1.6);
+          return '<div class="pm-grow-r"><em>'+r[0]+'</em><div class="pm-grow-b">'+
+            '<i class="'+(neg?'neg':'')+'" style="width:'+w+'%;'+(neg?'right:50%;left:auto':'left:50%')+'"></i></div>'+
+            '<b class="'+(neg?'neg':'')+'">'+(neg?'':'+')+pc+'%</b></div>';
+        }).join('')+'</div>';
+      }
+      return '<div class="pm-sec"><h4 class="pm-h4">Company<s>'+esc(tag||c.domain||'')+'</s></h4>'+
+        '<div class="pm-cocard"><div class="pm-cotop"><div class="pm-colg">'+logo+'</div>'+
+          '<div style="min-width:0"><div class="pm-coname">'+esc(c.name)+'</div>'+
+          (c.industry?'<div class="pm-coind">'+esc(c.industry)+'</div>':'')+'</div></div>'+
+          (c.description?'<div style="font-size:12.3px;color:#98a3c2;line-height:1.6;margin-top:12px">'+esc(c.description)+'</div>':'')+
+          grow+
+        '</div>'+
+        '<div class="pm-kv">'+
+          pmKV('Employees',c.employees?pmNum(c.employees):'')+
+          pmKV('Revenue',c.revenue?('$'+c.revenue):'')+
+          pmKV('Founded',c.founded)+
+          pmKV('HQ',c.hq)+
+          pmKV('Website',c.website,true)+
+        '</div>'+
+        ((c.keywords&&c.keywords.length)?'<div class="pm-tags">'+c.keywords.map(function(k){return '<span class="pm-tag">'+esc(k)+'</span>';}).join('')+'</div>':'')+
+      '</div>';
+    }
+
     function pmSkeleton(){
       var bar=function(w,h,mb){return '<div class="pm-sk" style="width:'+w+';height:'+h+'px;margin-bottom:'+mb+'px"></div>';};
       return '<div class="pm-sec">'+bar('40%',11,14)+bar('100%',52,9)+bar('100%',52,9)+'</div>'+
@@ -1028,9 +1061,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         }else if(p&&p.pending){
           head='Not enriched yet';
           why='The Apollo lookup for this person has not completed yet, or the last attempt could not reach Apollo. Nothing has been cached, so it will retry on the next load.';
+        }else if(p&&p.personal_domain){
+          why='Apollo has no person record for this email address, and it is a personal mailbox ('+esc(u.domain||'this domain')+'), so there is no employer to look up either. Their activity on the right is still fully tracked.';
         }else{
-          why='Apollo has no person record for this email address. That is normal for personal mailboxes (gmail, outlook) and for people at very small companies. Their activity on the right is still fully tracked.';
+          why='Apollo has no person record for this email address. Their activity on the right is still fully tracked.'+
+              ((p&&p.company_fallback)?' It does recognize their employer, shown below.':' That is also normal for people at very small companies Apollo has not indexed at all.');
         }
+        var fb=(p&&p.company_fallback)||null;
         return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4>'+
           '<div class="pm-empty"><b>'+esc(head)+'</b>'+esc(why)+
             '<div class="pm-acts">'+
@@ -1047,7 +1084,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           '<div class="pm-kv" style="margin-top:8px">'+
             pmKV('Email domain',u.domain)+
             pmKV('Display name',u.name)+
-          '</div></div>';
+          '</div></div>'+
+          /* We could not identify the PERSON, but Apollo may still know their
+             EMPLOYER by email domain. Labelled "by domain" rather than "apollo",
+             so it reads as "we know the company, not this specific person"
+             rather than being mistaken for a full profile match. */
+          (fb?pmCompanyCard(fb,'by domain, not this person'):'');
       }
       var c=p.company||{}, out='';
 
@@ -1087,35 +1129,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       '</div></div>';
 
       /* Company */
-      if(c.name){
-        var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\''+esc((c.name[0]||'?').toUpperCase())+'\'">'):esc((c.name[0]||'?').toUpperCase());
-        var grow='';
-        var rows=[['6 mo',c.growth6],['12 mo',c.growth12],['24 mo',c.growth24]].filter(function(r){return pmPct(r[1])!==null;});
-        if(rows.length){
-          grow='<div class="pm-grow">'+rows.map(function(r){
-            var pc=pmPct(r[1]), neg=pc<0, w=Math.min(50,Math.abs(pc)*1.6);
-            return '<div class="pm-grow-r"><em>'+r[0]+'</em><div class="pm-grow-b">'+
-              '<i class="'+(neg?'neg':'')+'" style="width:'+w+'%;'+(neg?'right:50%;left:auto':'left:50%')+'"></i></div>'+
-              '<b class="'+(neg?'neg':'')+'">'+(neg?'':'+')+pc+'%</b></div>';
-          }).join('')+'</div>';
-        }
-        out+='<div class="pm-sec"><h4 class="pm-h4">Company<s>'+esc(c.domain||'')+'</s></h4>'+
-          '<div class="pm-cocard"><div class="pm-cotop"><div class="pm-colg">'+logo+'</div>'+
-            '<div style="min-width:0"><div class="pm-coname">'+esc(c.name)+'</div>'+
-            (c.industry?'<div class="pm-coind">'+esc(c.industry)+'</div>':'')+'</div></div>'+
-            (c.description?'<div style="font-size:12.3px;color:#98a3c2;line-height:1.6;margin-top:12px">'+esc(c.description)+'</div>':'')+
-            grow+
-          '</div>'+
-          '<div class="pm-kv">'+
-            pmKV('Employees',c.employees?pmNum(c.employees):'')+
-            pmKV('Revenue',c.revenue?('$'+c.revenue):'')+
-            pmKV('Founded',c.founded)+
-            pmKV('HQ',c.hq)+
-            pmKV('Website',c.website,true)+
-          '</div>'+
-          ((c.keywords&&c.keywords.length)?'<div class="pm-tags">'+c.keywords.map(function(k){return '<span class="pm-tag">'+esc(k)+'</span>';}).join('')+'</div>':'')+
-        '</div>';
-      }
+      if(c.name)out+=pmCompanyCard(c,c.domain);
 
       /* Career history */
       if(p.history&&p.history.length){
