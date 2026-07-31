@@ -2328,6 +2328,40 @@ def _pe_emails(p: dict, contact: dict, email: str) -> list:
     return out[:6]
 
 
+def _apollo_org_normalize(org: dict) -> dict:
+    """One Apollo organization record -> the trimmed shape the Company card
+    renders. Shared by a matched person's own employer and by the domain-only
+    fallback used when Apollo has no PERSON record but does have the company."""
+    org = org or {}
+    if not org:
+        return {}
+    hq = ", ".join([x for x in [org.get("city"), org.get("state"), org.get("country")] if x])
+    return {
+        "name": org.get("name") or "",
+        "domain": org.get("primary_domain") or org.get("domain") or "",
+        "website": org.get("website_url") or "",
+        "linkedin": org.get("linkedin_url") or "",
+        "facebook": org.get("facebook_url") or "",
+        "twitter": org.get("twitter_url") or "",
+        "logo": org.get("logo_url") or "",
+        "industry": org.get("industry") or "",
+        "industries": _pe_names(org.get("industries"), 4),
+        "employees": org.get("estimated_num_employees") or 0,
+        "revenue": org.get("organization_revenue_printed") or "",
+        "founded": org.get("founded_year") or "",
+        "phone": (org.get("phone") or ((org.get("primary_phone") or {}).get("number"))
+                  or org.get("sanitized_phone") or ""),
+        "hq": hq,
+        "address": org.get("raw_address") or "",
+        "description": (org.get("short_description") or "")[:420],
+        "keywords": _pe_names(org.get("keywords"), 14),
+        "technologies": _pe_names(org.get("current_technologies"), 12),
+        "growth6": org.get("organization_headcount_six_month_growth"),
+        "growth12": org.get("organization_headcount_twelve_month_growth"),
+        "growth24": org.get("organization_headcount_twenty_four_month_growth"),
+    }
+
+
 def _apollo_person_normalize(p: dict, email: str) -> dict:
     """One Apollo person record -> the trimmed shape the modal renders. Never
     ships the raw record: org `keywords` alone can be 100+ entries."""
@@ -2353,39 +2387,13 @@ def _apollo_person_normalize(p: dict, email: str) -> dict:
     # current roles first, then most-recent start date down.
     history.sort(key=lambda h: (0 if h["current"] else 1, -_pe_year(h["start"])))
 
-    hq = ", ".join([x for x in [org.get("city"), org.get("state"), org.get("country")] if x])
     loc = p.get("formatted_address") or ", ".join(
         [x for x in [p.get("city"), p.get("state"), p.get("country")] if x])
 
     name = p.get("name") or " ".join(
         [x for x in [p.get("first_name"), p.get("last_name")] if x]).strip()
 
-    company = {}
-    if org:
-        company = {
-            "name": org.get("name") or "",
-            "domain": org.get("primary_domain") or org.get("domain") or "",
-            "website": org.get("website_url") or "",
-            "linkedin": org.get("linkedin_url") or "",
-            "facebook": org.get("facebook_url") or "",
-            "twitter": org.get("twitter_url") or "",
-            "logo": org.get("logo_url") or "",
-            "industry": org.get("industry") or "",
-            "industries": _pe_names(org.get("industries"), 4),
-            "employees": org.get("estimated_num_employees") or 0,
-            "revenue": org.get("organization_revenue_printed") or "",
-            "founded": org.get("founded_year") or "",
-            "phone": (org.get("phone") or ((org.get("primary_phone") or {}).get("number"))
-                      or org.get("sanitized_phone") or ""),
-            "hq": hq,
-            "address": org.get("raw_address") or "",
-            "description": (org.get("short_description") or "")[:420],
-            "keywords": _pe_names(org.get("keywords"), 14),
-            "technologies": _pe_names(org.get("current_technologies"), 12),
-            "growth6": org.get("organization_headcount_six_month_growth"),
-            "growth12": org.get("organization_headcount_twelve_month_growth"),
-            "growth24": org.get("organization_headcount_twenty_four_month_growth"),
-        }
+    company = _apollo_org_normalize(org) if org else {}
 
     crm = {}
     if acct or contact:
@@ -2529,11 +2537,213 @@ def _warm_person_enrichment(email: str) -> None:
         log.warning("could not start enrich thread: %s", e)
 
 
+# ── Company-by-domain fallback for people Apollo has no PERSON record for ──────
+# organizations/enrich has no bulk form and costs 1 Apollo credit per NEW domain
+# (0 if not found), so this is deliberately domain-cached, long-TTL, and skipped
+# outright for free/personal webmail domains -- enriching "gmail.com" as if it
+# were someone's employer is meaningless and would burn a credit on Google's own
+# profile instead of the person's actual company.
+_CE_POS_TTL_DAYS = 180   # firmographics move slower than one person's own title
+_CE_NEG_TTL_DAYS = 30    # small companies get added to Apollo over time; retry occasionally
+_CE_MISS_VERSION = 1     # same false-negative protection as _PE_MISS_VERSION, see there
+_CE_MEM: dict = {}
+_CE_MEM_TTL = 900
+_CE_TABLE_READY = False
+
+
+def _ensure_company_enrich_table(conn) -> None:
+    global _CE_TABLE_READY
+    if _CE_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS company_enrichment (
+                domain TEXT PRIMARY KEY,
+                matched BOOLEAN NOT NULL DEFAULT false,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _CE_TABLE_READY = True
+
+
+def _ce_cache_read(domains: list) -> dict:
+    """domain -> profile for every still-fresh cached row. Same miss-version
+    guard as _pe_cache_read: a miss not stamped by the current logic is
+    re-looked-up once rather than trusted for the negative TTL."""
+    out: dict = {}
+    if not domains:
+        return out
+    conn = _pg_conn()
+    if not conn:
+        return out
+    try:
+        _ensure_company_enrich_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT domain, matched, payload, updated_at FROM company_enrichment "
+                "WHERE domain = ANY(%s)", (list(domains),))
+            rows = cur.fetchall()
+        now = datetime.now(timezone.utc)
+        for domain, matched, payload, updated_at in rows:
+            payload = payload or {"matched": False, "domain": domain}
+            if not matched and int(payload.get("v") or 0) < _CE_MISS_VERSION:
+                continue
+            ttl = _CE_POS_TTL_DAYS if matched else _CE_NEG_TTL_DAYS
+            if updated_at and (now - updated_at).days < ttl:
+                out[domain] = payload
+        return out
+    except Exception as e:
+        log.warning("company enrich cache read failed: %s", e)
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _ce_cache_write(profiles: dict) -> None:
+    if not profiles:
+        return
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        from psycopg2.extras import Json
+        _ensure_company_enrich_table(conn)
+        with conn.cursor() as cur:
+            for domain, prof in profiles.items():
+                cur.execute(
+                    "INSERT INTO company_enrichment (domain, matched, payload, updated_at) "
+                    "VALUES (%s, %s, %s, now()) "
+                    "ON CONFLICT (domain) DO UPDATE SET matched = EXCLUDED.matched, "
+                    "payload = EXCLUDED.payload, updated_at = now()",
+                    (domain, bool(prof.get("matched")), Json(prof)))
+        conn.commit()
+    except Exception as e:
+        log.warning("company enrich cache write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _apollo_company_by_domain(domains: list) -> dict:
+    """domain -> normalized org profile, for the domains of people Apollo has no
+    PERSON record for. organizations/enrich takes one domain per call, so this
+    is about avoiding repeat spend (cache-first, 180-day positive TTL) rather
+    than batching -- concurrency here is purely wall-clock."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    domains = sorted({d.strip().lower() for d in (domains or []) if d})
+    if not (key and domains):
+        return {}
+
+    now = time.time()
+    out: dict = {}
+    todo: list = []
+    for d in domains:
+        hit = _CE_MEM.get(d)
+        if hit and hit[0] > now:
+            out[d] = hit[1]
+        else:
+            todo.append(d)
+
+    if todo:
+        cached = _ce_cache_read(todo)
+        out.update(cached)
+        todo = [d for d in todo if d not in cached]
+
+    if todo:
+        try:
+            from tracker.apollo_client import enrich_company as _apollo_enrich_company
+        except Exception as e:
+            log.warning("apollo client unavailable for company enrich: %s", e)
+            todo = []
+
+    if todo:
+        def _one(domain):
+            try:
+                org = _apollo_enrich_company(domain, key)
+            except Exception as e:
+                log.warning("apollo organizations/enrich failed for %s: %s", domain, e)
+                return domain, None          # not answered -- never cache
+            # A definitive "no such org" can come back as {"organization": null},
+            # which a naive .get(key, default) would return as None, not {}. Any
+            # non-dict or empty response is treated as "answered, no match" --
+            # never as "we failed to ask", which is the same class of bug fixed
+            # for bulk_match's response-shape guard.
+            if not isinstance(org, dict) or not (org.get("id") or org.get("name")):
+                return domain, {"matched": False, "domain": domain, "checked": True,
+                                "v": _CE_MISS_VERSION}
+            return domain, {"matched": True, "domain": domain, "v": _CE_MISS_VERSION,
+                            **_apollo_org_normalize(org)}
+
+        writeback = {}
+        if len(todo) == 1:
+            d, prof = _one(todo[0])
+            if prof:
+                writeback[d] = prof
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(4, len(todo))) as ex:
+                for d, prof in ex.map(_one, todo):
+                    if prof:
+                        writeback[d] = prof
+        _ce_cache_write(writeback)
+        out.update(writeback)
+
+    exp = now + _CE_MEM_TTL
+    for d, prof in out.items():
+        _CE_MEM[d] = (exp, prof)
+    return out
+
+
+def _attach_company_fallback(out: dict) -> None:
+    """For every person Apollo has definitively no PERSON record for, attach
+    what Apollo knows about their EMPLOYER by domain instead, so an unmatched
+    row is not a total blank. Mutates the profiles in `out` in place, adding
+    `company_fallback` (or `personal_domain: true`) -- never touches `matched`,
+    and never runs for a `pending` miss, since that means "we never reached
+    Apollo", not "Apollo confirmed no record", and must not trigger a second
+    paid lookup on a whim."""
+    domains = set()
+    for email, prof in out.items():
+        if prof.get("matched") or prof.get("pending"):
+            continue
+        domain = email.split("@", 1)[1] if "@" in email else ""
+        if not domain:
+            continue
+        if domain in _FREE_EMAIL_DOMAINS:
+            prof["personal_domain"] = True
+        else:
+            domains.add(domain)
+    if not domains:
+        return
+    co = _apollo_company_by_domain(list(domains))
+    for email, prof in out.items():
+        if prof.get("matched") or prof.get("pending") or prof.get("personal_domain"):
+            continue
+        domain = email.split("@", 1)[1] if "@" in email else ""
+        c = co.get(domain)
+        if c and c.get("matched"):
+            prof["company_fallback"] = c
+
+
 def _enrich_people(emails: list, force: bool = False) -> dict:
     """email -> profile for every requested email. A profile is either a real
     Apollo match (`matched: true`) or an honest {matched: false} placeholder --
     we never invent a person. Cached in-process, then in Postgres, then resolved
-    live against Apollo for whatever is left."""
+    live against Apollo for whatever is left. A definitive miss additionally
+    carries `company_fallback` (what Apollo knows about their employer, by email
+    domain) or `personal_domain: true` for free webmail, see
+    _attach_company_fallback."""
     wanted, seen = [], set()
     for e in (emails or []):
         e = str(e or "").strip().lower()
@@ -2587,6 +2797,8 @@ def _enrich_people(emails: list, force: bool = False) -> dict:
     for e, prof in out.items():
         if not prof.get("pending"):
             _PE_MEM[e] = (exp, prof)
+
+    _attach_company_fallback(out)
     return out
 
 
@@ -5501,7 +5713,11 @@ def _xl_people_columns():
     """(header, extractor) pairs for the workbook's People sheet. `u` is one row
     from _fetch_usage_data's user_activity, `p` that person's Apollo profile."""
     def co(p, k, d=""):
-        return ((p.get("company") or {}).get(k) or d)
+        # Falls back to the employer looked up by email domain when Apollo has
+        # no PERSON record at all (see _attach_company_fallback). "Company
+        # source" below says which of the two this actually is.
+        c = p.get("company") or p.get("company_fallback") or {}
+        return c.get(k) or d
     def pct(v):
         try:
             return round(float(v) * 100, 1)
@@ -5533,6 +5749,9 @@ def _xl_people_columns():
         # Apollo enrichment
         ("Enrichment",           lambda u, p: ("Matched" if p.get("matched")
                                                else ("Not run" if p.get("pending") else "No match"))),
+        ("Company source",       lambda u, p: ("Apollo (person match)" if p.get("company")
+                                               else ("Apollo (by domain, not this person)" if p.get("company_fallback")
+                                                     else ("Personal email domain" if p.get("personal_domain") else "")))),
         # Contact details. Phones exist only for people already in the team's
         # Apollo or CRM, so a blank here means Apollo holds no number for us.
         ("Phone",                lambda u, p: next(
@@ -5687,9 +5906,11 @@ def _export_external_usage_xlsx() -> bytes:
         ("Profiles matched", matched),
         ("Profiles with no Apollo match", len(profiles) - matched - pending),
         ("Profiles not yet enriched", pending),
+        ("Unmatched profiles with employer found by domain",
+         sum(1 for p in profiles.values() if not p.get("matched") and p.get("company_fallback"))),
     ]:
         ws4.append([k, v])
-    _finish(ws4, 2, 14, {1: 34, 2: 26})
+    _finish(ws4, 2, 15, {1: 34, 2: 26})
 
     buf = BytesIO()
     wb.save(buf)
