@@ -372,13 +372,16 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     .pm-chip.ac{color:color-mix(in srgb, var(--pc) 76%,#fff);border-color:color-mix(in srgb, var(--pc) 42%,transparent);
       background:color-mix(in srgb, var(--pc) 13%,transparent)}
     .pm-chip.gd{color:#6ee7b7;border-color:rgba(52,211,153,.36);background:rgba(52,211,153,.1)}
-    .pm-socials{display:flex;gap:8px;margin-top:15px;flex-wrap:wrap}
-    .pm-so{width:33px;height:33px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#a8b2d1;transition:.16s;text-decoration:none}
+    /* Outbound links. Labelled, not icon-only: a person's LinkedIn and their
+       company's LinkedIn are otherwise two identical buttons. */
+    .pm-socials{display:flex;gap:7px;margin-top:15px;flex-wrap:wrap}
+    .pm-so{height:30px;padding:0 11px;border-radius:var(--radius-pill,99px);display:inline-flex;align-items:center;
+      gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#a8b2d1;
+      transition:.16s;text-decoration:none;font-size:11.5px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
     .pm-so:hover{background:var(--pc);border-color:var(--pc);color:#fff;transform:translateY(-2px)}
-    .pm-so svg{width:15px;height:15px;fill:currentColor}
-    .pm-src{position:absolute;bottom:14px;right:30px;font-family:monospace;font-size:9.5px;
-      letter-spacing:.1em;text-transform:uppercase;color:#4d5878}
+    .pm-so svg{width:13.5px;height:13.5px;fill:currentColor;flex:none}
+    .pm-so.co{color:#8d97b8;background:rgba(255,255,255,.028)}
+    .pm-so.co em{font-style:normal;opacity:.72;font-weight:500}
 
     /* AI read band (OpenAI verdict), between the hero and the two columns */
     .pm-ai{flex:none;padding:15px 30px 16px;border-bottom:1px solid rgba(255,255,255,.09);
@@ -393,10 +396,6 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     .pm-int.medium{color:#fcd34d;background:rgba(245,166,35,.13);border:1px solid rgba(245,166,35,.42)}
     .pm-int.low{color:#94a3b8;background:rgba(148,163,184,.1);border:1px solid rgba(148,163,184,.3)}
     .pm-ai-s{font-size:13.2px;line-height:1.62;color:#c3ccdf;max-width:104ch}
-    .pm-ai-n{display:flex;align-items:flex-start;gap:7px;margin-top:9px;font-size:12.3px;line-height:1.5;
-      color:color-mix(in srgb, var(--pc) 74%,#fff)}
-    .pm-ai-n i{font-style:normal;flex:none;opacity:.8}
-    .pm-ai-m{font-family:monospace;font-size:9px;color:#4d5878;margin-left:auto;letter-spacing:.06em}
     .pm-ai-off{font-size:12.5px;color:#6b7699;line-height:1.55}
 
     /* Body: two independently-scrolling columns */
@@ -420,6 +419,32 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     .pm-kv-i b{display:block;font-size:13px;font-weight:600;color:#dde4f2;line-height:1.4;word-break:break-word}
     .pm-kv-i a{color:#7dd3fc;text-decoration:none}
     .pm-kv-i a:hover{text-decoration:underline}
+
+    /* Contact details: one copyable row per email / phone number */
+    .pm-ct{display:flex;flex-direction:column;gap:8px}
+    .pm-ct-i{display:flex;align-items:center;gap:11px;min-width:0;
+      background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.075);
+      border-radius:var(--radius-md,12px);padding:9px 11px 9px 12px}
+    .pm-ct-ic{width:29px;height:29px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;
+      background:color-mix(in srgb, var(--pc) 15%,transparent);color:color-mix(in srgb, var(--pc) 82%,#fff)}
+    .pm-ct-ic svg{width:13.5px;height:13.5px;fill:currentColor}
+    .pm-ct-b{min-width:0;flex:1}
+    .pm-ct-l{display:flex;align-items:center;gap:6px;font-family:monospace;font-size:9px;letter-spacing:.11em;
+      text-transform:uppercase;color:#5b6688;margin-bottom:3px}
+    .pm-ct-v{font-size:13px;font-weight:600;color:#dde4f2;line-height:1.35;word-break:break-all}
+    .pm-ct-v a{color:#7dd3fc;text-decoration:none}
+    .pm-ct-v a:hover{text-decoration:underline}
+    .pm-vf{font-family:monospace;font-size:8.5px;letter-spacing:.08em;color:#6ee7b7;
+      border:1px solid rgba(52,211,153,.36);background:rgba(52,211,153,.1);border-radius:99px;padding:1px 5px}
+    .pm-cp{flex:none;width:26px;height:26px;border-radius:7px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.11);
+      color:#8b95b8;transition:.15s;padding:0}
+    .pm-cp:hover{background:var(--pc);border-color:var(--pc);color:#fff}
+    .pm-cp.ok{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.45);color:#6ee7b7}
+    .pm-cp svg{width:12px;height:12px;fill:currentColor}
+    .pm-ct-no{font-size:12.2px;color:#6b7699;line-height:1.55;background:rgba(255,255,255,.02);
+      border:1px dashed rgba(255,255,255,.1);border-radius:var(--radius-md,12px);padding:10px 13px}
+    .pm-ct-no b{display:block;color:#96a1c0;font-weight:600;margin-bottom:2px}
 
     /* Company card */
     .pm-cocard{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);
@@ -910,6 +935,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     var SVG_FB='<svg viewBox="0 0 24 24"><path d="M22 12a10 10 0 10-11.6 9.9v-7h-2.5V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0022 12z"/></svg>';
     var SVG_WEB='<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 6h-2.9a15 15 0 00-1.3-3.6A8 8 0 0118.9 8zM12 4.1c.6.9 1.3 2.2 1.7 3.9h-3.4c.4-1.7 1.1-3 1.7-3.9zM4.3 14A8 8 0 014 12c0-.7.1-1.4.3-2h3.3a17 17 0 000 4H4.3zm.8 2H8a15 15 0 001.3 3.6A8 8 0 015.1 16zm2.9-8H5.1a8 8 0 014.2-3.6A15 15 0 008 8zm4 11.9c-.6-.9-1.3-2.2-1.7-3.9h3.4c-.4 1.7-1.1 3-1.7 3.9zm2.1-5.9H9.9a15 15 0 010-4h4.2a15 15 0 010 4zm.6 5.6A15 15 0 0016 16h2.9a8 8 0 01-4.2 3.6zm1.7-5.6a17 17 0 000-4h3.3c.2.6.3 1.3.3 2s-.1 1.4-.3 2h-3.3z"/></svg>';
     var SVG_CRM='<svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm2 4v2h12V7H6zm0 4v2h12v-2H6zm0 4v2h8v-2H6z"/></svg>';
+    var SVG_MAIL='<svg viewBox="0 0 24 24"><path d="M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm9 7.1L4.3 7H19.7L12 12.1zM4 9.2V17h16V9.2l-8 5.3-8-5.3z"/></svg>';
+    var SVG_PH='<svg viewBox="0 0 24 24"><path d="M6.6 2h3.1c.5 0 .9.3 1 .8l1 4a1 1 0 01-.3 1l-1.9 1.6a13 13 0 005.1 5.1l1.6-1.9a1 1 0 011-.3l4 1c.5.1.8.5.8 1v3.1c0 1.4-1.2 2.6-2.6 2.6C11.5 20 4 12.5 4 4.6 4 3.2 5.2 2 6.6 2z"/></svg>';
+    var SVG_CP='<svg viewBox="0 0 24 24"><path d="M9 2h9a1 1 0 011 1v13h-2V4H9V2zM5 6h9a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1zm1 2v12h7V8H6z"/></svg>';
+    var SVG_OK='<svg viewBox="0 0 24 24"><path d="M9.6 17.2l-4.8-4.8 1.7-1.7 3.1 3.1 7.9-7.9 1.7 1.7-9.6 9.6z"/></svg>';
 
     function pmPct(v){ if(v===null||v===undefined||isNaN(v))return null; return Math.round(v*1000)/10; }
     function pmNum(n){ n=+n||0; if(n>=1e9)return (n/1e9).toFixed(1).replace(/\.0$/,'')+'B';
@@ -922,9 +951,60 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       var v=isLink?('<a href="'+esc(val)+'" target="_blank" rel="noopener noreferrer">'+esc(String(val).replace(/^https?:\/\/(www\.)?/,''))+'</a>'):esc(val);
       return '<div class="pm-kv-i"><span>'+esc(label)+'</span><b>'+v+'</b></div>';
     }
-    function pmSo(url,svg,label){
+    /* Outbound link chip. The label is rendered, not just a tooltip, so a
+       person's LinkedIn is never confused with their company's. */
+    function pmSo(url,svg,label,isCo,tip){
       if(!url)return '';
-      return '<a class="pm-so" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(label)+'">'+svg+'</a>';
+      var txt=isCo?('<em>'+esc(label)+'</em>'):esc(label);
+      return '<a class="pm-so'+(isCo?' co':'')+'" href="'+esc(url)+'" target="_blank" '+
+             'rel="noopener noreferrer" title="'+esc(tip||label)+'">'+svg+'<span>'+txt+'</span></a>';
+    }
+
+    /* One copyable contact row (email or phone). */
+    function pmCt(icon,label,value,href,badge){
+      if(!value)return '';
+      var v=href?('<a href="'+esc(href)+'">'+esc(value)+'</a>'):esc(value);
+      return '<div class="pm-ct-i"><div class="pm-ct-ic">'+icon+'</div><div class="pm-ct-b">'+
+        '<div class="pm-ct-l"><span>'+esc(label)+'</span>'+(badge||'')+'</div>'+
+        '<div class="pm-ct-v">'+v+'</div></div>'+
+        '<button class="pm-cp" data-v="'+esc(value)+'" onclick="pmCopy(this)" '+
+        'title="Copy" aria-label="Copy '+esc(label)+'">'+SVG_CP+'</button></div>';
+    }
+
+    /* Copy to clipboard with a tick confirmation. navigator.clipboard needs both
+       a secure context and document focus, and rejects rather than throwing when
+       it lacks either, so the legacy path is the catch handler and not just a
+       feature-detect branch. */
+    function pmCopy(btn){
+      var v=btn.getAttribute('data-v')||'';
+      var done=function(){
+        btn.classList.add('ok'); btn.innerHTML=SVG_OK;
+        setTimeout(function(){ btn.classList.remove('ok'); btn.innerHTML=SVG_CP; },1400);
+      };
+      /* Last resort when the browser refuses both copy paths: select the value
+         so the button still leads somewhere instead of appearing to do nothing. */
+      var selectIt=function(){
+        try{
+          var el=btn.parentNode.querySelector('.pm-ct-v'), rng=document.createRange();
+          rng.selectNodeContents(el);
+          var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+        }catch(e){ console.warn('copy failed',e); }
+      };
+      var legacy=function(){
+        try{
+          var ta=document.createElement('textarea');
+          ta.value=v; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.select();
+          var ok=document.execCommand('copy');
+          document.body.removeChild(ta);
+          if(ok){ done(); } else { selectIt(); }
+        }catch(e){ selectIt(); }
+      };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(v).then(done).catch(legacy);
+      }else{
+        legacy();
+      }
     }
     function pmSkeleton(){
       var bar=function(w,h,mb){return '<div class="pm-sk" style="width:'+w+';height:'+h+'px;margin-bottom:'+mb+'px"></div>';};
@@ -953,12 +1033,42 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
             '</div>'+
             '<div class="pm-diag" id="pmDiag"></div>'+
           '</div>'+
-          '<div class="pm-kv" style="margin-top:11px">'+
+          /* Even with no Apollo record, the address they signed up with is worth
+             having one click away. */
+          '<div class="pm-ct" style="margin-top:11px">'+
+            pmCt(SVG_MAIL,'Email',u.email,'mailto:'+(u.email||''),'')+
+          '</div>'+
+          '<div class="pm-kv" style="margin-top:8px">'+
             pmKV('Email domain',u.domain)+
             pmKV('Display name',u.name)+
           '</div></div>';
       }
       var c=p.company||{}, out='';
+
+      /* Contact details. Apollo only hands back phone numbers for people already
+         in the team's Apollo or CRM, so an empty phone list is a real answer and
+         is labelled as one rather than silently omitted. */
+      var emails=(p.emails&&p.emails.length)?p.emails:[{email:u.email,primary:true,verified:false,status:''}];
+      var phones=p.phones||[];
+      var ct=emails.map(function(e){
+        var badge=e.verified?'<span class="pm-vf">verified</span>'
+                            :(e.status?'<span class="pm-vf" style="color:#9aa5c6;border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.05)">'+esc(e.status)+'</span>':'');
+        return pmCt(SVG_MAIL,e.primary?'Email':'Other email',e.email,'mailto:'+e.email,badge);
+      }).join('')+
+      phones.map(function(ph){
+        var lbl=(ph.owner==='company')?'Company phone':(ph.label||'Phone');
+        return pmCt(SVG_PH,lbl,ph.number,'tel:'+String(ph.number).replace(/[^\d+]/g,''),'');
+      }).join('');
+      var direct=phones.filter(function(ph){return ph.owner==='person';}).length;
+      var note='';
+      if(!phones.length){
+        note='<div class="pm-ct-no"><b>No phone number on file</b>Apollo hands back numbers only for people already saved in your Apollo or synced CRM. This person is not, so there is nothing to show. Revealing a number is a separate, metered Apollo call.</div>';
+      }else if(!direct){
+        note='<div class="pm-ct-no"><b>No personal number on file</b>Only the company line above. Apollo holds no direct dial or mobile for this person.</div>';
+      }
+      out+='<div class="pm-sec"><h4 class="pm-h4">Contact<s>'+
+        (emails.length+phones.length)+(emails.length+phones.length===1?' detail':' details')+'</s></h4>'+
+        '<div class="pm-ct">'+ct+note+'</div></div>';
 
       /* Professional */
       out+='<div class="pm-sec"><h4 class="pm-h4">Professional profile<s>apollo</s></h4><div class="pm-kv">'+
@@ -995,7 +1105,6 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
             pmKV('Revenue',c.revenue?('$'+c.revenue):'')+
             pmKV('Founded',c.founded)+
             pmKV('HQ',c.hq)+
-            pmKV('Phone',c.phone)+
             pmKV('Website',c.website,true)+
           '</div>'+
           ((c.keywords&&c.keywords.length)?'<div class="pm-tags">'+c.keywords.map(function(k){return '<span class="pm-tag">'+esc(k)+'</span>';}).join('')+'</div>':'')+
@@ -1072,11 +1181,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       if(p.crm&&p.crm.in_crm)chips+='<span class="pm-chip gd">✓ in CRM</span>';
       if(u.domain&&!(p.company&&p.company.name))chips+='<span class="pm-chip">🏢 '+esc(u.domain)+'</span>';
 
-      var so=pmSo(p.linkedin,SVG_LI,'LinkedIn')+pmSo(p.twitter,SVG_TW,'X / Twitter')+
+      var co=p.company||{};
+      var so=pmSo(p.linkedin,SVG_LI,'LinkedIn')+pmSo(p.twitter,SVG_TW,'X')+
              pmSo(p.facebook,SVG_FB,'Facebook')+
-             pmSo(p.company&&p.company.website,SVG_WEB,'Company website')+
-             pmSo(p.company&&p.company.linkedin,SVG_LI,'Company on LinkedIn')+
-             pmSo(p.crm&&p.crm.url,SVG_CRM,'Open in CRM');
+             pmSo(co.linkedin,SVG_LI,'Company LinkedIn',true,co.name)+
+             pmSo(co.website,SVG_WEB,'Company site',true,co.domain)+
+             pmSo(p.crm&&p.crm.url,SVG_CRM,'Open in CRM',true);
       var live=isRecent(u.last_active||u.last_seen);
       return '<div class="pm-hero-in">'+
         '<div class="pm-avw"><div class="pm-av">'+photo+'</div><div class="pm-live'+(live?' on':'')+'"><i></i></div></div>'+
@@ -1086,8 +1196,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           (p.headline?'<div class="pm-head">'+esc(p.headline)+'</div>':'')+
           (chips?'<div class="pm-chips">'+chips+'</div>':'')+
           (so?'<div class="pm-socials">'+so+'</div>':'')+
-        '</div></div>'+
-        (p.matched?'<div class="pm-src">enriched via apollo</div>':'');
+        '</div></div>';
     }
 
     /* The AI read. SUMM caches per email for the session so reopening a row is
@@ -1113,10 +1222,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       var chip = s.intent ? '<span class="pm-int '+esc(s.intent)+'">'+esc(s.intent)+' intent</span>' : '';
       return '<div class="pm-ai-h"><span class="pm-ai-t">AI read</span>'+chip+
                (s.headline?'<span class="pm-ai-hd">'+esc(s.headline)+'</span>':'')+
-               (s.model?'<span class="pm-ai-m">'+esc(s.model)+'</span>':'')+
              '</div>'+
-             '<div class="pm-ai-s">'+esc(s.summary)+'</div>'+
-             (s.next_step?'<div class="pm-ai-n"><i>&#8594;</i><span>'+esc(s.next_step)+'</span></div>':'');
+             '<div class="pm-ai-s">'+esc(s.summary)+'</div>';
     }
 
     /* Ask the server for one person's read. Never rejects. */
