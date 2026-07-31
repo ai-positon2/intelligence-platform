@@ -2117,6 +2117,11 @@ _PE_NEG_TTL_DAYS = 21    # an unmatched email: retry occasionally, not hourly
 # negative TTL. v1 was never written (misses carried only `checked`); v2 adds the
 # response-shape guard, so anything below 2 predates a real false-negative bug.
 _PE_MISS_VERSION = 2
+# Version stamped onto every cached MATCH. Bump this when the normalized shape
+# gains a field, so profiles cached under the old shape are re-normalized instead
+# of rendering a half-empty modal for up to the 90-day positive TTL. v2 adds the
+# `emails` and `phones` blocks read out of Apollo's nested `contact` object.
+_PE_SHAPE_VERSION = 2
 _PE_MEM: dict = {}       # email -> (expiry_epoch, profile) in-process hot cache
 _PE_MEM_TTL = 900
 _PE_TABLE_READY = False
@@ -2166,6 +2171,11 @@ def _pe_cache_read(emails: list) -> dict:
             # match for everyone") are false negatives, so they get re-looked-up
             # once rather than stranding those people for the negative TTL.
             if not matched and int(payload.get("v") or 0) < _PE_MISS_VERSION:
+                continue
+            # Same idea for matches, but about shape rather than truth: a profile
+            # normalized by an older build is missing whatever fields the modal
+            # has since learned to render, so re-resolve it once.
+            if matched and int(payload.get("sv") or 0) < _PE_SHAPE_VERSION:
                 continue
             ttl = _PE_POS_TTL_DAYS if matched else _PE_NEG_TTL_DAYS
             if updated_at and (now - updated_at).days < ttl:
@@ -2237,12 +2247,97 @@ def _pe_names(seq, limit: int) -> list:
     return out
 
 
+_PE_PHONE_LABELS = {
+    "mobile": "Mobile", "work_direct": "Direct dial", "work_hq": "Company HQ",
+    # Apollo's "other" carries no real distinction, so do not surface it as a
+    # meaningful label: an unqualified number is just a phone number.
+    "home": "Home", "other": "Phone", "":  "Phone",
+}
+
+
+def _pe_phones(p: dict, contact: dict, org: dict) -> list:
+    """Deduped phone list for one person, most useful number first.
+
+    Apollo only returns numbers inline for people already in the team's Apollo
+    or CRM (the nested `contact` object). For anyone else the synchronous
+    bulk_match response carries no number at all: revealing one is a separate
+    asynchronous, webhook-delivered, separately-metered call. So an empty list
+    here means "Apollo has none on file for us", not "we forgot to ask"."""
+    out: list = []
+    seen: set = set()
+
+    def add(number, kind, source, owner):
+        n = str(number or "").strip()
+        if not n:
+            return
+        key = re.sub(r"\D", "", n)[-10:] or n
+        if not key or key in seen:
+            return
+        seen.add(key)
+        kind = str(kind or "").lower()
+        # A main switchboard is a company number wherever it was stored. Apollo
+        # keeps HQ lines on the contact record too, and calling one of those a
+        # personal number would be actively misleading.
+        if kind == "work_hq":
+            owner = "company"
+        out.append({"number": n, "label": _PE_PHONE_LABELS.get(kind, "Phone"),
+                    "source": str(source or "")[:40], "owner": owner})
+
+    for src in (contact, p):
+        for ph in (src.get("phone_numbers") or []):
+            if isinstance(ph, dict):
+                add(ph.get("sanitized_number") or ph.get("raw_number"),
+                    ph.get("type"), ph.get("source_name"), "person")
+    add(contact.get("sanitized_phone") or p.get("sanitized_phone"), "", "", "person")
+    # One company switchboard at most, and only if the contact record did not
+    # already carry an HQ line: two rows both labelled "company phone" is noise,
+    # and mistaking either for a direct dial is worse.
+    if not any(ph["owner"] == "company" for ph in out):
+        add(org.get("sanitized_phone") or org.get("phone")
+            or ((org.get("primary_phone") or {}).get("number")), "work_hq", "", "company")
+    out.sort(key=lambda ph: 0 if ph["owner"] == "person" else 1)
+    return out[:6]
+
+
+def _pe_emails(p: dict, contact: dict, email: str) -> list:
+    """Deduped email list, the address this person signed up with first, each
+    tagged with Apollo's deliverability verdict where it has one."""
+    out: list = []
+    seen: set = set()
+
+    def add(addr, status):
+        a = str(addr or "").strip().lower()
+        if not a or "@" not in a or a in seen:
+            return
+        seen.add(a)
+        st = str(status or "").strip().lower()
+        out.append({"email": a,
+                    "verified": st in ("verified", "valid"),
+                    "status": st.replace("_", " ")[:24],
+                    "primary": a == (email or "").strip().lower()})
+
+    add(email, contact.get("email_status") or p.get("email_status"))
+    for ce in (contact.get("contact_emails") or []):
+        if isinstance(ce, dict):
+            add(ce.get("email"), ce.get("email_status"))
+    add(contact.get("email"), contact.get("email_status"))
+    add(p.get("email"), p.get("email_status"))
+    for pe in (p.get("personal_emails") or []):
+        add(pe, "")
+    out.sort(key=lambda e: 0 if e["primary"] else 1)
+    return out[:6]
+
+
 def _apollo_person_normalize(p: dict, email: str) -> dict:
     """One Apollo person record -> the trimmed shape the modal renders. Never
     ships the raw record: org `keywords` alone can be 100+ entries."""
     p = p or {}
     org = p.get("organization") or {}
     acct = p.get("account") or {}
+    # The nested `contact` object appears only when this person is already a
+    # contact in the team's Apollo or synced CRM, and it is the ONLY place the
+    # synchronous API hands back phone numbers and verified-email status.
+    contact = p.get("contact") or {}
 
     history = []
     for h in (p.get("employment_history") or [])[:14]:
@@ -2280,7 +2375,8 @@ def _apollo_person_normalize(p: dict, email: str) -> dict:
             "employees": org.get("estimated_num_employees") or 0,
             "revenue": org.get("organization_revenue_printed") or "",
             "founded": org.get("founded_year") or "",
-            "phone": org.get("phone") or ((org.get("primary_phone") or {}).get("number") or ""),
+            "phone": (org.get("phone") or ((org.get("primary_phone") or {}).get("number"))
+                      or org.get("sanitized_phone") or ""),
             "hq": hq,
             "address": org.get("raw_address") or "",
             "description": (org.get("short_description") or "")[:420],
@@ -2292,17 +2388,24 @@ def _apollo_person_normalize(p: dict, email: str) -> dict:
         }
 
     crm = {}
-    if acct:
+    if acct or contact:
+        # Prefer the person-level record: "open in CRM" should land on the
+        # contact, not on their employer's account page.
         crm = {
             "in_crm": True,
-            "name": acct.get("name") or "",
-            "url": acct.get("hubspot_record_url") or acct.get("crm_record_url") or "",
-            "source": acct.get("source_display_name") or acct.get("source") or "",
-            "created": (acct.get("created_at") or "")[:10],
+            "name": contact.get("name") or acct.get("name") or "",
+            "url": (contact.get("hubspot_record_url") or contact.get("crm_record_url")
+                    or acct.get("hubspot_record_url") or acct.get("crm_record_url") or ""),
+            "source": (contact.get("source_display_name") or acct.get("source_display_name")
+                       or contact.get("source") or acct.get("source") or ""),
+            "created": (contact.get("created_at") or acct.get("created_at") or "")[:10],
+            "account_url": acct.get("hubspot_record_url") or acct.get("crm_record_url") or "",
+            "is_contact": bool(contact),
         }
 
     return {
         "matched": True,
+        "sv": _PE_SHAPE_VERSION,
         "email": email,
         "name": name,
         "title": p.get("title") or "",
@@ -2321,6 +2424,8 @@ def _apollo_person_normalize(p: dict, email: str) -> dict:
         "facebook": p.get("facebook_url") or "",
         "apollo_id": p.get("id") or "",
         "apollo_email": p.get("email") or "",
+        "emails": _pe_emails(p, contact, email),
+        "phones": _pe_phones(p, contact, org),
         "history": history,
         "company": company,
         "crm": crm,
@@ -5130,6 +5235,10 @@ def admin_external_usage_data():
 _PS_TABLE_READY = False
 _PS_MEM: dict = {}          # email -> (expiry, payload)
 _PS_MEM_TTL = 900
+# Folded into the cache fingerprint, so changing the prompt regenerates every
+# stored summary instead of serving reads written under the old instructions.
+# v2 drops the suggested next step.
+_PS_PROMPT_VERSION = 2
 _AAR_SUMMARY_CACHE = {"t": 0.0, "rows": []}
 _AAR_SUMMARY_TTL = 180      # only for the summary path; _agent_access_requested_slugs
                             # deliberately stays uncached so "Request sent" is instant
@@ -5155,9 +5264,11 @@ def _ensure_person_summary_table(conn) -> None:
 def _ps_fingerprint(facts: dict) -> str:
     """Stable hash of the facts we are about to summarize. Any change to the
     person's activity or profile changes this, which is what invalidates the
-    cached summary without needing a TTL."""
+    cached summary without needing a TTL. The prompt version is folded in so that
+    editing what we ask for also regenerates every stored summary."""
     import hashlib
-    blob = json.dumps(facts, sort_keys=True, default=str, separators=(",", ":"))
+    blob = json.dumps({"v": _PS_PROMPT_VERSION, "f": facts},
+                      sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
 
 
@@ -5336,20 +5447,20 @@ _PS_SYSTEM = (
     "pattern means (evaluating, researching a specific need, tyre-kicking, already a "
     "client, a competitor looking around, an agency peer, and so on).\n"
     "4. Never use an em dash. Use commas, colons or periods.\n"
-    "5. Plain professional English. No marketing adjectives, no hedging padding.\n\n"
+    "5. Plain professional English. No marketing adjectives, no hedging padding.\n"
+    "6. Describe and interpret only. Do NOT recommend an action, pitch, demo, email or "
+    "follow-up of any kind, and do not end with advice. The reader decides what to do.\n\n"
     "Return STRICT JSON only, with these keys:\n"
     '{"headline": "at most 7 words, the person in a nutshell",\n'
     ' "summary": "at most 2 sentences, at most 42 words total: who they are, where they '
     'came from, what they actually did, what they seem to want",\n'
-    ' "intent": "high" | "medium" | "low",\n'
-    ' "next_step": "at most 14 words, the single most useful next action, or an empty '
-    'string if none is warranted"}'
+    ' "intent": "high" | "medium" | "low"}'
 )
 
 
 def _person_ai_summary(email: str, facts: dict) -> dict:
-    """{headline, summary, intent, next_step, model} for one person, or {} when
-    OpenAI is not configured or the call fails. Cached by fact fingerprint."""
+    """{headline, summary, intent, model} for one person, or {} when OpenAI is not
+    configured or the call fails. Cached by fact fingerprint."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         return {}
@@ -5378,7 +5489,6 @@ def _person_ai_summary(email: str, facts: dict) -> dict:
         # this guarantees it even if a model ignores the instruction.
         "summary": str(data.get("summary") or "").strip().replace("—", ",")[:600],
         "intent": intent,
-        "next_step": str(data.get("next_step") or "").strip().replace("—", ",")[:140],
         "model": model,
     }
     if not out["summary"]:
@@ -5406,7 +5516,6 @@ def _xl_people_columns():
         ("AI headline",          lambda u, p: (u.get("_ai") or {}).get("headline") or ""),
         ("AI intent",            lambda u, p: ((u.get("_ai") or {}).get("intent") or "").title()),
         ("AI summary",           lambda u, p: (u.get("_ai") or {}).get("summary") or ""),
-        ("AI next step",         lambda u, p: (u.get("_ai") or {}).get("next_step") or ""),
         ("Logins",               lambda u, p: u.get("logins") or 0),
         ("Agent runs",           lambda u, p: u.get("agent_runs") or 0),
         ("Page views",           lambda u, p: u.get("page_views") or 0),
@@ -5424,6 +5533,17 @@ def _xl_people_columns():
         # Apollo enrichment
         ("Enrichment",           lambda u, p: ("Matched" if p.get("matched")
                                                else ("Not run" if p.get("pending") else "No match"))),
+        # Contact details. Phones exist only for people already in the team's
+        # Apollo or CRM, so a blank here means Apollo holds no number for us.
+        ("Phone",                lambda u, p: next(
+            ("%s (%s)" % (ph.get("number"), ph.get("label"))
+             for ph in (p.get("phones") or []) if ph.get("owner") == "person"), "")),
+        ("All phones",           lambda u, p: " | ".join(
+            "%s (%s)" % (ph.get("number"), ph.get("label")) for ph in (p.get("phones") or []))),
+        ("Other emails",         lambda u, p: ", ".join(
+            e.get("email") for e in (p.get("emails") or []) if not e.get("primary"))),
+        ("Email status",         lambda u, p: next(
+            (e.get("status") for e in (p.get("emails") or []) if e.get("primary")), "")),
         ("Title",                lambda u, p: p.get("title") or ""),
         ("Seniority",            lambda u, p: p.get("seniority") or ""),
         ("Departments",          lambda u, p: ", ".join(p.get("departments") or [])),
