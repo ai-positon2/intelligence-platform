@@ -2111,6 +2111,12 @@ def _list_agent_run_titles(limit=5000) -> list:
 
 _PE_POS_TTL_DAYS = 90    # a matched profile: titles/companies move slowly
 _PE_NEG_TTL_DAYS = 21    # an unmatched email: retry occasionally, not hourly
+# Version stamped onto every cached MISS. Bump this whenever a bug could have
+# produced false negatives: an older stamp is treated as untrusted and re-looked
+# up once, which self-heals the cache instead of stranding people for the
+# negative TTL. v1 was never written (misses carried only `checked`); v2 adds the
+# response-shape guard, so anything below 2 predates a real false-negative bug.
+_PE_MISS_VERSION = 2
 _PE_MEM: dict = {}       # email -> (expiry_epoch, profile) in-process hot cache
 _PE_MEM_TTL = 900
 _PE_TABLE_READY = False
@@ -2154,11 +2160,12 @@ def _pe_cache_read(emails: list) -> dict:
         now = datetime.now(timezone.utc)
         for email, matched, payload, updated_at in rows:
             payload = payload or {"matched": False, "email": email}
-            # A miss row written before the answered/pending split (i.e. by the
-            # first deploy, when APOLLO_API_KEY was unset) carries no `checked`
-            # flag and cannot be trusted. Ignoring it here re-enriches those
-            # people once, instead of stranding them for the negative TTL.
-            if not matched and not payload.get("checked"):
+            # Only trust a miss stamped by the current logic. Rows written before
+            # the answered/pending split (APOLLO_API_KEY unset) or before the
+            # response-shape guard (HTTP 200 with an error body counted as "no
+            # match for everyone") are false negatives, so they get re-looked-up
+            # once rather than stranding those people for the negative TTL.
+            if not matched and int(payload.get("v") or 0) < _PE_MISS_VERSION:
                 continue
             ttl = _PE_POS_TTL_DAYS if matched else _PE_NEG_TTL_DAYS
             if updated_at and (now - updated_at).days < ttl:
@@ -2357,7 +2364,17 @@ def _apollo_bulk_match(emails: list):
         except Exception as e:
             log.warning("apollo bulk_match failed (%d emails): %s", len(chunk), e)
             return out, set()          # nothing in this chunk got an answer
-        matches = data.get("matches") or []
+        # Apollo can return HTTP 200 with a body that is not a bulk_match result
+        # at all (an error object, an auth/scope complaint, an HTML error page
+        # parsed as JSON). Treating that as "Apollo answered, nobody matched"
+        # would cache a permanent false negative for everyone in the chunk, so
+        # the shape is checked explicitly before we trust it.
+        matches = data.get("matches")
+        if not isinstance(matches, list):
+            log.warning("apollo bulk_match: unexpected response shape for %d emails, "
+                        "keys=%s error=%s", len(chunk), sorted(list(data.keys()))[:8],
+                        str(data.get("error") or data.get("message") or "")[:200])
+            return out, set()
         # `matches` is positionally aligned with the `details` we sent, with a
         # null for every email Apollo could not resolve.
         for i, email in enumerate(chunk):
@@ -2451,7 +2468,8 @@ def _enrich_people(emails: list, force: bool = False) -> dict:
             elif e in answered:
                 # Apollo genuinely has no record: cache it so an unmatchable
                 # address is not re-looked-up on every page load.
-                prof = {"matched": False, "email": e, "checked": True}
+                prof = {"matched": False, "email": e, "checked": True,
+                        "v": _PE_MISS_VERSION}
                 writeback[e] = prof
             else:
                 # Never reached Apollo. Report it as pending and cache NOTHING,
@@ -5575,6 +5593,53 @@ def admin_external_usage_enrich():
     profiles = _enrich_people(emails, force=bool(body.get("force")))
     return jsonify({"profiles": profiles,
                     "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+
+def _apollo_selftest() -> dict:
+    """Prove the Apollo integration end to end and report exactly where it fails.
+
+    Probes with Apollo's own public API example contact rather than anybody on
+    the dashboard, so this never puts a real person's email in a URL, a log or a
+    support paste, and the verdict is unambiguous: if the probe resolves, the
+    key, the scope, the base URL and the response shape are all good, and any
+    "no match" on the dashboard is a genuine absence of data rather than a
+    broken integration. Costs one Apollo credit per run."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    out = {"configured": bool(key), "key_len": len(key), "probe": "tim@apollo.io",
+           "base_url": None, "http_ok": False, "shape_ok": False,
+           "probe_matched": False, "error": ""}
+    if not key:
+        out["error"] = "APOLLO_API_KEY is not set on this environment."
+        return out
+    try:
+        from tracker import apollo_client as _ac
+        data = _ac._post("people/bulk_match", {"details": [{"email": "tim@apollo.io"}]}, key) or {}
+        out["base_url"] = _ac._BASE_OK or "unknown"
+        out["http_ok"] = True
+        matches = data.get("matches")
+        out["shape_ok"] = isinstance(matches, list)
+        if not out["shape_ok"]:
+            out["response_keys"] = sorted(list(data.keys()))[:10]
+            out["error"] = ("Apollo returned HTTP 200 but not a bulk_match body. "
+                            "Usually the API key lacks the api/v1/people/bulk_match scope. "
+                            + str(data.get("error") or data.get("message") or "")[:200])
+            return out
+        out["probe_matched"] = bool(matches and matches[0])
+        if not out["probe_matched"]:
+            out["error"] = ("The call succeeded but even Apollo's own example contact did "
+                            "not resolve, which points at a plan or permission limit rather "
+                            "than at this platform.")
+    except Exception as e:
+        out["error"] = "%s: %s" % (type(e).__name__, str(e)[:300])
+    return out
+
+
+@app.route("/p2/admin/external-usage/apollo-check", methods=["POST"])
+@admin_required
+def admin_external_usage_apollo_check():
+    """Run the Apollo self-test (see _apollo_selftest). POST so it is never
+    triggered by a crawler or a prefetch, since it spends one credit."""
+    return jsonify(_apollo_selftest())
+
 
 @app.route("/p2/admin/external-usage/summary", methods=["POST"])
 @admin_required

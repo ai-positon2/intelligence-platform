@@ -13,7 +13,15 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://api.apollo.io/v1"
+# Apollo serves the same API under two path prefixes: the currently documented
+# "https://api.apollo.io/api/v1/..." and the older "https://api.apollo.io/v1/...".
+# Which one answers has varied by endpoint and over time, and a wrong prefix
+# fails as a 404 that looks exactly like "no data". So we try the documented one
+# first, fall back to the legacy one on 404/405, and remember the winner for the
+# rest of the process instead of paying that probe on every call.
+_BASE_URLS = ("https://api.apollo.io/api/v1", "https://api.apollo.io/v1")
+_BASE_URL = _BASE_URLS[1]      # kept for backwards compatibility / callers reading it
+_BASE_OK: str | None = None    # the prefix proven to work in this process
 
 # Apollo employee range buckets that map to integer bounds
 _EMPLOYEE_RANGES = [
@@ -42,33 +50,53 @@ def _employee_ranges_for(min_emp: int, max_emp: int) -> list[str]:
     return result
 
 
+def _bases_to_try() -> tuple:
+    """Proven-good prefix first if we have one, else both in preference order."""
+    if _BASE_OK:
+        return (_BASE_OK,) + tuple(b for b in _BASE_URLS if b != _BASE_OK)
+    return _BASE_URLS
+
+
 def _post(endpoint: str, payload: dict, api_key: str, retries: int = 3) -> dict:
-    url = f"{_BASE_URL}/{endpoint}"
+    global _BASE_OK
     headers = {
         "Content-Type": "application/json",
         "Cache-Control": "no-cache",
         "X-Api-Key": api_key,
     }
     delay = 1.0
-    for attempt in range(retries):
-        try:
-            resp = requests.post(url, json=payload, headers=headers, timeout=30)
-            if resp.status_code == 429:
+    last_exc = None
+    for base in _bases_to_try():
+        url = f"{base}/{endpoint}"
+        for attempt in range(retries):
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=30)
+                if resp.status_code == 429:
+                    wait = delay * (2 ** attempt)
+                    logger.warning("Rate limited by Apollo. Waiting %.1fs before retry %d/%d", wait, attempt + 1, retries)
+                    time.sleep(wait)
+                    continue
+                if resp.status_code in (404, 405):
+                    # Wrong path prefix for this endpoint: try the other base
+                    # rather than burning retries or reporting it as "no data".
+                    logger.warning("Apollo %s on %s -- trying the other base URL", resp.status_code, url)
+                    last_exc = requests.HTTPError("%s on %s" % (resp.status_code, url))
+                    break
+                if resp.status_code == 422 and attempt == 0:
+                    logger.error("Apollo 422 on %s -- response body: %s", endpoint, resp.text[:500])
+                resp.raise_for_status()
+                _BASE_OK = base
+                return resp.json()
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt == retries - 1:
+                    logger.error("Apollo API error on %s after %d retries: %s", url, retries, exc)
+                    break
                 wait = delay * (2 ** attempt)
-                logger.warning("Rate limited by Apollo. Waiting %.1fs before retry %d/%d", wait, attempt + 1, retries)
+                logger.warning("Request error (%s). Retrying in %.1fs (%d/%d)...", exc, wait, attempt + 1, retries)
                 time.sleep(wait)
-                continue
-            if resp.status_code == 422 and attempt == 0:
-                logger.error("Apollo 422 on %s — response body: %s", endpoint, resp.text[:500])
-            resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as exc:
-            if attempt == retries - 1:
-                logger.error("Apollo API error on %s after %d retries: %s", endpoint, retries, exc)
-                raise
-            wait = delay * (2 ** attempt)
-            logger.warning("Request error (%s). Retrying in %.1fs (%d/%d)…", exc, wait, attempt + 1, retries)
-            time.sleep(wait)
+    if last_exc:
+        raise last_exc
     return {}
 
 
