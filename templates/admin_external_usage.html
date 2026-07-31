@@ -210,6 +210,28 @@
       padding:2px 8px;border-radius: var(--radius-pill);margin-left:8px;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.35);color:#6ee7b7}
     .ua-seen{font-size:10.5px;color:#5d6890;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ua-seen .dotsep{margin:0 6px;color:#3b4763}
+    /* ── People table filter bar (same visual language as anonymous_visitors.css'
+       .search-input/.filter-select/.clear-btn, redeclared locally since this page
+       doesn't otherwise load that stylesheet) ── */
+    .ppl-filters{padding:12px 22px;border-bottom:1px solid rgba(255,255,255,.07);
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .ppl-search{flex:1;min-width:200px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+      border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;color:#e2e8f0;font-family:inherit;
+      outline:none;transition:border-color .15s}
+    .ppl-search::placeholder{color:#64748b}
+    .ppl-search:focus{border-color:rgba(52,211,153,.4);background:rgba(255,255,255,.08)}
+    .ppl-select{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-sm);
+      padding:8px 12px;font-size:11.5px;color:#cbd5e1;font-family:inherit;outline:none;cursor:pointer;
+      transition:border-color .15s}
+    .ppl-select:focus{border-color:rgba(52,211,153,.4)}
+    .ppl-select option{background:#0f1220;color:#e2e8f0}
+    .ppl-clear{padding:7px 14px;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,.1);
+      background:transparent;color:#64748b;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;
+      transition:all .15s;white-space:nowrap}
+    .ppl-clear:hover{border-color:rgba(239,68,68,.4);color:#f87171}
+    .ppl-filter-count{font-size:11.5px;color:#5a6488;white-space:nowrap}
+    .ppl-no-match{padding:36px;text-align:center;color:#5a6488;font-size:13px}
+
     /* ── rich People table ── */
     #ppl-wrap{padding:6px 8px 10px}
     #ppl-wrap .tbl-wrap{max-height:600px;overflow:auto}
@@ -629,6 +651,24 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         <div class="card-title"><span class="card-title-icon">👥</span> People</div>
         <span class="card-meta"><span id="ppl-count">—</span> · click any row for the full journey</span>
       </div>
+      <div class="ppl-filters">
+        <input class="ppl-search" id="pplSearch" type="text"
+               placeholder="Search name, email, company, device, source…" oninput="applyPeopleFilter()" />
+        <select class="ppl-select" id="pplAgentFilter" onchange="applyPeopleFilter()">
+          <option value="">All activity</option>
+          <option value="ran">Ran an agent</option>
+          <option value="none">No agent runs</option>
+          <option value="linked">Linked to pre-login</option>
+        </select>
+        <select class="ppl-select" id="pplMatchFilter" onchange="applyPeopleFilter()">
+          <option value="">All enrichment</option>
+          <option value="matched">Apollo matched</option>
+          <option value="fallback">Company found by domain</option>
+          <option value="none">No Apollo match</option>
+        </select>
+        <button class="ppl-clear" onclick="clearPeopleFilter()">✕ Clear</button>
+        <span class="ppl-filter-count" id="pplFilterCount"></span>
+      </div>
       <div id="ppl-wrap"><div class="skel" style="height:240px;margin:18px 22px"></div></div>
     </div>
 
@@ -908,7 +948,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         var dev=devTxt?('<span class="pt-dev" title="'+esc([u.browser,u.os,u.device].filter(Boolean).join(' · '))+'"><span class="di">'+devIcon(u)+'</span>'+esc(devTxt)+'</span>'):'<span style="color:#475569">—</span>';
         var fs=shortTs(u.first_seen), la=shortTs(u.last_active||u.last_seen);
         var runsCell='<div class="pt-metric"><span class="pt-chip c-run'+(u.agent_runs?'':' zero')+'">'+ICO.run+(u.agent_runs||0)+'</span>'+(agentsMini||'')+'</div>';
-        return '<tr class="pt-row" style="--rc:'+col+';animation-delay:'+Math.min(i*32,480)+'ms" onclick="openUserDrawer('+i+')">'
+        // Filter data lives on the row as attributes rather than triggering a
+        // re-render per keystroke: applyPeopleFilter() just toggles display,
+        // so the indices openUserDrawer(i) relies on never shift underneath it.
+        var hay=[u.name,u.email,u.domain,u.browser,u.os,u.device,u.source].filter(Boolean).join(' ').toLowerCase();
+        return '<tr class="pt-row" data-hay="'+esc(hay)+'" data-email="'+esc((u.email||'').toLowerCase())+'" '
+          +'data-runs="'+(u.agent_runs||0)+'" data-linked="'+(u.linked?1:0)+'" '
+          +'style="--rc:'+col+';animation-delay:'+Math.min(i*32,480)+'ms" onclick="openUserDrawer('+i+')">'
           +'<td><div class="pt-person"><span class="pt-avw">'+av+dot+'</span><div style="min-width:0"><div class="pt-name">'+esc(u.name||u.email)+badge+'</div><div class="pt-email">'+esc(u.email)+'</div></div></div></td>'
           +'<td>'+co+'</td>'
           +'<td style="text-align:right">'+metric(u.logins,'c-log',ICO.log)+'</td>'
@@ -923,6 +969,63 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       }).join('');
       return '<div class="tbl-wrap"><table class="ppl-table">'+head+'<tbody>'+body+'</tbody></table></div>';
     }
+
+    /* Apollo status for one email, read live off ENRICH rather than baked into
+       the row at render time: enrichment lands a moment after the table does,
+       via the pmEnrich() prefetch below, so a stored attribute would go stale. */
+    function pplStatus(email){
+      var p=ENRICH[(email||'').toLowerCase()];
+      if(!p||p.pending)return 'unknown';
+      if(p.matched)return 'matched';
+      if(p.company_fallback)return 'fallback';
+      return 'none';
+    }
+
+    /* Filters the People table in place: toggles row display, never re-renders,
+       so onclick="openUserDrawer(i)" indices stay valid throughout. */
+    function applyPeopleFilter(){
+      var searchEl=document.getElementById('pplSearch');
+      var tbody=document.querySelector('#ppl-wrap tbody');
+      if(!searchEl||!tbody)return;
+      var q=(searchEl.value||'').trim().toLowerCase();
+      var actF=document.getElementById('pplAgentFilter').value;
+      var matchF=document.getElementById('pplMatchFilter').value;
+      var rows=tbody.querySelectorAll('tr.pt-row');
+      var shown=0;
+      rows.forEach(function(tr){
+        var ok=true;
+        if(q && (tr.getAttribute('data-hay')||'').indexOf(q)===-1)ok=false;
+        if(ok && actF==='ran'    && !(+tr.getAttribute('data-runs')))ok=false;
+        if(ok && actF==='none'   &&  (+tr.getAttribute('data-runs')))ok=false;
+        if(ok && actF==='linked' && tr.getAttribute('data-linked')!=='1')ok=false;
+        if(ok && matchF && pplStatus(tr.getAttribute('data-email'))!==matchF)ok=false;
+        tr.style.display=ok?'':'none';
+        if(ok)shown++;
+      });
+      var total=rows.length;
+      var noRow=tbody.querySelector('.ppl-no-match-row');
+      if(!shown && total){
+        if(!noRow){
+          noRow=document.createElement('tr');
+          noRow.className='ppl-no-match-row';
+          noRow.innerHTML='<td colspan="10" class="ppl-no-match">No one matches these filters.</td>';
+          tbody.appendChild(noRow);
+        }
+        noRow.style.display='';
+      }else if(noRow){
+        noRow.style.display='none';
+      }
+      var cntEl=document.getElementById('pplFilterCount');
+      if(cntEl)cntEl.textContent=(q||actF||matchF)?(shown+' of '+total+' shown'):'';
+    }
+
+    function clearPeopleFilter(){
+      document.getElementById('pplSearch').value='';
+      document.getElementById('pplAgentFilter').value='';
+      document.getElementById('pplMatchFilter').value='';
+      applyPeopleFilter();
+    }
+
     // Trim "2026-07-27 16:01:12 IST" → "Jul 27, 16:01" style short stamp; tolerant of odd formats.
     function shortTs(s){s=String(s||'');var m=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T]?(\d{2}:\d{2})?/);if(!m)return s;var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m[2],10)-1]||m[2];return mo+' '+m[3]+(m[4]?(', '+m[4]):'');}
     function initials(n){n=(n||'').trim();if(!n)return 'U';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
@@ -1455,10 +1558,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           document.getElementById('browser-wrap').innerHTML   = renderBrowsers(d.browser_breakdown);
           document.getElementById('pages-wrap').innerHTML     = renderTopPages(d.top_pages);
           document.getElementById('ppl-wrap').innerHTML       = renderUsers(d.user_activity);
+          /* Re-apply whatever filter is already typed/selected -- matters on a
+             Refresh click, where the filter bar survives but the rows don't. */
+          applyPeopleFilter();
           /* Warm every visible person's Apollo profile in one call so opening a
              row is instant. Server-side cached, so this is ~free after day one. */
           pmEnrich((d.user_activity||[]).map(function(u){return (u.email||'').toLowerCase();}))
-            .then(function(){ if(PM_I>=0)pmPaint(PM_I); });
+            .then(function(){ if(PM_I>=0)pmPaint(PM_I); applyPeopleFilter(); });
 
           /* Tables */
           var lt = d.login_table, pt = d.page_table, rt = d.agent_runs_table || [];
