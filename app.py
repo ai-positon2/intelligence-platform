@@ -2091,6 +2091,328 @@ def _list_agent_run_titles(limit=5000) -> list:
         except Exception:
             pass
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PERSON ENRICHMENT (Apollo) — powers the External Usage profile modal
+# ─────────────────────────────────────────────────────────────────────────────
+# The Sheets logs only know an email, a display name and a device string. To
+# answer "who actually is this person?" we resolve the email against Apollo
+# (people/bulk_match, 10 per call) and cache the normalized profile in Postgres
+# so a given email costs at most one credit per TTL window, not one per page
+# load. Fails soft in every direction: no APOLLO_API_KEY, no DATABASE_URL, or an
+# Apollo outage all degrade to "not enriched" rather than breaking the page.
+#
+# Unmatched emails are cached TOO (with a shorter TTL) -- most personal gmail
+# addresses will never match, and without a negative cache every modal open
+# would re-spend a lookup on them.
+
+_PE_POS_TTL_DAYS = 90    # a matched profile: titles/companies move slowly
+_PE_NEG_TTL_DAYS = 21    # an unmatched email: retry occasionally, not hourly
+_PE_MEM: dict = {}       # email -> (expiry_epoch, profile) in-process hot cache
+_PE_MEM_TTL = 900
+_PE_TABLE_READY = False
+
+
+def _ensure_person_enrich_table(conn) -> None:
+    """CREATE TABLE IF NOT EXISTS, once per process (same pattern/rationale as
+    _ensure_run_history_table -- concurrent workers racing the DDL is safe)."""
+    global _PE_TABLE_READY
+    if _PE_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS person_enrichment (
+                email TEXT PRIMARY KEY,
+                matched BOOLEAN NOT NULL DEFAULT false,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _PE_TABLE_READY = True
+
+
+def _pe_cache_read(emails: list) -> dict:
+    """email -> profile for every still-fresh cached row. {} if Postgres is not
+    configured (the in-process cache above is then the only cache)."""
+    out: dict = {}
+    if not emails:
+        return out
+    conn = _pg_conn()
+    if not conn:
+        return out
+    try:
+        _ensure_person_enrich_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT email, matched, payload, updated_at FROM person_enrichment "
+                "WHERE email = ANY(%s)", (list(emails),))
+            rows = cur.fetchall()
+        now = datetime.now(timezone.utc)
+        for email, matched, payload, updated_at in rows:
+            ttl = _PE_POS_TTL_DAYS if matched else _PE_NEG_TTL_DAYS
+            if updated_at and (now - updated_at).days < ttl:
+                out[email] = payload or {"matched": False, "email": email}
+        return out
+    except Exception as e:
+        log.warning("person enrich cache read failed: %s", e)
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _pe_cache_write(profiles: dict) -> None:
+    """Upsert freshly-resolved profiles. Best-effort: a write failure just means
+    the next request re-resolves."""
+    if not profiles:
+        return
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        from psycopg2.extras import Json
+        _ensure_person_enrich_table(conn)
+        with conn.cursor() as cur:
+            for email, prof in profiles.items():
+                cur.execute(
+                    "INSERT INTO person_enrichment (email, matched, payload, updated_at) "
+                    "VALUES (%s, %s, %s, now()) "
+                    "ON CONFLICT (email) DO UPDATE SET matched = EXCLUDED.matched, "
+                    "payload = EXCLUDED.payload, updated_at = now()",
+                    (email, bool(prof.get("matched")), Json(prof)))
+        conn.commit()
+    except Exception as e:
+        log.warning("person enrich cache write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _pe_pretty(s: str) -> str:
+    """Apollo ships enum-ish strings ('master_operations', 'c_suite'). Make them
+    readable without losing the original meaning."""
+    s = str(s or "")
+    if s.startswith("master_"):
+        s = s[7:]
+    return s.replace("_", " ").strip()
+
+
+def _pe_names(seq, limit: int) -> list:
+    """Flatten Apollo's mixed list-of-strings / list-of-{name} shapes, dedup,
+    preserve order, cap length."""
+    out: list = []
+    for x in (seq or []):
+        v = (x.get("name") if isinstance(x, dict) else x)
+        v = str(v or "").strip()
+        if v and v not in out:
+            out.append(v)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _apollo_person_normalize(p: dict, email: str) -> dict:
+    """One Apollo person record -> the trimmed shape the modal renders. Never
+    ships the raw record: org `keywords` alone can be 100+ entries."""
+    p = p or {}
+    org = p.get("organization") or {}
+    acct = p.get("account") or {}
+
+    history = []
+    for h in (p.get("employment_history") or [])[:14]:
+        history.append({
+            "title": h.get("title") or "",
+            "org": h.get("organization_name") or "",
+            "start": (h.get("start_date") or "")[:7],
+            "end": "" if h.get("current") else (h.get("end_date") or "")[:7],
+            "current": bool(h.get("current")),
+        })
+    # Apollo returns current-first already, but an explicit sort makes the
+    # rendered career timeline deterministic even if that ever changes:
+    # current roles first, then most-recent start date down.
+    history.sort(key=lambda h: (0 if h["current"] else 1, -_pe_year(h["start"])))
+
+    hq = ", ".join([x for x in [org.get("city"), org.get("state"), org.get("country")] if x])
+    loc = p.get("formatted_address") or ", ".join(
+        [x for x in [p.get("city"), p.get("state"), p.get("country")] if x])
+
+    name = p.get("name") or " ".join(
+        [x for x in [p.get("first_name"), p.get("last_name")] if x]).strip()
+
+    company = {}
+    if org:
+        company = {
+            "name": org.get("name") or "",
+            "domain": org.get("primary_domain") or org.get("domain") or "",
+            "website": org.get("website_url") or "",
+            "linkedin": org.get("linkedin_url") or "",
+            "facebook": org.get("facebook_url") or "",
+            "twitter": org.get("twitter_url") or "",
+            "logo": org.get("logo_url") or "",
+            "industry": org.get("industry") or "",
+            "industries": _pe_names(org.get("industries"), 4),
+            "employees": org.get("estimated_num_employees") or 0,
+            "revenue": org.get("organization_revenue_printed") or "",
+            "founded": org.get("founded_year") or "",
+            "phone": org.get("phone") or ((org.get("primary_phone") or {}).get("number") or ""),
+            "hq": hq,
+            "address": org.get("raw_address") or "",
+            "description": (org.get("short_description") or "")[:420],
+            "keywords": _pe_names(org.get("keywords"), 14),
+            "technologies": _pe_names(org.get("current_technologies"), 12),
+            "growth6": org.get("organization_headcount_six_month_growth"),
+            "growth12": org.get("organization_headcount_twelve_month_growth"),
+            "growth24": org.get("organization_headcount_twenty_four_month_growth"),
+        }
+
+    crm = {}
+    if acct:
+        crm = {
+            "in_crm": True,
+            "name": acct.get("name") or "",
+            "url": acct.get("hubspot_record_url") or acct.get("crm_record_url") or "",
+            "source": acct.get("source_display_name") or acct.get("source") or "",
+            "created": (acct.get("created_at") or "")[:10],
+        }
+
+    return {
+        "matched": True,
+        "email": email,
+        "name": name,
+        "title": p.get("title") or "",
+        "headline": p.get("headline") or "",
+        "photo": p.get("photo_url") or "",
+        "seniority": _pe_pretty(p.get("seniority")),
+        "departments": [_pe_pretty(d) for d in (p.get("departments") or [])][:6],
+        "functions": [_pe_pretty(f) for f in (p.get("functions") or [])][:6],
+        "city": p.get("city") or "",
+        "state": p.get("state") or "",
+        "country": p.get("country") or "",
+        "location": loc,
+        "time_zone": p.get("time_zone") or "",
+        "linkedin": p.get("linkedin_url") or "",
+        "twitter": p.get("twitter_url") or "",
+        "facebook": p.get("facebook_url") or "",
+        "apollo_id": p.get("id") or "",
+        "apollo_email": p.get("email") or "",
+        "history": history,
+        "company": company,
+        "crm": crm,
+    }
+
+
+def _pe_year(s: str) -> int:
+    try:
+        return int(str(s or "")[:4])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _apollo_bulk_match(emails: list) -> dict:
+    """email -> normalized profile (matched ones only) via Apollo
+    people/bulk_match, 10 per call, chunks issued concurrently. {} if no API key
+    is configured or every call fails."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    if not (key and emails):
+        return {}
+    try:
+        from tracker.apollo_client import _post as _apollo_post
+    except Exception as e:
+        log.warning("apollo client unavailable: %s", e)
+        return {}
+
+    chunks = [emails[i:i + 10] for i in range(0, len(emails), 10)]
+
+    def _one(chunk: list) -> dict:
+        out: dict = {}
+        try:
+            data = _apollo_post("people/bulk_match",
+                                {"details": [{"email": e} for e in chunk]}, key) or {}
+        except Exception as e:
+            log.warning("apollo bulk_match failed (%d emails): %s", len(chunk), e)
+            return out
+        matches = data.get("matches") or []
+        # `matches` is positionally aligned with the `details` we sent, with a
+        # null for every email Apollo could not resolve.
+        for i, email in enumerate(chunk):
+            m = matches[i] if i < len(matches) else None
+            if m:
+                try:
+                    out[email] = _apollo_person_normalize(m, email)
+                except Exception as e:
+                    log.warning("apollo normalize failed for one record: %s", e)
+        return out
+
+    results: dict = {}
+    if len(chunks) == 1:
+        results.update(_one(chunks[0]))
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(4, len(chunks))) as ex:
+            for r in ex.map(_one, chunks):
+                results.update(r)
+    return results
+
+
+def _enrich_people(emails: list, force: bool = False) -> dict:
+    """email -> profile for every requested email. A profile is either a real
+    Apollo match (`matched: true`) or an honest {matched: false} placeholder --
+    we never invent a person. Cached in-process, then in Postgres, then resolved
+    live against Apollo for whatever is left."""
+    wanted, seen = [], set()
+    for e in (emails or []):
+        e = str(e or "").strip().lower()
+        if e and "@" in e and e not in seen:
+            seen.add(e)
+            wanted.append(e)
+    if not wanted:
+        return {}
+
+    out: dict = {}
+    todo = list(wanted)
+
+    if not force:
+        now = time.time()
+        still: list = []
+        for e in todo:
+            hit = _PE_MEM.get(e)
+            if hit and hit[0] > now:
+                out[e] = hit[1]
+            else:
+                still.append(e)
+        todo = still
+
+        if todo:
+            cached = _pe_cache_read(todo)
+            for e, prof in cached.items():
+                out[e] = prof
+            todo = [e for e in todo if e not in cached]
+
+    if todo:
+        fresh = _apollo_bulk_match(todo)
+        # Every email we attempted gets a row, matched or not -- that's what
+        # stops unmatchable addresses from being retried on every page load.
+        writeback = {}
+        for e in todo:
+            prof = fresh.get(e) or {"matched": False, "email": e}
+            writeback[e] = prof
+            out[e] = prof
+        _pe_cache_write(writeback)
+
+    exp = time.time() + _PE_MEM_TTL
+    for e, prof in out.items():
+        _PE_MEM[e] = (exp, prof)
+    return out
+
+
 def _get_agent_run(email: str, run_id: int):
     """One saved run's full output, scoped to `email` so a user can only ever
     open their own runs (the id is a public URL param, not a secret)."""
@@ -4721,6 +5043,24 @@ def admin_external_usage_data():
     """JSON data endpoint for the External Usage dashboard (non-P2 sign-ins,
     enriched with agent runs and company/email-domain rollups)."""
     return jsonify(_fetch_usage_data(internal=False))
+
+@app.route("/p2/admin/external-usage/enrich", methods=["POST"])
+@admin_required
+def admin_external_usage_enrich():
+    """Resolve a batch of emails to full Apollo profiles for the person modal.
+
+    POST (not GET) on purpose: the emails are personal data and must not end up
+    in a URL query string, a server access log or browser history. Capped at 60
+    emails per call so one request can never fan out into an unbounded number of
+    Apollo lookups. Always 200 with a `profiles` map -- an unresolvable email
+    comes back as {matched:false} rather than an error, and `apollo:false` tells
+    the UI that no key is configured at all (so it can say so plainly instead of
+    showing every person as unmatched)."""
+    body = request.get_json(silent=True) or {}
+    emails = [e for e in (body.get("emails") or []) if isinstance(e, str) and "@" in e][:60]
+    profiles = _enrich_people(emails, force=bool(body.get("force")))
+    return jsonify({"profiles": profiles,
+                    "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
 
 # ── Client Usage (per-client-portal analytics) ───────────────────────────────
 # For each client we run a co-branded portal at /<slug>. This aggregates every
