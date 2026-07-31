@@ -1212,9 +1212,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       }).join('');
       var direct=phones.filter(function(ph){return ph.owner==='person';}).length;
       var note='';
-      if(!phones.length){
-        note='<div class="pm-ct-no"><b>No phone number on file</b>Apollo hands back numbers only for people already saved in your Apollo or synced CRM. This person is not, so there is nothing to show. Revealing a number is a separate, metered Apollo call.</div>';
-      }else if(!direct){
+      if(phones.length && !direct){
         note='<div class="pm-ct-no"><b>No personal number on file</b>Only the company line above. Apollo holds no direct dial or mobile for this person.</div>';
       }
       out+='<div class="pm-sec"><h4 class="pm-h4">Contact<s>'+
