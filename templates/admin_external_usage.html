@@ -521,9 +521,14 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         <h1>External Usage</h1>
         <p style="margin:8px 0 0;max-width:640px;font-size:13px;line-height:1.55;color:#64748b">Everyone who signed in with a non-Position2 email, leads, prospects and client users, with their full journey: first visit, logins, pages, agent runs and last activity.</p>
       </div>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
-        <span class="refresh-icon" id="refreshIcon">↻</span> Refresh
-      </button>
+      <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+        <button class="refresh-btn" id="exportBtn" onclick="exportXlsx()" title="Download every person, their activity and their enriched profile as an Excel workbook">
+          <span id="exportIcon">⬇</span> <span id="exportLabel">Export Excel</span>
+        </button>
+        <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+          <span class="refresh-icon" id="refreshIcon">↻</span> Refresh
+        </button>
+      </div>
     </div>
 
     <!-- Stats -->
@@ -898,11 +903,18 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     /* Left column: everything Apollo knows. Honest empty state when unmatched. */
     function pmEnrichHtml(u,p){
       if(!p||!p.matched){
-        var why = !ENRICH_ON
-          ? 'Apollo enrichment is not configured on this environment (no APOLLO_API_KEY), so no profile lookup ran.'
-          : 'Apollo has no person record for this email address. That is normal for personal mailboxes (gmail, outlook) and for people at very small companies. Their activity on the right is still fully tracked.';
+        var head='No match found', why;
+        if(!ENRICH_ON){
+          head='Enrichment not configured';
+          why='Apollo enrichment is switched off on this environment because APOLLO_API_KEY is not set, so no profile lookup ran. Set that variable in Railway and reload: every person here will enrich automatically.';
+        }else if(p&&p.pending){
+          head='Not enriched yet';
+          why='The Apollo lookup for this person has not completed yet, or the last attempt could not reach Apollo. Nothing has been cached, so it will retry on the next load.';
+        }else{
+          why='Apollo has no person record for this email address. That is normal for personal mailboxes (gmail, outlook) and for people at very small companies. Their activity on the right is still fully tracked.';
+        }
         return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4>'+
-          '<div class="pm-empty"><b>No match found</b>'+esc(why)+'</div>'+
+          '<div class="pm-empty"><b>'+esc(head)+'</b>'+esc(why)+'</div>'+
           '<div class="pm-kv" style="margin-top:11px">'+
             pmKV('Email domain',u.domain)+
             pmKV('Display name',u.name)+
@@ -1111,6 +1123,28 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           '<td class="dim">'+r.url+'</td><td class="dur">'+r.duration+'</td></tr>';
       }).join('')+'</tbody>';
       return '<div class="tbl-wrap"><table>'+h+b+'</table></div>';
+    }
+
+    /* Export the whole dashboard as .xlsx. Server builds the workbook, so this
+       just triggers the download and gives the button a busy state. The request
+       can take a few seconds on a large Sheet, hence the explicit feedback. */
+    function exportXlsx(){
+      var btn=document.getElementById('exportBtn'), lab=document.getElementById('exportLabel');
+      if(btn.disabled)return;
+      btn.disabled=true; var was=lab.textContent; lab.textContent='Building...';
+      var done=function(msg){ lab.textContent=msg||was; btn.disabled=false;
+        if(msg)setTimeout(function(){lab.textContent=was;},2600); };
+      fetch('/p2/admin/external-usage/export')
+        .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); return r.blob(); })
+        .then(function(blob){
+          var cd=new Date(), stamp=cd.toISOString().slice(0,10);
+          var url=URL.createObjectURL(blob), a=document.createElement('a');
+          a.href=url; a.download='external-usage-'+stamp+'.xlsx';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function(){URL.revokeObjectURL(url);},1500);
+          done('Downloaded');
+        })
+        .catch(function(e){ console.warn('export failed',e); done('Export failed'); });
     }
 
     /* ── Load data ── */
