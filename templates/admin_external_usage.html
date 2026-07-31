@@ -319,6 +319,153 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="/static/js/pfx_bg.js?v=3" defer></script>
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <style id="person-modal-css">
+    /* ── Person profile modal (External Usage) ────────────────────────────────
+       Deliberately declared AFTER admin.css / aurora-app.css / grid-tokens.css:
+       those load later than this file's first <style> block and would otherwise
+       win equal-specificity collisions. Every selector is pm-* prefixed. */
+    .pm-ovl{position:fixed;inset:0;background:rgba(3,5,13,.8);backdrop-filter:blur(7px);
+      opacity:0;visibility:hidden;transition:opacity .26s ease,visibility .26s;z-index:900}
+    .pm-ovl.on{opacity:1;visibility:visible}
+    .pm-wrap{position:fixed;inset:0;z-index:901;display:flex;align-items:center;justify-content:center;
+      padding:22px;pointer-events:none}
+    .pm-wrap.on{pointer-events:auto}
+    .pmodal{--pc:#8b5cf6;position:relative;width:min(1180px,96vw);max-height:92vh;display:flex;flex-direction:column;
+      background:linear-gradient(168deg,#0c1024,#080a17 46%);border:1px solid rgba(255,255,255,.13);
+      border-radius:22px;box-shadow:0 40px 120px -24px rgba(0,0,0,.92),0 0 0 1px rgba(255,255,255,.03) inset;
+      overflow:hidden;opacity:0;transform:translateY(16px) scale(.982);
+      transition:opacity .3s ease,transform .34s cubic-bezier(.2,.85,.25,1)}
+    .pm-wrap.on .pmodal{opacity:1;transform:none}
+    .pm-x{position:absolute;top:15px;right:16px;width:32px;height:32px;border-radius:50%;z-index:4;
+      background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);color:#9aa4c4;
+      font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s}
+    .pm-x:hover{background:rgba(255,255,255,.13);color:#fff;transform:rotate(90deg)}
+
+    /* Hero */
+    .pm-hero{position:relative;padding:26px 30px 20px;flex:none;
+      border-bottom:1px solid rgba(255,255,255,.09);overflow:hidden}
+    .pm-hero::before{content:'';position:absolute;top:-140px;right:-90px;width:420px;height:300px;pointer-events:none;
+      background:radial-gradient(circle at 60% 50%,color-mix(in srgb, var(--pc) 30%, transparent),transparent 68%);filter:blur(18px)}
+    .pm-hero-in{position:relative;display:flex;gap:20px;align-items:flex-start}
+    .pm-avw{position:relative;flex:none}
+    .pm-av{width:92px;height:92px;border-radius:22px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+      font-size:32px;font-weight:800;color:#050914;letter-spacing:-.02em;
+      background:linear-gradient(140deg,var(--pc),color-mix(in srgb, var(--pc) 34%,#131a30));
+      box-shadow:0 12px 34px -12px color-mix(in srgb, var(--pc) 62%, transparent),0 0 0 1px rgba(255,255,255,.1)}
+    .pm-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .pm-live{position:absolute;bottom:-3px;right:-3px;width:20px;height:20px;border-radius:50%;
+      background:#141a2e;border:2px solid #0b0f21;display:flex;align-items:center;justify-content:center}
+    .pm-live i{width:9px;height:9px;border-radius:50%;background:#3f4a6e;display:block}
+    .pm-live.on i{background:#34d399;box-shadow:0 0 0 3px rgba(52,211,153,.24)}
+    .pm-id{min-width:0;flex:1}
+    .pm-name{margin:0;font-size:27px;font-weight:800;color:#f4f7fb;letter-spacing:-.02em;line-height:1.12;
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .pm-role{margin-top:5px;font-size:14.5px;font-weight:600;color:#cdd6ea}
+    .pm-role b{color:var(--pc);font-weight:700}
+    .pm-email{margin-top:6px;font-family:monospace;font-size:12.5px;color:#7d87ab;word-break:break-all}
+    .pm-head{margin-top:11px;font-size:12.8px;line-height:1.55;color:#93a0c4;max-width:74ch;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .pm-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+    .pm-chip{display:inline-flex;align-items:center;gap:5px;font-family:monospace;font-size:10.5px;
+      color:#9aa5c6;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.11);
+      border-radius:var(--radius-pill,99px);padding:4px 10px;white-space:nowrap}
+    .pm-chip.ac{color:color-mix(in srgb, var(--pc) 76%,#fff);border-color:color-mix(in srgb, var(--pc) 42%,transparent);
+      background:color-mix(in srgb, var(--pc) 13%,transparent)}
+    .pm-chip.gd{color:#6ee7b7;border-color:rgba(52,211,153,.36);background:rgba(52,211,153,.1)}
+    .pm-socials{display:flex;gap:8px;margin-top:15px;flex-wrap:wrap}
+    .pm-so{width:33px;height:33px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#a8b2d1;transition:.16s;text-decoration:none}
+    .pm-so:hover{background:var(--pc);border-color:var(--pc);color:#fff;transform:translateY(-2px)}
+    .pm-so svg{width:15px;height:15px;fill:currentColor}
+    .pm-src{position:absolute;bottom:14px;right:30px;font-family:monospace;font-size:9.5px;
+      letter-spacing:.1em;text-transform:uppercase;color:#4d5878}
+
+    /* Body: two independently-scrolling columns */
+    .pm-body{display:grid;grid-template-columns:1.03fr .97fr;flex:1;min-height:0}
+    .pm-col{overflow-y:auto;padding:22px 26px 26px;min-width:0}
+    .pm-col.l{border-right:1px solid rgba(255,255,255,.08)}
+    .pm-sec{margin-bottom:24px}
+    .pm-sec:last-child{margin-bottom:4px}
+    .pm-h4{display:flex;align-items:center;gap:8px;margin:0 0 13px;font-family:monospace;font-size:10.5px;
+      letter-spacing:.15em;text-transform:uppercase;color:#69749b;font-weight:600}
+    .pm-h4::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--pc);flex:none}
+    .pm-h4 s{margin-left:auto;text-decoration:none;color:#4a5474;letter-spacing:.06em}
+
+    /* Key/value grid */
+    .pm-kv{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .pm-kv.one{grid-template-columns:1fr}
+    .pm-kv-i{background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.075);
+      border-radius:var(--radius-md,12px);padding:10px 13px;min-width:0}
+    .pm-kv-i span{display:block;font-family:monospace;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+      color:#5b6688;margin-bottom:4px}
+    .pm-kv-i b{display:block;font-size:13px;font-weight:600;color:#dde4f2;line-height:1.4;word-break:break-word}
+    .pm-kv-i a{color:#7dd3fc;text-decoration:none}
+    .pm-kv-i a:hover{text-decoration:underline}
+
+    /* Company card */
+    .pm-cocard{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);
+      border-radius:16px;padding:15px 16px;margin-bottom:11px}
+    .pm-cotop{display:flex;gap:13px;align-items:center;min-width:0}
+    .pm-colg{width:46px;height:46px;border-radius:12px;flex:none;background:#fff;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;font-weight:800;color:#0b1020;font-size:17px}
+    .pm-colg img{width:100%;height:100%;object-fit:contain;display:block;padding:4px;box-sizing:border-box}
+    .pm-coname{font-size:16px;font-weight:700;color:#eef2f9;line-height:1.25}
+    .pm-coind{font-size:11.5px;color:#8b96b8;margin-top:3px;text-transform:capitalize}
+    .pm-grow{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+    .pm-grow-r{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:9px}
+    .pm-grow-r em{font-family:monospace;font-size:9.5px;color:#5b6688;font-style:normal;letter-spacing:.06em}
+    .pm-grow-b{height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+    .pm-grow-b i{position:absolute;top:0;bottom:0;left:50%;border-radius:3px;background:#34d399;transition:width .5s ease}
+    .pm-grow-b i.neg{background:#f87171}
+    .pm-grow-r b{font-family:monospace;font-size:11px;text-align:right;color:#6ee7b7;font-weight:600}
+    .pm-grow-r b.neg{color:#fca5a5}
+    .pm-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+    .pm-tag{font-size:10.5px;color:#9aa5c6;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);
+      border-radius:var(--radius-pill,99px);padding:3px 9px;text-transform:capitalize}
+
+    /* Career history */
+    .pm-job{display:grid;grid-template-columns:20px 1fr;gap:12px;position:relative;padding-bottom:15px}
+    .pm-job:not(:last-child)::before{content:'';position:absolute;left:9px;top:19px;bottom:0;width:2px;
+      background:rgba(255,255,255,.08)}
+    .pm-job-d{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.16);z-index:1}
+    .pm-job.cur .pm-job-d{background:color-mix(in srgb, var(--pc) 26%,transparent);
+      border-color:var(--pc);box-shadow:0 0 0 4px color-mix(in srgb, var(--pc) 13%,transparent)}
+    .pm-job-t{font-size:13px;font-weight:650;color:#e6ecf7;line-height:1.35}
+    .pm-job-o{font-size:12px;color:#98a3c2;margin-top:2px}
+    .pm-job-w{font-family:monospace;font-size:10.5px;color:#616c8f;margin-top:3px}
+    .pm-job.cur .pm-job-w{color:color-mix(in srgb, var(--pc) 72%,#fff)}
+
+    /* Activity stat tiles */
+    .pm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(94px,1fr));gap:9px}
+    .pm-st{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.085);border-radius:14px;
+      padding:12px 13px;position:relative;overflow:hidden}
+    .pm-st span{display:block;font-family:monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+      color:#5b6688;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pm-st b{display:block;font-size:23px;font-weight:800;line-height:1;letter-spacing:-.02em;
+      background:linear-gradient(160deg,#fff,#93a0c4);-webkit-background-clip:text;background-clip:text;
+      -webkit-text-fill-color:transparent}
+    .pm-st.z b{background:linear-gradient(160deg,#5b6688,#3d4665);-webkit-background-clip:text;background-clip:text}
+    .pm-st.t b{font-size:17px}
+    .pm-tlwrap{max-height:none}
+    .pm-empty{font-size:12.5px;color:#6b7699;background:rgba(255,255,255,.025);border:1px dashed rgba(255,255,255,.11);
+      border-radius:var(--radius-md,12px);padding:16px 17px;line-height:1.6}
+    .pm-empty b{display:block;color:#aab4d0;font-size:13px;margin-bottom:5px;font-weight:650}
+
+    /* Enrichment skeleton */
+    .pm-sk{background:linear-gradient(90deg,rgba(255,255,255,.045),rgba(255,255,255,.1),rgba(255,255,255,.045));
+      background-size:220% 100%;border-radius:8px;animation:pmsh 1.25s linear infinite}
+    @keyframes pmsh{0%{background-position:120% 0}100%{background-position:-120% 0}}
+
+    @media (max-width:920px){
+      .pm-body{grid-template-columns:1fr}
+      .pm-col.l{border-right:0;border-bottom:1px solid rgba(255,255,255,.08)}
+      .pmodal{max-height:94vh}
+      .pm-hero-in{flex-direction:column}
+      .pm-av{width:72px;height:72px;font-size:26px}
+      .pm-name{font-size:22px}
+    }
+  </style>
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -495,12 +642,17 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
 
   </div>
 
-  <div class="overlay" id="ovl2" onclick="closeUserDrawer()"></div>
-  <aside class="drawer" id="drw2">
-    <button class="close" onclick="closeUserDrawer()">✕</button>
-    <div class="dh" id="drw2Head"></div>
-    <div class="tline" id="drw2Tline"></div>
-  </aside>
+  <div class="pm-ovl" id="pmOvl" onclick="closeUserDrawer()"></div>
+  <div class="pm-wrap" id="pmWrap">
+    <div class="pmodal" id="pmodal" role="dialog" aria-modal="true" aria-label="Person profile">
+      <button class="pm-x" onclick="closeUserDrawer()" aria-label="Close">✕</button>
+      <div class="pm-hero" id="pmHero"></div>
+      <div class="pm-body">
+        <div class="pm-col l" id="pmLeft"></div>
+        <div class="pm-col" id="pmRight"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     /* ── Dropdown ── */
@@ -706,41 +858,232 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     // Trim "2026-07-27 16:01:12 IST" → "Jul 27, 16:01" style short stamp; tolerant of odd formats.
     function shortTs(s){s=String(s||'');var m=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T]?(\d{2}:\d{2})?/);if(!m)return s;var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m[2],10)-1]||m[2];return mo+' '+m[3]+(m[4]?(', '+m[4]):'');}
     function initials(n){n=(n||'').trim();if(!n)return 'U';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
-    function openUserDrawer(i){
-      var u=USERS[i];if(!u)return;
-      var agentsHtml = (u.agents && u.agents.length)
-        ? '<div class="drw-agents">'+u.agents.map(function(a){
-            return '<span class="agent-pill" style="--ac:'+(a.ac||'#8b5cf6')+'">'+esc(a.name)+' <b>'+a.count+'</b></span>';
-          }).join('')+'</div>' : '';
-      document.getElementById('drw2Head').innerHTML=
-        '<div class="top"><div class="mavatar">'+esc(initials(u.name||u.email))+'</div><div><h3>'+esc(u.name||u.email)+'</h3>'+
-        '<div class="em">'+esc(u.email)+'</div></div></div>'+
-        '<div class="meta">'+
-          (u.domain?'<span class="chip">🏢 '+esc(u.domain)+'</span>':'')+
-          '<span class="chip">'+(u.logins||0)+' login'+(u.logins===1?'':'s')+'</span>'+
-          (u.agent_runs?'<span class="chip" style="color:#6ee7b7;border-color:rgba(52,211,153,.35)">🤖 '+u.agent_runs+' agent run'+(u.agent_runs===1?'':'s')+'</span>':'')+
-          '<span class="chip">'+esc(u.time_fmt||'—')+' on site</span>'+
-          (u.linked?'<span class="chip">'+u.prelogin_pages+' pre-login page'+(u.prelogin_pages===1?'':'s')+'</span>':'')+
-          (u.source?'<span class="chip">↗ '+esc(u.source)+'</span>':'')+
-        '</div>'+
-        '<div class="drw-seen">'+
-          '<div class="drw-seen-i"><span>First seen</span><b>'+esc(u.first_seen||'—')+'</b></div>'+
-          '<div class="drw-seen-i"><span>Last active</span><b>'+esc(u.last_active||u.last_seen||'—')+'</b></div>'+
-        '</div>'+agentsHtml;
-      var tl=u.timeline||[];
-      document.getElementById('drw2Tline').innerHTML=tl.length?tl.map(function(e){
-        var kl=e.kind==='signin'?'signin':(e.kind==='post'?'post':(e.kind==='run'?'run':'view'));
-        var kt=e.kind==='signin'?'sign-in':(e.kind==='post'?'after login':(e.kind==='run'?'agent run':'pre-login'));
-        var ic=e.kind==='signin'?'★':(e.kind==='post'?'●':(e.kind==='run'?'▶':'○'));
-        return '<div class="tl-item '+kl+'"><div class="tl-dot">'+ic+'</div><div class="tl-c">'+
-          '<b><span class="k '+kl+'">'+kt+'</span>'+esc(e.label)+'</b>'+
-          '<small>'+esc(e.t)+(e.meta?' · '+esc(e.meta):'')+'</small></div></div>';
-      }).join(''):'<div class="empty">No linked activity for this person yet (signed in without a tracked visitor session, or before p2_vid capture existed).</div>';
-      document.getElementById('ovl2').classList.add('open');
-      document.getElementById('drw2').classList.add('open');
+    /* ── Person profile modal ────────────────────────────────────────────────
+       Row click opens a full profile: Apollo enrichment on the left, this
+       person's real platform activity on the right. Enrichment is prefetched
+       for everyone in the table right after it renders (one POST, server-side
+       cached), so opening a row is instant; a person we somehow have no cached
+       answer for is fetched on open. */
+    var ENRICH = {};          /* lowercased email -> profile | undefined */
+    var ENRICH_ON = true;     /* false once the server tells us no Apollo key */
+    var PM_I = -1;
+
+    var SVG_LI='<svg viewBox="0 0 24 24"><path d="M4.98 3.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM2 21h6V9H2v12zm7.5 0h5.7v-6.4c0-3.4 4.3-3.7 4.3 0V21H22v-7.7c0-6.1-6.6-5.9-8.8-2.9V9H9.5v12z"/></svg>';
+    var SVG_TW='<svg viewBox="0 0 24 24"><path d="M18.9 2H22l-6.9 7.9L22.8 22h-6.6l-4.6-6.1L5.7 22H2.6l7.3-8.3L1.9 2h6.7l4.3 5.7L18.9 2zm-1.1 18h1.7L7.3 3.7H5.5L17.8 20z"/></svg>';
+    var SVG_FB='<svg viewBox="0 0 24 24"><path d="M22 12a10 10 0 10-11.6 9.9v-7h-2.5V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0022 12z"/></svg>';
+    var SVG_WEB='<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 6h-2.9a15 15 0 00-1.3-3.6A8 8 0 0118.9 8zM12 4.1c.6.9 1.3 2.2 1.7 3.9h-3.4c.4-1.7 1.1-3 1.7-3.9zM4.3 14A8 8 0 014 12c0-.7.1-1.4.3-2h3.3a17 17 0 000 4H4.3zm.8 2H8a15 15 0 001.3 3.6A8 8 0 015.1 16zm2.9-8H5.1a8 8 0 014.2-3.6A15 15 0 008 8zm4 11.9c-.6-.9-1.3-2.2-1.7-3.9h3.4c-.4 1.7-1.1 3-1.7 3.9zm2.1-5.9H9.9a15 15 0 010-4h4.2a15 15 0 010 4zm.6 5.6A15 15 0 0016 16h2.9a8 8 0 01-4.2 3.6zm1.7-5.6a17 17 0 000-4h3.3c.2.6.3 1.3.3 2s-.1 1.4-.3 2h-3.3z"/></svg>';
+    var SVG_CRM='<svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm2 4v2h12V7H6zm0 4v2h12v-2H6zm0 4v2h8v-2H6z"/></svg>';
+
+    function pmPct(v){ if(v===null||v===undefined||isNaN(v))return null; return Math.round(v*1000)/10; }
+    function pmNum(n){ n=+n||0; if(n>=1e9)return (n/1e9).toFixed(1).replace(/\.0$/,'')+'B';
+      if(n>=1e6)return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+      if(n>=1e3)return (n/1e3).toFixed(n>=1e4?0:1).replace(/\.0$/,'')+'K'; return String(n); }
+    function pmMon(s){ var m=String(s||'').match(/^(\d{4})-(\d{2})/); if(!m)return String(s||'');
+      return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2]-1]+' '+m[1]; }
+    function pmKV(label,val,isLink){
+      if(val===null||val===undefined||val==='')return '';
+      var v=isLink?('<a href="'+esc(val)+'" target="_blank" rel="noopener noreferrer">'+esc(String(val).replace(/^https?:\/\/(www\.)?/,''))+'</a>'):esc(val);
+      return '<div class="pm-kv-i"><span>'+esc(label)+'</span><b>'+v+'</b></div>';
     }
-    function closeUserDrawer(){document.getElementById('ovl2').classList.remove('open');document.getElementById('drw2').classList.remove('open');}
+    function pmSo(url,svg,label){
+      if(!url)return '';
+      return '<a class="pm-so" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(label)+'">'+svg+'</a>';
+    }
+    function pmSkeleton(){
+      var bar=function(w,h,mb){return '<div class="pm-sk" style="width:'+w+';height:'+h+'px;margin-bottom:'+mb+'px"></div>';};
+      return '<div class="pm-sec">'+bar('40%',11,14)+bar('100%',52,9)+bar('100%',52,9)+'</div>'+
+             '<div class="pm-sec">'+bar('32%',11,14)+bar('100%',96,11)+bar('86%',20,7)+bar('72%',20,0)+'</div>';
+    }
+
+    /* Left column: everything Apollo knows. Honest empty state when unmatched. */
+    function pmEnrichHtml(u,p){
+      if(!p||!p.matched){
+        var why = !ENRICH_ON
+          ? 'Apollo enrichment is not configured on this environment (no APOLLO_API_KEY), so no profile lookup ran.'
+          : 'Apollo has no person record for this email address. That is normal for personal mailboxes (gmail, outlook) and for people at very small companies. Their activity on the right is still fully tracked.';
+        return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4>'+
+          '<div class="pm-empty"><b>No match found</b>'+esc(why)+'</div>'+
+          '<div class="pm-kv" style="margin-top:11px">'+
+            pmKV('Email domain',u.domain)+
+            pmKV('Display name',u.name)+
+          '</div></div>';
+      }
+      var c=p.company||{}, out='';
+
+      /* Professional */
+      out+='<div class="pm-sec"><h4 class="pm-h4">Professional profile<s>apollo</s></h4><div class="pm-kv">'+
+        pmKV('Title',p.title)+
+        pmKV('Seniority',p.seniority)+
+        pmKV('Departments',(p.departments||[]).join(', '))+
+        pmKV('Functions',(p.functions||[]).join(', '))+
+        pmKV('Location',p.location)+
+        pmKV('Time zone',p.time_zone)+
+      '</div></div>';
+
+      /* Company */
+      if(c.name){
+        var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\''+esc((c.name[0]||'?').toUpperCase())+'\'">'):esc((c.name[0]||'?').toUpperCase());
+        var grow='';
+        var rows=[['6 mo',c.growth6],['12 mo',c.growth12],['24 mo',c.growth24]].filter(function(r){return pmPct(r[1])!==null;});
+        if(rows.length){
+          grow='<div class="pm-grow">'+rows.map(function(r){
+            var pc=pmPct(r[1]), neg=pc<0, w=Math.min(50,Math.abs(pc)*1.6);
+            return '<div class="pm-grow-r"><em>'+r[0]+'</em><div class="pm-grow-b">'+
+              '<i class="'+(neg?'neg':'')+'" style="width:'+w+'%;'+(neg?'right:50%;left:auto':'left:50%')+'"></i></div>'+
+              '<b class="'+(neg?'neg':'')+'">'+(neg?'':'+')+pc+'%</b></div>';
+          }).join('')+'</div>';
+        }
+        out+='<div class="pm-sec"><h4 class="pm-h4">Company<s>'+esc(c.domain||'')+'</s></h4>'+
+          '<div class="pm-cocard"><div class="pm-cotop"><div class="pm-colg">'+logo+'</div>'+
+            '<div style="min-width:0"><div class="pm-coname">'+esc(c.name)+'</div>'+
+            (c.industry?'<div class="pm-coind">'+esc(c.industry)+'</div>':'')+'</div></div>'+
+            (c.description?'<div style="font-size:12.3px;color:#98a3c2;line-height:1.6;margin-top:12px">'+esc(c.description)+'</div>':'')+
+            grow+
+          '</div>'+
+          '<div class="pm-kv">'+
+            pmKV('Employees',c.employees?pmNum(c.employees):'')+
+            pmKV('Revenue',c.revenue?('$'+c.revenue):'')+
+            pmKV('Founded',c.founded)+
+            pmKV('HQ',c.hq)+
+            pmKV('Phone',c.phone)+
+            pmKV('Website',c.website,true)+
+          '</div>'+
+          ((c.keywords&&c.keywords.length)?'<div class="pm-tags">'+c.keywords.map(function(k){return '<span class="pm-tag">'+esc(k)+'</span>';}).join('')+'</div>':'')+
+        '</div>';
+      }
+
+      /* Career history */
+      if(p.history&&p.history.length){
+        out+='<div class="pm-sec"><h4 class="pm-h4">Career history<s>'+p.history.length+(p.history.length===1?' role':' roles')+'</s></h4>'+
+          p.history.map(function(h){
+            var when=h.current?((h.start?pmMon(h.start):'')+' → now'):((h.start?pmMon(h.start):'?')+(h.end?(' → '+pmMon(h.end)):''));
+            return '<div class="pm-job'+(h.current?' cur':'')+'"><div class="pm-job-d"></div><div>'+
+              '<div class="pm-job-t">'+esc(h.title||'Role not specified')+'</div>'+
+              (h.org?'<div class="pm-job-o">'+esc(h.org)+'</div>':'')+
+              '<div class="pm-job-w">'+esc(when)+'</div></div></div>';
+          }).join('')+'</div>';
+      }
+      return out;
+    }
+
+    /* Right column: this person's real footprint on the platform. */
+    function pmActivityHtml(u){
+      var st=function(label,val,cls){
+        var zero=(!val||val==='0m'||val===0);
+        return '<div class="pm-st'+(zero?' z':'')+(cls?' '+cls:'')+'"><span>'+label+'</span><b>'+esc(String(val==null?0:val))+'</b></div>';
+      };
+      var out='<div class="pm-sec"><h4 class="pm-h4">Platform activity<s>first party</s></h4><div class="pm-stats">'+
+        st('Logins',u.logins||0)+st('Agent runs',u.agent_runs||0)+st('Page views',u.page_views||0)+
+        st('On site',(u.time_fmt&&u.time_fmt!=='\u2014')?u.time_fmt:'0m','t')+
+        st('Pre-login',u.prelogin_pages||0)+
+      '</div>'+
+      '<div class="pm-kv" style="margin-top:9px">'+
+        pmKV('First seen',u.first_seen)+
+        pmKV('Last active',u.last_active||u.last_seen)+
+        pmKV('Device',[u.browser,u.os,u.device].filter(Boolean).join(' · '))+
+        pmKV('First-touch source',u.source||'direct')+
+      '</div></div>';
+
+      if(u.agents&&u.agents.length){
+        out+='<div class="pm-sec"><h4 class="pm-h4">Agents used<s>'+u.agents.length+'</s></h4><div class="drw-agents" style="margin-top:0">'+
+          u.agents.map(function(a){return '<span class="agent-pill" style="--ac:'+(a.ac||'#8b5cf6')+'">'+esc(a.name)+' <b>'+a.count+'</b></span>';}).join('')+
+        '</div></div>';
+      }
+
+      var tl=u.timeline||[];
+      out+='<div class="pm-sec"><h4 class="pm-h4">Activity timeline<s>'+(tl.length||0)+(tl.length===1?' event':' events')+'</s></h4>';
+      out+= tl.length ? tl.slice().reverse().map(function(e){
+          var kl=e.kind==='signin'?'signin':(e.kind==='post'?'post':(e.kind==='run'?'run':'view'));
+          var kt=e.kind==='signin'?'sign-in':(e.kind==='post'?'after login':(e.kind==='run'?'agent run':'pre-login'));
+          var ic=e.kind==='signin'?'★':(e.kind==='post'?'●':(e.kind==='run'?'▶':'○'));
+          return '<div class="tl-item '+kl+'"><div class="tl-dot">'+ic+'</div><div class="tl-c">'+
+            '<b><span class="k '+kl+'">'+kt+'</span>'+esc(e.label)+'</b>'+
+            '<small>'+esc(e.t)+(e.meta?' · '+esc(e.meta):'')+'</small></div></div>';
+        }).join('')
+        : '<div class="pm-empty"><b>No linked activity yet</b>This person signed in without a tracked visitor session, or before p2_vid capture existed.</div>';
+      out+='</div>';
+      return out;
+    }
+
+    function pmHero(u,p){
+      p=p||{};
+      var col=palette(u.email||u.name);
+      var nm=p.name||u.name||u.email;
+      var photo=p.photo?('<img src="'+esc(p.photo)+'" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\''+esc(initials(nm))+'\'">'):esc(initials(nm));
+      var role='';
+      if(p.title||(p.company&&p.company.name)){
+        role='<div class="pm-role">'+esc(p.title||'')+((p.title&&p.company&&p.company.name)?' at ':'')+((p.company&&p.company.name)?'<b>'+esc(p.company.name)+'</b>':'')+'</div>';
+      }
+      var chips='';
+      if(p.seniority)chips+='<span class="pm-chip ac">'+esc(p.seniority)+'</span>';
+      if(p.location)chips+='<span class="pm-chip">📍 '+esc(p.location)+'</span>';
+      if(p.company&&p.company.employees)chips+='<span class="pm-chip">👥 '+pmNum(p.company.employees)+' employees</span>';
+      if(p.company&&p.company.revenue)chips+='<span class="pm-chip">$'+esc(p.company.revenue)+' revenue</span>';
+      if(p.crm&&p.crm.in_crm)chips+='<span class="pm-chip gd">✓ in CRM</span>';
+      if(u.domain&&!(p.company&&p.company.name))chips+='<span class="pm-chip">🏢 '+esc(u.domain)+'</span>';
+
+      var so=pmSo(p.linkedin,SVG_LI,'LinkedIn')+pmSo(p.twitter,SVG_TW,'X / Twitter')+
+             pmSo(p.facebook,SVG_FB,'Facebook')+
+             pmSo(p.company&&p.company.website,SVG_WEB,'Company website')+
+             pmSo(p.company&&p.company.linkedin,SVG_LI,'Company on LinkedIn')+
+             pmSo(p.crm&&p.crm.url,SVG_CRM,'Open in CRM');
+      var live=isRecent(u.last_active||u.last_seen);
+      return '<div class="pm-hero-in">'+
+        '<div class="pm-avw"><div class="pm-av">'+photo+'</div><div class="pm-live'+(live?' on':'')+'"><i></i></div></div>'+
+        '<div class="pm-id">'+
+          '<h3 class="pm-name">'+esc(nm)+'</h3>'+role+
+          '<div class="pm-email">'+esc(u.email)+'</div>'+
+          (p.headline?'<div class="pm-head">'+esc(p.headline)+'</div>':'')+
+          (chips?'<div class="pm-chips">'+chips+'</div>':'')+
+          (so?'<div class="pm-socials">'+so+'</div>':'')+
+        '</div></div>'+
+        (p.matched?'<div class="pm-src">enriched via apollo</div>':'');
+    }
+
+    function pmPaint(i){
+      var u=USERS[i]; if(!u)return;
+      var p=ENRICH[(u.email||'').toLowerCase()];
+      var mod=document.getElementById('pmodal');
+      mod.style.setProperty('--pc',palette(u.email||u.name));
+      document.getElementById('pmHero').innerHTML=pmHero(u,p);
+      document.getElementById('pmLeft').innerHTML=(p===undefined)?pmSkeleton():pmEnrichHtml(u,p);
+      document.getElementById('pmRight').innerHTML=pmActivityHtml(u);
+    }
+
+    function openUserDrawer(i){
+      var u=USERS[i]; if(!u)return;
+      PM_I=i;
+      pmPaint(i);
+      document.getElementById('pmOvl').classList.add('on');
+      document.getElementById('pmWrap').classList.add('on');
+      document.body.style.overflow='hidden';
+      var em=(u.email||'').toLowerCase();
+      if(ENRICH[em]===undefined&&ENRICH_ON){
+        pmEnrich([em]).then(function(){ if(PM_I===i)pmPaint(i); });
+      }
+    }
+    function closeUserDrawer(){
+      document.getElementById('pmOvl').classList.remove('on');
+      document.getElementById('pmWrap').classList.remove('on');
+      document.body.style.overflow='';
+      PM_I=-1;
+    }
     document.addEventListener('keydown',function(e){if(e.key==='Escape')closeUserDrawer();});
+
+    /* Ask the server for profiles. Resolves once ENRICH is updated; never
+       rejects, so a failed lookup just leaves those people unenriched. */
+    function pmEnrich(emails){
+      emails=(emails||[]).filter(Boolean);
+      if(!emails.length)return Promise.resolve();
+      return fetch('/p2/admin/external-usage/enrich',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({emails:emails})
+      }).then(function(r){return r.json();}).then(function(d){
+        if(d&&d.apollo===false)ENRICH_ON=false;
+        var pr=(d&&d.profiles)||{};
+        for(var k in pr){ if(Object.prototype.hasOwnProperty.call(pr,k))ENRICH[k.toLowerCase()]=pr[k]; }
+      }).catch(function(e){ console.warn('enrich failed',e); });
+    }
 
     function tagDevice(d) {
       var lower = (d||'').toLowerCase();
@@ -805,6 +1148,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           document.getElementById('browser-wrap').innerHTML   = renderBrowsers(d.browser_breakdown);
           document.getElementById('pages-wrap').innerHTML     = renderTopPages(d.top_pages);
           document.getElementById('ppl-wrap').innerHTML       = renderUsers(d.user_activity);
+          /* Warm every visible person's Apollo profile in one call so opening a
+             row is instant. Server-side cached, so this is ~free after day one. */
+          pmEnrich((d.user_activity||[]).map(function(u){return (u.email||'').toLowerCase();}))
+            .then(function(){ if(PM_I>=0)pmPaint(PM_I); });
 
           /* Tables */
           var lt = d.login_table, pt = d.page_table, rt = d.agent_runs_table || [];
