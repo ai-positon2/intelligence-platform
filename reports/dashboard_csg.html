@@ -1926,7 +1926,7 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
   var dn=document.getElementById("kp-dd-n");if(dn)dn.textContent=full;
   var de=document.getElementById("kp-dd-e");if(de)de.textContent=u.email||"";
   var av=document.getElementById("kp-av");if(av){if(u.picture){av.innerHTML="<img src=\""+u.picture+"\" alt=\"\">";}else{av.textContent=(nm||"U").slice(0,1).toUpperCase();}}
-  if(u.email&&(u.email==="krishna.ladha@position2.com"||u.email==="sudheer.d@position2.com")){var us=document.getElementById("kp-usage");if(us)us.style.display="";}
+  if(u.is_admin){var us=document.getElementById("kp-usage");if(us)us.style.display="";}
 }).catch(function(){});}catch(e){}})();
 </script>
 <div id="app">
