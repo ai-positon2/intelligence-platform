@@ -231,6 +231,14 @@
     .ppl-clear:hover{border-color:rgba(239,68,68,.4);color:#f87171}
     .ppl-filter-count{font-size:11.5px;color:#5a6488;white-space:nowrap}
     .ppl-no-match{padding:36px;text-align:center;color:#5a6488;font-size:13px}
+    .ppl-sort{position:relative}
+    .ppl-sort.ai-on{border-color:rgba(139,92,246,.5);color:#c4b5fd;background:rgba(139,92,246,.1)}
+    .ppl-sort:disabled{opacity:.6;cursor:wait}
+    .ppl-sort-status{font-size:11.5px;color:#a78bfa;white-space:nowrap;display:none;align-items:center;gap:5px}
+    .ppl-sort-status.err{color:#f87171}
+    .ppl-sort-status .spin{width:9px;height:9px;border-radius:50%;border:2px solid rgba(167,139,250,.3);
+      border-top-color:#a78bfa;display:inline-block;animation:pplspin .7s linear infinite}
+    @keyframes pplspin{to{transform:rotate(360deg)}}
 
     /* ── rich People table ── */
     #ppl-wrap{padding:6px 8px 10px}
@@ -666,8 +674,21 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           <option value="fallback">Company found by domain</option>
           <option value="none">No Apollo match</option>
         </select>
+        <select class="ppl-select ppl-sort" id="pplSort" onchange="onPplSortChange()">
+          <option value="last_active">Sort: Last active</option>
+          <option value="last_run">Sort: Last agent run</option>
+          <option value="first_seen">Sort: First seen (newest)</option>
+          <option value="page_views">Sort: Most page views</option>
+          <option value="time_spent">Sort: Most time on site</option>
+          <option value="agent_runs">Sort: Most agent runs</option>
+          <option value="logins">Sort: Most logins</option>
+          <option value="name">Sort: Name (A→Z)</option>
+          <option value="company">Sort: Company (A→Z)</option>
+          <option value="ai">✨ Sort by AI</option>
+        </select>
         <button class="ppl-clear" onclick="clearPeopleFilter()">✕ Clear</button>
         <span class="ppl-filter-count" id="pplFilterCount"></span>
+        <span class="ppl-sort-status" id="pplSortStatus"><i class="spin"></i><b id="pplSortStatusTxt"></b></span>
       </div>
       <div id="ppl-wrap"><div class="skel" style="height:240px;margin:18px 22px"></div></div>
     </div>
@@ -954,6 +975,10 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
         var hay=[u.name,u.email,u.domain,u.browser,u.os,u.device,u.source].filter(Boolean).join(' ').toLowerCase();
         return '<tr class="pt-row" data-hay="'+esc(hay)+'" data-email="'+esc((u.email||'').toLowerCase())+'" '
           +'data-runs="'+(u.agent_runs||0)+'" data-linked="'+(u.linked?1:0)+'" '
+          +'data-last-active="'+esc(u.last_active||u.last_seen||'')+'" data-last-run="'+esc(u.last_run||'')+'" '
+          +'data-first-seen="'+esc(u.first_seen||'')+'" data-views="'+(u.page_views||0)+'" '
+          +'data-secs="'+(u.total_secs||0)+'" data-logins="'+(u.logins||0)+'" '
+          +'data-name="'+esc((u.name||u.email||'').toLowerCase())+'" data-domain="'+esc((u.domain||'').toLowerCase())+'" '
           +'style="--rc:'+col+';animation-delay:'+Math.min(i*32,480)+'ms" onclick="openUserDrawer('+i+')">'
           +'<td><div class="pt-person"><span class="pt-avw">'+av+dot+'</span><div style="min-width:0"><div class="pt-name">'+esc(u.name||u.email)+badge+'</div><div class="pt-email">'+esc(u.email)+'</div></div></div></td>'
           +'<td>'+co+'</td>'
@@ -1024,6 +1049,129 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       document.getElementById('pplAgentFilter').value='';
       document.getElementById('pplMatchFilter').value='';
       applyPeopleFilter();
+    }
+
+    /* ── People table sort ──
+       Reorders the existing <tr> nodes in place (never re-renders), so the
+       onclick="openUserDrawer(i)" baked into each row at render time keeps
+       pointing at the right USERS[i] regardless of DOM position. */
+    function attrDesc(name){return function(a,b){return (b.getAttribute(name)||'').localeCompare(a.getAttribute(name)||'');};}
+    function attrAsc(name){ return function(a,b){return (a.getAttribute(name)||'').localeCompare(b.getAttribute(name)||'');};}
+    function numDesc(name){return function(a,b){return (+b.getAttribute(name)||0)-(+a.getAttribute(name)||0);};}
+
+    function sortRowsBy(mode, emailOrder){
+      var tbody=document.querySelector('#ppl-wrap tbody');
+      if(!tbody)return;
+      var noRow=tbody.querySelector('.ppl-no-match-row');
+      var rows=Array.prototype.slice.call(tbody.querySelectorAll('tr.pt-row'));
+      if(!rows.length)return;
+      if(mode==='ai' && emailOrder){
+        var pos={};
+        emailOrder.forEach(function(e,i){pos[e]=i;});
+        rows.sort(function(a,b){
+          var ea=a.getAttribute('data-email'), eb=b.getAttribute('data-email');
+          var pa=pos.hasOwnProperty(ea)?pos[ea]:1e9, pb=pos.hasOwnProperty(eb)?pos[eb]:1e9;
+          return pa-pb;
+        });
+      } else {
+        var cmp=({
+          last_active: attrDesc('data-last-active'),
+          last_run:    attrDesc('data-last-run'),
+          first_seen:  attrDesc('data-first-seen'),
+          page_views:  numDesc('data-views'),
+          time_spent:  numDesc('data-secs'),
+          agent_runs:  numDesc('data-runs'),
+          logins:      numDesc('data-logins'),
+          name:        attrAsc('data-name'),
+          company:     attrAsc('data-domain')
+        })[mode] || attrDesc('data-last-active');
+        rows.sort(cmp);
+      }
+      rows.forEach(function(tr){tbody.appendChild(tr);});
+      if(noRow) tbody.appendChild(noRow);
+    }
+
+    /* Cache keyed by how many people were loaded: cheap way to notice "this is
+       a different data pull than the one the AI ranked" without a real diff,
+       so a Refresh click doesn't silently serve a stale order. */
+    var AI_SORT_CACHE = null;
+
+    function pplSortStatus(text, isErr, autoHideMs){
+      var el=document.getElementById('pplSortStatus');
+      if(!el)return;
+      if(!text){el.style.display='none';return;}
+      el.style.display='inline-flex';
+      el.classList.toggle('err', !!isErr);
+      document.getElementById('pplSortStatusTxt').textContent=text;
+      if(autoHideMs)setTimeout(function(){if(el)el.style.display='none';},autoHideMs);
+    }
+
+    /* Re-applies whatever's already selected in the Sort dropdown, without ever
+       triggering a fresh OpenAI call itself -- only onPplSortChange() (an
+       explicit user pick of "Sort by AI") is allowed to spend that credit. */
+    function applyPeopleSort(){
+      var sel=document.getElementById('pplSort');
+      if(!sel)return;
+      var mode=sel.value;
+      if(mode==='ai'){
+        if(AI_SORT_CACHE && AI_SORT_CACHE._forCount===(USERS||[]).length){
+          sortRowsBy('ai', AI_SORT_CACHE.order);
+        } else {
+          sel.value='last_active';
+          sortRowsBy('last_active');
+        }
+        return;
+      }
+      sortRowsBy(mode);
+    }
+
+    function onPplSortChange(){
+      var sel=document.getElementById('pplSort');
+      if(!sel)return;
+      if(sel.value==='ai'){ runAiSort(); return; }
+      pplSortStatus('');
+      sortRowsBy(sel.value);
+      applyPeopleFilter();
+    }
+
+    function runAiSort(){
+      var sel=document.getElementById('pplSort');
+      if(!USERS || !USERS.length)return;
+      if(AI_SORT_CACHE && AI_SORT_CACHE._forCount===USERS.length){
+        sortRowsBy('ai', AI_SORT_CACHE.order);
+        applyPeopleFilter();
+        return;
+      }
+      sel.disabled=true;
+      pplSortStatus('Asking AI to rank everyone…');
+      var people=USERS.map(function(u){
+        return {email:u.email, name:u.name, domain:u.domain, logins:u.logins,
+                agent_runs:u.agent_runs, page_views:u.page_views, time_fmt:u.time_fmt,
+                first_seen:u.first_seen, last_active:u.last_active||u.last_seen, linked:!!u.linked};
+      });
+      fetch('/p2/admin/external-usage/ai-sort', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({people:people})
+      }).then(function(r){return r.json();}).then(function(d){
+        sel.disabled=false;
+        if(!d || !d.order || !d.order.length){
+          sel.value='last_active';
+          sortRowsBy('last_active');
+          applyPeopleFilter();
+          pplSortStatus(d&&d.openai===false?'Add OPENAI_API_KEY to use AI sort.':'AI sort came back empty, showing Last active.', true, 5000);
+          return;
+        }
+        AI_SORT_CACHE={order:d.order, _forCount:USERS.length};
+        sortRowsBy('ai', d.order);
+        applyPeopleFilter();
+        pplSortStatus('✨ Sorted by AI'+(d.model?(' · '+d.model):''), false, 3500);
+      }).catch(function(){
+        sel.disabled=false;
+        sel.value='last_active';
+        sortRowsBy('last_active');
+        applyPeopleFilter();
+        pplSortStatus('AI sort failed, showing Last active.', true, 5000);
+      });
     }
 
     // Trim "2026-07-27 16:01:12 IST" → "Jul 27, 16:01" style short stamp; tolerant of odd formats.
@@ -1556,8 +1704,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
           document.getElementById('browser-wrap').innerHTML   = renderBrowsers(d.browser_breakdown);
           document.getElementById('pages-wrap').innerHTML     = renderTopPages(d.top_pages);
           document.getElementById('ppl-wrap').innerHTML       = renderUsers(d.user_activity);
-          /* Re-apply whatever filter is already typed/selected -- matters on a
+          /* Re-apply whatever filter/sort is already typed/selected -- matters on a
              Refresh click, where the filter bar survives but the rows don't. */
+          applyPeopleSort();
           applyPeopleFilter();
           /* Warm every visible person's Apollo profile in one call so opening a
              row is instant. Server-side cached, so this is ~free after day one. */
