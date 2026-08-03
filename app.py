@@ -5764,6 +5764,56 @@ def _person_ai_summary(email: str, facts: dict) -> dict:
     return out
 
 
+_AI_SORT_SYSTEM = (
+    "You are a B2B revenue-intelligence analyst for Position2, a B2B digital marketing "
+    "agency. You are given a JSON list of external people who signed in to a first-party "
+    "analytics platform, each with facts about how they arrived, how much they engaged, "
+    "and which AI agents they ran.\n\n"
+    "Rank them by overall priority: how strong the signal is that this is a real, "
+    "engaged, high-intent visitor a salesperson should look at first. Weigh, in "
+    "roughly this order: agent runs (using an agent is the strongest intent signal), "
+    "recency of activity, time on site and page views, whether they returned across "
+    "more than one login, and whether their email domain looks like a real company "
+    "rather than a personal/free-mail address.\n\n"
+    "Use ONLY the supplied facts. Never invent a title, company or motive.\n\n"
+    "Return STRICT JSON only, with this key:\n"
+    '{"order": ["email1", "email2", ...]} listing EVERY email given, exactly once '
+    "each, most important first."
+)
+
+
+def _people_ai_sort(people: list) -> dict:
+    """{order: [emails...], model} ranking a list of external people by AI-judged
+    priority, or {} when OpenAI is not configured or the call fails. `people` must
+    already be whitelisted/capped (see admin_external_usage_ai_sort)."""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key or not people:
+        return {}
+    try:
+        from openai import OpenAI
+        oai = OpenAI(api_key=api_key, timeout=45.0, max_retries=1)
+        raw, model = _vimi_chat_json(oai, [
+            {"role": "system", "content": _AI_SORT_SYSTEM},
+            {"role": "user", "content": json.dumps(people, default=str)[:16000]},
+        ], 1200)
+        data = json.loads(raw)
+    except Exception as e:
+        log.warning("AI people-sort failed: %s", e)
+        return {}
+
+    order = data.get("order")
+    if not isinstance(order, list):
+        return {}
+    seen = set(); clean = []
+    for e in order:
+        el = str(e or "").strip().lower()
+        if el and el not in seen:
+            seen.add(el); clean.append(el)
+    if not clean:
+        return {}
+    return {"order": clean, "model": model}
+
+
 def _xl_people_columns():
     """(header, extractor) pairs for the workbook's People sheet. `u` is one row
     from _fetch_usage_data's user_activity, `p` that person's Apollo profile."""
@@ -6058,6 +6108,53 @@ def admin_external_usage_summary():
     facts = _person_summary_facts(email, activity, profile)
     return jsonify({"summary": _person_ai_summary(email, facts),
                     "openai": bool(os.environ.get("OPENAI_API_KEY", ""))})
+
+
+@app.route("/p2/admin/external-usage/ai-sort", methods=["POST"])
+@admin_required
+def admin_external_usage_ai_sort():
+    """AI-ranked priority order for the People table's "Sort by AI" option.
+
+    The caller sends the compact per-person facts it already has from
+    /external-usage/data (see runAiSort() in the template) rather than the
+    server re-reading the whole Sheet. Every field is whitelisted and
+    length-capped here before it reaches the prompt. Always 200: `order` is
+    [] when OpenAI is not configured or the model call failed, and the UI
+    falls back to Last active."""
+    body = request.get_json(silent=True) or {}
+    people = body.get("people")
+    if not isinstance(people, list) or not people:
+        return jsonify({"error": "no people", "order": []}), 400
+
+    def s(v, n=180):
+        return str(v or "")[:n]
+
+    clean = []
+    for p in people[:300]:
+        if not isinstance(p, dict):
+            continue
+        email = s(p.get("email"), 120).strip().lower()
+        if not email or "@" not in email:
+            continue
+        clean.append({
+            "email": email,
+            "name": s(p.get("name"), 80),
+            "email_domain": s(p.get("domain"), 80),
+            "logins": p.get("logins") or 0,
+            "agent_runs": p.get("agent_runs") or 0,
+            "page_views": p.get("page_views") or 0,
+            "time_on_site": s(p.get("time_fmt"), 20),
+            "first_seen": s(p.get("first_seen"), 40),
+            "last_active": s(p.get("last_active"), 40),
+            "linked_from_prelogin_browsing": bool(p.get("linked")),
+        })
+    if not clean:
+        return jsonify({"error": "no valid people", "order": []}), 400
+
+    result = _people_ai_sort(clean)
+    return jsonify({"order": result.get("order") or [], "model": result.get("model") or "",
+                     "openai": bool(os.environ.get("OPENAI_API_KEY", ""))})
+
 
 @app.route("/p2/admin/external-usage/export")
 @admin_required
