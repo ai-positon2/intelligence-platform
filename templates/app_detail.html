@@ -205,6 +205,14 @@
         </div>
         <span class="uc-arrow">&check;</span>
       </div>
+      {% elif agent.no_request %}
+      <div class="use-card disabled">
+        <div>
+          <div class="uc-title">{{ agent.lock_label or "Not connected yet" }}</div>
+          <div class="uc-sub">Not available to request right now</div>
+        </div>
+        <span class="uc-arrow">&times;</span>
+      </div>
       {% else %}
       <button type="button" class="use-card" id="reqAccessBtn" data-slug="{{ agent.slug }}">
         <div>
@@ -239,7 +247,7 @@
     </aside>
   </div>
 </div>
-{% if not agent.seo_slug and not already_requested %}
+{% if not agent.seo_slug and not already_requested and not agent.no_request %}
 <div class="reqmodal-overlay" id="reqModalOverlay" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
   <div class="reqmodal" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
     <div class="reqmodal-head">
@@ -260,7 +268,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
-{% if not agent.seo_slug and not already_requested %}
+{% if not agent.seo_slug and not already_requested and not agent.no_request %}
 <script>
   (function(){
     var btn = document.getElementById('reqAccessBtn');

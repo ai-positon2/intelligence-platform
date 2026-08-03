@@ -1452,19 +1452,6 @@ APP_AGENTS = [
         "tags": ["Curated sources", "News", "Slack", "Sheets"],
     },
     {
-        "slug": "generative-search-visibility", "name": "Generative Search Visibility",
-        "tagline": "AI Answer-Engine Tracking",
-        "ac": "#22d3ee", "ac2": "#38bdf8", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/><path d=\"M11 7.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z\"/>"),
-        "pill1": "AI Answer-Engine Tracking", "pill2": "ChatGPT \u00b7 Gemini \u00b7 Perplexity",
-        "lead": ("See exactly where your brand shows up across AI answer engines \u2014 ChatGPT, Google AI Overviews, Gemini and Perplexity \u2014 track your share of voice, and find the prompts you are losing."),
-        "trips": [
-            {"t": "What it does", "d": "Win the answer, not just the link. Know your AI share of voice, which sources get cited, and where to act before a competitor owns the response."},
-            {"t": "How it works", "d": "It monitors branded and category prompts across major AI engines, measures mention frequency and share of voice over time, maps the domains and pages being cited, and flags the gaps to close."},
-            {"t": "Best for", "d": "SEO, content and brand teams defending visibility in AI search."},
-        ],
-        "tags": ["Brand Radar", "AI engines", "GSC", "Sheets"],
-    },
-    {
         "slug": "anonymous-visitors", "name": "Anonymous Website Visitors",
         "tagline": "Visitor De-anonymization",
         "ac": "#34d399", "ac2": "#2dd4bf", "icon": _asvg("<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4 4-6 8-6s8 2 8 6\"/>"),
@@ -1478,7 +1465,7 @@ APP_AGENTS = [
         "tags": ["GTM", "Sheets", "CRM"],
     },
     {
-        "slug": "technical-seo-geo-auditor", "name": "Technical SEO & GEO Auditor",
+        "slug": "technical-seo-geo-auditor", "name": "SEO & GEO Audit",
         "tagline": "Site Health & AI Readiness",
         "ac": "#38bdf8", "ac2": "#22d3ee", "icon": _asvg("<path d=\"M9 11l3 3 8-8\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
         "pill1": "Site Health & AI Readiness", "pill2": "200+ checks \u00b7 scored in seconds",
@@ -1489,9 +1476,10 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO leads, technical SEOs and web teams."},
         ],
         "tags": ["Crawl", "GSC", "Sheets"],
+        "no_request": True,
     },
     {
-        "slug": "ai-readiness-auditor", "name": "AI Readiness Auditor",
+        "slug": "ai-readiness-auditor", "name": "Agentic Readiness Audit",
         "tagline": "Answer-Engine Optimization",
         "ac": "#818cf8", "ac2": "#a78bfa", "icon": _asvg("<rect x=\"4\" y=\"8\" width=\"16\" height=\"11\" rx=\"3\"/><path d=\"M12 8V4\"/><circle cx=\"9\" cy=\"13.5\" r=\"1.1\"/><circle cx=\"15\" cy=\"13.5\" r=\"1.1\"/>"),
         "pill1": "Answer-Engine Optimization", "pill2": "Score any site in ~15 seconds",
@@ -1502,22 +1490,10 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO and content teams future-proofing for AI search."},
         ],
         "tags": ["Crawl", "Schema", "GSC"],
+        "lock_label": "Ready",
     },
     {
-        "slug": "content-authority-optimizer", "name": "Content Authority Optimizer",
-        "tagline": "On-Page & E-E-A-T",
-        "ac": "#e879f9", "ac2": "#c084fc", "icon": _asvg("<path d=\"M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>"),
-        "pill1": "On-Page & E-E-A-T", "pill2": "Tuned for AEO & E-E-A-T",
-        "lead": ("Audit and rewrite existing pages for structure, depth and authority signals \u2014 tuned for answer engines and E-E-A-T \u2014 so pages climb."),
-        "trips": [
-            {"t": "What it does", "d": "Get more from content you have already published. Targeted, authority-building edits that move rankings without a full rewrite."},
-            {"t": "How it works", "d": "It assesses topical depth, structure, internal links and trust signals, then recommends specific edits aligned to E-E-A-T and AEO."},
-            {"t": "Best for", "d": "Content and SEO teams optimizing existing libraries."},
-        ],
-        "tags": ["GSC", "CMS", "Docs"],
-    },
-    {
-        "slug": "competitor-seo-intelligence", "name": "Competitor SEO Intelligence",
+        "slug": "competitor-seo-intelligence", "name": "Competitor Analysis",
         "tagline": "Organic Benchmarking",
         "ac": "#fb7185", "ac2": "#f472b6", "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><path d=\"M12 3v3M12 18v3M3 12h3M18 12h3\"/>"),
         "pill1": "Organic Benchmarking", "pill2": "Gaps \u00b7 backlinks \u00b7 authority",
@@ -1528,19 +1504,8 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO leads and growth teams in competitive markets."},
         ],
         "tags": ["Semrush", "Ahrefs", "Sheets"],
-    },
-    {
-        "slug": "local-visibility-builder", "name": "Local Visibility Builder",
-        "tagline": "Multi-Location SEO",
-        "ac": "#2dd4bf", "ac2": "#34d399", "icon": _asvg("<path d=\"M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.6\"/>"),
-        "pill1": "Multi-Location SEO", "pill2": "Dev-ready local pages at scale",
-        "lead": ("Compose approved, developer-ready location and service pages at scale \u2014 with optimized copy and image alt text \u2014 for multi-location brands."),
-        "trips": [
-            {"t": "What it does", "d": "Launch hundreds of consistent, optimized local pages without the manual grind, and capture 'near me' demand."},
-            {"t": "How it works", "d": "It assembles location and service pages from approved templates and data, generates optimized copy and bulk image alt tags, and outputs dev-ready pages."},
-            {"t": "Best for", "d": "Local SEO and web teams managing many locations."},
-        ],
-        "tags": ["Sheets", "CMS", "Maps"],
+        "lock_label": "Need extensive testing",
+        "no_request": True,
     },
     {
         "slug": "search-term-intelligence", "name": "Search Term Intelligence",
@@ -1596,19 +1561,6 @@ APP_AGENTS = [
         "tags": ["Paid social", "Search", "Brand"],
     },
     {
-        "slug": "gbp-qc-agent", "name": "GBP QC Agent",
-        "tagline": "Google Business Profile QC",
-        "ac": "#f97316", "ac2": "#fbbf24", "icon": _asvg("<path d=\"M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z\"/><path d=\"M9 10l2 2 4-4\"/>"),
-        "pill1": "Google Business Profile QC", "pill2": "3-stage QC \u00b7 brand-checked",
-        "lead": ("A quality-control and content-generation tool for Google Business Profile posts. Run base content through a 3-stage workflow \u2014 base review, location-specific QC, and automated location content generation \u2014 all checked against your brand guidelines."),
-        "trips": [
-            {"t": "What it does", "d": "Ship on-brand GBP posts at multi-location scale without manual review \u2014 every post scored and checked against the client's exact rules, with the fixes written for you."},
-            {"t": "How it works", "d": "Pick a client and a stage. It runs base-content review, location-specific QC against the approved base, and automated location content generation \u2014 scoring each post 0-100, flagging only real violations by severity, and returning recommended fixes plus a corrected version, all against client brand guidelines."},
-            {"t": "Best for", "d": "Local and multi-location SEO and content teams managing Google Business Profile posts across many locations and clients."},
-        ],
-        "tags": ["Google Business Profile", "Brand guidelines", "Sheets"],
-    },
-    {
         "slug": "on-page-auditor", "name": "On-Page SEO Auditor",
         "tagline": "On-Page Optimization",
         "ac": "#14b8a6", "ac2": "#2dd4bf", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/><path d=\"M8.4 11l2 2 3.4-3.4\"/>"),
@@ -1620,6 +1572,7 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO and web teams optimizing individual pages."},
         ],
         "tags": ["PageSpeed", "Crawl", "GSC"],
+        "no_request": True,
     },
     {
         "slug": "hub-spoke-architect", "name": "Hub & Spoke Architect",
@@ -1633,9 +1586,11 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO teams running content clusters and topical-authority plays."},
         ],
         "tags": ["Sheets", "Crawl", "CMS"],
+        "lock_label": "Need extensive testing",
+        "no_request": True,
     },
     {
-        "slug": "robots-monitor", "name": "Robots & Index Monitor",
+        "slug": "robots-monitor", "name": "Robots Monitor",
         "tagline": "Index-Health Monitoring",
         "ac": "#f59e0b", "ac2": "#fbbf24", "icon": _asvg("<path d=\"M7 3h8l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z\"/><path d=\"M14 3v5h5\"/><path d=\"M9.5 13.5l4 4M13.5 13.5l-4 4\"/>"),
         "pill1": "Index-Health Monitoring", "pill2": "Daily noindex alerts",
@@ -1646,6 +1601,7 @@ APP_AGENTS = [
             {"t": "Best for", "d": "Technical SEO and web teams guarding against accidental deindexing."},
         ],
         "tags": ["Sitemaps", "Slack", "Crawl"],
+        "no_request": True,
     },
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
@@ -2917,6 +2873,8 @@ def app_request_access(slug):
         return jsonify({"ok": False, "error": "unknown agent"}), 404
     if agent.get("seo_slug"):
         return jsonify({"ok": False, "error": "agent is already connected"}), 400
+    if agent.get("no_request"):
+        return jsonify({"ok": False, "error": "not accepting requests for this agent"}), 400
     user = _get_user()
     email = (user or {}).get("email", "")
     data = request.get_json(silent=True) or {}

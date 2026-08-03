@@ -72,6 +72,7 @@
     border:1px solid color-mix(in srgb, var(--ac) 40%, transparent); border-style:solid;
     background:color-mix(in srgb, var(--ac) 10%, transparent) }
   .card.requested .more{ color:color-mix(in srgb, var(--ac) 78%, #fff) }
+  .card.inert .more{ color:var(--tx3) }
 
   .activity-box{
     border-radius: var(--radius-lg); border:1px solid var(--line); background:rgba(12,15,30,.5);
@@ -147,15 +148,16 @@
     <div class="cards cards-locked" style="margin-top:22px">
       {% for a in locked_agents %}
       {% set req = a.slug in requested_agents %}
-      <a class="card locked{{ ' requested' if req }}" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
+      {% set no_req = a.no_request and not req %}
+      <a class="card locked{{ ' requested' if req }}{{ ' inert' if no_req }}" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
         <div class="ctop">
           <div class="cicon">{{ a.icon|safe }}</div>
           <span class="cext">&#8599;</span>
         </div>
         <h3>{{ a.name }}</h3>
         <p>{{ a.tagline }}</p>
-        <div class="lockpill">{% if req %}<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Access requested{% else %}Not connected yet{% endif %}</div>
-        <div class="more">{% if req %}Request sent{% else %}Request access &rarr;{% endif %}</div>
+        <div class="lockpill">{% if req %}<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Access requested{% else %}{{ a.lock_label or "Not connected yet" }}{% endif %}</div>
+        <div class="more">{% if req %}Request sent{% elif no_req %}View details &rarr;{% else %}Request access &rarr;{% endif %}</div>
       </a>
       {% endfor %}
     </div>
