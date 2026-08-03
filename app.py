@@ -4738,6 +4738,61 @@ def admin_visitor_deepen():
     }})
 
 
+@app.route("/p2/admin/anonymous-traffic/self-test", methods=["POST"])
+@admin_required
+def admin_visitors_selftest():
+    """Diagnostic for the two env flags that silently gate this engine's
+    accuracy, so a redeploy's actual effect can be confirmed from the app
+    itself rather than trusted from Railway's variable list or guessed from
+    downstream dashboard behavior:
+
+    IPINFO_TOKEN -- a missing token loses the privacy/VPN signal that is the
+    main false-positive control on the residential/VPN exclusion gate.
+    VI_ENRICH_ON_VIEW -- gates whether the identity graph may spend Apollo
+    credits person-matching anonymous visitors automatically.
+
+    Probes IPinfo directly with Google's public DNS (8.8.8.8), never a real
+    visitor's IP, so this is safe to run with zero PII exposure. Whether the
+    response includes a "privacy" key at all (regardless of its value for this
+    specific, non-VPN IP) is what actually answers "does this plan include
+    privacy detection", since 8.8.8.8 itself is never expected to BE a VPN."""
+    ipinfo_token = os.environ.get("IPINFO_TOKEN", "")
+    out = {
+        "vi_available": _VI_OK,
+        "ipinfo_token_set": bool(ipinfo_token),
+        "vi_enrich_on_view": os.environ.get("VI_ENRICH_ON_VIEW", "") in ("1", "true", "yes"),
+        "apollo_key_set": bool(os.environ.get("APOLLO_API_KEY", "")),
+        "identity_graph_apollo_active": False,
+        "ipinfo_probe": None,
+        "error": None,
+    }
+    if not _VI_OK:
+        out["error"] = "visitor_intelligence package failed to import"
+        return jsonify(out)
+
+    try:
+        g = _identity_graph()
+        out["identity_graph_apollo_active"] = bool(
+            g and any(type(p).__name__ == "ApolloPersonProvider" for p in getattr(g, "providers", [])))
+    except Exception as e:
+        out["error"] = "identity graph check failed: %s" % e
+
+    if ipinfo_token:
+        try:
+            from visitor_intelligence.resolver import ipinfo_lookup
+            raw = ipinfo_lookup("8.8.8.8", ipinfo_token) or {}
+            out["ipinfo_probe"] = {
+                "reached": bool(raw),
+                "org": raw.get("org") or "",
+                "country": raw.get("country") or "",
+                "plan_includes_privacy_detection": "privacy" in raw,
+                "plan_includes_company_data": "company" in raw,
+            }
+        except Exception as e:
+            out["error"] = ((out["error"] + "; ") if out["error"] else "") + ("ipinfo probe failed: %s" % e)
+    return jsonify(out)
+
+
 _MEMBER_ANALYTICS_CACHE = {"data": None, "ts": 0.0}
 _MEMBER_ANALYTICS_CACHE_TTL = 300  # seconds — same as the sibling admin dashboards.
                                    # This aggregation does several serial Sheets reads
