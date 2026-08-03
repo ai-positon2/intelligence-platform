@@ -1219,7 +1219,7 @@ ACCOUNTS = {
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
-ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com"}
+ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com"}
 
 def _get_user():
     """Return current user dict or None."""
@@ -3748,9 +3748,15 @@ def dashboard_legacy(account_id: str, section: str = None):
 @app.route("/api/whoami")
 @position2_required
 def whoami():
+    # is_admin is served here (same ADMIN_EMAILS source of truth as admin_required
+    # and the template-wide is_admin) so client-rendered surfaces, i.e. the legacy
+    # signal dashboards and the Ad Intelligence bundle, can show their admin links
+    # off one authoritative flag instead of their own hardcoded email lists, which
+    # silently went stale every time ADMIN_EMAILS changed.
     u = _get_user() or {}
     return jsonify({"name": u.get("name", ""), "given_name": u.get("given_name", ""),
-                    "email": u.get("email", ""), "picture": u.get("picture", "")})
+                    "email": u.get("email", ""), "picture": u.get("picture", ""),
+                    "is_admin": (u.get("email", "").lower() in ADMIN_EMAILS)})
 
 # ── Health + API ─────────────────────────────────────────────────────────────────
 @app.route("/api/track", methods=["POST"])
