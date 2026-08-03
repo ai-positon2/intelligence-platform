@@ -404,7 +404,7 @@ def _demo_request_to_email(d: dict) -> bool:
     """Email a 'Request access' submission to the team. Returns True on success.
     Prefers the Gmail API (HTTPS) when GMAIL_SENDER is set (Railway blocks outbound
     SMTP); otherwise falls back to SMTP (SMTP_HOST/PORT/USER/PASS)."""
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com, pushpendra.k@position2.com"
     subject = "New Request access: %s (%s)" % (d.get("name", ""), d.get("company") or "no company")
     reply_to = d.get("email", "") if _EMAIL_RE.match(d.get("email", "")) else ""
     body = "\n".join([
@@ -6593,7 +6593,7 @@ def admin_email_test():
     user = os.environ.get("SMTP_USER", "")
     pwd  = os.environ.get("SMTP_PASS", "")
     port = os.environ.get("SMTP_PORT", "587")
-    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com"
+    to = os.environ.get("DEMO_NOTIFY_EMAIL", "") or "krishna.ladha@position2.com, abhilash.dg@position2.com, sudheer.d@position2.com, sparikh@position2.com, pushpendra.k@position2.com"
     gmail_sender = os.environ.get("GMAIL_SENDER", "")
     info = {"host": host or "(unset)", "port": port or "(unset)",
             "user": user or "(unset)", "pass_set": bool(pwd),
