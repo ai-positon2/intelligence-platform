@@ -588,6 +588,16 @@ AGENTS = [
         "connects": ["LinkedIn", "GTM", "CRM"],
     },
     {
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher", "role": "Competitive LinkedIn Analysis",
+        "badge": "NEW", "cat": "Social", "accent": "#3b82f6", "metric": "12 months of posts, scored in minutes",
+        "icon": _svg('<path d="M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z"/><path d="M12 7v12.8"/>'),
+        "summary": "Decode any company's organic LinkedIn strategy in one report. Point it at a company page and it reads a year of their posts, then breaks down messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run.",
+        "benefit": "Stop guessing what is working for competitors. See their exact messaging themes, content categories and top posts, then get a prioritized 30/60/90 plan for what to post next.",
+        "how": "It pulls the last 12 months of organic posts from a chosen company page, analyzes the copy, creative and reactions, scores the account against engagement benchmarks, and writes a prioritized set of recommendations.",
+        "who": "Marketing and demand-gen teams benchmarking their own LinkedIn against competitors.",
+        "connects": ["LinkedIn", "Competitive", "AI"],
+    },
+    {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence", "role": "Competitive Creative",
         "badge": "NEW", "cat": "Paid", "accent": "#a855f7", "metric": "Live competitor creative tracking",
         "icon": _svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
