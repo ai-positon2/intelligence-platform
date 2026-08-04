@@ -3463,12 +3463,12 @@ CX_CHAPTERS = [
      "stat": "1 min read", "ac": "#6366f1", "ac2": "#8b5cf6",
      "bg": "rgba(99,102,241,.14)", "bd": "rgba(99,102,241,.34)"},
     {"slug": "agent-landscape", "num": 5, "icon": "🗺️", "title": "The agent landscape",
-     "teaser": "18 agents, 3 buckets, at a glance.",
-     "stat": "18 agents", "ac": "#22d3ee", "ac2": "#38bdf8",
+     "teaser": "15 agents, 3 buckets, at a glance.",
+     "stat": "15 agents", "ac": "#22d3ee", "ac2": "#38bdf8",
      "bg": "rgba(34,211,238,.14)", "bd": "rgba(34,211,238,.34)"},
     {"slug": "every-agent", "num": 6, "icon": "🤖", "title": "Every agent, explained",
      "teaser": "What each does, how it's built, who runs it.",
-     "stat": "18 cards", "ac": "#e879f9", "ac2": "#818cf8",
+     "stat": "15 cards", "ac": "#e879f9", "ac2": "#818cf8",
      "bg": "rgba(232,121,249,.14)", "bd": "rgba(232,121,249,.34)"},
     {"slug": "tech-stack", "num": 7, "icon": "🧬", "title": "Tech stack",
      "teaser": "Five layers, full candor.",
@@ -7581,9 +7581,8 @@ AD INTELLIGENCE (/p2/gtm/ad-intelligence): tracks competitors' running ads (head
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
 SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief
-Generator, Content Enhancer, Technical SEO & GEO Auditor, Generative Search Visibility, AI Readiness
-Auditor, Competitor SEO Intelligence, Local Visibility Builder, and more). Some are fully live and
-connected; others are request-access only.
+Generator, Content Enhancer, SEO & GEO Audit, Agentic Readiness Audit, Competitor Analysis, and more).
+Some are fully live and connected; others are request-access only.
 
 ADMIN DASHBOARDS (/p2/admin/*, admin-only): Internal Usage, Anonymous Traffic (the visitor de-anon
 dashboard above), Public Page Analytics, Public Agent Usage, Agent Runs, Access Requests.
