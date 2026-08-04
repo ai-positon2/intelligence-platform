@@ -1362,11 +1362,11 @@ APP_AGENTS = [
         "tagline": "AI keyword discovery, scoring & clustering",
         "seo_slug": "keyword-research", "ac": "#22d3ee", "ac2": "#6366f1", "icon": _SVG_COMPASS,
         "pill1": "Keyword intelligence", "pill2": "SERP · AI · clustering",
-        "lead": ("Point it at a topic and it finds the keywords worth chasing. Keyword Finder "
-            "pulls candidate terms, enriches them with live search data, then scores and clusters "
-            "them into clean topic groups so you know exactly what to target next."),
+        "lead": ("Point it at a topic by giving it a seed keyword and it finds the keywords worth chasing. "
+            "Keyword Finder pulls candidate terms, enriches them with live search data, then scores and "
+            "clusters them into clean topic groups so you know exactly what to target next."),
         "trips": [
-            {"t": "What it does", "d": "Shortlists high-opportunity keywords with AI and groups them into topic clusters you can act on."},
+            {"t": "What it does", "d": "Shortlist high-opportunity keywords with AI and group them into topic clusters you can act on."},
             {"t": "How it works", "d": "Gathers candidate terms, layers on SERP and volume signals, then scores and clusters each one by intent and opportunity."},
             {"t": "Best for", "d": "SEO and content teams deciding what to write and which terms are actually worth the effort."},
         ],
@@ -1439,10 +1439,10 @@ APP_AGENTS = [
         "tagline": "Site Health & AI Readiness",
         "ac": "#38bdf8", "ac2": "#22d3ee", "icon": _asvg("<path d=\"M9 11l3 3 8-8\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
         "pill1": "Site Health & AI Readiness", "pill2": "200+ checks \u00b7 scored in seconds",
-        "lead": ("A full technical, on-page and GEO audit of any site \u2014 200+ checks scored and ranked \u2014 with AI-written fixes your team can ship immediately."),
+        "lead": ("A complete technical, on-page, and GEO audit for any site, 200+ checks ranked by severity and paired with ready-to-ship AI fixes."),
         "trips": [
             {"t": "What it does", "d": "Replace week-long manual audits with a scored, prioritized fix-list in seconds, so the highest-impact issues get fixed first."},
-            {"t": "How it works", "d": "It crawls the site, runs 200+ technical, on-page, structured-data and answer-engine checks, scores each by impact, and generates specific, AI-written recommendations."},
+            {"t": "How it works", "d": "Crawls your site across 200+ technical, on-page, structured data, and answer-engine checks. It ranks every issue by severity and business impact, then generates exact, AI-written fix recommendations."},
             {"t": "Best for", "d": "SEO leads, technical SEOs and web teams."},
         ],
         "tags": ["Crawl", "GSC", "Sheets"],
@@ -1453,11 +1453,11 @@ APP_AGENTS = [
         "tagline": "Answer-Engine Optimization",
         "ac": "#818cf8", "ac2": "#a78bfa", "icon": _asvg("<rect x=\"4\" y=\"8\" width=\"16\" height=\"11\" rx=\"3\"/><path d=\"M12 8V4\"/><circle cx=\"9\" cy=\"13.5\" r=\"1.1\"/><circle cx=\"15\" cy=\"13.5\" r=\"1.1\"/>"),
         "pill1": "Answer-Engine Optimization", "pill2": "Score any site in ~15 seconds",
-        "lead": ("Score any site's readiness to be understood and cited by AI agents and answer engines \u2014 in about 15 seconds \u2014 with the exact fixes to get picked up."),
+        "lead": ("Score any site's readiness to be understood and cited by AI agents and answer engines in about 15 seconds with exact, actionable fixes."),
         "trips": [
             {"t": "What it does", "d": "Get ahead of the shift to AI search. Know precisely what is blocking your pages from being cited, and how to fix it."},
             {"t": "How it works", "d": "It evaluates structure, schema, crawlability, content clarity and machine-readability against answer-engine best practices, then returns a score and prioritized fixes."},
-            {"t": "Best for", "d": "SEO and content teams future-proofing for AI search."},
+            {"t": "Best for", "d": "SEO, Marketing, content, and web development teams looking to future-proof their websites for AI agents."},
         ],
         "tags": ["Crawl", "Schema", "GSC"],
         "lock_label": "Ready",
@@ -1467,7 +1467,7 @@ APP_AGENTS = [
         "tagline": "Organic Benchmarking",
         "ac": "#fb7185", "ac2": "#f472b6", "icon": _asvg("<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><path d=\"M12 3v3M12 18v3M3 12h3M18 12h3\"/>"),
         "pill1": "Organic Benchmarking", "pill2": "Gaps \u00b7 backlinks \u00b7 authority",
-        "lead": ("Benchmark your organic footprint against any rival \u2014 keyword gaps, backlink profiles, authority and page speed \u2014 with the plays to overtake them."),
+        "lead": ("Compare your site against top competitors to uncover keyword gaps and backlink opportunities, complete with the exact steps needed to overtake them."),
         "trips": [
             {"t": "What it does", "d": "See exactly where competitors beat you and where they are exposed, then act on a prioritized gap list."},
             {"t": "How it works", "d": "It compares domains across rankings, keyword gaps, backlinks and authority, validates the findings, and drafts opportunity-and-recommendation notes."},
