@@ -21,17 +21,17 @@
 
 /* ── Theme tokens ── */
 :root{
-  --ink:#eef1fb; --ink2:#c6cee8; --dim:#8b96b8; --mute:#5f6a8c;
-  --card:rgba(255,255,255,.065); --card2:rgba(255,255,255,.1);
-  --bd:rgba(255,255,255,.11); --bd-hi:rgba(129,140,248,.42);
+  --ink:#eef1fb; --ink2:#c6cee8; --dim:#8b96b8; --mute:#707cab;
+  --card:rgba(255,255,255,.09); --card2:rgba(255,255,255,.15);
+  --bd:rgba(255,255,255,.18); --bd-hi:rgba(129,140,248,.42);
   --glass:rgba(15,18,34,.6); --shadow:0 24px 60px rgba(0,0,0,.5);
   --cyan:#22d3ee; --indigo:#818cf8; --violet:#a78bfa; --magenta:#e879f9;
   --green:#34d399; --amber:#fbbf24; --rose:#fb7185; --blue:#38bdf8;
 }
 html[data-theme="light"]{
-  --ink:#141a33; --ink2:#2f3a5e; --dim:#54608a; --mute:#78849f;
-  --card:rgba(18,26,54,.055); --card2:rgba(18,26,54,.09);
-  --bd:rgba(18,26,54,.14); --bd-hi:rgba(99,102,241,.4);
+  --ink:#141a33; --ink2:#2f3a5e; --dim:#54608a; --mute:#66718f;
+  --card:rgba(18,26,54,.08); --card2:rgba(18,26,54,.13);
+  --bd:rgba(18,26,54,.2); --bd-hi:rgba(99,102,241,.4);
   --glass:rgba(255,255,255,.72); --shadow:0 24px 60px rgba(40,52,98,.16);
 }
 
@@ -114,7 +114,7 @@ html[data-theme="light"] .user-dropdown{background:#fff;border-color:rgba(18,26,
 
 /* ══════════════ shared bits ══════════════ */
 .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 var(--margin)}
-.cx-card{position:relative;background:var(--card);border:1px solid var(--bd);border-radius: var(--radius-lg);overflow:hidden;transition:border-color .25s,transform .25s,background .25s}
+.cx-card{position:relative;background:var(--card);border:1px solid var(--bd);border-radius: var(--radius-lg);overflow:hidden;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .25s,transform .25s,background .25s}
 .cx-card::before{content:"";position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s;pointer-events:none;
   background:radial-gradient(400px circle at var(--mx,50%) var(--my,50%),rgba(129,140,248,.10),transparent 45%)}
 .cx-card:hover::before{opacity:1}
@@ -145,7 +145,7 @@ html[data-theme="light"] .serif{background:linear-gradient(95deg,#0891b2,#6366f1
 @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .lc{position:relative;display:flex;align-items:center;gap:22px;padding:24px 30px;cursor:pointer;text-align:left;
   background:var(--card);border:1px solid var(--bd);border-radius: var(--radius-lg);color:inherit;font:inherit;text-decoration:none;
-  overflow:hidden;isolation:isolate;
+  overflow:hidden;isolation:isolate;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   transition:transform .3s cubic-bezier(.16,1,.3,1),border-color .3s,background .3s,box-shadow .3s;
   animation:cardIn .5s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--d,0) * 45ms)}
 .lc::before{content:"";position:absolute;top:18px;bottom:18px;left:0;width:3px;border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
