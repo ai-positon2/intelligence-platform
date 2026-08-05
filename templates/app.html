@@ -113,7 +113,7 @@
     <h2>Launch an agent</h2>
     <p class="sub">Each one is a focused tool you can run right here.</p>
     <div class="cards" style="margin-top:22px">
-      {% for a in agents if a.seo_slug %}
+      {% for a in agents if a.seo_slug or a.external_url %}
       <a class="card" href="/app/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
         <div class="ctop">
           <div class="cicon">{{ a.icon|safe }}</div>
@@ -122,13 +122,21 @@
         <h3>{{ a.name }}</h3>
         <p>{{ a.tagline }}</p>
         {% set used = run_counts.get(a.slug, 0) %}
-        {% set at_cap = used >= run_cap %}
+        {% set at_cap = (not a.uncapped) and used >= run_cap %}
         <div class="cruns">
+          {% if a.uncapped %}
+          <div class="cruns-top">
+            <span>Unlimited runs</span>
+            <b>No cap</b>
+          </div>
+          <div class="cruns-track"><div class="cruns-fill" style="width:100%"></div></div>
+          {% else %}
           <div class="cruns-top{{ ' at-cap' if at_cap }}">
             <span>{{ used }} / {{ run_cap }} runs used</span>
             <b>{{ 0 if at_cap else (run_cap - used) }} left</b>
           </div>
           <div class="cruns-track"><div class="cruns-fill{{ ' at-cap' if at_cap }}" style="width:{{ (used / run_cap * 100) if run_cap else 0 }}%"></div></div>
+          {% endif %}
         </div>
         <div class="cmeta" data-lastrun="{{ a.slug }}">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.2 2"/></svg>
@@ -140,7 +148,7 @@
     </div>
   </div>
 
-  {% set locked_agents = agents | rejectattr('seo_slug') | list %}
+  {% set locked_agents = agents | rejectattr('seo_slug') | rejectattr('external_url') | list %}
   {% if locked_agents %}
   <div class="sect">
     <h2>More agents</h2>

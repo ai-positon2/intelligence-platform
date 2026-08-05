@@ -180,7 +180,8 @@
     </section>
 
     <aside class="side">
-      {% set at_cap = agent.seo_slug and runs_used >= runs_cap %}
+      {% set connected = agent.seo_slug or agent.external_url %}
+      {% set at_cap = connected and not agent.uncapped and runs_used >= runs_cap %}
       {% if at_cap %}
       <div class="use-card disabled">
         <div>
@@ -189,7 +190,7 @@
         </div>
         <span class="uc-arrow">&times;</span>
       </div>
-      {% elif agent.seo_slug %}
+      {% elif connected %}
       <a class="use-card" href="/app/{{ agent.slug }}/use">
         <div>
           <div class="uc-title">Use this agent</div>
@@ -222,7 +223,14 @@
         <span class="uc-arrow">&rarr;</span>
       </button>
       {% endif %}
-      {% if agent.seo_slug %}
+      {% if connected and agent.uncapped %}
+      <div class="scard">
+        <div class="lbl">Runs</div>
+        <div class="runs-row"><b>&#8734;</b><span>unlimited &middot; no cap</span></div>
+        <div class="runs-track"><div class="runs-fill" style="width:100%"></div></div>
+        <p class="runs-note">Free for everyone, no run limit on this agent.</p>
+      </div>
+      {% elif connected %}
       <div class="scard">
         <div class="lbl">Runs</div>
         <div class="runs-row"><b>{{ runs_used }}</b><span>of {{ runs_cap }} used &middot; {{ 0 if at_cap else (runs_cap - runs_used) }} left</span></div>
@@ -247,7 +255,7 @@
     </aside>
   </div>
 </div>
-{% if not agent.seo_slug and not already_requested and not agent.no_request %}
+{% if not (agent.seo_slug or agent.external_url) and not already_requested and not agent.no_request %}
 <div class="reqmodal-overlay" id="reqModalOverlay" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
   <div class="reqmodal" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
     <div class="reqmodal-head">
@@ -268,7 +276,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
-{% if not agent.seo_slug and not already_requested and not agent.no_request %}
+{% if not (agent.seo_slug or agent.external_url) and not already_requested and not agent.no_request %}
 <script>
   (function(){
     var btn = document.getElementById('reqAccessBtn');
