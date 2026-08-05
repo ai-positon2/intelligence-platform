@@ -50,6 +50,73 @@ def _employee_ranges_for(min_emp: int, max_emp: int) -> list[str]:
     return result
 
 
+def _range(filters: dict, min_key: str, max_key: str) -> dict | None:
+    """Apollo's {"min": x, "max": y} range object from a pair of flat filter keys.
+
+    Returns None when neither bound is set, so callers can skip the parameter
+    entirely rather than sending an empty object (which Apollo rejects on some
+    range filters instead of treating as "unbounded").
+    """
+    lo, hi = filters.get(min_key), filters.get(max_key)
+    if lo is None and hi is None:
+        return None
+    out = {}
+    if lo is not None:
+        out["min"] = lo
+    if hi is not None:
+        out["max"] = hi
+    return out
+
+
+# Org-level filters that mixed_people/api_search and mixed_companies/search
+# accept under identical parameter names -- for people these constrain the
+# person's *current employer*, for companies the company itself. Kept in one
+# table so the two endpoints can't drift apart as filters are added.
+_ORG_LIST_FILTERS = (
+    ("industries",                 "q_organization_keyword_tags"),
+    ("job_titles",                 "q_organization_job_titles"),
+    ("job_locations",              "organization_job_locations"),
+    ("market_segments",            "market_segments"),
+    ("naics_codes",                "organization_naics_codes"),
+    ("exclude_naics_codes",        "not_organization_naics_codes"),
+    ("sic_codes",                  "organization_sic_codes"),
+    ("exclude_sic_codes",          "not_organization_sic_codes"),
+    ("technologies",               "currently_using_any_of_technology_uids"),
+    ("technologies_all",           "currently_using_all_of_technology_uids"),
+    ("exclude_technologies",       "currently_not_using_any_of_technology_uids"),
+)
+
+_ORG_RANGE_FILTERS = (
+    ("revenue_min",       "revenue_max",       "revenue_range"),
+    ("founded_min",       "founded_max",       "organization_founded_year_range"),
+    ("num_jobs_min",      "num_jobs_max",      "organization_num_jobs_range"),
+    ("job_posted_after",  "job_posted_before", "organization_job_posted_at_range"),
+    ("headcount_growth_min", "headcount_growth_max", "organization_headcount_growth_range"),
+)
+
+
+def _apply_org_filters(payload: dict, filters: dict) -> None:
+    """Fill in every org-level Apollo filter both search endpoints share."""
+    for src, param in _ORG_LIST_FILTERS:
+        if filters.get(src):
+            payload[param] = list(filters[src])
+    for min_key, max_key, param in _ORG_RANGE_FILTERS:
+        rng = _range(filters, min_key, max_key)
+        if rng is not None:
+            payload[param] = rng
+    if filters.get("headcount_growth_months") is not None:
+        payload["organization_headcount_growth_past_n_months"] = filters["headcount_growth_months"]
+    if filters.get("include_unknown_founded_year"):
+        payload["organization_include_unknown_founded_year"] = True
+    if filters.get("department_counts"):
+        payload["organization_department_or_subdepartment_counts"] = dict(filters["department_counts"])
+    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
+    if emp_min is not None and emp_max is not None:
+        ranges = _employee_ranges_for(emp_min, emp_max)
+        if ranges:
+            payload["organization_num_employees_ranges"] = ranges
+
+
 def _bases_to_try() -> tuple:
     """Proven-good prefix first if we have one, else both in preference order."""
     if _BASE_OK:
@@ -121,16 +188,25 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     count instead of guessing one from len(returned rows), which undercounts
     the moment there is more than one page.
 
-    filters keys (all optional): name (fuzzy match, e.g. for disambiguating a
-    company by its display name), domains (list), employee_min/employee_max
-    (mapped to Apollo's bucket ranges via _employee_ranges_for), locations
+    Company-only filter keys (all optional): name (fuzzy match, e.g. for
+    disambiguating a company by its display name), domains (list), locations
     (list, HQ location), exclude_locations (list, HQ locations to exclude),
-    industries (list, mapped to Apollo's keyword-tag search since there is no
-    separate industry filter), technologies (list, any-of, mapped to Apollo's
-    technology-UID filter), revenue_min/revenue_max (company annual revenue),
-    founded_min/founded_max (founding year range), exclude_keywords
-    (client-side post-filter -- Apollo has no native text-exclusion param),
-    max_companies (caps the returned list length).
+    label_ids (list, Apollo list/label IDs -- ids not names),
+    total_funding_min/max, latest_funding_min/max, funded_after/funded_before
+    (ISO dates, most recent round), exclude_keywords (client-side post-filter --
+    Apollo has no native text-exclusion param), max_companies (caps the returned
+    list length).
+
+    The remaining filter keys are shared with search_people and documented on
+    _apply_org_filters / _ORG_LIST_FILTERS / _ORG_RANGE_FILTERS: industries
+    (mapped to Apollo's keyword-tag search, since there is no separate industry
+    filter), job_titles, job_locations, market_segments, naics_codes, sic_codes
+    and their exclude_* forms, technologies / technologies_all /
+    exclude_technologies, revenue_min/max, founded_min/max, num_jobs_min/max,
+    job_posted_after/before, headcount_growth_min/max (+
+    headcount_growth_months), include_unknown_founded_year, department_counts,
+    employee_min/employee_max (mapped to Apollo's bucket ranges via
+    _employee_ranges_for).
     """
     payload: dict = {
         "page": page,
@@ -144,31 +220,18 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         payload["organization_locations"] = list(filters["locations"])
     if filters.get("exclude_locations"):
         payload["organization_not_locations"] = list(filters["exclude_locations"])
-    if filters.get("industries"):
-        payload["q_organization_keyword_tags"] = list(filters["industries"])
-    if filters.get("technologies"):
-        payload["currently_using_any_of_technology_uids"] = list(filters["technologies"])
-    rev_min, rev_max = filters.get("revenue_min"), filters.get("revenue_max")
-    if rev_min is not None or rev_max is not None:
-        rev_range = {}
-        if rev_min is not None:
-            rev_range["min"] = rev_min
-        if rev_max is not None:
-            rev_range["max"] = rev_max
-        payload["revenue_range"] = rev_range
-    found_min, found_max = filters.get("founded_min"), filters.get("founded_max")
-    if found_min is not None or found_max is not None:
-        founded_range = {}
-        if found_min is not None:
-            founded_range["min"] = found_min
-        if found_max is not None:
-            founded_range["max"] = found_max
-        payload["organization_founded_year_range"] = founded_range
-    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
-    if emp_min is not None and emp_max is not None:
-        ranges = _employee_ranges_for(emp_min, emp_max)
-        if ranges:
-            payload["organization_num_employees_ranges"] = ranges
+    if filters.get("label_ids"):
+        payload["account_label_ids"] = list(filters["label_ids"])
+    _apply_org_filters(payload, filters)
+    # Funding filters exist only on the company endpoint, not on people search.
+    for min_key, max_key, param in (
+        ("total_funding_min",   "total_funding_max",   "total_funding_range"),
+        ("latest_funding_min",  "latest_funding_max",  "latest_funding_amount_range"),
+        ("funded_after",        "funded_before",       "latest_funding_date_range"),
+    ):
+        rng = _range(filters, min_key, max_key)
+        if rng is not None:
+            payload[param] = rng
 
     try:
         data = _post("mixed_companies/search", payload, api_key)
@@ -248,15 +311,24 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
     count instead of guessing one from len(returned rows), which undercounts
     the moment there is more than one page.
 
-    filters keys (all optional): titles (list), include_similar_titles (bool,
-    default True), seniorities (list, e.g. "c_suite"/"vp"/"director"/...),
-    person_locations (list), company_locations (list, employer HQ),
-    company_domains (list), organization_ids (list, Apollo org IDs -- same
-    namespace get_leadership uses), employee_min/employee_max (employer size,
-    mapped via _employee_ranges_for), technologies (list, any-of, mapped to
-    Apollo's technology-UID filter on the employer), revenue_min/revenue_max
-    (employer annual revenue), keywords (str), email_status (list),
-    max_people (caps the returned list length, like get_leadership).
+    Person-level filter keys (all optional): titles (list),
+    include_similar_titles (bool, default True), seniorities (list, e.g.
+    "c_suite"/"vp"/"director"/...), person_locations (list, where the PERSON
+    lives), linkedin_urls (list of full profile URLs), keywords (str),
+    email_status (list), days_in_title_min/days_in_title_max (tenure in the
+    current role, in days), yoe_min/yoe_max (total career years),
+    organization_ids (list, Apollo org IDs -- same namespace get_leadership
+    uses), company_domains (list), company_locations (list, employer HQ --
+    independent of and ANDed with person_locations), max_people (caps the
+    returned list length, like get_leadership).
+
+    Employer-level filter keys are shared with search_companies and documented
+    on _apply_org_filters / _ORG_LIST_FILTERS / _ORG_RANGE_FILTERS: industries,
+    job_titles, job_locations, market_segments, naics_codes, sic_codes and their
+    exclude_* forms, technologies / technologies_all / exclude_technologies,
+    revenue_min/max, founded_min/max, num_jobs_min/max, job_posted_after/before,
+    headcount_growth_min/max (+ headcount_growth_months),
+    include_unknown_founded_year, department_counts, employee_min/employee_max.
     """
     payload: dict = {
         "page": page,
@@ -275,25 +347,20 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         payload["q_organization_domains_list"] = list(filters["company_domains"])
     if filters.get("organization_ids"):
         payload["organization_ids"] = list(filters["organization_ids"])
+    if filters.get("linkedin_urls"):
+        payload["person_linkedin_urls"] = list(filters["linkedin_urls"])
     if filters.get("keywords"):
         payload["q_keywords"] = filters["keywords"]
     if filters.get("email_status"):
         payload["contact_email_status"] = list(filters["email_status"])
-    if filters.get("technologies"):
-        payload["currently_using_any_of_technology_uids"] = list(filters["technologies"])
-    rev_min, rev_max = filters.get("revenue_min"), filters.get("revenue_max")
-    if rev_min is not None or rev_max is not None:
-        rev_range = {}
-        if rev_min is not None:
-            rev_range["min"] = rev_min
-        if rev_max is not None:
-            rev_range["max"] = rev_max
-        payload["revenue_range"] = rev_range
-    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
-    if emp_min is not None and emp_max is not None:
-        ranges = _employee_ranges_for(emp_min, emp_max)
-        if ranges:
-            payload["organization_num_employees_ranges"] = ranges
+    for min_key, max_key, param in (
+        ("days_in_title_min", "days_in_title_max", "person_days_in_current_title_range"),
+        ("yoe_min",           "yoe_max",           "person_total_yoe_range"),
+    ):
+        rng = _range(filters, min_key, max_key)
+        if rng is not None:
+            payload[param] = rng
+    _apply_org_filters(payload, filters)
 
     try:
         data = _post("mixed_people/api_search", payload, api_key)
@@ -313,30 +380,106 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
     if max_people is not None:
         people = people[:max_people]
 
-    normalized = []
-    for p in people:
-        first = (p.get("first_name") or "").strip()
-        last = (p.get("last_name") or "").strip()
-        full_name = (f"{first} {last}".strip()) or (p.get("name") or "").strip() or None
-        org = p.get("organization") or {}
-        normalized.append({
-            "id": p.get("id"),
-            "full_name": full_name,
-            "first_name": first or None,
-            "last_name": last or None,
-            "title": p.get("title"),
-            "seniority": p.get("seniority"),
-            "linkedin_url": p.get("linkedin_url"),
-            "city": p.get("city"),
-            "state": p.get("state"),
-            "country": p.get("country"),
-            "organization_id": org.get("id") or p.get("organization_id"),
-            "organization_name": org.get("name"),
-            "organization_domain": org.get("primary_domain") or org.get("website_url"),
-        })
-
-    logger.info("search_people: received %d people", len(normalized))
+    normalized = [_normalize_search_person(p) for p in people]
+    logger.info("search_people: received %d people (%s)",
+                len(normalized), _field_coverage(normalized))
     return normalized
+
+
+# Fields worth reporting coverage on: everything the results grid can render.
+# Which of these Apollo actually populates is plan-dependent and has changed
+# over time (some tiers return only availability booleans plus an obfuscated
+# last name), so the grid must treat every one as optional.
+_COVERAGE_KEYS = ("last_name", "linkedin_url", "photo_url", "seniority", "city",
+                  "country", "headline", "email_status", "departments",
+                  "employment_history", "organization_domain",
+                  "organization_industry", "organization_employees")
+
+
+def _field_coverage(rows: list[dict]) -> str:
+    """"last_name 25/25, photo_url 0/25, ..." for the log line.
+
+    Counts only -- never the values themselves, which are personal data that
+    must not land in application logs. This exists because which fields Apollo
+    returns varies by plan and silently changes: without it, a grid that has
+    gone sparse is indistinguishable from a rendering bug.
+    """
+    if not rows:
+        return "no rows"
+    total = len(rows)
+    return ", ".join("%s %d/%d" % (k, sum(1 for r in rows if r.get(k)), total)
+                     for k in _COVERAGE_KEYS)
+
+
+def _normalize_search_person(p: dict) -> dict:
+    """One mixed_people/api_search row -> the flat shape the CPI grid renders.
+
+    Every field is optional by design. Apollo's free search tier returns a
+    subset that depends on the plan -- verified live against this account it is
+    id / first_name / last_name / title / linkedin_url / organization{id,name,
+    domain} and nothing else -- while photo, location, seniority, department and
+    employment history come back only from the paid enrichment endpoints. Rather
+    than assume either shape, this reads all of them defensively so the grid
+    shows whatever is genuinely present and hides the rest.
+    """
+    first = (p.get("first_name") or "").strip()
+    last = (p.get("last_name") or "").strip()
+    # Some plans withhold the real surname and return only a masked form. Show
+    # it (it still disambiguates two same-first-name people in a list) but flag
+    # it, so the UI can offer enrichment instead of implying it is the real name.
+    masked = ""
+    if not last:
+        masked = (p.get("last_name_obfuscated") or "").strip()
+    display_last = last or masked
+    full_name = (f"{first} {display_last}".strip()
+                 or (p.get("name") or "").strip() or None)
+
+    org = p.get("organization") or {}
+    history = [h for h in (p.get("employment_history") or []) if isinstance(h, dict)]
+    current = next((h for h in history if h.get("current")), history[0] if history else {})
+    past = [h for h in history if not h.get("current") and h.get("organization_name")]
+
+    return {
+        "id": p.get("id"),
+        "full_name": full_name,
+        "first_name": first or None,
+        "last_name": last or None,
+        "name_masked": bool(masked),
+        "title": p.get("title"),
+        "headline": p.get("headline"),
+        "seniority": p.get("seniority"),
+        "departments": [d for d in (p.get("departments") or []) if d],
+        "subdepartments": [d for d in (p.get("subdepartments") or []) if d],
+        "functions": [f for f in (p.get("functions") or []) if f],
+        "email_status": p.get("email_status"),
+        "photo_url": p.get("photo_url"),
+        "linkedin_url": p.get("linkedin_url"),
+        "twitter_url": p.get("twitter_url"),
+        "github_url": p.get("github_url"),
+        "city": p.get("city"),
+        "state": p.get("state"),
+        "country": p.get("country"),
+        "title_start_date": current.get("start_date"),
+        "past_companies": [h.get("organization_name") for h in past[:3]],
+        "past_roles_count": len(past),
+        "last_refreshed_at": p.get("last_refreshed_at"),
+        "organization_id": org.get("id") or p.get("organization_id"),
+        "organization_name": org.get("name"),
+        "organization_domain": (org.get("primary_domain") or org.get("domain")
+                                or org.get("website_url")),
+        "organization_logo": org.get("logo_url"),
+        "organization_industry": org.get("industry"),
+        "organization_employees": org.get("estimated_num_employees"),
+        "organization_founded": org.get("founded_year"),
+        "organization_revenue": org.get("annual_revenue"),
+        "organization_funding": org.get("total_funding"),
+        "organization_linkedin": org.get("linkedin_url"),
+        "organization_website": org.get("website_url"),
+        "organization_city": org.get("city"),
+        "organization_country": org.get("country"),
+        "organization_technologies": [t for t in (org.get("technology_names") or []) if t][:12],
+        "organization_keywords": [k for k in (org.get("keywords") or []) if k][:10],
+    }
 
 
 def bulk_match_people(ids: list, api_key: str) -> dict:
