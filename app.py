@@ -1402,12 +1402,34 @@ APP_AGENTS = [
         ],
         "tags": ["Enhance", "LLM", "SERP", "E-E-A-T"],
     },
+    {
+        # Connected via "external_url" instead of "seo_slug" -- it embeds the same
+        # Position2-hosted watchtower tool as the internal /p2/gtm copy (its own
+        # host masked behind this path), not a SERP-app tool. "uncapped": True
+        # means it's exempt from AGENT_RUN_CAP everywhere that cap is enforced
+        # (app_use, app_use_log_run, app.html, app_detail.html, app_embed.html):
+        # free for every signed-in user, no run limit, no metering.
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher",
+        "tagline": "Competitive LinkedIn content analysis",
+        "external_url": "https://watchtower-by-position2.vercel.app/linkedin.html",
+        "uncapped": True,
+        "ac": "#3b82f6", "ac2": "#a855f7",
+        "icon": _asvg("<path d=\"M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z\"/><path d=\"M12 7v12.8\"/>"),
+        "pill1": "Competitive LinkedIn Analysis", "pill2": "Messaging · creative · cadence · AI playbook",
+        "lead": ("Decode any company's organic LinkedIn strategy in one report. Point it at a company and it reads a year of their posts, then breaks down the messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run."),
+        "trips": [
+            {"t": "What it does", "d": "Turns any company's public LinkedIn presence into a full strategy report: messaging themes, content categories, creative formats, engagement benchmarks, top posts and a 30/60/90 AI playbook."},
+            {"t": "How it works", "d": "Pick the exact company page and it pulls the last 12 months of organic posts, analyses the copy, creative and reactions, scores the account, and writes a prioritised set of recommendations."},
+            {"t": "Best for", "d": "Marketing and demand-gen teams benchmarking their own LinkedIn against competitors and planning what to post next."},
+        ],
+        "tags": ["LinkedIn", "Competitive", "Content", "Engagement", "AI"],
+    },
 
     # Agents below are shown publicly (dashboard, sidebar, detail pages) but are
-    # not yet connected to a live tool -- no "seo_slug", so every reader of
-    # APP_AGENTS must treat that as the single source of truth for "connected"
-    # vs. "request access" (see _app_embed_url, app_home, app_detail, app.html,
-    # app_detail.html). Ported from the marketing /agents directory.
+    # not yet connected to a live tool -- no "seo_slug"/"external_url", so every
+    # reader of APP_AGENTS must treat that as the single source of truth for
+    # "connected" vs. "request access" (see _app_embed_url, app_home, app_detail,
+    # app.html, app_detail.html). Ported from the marketing /agents directory.
     {
         "slug": "signal-tracker", "name": "ABM Signal Tracker",
         "tagline": "Account Intent Monitoring",
@@ -1502,20 +1524,6 @@ APP_AGENTS = [
             {"t": "Best for", "d": "ABM and social-selling teams."},
         ],
         "tags": ["LinkedIn", "GTM", "CRM"],
-    },
-    {
-        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher",
-        "tagline": "Competitive LinkedIn content analysis",
-        "ac": "#3b82f6", "ac2": "#a855f7",
-        "icon": _asvg("<path d=\"M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z\"/><path d=\"M12 7v12.8\"/>"),
-        "pill1": "Competitive LinkedIn Analysis", "pill2": "Messaging · creative · cadence · AI playbook",
-        "lead": ("Decode any company's organic LinkedIn strategy in one report. Point it at a company and it reads a year of their posts, then breaks down the messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run."),
-        "trips": [
-            {"t": "What it does", "d": "Turns any company's public LinkedIn presence into a full strategy report: messaging themes, content categories, creative formats, engagement benchmarks, top posts and a 30/60/90 AI playbook."},
-            {"t": "How it works", "d": "Pick the exact company page and it pulls the last 12 months of organic posts, analyses the copy, creative and reactions, scores the account, and writes a prioritised set of recommendations."},
-            {"t": "Best for", "d": "Marketing and demand-gen teams benchmarking their own LinkedIn against competitors and planning what to post next."},
-        ],
-        "tags": ["LinkedIn", "Competitive", "Content", "Engagement", "AI"],
     },
     {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence",
@@ -2766,7 +2774,11 @@ def _fmt_run_ts(iso_str: str) -> str:
         return iso_str or ""
 
 def _app_embed_url(agent):
-    """Build the live SERP tool URL for an agent (same as the internal /p2/seo embed)."""
+    """Build the live tool URL for an agent: either a hardcoded external tool
+    (via "external_url", e.g. the watchtower-hosted LinkedIn Strategy Researcher)
+    or the SERP tool (via "seo_slug", same as the internal /p2/seo embed)."""
+    if agent.get("external_url"):
+        return agent["external_url"]
     seo_slug = agent.get("seo_slug")
     if not seo_slug:
         return ""
@@ -2841,7 +2853,7 @@ def app_request_access(slug):
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return jsonify({"ok": False, "error": "unknown agent"}), 404
-    if agent.get("seo_slug"):
+    if agent.get("seo_slug") or agent.get("external_url"):
         return jsonify({"ok": False, "error": "agent is already connected"}), 400
     if agent.get("no_request"):
         return jsonify({"ok": False, "error": "not accepting requests for this agent"}), 400
@@ -2870,8 +2882,9 @@ def app_use(slug):
         return redirect("/app")
     user = _get_user()
     email = (user or {}).get("email", "")
-    runs_used = _agent_run_counts(email).get(slug, 0)
-    if runs_used >= AGENT_RUN_CAP:
+    uncapped = bool(agent.get("uncapped"))
+    runs_used = 0 if uncapped else _agent_run_counts(email).get(slug, 0)
+    if not uncapped and runs_used >= AGENT_RUN_CAP:
         return render_template("app_embed.html", user=user, agent=agent, embed_url=None,
                                runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=True,
                                serp_origin=_SERP_BASE)
@@ -2894,6 +2907,8 @@ def app_use_log_run(slug):
     agent = APP_AGENTS_BY_SLUG.get(slug)
     if not agent:
         return jsonify({"logged": False, "error": "unknown agent"}), 404
+    if agent.get("uncapped"):
+        return jsonify({"logged": False, "error": "agent is uncapped, runs aren't tracked"}), 400
     user = _get_user()
     email = (user or {}).get("email", "")
     runs_used = _agent_run_counts(email).get(slug, 0)
