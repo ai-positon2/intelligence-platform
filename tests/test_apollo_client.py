@@ -151,6 +151,110 @@ def test_rate_limit_retries(mock_post, mock_sleep):
     assert mock_sleep.called
 
 
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_builds_real_payload(mock_post):
+    mock_post.return_value = _mock_response({"organizations": []})
+
+    filters = {
+        "name": "Acme",
+        "domains": ["acme.com"],
+        "locations": ["United States"],
+        "industries": ["Hospital & Health Care"],
+        "employee_min": 100,
+        "employee_max": 500,
+    }
+    apollo_client.search_companies(filters, _FAKE_API_KEY, page=2, per_page=50)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["q_organization_name"] == "Acme"
+    assert sent["q_organization_domains_list"] == ["acme.com"]
+    assert sent["organization_locations"] == ["United States"]
+    assert sent["q_organization_keyword_tags"] == ["Hospital & Health Care"]
+    assert "101,200" in sent["organization_num_employees_ranges"]
+    assert "201,500" in sent["organization_num_employees_ranges"]
+    assert sent["page"] == 2
+    assert sent["per_page"] == 50
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_normalizes_accounts_bucket_id(mock_post):
+    """mixed_companies/search splits results into "organizations" (id IS the org
+    id) and "accounts" (id is an ACCOUNT id; the real org id is a separate
+    organization_id field, and domain lives in `domain` not `primary_domain`).
+    Feeding an account's raw id into organization_ids elsewhere would silently
+    match nothing or the wrong org, so both buckets must come out normalized."""
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "org-real-1", "name": "Acme Health", "primary_domain": "acme.com"}],
+        "accounts": [{"id": "acct-999", "organization_id": "org-real-2", "name": "Acme Care", "domain": "acmecare.com"}],
+    })
+    result = apollo_client.search_companies({}, _FAKE_API_KEY)
+    assert len(result) == 2
+    by_name = {o["name"]: o for o in result}
+    assert by_name["Acme Health"]["id"] == "org-real-1"
+    assert by_name["Acme Care"]["id"] == "org-real-2"
+    assert by_name["Acme Care"]["primary_domain"] == "acmecare.com"
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_max_companies_caps_results(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1"}, {"id": "o2"}, {"id": "o3"}],
+    })
+    result = apollo_client.search_companies({"max_companies": 2}, _FAKE_API_KEY)
+    assert len(result) == 2
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_builds_real_payload(mock_post):
+    mock_post.return_value = _mock_response({"people": []})
+
+    filters = {
+        "titles": ["CMO", "Chief Marketing Officer"],
+        "seniorities": ["c_suite"],
+        "company_domains": ["acme.com"],
+        "employee_min": 51,
+        "employee_max": 200,
+        "keywords": "marketing",
+    }
+    apollo_client.search_people(filters, _FAKE_API_KEY, page=1, per_page=10)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["person_titles"] == ["CMO", "Chief Marketing Officer"]
+    assert sent["include_similar_titles"] is True
+    assert sent["person_seniorities"] == ["c_suite"]
+    assert sent["q_organization_domains_list"] == ["acme.com"]
+    assert "51,100" in sent["organization_num_employees_ranges"]
+    assert "101,200" in sent["organization_num_employees_ranges"]
+    assert sent["q_keywords"] == "marketing"
+    assert sent["per_page"] == 10
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_normalizes_and_caps_results(mock_post):
+    mock_post.return_value = _mock_response({
+        "people": [
+            {"id": "p1", "first_name": "Jane", "last_name": "Doe", "title": "CMO",
+             "linkedin_url": "https://linkedin.com/in/jane", "seniority": "c_suite",
+             "city": "Austin", "state": "TX", "country": "US",
+             "organization": {"id": "org1", "name": "Acme Health", "primary_domain": "acme.com"}},
+            {"id": "p2", "name": "John Smith", "title": "VP Marketing"},
+        ],
+    })
+    result = apollo_client.search_people({"max_people": 1}, _FAKE_API_KEY)
+    assert len(result) == 1
+    assert result[0]["full_name"] == "Jane Doe"
+    assert result[0]["organization_name"] == "Acme Health"
+    assert result[0]["organization_domain"] == "acme.com"
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_api_error_returns_empty(mock_post):
+    import requests as req_lib
+    mock_post.side_effect = req_lib.RequestException("Network error")
+    result = apollo_client.search_people({"titles": ["CEO"]}, _FAKE_API_KEY)
+    assert result == []
+
+
 def test_employee_ranges_mapping():
     ranges = apollo_client._employee_ranges_for(100, 500)
     assert "101,200" in ranges

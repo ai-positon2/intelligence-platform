@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company &amp; People Intelligence · Position²</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=1">
+<script src="/static/js/theme.js"></script>
+<link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+<script src="/static/js/aurora.js?v=1" defer></script>
+</head>
+<body>
+<div class="cpi-aurora"><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
+<div class="cpi-grain"></div>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="/p2/hub" class="tb-brand">
+      <div class="tb-brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      <span class="tb-brand-name">Platform</span>
+    </a>
+    <div class="tb-breadcrumb">
+      <a href="/p2/hub" class="tb-bc-link">Hub</a>
+      <span class="tb-bc-sep">&rsaquo;</span>
+      <a href="/p2/gtm" class="tb-bc-link">GTM</a>
+      <span class="tb-bc-sep">&rsaquo;</span>
+      <span class="tb-bc-cur">Company &amp; People Intelligence</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="tb-user-menu" id="tbUserMenu">
+      <div class="tb-user-pill" id="tbUserPill" onclick="toggleTbMenu()">
+        <div class="tb-user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>
+          {% else %}<span>{{ (user.name or 'U')[:2]|upper }}</span>{% endif %}
+        </div>
+        <span class="tb-user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="tb-chevron">&#9660;</span>
+      </div>
+      <div class="tb-dropdown" id="tbDropdown">
+        <div class="tb-dd-header">
+          <div class="tb-dd-name">{{ user.name or 'User' }}</div>
+          <div class="tb-dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="page-hdr">
+    <div class="page-hdr-icon">&#128269;</div>
+    <div>
+      <div class="page-hdr-title">Company &amp; People Intelligence</div>
+      <div class="page-hdr-sub">Search Apollo's data live, filter by role or firmographics, or just ask.</div>
+    </div>
+    <div class="page-hdr-credits"><span class="d"></span>People search is free &middot; Company search &amp; Enrich each spend 1 Apollo credit</div>
+  </div>
+
+  <div class="cpi-layout">
+    <div>
+      <div class="cpi-toggle" id="cpiEntityToggle">
+        <button class="on" data-entity="people" onclick="cpiSetEntity('people')">&#128100; People</button>
+        <button data-entity="companies" onclick="cpiSetEntity('companies')">&#127970; Companies</button>
+      </div>
+
+      <div class="cpi-filters" id="cpiFiltersPeople">
+        <div class="cpi-filter-row">
+          <input class="cpi-tag-input" id="fpTitles" placeholder="Job title(s), comma separated, e.g. CMO, VP Marketing">
+          <input class="cpi-search-input" id="fpCompanyDomain" placeholder="At company (domain), e.g. acme.com" style="flex:none;width:220px">
+        </div>
+        <div class="cpi-filter-row">
+          <div class="cpi-chip-group" id="fpSeniority">
+            {% for s in [("owner","Owner"),("founder","Founder"),("c_suite","C-Suite"),("vp","VP"),("director","Director"),("manager","Manager"),("senior","Senior"),("entry","Entry")] %}
+            <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="cpi-filter-row">
+          <input class="cpi-search-input" id="fpLocation" placeholder="Person location, e.g. Austin, TX" style="flex:1;min-width:160px">
+          <select class="cpi-filter-select" id="fpEmpRange">
+            <option value="">Any company size</option>
+            <option value="1,10">1-10 employees</option>
+            <option value="11,50">11-50 employees</option>
+            <option value="51,200">51-200 employees</option>
+            <option value="201,500">201-500 employees</option>
+            <option value="501,1000">501-1,000 employees</option>
+            <option value="1001,5000">1,001-5,000 employees</option>
+            <option value="5001,">5,001+ employees</option>
+          </select>
+          <input class="cpi-search-input" id="fpKeywords" placeholder="Keywords" style="flex:1;min-width:140px">
+          <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
+          <button class="cpi-search-btn" id="cpiSearchBtn" onclick="cpiRunSearch(true)">Search</button>
+        </div>
+      </div>
+
+      <div class="cpi-filters" id="cpiFiltersCompanies" style="display:none">
+        <div class="cpi-filter-row">
+          <input class="cpi-search-input" id="fcName" placeholder="Company name, e.g. Acme">
+          <input class="cpi-search-input" id="fcDomain" placeholder="Domain, e.g. acme.com" style="flex:none;width:200px">
+        </div>
+        <div class="cpi-filter-row">
+          <input class="cpi-search-input" id="fcLocation" placeholder="HQ location, e.g. United States" style="flex:1;min-width:160px">
+          <select class="cpi-filter-select" id="fcEmpRange">
+            <option value="">Any company size</option>
+            <option value="1,10">1-10 employees</option>
+            <option value="11,50">11-50 employees</option>
+            <option value="51,200">51-200 employees</option>
+            <option value="201,500">201-500 employees</option>
+            <option value="501,1000">501-1,000 employees</option>
+            <option value="1001,5000">1,001-5,000 employees</option>
+            <option value="5001,">5,001+ employees</option>
+          </select>
+          <input class="cpi-search-input" id="fcIndustry" placeholder="Industry keywords" style="flex:1;min-width:160px">
+          <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
+          <button class="cpi-search-btn" id="cpiSearchBtnCo" onclick="cpiRunSearch(true)">Search</button>
+        </div>
+      </div>
+
+      <div id="cpiResultsWrap">
+        <div class="cpi-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg>
+          <span>Set a filter and hit Search, or just ask the assistant on the right.</span>
+        </div>
+      </div>
+      <button class="cpi-load-more" id="cpiLoadMore" style="display:none" onclick="cpiRunSearch(false)">Load more</button>
+    </div>
+
+    <div class="cpi-chat">
+      <div class="cpi-chat-hdr">
+        <div class="cpi-chat-hdr-ic">&#129302;</div>
+        <div><b>Ask about a company or person</b><span>Grounded in live Apollo data</span></div>
+      </div>
+      <div class="cpi-chat-body" id="cpiChatBody">
+        <div class="cpi-msg assistant">
+          <div class="cpi-msg-av">AI</div>
+          <div class="cpi-bub"><p>Try something like <b>"Who is the CMO of Acme?"</b> or <b>"List VPs of Sales at healthcare companies in Texas"</b>. If a company name is ambiguous I'll show you the matches and ask which one you mean.</p></div>
+        </div>
+      </div>
+      <div class="cpi-chat-input-row">
+        <input class="cpi-chat-input" id="cpiChatInput" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')cpiSendChat()">
+        <button class="cpi-chat-send" id="cpiChatSend" onclick="cpiSendChat()">&#10148;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Enrich modal -->
+<div class="pm-ovl" id="pmOvl" onclick="cpiCloseModal()"></div>
+<div class="pm-wrap" id="pmWrap">
+  <div class="pmodal" id="pmodal" role="dialog" aria-modal="true" aria-label="Profile">
+    <button class="pm-x" onclick="cpiCloseModal()" aria-label="Close">&#10005;</button>
+    <div class="pm-scroll" id="pmScroll">
+      <div class="pm-hero" id="pmHero"></div>
+      <div class="pm-body" id="pmBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__CPI_SEARCH_URL__ = "{{ search_url }}";
+window.__CPI_ENRICH_URL__ = "{{ enrich_url }}";
+window.__CPI_CHAT_URL__ = "{{ chat_url }}";
+</script>
+<script src="/static/js/company_people_intelligence.js?v=1" defer></script>
+<script>
+function toggleTbMenu(){
+  var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');
+  var open=dd.classList.contains('open');
+  pill.classList.toggle('open',!open);dd.classList.toggle('open',!open);
+}
+document.addEventListener('click',function(e){
+  var m=document.getElementById('tbUserMenu');
+  if(m&&!m.contains(e.target)){
+    document.getElementById('tbUserPill').classList.remove('open');
+    document.getElementById('tbDropdown').classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>
