@@ -73,6 +73,7 @@
       <div class="cpi-filters" id="cpiFiltersPeople">
         <div class="cpi-filter-row">
           <input class="cpi-tag-input" id="fpTitles" placeholder="Job title(s), comma separated, e.g. CMO, VP Marketing">
+          <label class="cpi-check"><input type="checkbox" id="fpSimilarTitles" checked>Include similar titles</label>
           <input class="cpi-search-input" id="fpCompanyDomain" placeholder="At company (domain), e.g. acme.com" style="flex:none;width:220px">
         </div>
         <div class="cpi-filter-row">
@@ -84,6 +85,7 @@
         </div>
         <div class="cpi-filter-row">
           <input class="cpi-search-input" id="fpLocation" placeholder="Person location, e.g. Austin, TX" style="flex:1;min-width:160px">
+          <input class="cpi-search-input" id="fpCompanyLocation" placeholder="Company HQ location, e.g. United States" style="flex:1;min-width:160px">
           <select class="cpi-filter-select" id="fpEmpRange">
             <option value="">Any company size</option>
             <option value="1,10">1-10 employees</option>
@@ -94,7 +96,25 @@
             <option value="1001,5000">1,001-5,000 employees</option>
             <option value="5001,">5,001+ employees</option>
           </select>
+        </div>
+        <div class="cpi-filter-row">
+          <div class="cpi-chip-group" id="fpEmailStatus">
+            {% for s in [("verified","Verified email"),("likely_to_engage","Likely to engage"),("unverified","Unverified")] %}
+            <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
+            {% endfor %}
+          </div>
           <input class="cpi-search-input" id="fpKeywords" placeholder="Keywords" style="flex:1;min-width:140px">
+        </div>
+        <div class="cpi-advanced" id="fpAdvanced">
+          <div class="cpi-filter-row" style="margin-top:11px">
+            <input class="cpi-tag-input" id="fpTechnologies" placeholder="Technologies used, comma separated, e.g. Salesforce, HubSpot">
+            <input class="cpi-num-input" id="fpRevenueMin" type="number" placeholder="Min revenue $">
+            <span class="cpi-range-sep">-</span>
+            <input class="cpi-num-input" id="fpRevenueMax" type="number" placeholder="Max revenue $">
+          </div>
+        </div>
+        <div class="cpi-filter-row">
+          <button class="cpi-more-btn" id="fpMoreBtn" onclick="cpiToggleAdvanced('fpAdvanced','fpMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
           <button class="cpi-search-btn" id="cpiSearchBtn" onclick="cpiRunSearch(true)">Search</button>
         </div>
@@ -107,6 +127,7 @@
         </div>
         <div class="cpi-filter-row">
           <input class="cpi-search-input" id="fcLocation" placeholder="HQ location, e.g. United States" style="flex:1;min-width:160px">
+          <input class="cpi-search-input" id="fcExcludeLocation" placeholder="Exclude HQ location" style="flex:1;min-width:160px">
           <select class="cpi-filter-select" id="fcEmpRange">
             <option value="">Any company size</option>
             <option value="1,10">1-10 employees</option>
@@ -117,7 +138,25 @@
             <option value="1001,5000">1,001-5,000 employees</option>
             <option value="5001,">5,001+ employees</option>
           </select>
+        </div>
+        <div class="cpi-filter-row">
           <input class="cpi-search-input" id="fcIndustry" placeholder="Industry keywords" style="flex:1;min-width:160px">
+        </div>
+        <div class="cpi-advanced" id="fcAdvanced">
+          <div class="cpi-filter-row" style="margin-top:11px">
+            <input class="cpi-tag-input" id="fcTechnologies" placeholder="Technologies used, comma separated, e.g. Salesforce, HubSpot">
+          </div>
+          <div class="cpi-filter-row" style="margin-top:11px">
+            <input class="cpi-num-input" id="fcRevenueMin" type="number" placeholder="Min revenue $">
+            <span class="cpi-range-sep">-</span>
+            <input class="cpi-num-input" id="fcRevenueMax" type="number" placeholder="Max revenue $">
+            <input class="cpi-num-input" id="fcFoundedMin" type="number" placeholder="Founded after">
+            <span class="cpi-range-sep">-</span>
+            <input class="cpi-num-input" id="fcFoundedMax" type="number" placeholder="Founded before">
+          </div>
+        </div>
+        <div class="cpi-filter-row">
+          <button class="cpi-more-btn" id="fcMoreBtn" onclick="cpiToggleAdvanced('fcAdvanced','fcMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
           <button class="cpi-search-btn" id="cpiSearchBtnCo" onclick="cpiRunSearch(true)">Search</button>
         </div>

@@ -107,7 +107,7 @@ def _post(endpoint: str, payload: dict, api_key: str, retries: int = 3) -> dict:
 
 
 def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int = 25,
-                     strict: bool = False) -> list[dict]:
+                     strict: bool = False, meta: dict | None = None) -> list[dict]:
     """Search Apollo organizations via mixed_companies/search. Costs 1 Apollo
     credit per call that returns at least one result (0 if it returns none) --
     unlike search_people, this is NOT free.
@@ -116,11 +116,19 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     anywhere the empty result would be shown to a person as "no such company
     exists", because [] otherwise conflates that with "Apollo was unreachable".
 
+    If `meta` is passed a dict, it is filled in with Apollo's own pagination
+    totals ("total_entries"/"total_pages") so a caller can report an honest
+    count instead of guessing one from len(returned rows), which undercounts
+    the moment there is more than one page.
+
     filters keys (all optional): name (fuzzy match, e.g. for disambiguating a
     company by its display name), domains (list), employee_min/employee_max
     (mapped to Apollo's bucket ranges via _employee_ranges_for), locations
-    (list, HQ location), industries (list, mapped to Apollo's keyword-tag
-    search since there is no separate industry filter), exclude_keywords
+    (list, HQ location), exclude_locations (list, HQ locations to exclude),
+    industries (list, mapped to Apollo's keyword-tag search since there is no
+    separate industry filter), technologies (list, any-of, mapped to Apollo's
+    technology-UID filter), revenue_min/revenue_max (company annual revenue),
+    founded_min/founded_max (founding year range), exclude_keywords
     (client-side post-filter -- Apollo has no native text-exclusion param),
     max_companies (caps the returned list length).
     """
@@ -134,8 +142,28 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         payload["q_organization_domains_list"] = list(filters["domains"])
     if filters.get("locations"):
         payload["organization_locations"] = list(filters["locations"])
+    if filters.get("exclude_locations"):
+        payload["organization_not_locations"] = list(filters["exclude_locations"])
     if filters.get("industries"):
         payload["q_organization_keyword_tags"] = list(filters["industries"])
+    if filters.get("technologies"):
+        payload["currently_using_any_of_technology_uids"] = list(filters["technologies"])
+    rev_min, rev_max = filters.get("revenue_min"), filters.get("revenue_max")
+    if rev_min is not None or rev_max is not None:
+        rev_range = {}
+        if rev_min is not None:
+            rev_range["min"] = rev_min
+        if rev_max is not None:
+            rev_range["max"] = rev_max
+        payload["revenue_range"] = rev_range
+    found_min, found_max = filters.get("founded_min"), filters.get("founded_max")
+    if found_min is not None or found_max is not None:
+        founded_range = {}
+        if found_min is not None:
+            founded_range["min"] = found_min
+        if found_max is not None:
+            founded_range["max"] = found_max
+        payload["organization_founded_year_range"] = founded_range
     emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
     if emp_min is not None and emp_max is not None:
         ranges = _employee_ranges_for(emp_min, emp_max)
@@ -149,6 +177,11 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         if strict:
             raise
         return []
+
+    if meta is not None:
+        pagination = data.get("pagination") or {}
+        meta["total_entries"] = pagination.get("total_entries")
+        meta["total_pages"] = pagination.get("total_pages")
 
     # mixed_companies/search splits results into two buckets whose `id` fields are
     # NOT interchangeable: "organizations" (net-new companies) carries the real
@@ -201,17 +234,28 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
 
 
 def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25,
-                  strict: bool = False) -> list[dict]:
+                  strict: bool = False, meta: dict | None = None) -> list[dict]:
     """Search Apollo people via mixed_people/api_search (free, no credits --
     this does NOT return verified emails/phones, only identity + role fields;
-    use enrich_company/get_leadership or the person-enrichment path for that).
+    use enrich_company/get_leadership, bulk_match_people, or the
+    person-enrichment path for that). Apollo also masks/truncates some
+    contacts' last names in THIS endpoint's results depending on plan type --
+    that is expected, not a bug, and is resolved by enriching the id via
+    bulk_match_people, not by anything this function can do differently.
+
+    If `meta` is passed a dict, it is filled in with Apollo's own pagination
+    totals ("total_entries"/"total_pages") so a caller can report an honest
+    count instead of guessing one from len(returned rows), which undercounts
+    the moment there is more than one page.
 
     filters keys (all optional): titles (list), include_similar_titles (bool,
     default True), seniorities (list, e.g. "c_suite"/"vp"/"director"/...),
     person_locations (list), company_locations (list, employer HQ),
     company_domains (list), organization_ids (list, Apollo org IDs -- same
     namespace get_leadership uses), employee_min/employee_max (employer size,
-    mapped via _employee_ranges_for), keywords (str), email_status (list),
+    mapped via _employee_ranges_for), technologies (list, any-of, mapped to
+    Apollo's technology-UID filter on the employer), revenue_min/revenue_max
+    (employer annual revenue), keywords (str), email_status (list),
     max_people (caps the returned list length, like get_leadership).
     """
     payload: dict = {
@@ -235,6 +279,16 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         payload["q_keywords"] = filters["keywords"]
     if filters.get("email_status"):
         payload["contact_email_status"] = list(filters["email_status"])
+    if filters.get("technologies"):
+        payload["currently_using_any_of_technology_uids"] = list(filters["technologies"])
+    rev_min, rev_max = filters.get("revenue_min"), filters.get("revenue_max")
+    if rev_min is not None or rev_max is not None:
+        rev_range = {}
+        if rev_min is not None:
+            rev_range["min"] = rev_min
+        if rev_max is not None:
+            rev_range["max"] = rev_max
+        payload["revenue_range"] = rev_range
     emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
     if emp_min is not None and emp_max is not None:
         ranges = _employee_ranges_for(emp_min, emp_max)
@@ -248,6 +302,11 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         if strict:
             raise
         return []
+
+    if meta is not None:
+        pagination = data.get("pagination") or {}
+        meta["total_entries"] = pagination.get("total_entries")
+        meta["total_pages"] = pagination.get("total_pages")
 
     people = data.get("people", [])
     max_people = filters.get("max_people")
@@ -278,6 +337,41 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
 
     logger.info("search_people: received %d people", len(normalized))
     return normalized
+
+
+def bulk_match_people(ids: list, api_key: str) -> dict:
+    """Apollo person id -> raw Apollo person record, via people/bulk_match (up to
+    10 ids per call, issued in sequential chunks). Costs 1 Apollo credit per id
+    that actually matches (0 for a miss).
+
+    This is how search_people's masked/truncated last names get revealed: pass
+    the `id` field straight from a search_people row here rather than
+    re-searching by name, which could resolve to the wrong same-named person.
+    Returns only ids that Apollo actually matched -- a missing id means either
+    no match or a failed chunk, and callers should keep whatever they already
+    had for that person rather than treating the omission as a fact.
+    """
+    ids = [i for i in dict.fromkeys(ids) if i]
+    if not ids:
+        return {}
+    out: dict = {}
+    for i in range(0, len(ids), 10):
+        chunk = ids[i:i + 10]
+        try:
+            data = _post("people/bulk_match", {"details": [{"id": pid} for pid in chunk]}, api_key)
+        except Exception:
+            logger.error("bulk_match_people failed for a chunk of %d ids", len(chunk))
+            continue
+        matches = data.get("matches")
+        if not isinstance(matches, list):
+            logger.warning("bulk_match_people: unexpected response shape (keys=%s)",
+                           sorted(list(data.keys()))[:8])
+            continue
+        for j, pid in enumerate(chunk):
+            m = matches[j] if j < len(matches) else None
+            if m:
+                out[pid] = m
+    return out
 
 
 def enrich_company(domain: str, api_key: str) -> dict:

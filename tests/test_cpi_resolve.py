@@ -251,6 +251,71 @@ def test_choices_carry_the_apollo_org_id(fake_search):
 
 # ── _cpi_title_matches ───────────────────────────────────────────────────────
 
+# ── _cpi_reveal_names ────────────────────────────────────────────────────────
+
+@pytest.fixture
+def no_postgres(monkeypatch):
+    """Postgres unavailable -- the id-keyed name-reveal cache must degrade to
+    always calling Apollo rather than erroring."""
+    monkeypatch.setattr(appmod, "_pg_conn", lambda: None)
+
+
+def test_reveal_names_merges_real_name_without_leaking_contact_fields(no_postgres, monkeypatch):
+    """The production bug: search_people's masked "Sanjeev" must become
+    "Sanjeev Dhanaraj" in a chat answer, but revealing a name must not smuggle
+    an email/phone into an answer the user never asked for contact info on."""
+    import tracker.apollo_client as ac
+
+    def _fake_bulk(ids, api_key):
+        assert ids == ["p1"]
+        return {"p1": {"id": "p1", "first_name": "Sanjeev", "last_name": "Dhanaraj",
+                       "title": "Vice President Marketing",
+                       "linkedin_url": "https://linkedin.com/in/sanjeev",
+                       "email": "sanjeev@position2.com"}}
+    monkeypatch.setattr(ac, "bulk_match_people", _fake_bulk)
+
+    people = [{"id": "p1", "full_name": "Sanjeev", "title": "VP Marketing"}]
+    out = appmod._cpi_reveal_names(people, "key")
+
+    assert out[0]["full_name"] == "Sanjeev Dhanaraj"
+    assert out[0]["title"] == "Vice President Marketing"
+    assert out[0]["linkedin_url"] == "https://linkedin.com/in/sanjeev"
+    assert "emails" not in out[0] and "phones" not in out[0] and "email" not in out[0]
+
+
+def test_reveal_names_keeps_original_when_apollo_has_no_match(no_postgres, monkeypatch):
+    import tracker.apollo_client as ac
+    monkeypatch.setattr(ac, "bulk_match_people", lambda ids, api_key: {})
+    people = [{"id": "p1", "full_name": "Sanjeev", "title": "VP Marketing"}]
+    out = appmod._cpi_reveal_names(people, "key")
+    assert out[0]["full_name"] == "Sanjeev"
+    assert out[0]["title"] == "VP Marketing"
+
+
+def test_reveal_names_keeps_original_when_bulk_match_raises(no_postgres, monkeypatch):
+    """Apollo unreachable during the reveal call must not blank out or crash on
+    a person the caller already has a real search hit for."""
+    import tracker.apollo_client as ac
+    def _boom(ids, api_key):
+        raise RuntimeError("apollo down")
+    monkeypatch.setattr(ac, "bulk_match_people", _boom)
+    people = [{"id": "p1", "full_name": "Sanjeev"}]
+    out = appmod._cpi_reveal_names(people, "key")
+    assert out[0]["full_name"] == "Sanjeev"
+
+
+def test_reveal_names_skips_people_with_no_apollo_id(no_postgres):
+    people = [{"full_name": "No Id Here"}]
+    out = appmod._cpi_reveal_names(people, "key")
+    assert out == people
+
+
+def test_reveal_names_noop_without_api_key(no_postgres):
+    people = [{"id": "p1", "full_name": "Sanjeev"}]
+    out = appmod._cpi_reveal_names(people, "")
+    assert out == people
+
+
 @pytest.mark.parametrize("actual,requested,expected", [
     # Abbreviation and full form are the same role.
     ("Chief Marketing Officer", ["CMO"], True),
