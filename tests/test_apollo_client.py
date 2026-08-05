@@ -255,6 +255,127 @@ def test_search_people_api_error_returns_empty(mock_post):
     assert result == []
 
 
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_apollo_parity_filters(mock_post):
+    mock_post.return_value = _mock_response({"organizations": []})
+
+    filters = {
+        "exclude_locations": ["Ireland"],
+        "technologies": ["salesforce", "hubspot"],
+        "revenue_min": 1000000,
+        "revenue_max": 50000000,
+        "founded_min": 2010,
+        "founded_max": 2020,
+    }
+    apollo_client.search_companies(filters, _FAKE_API_KEY)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["organization_not_locations"] == ["Ireland"]
+    assert sent["currently_using_any_of_technology_uids"] == ["salesforce", "hubspot"]
+    assert sent["revenue_range"] == {"min": 1000000, "max": 50000000}
+    assert sent["organization_founded_year_range"] == {"min": 2010, "max": 2020}
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_meta_captures_pagination(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1"}],
+        "pagination": {"total_entries": 137, "total_pages": 6},
+    })
+    meta = {}
+    apollo_client.search_companies({}, _FAKE_API_KEY, meta=meta)
+    assert meta["total_entries"] == 137
+    assert meta["total_pages"] == 6
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_apollo_parity_filters(mock_post):
+    mock_post.return_value = _mock_response({"people": []})
+
+    filters = {
+        "titles": ["CMO"],
+        "include_similar_titles": False,
+        "company_locations": ["United States"],
+        "email_status": ["verified"],
+        "technologies": ["salesforce"],
+        "revenue_min": 500000,
+        "revenue_max": 2000000,
+    }
+    apollo_client.search_people(filters, _FAKE_API_KEY)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["include_similar_titles"] is False
+    assert sent["organization_locations"] == ["United States"]
+    assert sent["contact_email_status"] == ["verified"]
+    assert sent["currently_using_any_of_technology_uids"] == ["salesforce"]
+    assert sent["revenue_range"] == {"min": 500000, "max": 2000000}
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_meta_captures_pagination(mock_post):
+    mock_post.return_value = _mock_response({
+        "people": [{"id": "p1", "name": "Jane Doe"}],
+        "pagination": {"total_entries": 48, "total_pages": 2},
+    })
+    meta = {}
+    apollo_client.search_people({}, _FAKE_API_KEY, meta=meta)
+    assert meta["total_entries"] == 48
+    assert meta["total_pages"] == 2
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_bulk_match_people_builds_id_payload(mock_post):
+    mock_post.return_value = _mock_response({
+        "matches": [
+            {"id": "p1", "first_name": "Sanjeev", "last_name": "Dhanaraj"},
+            {"id": "p2", "first_name": "Sudheer", "last_name": "Reddy"},
+        ],
+    })
+    result = apollo_client.bulk_match_people(["p1", "p2"], _FAKE_API_KEY)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["details"] == [{"id": "p1"}, {"id": "p2"}]
+    assert result["p1"]["last_name"] == "Dhanaraj"
+    assert result["p2"]["last_name"] == "Reddy"
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_bulk_match_people_chunks_over_ten_ids(mock_post):
+    """Apollo caps bulk_match at 10 details per call, so 15 ids must be two calls."""
+    mock_post.side_effect = [
+        _mock_response({"matches": [{"id": "p%d" % i} for i in range(10)]}),
+        _mock_response({"matches": [{"id": "p%d" % i} for i in range(10, 15)]}),
+    ]
+    ids = ["p%d" % i for i in range(15)]
+    result = apollo_client.bulk_match_people(ids, _FAKE_API_KEY)
+
+    assert mock_post.call_count == 2
+    assert len(mock_post.call_args_list[0].kwargs["json"]["details"]) == 10
+    assert len(mock_post.call_args_list[1].kwargs["json"]["details"]) == 5
+    assert set(result.keys()) == set(ids)
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_bulk_match_people_skips_unmatched_and_dedupes(mock_post):
+    mock_post.return_value = _mock_response({"matches": [{"id": "p1", "name": "Jane"}, None]})
+    result = apollo_client.bulk_match_people(["p1", "p1", "p2"], _FAKE_API_KEY)
+    # Deduped to 2 unique ids sent; p2 (the null slot) never made it into the result.
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["details"] == [{"id": "p1"}, {"id": "p2"}]
+    assert list(result.keys()) == ["p1"]
+
+
+def test_bulk_match_people_empty_ids_returns_empty():
+    assert apollo_client.bulk_match_people([], _FAKE_API_KEY) == {}
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_bulk_match_people_bad_response_shape_returns_empty_for_chunk(mock_post):
+    mock_post.return_value = _mock_response({"error": "scope missing"})
+    result = apollo_client.bulk_match_people(["p1"], _FAKE_API_KEY)
+    assert result == {}
+
+
 def test_employee_ranges_mapping():
     ranges = apollo_client._employee_ranges_for(100, 500)
     assert "101,200" in ranges

@@ -43,29 +43,53 @@ window.cpiSetEntity = function(entity){
 
 window.cpiToggleChip = function(el){ el.classList.toggle("on"); };
 
+window.cpiToggleAdvanced = function(panelId, btnId){
+  var panel=document.getElementById(panelId), btn=document.getElementById(btnId);
+  var on=!panel.classList.contains("on");
+  panel.classList.toggle("on", on);
+  if(btn) btn.classList.toggle("on", on);
+};
+
 window.cpiClearFilters = function(){
-  ["fpTitles","fpCompanyDomain","fpLocation","fpKeywords","fcName","fcDomain","fcLocation","fcIndustry"].forEach(function(id){
+  ["fpTitles","fpCompanyDomain","fpLocation","fpCompanyLocation","fpKeywords","fpTechnologies",
+   "fpRevenueMin","fpRevenueMax","fcName","fcDomain","fcLocation","fcExcludeLocation","fcIndustry",
+   "fcTechnologies","fcRevenueMin","fcRevenueMax","fcFoundedMin","fcFoundedMax"].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value="";
   });
   ["fpEmpRange","fcEmpRange"].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=""; });
-  document.querySelectorAll("#fpSeniority .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
+  var sim=document.getElementById("fpSimilarTitles"); if(sim) sim.checked=true;
+  document.querySelectorAll("#fpSeniority .cpi-chip.on, #fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
+  ["fpAdvanced","fcAdvanced"].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove("on"); });
+  ["fpMoreBtn","fcMoreBtn"].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove("on"); });
 };
 
 function splitCsv(v){ return (v||"").split(",").map(function(s){return s.trim();}).filter(Boolean); }
+function numVal(id){ var v=document.getElementById(id).value; return v===""?null:+v; }
 
 function gatherFilters(){
   if(STATE.entity==="people"){
     var seniorities=[];
     document.querySelectorAll("#fpSeniority .cpi-chip.on").forEach(function(c){ seniorities.push(c.getAttribute("data-val")); });
+    var emailStatus=[];
+    document.querySelectorAll("#fpEmailStatus .cpi-chip.on").forEach(function(c){ emailStatus.push(c.getAttribute("data-val")); });
     var emp=(document.getElementById("fpEmpRange").value||"").split(",");
-    var f={ titles: splitCsv(document.getElementById("fpTitles").value) };
+    var f={ titles: splitCsv(document.getElementById("fpTitles").value),
+            include_similar_titles: !!document.getElementById("fpSimilarTitles").checked };
     if(seniorities.length) f.seniorities=seniorities;
+    if(emailStatus.length) f.email_status=emailStatus;
     var dom=document.getElementById("fpCompanyDomain").value.trim();
     if(dom) f.company_domains=[dom];
     var loc=document.getElementById("fpLocation").value.trim();
     if(loc) f.person_locations=[loc];
+    var coLoc=document.getElementById("fpCompanyLocation").value.trim();
+    if(coLoc) f.company_locations=[coLoc];
     var kw=document.getElementById("fpKeywords").value.trim();
     if(kw) f.keywords=kw;
+    var tech=splitCsv(document.getElementById("fpTechnologies").value);
+    if(tech.length) f.technologies=tech;
+    var revMin=numVal("fpRevenueMin"), revMax=numVal("fpRevenueMax");
+    if(revMin!==null) f.revenue_min=revMin;
+    if(revMax!==null) f.revenue_max=revMax;
     if(emp[0]){ f.employee_min=+emp[0]; f.employee_max=emp[1]?+emp[1]:999999999; }
     return f;
   }
@@ -74,7 +98,16 @@ function gatherFilters(){
   var name=document.getElementById("fcName").value.trim(); if(name) f2.name=name;
   var domain=document.getElementById("fcDomain").value.trim(); if(domain) f2.domains=[domain];
   var loc2=document.getElementById("fcLocation").value.trim(); if(loc2) f2.locations=[loc2];
+  var exLoc=document.getElementById("fcExcludeLocation").value.trim(); if(exLoc) f2.exclude_locations=[exLoc];
   var ind=document.getElementById("fcIndustry").value.trim(); if(ind) f2.industries=splitCsv(ind);
+  var tech2=splitCsv(document.getElementById("fcTechnologies").value);
+  if(tech2.length) f2.technologies=tech2;
+  var revMin2=numVal("fcRevenueMin"), revMax2=numVal("fcRevenueMax");
+  if(revMin2!==null) f2.revenue_min=revMin2;
+  if(revMax2!==null) f2.revenue_max=revMax2;
+  var fndMin=numVal("fcFoundedMin"), fndMax=numVal("fcFoundedMax");
+  if(fndMin!==null) f2.founded_min=fndMin;
+  if(fndMax!==null) f2.founded_max=fndMax;
   if(emp2[0]){ f2.employee_min=+emp2[0]; f2.employee_max=emp2[1]?+emp2[1]:999999999; }
   return f2;
 }
