@@ -8,10 +8,20 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
 
 var STATE = { entity: "people", page: 1, results: [] };
 var CHAT_HISTORY = [];
+/* The last real question the user typed, replayed verbatim when they pick a
+   company from a disambiguation list so the original role/title is not lost. */
+var LAST_QUESTION = "";
+/* The company resolved on a previous turn. Sent back on each subsequent turn so
+   a follow-up ("and their CFO?") does not re-run the same ambiguous name and ask
+   the user to choose all over again, once per turn, at a credit a time. */
+var ACTIVE_COMPANY = null;
 
-function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"'`]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;","`":"&#96;"}[c]; }); }
+/* Apollo-supplied URLs go into href/src. esc() stops attribute breakout but not
+   a "javascript:" scheme, so anything linkable is allowlisted to http(s) first. */
+function safeUrl(u){ u=String(u==null?"":u).trim(); return /^https?:\/\//i.test(u) ? u : ""; }
 function initials(n){ n=(n||"").trim(); if(!n) return "?"; var p=n.split(/\s+/); return ((p[0][0]||"")+(p[1]?p[1][0]:"")).toUpperCase(); }
-function pmNum(n){ n=+n||0; if(n>=1e9) return (n/1e9).toFixed(1).replace(/\.0$/,"")+"B"; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+"M"; if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1).replace(/\.0$/,"")+"K"; return String(n); }
+function pmNum(n){ if(n===null||n===undefined||n==="") return ""; if(isNaN(+n)) return String(n); n=+n||0; if(n>=1e9) return (n/1e9).toFixed(1).replace(/\.0$/,"")+"B"; if(n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,"")+"M"; if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1).replace(/\.0$/,"")+"K"; return String(n); }
 function pmMon(s){ var m=String(s||"").match(/^(\d{4})-(\d{2})/); if(!m) return String(s||""); return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m[2]-1]+" "+m[1]; }
 
 var SVG_LI='<svg viewBox="0 0 24 24"><path d="M4.98 3.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM2 21h6V9H2v12zm7.5 0h5.7v-6.4c0-3.4 4.3-3.7 4.3 0V21H22v-7.7c0-6.1-6.6-5.9-8.8-2.9V9H9.5v12z"/></svg>';
@@ -83,6 +93,10 @@ window.cpiRunSearch = function(reset){
   }).then(function(r){ return r.json(); }).then(function(d){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
     var items=(d&&d.results)||[];
+    /* Advance only when a page actually came back, so Load more fetches the NEXT
+       page instead of re-fetching page 1 and appending duplicate cards (which on
+       the Companies tab also spent a fresh Apollo credit per click). */
+    if(items.length){ STATE.page = (STATE.page||1) + 1; }
     STATE.results = reset ? items : STATE.results.concat(items);
     renderResults();
     document.getElementById("cpiLoadMore").style.display=(d&&d.has_more)?"":"none";
@@ -118,14 +132,14 @@ function personCard(p,i){
       (loc?'<span class="cpi-meta-chip">'+esc(loc)+'</span>':'')+
     '</div>'+
     '<div class="cpi-card-footer">'+
-      (p.linkedin_url?'<a class="cpi-card-link" href="'+esc(p.linkedin_url)+'" target="_blank" rel="noopener noreferrer" title="LinkedIn">'+SVG_LI+'</a>':'')+
+      (p.linkedin_url?'<a class="cpi-card-link" href="'+esc(safeUrl(p.linkedin_url))+'" target="_blank" rel="noopener noreferrer" title="LinkedIn">'+SVG_LI+'</a>':'')+
       '<button class="cpi-enrich-btn" onclick=\'cpiOpenEnrich("person",'+i+')\'>Enrich &rarr;</button>'+
     '</div></div>';
 }
 
 function companyCard(c,i){
   var loc=[c.city,c.state,c.country].filter(Boolean).join(", ");
-  var logo=c.logo_url?('<img src="'+esc(c.logo_url)+'" alt="" onerror="this.style.display=\'none\'">'):esc(initials(c.name));
+  var logo=c.logo_url?('<img src="'+esc(safeUrl(c.logo_url))+'" alt="" onerror="this.style.display=\'none\'">'):esc(initials(c.name));
   return '<div class="cpi-card" data-spotlight>'+
     '<div class="cpi-card-top">'+
       '<div class="cpi-avatar co">'+logo+'</div>'+
@@ -138,7 +152,7 @@ function companyCard(c,i){
       (loc?'<span class="cpi-meta-chip">'+esc(loc)+'</span>':'')+
     '</div>'+
     '<div class="cpi-card-footer">'+
-      (c.website_url?'<a class="cpi-card-link" href="'+esc(c.website_url)+'" target="_blank" rel="noopener noreferrer" title="Website">'+SVG_WEB+'</a>':'')+
+      (c.website_url?'<a class="cpi-card-link" href="'+esc(safeUrl(c.website_url))+'" target="_blank" rel="noopener noreferrer" title="Website">'+SVG_WEB+'</a>':'')+
       '<button class="cpi-enrich-btn" onclick=\'cpiOpenEnrich("company",'+i+')\'>Enrich &rarr;</button>'+
     '</div></div>';
 }
@@ -168,7 +182,7 @@ window.cpiCopy = function(btn){
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v).then(done).catch(function(){}); }
 };
 function pmCompanyCard(c,tag){
-  var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\''+esc((c.name[0]||"?").toUpperCase())+'\'">'):esc((c.name[0]||"?").toUpperCase());
+  var logo=c.logo?('<img src="'+esc(safeUrl(c.logo))+'" alt="" onerror="this.style.display=\'none\';this.parentNode.textContent=\''+esc((c.name[0]||"?").toUpperCase())+'\'">'):esc((c.name[0]||"?").toUpperCase());
   return '<div class="pm-sec"><h4 class="pm-h4">Company<s>'+esc(tag||c.domain||"")+'</s></h4>'+
     '<div class="pm-cocard"><div class="pm-cotop"><div class="pm-colg">'+logo+'</div>'+
       '<div style="min-width:0"><div class="pm-coname">'+esc(c.name)+'</div>'+
@@ -187,7 +201,7 @@ function pmCompanyCard(c,tag){
 }
 
 function personHero(p){
-  var photo=p.photo?('<img src="'+esc(p.photo)+'" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\''+esc(initials(p.name))+'\'">'):esc(initials(p.name));
+  var photo=p.photo?('<img src="'+esc(safeUrl(p.photo))+'" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\''+esc(initials(p.name))+'\'">'):esc(initials(p.name));
   var role="";
   if(p.title||(p.company&&p.company.name)){
     role='<div class="pm-role">'+esc(p.title||"")+((p.title&&p.company&&p.company.name)?" at ":"")+((p.company&&p.company.name)?"<b>"+esc(p.company.name)+"</b>":"")+"</div>";
@@ -239,14 +253,14 @@ function personBody(p){
         return '<div class="pm-job'+(h.current?" cur":"")+'"><div class="pm-job-d"></div><div>'+
           '<div class="pm-job-t">'+esc(h.title||"Role not specified")+"</div>"+
           (h.org?'<div class="pm-job-o">'+esc(h.org)+"</div>":"")+
-          '<div class="pm-job-w">'+when+"</div></div></div>";
+          '<div class="pm-job-w">'+esc(when)+"</div></div></div>";
       }).join("")+"</div>";
   }
   return out;
 }
 
 function companyHero(c){
-  var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="" onerror="this.parentNode.textContent=\''+esc(initials(c.name))+'\'">'):esc(initials(c.name));
+  var logo=c.logo?('<img src="'+esc(safeUrl(c.logo))+'" alt="" onerror="this.parentNode.textContent=\''+esc(initials(c.name))+'\'">'):esc(initials(c.name));
   var chips="";
   if(c.employees) chips+='<span class="pm-chip ac">'+pmNum(c.employees)+" employees</span>";
   if(c.hq) chips+='<span class="pm-chip">&#128205; '+esc(c.hq)+"</span>";
@@ -276,7 +290,7 @@ function companyBody(c){
         return '<div class="pm-ct-i"><div class="pm-ct-ic">'+esc(initials(p.full_name))+"</div>"+
           '<div class="pm-ct-b"><div class="pm-ct-l"><span>'+esc(p.title||"")+"</span></div>"+
           '<div class="pm-ct-v">'+esc(p.full_name||"")+"</div></div>"+
-          (p.linkedin_url?'<a class="pm-cp" href="'+esc(p.linkedin_url)+'" target="_blank" rel="noopener noreferrer" title="LinkedIn">'+SVG_LI+"</a>":"")+
+          (p.linkedin_url?'<a class="pm-cp" href="'+esc(safeUrl(p.linkedin_url))+'" target="_blank" rel="noopener noreferrer" title="LinkedIn">'+SVG_LI+"</a>":"")+
         "</div>";
       }).join("")+"</div>";
   }
@@ -333,40 +347,93 @@ function addAssistantMsg(answer, choices){
   var choicesHtml="";
   if(choices&&choices.length){
     choicesHtml='<div class="cpi-choices">'+choices.map(function(c,i){
-      var logo=c.logo?('<img src="'+esc(c.logo)+'" alt="">'):esc(initials(c.name));
-      return '<button class="cpi-choice" onclick=\'cpiPickChoice("'+esc((c.name||"").replace(/"/g,"&quot;"))+'","'+esc(c.domain||"")+'")\'>'+
+      var logo=c.logo?('<img src="'+esc(safeUrl(c.logo))+'" alt="">'):esc(initials(c.name));
+      /* Values ride in data-* attributes and are wired up by a real event
+         listener below, rather than being interpolated into an inline onclick
+         string, so a company name containing a quote or apostrophe cannot
+         break the handler. */
+      return '<button class="cpi-choice" data-pick-name="'+esc(c.name||"")+'" data-pick-domain="'+esc(c.domain||"")+'" data-pick-org-id="'+esc(c.id||"")+'" data-pick-question="'+esc(LAST_QUESTION||"")+'">'+
         '<div class="cpi-choice-logo">'+logo+"</div>"+
         '<div class="cpi-choice-t"><b>'+esc(c.name)+"</b><span>"+esc([c.domain,c.hq].filter(Boolean).join(" · "))+"</span></div>"+
       "</button>";
     }).join("")+"</div>";
   }
   b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">AI</div><div class="cpi-bub"><p>'+esc(answer||"I could not find an answer for that.").replace(/\n/g,"<br>")+"</p>"+choicesHtml+"</div></div>");
+  var justAdded=b.lastElementChild;
+  if(justAdded){
+    justAdded.querySelectorAll(".cpi-choice").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        /* The question is read off the button, not off LAST_QUESTION, so
+           clicking a choice from an older message still answers the question
+           that produced THAT list rather than whatever was typed since. */
+        window.cpiPickChoice(btn.getAttribute("data-pick-name")||"",
+                             btn.getAttribute("data-pick-domain")||"",
+                             btn.getAttribute("data-pick-question")||"",
+                             btn.getAttribute("data-pick-org-id")||"");
+      });
+    });
+  }
   chatScroll();
 }
-window.cpiPickChoice = function(name, domain){
-  var text = "I mean " + name + (domain?(" (" + domain + ")"):"");
-  document.getElementById("cpiChatInput").value = text;
-  cpiSendChat();
+/* Picking a company from a disambiguation list re-asks the ORIGINAL question
+   (so the role/title being asked about is preserved verbatim) and passes the
+   chosen company as a structured domain. Sending "I mean Acme (acme.com)" as
+   free text instead would go back through the intent parser as a company NAME
+   containing a domain, which resolves to nothing. */
+window.cpiPickChoice = function(name, domain, question, orgId){
+  var q = question || LAST_QUESTION || ("Tell me about " + name);
+  sendChat(q, domain, name, orgId);
 };
+
 window.cpiSendChat = function(){
   var input=document.getElementById("cpiChatInput");
   var text=(input.value||"").trim();
   if(!text) return;
   input.value="";
-  var sendBtn=document.getElementById("cpiChatSend"); sendBtn.disabled=true;
-  addUserMsg(text);
+  sendChat(text, "", "", "");
+};
+
+function sendChat(text, selectedDomain, selectedName, selectedOrgId){
+  var sendBtn=document.getElementById("cpiChatSend");
+  if(sendBtn.disabled) return;          /* a request is already in flight */
+  sendBtn.disabled=true;
+  /* Retire every on-screen choice button for the duration of the request, so
+     double-clicking two different companies cannot fire two lookups (two
+     credits, two contradictory answers appended to one transcript). */
+  document.querySelectorAll(".cpi-choice").forEach(function(b){ b.disabled=true; });
+  var isPick = !!(selectedDomain || selectedOrgId);
+  if(!isPick){ LAST_QUESTION = text; }
+  /* Show the company they picked, not the replayed question, so the transcript
+     reads the way the conversation actually went. Name AND domain, since the
+     whole point of the pick was to tell two same-named companies apart. */
+  addUserMsg(isPick
+    ? (selectedName ? (selectedDomain ? selectedName + " (" + selectedDomain + ")" : selectedName)
+                    : selectedDomain)
+    : text);
   addTyping();
   fetch(CHAT_URL, { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ message: text, history: CHAT_HISTORY.slice(0,-1) }) })
+    body: JSON.stringify({
+      message: text,
+      selected_domain: selectedDomain || "",
+      selected_org_id: selectedOrgId || "",
+      selected_name: selectedName || "",
+      context_org_id: (ACTIVE_COMPANY && ACTIVE_COMPANY.org_id) || "",
+      context_domain: (ACTIVE_COMPANY && ACTIVE_COMPANY.domain) || "",
+      context_name: (ACTIVE_COMPANY && ACTIVE_COMPANY.name) || "",
+      history: CHAT_HISTORY.slice(0,-1)
+    }) })
     .then(function(r){ return r.json(); })
     .then(function(d){
       removeTyping(); sendBtn.disabled=false;
+      /* Pin whatever company the server actually resolved, so the next turn
+         inherits it instead of re-disambiguating. */
+      if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
       addAssistantMsg(d&&d.answer, d&&d.choices);
     })
     .catch(function(){
       removeTyping(); sendBtn.disabled=false;
       addAssistantMsg("Something went wrong reaching the assistant. Try again.");
     });
-};
+}
 
 })();

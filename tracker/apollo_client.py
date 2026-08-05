@@ -97,13 +97,24 @@ def _post(endpoint: str, payload: dict, api_key: str, retries: int = 3) -> dict:
                 time.sleep(wait)
     if last_exc:
         raise last_exc
-    return {}
+    # Every attempt was rate limited (429 retries `continue` without recording an
+    # exception). Returning {} here would be indistinguishable from "Apollo
+    # answered and had nothing", which callers would go on to report to a user as
+    # a definitive absence of data. Raise instead: not reaching Apollo and Apollo
+    # confirming nothing exists must never share a code path.
+    raise requests.HTTPError("Apollo did not answer %s after %d attempts per base "
+                             "URL (rate limited)" % (endpoint, retries))
 
 
-def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int = 25) -> list[dict]:
+def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int = 25,
+                     strict: bool = False) -> list[dict]:
     """Search Apollo organizations via mixed_companies/search. Costs 1 Apollo
     credit per call that returns at least one result (0 if it returns none) --
     unlike search_people, this is NOT free.
+
+    strict=True re-raises transport failures instead of returning []. Use it
+    anywhere the empty result would be shown to a person as "no such company
+    exists", because [] otherwise conflates that with "Apollo was unreachable".
 
     filters keys (all optional): name (fuzzy match, e.g. for disambiguating a
     company by its display name), domains (list), employee_min/employee_max
@@ -135,6 +146,8 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         data = _post("mixed_companies/search", payload, api_key)
     except Exception:
         logger.error("Failed to fetch companies from Apollo.")
+        if strict:
+            raise
         return []
 
     # mixed_companies/search splits results into two buckets whose `id` fields are
@@ -148,9 +161,20 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     # same shape here before any caller ever sees the difference.
     orgs = list(data.get("organizations") or [])
     for acct in (data.get("accounts") or []):
+        org_id = acct.get("organization_id")
+        if not org_id:
+            # No organization id on this saved-account row. Falling back to its
+            # account `id` would put an account-namespace value into org-level
+            # filters (organization_ids, organizations/enrich), which matches
+            # nothing and burns a credit while looking like "no data". Skipping
+            # the row is the honest outcome.
+            logger.warning("apollo accounts row without organization_id, skipping: %s",
+                           str(acct.get("name") or "")[:60])
+            continue
         merged = dict(acct)
-        merged["id"] = acct.get("organization_id") or acct.get("id")
-        merged.setdefault("primary_domain", acct.get("domain"))
+        merged["id"] = org_id
+        if not merged.get("primary_domain"):
+            merged["primary_domain"] = acct.get("domain")
         orgs.append(merged)
 
     # Client-side keyword exclusion (Apollo doesn't natively filter by text keywords)
@@ -176,7 +200,8 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     return orgs
 
 
-def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25) -> list[dict]:
+def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25,
+                  strict: bool = False) -> list[dict]:
     """Search Apollo people via mixed_people/api_search (free, no credits --
     this does NOT return verified emails/phones, only identity + role fields;
     use enrich_company/get_leadership or the person-enrichment path for that).
@@ -220,6 +245,8 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         data = _post("mixed_people/api_search", payload, api_key)
     except Exception:
         logger.error("Failed to search people on Apollo.")
+        if strict:
+            raise
         return []
 
     people = data.get("people", [])
@@ -336,8 +363,9 @@ def get_leadership(organization_id: str, api_key: str, max_people: int = 20) -> 
     try:
         data = _post("mixed_people/api_search", payload, api_key)
         people = data.get("people", [])
-        if people:
-            logger.info("[DEBUG] First person raw fields: %s", json.dumps(people[0], default=str)[:500])
+        # Deliberately does NOT dump the raw record: it carries personal data
+        # (name, email) that must not land in application logs. Count only.
+        logger.info("get_leadership: %d people for org_id=%s", len(people), organization_id)
         result = []
         for p in people[:max_people]:
             first = (p.get("first_name") or "").strip()

@@ -164,6 +164,7 @@
 </div>
 
 <script>
+window.__CPI_USER_NAME__ = {{ (user.given_name or user.name or 'You')|tojson }};
 window.__CPI_SEARCH_URL__ = "{{ search_url }}";
 window.__CPI_ENRICH_URL__ = "{{ enrich_url }}";
 window.__CPI_CHAT_URL__ = "{{ chat_url }}";
