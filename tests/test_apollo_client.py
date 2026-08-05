@@ -388,3 +388,185 @@ def test_employee_ranges_overlap():
     ranges = apollo_client._employee_ranges_for(50, 200)
     assert "51,100" in ranges
     assert "101,200" in ranges
+
+
+# ── Full Apollo filter parity (org-level filters shared by both endpoints) ────
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_full_org_filter_parity(mock_post):
+    """Every org-level filter the UI can set reaches Apollo under its real name."""
+    mock_post.return_value = _mock_response({"people": []})
+
+    apollo_client.search_people({
+        "industries": ["SaaS"],
+        "market_segments": ["B2B"],
+        "naics_codes": ["5415"],
+        "exclude_naics_codes": ["7372"],
+        "sic_codes": ["7372"],
+        "exclude_sic_codes": ["5045"],
+        "technologies": ["salesforce"],
+        "technologies_all": ["hubspot"],
+        "exclude_technologies": ["marketo"],
+        "job_titles": ["sales manager"],
+        "job_locations": ["atlanta"],
+        "num_jobs_min": 5, "num_jobs_max": 50,
+        "job_posted_after": "2026-01-01", "job_posted_before": "2026-06-01",
+        "founded_min": 2015, "founded_max": 2020,
+        "include_unknown_founded_year": True,
+        "headcount_growth_min": 10, "headcount_growth_max": 90,
+        "headcount_growth_months": 6,
+        "department_counts": {"master_marketing": {"min": 5, "max": 40}},
+        "yoe_min": 5, "yoe_max": 20,
+        "days_in_title_min": 90, "days_in_title_max": 730,
+        "linkedin_urls": ["https://www.linkedin.com/in/x"],
+    }, _FAKE_API_KEY)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["q_organization_keyword_tags"] == ["SaaS"]
+    assert sent["market_segments"] == ["B2B"]
+    assert sent["organization_naics_codes"] == ["5415"]
+    assert sent["not_organization_naics_codes"] == ["7372"]
+    assert sent["organization_sic_codes"] == ["7372"]
+    assert sent["not_organization_sic_codes"] == ["5045"]
+    assert sent["currently_using_any_of_technology_uids"] == ["salesforce"]
+    assert sent["currently_using_all_of_technology_uids"] == ["hubspot"]
+    assert sent["currently_not_using_any_of_technology_uids"] == ["marketo"]
+    assert sent["q_organization_job_titles"] == ["sales manager"]
+    assert sent["organization_job_locations"] == ["atlanta"]
+    assert sent["organization_num_jobs_range"] == {"min": 5, "max": 50}
+    assert sent["organization_job_posted_at_range"] == {"min": "2026-01-01", "max": "2026-06-01"}
+    assert sent["organization_founded_year_range"] == {"min": 2015, "max": 2020}
+    assert sent["organization_include_unknown_founded_year"] is True
+    assert sent["organization_headcount_growth_range"] == {"min": 10, "max": 90}
+    assert sent["organization_headcount_growth_past_n_months"] == 6
+    assert sent["organization_department_or_subdepartment_counts"] == {
+        "master_marketing": {"min": 5, "max": 40}}
+    assert sent["person_total_yoe_range"] == {"min": 5, "max": 20}
+    assert sent["person_days_in_current_title_range"] == {"min": 90, "max": 730}
+    assert sent["person_linkedin_urls"] == ["https://www.linkedin.com/in/x"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_funding_filters(mock_post):
+    mock_post.return_value = _mock_response({"organizations": []})
+
+    apollo_client.search_companies({
+        "total_funding_min": 50_000_000, "total_funding_max": 350_000_000,
+        "latest_funding_min": 5_000_000, "latest_funding_max": 15_000_000,
+        "funded_after": "2025-07-25", "funded_before": "2026-09-25",
+        "label_ids": ["6605a710bd01d100a506d4ae"],
+    }, _FAKE_API_KEY)
+
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["total_funding_range"] == {"min": 50_000_000, "max": 350_000_000}
+    assert sent["latest_funding_amount_range"] == {"min": 5_000_000, "max": 15_000_000}
+    assert sent["latest_funding_date_range"] == {"min": "2025-07-25", "max": "2026-09-25"}
+    assert sent["account_label_ids"] == ["6605a710bd01d100a506d4ae"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_open_ended_range_sends_only_the_given_bound(mock_post):
+    """A min with no max must not send max:null, which Apollo rejects."""
+    mock_post.return_value = _mock_response({"organizations": []})
+    apollo_client.search_companies({"revenue_min": 1000}, _FAKE_API_KEY)
+    assert mock_post.call_args.kwargs["json"]["revenue_range"] == {"min": 1000}
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_unset_ranges_are_omitted_entirely(mock_post):
+    mock_post.return_value = _mock_response({"organizations": []})
+    apollo_client.search_companies({"name": "Acme"}, _FAKE_API_KEY)
+    sent = mock_post.call_args.kwargs["json"]
+    for absent in ("revenue_range", "organization_founded_year_range",
+                   "total_funding_range", "organization_num_jobs_range"):
+        assert absent not in sent
+
+
+# ── Richer person normalisation ──────────────────────────────────────────────
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_surfaces_all_free_fields(mock_post):
+    mock_post.return_value = _mock_response({"people": [{
+        "id": "p1", "first_name": "Ada", "last_name": "Lovelace",
+        "title": "CMO", "headline": "Marketing leader", "seniority": "c_suite",
+        "departments": ["marketing"], "subdepartments": ["brand"],
+        "functions": ["marketing"], "email_status": "verified",
+        "photo_url": "https://cdn/x.jpg", "linkedin_url": "http://li/in/ada",
+        "twitter_url": "http://tw/ada",
+        "city": "Austin", "state": "TX", "country": "United States",
+        "employment_history": [
+            {"organization_name": "Acme", "title": "CMO", "current": True,
+             "start_date": "2023-04-01"},
+            {"organization_name": "Globex", "title": "VP", "current": False},
+            {"organization_name": "Initech", "title": "Dir", "current": False},
+        ],
+        "organization": {
+            "id": "o1", "name": "Acme", "primary_domain": "acme.com",
+            "logo_url": "https://cdn/logo.png", "industry": "software",
+            "estimated_num_employees": 240, "founded_year": 2015,
+            "annual_revenue": 4_200_000, "total_funding": 9_000_000,
+            "technology_names": ["Salesforce", "HubSpot"], "keywords": ["saas"],
+            "city": "Austin", "country": "United States",
+        },
+    }]})
+
+    row = apollo_client.search_people({}, _FAKE_API_KEY)[0]
+    assert row["full_name"] == "Ada Lovelace"
+    assert row["name_masked"] is False
+    assert row["headline"] == "Marketing leader"
+    assert row["seniority"] == "c_suite"
+    assert row["departments"] == ["marketing"]
+    assert row["email_status"] == "verified"
+    assert row["photo_url"] == "https://cdn/x.jpg"
+    assert row["title_start_date"] == "2023-04-01"
+    assert row["past_companies"] == ["Globex", "Initech"]
+    assert row["past_roles_count"] == 2
+    assert row["organization_logo"] == "https://cdn/logo.png"
+    assert row["organization_industry"] == "software"
+    assert row["organization_employees"] == 240
+    assert row["organization_revenue"] == 4_200_000
+    assert row["organization_technologies"] == ["Salesforce", "HubSpot"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_handles_restricted_response_shape(mock_post):
+    """Some plans withhold the surname and return only an obfuscated form.
+
+    The row must still render (masked surname shown, flagged) rather than
+    collapsing to a bare first name with no explanation.
+    """
+    mock_post.return_value = _mock_response({"people": [{
+        "id": "p2", "first_name": "Celine", "last_name_obfuscated": "D.",
+        "title": "Chief Marketing Officer (CMO)",
+        "organization": {"name": "BTS"},
+    }]})
+
+    row = apollo_client.search_people({}, _FAKE_API_KEY)[0]
+    assert row["full_name"] == "Celine D."
+    assert row["name_masked"] is True
+    assert row["last_name"] is None
+    assert row["organization_name"] == "BTS"
+    # Absent fields must be falsy, never the string "None".
+    for key in ("photo_url", "seniority", "city", "organization_industry"):
+        assert not row[key]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_people_missing_fields_do_not_raise(mock_post):
+    """A minimal row (all optional fields absent) normalises without error."""
+    mock_post.return_value = _mock_response({"people": [{"id": "p3"}]})
+    row = apollo_client.search_people({}, _FAKE_API_KEY)[0]
+    assert row["id"] == "p3"
+    assert row["full_name"] is None
+    assert row["departments"] == [] and row["past_companies"] == []
+
+
+def test_field_coverage_counts_without_leaking_values():
+    """The diagnostic log line must carry counts only, never personal data."""
+    rows = [{"last_name": "Lovelace", "linkedin_url": "http://li/in/ada"},
+            {"last_name": None, "linkedin_url": None}]
+    out = apollo_client._field_coverage(rows)
+    assert "last_name 1/2" in out
+    assert "photo_url 0/2" in out
+    assert "Lovelace" not in out and "li/in/ada" not in out
+    assert apollo_client._field_coverage([]) == "no rows"

@@ -7112,7 +7112,10 @@ def linkedin_scraper_data():
 def cpi_home():
     return render_template("company_people_intelligence.html", user=_get_user(),
                            search_url=url_for("cpi_search"), enrich_url=url_for("cpi_enrich"),
-                           chat_url=url_for("cpi_chat"))
+                           chat_url=url_for("cpi_chat"),
+                           enrich_bulk_url=url_for("cpi_enrich_bulk"),
+                           history_url=url_for("cpi_history"),
+                           export_url=url_for("cpi_export"))
 
 
 @app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
@@ -7135,25 +7138,55 @@ def cpi_search():
         return jsonify({"results": [], "has_more": False,
                         "error": "Apollo is not configured on this environment."})
     per_page = 24
+    meta: dict = {}
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
-            results = _search_people(filters, api_key, page=page, per_page=per_page)
+            results = _search_people(filters, api_key, page=page,
+                                     per_page=per_page, meta=meta)
         else:
             from tracker.apollo_client import search_companies as _search_companies
-            raw = _search_companies(filters, api_key, page=page, per_page=per_page)
-            results = [{
-                "id": o.get("id"), "name": o.get("name"),
-                "primary_domain": o.get("primary_domain") or o.get("domain"),
-                "logo_url": o.get("logo_url"), "website_url": o.get("website_url"),
-                "estimated_num_employees": o.get("estimated_num_employees"),
-                "industry": o.get("industry"),
-                "city": o.get("city"), "state": o.get("state"), "country": o.get("country"),
-            } for o in raw]
+            raw = _search_companies(filters, api_key, page=page,
+                                    per_page=per_page, meta=meta)
+            results = [_cpi_company_row(o) for o in raw]
     except Exception as e:
         log.warning("cpi search failed (entity=%s): %s", entity, e)
         return jsonify({"results": [], "has_more": False, "error": "Search failed."})
-    return jsonify({"results": results, "has_more": len(results) >= per_page})
+    total = meta.get("total_entries")
+    total_pages = meta.get("total_pages")
+    # Prefer Apollo's own page count for "is there more": len(results) == per_page
+    # is a guess that both over- and under-reports on the last page.
+    has_more = (page < total_pages) if total_pages else (len(results) >= per_page)
+    return jsonify({"results": results, "has_more": bool(has_more),
+                    "total": total, "page": page})
+
+
+def _cpi_company_row(o: dict) -> dict:
+    """One mixed_companies/search org -> the flat shape the grid + export share.
+
+    Unlike people search, the company endpoint is paid and returns full records,
+    so there is real firmographic depth here to show. Still all optional: Apollo
+    leaves plenty of these blank for smaller companies.
+    """
+    return {
+        "id": o.get("id"),
+        "name": o.get("name"),
+        "primary_domain": o.get("primary_domain") or o.get("domain"),
+        "logo_url": o.get("logo_url"),
+        "website_url": o.get("website_url"),
+        "linkedin_url": o.get("linkedin_url"),
+        "estimated_num_employees": o.get("estimated_num_employees"),
+        "industry": o.get("industry"),
+        "founded_year": o.get("founded_year"),
+        "annual_revenue": o.get("annual_revenue"),
+        "total_funding": o.get("total_funding"),
+        "latest_funding_round_date": o.get("latest_funding_round_date"),
+        "publicly_traded_symbol": o.get("publicly_traded_symbol"),
+        "short_description": (o.get("short_description") or "")[:280] or None,
+        "technologies": [t for t in (o.get("technology_names") or []) if t][:12],
+        "keywords": [k for k in (o.get("keywords") or []) if k][:10],
+        "city": o.get("city"), "state": o.get("state"), "country": o.get("country"),
+    }
 
 
 # ── Id-keyed name reveal cache ────────────────────────────────────────────────
@@ -7378,6 +7411,364 @@ def cpi_enrich():
     else:
         return jsonify({"error": "unknown type"}), 400
     return jsonify({"profile": profile, "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+
+
+# Bulk reveal is the one place staff can spend a lot of Apollo credit in a single
+# click, so it is capped. Apollo bills ~1 credit per id it actually matches, and
+# the whole team shares one finite pool -- an uncapped "enrich all" over a few
+# pages of results could quietly drain it.
+_CPI_BULK_ENRICH_CAP = 50
+
+
+@app.route("/p2/gtm/company-people-intelligence/enrich-bulk", methods=["POST"])
+@position2_required
+def cpi_enrich_bulk():
+    """Reveal a chosen set of people by Apollo id, in one batch.
+
+    Deliberately explicit rather than automatic: search results are free, and
+    this is the paid step, so it only ever runs on ids the user has ticked.
+    Already-cached ids cost nothing, so the response reports how many were
+    actually fetched from Apollo versus served from cache -- otherwise there is
+    no way to tell what a click cost.
+    """
+    body = request.get_json(silent=True) or {}
+    ids = [str(i).strip() for i in (body.get("ids") or []) if str(i or "").strip()]
+    # dict.fromkeys de-dupes while keeping the user's ordering
+    ids = list(dict.fromkeys(ids))[:_CPI_BULK_ENRICH_CAP]
+    if not ids:
+        return jsonify({"profiles": {}, "fetched": 0, "cached": 0})
+    api_key = os.environ.get("APOLLO_API_KEY", "")
+    if not api_key:
+        return jsonify({"profiles": {}, "fetched": 0, "cached": 0,
+                        "error": "Apollo is not configured on this environment."})
+
+    cached = _cpi_id_cache_read(ids)
+    missing = [i for i in ids if i not in cached]
+    fetched: dict = {}
+    if missing:
+        try:
+            from tracker.apollo_client import bulk_match_people
+            fetched = bulk_match_people(missing, api_key) or {}
+            if fetched:
+                _cpi_id_cache_write(fetched)
+        except Exception as e:
+            log.warning("cpi bulk enrich failed for %d ids: %s", len(missing), e)
+            if not cached:
+                return jsonify({"profiles": {}, "fetched": 0, "cached": 0,
+                                "error": "Enrichment failed."})
+
+    merged = dict(cached)
+    merged.update(fetched)
+    return jsonify({
+        "profiles": {i: _cpi_person_row(p) for i, p in merged.items()},
+        "fetched": len(fetched), "cached": len(cached),
+        "capped": len(ids) >= _CPI_BULK_ENRICH_CAP,
+    })
+
+
+def _cpi_person_row(p: dict) -> dict:
+    """An enriched Apollo person -> the flat shape the grid and export share.
+
+    Contact fields (email/phone) are included because reaching this function
+    means the user explicitly spent a credit to reveal this person; the free
+    search path never calls it.
+    """
+    p = p or {}
+    org = p.get("organization") or {}
+    history = [h for h in (p.get("employment_history") or []) if isinstance(h, dict)]
+    past = [h for h in history if not h.get("current") and h.get("organization_name")]
+    phones = [n.get("sanitized_number") or n.get("raw_number")
+              for n in (p.get("phone_numbers") or []) if isinstance(n, dict)]
+    return {
+        "id": p.get("id"),
+        "full_name": (p.get("name")
+                      or " ".join(x for x in (p.get("first_name"), p.get("last_name")) if x)
+                      or None),
+        "first_name": p.get("first_name"), "last_name": p.get("last_name"),
+        "name_masked": False,
+        "title": p.get("title"), "headline": p.get("headline"),
+        "seniority": p.get("seniority"),
+        "departments": [d for d in (p.get("departments") or []) if d],
+        "email": p.get("email"), "email_status": p.get("email_status"),
+        "phones": [n for n in phones if n][:3],
+        "photo_url": p.get("photo_url"),
+        "linkedin_url": p.get("linkedin_url"),
+        "twitter_url": p.get("twitter_url"),
+        "city": p.get("city"), "state": p.get("state"), "country": p.get("country"),
+        "past_companies": [h.get("organization_name") for h in past[:3]],
+        "organization_id": org.get("id") or p.get("organization_id"),
+        "organization_name": org.get("name"),
+        "organization_domain": org.get("primary_domain") or org.get("website_url"),
+        "organization_logo": org.get("logo_url"),
+        "organization_industry": org.get("industry"),
+        "organization_employees": org.get("estimated_num_employees"),
+        "enriched": True,
+    }
+
+
+# ── Search history ────────────────────────────────────────────────────────────
+# Every search is stored so staff can come back to a result set without paying
+# for it again (company searches cost a credit each, and enriched rows cost one
+# per person). Scoped per user: this carries contact data, so one person's
+# lookups are not another's to browse.
+_CPI_HISTORY_TABLE_READY = False
+_CPI_HISTORY_KEEP = 60          # rows retained per user; older ones are pruned
+_CPI_HISTORY_MAX_ROWS = 120     # result rows stored per entry
+
+
+def _ensure_cpi_history_table(conn) -> None:
+    global _CPI_HISTORY_TABLE_READY
+    if _CPI_HISTORY_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_search_history (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                entity TEXT NOT NULL,
+                label TEXT,
+                filters JSONB NOT NULL,
+                total INTEGER,
+                rows JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cpi_history_email
+            ON cpi_search_history (email, created_at DESC)
+        """)
+    conn.commit()
+    _CPI_HISTORY_TABLE_READY = True
+
+
+def _cpi_history_label(entity: str, filters: dict) -> str:
+    """Short human label for a saved search, e.g. 'CMO · United States · 24 results'."""
+    f = filters or {}
+    parts = []
+    for key in ("titles", "seniorities", "industries"):
+        vals = [str(v) for v in (f.get(key) or []) if v]
+        if vals:
+            parts.append(", ".join(vals[:3]))
+    for key in ("name", "keywords"):
+        if f.get(key):
+            parts.append(str(f[key]))
+    for key in ("company_domains", "domains", "person_locations", "locations",
+                "company_locations"):
+        vals = [str(v) for v in (f.get(key) or []) if v]
+        if vals:
+            parts.append(vals[0])
+            break
+    return " · ".join(parts)[:160] or ("All companies" if entity == "companies"
+                                       else "All people")
+
+
+@app.route("/p2/gtm/company-people-intelligence/history", methods=["GET", "POST"])
+@position2_required
+def cpi_history():
+    """POST saves a result set; GET lists this user's recent saved searches."""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    conn = _pg_conn()
+    if not conn:
+        # No Postgres on this environment: history degrades to "not available"
+        # rather than erroring, same as every other optional store in this app.
+        return jsonify({"entries": [], "available": False})
+    try:
+        _ensure_cpi_history_table(conn)
+        if request.method == "GET":
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, entity, label, total, "
+                    "       COALESCE(jsonb_array_length(rows), 0), created_at "
+                    "FROM cpi_search_history WHERE email = %s "
+                    "ORDER BY created_at DESC LIMIT %s",
+                    (email, _CPI_HISTORY_KEEP))
+                entries = [{"id": r[0], "entity": r[1], "label": r[2], "total": r[3],
+                            "count": r[4],
+                            "created_at": r[5].isoformat() if r[5] else None}
+                           for r in cur.fetchall()]
+            return jsonify({"entries": entries, "available": True})
+
+        body = request.get_json(silent=True) or {}
+        rows = [r for r in (body.get("rows") or []) if isinstance(r, dict)]
+        if not rows:
+            return jsonify({"saved": False, "available": True})
+        entity = "companies" if body.get("entity") == "companies" else "people"
+        filters = body.get("filters") if isinstance(body.get("filters"), dict) else {}
+        from psycopg2.extras import Json
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO cpi_search_history (email, entity, label, filters, total, rows) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at",
+                (email, entity, _cpi_history_label(entity, filters), Json(filters),
+                 body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS])))
+            new_id, created = cur.fetchone()
+            # Keep the list bounded per user instead of growing without limit.
+            cur.execute(
+                "DELETE FROM cpi_search_history WHERE email = %s AND id NOT IN "
+                "(SELECT id FROM cpi_search_history WHERE email = %s "
+                " ORDER BY created_at DESC LIMIT %s)",
+                (email, email, _CPI_HISTORY_KEEP))
+        conn.commit()
+        return jsonify({"saved": True, "available": True, "id": new_id,
+                        "created_at": created.isoformat() if created else None})
+    except Exception as e:
+        log.warning("cpi history %s failed: %s", request.method, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"entries": [], "available": False, "saved": False})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.route("/p2/gtm/company-people-intelligence/history/<int:entry_id>",
+           methods=["GET", "DELETE"])
+@position2_required
+def cpi_history_entry(entry_id: int):
+    """Reopen or delete one saved search. Scoped to the signed-in user's own rows."""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    conn = _pg_conn()
+    if not conn:
+        return jsonify({"error": "History is not available on this environment."}), 404
+    try:
+        _ensure_cpi_history_table(conn)
+        with conn.cursor() as cur:
+            if request.method == "DELETE":
+                # email in the WHERE clause is the authorization check: a guessed
+                # id belonging to someone else matches nothing.
+                cur.execute("DELETE FROM cpi_search_history WHERE id = %s AND email = %s",
+                            (entry_id, email))
+                deleted = cur.rowcount
+                conn.commit()
+                return jsonify({"deleted": bool(deleted)})
+            cur.execute("SELECT entity, label, filters, total, rows FROM cpi_search_history "
+                        "WHERE id = %s AND email = %s", (entry_id, email))
+            row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"entity": row[0], "label": row[1], "filters": row[2],
+                        "total": row[3], "rows": row[4]})
+    except Exception as e:
+        log.warning("cpi history entry %s failed: %s", entry_id, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": "History lookup failed."}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+# ── Export ────────────────────────────────────────────────────────────────────
+_CPI_PERSON_COLS = [
+    ("full_name", "Name"), ("title", "Title"), ("seniority", "Seniority"),
+    ("email", "Email"), ("email_status", "Email status"), ("phones", "Phone"),
+    ("organization_name", "Company"), ("organization_domain", "Domain"),
+    ("organization_industry", "Industry"), ("organization_employees", "Employees"),
+    ("city", "City"), ("state", "State"), ("country", "Country"),
+    ("departments", "Departments"), ("past_companies", "Previous companies"),
+    ("linkedin_url", "LinkedIn"), ("id", "Apollo ID"),
+]
+_CPI_COMPANY_COLS = [
+    ("name", "Company"), ("primary_domain", "Domain"), ("industry", "Industry"),
+    ("estimated_num_employees", "Employees"), ("annual_revenue", "Annual revenue"),
+    ("total_funding", "Total funding"), ("founded_year", "Founded"),
+    ("publicly_traded_symbol", "Ticker"),
+    ("city", "City"), ("state", "State"), ("country", "Country"),
+    ("technologies", "Technologies"), ("keywords", "Keywords"),
+    ("short_description", "Description"),
+    ("website_url", "Website"), ("linkedin_url", "LinkedIn"), ("id", "Apollo ID"),
+]
+
+
+# A leading =, +, - or @ makes Excel/Sheets treat a cell as a formula, so
+# third-party text (Apollo company names, descriptions) has to be defused. But
+# phone numbers legitimately start with "+" and negative figures with "-", and
+# quoting those would show a stray apostrophe in every phone column -- so a
+# value that is purely digits and phone punctuation is left alone. Anything with
+# letters or a pipe (=cmd|..., +HYPERLINK(...), DDE payloads) still gets quoted.
+_NUMERIC_CELL_RE = re.compile(r"^[+-]?[\d\s().+\-/]{1,}$")
+
+
+def _csv_safe(value) -> str:
+    """Flatten a cell to a string and defuse spreadsheet formula injection."""
+    if value is None or value is False:
+        return ""
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(v) for v in value if v not in (None, ""))
+    text = str(value)
+    if text[:1] in ("=", "+", "-", "@") and not _NUMERIC_CELL_RE.match(text):
+        return "'" + text
+    return text
+
+
+@app.route("/p2/gtm/company-people-intelligence/export", methods=["POST"])
+@position2_required
+def cpi_export():
+    """Download the selected rows as .csv or .xlsx.
+
+    Rows come from the client rather than being re-queried, so exporting a
+    selection costs no Apollo credits and returns exactly what the user ticked --
+    including any enrichment they already paid to reveal.
+    """
+    body = request.get_json(silent=True) or {}
+    rows = [r for r in (body.get("rows") or []) if isinstance(r, dict)]
+    if not rows:
+        return jsonify({"error": "Nothing selected to export."}), 400
+    entity = "companies" if body.get("entity") == "companies" else "people"
+    cols = _CPI_COMPANY_COLS if entity == "companies" else _CPI_PERSON_COLS
+    fmt = "csv" if str(body.get("format") or "").lower() == "csv" else "xlsx"
+    stamp = datetime.now(IST).strftime("%Y-%m-%d-%H%M")
+    fname = "apollo-%s-%s.%s" % (entity, stamp, fmt)
+
+    if fmt == "csv":
+        import csv as _csv
+        import io
+        buf = io.StringIO()
+        w = _csv.writer(buf)
+        w.writerow([label for _k, label in cols])
+        for r in rows:
+            w.writerow([_csv_safe(r.get(k)) for k, _label in cols])
+        payload = buf.getvalue().encode("utf-8-sig")   # BOM so Excel reads UTF-8
+        mime = "text/csv; charset=utf-8"
+    else:
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Companies" if entity == "companies" else "People"
+        ws.append([label for _k, label in cols])
+        head_fill = PatternFill("solid", fgColor="151B2E")
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = head_fill
+            cell.alignment = Alignment(vertical="center")
+        for r in rows:
+            ws.append([_csv_safe(r.get(k)) for k, _label in cols])
+        for i, (key, label) in enumerate(cols, start=1):
+            longest = max([len(label)] + [len(_csv_safe(r.get(key))) for r in rows])
+            ws.column_dimensions[get_column_letter(i)].width = min(max(longest + 2, 10), 46)
+        ws.freeze_panes = "A2"
+        out = io.BytesIO()
+        wb.save(out)
+        payload = out.getvalue()
+        mime = ("application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet")
+
+    resp = make_response(payload)
+    resp.headers["Content-Type"] = mime
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s"' % fname
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 _CPI_INTENT_SYSTEM = (
@@ -8829,7 +9220,7 @@ CSV/EXCEL EXPORT RULES:
             answer, _m = _vimi_completion(oai, messages, _max_out, temperature=0.1)
             web_used = False
         else:
-            model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+            model = _vimi_model_chain()[0]
             answer, web_used = _responses_web_search(oai, model, messages, _max_out)
             if not answer:
                 answer, web_used = _responses_web_search(
@@ -8999,35 +9390,116 @@ def _responses_web_search(oai, model, input_msgs, max_tokens):
     return None, False
 
 
+# Strongest-first OpenAI model chain. GPT-5.6 Sol leads, GPT-5.5 is the first
+# fallback, and the older ids stay on as a last resort so chat never hard-fails
+# just because a newer id is retired or not yet enabled on this account's key.
+# Every id is overridable by env (OPENAI_INSIGHTS_MODEL jumps the queue), since
+# model names are the one part of this file that changes without a deploy.
+_VIMI_MODELS = ("gpt-5.6-sol", "gpt-5.5", "gpt-5.4")
+
+# Reasoning effort, strongest first. Tried per model and dropped on rejection,
+# because only reasoning-capable models accept the parameter at all and the
+# accepted value set has changed between releases.
+_VIMI_EFFORT_LADDER = ("max", "high", None)
+
+# Reasoning tokens bill against max_completion_tokens, so a caller's tight budget
+# (intent parsing asks for ~500) can be consumed entirely by reasoning and return
+# EMPTY content -- which looks exactly like a model failure and silently demotes
+# the request to a weaker model. Any attempt that asks for reasoning gets at
+# least this much room. Deliberately generous: accuracy over token cost.
+_VIMI_REASONING_FLOOR = 8000
+
+# model -> the first effort value that actually worked for it ("max"/"high"/None).
+# Without this, a model that rejects reasoning_effort would re-probe the whole
+# ladder on every single call, adding two dead API round-trips to every AI
+# feature in the app. Same "remember the winner for this process" trick
+# apollo_client uses for its base URL.
+_VIMI_EFFORT_OK: dict = {}
+
+
 def _vimi_model_chain():
-    """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > gpt-5.4 (ChatGPT 5.4) > OPENAI_MODEL/gpt-4o-mini."""
+    """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > _VIMI_MODELS > OPENAI_MODEL/gpt-4o-mini."""
     chain = []
-    for m in (os.environ.get("OPENAI_INSIGHTS_MODEL"), "gpt-5.4",
-              os.environ.get("OPENAI_MODEL", "gpt-4o-mini")):
+    for m in ((os.environ.get("OPENAI_INSIGHTS_MODEL"),) + _VIMI_MODELS
+              + (os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),)):
         if m and m not in chain:
             chain.append(m)
     return chain
 
 
+def _vimi_effort_ladder():
+    """Effort values to try, strongest first. OPENAI_REASONING_EFFORT pins one."""
+    pinned = (os.environ.get("OPENAI_REASONING_EFFORT") or "").strip().lower()
+    if pinned in ("off", "none"):
+        return (None,)
+    if pinned:
+        # Still fall through to no-effort, so an unsupported pin can't wedge chat.
+        return (pinned, None)
+    return _VIMI_EFFORT_LADDER
+
+
+def _vimi_attempts(max_tokens, temperature=None):
+    """(kwargs, token_budget) pairs to try for one model, best quality first.
+
+    Ordered so the highest-reasoning attempt runs first and each fallback drops
+    exactly one thing a model might have rejected: the effort level, then
+    reasoning altogether, then temperature.
+    """
+    out = []
+    for effort in _vimi_effort_ladder():
+        kw, budget = {}, max_tokens
+        if effort:
+            kw["reasoning_effort"] = effort
+            budget = max(max_tokens, _VIMI_REASONING_FLOOR)
+        elif temperature is not None:
+            # Temperature rides only on non-reasoning attempts: reasoning models
+            # reject it, which would waste the attempt.
+            kw["temperature"] = temperature
+        out.append((kw, budget))
+    if temperature is not None and not any(kw == {} for kw, _ in out):
+        out.append(({}, max_tokens))
+    return out
+
+
+def _vimi_create(oai, model, messages, max_tokens, temperature=None, json_mode=False):
+    """One model, walked down the effort ladder. Returns (text|None, last_error)."""
+    last_err = None
+    attempts = _vimi_attempts(max_tokens, temperature)
+    known = _VIMI_EFFORT_OK.get(model, "?")
+    if known != "?":
+        # Already learned what this model accepts: go straight to it, keeping the
+        # later (weaker) attempts as a safety net for transient failures.
+        matching = [(kw, b) for kw, b in attempts if kw.get("reasoning_effort") == known]
+        rest = [(kw, b) for kw, b in attempts if kw.get("reasoning_effort") != known]
+        attempts = matching + rest
+    for kw, budget in attempts:
+        call_kw = dict(kw, response_format={"type": "json_object"}) if json_mode else kw
+        try:
+            resp = oai.chat.completions.create(
+                model=model, messages=messages,
+                max_completion_tokens=budget, **call_kw)
+            txt = (resp.choices[0].message.content or "").strip()
+            if txt:
+                _VIMI_EFFORT_OK[model] = kw.get("reasoning_effort")
+                return txt, None
+            log.warning("vimi: '%s' (%s) returned empty content at budget %d",
+                        model, call_kw, budget)
+        except Exception as e:
+            last_err = e
+            log.warning("vimi: '%s' (%s) failed: %s", model, call_kw, e)
+    return None, last_err
+
+
 def _vimi_completion(oai, messages, max_tokens, temperature=None):
-    """Plain-text chat completion on the primary Vimi model (GPT-5.4) with graceful
-    fallback down the model chain; retries without temperature if a model rejects it.
+    """Plain-text chat completion on the strongest available model at the highest
+    reasoning effort it accepts, falling back down the model chain.
     Returns (text, model_used)."""
     last_err = None
     for model in _vimi_model_chain():
-        attempts = [{"temperature": temperature}] if temperature is not None else []
-        attempts.append({})
-        for kw in attempts:
-            try:
-                resp = oai.chat.completions.create(
-                    model=model, messages=messages,
-                    max_completion_tokens=max_tokens, **kw)
-                txt = (resp.choices[0].message.content or "").strip()
-                if txt:
-                    return txt, model
-            except Exception as e:
-                last_err = e
-                log.warning("vimi: completion on '%s' (%s) failed: %s", model, kw, e)
+        txt, err = _vimi_create(oai, model, messages, max_tokens, temperature)
+        if txt:
+            return txt, model
+        last_err = err or last_err
     raise last_err if last_err else RuntimeError("no usable OpenAI model")
 
 
@@ -9036,17 +9508,10 @@ def _vimi_chat_json(oai, messages, max_tokens):
     Returns (raw_text, model_used)."""
     last_err = None
     for model in _vimi_model_chain():
-        try:
-            resp = oai.chat.completions.create(
-                model=model, messages=messages,
-                max_completion_tokens=max_tokens,
-                response_format={"type": "json_object"})
-            txt = (resp.choices[0].message.content or "").strip()
-            if txt:
-                return txt, model
-        except Exception as e:
-            last_err = e
-            log.warning("vimi: model '%s' failed, trying next: %s", model, e)
+        txt, err = _vimi_create(oai, model, messages, max_tokens, json_mode=True)
+        if txt:
+            return txt, model
+        last_err = err or last_err
     raise last_err if last_err else RuntimeError("no usable OpenAI model")
 
 
@@ -9661,7 +10126,7 @@ def research_company(account_id):
         from openai import OpenAI
         oai   = OpenAI(api_key=api_key)
         _msgs = [{"role":"system","content":system},{"role":"user","content":user_msg}]
-        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+        model = _vimi_model_chain()[0]
         raw, web_used = _responses_web_search(oai, model, _msgs, 2500)
         if not raw:
             model = os.environ.get("OPENAI_MODEL","gpt-4o-mini")
@@ -9717,7 +10182,7 @@ def decision_makers(account_id):
         from openai import OpenAI
         oai   = OpenAI(api_key=api_key)
         _msgs = [{"role": "system", "content": system}, {"role": "user", "content": user_msg}]
-        model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+        model = _vimi_model_chain()[0]
         raw, web_used = _responses_web_search(oai, model, _msgs, 1500)
         if not raw:
             model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
@@ -9870,7 +10335,7 @@ def vimi_chat(account_id):
             answer, _m = _vimi_completion(oai, msgs, _max_out)
             web = False
         else:
-            model = os.environ.get("OPENAI_INSIGHTS_MODEL") or "gpt-5.4"
+            model = _vimi_model_chain()[0]
             answer, web = _responses_web_search(oai, model, msgs, _max_out)
             if not answer:
                 answer, web = _responses_web_search(oai, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), msgs, _max_out)

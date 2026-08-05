@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=2">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -70,6 +70,7 @@
         <button data-entity="companies" onclick="cpiSetEntity('companies')">&#127970; Companies</button>
       </div>
 
+      <!-- ══════════ People filters ══════════ -->
       <div class="cpi-filters" id="cpiFiltersPeople">
         <div class="cpi-filter-row">
           <input class="cpi-tag-input" id="fpTitles" placeholder="Job title(s), comma separated, e.g. CMO, VP Marketing">
@@ -78,7 +79,7 @@
         </div>
         <div class="cpi-filter-row">
           <div class="cpi-chip-group" id="fpSeniority">
-            {% for s in [("owner","Owner"),("founder","Founder"),("c_suite","C-Suite"),("vp","VP"),("director","Director"),("manager","Manager"),("senior","Senior"),("entry","Entry")] %}
+            {% for s in [("owner","Owner"),("founder","Founder"),("c_suite","C-Suite"),("vp","VP"),("director","Director"),("manager","Manager"),("senior","Senior"),("entry","Entry"),("intern","Intern")] %}
             <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
             {% endfor %}
           </div>
@@ -99,20 +100,98 @@
         </div>
         <div class="cpi-filter-row">
           <div class="cpi-chip-group" id="fpEmailStatus">
-            {% for s in [("verified","Verified email"),("likely_to_engage","Likely to engage"),("unverified","Unverified")] %}
+            {% for s in [("verified","Verified email"),("likely_to_engage","Likely to engage"),("unverified","Unverified"),("unavailable","Unavailable")] %}
             <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
             {% endfor %}
           </div>
           <input class="cpi-search-input" id="fpKeywords" placeholder="Keywords" style="flex:1;min-width:140px">
         </div>
+
         <div class="cpi-advanced" id="fpAdvanced">
-          <div class="cpi-filter-row" style="margin-top:11px">
-            <input class="cpi-tag-input" id="fpTechnologies" placeholder="Technologies used, comma separated, e.g. Salesforce, HubSpot">
-            <input class="cpi-num-input" id="fpRevenueMin" type="number" placeholder="Min revenue $">
-            <span class="cpi-range-sep">-</span>
-            <input class="cpi-num-input" id="fpRevenueMax" type="number" placeholder="Max revenue $">
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Person</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fpYoeMin" type="number" min="0" placeholder="Min yrs exp">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpYoeMax" type="number" min="0" placeholder="Max yrs exp">
+              <input class="cpi-num-input" id="fpTenureMin" type="number" min="0" placeholder="Min mo in role" style="width:118px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpTenureMax" type="number" min="0" placeholder="Max mo in role" style="width:120px">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpLinkedinUrls" placeholder="LinkedIn profile URL(s), comma separated">
+            </div>
+          </div>
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Employer firmographics</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpIndustry" placeholder="Industry / keyword tags, e.g. SaaS, fintech">
+              <input class="cpi-tag-input" id="fpSegments" placeholder="Market segments, e.g. B2B, Enterprise">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fpRevenueMin" type="number" placeholder="Min revenue $" style="width:126px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpRevenueMax" type="number" placeholder="Max revenue $" style="width:128px">
+              <input class="cpi-num-input" id="fpFoundedMin" type="number" placeholder="Founded after" style="width:124px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpFoundedMax" type="number" placeholder="Founded before" style="width:126px">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpNaics" placeholder="NAICS codes, e.g. 5415">
+              <input class="cpi-tag-input" id="fpSic" placeholder="SIC codes, e.g. 7372">
+            </div>
+            <div class="cpi-filter-row">
+              <select class="cpi-filter-select" id="fpDeptName">
+                <option value="">Dept. headcount (any)</option>
+                {% for d in [("c_suite","C-Suite"),("master_marketing","Marketing"),("master_sales","Sales"),("master_engineering_technical","Engineering"),("product_management","Product"),("design","Design"),("master_finance","Finance"),("master_human_resources","HR"),("master_information_technology","IT"),("master_operations","Operations"),("master_legal","Legal"),("medical_health","Medical / Health"),("education","Education"),("consulting","Consulting")] %}
+                <option value="{{ d[0] }}">{{ d[1] }} headcount</option>
+                {% endfor %}
+              </select>
+              <input class="cpi-num-input" id="fpDeptMin" type="number" min="0" placeholder="Min">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpDeptMax" type="number" min="0" placeholder="Max">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fpGrowthMin" type="number" placeholder="Min growth %" style="width:122px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpGrowthMax" type="number" placeholder="Max growth %" style="width:124px">
+              <select class="cpi-filter-select" id="fpGrowthMonths">
+                <option value="">Growth window</option>
+                <option value="3">Past 3 months</option>
+                <option value="6">Past 6 months</option>
+                <option value="12">Past 12 months</option>
+                <option value="24">Past 24 months</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Technologies</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot">
+              <input class="cpi-tag-input" id="fpTechnologiesAll" placeholder="Uses ALL of">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpTechnologiesNot" placeholder="Does NOT use, e.g. Marketo">
+            </div>
+          </div>
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Hiring signals</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fpJobTitles" placeholder="Hiring for title(s), e.g. sales manager">
+              <input class="cpi-tag-input" id="fpJobLocations" placeholder="Hiring in, e.g. atlanta, japan">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fpJobsMin" type="number" min="0" placeholder="Min jobs">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fpJobsMax" type="number" min="0" placeholder="Max jobs">
+              <input class="cpi-search-input" id="fpJobPostedAfter" type="date" style="flex:none;width:170px" title="Jobs posted on or after">
+            </div>
           </div>
         </div>
+
         <div class="cpi-filter-row">
           <button class="cpi-more-btn" id="fpMoreBtn" onclick="cpiToggleAdvanced('fpAdvanced','fpMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
@@ -120,6 +199,7 @@
         </div>
       </div>
 
+      <!-- ══════════ Company filters ══════════ -->
       <div class="cpi-filters" id="cpiFiltersCompanies" style="display:none">
         <div class="cpi-filter-row">
           <input class="cpi-search-input" id="fcName" placeholder="Company name, e.g. Acme">
@@ -140,26 +220,133 @@
           </select>
         </div>
         <div class="cpi-filter-row">
-          <input class="cpi-search-input" id="fcIndustry" placeholder="Industry keywords" style="flex:1;min-width:160px">
+          <input class="cpi-tag-input" id="fcIndustry" placeholder="Industry / keyword tags, e.g. SaaS, fintech">
+          <input class="cpi-tag-input" id="fcExcludeKeywords" placeholder="Exclude keywords">
         </div>
+
         <div class="cpi-advanced" id="fcAdvanced">
-          <div class="cpi-filter-row" style="margin-top:11px">
-            <input class="cpi-tag-input" id="fcTechnologies" placeholder="Technologies used, comma separated, e.g. Salesforce, HubSpot">
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Firmographics</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcSegments" placeholder="Market segments, e.g. B2B, Enterprise">
+              <label class="cpi-check"><input type="checkbox" id="fcUnknownFounded">Include unknown founding year</label>
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fcRevenueMin" type="number" placeholder="Min revenue $" style="width:126px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcRevenueMax" type="number" placeholder="Max revenue $" style="width:128px">
+              <input class="cpi-num-input" id="fcFoundedMin" type="number" placeholder="Founded after" style="width:124px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcFoundedMax" type="number" placeholder="Founded before" style="width:126px">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcNaics" placeholder="NAICS codes, e.g. 5415">
+              <input class="cpi-tag-input" id="fcNaicsNot" placeholder="Exclude NAICS">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcSic" placeholder="SIC codes, e.g. 7372">
+              <input class="cpi-tag-input" id="fcSicNot" placeholder="Exclude SIC">
+            </div>
+            <div class="cpi-filter-row">
+              <select class="cpi-filter-select" id="fcDeptName">
+                <option value="">Dept. headcount (any)</option>
+                {% for d in [("c_suite","C-Suite"),("master_marketing","Marketing"),("master_sales","Sales"),("master_engineering_technical","Engineering"),("product_management","Product"),("design","Design"),("master_finance","Finance"),("master_human_resources","HR"),("master_information_technology","IT"),("master_operations","Operations"),("master_legal","Legal"),("medical_health","Medical / Health"),("education","Education"),("consulting","Consulting")] %}
+                <option value="{{ d[0] }}">{{ d[1] }} headcount</option>
+                {% endfor %}
+              </select>
+              <input class="cpi-num-input" id="fcDeptMin" type="number" min="0" placeholder="Min">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcDeptMax" type="number" min="0" placeholder="Max">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fcGrowthMin" type="number" placeholder="Min growth %" style="width:122px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcGrowthMax" type="number" placeholder="Max growth %" style="width:124px">
+              <select class="cpi-filter-select" id="fcGrowthMonths">
+                <option value="">Growth window</option>
+                <option value="3">Past 3 months</option>
+                <option value="6">Past 6 months</option>
+                <option value="12">Past 12 months</option>
+                <option value="24">Past 24 months</option>
+              </select>
+            </div>
           </div>
-          <div class="cpi-filter-row" style="margin-top:11px">
-            <input class="cpi-num-input" id="fcRevenueMin" type="number" placeholder="Min revenue $">
-            <span class="cpi-range-sep">-</span>
-            <input class="cpi-num-input" id="fcRevenueMax" type="number" placeholder="Max revenue $">
-            <input class="cpi-num-input" id="fcFoundedMin" type="number" placeholder="Founded after">
-            <span class="cpi-range-sep">-</span>
-            <input class="cpi-num-input" id="fcFoundedMax" type="number" placeholder="Founded before">
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Funding</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fcTotalFundMin" type="number" placeholder="Min total $" style="width:124px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcTotalFundMax" type="number" placeholder="Max total $" style="width:126px">
+              <input class="cpi-num-input" id="fcLastFundMin" type="number" placeholder="Min last round $" style="width:144px">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcLastFundMax" type="number" placeholder="Max last round $" style="width:146px">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-search-input" id="fcFundedAfter" type="date" style="flex:none;width:170px" title="Last round on or after">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-search-input" id="fcFundedBefore" type="date" style="flex:none;width:170px" title="Last round on or before">
+            </div>
+          </div>
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Technologies</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot">
+              <input class="cpi-tag-input" id="fcTechnologiesAll" placeholder="Uses ALL of">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcTechnologiesNot" placeholder="Does NOT use, e.g. Marketo">
+            </div>
+          </div>
+
+          <div class="cpi-adv-sec">
+            <div class="cpi-adv-lbl">Hiring signals</div>
+            <div class="cpi-filter-row">
+              <input class="cpi-tag-input" id="fcJobTitles" placeholder="Hiring for title(s), e.g. sales manager">
+              <input class="cpi-tag-input" id="fcJobLocations" placeholder="Hiring in, e.g. atlanta, japan">
+            </div>
+            <div class="cpi-filter-row">
+              <input class="cpi-num-input" id="fcJobsMin" type="number" min="0" placeholder="Min jobs">
+              <span class="cpi-range-sep">-</span>
+              <input class="cpi-num-input" id="fcJobsMax" type="number" min="0" placeholder="Max jobs">
+              <input class="cpi-search-input" id="fcJobPostedAfter" type="date" style="flex:none;width:170px" title="Jobs posted on or after">
+            </div>
           </div>
         </div>
+
         <div class="cpi-filter-row">
           <button class="cpi-more-btn" id="fcMoreBtn" onclick="cpiToggleAdvanced('fcAdvanced','fcMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
           <button class="cpi-search-btn" id="cpiSearchBtnCo" onclick="cpiRunSearch(true)">Search</button>
         </div>
+      </div>
+
+      <!-- ══════════ Results toolbar ══════════ -->
+      <div class="cpi-toolbar" id="cpiToolbar" style="display:none">
+        <span class="cpi-tb-count" id="cpiCount"></span>
+        <span class="cpi-tb-spacer"></span>
+        <button class="cpi-tb-btn" id="cpiSelectAll" onclick="cpiToggleSelectAll()">
+          <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Select all
+        </button>
+        <div class="cpi-menu-wrap">
+          <button class="cpi-tb-btn" id="cpiDownloadBtn" onclick="cpiToggleMenu('cpiDownloadMenu')">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+            Download
+          </button>
+          <div class="cpi-menu" id="cpiDownloadMenu">
+            <button onclick="cpiExport('xlsx',true)">Selected rows <em>.xlsx</em></button>
+            <button onclick="cpiExport('csv',true)">Selected rows <em>.csv</em></button>
+            <div class="cpi-menu-sep"></div>
+            <button onclick="cpiExport('xlsx',false)">All loaded rows <em>.xlsx</em></button>
+            <button onclick="cpiExport('csv',false)">All loaded rows <em>.csv</em></button>
+          </div>
+        </div>
+        <button class="cpi-tb-btn" onclick="cpiOpenHistory()">
+          <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+          History
+        </button>
       </div>
 
       <div id="cpiResultsWrap">
@@ -171,24 +358,61 @@
       <button class="cpi-load-more" id="cpiLoadMore" style="display:none" onclick="cpiRunSearch(false)">Load more</button>
     </div>
 
+    <!-- ══════════ Chat panel ══════════ -->
     <div class="cpi-chat">
       <div class="cpi-chat-hdr">
-        <div class="cpi-chat-hdr-ic">&#129302;</div>
-        <div><b>Ask about a company or person</b><span>Grounded in live Apollo data</span></div>
+        <div class="cpi-chat-hdr-ic"><img src="/static/logo-mark.svg?v=1" alt="Arena"></div>
+        <div><b>Arena Intelligence</b><span>Grounded in live Apollo data</span></div>
+        <span class="cpi-chat-live"><i></i>Live</span>
       </div>
       <div class="cpi-chat-body" id="cpiChatBody">
         <div class="cpi-msg assistant">
-          <div class="cpi-msg-av">AI</div>
-          <div class="cpi-bub"><p>Try something like <b>"Who is the CMO of Acme?"</b> or <b>"List VPs of Sales at healthcare companies in Texas"</b>. If a company name is ambiguous I'll show you the matches and ask which one you mean.</p></div>
+          <div class="cpi-msg-av"><img src="/static/logo-mark.svg?v=1" alt="Arena"></div>
+          <div class="cpi-bub">
+            <p>Ask me about any company or person and I'll answer from live Apollo data, never from memory. If a company name is ambiguous I'll show the matches and ask which you meant.</p>
+            <div class="cpi-sugg">
+              <button onclick="cpiAsk(this.textContent)">Who is the CMO of Databricks?</button>
+              <button onclick="cpiAsk(this.textContent)">List VPs of Sales at healthcare companies in Texas</button>
+              <button onclick="cpiAsk(this.textContent)">Tell me about Snowflake</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="cpi-chat-input-row">
         <input class="cpi-chat-input" id="cpiChatInput" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')cpiSendChat()">
         <button class="cpi-chat-send" id="cpiChatSend" onclick="cpiSendChat()">&#10148;</button>
       </div>
+      <div class="cpi-chat-foot">Answers are grounded in Apollo results only</div>
     </div>
   </div>
 </div>
+
+<!-- Sticky bulk-action bar -->
+<div class="cpi-bulk" id="cpiBulk">
+  <span class="cpi-bulk-n" id="cpiBulkN"></span>
+  <button class="cpi-tb-btn accent" id="cpiBulkEnrich" onclick="cpiEnrichSelected()">
+    <svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+    Enrich selected
+  </button>
+  <button class="cpi-tb-btn" onclick="cpiExport('xlsx',true)">
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+    Download
+  </button>
+  <button class="cpi-bulk-x" onclick="cpiClearSelection()" aria-label="Clear selection">&#10005;</button>
+</div>
+
+<!-- History drawer -->
+<div class="cpi-drawer-ovl" id="cpiDrawerOvl" onclick="cpiCloseHistory()"></div>
+<aside class="cpi-drawer" id="cpiDrawer" aria-label="Search history">
+  <div class="cpi-dw-hdr">
+    <div class="cpi-hist-ic">&#128337;</div>
+    <div><b>Search history</b><span>Your saved result sets</span></div>
+    <button class="cpi-dw-x" onclick="cpiCloseHistory()" aria-label="Close">&#10005;</button>
+  </div>
+  <div class="cpi-dw-body" id="cpiDrawerBody"></div>
+</aside>
+
+<div class="cpi-toast" id="cpiToast"></div>
 
 <!-- Enrich modal -->
 <div class="pm-ovl" id="pmOvl" onclick="cpiCloseModal()"></div>
@@ -207,8 +431,11 @@ window.__CPI_USER_NAME__ = {{ (user.given_name or user.name or 'You')|tojson }};
 window.__CPI_SEARCH_URL__ = "{{ search_url }}";
 window.__CPI_ENRICH_URL__ = "{{ enrich_url }}";
 window.__CPI_CHAT_URL__ = "{{ chat_url }}";
+window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
+window.__CPI_HISTORY_URL__ = "{{ history_url }}";
+window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=1" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=2" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');
