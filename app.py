@@ -3075,6 +3075,9 @@ CLIENTS = {
         "logo":     "/static/clients/northstaranesthesia/logo-white.svg",
         # Email domains allowed in addition to @position2.com (always allowed).
         "domains":  ["northstaranesthesia.com"],
+        # Any signed-in Google account can enter this portal -- the domain
+        # gate above is bypassed entirely for this client (see _client_allowed).
+        "open_to_all": True,
         "accent":   "#5b9dff",
         "accent2":  "#8b5cf6",
         "tagline":  "Your agents, all in one place.",
@@ -3161,6 +3164,12 @@ def _client_agents(client):
     return [v for v in (_client_agent_view(s, client) for s in client.get("agents", [])) if v]
 
 def _client_allowed(client, email):
+    # Opt-in per client: "open_to_all" drops the domain gate entirely, so any
+    # signed-in Google account can enter this client's portal. Set explicitly
+    # on a client's CLIENTS entry, not a global default -- every other client
+    # portal stays restricted to its own domain(s) plus @position2.com.
+    if client.get("open_to_all"):
+        return True
     email = (email or "").lower()
     if email.endswith("@position2.com"):
         return True
