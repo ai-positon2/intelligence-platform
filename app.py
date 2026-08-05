@@ -1526,6 +1526,19 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "GTM", "CRM"],
     },
     {
+        "slug": "company-people-intelligence", "name": "Company & People Intelligence",
+        "tagline": "Apollo-Powered Lookup",
+        "ac": "#7c83f5", "ac2": "#22d3ee", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/>"),
+        "pill1": "Apollo-Powered Lookup", "pill2": "Filters + grounded chat",
+        "lead": ("Search and filter Apollo's company and people data live, or just ask: point it at a role and a company and it finds the person, or ask for a whole list by title, seniority or industry."),
+        "trips": [
+            {"t": "What it does", "d": "Find any person or company Apollo knows about by role, seniority, industry or company size, or ask a plain question like who is the CMO of a given company."},
+            {"t": "How it works", "d": "Filters run live Apollo searches; a chat layer parses the question, resolves the company (asking you to pick when a name is ambiguous), and answers strictly from what Apollo actually returns."},
+            {"t": "Best for", "d": "Sales and GTM teams doing account or contact research."},
+        ],
+        "tags": ["Apollo", "OpenAI", "GTM"],
+    },
+    {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence",
         "tagline": "Competitive Creative",
         "ac": "#a855f7", "ac2": "#e879f9", "icon": _asvg("<path d=\"M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>"),
@@ -7075,6 +7088,332 @@ def linkedin_scraper_data():
     dashboard's Refresh button calls."""
     force = request.args.get("fresh") in ("1", "true", "yes")
     return _linkedin_data_response(LINKEDIN_INTEL_SHEET_ID, force)
+
+
+# ── Company & People Intelligence ─────────────────────────────────────────────
+# Internal, staff-only Apollo search + chat agent: filter/browse companies and
+# people live against Apollo (search_people is free; search_companies and any
+# enrichment each cost 1 Apollo credit), plus a grounded NL chat ("Who is the
+# CMO of Acme?") that resolves ambiguous company names by asking rather than
+# guessing. See tracker/apollo_client.py for the underlying search functions.
+
+@app.route("/p2/gtm/company-people-intelligence")
+@position2_required
+def cpi_home():
+    return render_template("company_people_intelligence.html", user=_get_user(),
+                           search_url=url_for("cpi_search"), enrich_url=url_for("cpi_enrich"),
+                           chat_url=url_for("cpi_chat"))
+
+
+@app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
+@position2_required
+def cpi_search():
+    """Live Apollo search for the results grid. People search is free; company
+    search costs 1 Apollo credit per call that returns a result (see
+    search_companies' docstring) -- there's no free way to browse companies, so
+    this is a real, if small, per-search cost when the entity toggle is on
+    Companies."""
+    body = request.get_json(silent=True) or {}
+    entity = "companies" if body.get("entity") == "companies" else "people"
+    filters = body.get("filters") or {}
+    page = max(1, int(body.get("page") or 1))
+    api_key = os.environ.get("APOLLO_API_KEY", "")
+    if not api_key:
+        return jsonify({"results": [], "has_more": False,
+                        "error": "Apollo is not configured on this environment."})
+    per_page = 24
+    try:
+        if entity == "people":
+            from tracker.apollo_client import search_people as _search_people
+            results = _search_people(filters, api_key, page=page, per_page=per_page)
+        else:
+            from tracker.apollo_client import search_companies as _search_companies
+            raw = _search_companies(filters, api_key, page=page, per_page=per_page)
+            results = [{
+                "id": o.get("id"), "name": o.get("name"),
+                "primary_domain": o.get("primary_domain") or o.get("domain"),
+                "logo_url": o.get("logo_url"), "website_url": o.get("website_url"),
+                "estimated_num_employees": o.get("estimated_num_employees"),
+                "industry": o.get("industry"),
+                "city": o.get("city"), "state": o.get("state"), "country": o.get("country"),
+            } for o in raw]
+    except Exception as e:
+        log.warning("cpi search failed (entity=%s): %s", entity, e)
+        return jsonify({"results": [], "has_more": False, "error": "Search failed."})
+    return jsonify({"results": results, "has_more": len(results) >= per_page})
+
+
+def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "") -> dict:
+    """One person -> the same normalized profile shape the External Usage person
+    modal renders (_apollo_person_normalize), so this page's Enrich modal reuses
+    that exact contract. Costs 1 Apollo credit if a match is found."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    if not key:
+        return {"matched": False}
+    if email:
+        profiles = _enrich_people([email])
+        return profiles.get(email.strip().lower(), {"matched": False})
+    if not (name and domain):
+        return {"matched": False}
+    try:
+        from tracker.apollo_client import _post as _apollo_post
+        data = _apollo_post("people/match", {"name": name, "domain": domain}, key) or {}
+        p = data.get("person") or {}
+        if not p:
+            return {"matched": False}
+        return _apollo_person_normalize(p, p.get("email") or "")
+    except Exception as e:
+        log.warning("cpi person enrich failed name=%s domain=%s: %s", name, domain, e)
+        return {"matched": False}
+
+
+def _cpi_enrich_company(domain: str, apollo_id: str) -> dict:
+    """One company -> the same normalized shape the Company card renders
+    (_apollo_org_normalize), plus a short "leadership" list (reuses the
+    existing get_leadership, itself already used by the visitor-intelligence
+    buying-committee feature). Costs 1 Apollo credit if a match is found."""
+    key = os.environ.get("APOLLO_API_KEY", "")
+    if not key:
+        return {"matched": False}
+    try:
+        from tracker.apollo_client import enrich_company as _apollo_enrich_company_fn
+        from tracker.apollo_client import enrich_company_by_id as _apollo_enrich_company_by_id
+        from tracker.apollo_client import get_leadership as _apollo_get_leadership
+        org = _apollo_enrich_company_by_id(apollo_id, key) if apollo_id else _apollo_enrich_company_fn(domain, key)
+        if not isinstance(org, dict) or not (org.get("id") or org.get("name")):
+            return {"matched": False}
+        profile = {"matched": True, **_apollo_org_normalize(org)}
+        org_id = org.get("id")
+        if org_id:
+            try:
+                profile["leadership"] = _apollo_get_leadership(org_id, key, max_people=8)
+            except Exception as e:
+                log.warning("cpi leadership lookup failed org_id=%s: %s", org_id, e)
+                profile["leadership"] = []
+        return profile
+    except Exception as e:
+        log.warning("cpi company enrich failed domain=%s apollo_id=%s: %s", domain, apollo_id, e)
+        return {"matched": False}
+
+
+@app.route("/p2/gtm/company-people-intelligence/enrich", methods=["POST"])
+@position2_required
+def cpi_enrich():
+    body = request.get_json(silent=True) or {}
+    kind = body.get("type")
+    if kind == "person":
+        profile = _cpi_enrich_person(body.get("name") or "", body.get("domain") or "",
+                                      body.get("apollo_id") or "", body.get("email") or "")
+    elif kind == "company":
+        profile = _cpi_enrich_company(body.get("domain") or "", body.get("apollo_id") or "")
+    else:
+        return jsonify({"error": "unknown type"}), 400
+    return jsonify({"profile": profile, "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+
+
+_CPI_INTENT_SYSTEM = (
+    "You are the query parser for a B2B contact/company lookup tool backed by Apollo.io "
+    "data. Given the user's latest message and the conversation history, extract exactly "
+    "what they want as STRICT JSON. Do not answer the question yourself here, only extract "
+    "structured intent; a separate step fetches the real data.\n\n"
+    "Return one JSON object with these keys:\n"
+    '{"intent": "person_at_company" | "people_list" | "company_info" | "unclear",\n'
+    ' "titles": ["..."],\n'
+    ' "seniorities": ["..."],\n'
+    ' "company_name": "...",\n'
+    ' "person_locations": ["..."],\n'
+    ' "company_locations": ["..."],\n'
+    ' "industries": ["..."],\n'
+    ' "keywords": "...",\n'
+    ' "wants_contact_info": false,\n'
+    ' "max_results": 10}\n\n'
+    "titles: job titles/roles asked about, e.g. [\"CMO\",\"Chief Marketing Officer\"] -- expand "
+    "common abbreviations to their full title too. seniorities: only from owner, founder, "
+    "c_suite, vp, director, manager, senior, entry, intern. company_name: the company "
+    "mentioned, exactly as the user wrote it. wants_contact_info: true only if they "
+    "explicitly ask for an email address or phone number.\n\n"
+    "If the latest message is picking one company from a list offered earlier in the "
+    "conversation (e.g. \"the second one\", \"I mean Acme Inc\", \"the one in Texas\"), use "
+    "the conversation history to resolve company_name to that specific company's name, and "
+    "carry over whatever titles/roles were being asked about in the turn before the list was "
+    "shown.\n\n"
+    "intent is \"person_at_company\" for a specific role at a specific company (\"who is the "
+    "CMO of Acme\"), \"people_list\" for broader multi-person requests (\"list VPs of sales in "
+    "healthcare\"), \"company_info\" for questions about a company itself (\"tell me about "
+    "Acme\", \"how big is Acme\"), and \"unclear\" if there isn't enough to act on."
+)
+
+_CPI_ANSWER_SYSTEM = (
+    "You write the final answer for a B2B contact/company lookup assistant. You are given "
+    "STRICT facts fetched from Apollo.io as JSON -- use ONLY those facts. Never invent a "
+    "name, title, company, email, or phone number, and never guess at a fact that is not "
+    "present in the JSON; say plainly that it is not available instead. Do not mention "
+    "Apollo, models, or how the data was fetched. Be concise: 1-3 sentences for a single "
+    "person or company, or a short bullet list for multiple people. Never use an em dash; "
+    "use commas or periods instead."
+)
+
+
+def _cpi_norm_name(s: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+    s = re.sub(r"\b(inc|llc|ltd|corp|corporation|co|company|group|holdings|the)\b", "", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _cpi_resolve_company(name: str, api_key: str):
+    """(org, choices) -- exactly one is non-None. `choices` is a disambiguation
+    payload when the name is genuinely ambiguous (multiple exact-name matches,
+    or multiple fuzzy matches with no single clear winner); `org` is the one
+    resolved Apollo organization dict otherwise. Never silently guesses between
+    two equally-plausible companies. Costs 1 Apollo credit (mixed_companies/search)."""
+    from tracker.apollo_client import search_companies as _sc
+    candidates = _sc({"name": name, "max_companies": 6}, api_key)
+    if not candidates:
+        return None, None
+    query_norm = _cpi_norm_name(name)
+    exact = [c for c in candidates if _cpi_norm_name(c.get("name")) == query_norm]
+    if len(exact) == 1:
+        return exact[0], None
+    if len(candidates) == 1:
+        return candidates[0], None
+    pool = exact if len(exact) > 1 else candidates
+    choices = [{
+        "name": c.get("name"),
+        "domain": c.get("primary_domain") or c.get("domain"),
+        "logo": c.get("logo_url"),
+        "hq": ", ".join(x for x in [c.get("city"), c.get("state"), c.get("country")] if x),
+    } for c in pool]
+    return None, choices
+
+
+def _cpi_grounded_answer(oai, facts, question: str) -> str:
+    """Phrase a natural-language answer strictly from `facts` (JSON-serializable
+    real fetched Apollo data). Same grounding discipline as _person_ai_summary:
+    forbidden to invent anything not present; em dashes stripped as a backstop
+    even though the prompt already forbids them."""
+    raw, _model = _vimi_completion(oai, [
+        {"role": "system", "content": _CPI_ANSWER_SYSTEM},
+        {"role": "user", "content": "Question: %s\n\nFacts (JSON): %s" % (
+            question, json.dumps(facts, default=str)[:6000])},
+    ], 350)
+    return raw.replace("—", ",").strip()
+
+
+@app.route("/p2/gtm/company-people-intelligence/chat", methods=["POST"])
+@position2_required
+def cpi_chat():
+    """Grounded NL Q&A over live Apollo data. Stateless: the client resends the
+    full conversation history each turn (same pattern as /api/ppc-chat), so a
+    reply like "the second one" naturally resolves against a company list from
+    a prior turn without server-side session state. Intent parsing (what does
+    the user want) is one JSON-mode OpenAI call; which Apollo calls to make and
+    whether a company name is ambiguous is decided in plain Python, never left
+    to the model -- see _cpi_resolve_company."""
+    body = request.get_json(silent=True) or {}
+    message = str(body.get("message") or "").strip()[:600]
+    history = body.get("history") or []
+    if not message:
+        return jsonify({"answer": "Ask me something, like “Who is the CMO of Acme?”"})
+
+    oai_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = os.environ.get("APOLLO_API_KEY", "")
+    if not oai_key:
+        return jsonify({"answer": "The chat assistant needs OPENAI_API_KEY configured on this environment."})
+    if not api_key:
+        return jsonify({"answer": "Apollo isn't configured on this environment (APOLLO_API_KEY missing), so I can't look anything up."})
+
+    from openai import OpenAI
+    oai = OpenAI(api_key=oai_key, timeout=45.0, max_retries=1)
+
+    try:
+        msgs = [{"role": "system", "content": _CPI_INTENT_SYSTEM}]
+        for h in history[-12:]:
+            role = h.get("role")
+            if role in ("user", "assistant") and h.get("content"):
+                msgs.append({"role": role, "content": str(h["content"])[:2000]})
+        msgs.append({"role": "user", "content": message})
+        raw, _model = _vimi_chat_json(oai, msgs, 500)
+        intent = json.loads(raw)
+    except Exception as e:
+        log.warning("cpi chat intent parse failed: %s", e)
+        return jsonify({"answer": "I couldn't understand that, try rephrasing."})
+
+    kind = str(intent.get("intent") or "unclear")
+    company_name = str(intent.get("company_name") or "").strip()
+    titles = [t for t in (intent.get("titles") or []) if isinstance(t, str) and t.strip()][:8]
+    seniorities = [s for s in (intent.get("seniorities") or []) if isinstance(s, str)][:6]
+    wants_contact = bool(intent.get("wants_contact_info"))
+    try:
+        max_results = min(int(intent.get("max_results") or 10), 20)
+    except (TypeError, ValueError):
+        max_results = 10
+
+    if kind == "unclear" and not titles and not company_name:
+        return jsonify({"answer": "I can look up a specific person's role at a company, a "
+                                  "list of people by title or industry, or a company's "
+                                  "profile. Try “Who is the CFO of Acme?” or “List "
+                                  "VPs of Engineering at fintech companies in NYC”."})
+
+    resolved_org = None
+    if company_name:
+        resolved_org, choices = _cpi_resolve_company(company_name, api_key)
+        if choices:
+            return jsonify({
+                "answer": "I found a few companies matching “%s”, which one did "
+                          "you mean?" % company_name,
+                "choices": choices,
+            })
+        if not resolved_org:
+            return jsonify({"answer": "I couldn't find a company called “%s” in "
+                                      "Apollo." % company_name})
+
+    if kind == "company_info" and resolved_org:
+        profile = _cpi_enrich_company(resolved_org.get("primary_domain") or resolved_org.get("domain") or "",
+                                       resolved_org.get("id") or "")
+        if not profile.get("matched"):
+            return jsonify({"answer": "Apollo doesn’t have a full profile for %s beyond "
+                                      "the basics." % (resolved_org.get("name") or company_name)})
+        return jsonify({"answer": _cpi_grounded_answer(oai, profile, message)})
+
+    people_filters = {"titles": titles, "seniorities": seniorities,
+                      "max_people": max_results if kind == "people_list" else 5}
+    if resolved_org:
+        people_filters["organization_ids"] = [resolved_org.get("id")]
+    elif intent.get("company_locations"):
+        people_filters["company_locations"] = intent["company_locations"]
+    if intent.get("person_locations"):
+        people_filters["person_locations"] = intent["person_locations"]
+    if intent.get("industries"):
+        people_filters["keywords"] = " ".join(str(x) for x in intent["industries"])[:200]
+    elif intent.get("keywords"):
+        people_filters["keywords"] = str(intent["keywords"])[:200]
+
+    try:
+        from tracker.apollo_client import search_people as _search_people
+        people = _search_people(people_filters, api_key,
+                                per_page=max_results if kind == "people_list" else 10)
+    except Exception as e:
+        log.warning("cpi chat people search failed: %s", e)
+        return jsonify({"answer": "The lookup failed just now, try again in a moment."})
+
+    if not people:
+        return jsonify({"answer": "I couldn't find anyone matching that in Apollo."})
+
+    if kind == "person_at_company":
+        top = people[0]
+        facts = top
+        if wants_contact:
+            enriched = _cpi_enrich_person(top.get("full_name") or "",
+                                          top.get("organization_domain")
+                                          or (resolved_org or {}).get("primary_domain") or "",
+                                          top.get("id") or "")
+            if enriched.get("matched"):
+                facts = enriched
+        return jsonify({"answer": _cpi_grounded_answer(oai, facts, message)})
+
+    # people_list
+    return jsonify({"answer": _cpi_grounded_answer(oai, {"people": people[:max_results]}, message)})
+
 
 @app.route("/health")
 def health():

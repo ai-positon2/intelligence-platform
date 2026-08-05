@@ -100,14 +100,36 @@ def _post(endpoint: str, payload: dict, api_key: str, retries: int = 3) -> dict:
     return {}
 
 
-def search_companies(filters: dict, api_key: str) -> list[dict]:
-    """Fetch 10 companies from Apollo and print the first result's raw JSON."""
-    payload = {
-        "page": 1,
-        "per_page": 10,
-        "organization_num_employees_ranges": ["100,2000"],
-        "organization_locations": ["United States"],
+def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int = 25) -> list[dict]:
+    """Search Apollo organizations via mixed_companies/search. Costs 1 Apollo
+    credit per call that returns at least one result (0 if it returns none) --
+    unlike search_people, this is NOT free.
+
+    filters keys (all optional): name (fuzzy match, e.g. for disambiguating a
+    company by its display name), domains (list), employee_min/employee_max
+    (mapped to Apollo's bucket ranges via _employee_ranges_for), locations
+    (list, HQ location), industries (list, mapped to Apollo's keyword-tag
+    search since there is no separate industry filter), exclude_keywords
+    (client-side post-filter -- Apollo has no native text-exclusion param),
+    max_companies (caps the returned list length).
+    """
+    payload: dict = {
+        "page": page,
+        "per_page": min(per_page, 100),
     }
+    if filters.get("name"):
+        payload["q_organization_name"] = filters["name"]
+    if filters.get("domains"):
+        payload["q_organization_domains_list"] = list(filters["domains"])
+    if filters.get("locations"):
+        payload["organization_locations"] = list(filters["locations"])
+    if filters.get("industries"):
+        payload["q_organization_keyword_tags"] = list(filters["industries"])
+    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
+    if emp_min is not None and emp_max is not None:
+        ranges = _employee_ranges_for(emp_min, emp_max)
+        if ranges:
+            payload["organization_num_employees_ranges"] = ranges
 
     try:
         data = _post("mixed_companies/search", payload, api_key)
@@ -115,7 +137,21 @@ def search_companies(filters: dict, api_key: str) -> list[dict]:
         logger.error("Failed to fetch companies from Apollo.")
         return []
 
-    orgs = data.get("organizations", []) or data.get("accounts", [])
+    # mixed_companies/search splits results into two buckets whose `id` fields are
+    # NOT interchangeable: "organizations" (net-new companies) carries the real
+    # Apollo organization ID in `id`; "accounts" (companies this Apollo team has
+    # already saved) carries an ACCOUNT id in `id` -- the organization ID is a
+    # separate `organization_id` field, and the domain lives in `domain` rather
+    # than `primary_domain`. Feeding an account's raw `id` into an
+    # organization_ids filter elsewhere (e.g. search_people) would silently
+    # match nothing or the wrong org, so both buckets are normalized onto the
+    # same shape here before any caller ever sees the difference.
+    orgs = list(data.get("organizations") or [])
+    for acct in (data.get("accounts") or []):
+        merged = dict(acct)
+        merged["id"] = acct.get("organization_id") or acct.get("id")
+        merged.setdefault("primary_domain", acct.get("domain"))
+        orgs.append(merged)
 
     # Client-side keyword exclusion (Apollo doesn't natively filter by text keywords)
     exclude_kws = [kw.lower() for kw in (filters.get("exclude_keywords") or [])]
@@ -129,11 +165,92 @@ def search_companies(filters: dict, api_key: str) -> list[dict]:
             return any(kw in text for kw in exclude_kws)
         orgs = [o for o in orgs if not _excluded(o)]
 
+    max_companies = filters.get("max_companies")
+    if max_companies is not None:
+        orgs = orgs[:max_companies]
+
     if orgs:
         logger.debug("[DEBUG] First company: %s", json.dumps(orgs[0], default=str)[:200])
 
     logger.info("search_companies: received %d companies (after filtering)", len(orgs))
     return orgs
+
+
+def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25) -> list[dict]:
+    """Search Apollo people via mixed_people/api_search (free, no credits --
+    this does NOT return verified emails/phones, only identity + role fields;
+    use enrich_company/get_leadership or the person-enrichment path for that).
+
+    filters keys (all optional): titles (list), include_similar_titles (bool,
+    default True), seniorities (list, e.g. "c_suite"/"vp"/"director"/...),
+    person_locations (list), company_locations (list, employer HQ),
+    company_domains (list), organization_ids (list, Apollo org IDs -- same
+    namespace get_leadership uses), employee_min/employee_max (employer size,
+    mapped via _employee_ranges_for), keywords (str), email_status (list),
+    max_people (caps the returned list length, like get_leadership).
+    """
+    payload: dict = {
+        "page": page,
+        "per_page": min(per_page, 100),
+    }
+    if filters.get("titles"):
+        payload["person_titles"] = list(filters["titles"])
+        payload["include_similar_titles"] = bool(filters.get("include_similar_titles", True))
+    if filters.get("seniorities"):
+        payload["person_seniorities"] = list(filters["seniorities"])
+    if filters.get("person_locations"):
+        payload["person_locations"] = list(filters["person_locations"])
+    if filters.get("company_locations"):
+        payload["organization_locations"] = list(filters["company_locations"])
+    if filters.get("company_domains"):
+        payload["q_organization_domains_list"] = list(filters["company_domains"])
+    if filters.get("organization_ids"):
+        payload["organization_ids"] = list(filters["organization_ids"])
+    if filters.get("keywords"):
+        payload["q_keywords"] = filters["keywords"]
+    if filters.get("email_status"):
+        payload["contact_email_status"] = list(filters["email_status"])
+    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
+    if emp_min is not None and emp_max is not None:
+        ranges = _employee_ranges_for(emp_min, emp_max)
+        if ranges:
+            payload["organization_num_employees_ranges"] = ranges
+
+    try:
+        data = _post("mixed_people/api_search", payload, api_key)
+    except Exception:
+        logger.error("Failed to search people on Apollo.")
+        return []
+
+    people = data.get("people", [])
+    max_people = filters.get("max_people")
+    if max_people is not None:
+        people = people[:max_people]
+
+    normalized = []
+    for p in people:
+        first = (p.get("first_name") or "").strip()
+        last = (p.get("last_name") or "").strip()
+        full_name = (f"{first} {last}".strip()) or (p.get("name") or "").strip() or None
+        org = p.get("organization") or {}
+        normalized.append({
+            "id": p.get("id"),
+            "full_name": full_name,
+            "first_name": first or None,
+            "last_name": last or None,
+            "title": p.get("title"),
+            "seniority": p.get("seniority"),
+            "linkedin_url": p.get("linkedin_url"),
+            "city": p.get("city"),
+            "state": p.get("state"),
+            "country": p.get("country"),
+            "organization_id": org.get("id") or p.get("organization_id"),
+            "organization_name": org.get("name"),
+            "organization_domain": org.get("primary_domain") or org.get("website_url"),
+        })
+
+    logger.info("search_people: received %d people", len(normalized))
+    return normalized
 
 
 def enrich_company(domain: str, api_key: str) -> dict:
