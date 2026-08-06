@@ -7138,31 +7138,44 @@ _CPI_NAME_RESOLVE_CACHE: dict = {}
 _CPI_NAME_RESOLVE_TTL_S = 24 * 3600
 
 
-def _cpi_resolve_company_name_to_org_ids(name: str, api_key: str, spend=None):
-    """(org_ids, resolved_names, found) for a plain company name typed into the
-    People filter bar's single "at company" field, which otherwise only
-    understands a domain. organization_ids is an exact, id-keyed Apollo filter
-    (unlike the domain param -- see search_people's own fix for why that
-    matters), so once a name resolves this is a strict match, not a guess.
-    Deliberately does not disambiguate the way chat does: a filter-bar search
-    has no per-result "did you mean" turn, so every distinct company the name
-    matches is included rather than picking one and silently dropping the rest."""
+def _cpi_resolve_company_name(name: str, api_key: str, spend=None):
+    """(org_id, org_name, choices, found) for a plain company name typed into
+    the People filter bar's single "at company" field, which otherwise only
+    understands a domain. Exactly one of org_id/org_name or choices is
+    populated when found is True. organization_ids is an exact, id-keyed
+    Apollo filter (unlike the domain param -- see search_people's own fix for
+    why that matters), so a single match is a strict filter, not a guess.
+
+    A name that matches more than one distinct company is never auto-resolved
+    to one guess or silently OR'd across every match: a filter-bar search has
+    no per-result "did you mean" turn the way chat does, so the caller must
+    let the user pick, and `choices` carries the same {name, domain, id, logo,
+    hq} shape chat's own disambiguation already uses."""
     key = _cpi_norm_name(name) or str(name or "").strip().lower()
     now = time.time()
     cached = _CPI_NAME_RESOLVE_CACHE.get(key)
     if cached and now - cached["ts"] < _CPI_NAME_RESOLVE_TTL_S:
-        return cached["ids"], cached["names"], True
+        return cached["id"], cached["name"], cached["choices"], True
     from tracker.apollo_client import search_companies as _sc
     rows = _sc({"name": name, "max_companies": 10}, api_key, strict=True)
     if rows and spend is not None:
         spend["credits"] = spend.get("credits", 0) + 1
     rows = _cpi_dedup_orgs(rows)
-    ids = [o.get("id") for o in rows if o.get("id")][:10]
-    names = [o.get("name") for o in rows if o.get("name")][:10]
-    found = bool(ids)
-    if found:
-        _CPI_NAME_RESOLVE_CACHE[key] = {"ids": ids, "names": names, "ts": now}
-    return ids, names, found
+    if not rows:
+        return None, None, None, False
+    if len(rows) == 1:
+        org_id, org_name = rows[0].get("id"), rows[0].get("name")
+        _CPI_NAME_RESOLVE_CACHE[key] = {"id": org_id, "name": org_name, "choices": None, "ts": now}
+        return org_id, org_name, None, True
+    choices = [{
+        "name": c.get("name"),
+        "domain": _cpi_domain_key(c),
+        "id": c.get("id"),
+        "logo": c.get("logo_url"),
+        "hq": ", ".join(x for x in [c.get("city"), c.get("state"), c.get("country")] if x),
+    } for c in rows]
+    _CPI_NAME_RESOLVE_CACHE[key] = {"id": None, "name": None, "choices": choices, "ts": now}
+    return None, None, choices, True
 
 
 @app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
@@ -7193,7 +7206,7 @@ def cpi_search():
         company_query = (raw_domains[0] or "").strip() if len(raw_domains) == 1 else ""
         if company_query and not _cpi_is_domain_shaped(company_query):
             try:
-                ids, names, found = _cpi_resolve_company_name_to_org_ids(
+                org_id, org_name, choices, found = _cpi_resolve_company_name(
                     company_query, api_key, spend)
             except Exception as e:
                 log.warning("cpi company-name resolve failed: %s", e)
@@ -7201,11 +7214,20 @@ def cpi_search():
             if not found:
                 return jsonify({"results": [], "has_more": False,
                                 "error": 'No company found matching "%s".' % company_query})
+            if choices:
+                # Ambiguous: never guess between distinct companies or search
+                # across all of them at once. Hand the choices back so the UI
+                # can ask, then run for exactly the one the user picks.
+                out = {"results": [], "has_more": False,
+                       "needs_company_choice": True, "choices": choices}
+                if spend["credits"]:
+                    out["credits"] = spend["credits"]
+                return jsonify(out)
             filters = dict(filters)
             filters.pop("company_domains", None)
             filters["organization_ids"] = list(dict.fromkeys(
-                list(filters.get("organization_ids") or []) + ids))
-            resolved_names = names
+                list(filters.get("organization_ids") or []) + [org_id]))
+            resolved_names = [org_name]
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people

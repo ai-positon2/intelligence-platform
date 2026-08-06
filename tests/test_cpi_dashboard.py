@@ -1002,3 +1002,76 @@ def test_a_not_found_company_name_is_never_cached(
                       json=_cpi_search_body(company_domains=["Position2"]))
     assert miss.get_json()["results"] == [] and "Position2" in miss.get_json()["error"]
     assert hit.get_json().get("resolved_company") == ["Position2"]
+
+
+def test_an_ambiguous_company_name_returns_choices_instead_of_guessing(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """The exact bug this guards: "Ola" matched ten unrelated companies (Ola,
+    Ola Chat, Olam Agri, ...) and the old behaviour silently OR'd every one of
+    them into the people search. A filter-bar search has no per-result "did
+    you mean" turn, so it must hand the choices back instead of guessing."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    orgs = [{"id": "org%d" % i, "name": "Ola %d" % i, "primary_domain": "ola%d.com" % i,
+            "city": "City%d" % i} for i in range(3)]
+    monkeypatch.setattr(ac, "search_companies", lambda filters, key, **kw: orgs)
+
+    def _boom(*a, **k):
+        raise AssertionError("search_people must not run before the user picks one")
+
+    monkeypatch.setattr(ac, "search_people", _boom)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json=_cpi_search_body(company_domains=["Ola"]))
+    body = r.get_json()
+    assert body["needs_company_choice"] is True
+    assert body["results"] == []
+    assert len(body["choices"]) == 3
+    assert {c["name"] for c in body["choices"]} == {"Ola 0", "Ola 1", "Ola 2"}
+    assert body["credits"] == 1
+
+
+def test_picking_one_choice_by_domain_runs_a_normal_domain_search(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """This is how the frontend resolves a pick: it puts the chosen company's
+    own domain into the same field and searches again, which must skip name
+    resolution entirely (it's already domain-shaped) and run a plain, free,
+    strictly domain-filtered people search -- no second credit spent."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+
+    def _boom(*a, **k):
+        raise AssertionError("a real domain must never trigger company-name resolution")
+
+    monkeypatch.setattr(ac, "search_companies", _boom)
+    seen = {}
+
+    def _fake_search_people(filters, key, **kw):
+        seen["filters"] = filters
+        return []
+
+    monkeypatch.setattr(ac, "search_people", _fake_search_people)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json=_cpi_search_body(company_domains=["ola1.com"]))
+    assert r.status_code == 200
+    assert seen["filters"].get("company_domains") == ["ola1.com"]
+    assert "credits" not in r.get_json()
+
+
+def test_ambiguous_choices_are_cached_to_avoid_a_repeat_credit_charge(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    calls = []
+    orgs = [{"id": "org1", "name": "Ola A"}, {"id": "org2", "name": "Ola B"}]
+    monkeypatch.setattr(ac, "search_companies",
+                        lambda filters, key, **kw: calls.append(1) or orgs)
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+
+    r1 = client.post("/p2/gtm/company-people-intelligence/search",
+                     json=_cpi_search_body(company_domains=["Ola"]))
+    r2 = client.post("/p2/gtm/company-people-intelligence/search",
+                     json=_cpi_search_body(company_domains=["Ola"]))
+    assert len(calls) == 1, "the same ambiguous name must resolve from cache the second time"
+    assert r1.get_json()["credits"] == 1
+    assert "credits" not in r2.get_json()
+    assert r2.get_json()["needs_company_choice"] is True
