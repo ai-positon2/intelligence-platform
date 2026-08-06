@@ -8,8 +8,10 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
 
 /* selected is keyed by Apollo id (not grid index) so a tick survives Load more,
    re-renders after a bulk enrich, and reopening a saved search. */
+/* historyId is the drawer entry this search already owns, so Load more grows it
+   instead of writing a second near-identical row. */
 var STATE = { entity: "people", page: 1, results: [], selected: {},
-              total: null, lastFilters: {} };
+              total: null, lastFilters: {}, historyId: null };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -46,7 +48,19 @@ window.cpiSetEntity = function(entity){
   /* People and company rows have different shapes and export columns, so a
      selection cannot survive the switch. Clear it rather than mixing the two. */
   if(changed){ STATE.selected={}; updateBulk(); }
+  syncLoadMoreLabel();
 };
+
+/* Each Companies page is a fresh mixed_companies/search call, which Apollo bills
+   a credit for, while People pages are free. The button says which it is, so the
+   cost is known before the click rather than inferred from the balance later. */
+function syncLoadMoreLabel(){
+  var btn=document.getElementById("cpiLoadMore");
+  if(!btn) return;
+  btn.innerHTML = STATE.entity==="companies"
+    ? 'Load more <s>&middot; 1 Apollo credit</s>'
+    : 'Load more <s>&middot; free</s>';
+}
 
 window.cpiToggleChip = function(el){ el.classList.toggle("on"); };
 
@@ -209,8 +223,9 @@ window.cpiRunSearch = function(reset){
     if(d && d.total!==undefined && d.total!==null) STATE.total=d.total;
     STATE.results = reset ? items : STATE.results.concat(items);
     renderResults();
+    syncLoadMoreLabel();
     document.getElementById("cpiLoadMore").style.display=(d&&d.has_more)?"":"none";
-    if(items.length) saveHistory();
+    if(items.length) saveHistory(reset);
   }).catch(function(){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
     wrap.innerHTML='<div class="cpi-empty"><span>Search failed. Try again in a moment.</span></div>';
@@ -479,13 +494,69 @@ window.cpiExport = function(fmt, onlySelected){
 };
 
 /* ── History ── */
-function saveHistory(){
+/* isNewSearch distinguishes "Search" from "Load more". A new search starts a new
+   entry; paging grows the entry the server already gave us an id for, so one
+   search is one row in the drawer no matter how deep it is paged. */
+function saveHistory(isNewSearch){
   if(!STATE.results.length) return;
+  if(isNewSearch) STATE.historyId = null;
   fetch(window.__CPI_HISTORY_URL__, {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ entity: STATE.entity, filters: STATE.lastFilters||{},
-                           total: STATE.total, rows: STATE.results })
+                           total: STATE.total, rows: STATE.results,
+                           replace_id: STATE.historyId||0 })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d && d.id) STATE.historyId = d.id;
   }).catch(function(){ /* history is best-effort, never blocks a search */ });
+}
+
+/* Reverse of gatherFilters: put a saved search's filters back on screen. Without
+   this, reopening an entry showed its rows while the panel still held whatever
+   was last typed, so pressing Search ran a different query than the one on
+   screen. Uses the same specs, so a new filter stays a one-line change. */
+function applyFiltersToForm(f){
+  f=f||{};
+  window.cpiClearFilters();
+  (STATE.entity==="people"?PEOPLE_FIELDS:COMPANY_FIELDS).forEach(function(spec){
+    var el=document.getElementById(spec[0]); if(!el) return;
+    var v=f[spec[1]];
+    if(v===undefined||v===null||v==="") return;
+    el.value = Array.isArray(v) ? v.join(", ") : String(v);
+  });
+  [["#fpSeniority .cpi-chip", f.seniorities], ["#fpEmailStatus .cpi-chip", f.email_status]]
+    .forEach(function(pair){
+      var want=pair[1]||[];
+      document.querySelectorAll(pair[0]).forEach(function(c){
+        c.classList.toggle("on", want.indexOf(c.getAttribute("data-val"))>=0);
+      });
+    });
+  /* The employee filter is a <select> of "min,max" buckets, so match the option
+     back by value rather than trying to set the numbers directly. */
+  var empId=STATE.entity==="people"?"fpEmpRange":"fcEmpRange";
+  var emp=document.getElementById(empId);
+  if(emp && f.employee_min!==undefined && f.employee_min!==null){
+    var want=String(f.employee_min)+","+
+      ((f.employee_max===undefined||f.employee_max===null||f.employee_max>=999999999)?"":String(f.employee_max));
+    for(var i=0;i<emp.options.length;i++){
+      if(emp.options[i].value===want){ emp.value=want; break; }
+    }
+  }
+  var dc=f.department_counts||{};
+  var dcName=Object.keys(dc)[0];
+  if(dcName){
+    var pre=STATE.entity==="people"?"fp":"fc";
+    var n=document.getElementById(pre+"DeptName"); if(n) n.value=dcName;
+    var lo=document.getElementById(pre+"DeptMin"); if(lo) lo.value=(dc[dcName].min!==undefined?dc[dcName].min:"");
+    var hi=document.getElementById(pre+"DeptMax"); if(hi) hi.value=(dc[dcName].max!==undefined?dc[dcName].max:"");
+  }
+  /* Stored in Apollo's days, shown in the months the UI collects. */
+  var tMin=document.getElementById("fpTenureMin"), tMax=document.getElementById("fpTenureMax");
+  if(tMin && f.days_in_title_min) tMin.value=Math.round(f.days_in_title_min/30);
+  if(tMax && f.days_in_title_max) tMax.value=Math.round(f.days_in_title_max/30);
+  var sim=document.getElementById("fpSimilarTitles");
+  if(sim && f.include_similar_titles!==undefined) sim.checked=!!f.include_similar_titles;
+  var unk=document.getElementById("fcUnknownFounded");
+  if(unk) unk.checked=!!f.include_unknown_founded_year;
 }
 
 window.cpiOpenHistory = function(){
@@ -530,6 +601,14 @@ window.cpiRestoreHistory = function(id){
     STATE.total = d.total;
     STATE.selected = {};
     STATE.page = 1;
+    /* Put the filters back on screen and keep them as lastFilters, so what the
+       panel shows, what a re-run would query, and what the entry is labelled
+       with all stay the same thing. */
+    STATE.lastFilters = d.filters||{};
+    applyFiltersToForm(STATE.lastFilters);
+    /* Continuing this reopened search grows its own entry rather than forking a
+       near-duplicate in the drawer. */
+    STATE.historyId = d.id||null;
     renderResults();
     document.getElementById("cpiLoadMore").style.display="none";
     window.cpiCloseHistory();
@@ -543,12 +622,21 @@ window.cpiDeleteHistory = function(id){
 };
 
 /* ── Enrich modal ── */
+/* safeUrl is applied HERE rather than at the call sites: these two helpers are
+   the only places Apollo-supplied URLs become an href, and a caller that forgot
+   would ship a clickable "javascript:" link that esc() cannot defuse (it stops
+   attribute breakout, not the scheme). Sanitizing at the sink means a new caller
+   cannot reintroduce it. */
 function pmKV(label,val,isLink){
   if(val===null||val===undefined||val==="") return "";
-  var v=isLink?('<a href="'+esc(val)+'" target="_blank" rel="noopener noreferrer">'+esc(String(val).replace(/^https?:\/\/(www\.)?/,""))+'</a>'):esc(val);
+  var href=isLink?safeUrl(val):"";
+  /* An unlinkable value still shows as text: dropping the row would hide a real
+     fact, and rendering a dead <a> would invite the click anyway. */
+  var v=href?('<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+esc(String(href).replace(/^https?:\/\/(www\.)?/,""))+'</a>'):esc(val);
   return '<div class="pm-kv-i"><span>'+esc(label)+'</span><b>'+v+'</b></div>';
 }
 function pmSo(url,svg,label,isCo,tip){
+  url=safeUrl(url);
   if(!url) return "";
   var txt=isCo?('<em>'+esc(label)+'</em>'):esc(label);
   return '<a class="pm-so'+(isCo?' co':'')+'" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(tip||label)+'">'+svg+'<span>'+txt+'</span></a>';
@@ -730,9 +818,15 @@ function addTyping(){
   chatScroll();
 }
 function removeTyping(){ var t=document.getElementById("cpiTyping"); if(t) t.remove(); }
-function addAssistantMsg(answer, choices){
+function addAssistantMsg(answer, choices, credits){
   CHAT_HISTORY.push({role:"assistant", content:answer||""});
   var b=document.getElementById("cpiChatBody");
+  /* Answers can spend Apollo credits from a pool the whole team shares, so each
+     one says what it cost. Silence here is what let a single question quietly
+     spend twenty. */
+  var costHtml="";
+  var n=+credits||0;
+  if(n>0){ costHtml='<div class="cpi-bub-cost">'+n+" Apollo credit"+(n===1?"":"s")+" used</div>"; }
   var choicesHtml="";
   if(choices&&choices.length){
     choicesHtml='<div class="cpi-choices">'+choices.map(function(c,i){
@@ -747,7 +841,7 @@ function addAssistantMsg(answer, choices){
       "</button>";
     }).join("")+"</div>";
   }
-  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub"><p>'+esc(answer||"I could not find an answer for that.").replace(/\n/g,"<br>")+"</p>"+choicesHtml+"</div></div>");
+  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub"><p>'+esc(answer||"I could not find an answer for that.").replace(/\n/g,"<br>")+"</p>"+choicesHtml+costHtml+"</div></div>");
   var justAdded=b.lastElementChild;
   if(justAdded){
     justAdded.querySelectorAll(".cpi-choice").forEach(function(btn){
@@ -826,7 +920,7 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
       /* Pin whatever company the server actually resolved, so the next turn
          inherits it instead of re-disambiguating. */
       if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
-      addAssistantMsg(d&&d.answer, d&&d.choices);
+      addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits);
     })
     .catch(function(){
       removeTyping(); sendBtn.disabled=false;
