@@ -111,8 +111,14 @@ def _apply_org_filters(payload: dict, filters: dict) -> None:
     if filters.get("department_counts"):
         payload["organization_department_or_subdepartment_counts"] = dict(filters["department_counts"])
     emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
-    if emp_min is not None and emp_max is not None:
-        ranges = _employee_ranges_for(emp_min, emp_max)
+    if emp_min is not None or emp_max is not None:
+        # One-sided is a real request ("1000+ employees", "under 50"), and
+        # requiring both bounds meant such a filter was dropped in silence, so the
+        # search quietly answered a broader question than the one that was asked.
+        # Apollo only takes discrete buckets, so an open end becomes the outermost
+        # bucket rather than no filter at all.
+        ranges = _employee_ranges_for(emp_min if emp_min is not None else 1,
+                                      emp_max if emp_max is not None else 10 ** 9)
         if ranges:
             payload["organization_num_employees_ranges"] = ranges
 
@@ -529,10 +535,19 @@ def enrich_company(domain: str, api_key: str) -> dict:
 
 
 def enrich_company_by_id(apollo_id: str, api_key: str) -> dict:
-    """Return full Apollo organization profile for the given Apollo account ID."""
+    """Return full Apollo organization profile for the given Apollo organization ID.
+
+    NOTE: organizations/enrich is documented as a DOMAIN-keyed endpoint and does
+    not officially accept an id, so this can legitimately come back empty even
+    for a real organization. Callers must therefore treat an empty result as
+    "try the domain instead", never as "Apollo has no such company" -- see
+    _cpi_enrich_company, where taking this as final made every company profile
+    question answer "no full profile" no matter which company was asked about.
+    """
     try:
         data = _post("organizations/enrich", {"id": apollo_id}, api_key)
-        return data.get("organization", data)
+        org = data.get("organization", data)
+        return org if isinstance(org, dict) and (org.get("id") or org.get("name")) else {}
     except Exception:
         logger.error("Failed to enrich company apollo_id=%s", apollo_id)
         return {}
