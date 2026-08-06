@@ -123,6 +123,65 @@ def test_export_defaults_to_xlsx_for_unknown_format(client):
     assert r.headers["Content-Disposition"].endswith('.xlsx"')
 
 
+def test_xlsx_export_with_filters_adds_a_search_details_sheet(client):
+    """A full-page or history export knows which filters produced the rows --
+    the file should say so, not just list the rows."""
+    import io
+    import openpyxl
+    r = client.post("/p2/gtm/company-people-intelligence/export",
+                    json={"entity": "people", "format": "xlsx", "rows": [_ROW],
+                          "filters": {"titles": ["CMO"], "seniorities": ["c_suite"]},
+                          "meta": {"total": 42, "label": "CMO · Acme"}})
+    wb = openpyxl.load_workbook(io.BytesIO(r.data))
+    assert "Search details" in wb.sheetnames
+    ws2 = wb["Search details"]
+    values = [ws2.cell(row=i, column=1).value for i in range(1, ws2.max_row + 1)]
+    labels = [ws2.cell(row=i, column=2).value for i in range(1, ws2.max_row + 1)]
+    assert "Titles" in values
+    assert "CMO" in labels
+    assert "Total matches in Apollo" in values and "42" in labels
+    assert "Saved search" in values and "CMO · Acme" in labels
+
+
+def test_xlsx_export_without_filters_has_no_search_details_sheet(client):
+    """A plain selection export (no known filters) stays exactly as before --
+    no half-empty details sheet added when there is nothing to say."""
+    import io
+    import openpyxl
+    r = client.post("/p2/gtm/company-people-intelligence/export",
+                    json={"entity": "people", "format": "xlsx", "rows": [_ROW]})
+    wb = openpyxl.load_workbook(io.BytesIO(r.data))
+    assert "Search details" not in wb.sheetnames
+
+
+def test_csv_export_ignores_filters_and_stays_a_flat_table(client):
+    """CSV has no second sheet to put search context in, so filters/meta must
+    never leak into the data rows -- the header stays exactly the column list."""
+    r = client.post("/p2/gtm/company-people-intelligence/export",
+                    json={"entity": "people", "format": "csv", "rows": [_ROW],
+                          "filters": {"titles": ["CMO"]}, "meta": {"total": 42}})
+    body = r.data.decode("utf-8-sig")
+    lines = body.splitlines()
+    assert lines[0].startswith("Name,Title,Seniority,Email")
+    assert len(lines) == 2
+
+
+def test_filters_readable_formats_lists_dicts_and_bools():
+    out = dict(appmod._cpi_filters_readable({
+        "titles": ["CMO", "VP Marketing"],
+        "employee_min": 50,
+        "include_similar_titles": True,
+        "department_counts": {"marketing": {"min": 2}},
+        "keywords": "",
+        "seniorities": [],
+    }))
+    assert out["Titles"] == "CMO, VP Marketing"
+    assert out["Employee min"] == "50"
+    assert out["Include similar titles"] == "Yes"
+    assert out["Department counts"] == "marketing: {'min': 2}"
+    assert "Keywords" not in out and "Seniorities" not in out
+
+
 # ── Bulk enrich ──────────────────────────────────────────────────────────────
 
 def test_bulk_enrich_is_capped_and_deduped(client, monkeypatch, no_postgres):
