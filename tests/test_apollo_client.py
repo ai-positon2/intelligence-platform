@@ -570,3 +570,45 @@ def test_field_coverage_counts_without_leaking_values():
     assert "photo_url 0/2" in out
     assert "Lovelace" not in out and "li/in/ada" not in out
     assert apollo_client._field_coverage([]) == "no rows"
+
+
+# ── One-sided employee filters ───────────────────────────────────────────────
+
+def test_a_min_only_employee_filter_is_not_dropped():
+    """"1000+ employees" is a real request. Requiring both bounds meant it was
+    discarded in silence, so the search answered a broader question than asked."""
+    payload = {}
+    apollo_client._apply_org_filters(payload, {"employee_min": 1000})
+    buckets = payload.get("organization_num_employees_ranges")
+    assert buckets, "the filter was dropped"
+    assert "10001," in buckets, "the open-ended top bucket must be included"
+    assert "1,10" not in buckets and "201,500" not in buckets
+
+
+def test_a_max_only_employee_filter_is_not_dropped():
+    payload = {}
+    apollo_client._apply_org_filters(payload, {"employee_max": 50})
+    buckets = payload.get("organization_num_employees_ranges")
+    assert buckets and "1,10" in buckets
+    assert "10001," not in buckets
+
+
+def test_no_employee_filter_stays_absent():
+    payload = {}
+    apollo_client._apply_org_filters(payload, {})
+    assert "organization_num_employees_ranges" not in payload
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_enrich_by_id_returns_empty_for_a_non_organization_body(mock_post):
+    """organizations/enrich is domain-keyed, so the id form can answer with an
+    error body. Returning that as an "organization" made callers treat a failed
+    lookup as a real company that simply had no fields."""
+    mock_post.return_value = _mock_response({"error": "unsupported parameter: id"})
+    assert apollo_client.enrich_company_by_id("org_1", "key") == {}
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_enrich_by_id_passes_through_a_real_organization(mock_post):
+    mock_post.return_value = _mock_response({"organization": {"id": "o1", "name": "Acme"}})
+    assert apollo_client.enrich_company_by_id("o1", "key")["name"] == "Acme"

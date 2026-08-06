@@ -818,15 +818,33 @@ function addTyping(){
   chatScroll();
 }
 function removeTyping(){ var t=document.getElementById("cpiTyping"); if(t) t.remove(); }
-function addAssistantMsg(answer, choices, credits){
+/* Answers now arrive as a lead paragraph plus bullets, so a little structure gets
+   rendered. esc() runs FIRST and every tag introduced below is one we generate
+   ourselves, so nothing in the model's output can inject markup. */
+function fmtAnswer(text){
+  var safe=esc(String(text==null?"":text)).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>");
+  var out=[], list=null;
+  safe.split(/\n/).forEach(function(ln){
+    var m=ln.match(/^\s*(?:[-*•])\s+(.*)$/);
+    if(m){ (list=list||[]).push("<li>"+m[1]+"</li>"); return; }
+    if(list){ out.push('<ul class="cpi-bub-ul">'+list.join("")+"</ul>"); list=null; }
+    if(ln.trim()) out.push("<p>"+ln+"</p>");
+  });
+  if(list) out.push('<ul class="cpi-bub-ul">'+list.join("")+"</ul>");
+  return out.join("") || "<p>"+safe+"</p>";
+}
+
+function addAssistantMsg(answer, choices, credits, researched){
   CHAT_HISTORY.push({role:"assistant", content:answer||""});
   var b=document.getElementById("cpiChatBody");
   /* Answers can spend Apollo credits from a pool the whole team shares, so each
-     one says what it cost. Silence here is what let a single question quietly
-     spend twenty. */
-  var costHtml="";
+     one says what it cost, and says when it drew on web research as well as our
+     own records. Silence here is what let a single question quietly spend twenty. */
+  var bits=[];
   var n=+credits||0;
-  if(n>0){ costHtml='<div class="cpi-bub-cost">'+n+" Apollo credit"+(n===1?"":"s")+" used</div>"; }
+  if(n>0) bits.push(n+" Apollo credit"+(n===1?"":"s")+" used");
+  if(researched) bits.push("includes web research");
+  var costHtml=bits.length?('<div class="cpi-bub-cost">'+esc(bits.join(" · "))+"</div>"):"";
   var choicesHtml="";
   if(choices&&choices.length){
     choicesHtml='<div class="cpi-choices">'+choices.map(function(c,i){
@@ -841,7 +859,7 @@ function addAssistantMsg(answer, choices, credits){
       "</button>";
     }).join("")+"</div>";
   }
-  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub"><p>'+esc(answer||"I could not find an answer for that.").replace(/\n/g,"<br>")+"</p>"+choicesHtml+costHtml+"</div></div>");
+  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+costHtml+"</div></div>");
   var justAdded=b.lastElementChild;
   if(justAdded){
     justAdded.querySelectorAll(".cpi-choice").forEach(function(btn){
@@ -920,7 +938,7 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
       /* Pin whatever company the server actually resolved, so the next turn
          inherits it instead of re-disambiguating. */
       if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
-      addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits);
+      addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits, d&&d.researched);
     })
     .catch(function(){
       removeTyping(); sendBtn.disabled=false;

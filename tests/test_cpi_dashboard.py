@@ -653,3 +653,150 @@ def test_expired_history_is_pruned_by_age_not_only_by_count(fake_pg, client):
             if sql.startswith("DELETE") and "make_interval" in sql]
     assert aged, "no age-based prune was issued"
     assert appmod._CPI_HISTORY_TTL_DAYS in (aged[0][1] or ())
+
+
+# ── Bulk-enrich cap reporting ────────────────────────────────────────────────
+
+def test_capped_is_only_true_when_rows_were_actually_dropped(client, no_postgres, monkeypatch):
+    """Comparing the truncated length to the cap told a user who selected exactly
+    50 that "only the first 50 were enriched", when nothing had been left out."""
+    import tracker.apollo_client as ac
+    monkeypatch.setattr(ac, "bulk_match_people",
+                        lambda ids, key: {i: {"id": i} for i in ids})
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    cap = appmod._CPI_BULK_ENRICH_CAP
+
+    def _post(n):
+        return client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+                           json={"ids": ["id%d" % i for i in range(n)]}).get_json()
+
+    assert _post(cap - 1)["capped"] is False
+    assert _post(cap)["capped"] is False, "a full selection is not a truncated one"
+    assert _post(cap + 1)["capped"] is True
+
+
+def test_duplicate_ids_do_not_count_towards_the_cap(client, no_postgres, monkeypatch):
+    import tracker.apollo_client as ac
+    monkeypatch.setattr(ac, "bulk_match_people",
+                        lambda ids, key: {i: {"id": i} for i in ids})
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    ids = ["same"] * (appmod._CPI_BULK_ENRICH_CAP + 20)
+    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+                       json={"ids": ids}).get_json()
+    assert body["capped"] is False and body["fetched"] == 1
+
+
+# ── Company enrichment falls back instead of dead-ending ─────────────────────
+
+def test_company_enrichment_falls_back_from_id_to_domain(monkeypatch):
+    """organizations/enrich is domain-keyed. Calling only the id form when an id
+    was known, which is always, made every company profile question answer
+    "Apollo doesn't have a full profile"."""
+    import tracker.apollo_client as ac
+    tried = []
+
+    def _by_id(apollo_id, key):
+        tried.append("id")
+        return {}
+
+    def _by_domain(domain, key):
+        tried.append("domain")
+        return {"id": "o1", "name": "Acme", "primary_domain": domain}
+
+    monkeypatch.setattr(ac, "enrich_company_by_id", _by_id)
+    monkeypatch.setattr(ac, "enrich_company", _by_domain)
+    monkeypatch.setattr(ac, "get_leadership", lambda *a, **k: [])
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+
+    profile = appmod._cpi_enrich_company("acme.com", "o1")
+    assert profile.get("matched") is True
+    assert tried == ["id", "domain"], "the domain form must be reached"
+
+
+def test_company_enrichment_bills_only_a_real_match(monkeypatch):
+    import tracker.apollo_client as ac
+    monkeypatch.setattr(ac, "enrich_company_by_id", lambda *a, **k: {})
+    monkeypatch.setattr(ac, "enrich_company", lambda *a, **k: {})
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    spend = {"credits": 0}
+    assert appmod._cpi_enrich_company("acme.com", "o1", spend=spend)["matched"] is False
+    assert spend["credits"] == 0, "a miss costs nothing and must not be counted"
+
+
+# ── Apollo facts combined with research ──────────────────────────────────────
+
+def test_the_answer_prompt_carries_both_sources(monkeypatch):
+    seen = {}
+
+    def _completion(oai, messages, max_tokens, temperature=None):
+        seen["user"] = messages[-1]["content"]
+        return "answer", "m"
+
+    monkeypatch.setattr(appmod, "_vimi_completion", _completion)
+    appmod._cpi_grounded_answer(None, {"company": {"name": "Acme"}}, "tell me about Acme",
+                                research="Acme sells widgets.")
+    assert "<apollo_facts>" in seen["user"] and "Acme" in seen["user"]
+    assert "<web_research>" in seen["user"] and "widgets" in seen["user"]
+    # Both blocks stay fenced and labelled as data, so third-party text inside
+    # them cannot be read as instructions.
+    assert "not instructions" in seen["user"]
+
+
+def test_an_empty_facts_block_is_omitted_rather_than_sent_empty(monkeypatch):
+    """A general question has nothing on file, and an empty facts block invites
+    the model to imply we hold records we do not."""
+    seen = {}
+
+    def _completion(oai, messages, max_tokens, temperature=None):
+        seen["user"] = messages[-1]["content"]
+        return "answer", "m"
+
+    monkeypatch.setattr(appmod, "_vimi_completion", _completion)
+    appmod._cpi_grounded_answer(None, {}, "what is ABM?", research="ABM is...")
+    assert "<apollo_facts>" not in seen["user"]
+    assert "<web_research>" in seen["user"]
+
+
+def test_em_dashes_never_survive_into_an_answer(monkeypatch):
+    monkeypatch.setattr(appmod, "_vimi_completion",
+                        lambda o, m, t, temperature=None: ("Acme — a widget maker", "m"))
+    out = appmod._cpi_grounded_answer(None, {}, "q", research="r")
+    assert "—" not in out
+    assert " , " not in out, "the replacement must not leave a space before the comma"
+
+
+def test_research_degrades_to_model_knowledge_without_a_web_tool(monkeypatch):
+    """No web-search tool on the key must not silently remove the research half of
+    every answer."""
+    monkeypatch.setattr(appmod, "_responses_web_search", lambda *a, **k: (None, False))
+    monkeypatch.setattr(appmod, "_vimi_completion",
+                        lambda o, m, t, temperature=None: ("brief", "m"))
+    text, used_web = appmod._cpi_research(None, "tell me about Acme")
+    assert text == "brief" and used_web is False
+
+
+def test_research_failure_leaves_the_apollo_answer_intact(monkeypatch):
+    """Research is an enhancement. If it cannot run at all, the answer still gets
+    made from the facts rather than the request failing."""
+    monkeypatch.setattr(appmod, "_responses_web_search", lambda *a, **k: (None, False))
+
+    def _boom(*a, **k):
+        raise RuntimeError("no model")
+
+    monkeypatch.setattr(appmod, "_vimi_completion", _boom)
+    assert appmod._cpi_research(None, "q") == ("", False)
+
+
+@pytest.mark.parametrize("org,expected_in", [
+    ({"name": "Acme", "primary_domain": "acme.com"}, "acme.com"),
+    ({"name": "Acme"}, "Acme"),
+    ({}, ""),
+    (None, ""),
+])
+def test_research_is_pinned_to_the_resolved_company(org, expected_in):
+    """A common company name would otherwise send the research off to a different
+    business than the one Apollo resolved."""
+    note = appmod._cpi_company_note(org)
+    assert expected_in in note
+    if not expected_in:
+        assert note == ""
