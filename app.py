@@ -7115,6 +7115,56 @@ def cpi_home():
                            export_url=url_for("cpi_export"))
 
 
+def _cpi_is_domain_shaped(s: str) -> bool:
+    """Same domain-detection regex as _cpi_clean_company_name, split out so the
+    people-search route can decide whether the single "at company" field holds
+    a domain (pass straight through) or a plain name (needs resolving first)."""
+    s = re.sub(r"^https?://", "", str(s or "").strip(), flags=re.I)
+    s = re.sub(r"^www\.", "", s, flags=re.I)
+    return bool(re.fullmatch(r"[a-z0-9][a-z0-9.\-]*\.[a-z]{2,}", s, re.I))
+
+
+# In-memory only, not persisted: a company's Apollo organization id and name
+# are stable, so caching a resolved name is safe indefinitely, but there is no
+# need to survive a redeploy for it. This exists so that filtering people by a
+# company NAME (see cpi_search) doesn't spend a fresh mixed_companies/search
+# credit on every "Load more" page of what is otherwise a free people search --
+# without it, paging through the same name-filtered search would bill once per
+# page instead of once per distinct name. Only a FOUND resolution is cached: a
+# no-match search costs 0 Apollo credits (mixed_companies/search only bills a
+# call that returns at least one result), so there is no cost to save by
+# caching "not found," only staleness risk if the name is indexed later.
+_CPI_NAME_RESOLVE_CACHE: dict = {}
+_CPI_NAME_RESOLVE_TTL_S = 24 * 3600
+
+
+def _cpi_resolve_company_name_to_org_ids(name: str, api_key: str, spend=None):
+    """(org_ids, resolved_names, found) for a plain company name typed into the
+    People filter bar's single "at company" field, which otherwise only
+    understands a domain. organization_ids is an exact, id-keyed Apollo filter
+    (unlike the domain param -- see search_people's own fix for why that
+    matters), so once a name resolves this is a strict match, not a guess.
+    Deliberately does not disambiguate the way chat does: a filter-bar search
+    has no per-result "did you mean" turn, so every distinct company the name
+    matches is included rather than picking one and silently dropping the rest."""
+    key = _cpi_norm_name(name) or str(name or "").strip().lower()
+    now = time.time()
+    cached = _CPI_NAME_RESOLVE_CACHE.get(key)
+    if cached and now - cached["ts"] < _CPI_NAME_RESOLVE_TTL_S:
+        return cached["ids"], cached["names"], True
+    from tracker.apollo_client import search_companies as _sc
+    rows = _sc({"name": name, "max_companies": 10}, api_key, strict=True)
+    if rows and spend is not None:
+        spend["credits"] = spend.get("credits", 0) + 1
+    rows = _cpi_dedup_orgs(rows)
+    ids = [o.get("id") for o in rows if o.get("id")][:10]
+    names = [o.get("name") for o in rows if o.get("name")][:10]
+    found = bool(ids)
+    if found:
+        _CPI_NAME_RESOLVE_CACHE[key] = {"ids": ids, "names": names, "ts": now}
+    return ids, names, found
+
+
 @app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
 @position2_required
 def cpi_search():
@@ -7136,6 +7186,26 @@ def cpi_search():
                         "error": "Apollo is not configured on this environment."})
     per_page = 24
     meta: dict = {}
+    spend = {"credits": 0}
+    resolved_names = None
+    if entity == "people":
+        raw_domains = filters.get("company_domains") or []
+        company_query = (raw_domains[0] or "").strip() if len(raw_domains) == 1 else ""
+        if company_query and not _cpi_is_domain_shaped(company_query):
+            try:
+                ids, names, found = _cpi_resolve_company_name_to_org_ids(
+                    company_query, api_key, spend)
+            except Exception as e:
+                log.warning("cpi company-name resolve failed: %s", e)
+                return jsonify({"results": [], "has_more": False, "error": "Search failed."})
+            if not found:
+                return jsonify({"results": [], "has_more": False,
+                                "error": 'No company found matching "%s".' % company_query})
+            filters = dict(filters)
+            filters.pop("company_domains", None)
+            filters["organization_ids"] = list(dict.fromkeys(
+                list(filters.get("organization_ids") or []) + ids))
+            resolved_names = names
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
@@ -7154,8 +7224,12 @@ def cpi_search():
     # Prefer Apollo's own page count for "is there more": len(results) == per_page
     # is a guess that both over- and under-reports on the last page.
     has_more = (page < total_pages) if total_pages else (len(results) >= per_page)
-    return jsonify({"results": results, "has_more": bool(has_more),
-                    "total": total, "page": page})
+    out = {"results": results, "has_more": bool(has_more), "total": total, "page": page}
+    if resolved_names:
+        out["resolved_company"] = resolved_names
+    if spend["credits"]:
+        out["credits"] = spend["credits"]
+    return jsonify(out)
 
 
 def _cpi_company_row(o: dict) -> dict:
