@@ -381,3 +381,275 @@ def test_empty_content_is_not_treated_as_success(monkeypatch):
     txt, _err = appmod._vimi_create(oai, "m", [], 500)
     assert txt is None
     appmod._VIMI_EFFORT_OK.clear()
+
+
+# ── Dead-model memoisation ───────────────────────────────────────────────────
+
+class _DeadModelOAI:
+    """OpenAI stand-in where some model ids do not exist on the account."""
+
+    def __init__(self, dead_models, status=404):
+        self.dead_models, self.status, self.tried = dead_models, status, []
+        outer = self
+
+        class _Err(Exception):
+            status_code = status
+
+        def create(model, messages, max_completion_tokens, **kw):
+            outer.tried.append(model)
+            if model in outer.dead_models:
+                raise _Err("The model `%s` does not exist" % model)
+            msg = types.SimpleNamespace(content="ok")
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+
+        self.chat = types.SimpleNamespace(
+            completions=types.SimpleNamespace(create=create))
+
+
+@pytest.fixture
+def clean_model_memo(monkeypatch):
+    monkeypatch.delenv("OPENAI_REASONING_EFFORT", raising=False)
+    monkeypatch.delenv("OPENAI_INSIGHTS_MODEL", raising=False)
+    appmod._VIMI_DEAD.clear()
+    appmod._VIMI_EFFORT_OK.clear()
+    yield
+    appmod._VIMI_DEAD.clear()
+    appmod._VIMI_EFFORT_OK.clear()
+
+
+def test_a_nonexistent_model_is_retired_after_one_call(clean_model_memo):
+    """A wrong id in _VIMI_MODELS otherwise costs a full failed effort-ladder walk
+    on every AI call in the app, for the life of the process."""
+    chain = appmod._vimi_model_chain()
+    oai = _DeadModelOAI({chain[0]})
+
+    appmod._vimi_completion(oai, [], 500)
+    assert chain[0] in oai.tried, "first call should still try the strongest model"
+
+    oai.tried = []
+    txt, _model = appmod._vimi_completion(oai, [], 500)
+    assert txt == "ok"
+    assert chain[0] not in oai.tried, "a retired model must not be probed again"
+
+
+def test_a_transient_failure_does_not_retire_a_model(clean_model_memo):
+    """Rate limits and 5xx are about this request, not the model. Disqualifying
+    the strongest model over one would silently degrade every later answer."""
+    chain = appmod._vimi_model_chain()
+    oai = _DeadModelOAI({chain[0]}, status=429)
+    appmod._vimi_completion(oai, [], 500)
+    assert chain[0] not in appmod._VIMI_DEAD
+
+
+def test_a_bad_api_key_does_not_retire_the_whole_chain(clean_model_memo):
+    """401 fails every model identically, so treating it as permanent would turn
+    a fixable credential problem into a process-long degradation."""
+    chain = appmod._vimi_model_chain()
+    oai = _DeadModelOAI(set(chain), status=401)
+    with pytest.raises(Exception):
+        appmod._vimi_completion(oai, [], 500)
+    assert not appmod._VIMI_DEAD
+
+
+def test_the_chain_is_never_empty_even_if_every_model_is_retired(clean_model_memo):
+    appmod._VIMI_DEAD.update(appmod._vimi_model_chain(skip_dead=False))
+    assert appmod._vimi_model_chain(), "an empty chain would mask the real error"
+
+
+# ── Contact fields reach the answer only when asked for ──────────────────────
+
+_ENRICHED = {"matched": True, "name": "Jane Doe", "title": "CMO",
+             "email": "jane@acme.com", "apollo_email": "jane@acme.com",
+             "emails": [{"email": "jane@acme.com"}],
+             "phones": [{"number": "+1 555 0100"}],
+             "company": {"name": "Acme"}, "location": "Austin, TX"}
+
+
+def test_no_contact_field_reaches_the_answer_unless_requested():
+    """_apollo_person_normalize carries FOUR keys with contact data. A denylist
+    naming two of them quietly handed the model the other two on every answer."""
+    facts = appmod._cpi_answer_person(_ENRICHED, wants_contact=False)
+    for key in ("email", "apollo_email", "emails", "phones"):
+        assert key not in facts, "%s must not reach the answer prompt" % key
+    assert facts["name"] == "Jane Doe" and facts["title"] == "CMO"
+
+
+def test_contact_fields_are_included_when_requested():
+    facts = appmod._cpi_answer_person(_ENRICHED, wants_contact=True)
+    assert facts["emails"] and facts["phones"] and facts["email"]
+
+
+def test_a_new_normalizer_field_cannot_leak_by_default():
+    """The allowlist has to fail closed: an unknown key is dropped, so adding a
+    field to the normalizer cannot start volunteering it."""
+    facts = appmod._cpi_answer_person(dict(_ENRICHED, home_address="12 Elm St"),
+                                      wants_contact=True)
+    assert "home_address" not in facts
+
+
+# ── The reveal only pays for names Apollo actually withheld ──────────────────
+
+@pytest.mark.parametrize("row,needs", [
+    ({"full_name": "Jane Doe", "last_name": "Doe"}, False),
+    ({"full_name": "Jane H.", "name_masked": True}, True),
+    ({"full_name": "Sanjeev"}, True),          # first name only, carries no flag
+    ({"full_name": ""}, True),
+    ({"full_name": "Jane Doe"}, False),        # two tokens, no last_name key
+])
+def test_name_completeness_decides_whether_a_credit_is_spent(row, needs):
+    assert appmod._cpi_name_incomplete(row) is needs
+
+
+def test_reveal_skips_rows_that_already_have_a_full_name(no_postgres, monkeypatch):
+    """A list answer used to spend one credit per person it mentioned, including
+    every person whose surname had already come back free."""
+    import tracker.apollo_client as ac
+    calls = []
+    monkeypatch.setattr(ac, "bulk_match_people",
+                        lambda ids, key: calls.append(list(ids)) or {})
+    people = [{"id": "p%d" % i, "full_name": "Person %d" % i, "last_name": "%d" % i}
+              for i in range(10)]
+    appmod._cpi_reveal_names(people, "key")
+    assert calls == [], "nothing to reveal means no Apollo call at all"
+
+
+def test_reveal_is_capped_and_reports_its_cost(no_postgres, monkeypatch):
+    import tracker.apollo_client as ac
+    seen = []
+
+    def _bulk(ids, key):
+        seen.extend(ids)
+        return {i: {"id": i, "first_name": "Real", "last_name": "Name"} for i in ids}
+
+    monkeypatch.setattr(ac, "bulk_match_people", _bulk)
+    people = [{"id": "p%d" % i, "full_name": "P%d H." % i, "name_masked": True}
+              for i in range(40)]
+    spend = {"credits": 0}
+    appmod._cpi_reveal_names(people, "key", spend=spend)
+    assert len(seen) == appmod._CPI_CHAT_REVEAL_CAP
+    assert len(seen) == len(set(seen)), "no id may be submitted twice"
+    assert spend["credits"] == appmod._CPI_CHAT_REVEAL_CAP
+
+
+def test_chat_reply_states_its_cost_and_omits_it_when_free():
+    with appmod.app.test_request_context():
+        assert appmod._cpi_chat_reply({"credits": 3}, answer="x").get_json()["credits"] == 3
+        assert "credits" not in appmod._cpi_chat_reply({"credits": 0}, answer="x").get_json()
+
+
+# ── History: one search is one entry ─────────────────────────────────────────
+
+class _FakeCursor:
+    """Records the SQL a request issues and hands back queued fetchone results."""
+
+    def __init__(self, log, rows):
+        self.log, self.rows = log, rows
+
+    def execute(self, sql, params=None):
+        self.log.append((" ".join(sql.split()), params))
+
+    def fetchone(self):
+        return self.rows.pop(0) if self.rows else None
+
+    def fetchall(self):
+        return []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _FakeConn:
+    def __init__(self, rows=None):
+        self.log, self.rows, self.commits = [], list(rows or []), 0
+
+    def cursor(self):
+        return _FakeCursor(self.log, self.rows)
+
+    def commit(self):
+        self.commits += 1
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+    def verbs(self):
+        return [sql.split()[0].upper() for sql, _ in self.log
+                if sql.split()[0].upper() in ("INSERT", "UPDATE", "DELETE")]
+
+
+@pytest.fixture
+def fake_pg(monkeypatch):
+    """Swap in a recording connection and reset the one-shot DDL guard, which
+    would otherwise leak table-created state between tests."""
+    def _make(rows=None):
+        conn = _FakeConn(rows)
+        monkeypatch.setattr(appmod, "_pg_conn", lambda: conn)
+        monkeypatch.setattr(appmod, "_CPI_HISTORY_TABLE_READY", False)
+        return conn
+    return _make
+
+
+def test_paging_grows_the_existing_history_entry(fake_pg, client):
+    """Without this, every Load more wrote another entry holding a superset of
+    the last one, evicting real history against the 60-per-user cap."""
+    import datetime as _dt
+    conn = fake_pg(rows=[(7, _dt.datetime(2026, 8, 6))])   # the UPDATE finds row 7
+    body = client.post("/p2/gtm/company-people-intelligence/history",
+                       json={"entity": "people", "filters": {"titles": ["CMO"]},
+                             "rows": [{"id": "p1"}], "replace_id": 7}).get_json()
+    assert body["saved"] is True and body["id"] == 7
+    assert "UPDATE" in conn.verbs()
+    assert "INSERT" not in conn.verbs(), "paging must not fork a second entry"
+
+
+def test_a_new_search_inserts_a_fresh_entry(fake_pg, client):
+    import datetime as _dt
+    conn = fake_pg(rows=[(9, _dt.datetime(2026, 8, 6))])
+    body = client.post("/p2/gtm/company-people-intelligence/history",
+                       json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}]}).get_json()
+    assert body["id"] == 9
+    assert "INSERT" in conn.verbs() and "UPDATE" not in conn.verbs()
+
+
+def test_an_unknown_replace_id_falls_through_to_an_insert(fake_pg, client):
+    """A replace_id belonging to someone else matches nothing, and the save must
+    still land under the signed-in user rather than being dropped."""
+    import datetime as _dt
+    conn = fake_pg(rows=[None, (11, _dt.datetime(2026, 8, 6))])
+    body = client.post("/p2/gtm/company-people-intelligence/history",
+                       json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}],
+                             "replace_id": 999999}).get_json()
+    assert body["id"] == 11
+    verbs = conn.verbs()
+    assert verbs.count("UPDATE") == 1 and verbs.count("INSERT") == 1
+
+
+def test_history_save_scopes_every_write_to_the_signed_in_user(fake_pg, client):
+    """email in the WHERE clause is the authorization boundary here."""
+    import datetime as _dt
+    conn = fake_pg(rows=[(7, _dt.datetime(2026, 8, 6))])
+    client.post("/p2/gtm/company-people-intelligence/history",
+                json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}],
+                      "replace_id": 7})
+    for sql, params in conn.log:
+        verb = sql.split()[0].upper()
+        if verb in ("UPDATE", "DELETE"):
+            assert "reporting@position2.com" in (params or ()), sql
+
+
+def test_expired_history_is_pruned_by_age_not_only_by_count(fake_pg, client):
+    """These rows hold revealed emails and phone numbers, so they must not be
+    retained indefinitely just because the count cap has not been reached."""
+    import datetime as _dt
+    conn = fake_pg(rows=[(9, _dt.datetime(2026, 8, 6))])
+    client.post("/p2/gtm/company-people-intelligence/history",
+                json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}]})
+    aged = [(sql, params) for sql, params in conn.log
+            if sql.startswith("DELETE") and "make_interval" in sql]
+    assert aged, "no age-based prune was issued"
+    assert appmod._CPI_HISTORY_TTL_DAYS in (aged[0][1] or ())

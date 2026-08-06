@@ -1,7 +1,19 @@
 """Tests for change_detector.py — pure logic, no I/O."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from tracker.change_detector import detect_changes, ChangeEvent, is_within_age_limit
+
+# Signals are suppressed once their date falls outside the config's age window
+# (90 days), so a hardcoded "recent" date is a time bomb: it passes when written
+# and fails silently months later on a date nobody chose. Derive both ends of the
+# window from today so these tests assert the behaviour, not the calendar.
+_NOW = datetime.now(timezone.utc)
+_RECENT = (_NOW - timedelta(days=10)).strftime("%Y-%m-%d")
+_RECENT_RSS = (_NOW - timedelta(days=10)).strftime("%a, %d %b %Y 10:00:00 GMT")
+_STALE = (_NOW - timedelta(days=400)).strftime("%Y-%m-%d")
+_STALE_RSS = (_NOW - timedelta(days=400)).strftime("%a, %d %b %Y 10:00:00 GMT")
 
 _BASE_CONFIG = {
     "signals": {
@@ -23,7 +35,7 @@ _BASE_OLD = {
     "hq_state": "TX",
     "latest_funding_type": "Series B",
     "latest_funding_amount": 20_000_000.0,
-    "last_raised_at": "2023-01-01",
+    "last_raised_at": _STALE,
     "total_funding": 20_000_000.0,
     "open_job_count": 10,
     "tech_stack": ["Salesforce", "HubSpot"],
@@ -117,7 +129,7 @@ def test_same_location_no_event():
 
 
 def test_funding_round_detected():
-    new = _new({"latest_funding_type": "Series C", "latest_funding_amount": 50_000_000.0, "last_raised_at": "2026-04-01"})
+    new = _new({"latest_funding_type": "Series C", "latest_funding_amount": 50_000_000.0, "last_raised_at": _RECENT})
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
     funding = [e for e in events if e.signal_type == "Funding Round"]
     assert len(funding) == 1
@@ -125,7 +137,7 @@ def test_funding_round_detected():
 
 
 def test_funding_stage_detected_separately():
-    new = _new({"latest_funding_type": "Series C", "last_raised_at": "2026-04-01"})
+    new = _new({"latest_funding_type": "Series C", "last_raised_at": _RECENT})
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
     types = {e.signal_type for e in events}
     assert "Funding Round" in types or "New Funding Stage" in types
@@ -184,7 +196,7 @@ def test_multiple_signals_in_one_diff():
         "open_job_count": 15,
         "latest_funding_type": "Series C",
         "latest_funding_amount": 60_000_000.0,
-        "last_raised_at": "2026-04-01",
+        "last_raised_at": _RECENT,
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
     types = {e.signal_type for e in events}
@@ -193,12 +205,20 @@ def test_multiple_signals_in_one_diff():
     assert "Funding Round" in types or "New Funding Stage" in types
 
 
-def test_acquisition_from_news():
+def test_ma_news_article_fires_news_mention_not_a_synthesized_ma_signal():
+    """An M&A-sounding headline is reported as News Mention, never as an M&A event.
+
+    detect_changes deliberately does not infer M&A or IPO from article keywords
+    (those come from Google Sheets), because a headline saying a company was
+    acquired is not confirmation that it was.
+    """
     new = _new({
         "news_articles": [{"title": "Acme Corp acquired by BigCo", "summary": "acquisition deal closed"}]
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
-    assert any(e.signal_type == "Acquisition / M&A" for e in events)
+    types = {e.signal_type for e in events}
+    assert "News Mention" in types
+    assert "Acquisition / M&A" not in types
 
 
 def test_csuite_join_dedup_more_than_3_collapses():
@@ -252,11 +272,11 @@ def test_csuite_join_uses_full_name():
 # ── is_within_age_limit tests ───────────────────────────────────────────────
 
 def test_is_within_age_limit_recent_iso():
-    assert is_within_age_limit("2026-04-01", 90) is True
+    assert is_within_age_limit(_RECENT, 90) is True
 
 
 def test_is_within_age_limit_old_iso():
-    assert is_within_age_limit("2023-01-01", 90) is False
+    assert is_within_age_limit(_STALE, 90) is False
 
 
 def test_is_within_age_limit_empty_allows():
@@ -270,8 +290,8 @@ def test_is_within_age_limit_none_allows():
 
 def test_is_within_age_limit_rss_format():
     """RFC 2822 date format used by Google News RSS."""
-    assert is_within_age_limit("Mon, 05 May 2026 10:00:00 GMT", 90) is True
-    assert is_within_age_limit("Mon, 01 Jan 2023 10:00:00 GMT", 90) is False
+    assert is_within_age_limit(_RECENT_RSS, 90) is True
+    assert is_within_age_limit(_STALE_RSS, 90) is False
 
 
 # ── 90-day signal gate tests ─────────────────────────────────────────────────
@@ -281,7 +301,7 @@ def test_csuite_join_with_old_start_date_suppressed():
     new = _new({
         "leadership": [
             *_BASE_OLD["leadership_json"],
-            {"id": "p3", "full_name": "Carol Lee", "title": "CFO", "linkedin_url": None, "start_date": "2022-01-01"},
+            {"id": "p3", "full_name": "Carol Lee", "title": "CFO", "linkedin_url": None, "start_date": _STALE},
         ]
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
@@ -293,7 +313,7 @@ def test_csuite_join_with_recent_start_date_fires():
     new = _new({
         "leadership": [
             *_BASE_OLD["leadership_json"],
-            {"id": "p3", "full_name": "Carol Lee", "title": "CFO", "linkedin_url": None, "start_date": "2026-04-01"},
+            {"id": "p3", "full_name": "Carol Lee", "title": "CFO", "linkedin_url": None, "start_date": _RECENT},
         ]
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
@@ -302,7 +322,7 @@ def test_csuite_join_with_recent_start_date_fires():
 
 def test_funding_with_stale_raised_at_suppressed():
     """Funding stage change with last_raised_at older than 90 days must not fire."""
-    new = _new({"latest_funding_type": "Series C", "last_raised_at": "2022-06-01"})
+    new = _new({"latest_funding_type": "Series C", "last_raised_at": _STALE})
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
     assert not any(e.signal_type in ("Funding Round", "New Funding Stage") for e in events)
 
@@ -315,18 +335,18 @@ def test_funding_without_raised_at_fires():
 
 
 def test_news_article_with_old_date_suppressed():
-    """M&A news article with a published date older than 90 days must not fire."""
+    """A news article published outside the age window must not fire at all."""
     new = _new({
-        "news_articles": [{"title": "Acme Corp acquired by BigCo", "summary": "deal", "published": "2022-01-01"}]
+        "news_articles": [{"title": "Acme Corp acquired by BigCo", "summary": "deal", "published": _STALE}]
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
-    assert not any(e.signal_type == "Acquisition / M&A" for e in events)
+    assert not any(e.signal_type == "News Mention" for e in events)
 
 
 def test_news_article_with_recent_date_fires():
-    """M&A news article with a recent published date must fire."""
+    """A news article published inside the age window must fire."""
     new = _new({
-        "news_articles": [{"title": "Acme Corp acquired by BigCo", "summary": "deal", "published": "2026-04-01"}]
+        "news_articles": [{"title": "Acme Corp acquired by BigCo", "summary": "deal", "published": _RECENT}]
     })
     events = detect_changes(_BASE_OLD, new, _BASE_CONFIG)
-    assert any(e.signal_type == "Acquisition / M&A" for e in events)
+    assert any(e.signal_type == "News Mention" for e in events)

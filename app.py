@@ -7284,7 +7284,31 @@ def _cpi_id_cache_write(profiles: dict) -> None:
             pass
 
 
-def _cpi_reveal_names(people: list, api_key: str) -> list:
+# A chat answer must never be able to spend an unbounded number of credits. Ten
+# is enough to fix a list whose surnames Apollo withheld while keeping the worst
+# case for a single question small against a shared pool.
+_CPI_CHAT_REVEAL_CAP = 10
+
+
+def _cpi_name_incomplete(p: dict) -> bool:
+    """Does this row still need a paid lookup to have a usable full name?
+
+    Three different ways a free search row falls short, and all three have to
+    count or the reveal skips the person it exists for: Apollo flagged the
+    surname as withheld, it returned no name at all, or it returned a first name
+    with no surname. That last one is the case this feature was built for, where
+    an answer said "Sanjeev" about a person named Sanjeev Dhanaraj, and it
+    carries no masking flag at all.
+    """
+    if p.get("name_masked") or not p.get("full_name"):
+        return True
+    if p.get("last_name"):
+        return False
+    return len(str(p.get("full_name") or "").split()) < 2
+
+
+def _cpi_reveal_names(people: list, api_key: str, cap: int = _CPI_CHAT_REVEAL_CAP,
+                      spend=None) -> list:
     """Best-effort: patch each person's full_name/title/linkedin_url with the
     real values Apollo enrichment returns, replacing whatever
     mixed_people/api_search masked. A person who cannot be enriched (no id, no
@@ -7293,10 +7317,18 @@ def _cpi_reveal_names(people: list, api_key: str) -> list:
     Apollo hit for them, just possibly a masked name. Deliberately does NOT
     carry emails/phones back into the returned dicts: this feeds list-style
     chat answers, and the answer prompt should only see contact fields when
-    the user actually asked for them (see wants_contact_info in cpi_chat)."""
+    the user actually asked for them (see wants_contact_info in cpi_chat).
+
+    Only people whose name Apollo actually withheld are enriched, and at most
+    `cap` of them. Enriching a row whose surname already came back free would
+    spend a credit to learn something we already have, which is what a list
+    answer used to do once per person for every row it mentioned. `spend`, if
+    given, accumulates the billable matches so the caller can report the cost.
+    """
     if not api_key:
         return people
-    ids = [p.get("id") for p in (people or []) if p.get("id")]
+    needy = [p for p in (people or []) if p.get("id") and _cpi_name_incomplete(p)]
+    ids = list(dict.fromkeys(p["id"] for p in needy))[:cap]
     if not ids:
         return people
     cached = _cpi_id_cache_read(ids)
@@ -7309,6 +7341,9 @@ def _cpi_reveal_names(people: list, api_key: str) -> list:
         except Exception as e:
             log.warning("cpi bulk name reveal failed: %s", e)
             raw = {}
+        # Apollo bills ~1 credit per id it actually matched; misses are free.
+        if raw and spend is not None:
+            spend["credits"] = spend.get("credits", 0) + len(raw)
         for apollo_id, m in raw.items():
             try:
                 fresh[apollo_id] = _apollo_person_normalize(m, m.get("email") or "")
@@ -7330,7 +7365,8 @@ def _cpi_reveal_names(people: list, api_key: str) -> list:
     return merged
 
 
-def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "") -> dict:
+def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
+                       spend=None) -> dict:
     """One person -> the same normalized profile shape the External Usage person
     modal renders (_apollo_person_normalize), so this page's Enrich modal reuses
     that exact contract. Costs 1 Apollo credit if a match is found."""
@@ -7361,6 +7397,9 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "") 
         p = data.get("person") or {}
         if not p:
             return {"matched": False}
+        # A match is what Apollo bills for; a miss costs nothing.
+        if spend is not None:
+            spend["credits"] = spend.get("credits", 0) + 1
         return _apollo_person_normalize(p, p.get("email") or "")
     except Exception as e:
         # No personal data in the log line: an id and a domain only.
@@ -7369,7 +7408,7 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "") 
         return {"matched": False}
 
 
-def _cpi_enrich_company(domain: str, apollo_id: str) -> dict:
+def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
     """One company -> the same normalized shape the Company card renders
     (_apollo_org_normalize), plus a short "leadership" list (reuses the
     existing get_leadership, itself already used by the visitor-intelligence
@@ -7384,6 +7423,8 @@ def _cpi_enrich_company(domain: str, apollo_id: str) -> dict:
         org = _apollo_enrich_company_by_id(apollo_id, key) if apollo_id else _apollo_enrich_company_fn(domain, key)
         if not isinstance(org, dict) or not (org.get("id") or org.get("name")):
             return {"matched": False}
+        if spend is not None:
+            spend["credits"] = spend.get("credits", 0) + 1
         profile = {"matched": True, **_apollo_org_normalize(org)}
         org_id = org.get("id")
         if org_id:
@@ -7514,6 +7555,9 @@ def _cpi_person_row(p: dict) -> dict:
 _CPI_HISTORY_TABLE_READY = False
 _CPI_HISTORY_KEEP = 60          # rows retained per user; older ones are pruned
 _CPI_HISTORY_MAX_ROWS = 120     # result rows stored per entry
+# These rows hold revealed emails and phone numbers, so they are not kept
+# indefinitely just because the per-user count cap has not been reached.
+_CPI_HISTORY_TTL_DAYS = 90
 
 
 def _ensure_cpi_history_table(conn) -> None:
@@ -7594,15 +7638,43 @@ def cpi_history():
             return jsonify({"saved": False, "available": True})
         entity = "companies" if body.get("entity") == "companies" else "people"
         filters = body.get("filters") if isinstance(body.get("filters"), dict) else {}
+        # A "Load more" is the same search getting longer, not a new one. The
+        # client sends back the id it was given for this search so the entry is
+        # grown in place; without it, paging three deep wrote three entries
+        # holding 24, 48 and 72 rows and evicted real history against the cap.
+        try:
+            replace_id = int(body.get("replace_id") or 0)
+        except (TypeError, ValueError):
+            replace_id = 0
         from psycopg2.extras import Json
         with conn.cursor() as cur:
+            new_id = created = None
+            if replace_id:
+                # email in the WHERE clause is the authorization check: a guessed
+                # id belonging to someone else updates nothing and falls through
+                # to an insert under this user's own email.
+                cur.execute(
+                    "UPDATE cpi_search_history SET entity = %s, label = %s, filters = %s, "
+                    "total = %s, rows = %s, created_at = now() "
+                    "WHERE id = %s AND email = %s RETURNING id, created_at",
+                    (entity, _cpi_history_label(entity, filters), Json(filters),
+                     body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS]),
+                     replace_id, email))
+                got = cur.fetchone()
+                if got:
+                    new_id, created = got
+            if new_id is None:
+                cur.execute(
+                    "INSERT INTO cpi_search_history (email, entity, label, filters, total, rows) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at",
+                    (email, entity, _cpi_history_label(entity, filters), Json(filters),
+                     body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS])))
+                new_id, created = cur.fetchone()
+            # Retire anything past the TTL, then keep the list bounded per user.
             cur.execute(
-                "INSERT INTO cpi_search_history (email, entity, label, filters, total, rows) "
-                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at",
-                (email, entity, _cpi_history_label(entity, filters), Json(filters),
-                 body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS])))
-            new_id, created = cur.fetchone()
-            # Keep the list bounded per user instead of growing without limit.
+                "DELETE FROM cpi_search_history WHERE email = %s "
+                "AND created_at < now() - make_interval(days => %s)",
+                (email, _CPI_HISTORY_TTL_DAYS))
             cur.execute(
                 "DELETE FROM cpi_search_history WHERE email = %s AND id NOT IN "
                 "(SELECT id FROM cpi_search_history WHERE email = %s "
@@ -7650,8 +7722,10 @@ def cpi_history_entry(entry_id: int):
             row = cur.fetchone()
         if not row:
             return jsonify({"error": "Not found"}), 404
-        return jsonify({"entity": row[0], "label": row[1], "filters": row[2],
-                        "total": row[3], "rows": row[4]})
+        # id travels back so the client can keep growing this same entry if the
+        # reopened search is continued, rather than forking a near-duplicate.
+        return jsonify({"id": entry_id, "entity": row[0], "label": row[1],
+                        "filters": row[2], "total": row[3], "rows": row[4]})
     except Exception as e:
         log.warning("cpi history entry %s failed: %s", entry_id, e)
         try:
@@ -7841,6 +7915,27 @@ _CPI_ANSWER_SYSTEM = (
 )
 
 
+# Which fields of an enriched person the answer prompt is allowed to see.
+# Deliberately an allowlist: _apollo_person_normalize returns FOUR keys carrying
+# contact data (email, apollo_email, emails, phones), and a denylist naming only
+# two of them quietly handed the other two to the model on every answer, even
+# when the user had not asked for contact details. An allowlist fails closed when
+# the normalizer gains a field.
+_CPI_ANSWER_PERSON_FIELDS = ("matched", "name", "title", "headline", "seniority",
+                             "departments", "functions", "city", "state", "country",
+                             "location", "time_zone", "linkedin", "twitter",
+                             "company", "history")
+_CPI_ANSWER_CONTACT_FIELDS = ("email", "apollo_email", "emails", "phones")
+
+
+def _cpi_answer_person(profile: dict, wants_contact: bool) -> dict:
+    """An enriched profile trimmed to what the answer is entitled to state."""
+    allowed = _CPI_ANSWER_PERSON_FIELDS
+    if wants_contact:
+        allowed = allowed + _CPI_ANSWER_CONTACT_FIELDS
+    return {k: v for k, v in (profile or {}).items() if k in allowed}
+
+
 def _cpi_norm_name(s: str) -> str:
     """Company name -> comparison key. NFKC first, because Apollo stores stylized
     names with typographic characters (Position2 is literally "Position²" in
@@ -7895,7 +7990,8 @@ def _cpi_dedup_orgs(candidates: list) -> list:
     return out
 
 
-def _cpi_resolve_company(name: str, api_key: str, domain: str = ""):
+def _cpi_resolve_company(name: str, api_key: str, domain: str = "",
+                         spend=None):
     """(org, choices) -- at most one is non-None. `choices` is a disambiguation
     payload only when the name is genuinely ambiguous, meaning it still maps to
     more than one DISTINCT company after deduping; `org` is the one resolved
@@ -7906,12 +8002,20 @@ def _cpi_resolve_company(name: str, api_key: str, domain: str = ""):
     Costs 1 Apollo credit per call (mixed_companies/search)."""
     from tracker.apollo_client import search_companies as _sc
 
+    def _search(filters: dict) -> list:
+        rows = _sc(filters, api_key, strict=True)
+        # mixed_companies/search bills 1 credit per call that returns at least one
+        # row and 0 for an empty result, so the count has to be taken here, per
+        # call, rather than inferred from how this function ended up resolving.
+        if rows and spend is not None:
+            spend["credits"] = spend.get("credits", 0) + 1
+        return _cpi_dedup_orgs(rows)
+
     name, name_domain = _cpi_clean_company_name(name)
     domain = (domain or name_domain or "").strip().lower()
 
     if domain:
-        hits = _cpi_dedup_orgs(_sc({"domains": [domain], "max_companies": 5}, api_key,
-                                   strict=True))
+        hits = _search({"domains": [domain], "max_companies": 5})
         # Only an ACTUAL domain match counts. q_organization_domains_list is a
         # fuzzy search input, not a strict equality filter, so taking hits[0]
         # here would hand back a neighbouring company that shares nothing with
@@ -7928,8 +8032,7 @@ def _cpi_resolve_company(name: str, api_key: str, domain: str = ""):
     if not name:
         return None, None
 
-    candidates = _cpi_dedup_orgs(_sc({"name": name, "max_companies": 8}, api_key,
-                                     strict=True))
+    candidates = _search({"name": name, "max_companies": 8})
     if not candidates:
         return None, None
     if len(candidates) == 1:
@@ -8050,6 +8153,20 @@ def _cpi_trim_facts(facts):
     return out
 
 
+def _cpi_chat_reply(spend: dict, **fields):
+    """One chat reply, carrying what it cost.
+
+    Every answer that touched a paid Apollo endpoint reports its credits, because
+    the alternative is what this page shipped with: a question that quietly spent
+    somewhere between 0 and 20 credits from a pool the whole team shares, with
+    nothing on screen to say so until the pool ran out.
+    """
+    n = int((spend or {}).get("credits") or 0)
+    if n:
+        fields["credits"] = n
+    return jsonify(fields)
+
+
 @app.route("/p2/gtm/company-people-intelligence/chat", methods=["POST"])
 @position2_required
 def cpi_chat():
@@ -8063,6 +8180,9 @@ def cpi_chat():
     body = request.get_json(silent=True) or {}
     message = str(body.get("message") or "").strip()[:600]
     history = body.get("history") or []
+    # Accumulates every billable Apollo call made while answering this one
+    # question, so the reply can say what it cost.
+    spend: dict = {"credits": 0}
     # Set when the user clicks a company in a disambiguation list. Carrying the
     # pick as structured fields rather than as free text ("I mean Acme
     # (acme.com)") is deliberate: the latter goes back through the intent parser
@@ -8139,23 +8259,24 @@ def cpi_chat():
     elif company_name or selected_domain:
         try:
             resolved_org, choices = _cpi_resolve_company(company_name, api_key,
-                                                         domain=selected_domain)
+                                                         domain=selected_domain,
+                                                         spend=spend)
         except Exception as e:
             # Apollo was unreachable. Saying "no such company" here would assert
             # a negative fact that was never established.
             log.warning("cpi chat company resolve failed: %s", e)
-            return jsonify({"answer": "I couldn't reach Apollo just now, so I can't "
-                                      "confirm anything about that company yet. Try "
-                                      "again in a moment."})
+            return _cpi_chat_reply(spend, answer="I couldn't reach Apollo just now, so I "
+                                                 "can't confirm anything about that company "
+                                                 "yet. Try again in a moment.")
         if choices:
-            return jsonify({
-                "answer": "I found a few companies matching “%s”, which one did "
-                          "you mean?" % (company_name or selected_domain),
-                "choices": choices,
-            })
+            return _cpi_chat_reply(
+                spend,
+                answer="I found a few companies matching “%s”, which one did "
+                       "you mean?" % (company_name or selected_domain),
+                choices=choices)
         if not resolved_org:
-            return jsonify({"answer": "I couldn't find a company called “%s” in "
-                                      "Apollo." % (company_name or selected_domain)})
+            return _cpi_chat_reply(spend, answer="I couldn't find a company called “%s” in "
+                                                 "Apollo." % (company_name or selected_domain))
 
     # Echoed back so the client can pin this company for follow-up turns.
     ctx = ({"org_id": resolved_org.get("id"), "name": resolved_org.get("name"),
@@ -8164,12 +8285,13 @@ def cpi_chat():
 
     if kind == "company_info" and resolved_org:
         profile = _cpi_enrich_company(resolved_org.get("primary_domain") or resolved_org.get("domain") or "",
-                                       resolved_org.get("id") or "")
+                                       resolved_org.get("id") or "", spend=spend)
         if not profile.get("matched"):
-            return jsonify({"answer": "Apollo doesn’t have a full profile for %s beyond "
-                                      "the basics." % (resolved_org.get("name") or company_name),
-                            "context": ctx})
-        return jsonify({"answer": _cpi_grounded_answer(oai, profile, message), "context": ctx})
+            return _cpi_chat_reply(spend, context=ctx,
+                                   answer="Apollo doesn’t have a full profile for %s beyond "
+                                          "the basics." % (resolved_org.get("name") or company_name))
+        return _cpi_chat_reply(spend, answer=_cpi_grounded_answer(oai, profile, message),
+                               context=ctx)
 
     people_filters = {"titles": titles, "seniorities": seniorities,
                       "max_people": max_results if kind == "people_list" else 5}
@@ -8198,9 +8320,9 @@ def cpi_chat():
                                 strict=True, meta=people_meta)
     except Exception as e:
         log.warning("cpi chat people search failed: %s", e)
-        return jsonify({"answer": "I couldn't reach Apollo just now, so I don't have an "
-                                  "answer for that yet. Try again in a moment.",
-                        "context": ctx})
+        return _cpi_chat_reply(spend, context=ctx,
+                               answer="I couldn't reach Apollo just now, so I don't have an "
+                                      "answer for that yet. Try again in a moment.")
 
     # Apollo searches titles loosely (include_similar_titles), so a request for a
     # CMO can come back with a Marketing Manager. Verify in code that somebody
@@ -8236,11 +8358,11 @@ def cpi_chat():
 
     if not people:
         if resolved_org:
-            return jsonify({"answer": "Apollo has no people on file for %s that match "
-                                      "that." % (resolved_org.get("name") or company_name),
-                            "context": ctx})
-        return jsonify({"answer": "I couldn't find anyone matching that in Apollo.",
-                        "context": ctx})
+            return _cpi_chat_reply(spend, context=ctx,
+                                   answer="Apollo has no people on file for %s that match "
+                                          "that." % (resolved_org.get("name") or company_name))
+        return _cpi_chat_reply(spend, context=ctx,
+                               answer="I couldn't find anyone matching that in Apollo.")
 
     if kind == "person_at_company" and not no_title_match:
         # Prefer a person whose real title actually matches what was asked for,
@@ -8254,17 +8376,22 @@ def cpi_chat():
         enriched = _cpi_enrich_person(top.get("full_name") or "",
                                       top.get("organization_domain")
                                       or (resolved_org or {}).get("primary_domain") or "",
-                                      top.get("id") or "")
+                                      top.get("id") or "", spend=spend)
         if enriched.get("matched"):
-            # Contact fields (emails/phones) only reach the answer prompt when
-            # the user actually asked for them -- enriching for an accurate name
-            # should not cause an email address to get volunteered unprompted.
-            person_facts = enriched if wants_contact else {
-                k: v for k, v in enriched.items() if k not in ("emails", "phones")}
-            facts = {"person": person_facts, "asked_for_titles": titles}
-        return jsonify({"answer": _cpi_grounded_answer(oai, facts, message), "context": ctx})
+            # Contact fields reach the answer prompt only when the user actually
+            # asked for them: enriching to get the name right must not cause an
+            # email address to be volunteered. Allowlisted, not denylisted, so a
+            # new field on the normalizer cannot leak by default.
+            facts = {"person": _cpi_answer_person(enriched, wants_contact),
+                     "asked_for_titles": titles}
+        return _cpi_chat_reply(spend, answer=_cpi_grounded_answer(oai, facts, message),
+                               context=ctx)
 
-    shown = _cpi_reveal_names(people[:max_results], api_key)
+    # Revealed ONCE, then reused by whichever facts shape this answer takes. The
+    # no-title-match branch below used to call _cpi_reveal_names a second time on
+    # the same list, which re-billed every one of those people on any environment
+    # without the id cache to absorb it.
+    shown = _cpi_reveal_names(people[:max_results], api_key, spend=spend)
     facts = {"people": shown}
     try:
         total_entries = int(people_meta.get("total_entries"))
@@ -8280,9 +8407,10 @@ def cpi_chat():
             "no_one_holds_the_requested_title": True,
             "requested_titles": titles,
             "company": resolved_org.get("name"),
-            "other_senior_people_at_this_company": _cpi_reveal_names(people[:10], api_key),
+            "other_senior_people_at_this_company": shown,
         }
-    return jsonify({"answer": _cpi_grounded_answer(oai, facts, message), "context": ctx})
+    return _cpi_chat_reply(spend, answer=_cpi_grounded_answer(oai, facts, message),
+                           context=ctx)
 
 
 @app.route("/health")
@@ -9416,14 +9544,50 @@ _VIMI_REASONING_FLOOR = 8000
 # apollo_client uses for its base URL.
 _VIMI_EFFORT_OK: dict = {}
 
+# Models this process has proven unusable: a wrong id, or one this account has no
+# access to. _VIMI_EFFORT_OK only ever remembers models that WORKED, so without
+# this a bad id in _VIMI_MODELS costs a full failed effort-ladder walk on every
+# single AI call for the life of the process, across every feature in the app.
+# Only permanent, model-specific failures land here: a rate limit, timeout or 5xx
+# is transient and must never disqualify the strongest model for good.
+_VIMI_DEAD: set = set()
 
-def _vimi_model_chain():
+_VIMI_PERMANENT_ERRORS = ("model_not_found", "does not exist", "unknown model",
+                          "invalid model", "unsupported_model",
+                          "does not have access", "do not have access")
+
+
+def _vimi_is_permanent(err) -> bool:
+    """Is this error about the MODEL, or just about this one request?
+
+    401 is deliberately NOT permanent: a bad or missing API key fails every model
+    identically, and disqualifying the whole chain over it would turn a fixable
+    credential problem into a silent, process-long degradation.
+    """
+    status = getattr(err, "status_code", None) or getattr(err, "http_status", None)
+    if status == 401:
+        return False
+    if isinstance(status, int) and (status in (408, 409, 429) or status >= 500):
+        return False
+    if status in (403, 404):
+        return True
+    text = str(err or "").lower()
+    return any(s in text for s in _VIMI_PERMANENT_ERRORS)
+
+
+def _vimi_model_chain(skip_dead: bool = True):
     """Strongest-first model chain: OPENAI_INSIGHTS_MODEL > _VIMI_MODELS > OPENAI_MODEL/gpt-4o-mini."""
     chain = []
     for m in ((os.environ.get("OPENAI_INSIGHTS_MODEL"),) + _VIMI_MODELS
               + (os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),)):
         if m and m not in chain:
             chain.append(m)
+    if skip_dead and _VIMI_DEAD:
+        live = [m for m in chain if m not in _VIMI_DEAD]
+        # Never hand back an empty chain. If every model has been disqualified,
+        # keep the weakest one so the caller gets the real API error instead of a
+        # synthetic "no usable model" that hides what actually went wrong.
+        return live or chain[-1:]
     return chain
 
 
@@ -9487,6 +9651,14 @@ def _vimi_create(oai, model, messages, max_tokens, temperature=None, json_mode=F
         except Exception as e:
             last_err = e
             log.warning("vimi: '%s' (%s) failed: %s", model, call_kw, e)
+    # Every attempt for this model failed. If the reason was the model itself and
+    # not this request, stop paying for it: retire it for the rest of the process
+    # and say so once, at INFO, so the log names which ids are actually usable on
+    # this account rather than leaving it to be inferred from latency.
+    if last_err is not None and _vimi_is_permanent(last_err):
+        if model not in _VIMI_DEAD:
+            _VIMI_DEAD.add(model)
+            log.info("vimi: retiring model '%s' for this process (%s)", model, last_err)
     return None, last_err
 
 
