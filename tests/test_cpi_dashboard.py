@@ -800,3 +800,87 @@ def test_research_is_pinned_to_the_resolved_company(org, expected_in):
     assert expected_in in note
     if not expected_in:
         assert note == ""
+
+
+# ── Web-search availability is detected, memoised and reported ───────────────
+
+class _WebSearchOAI:
+    """Responses-API stand-in. `fail_with` is raised for every tool type tried."""
+
+    def __init__(self, works_with=None, fail_with=None):
+        self.works_with, self.fail_with, self.tried = works_with, fail_with, []
+        outer = self
+
+        def create(model, tools, input, max_output_tokens):
+            tt = tools[0]["type"]
+            outer.tried.append(tt)
+            if outer.fail_with is not None:
+                raise outer.fail_with
+            if tt != outer.works_with:
+                raise RuntimeError("Unknown parameter: tools[0].type")
+            return types.SimpleNamespace(output_text="researched text")
+
+        self.responses = types.SimpleNamespace(create=create)
+
+
+@pytest.fixture
+def clean_web_memo():
+    appmod._WEB_SEARCH_OK = None
+    appmod._WEB_SEARCH_TOOL = None
+    yield
+    appmod._WEB_SEARCH_OK = None
+    appmod._WEB_SEARCH_TOOL = None
+
+
+def test_a_working_web_search_is_detected_and_remembered(clean_web_memo):
+    oai = _WebSearchOAI(works_with="web_search_preview")
+    txt, used = appmod._responses_web_search(oai, "m", [], 500)
+    assert txt == "researched text" and used is True
+    assert appmod._WEB_SEARCH_OK is True
+
+    oai.tried = []
+    appmod._responses_web_search(oai, "m", [], 500)
+    assert oai.tried == ["web_search_preview"], "the proven tool name should be reused"
+
+
+def test_an_unavailable_web_search_stops_being_retried(clean_web_memo):
+    """Otherwise every research call pays two failed round trips, forever."""
+    oai = _WebSearchOAI(fail_with=RuntimeError("Unknown parameter: tools[0].type"))
+    txt, used = appmod._responses_web_search(oai, "m", [], 500)
+    assert txt is None and used is False
+    assert appmod._WEB_SEARCH_OK is False
+
+    oai.tried = []
+    appmod._responses_web_search(oai, "m", [], 500)
+    assert oai.tried == [], "a key without web search must not be probed again"
+
+
+def test_an_old_sdk_without_responses_is_treated_as_unsupported(clean_web_memo):
+    oai = _WebSearchOAI(fail_with=AttributeError("'OpenAI' object has no attribute 'responses'"))
+    appmod._responses_web_search(oai, "m", [], 500)
+    assert appmod._WEB_SEARCH_OK is False
+
+
+def test_a_transient_failure_does_not_disable_web_search(clean_web_memo):
+    """A rate limit is a bad minute, not a missing capability. Disabling the tool
+    over one would silently strip live research from every later answer."""
+    class _Rate(Exception):
+        status_code = 429
+
+    oai = _WebSearchOAI(fail_with=_Rate("slow down"))
+    appmod._responses_web_search(oai, "m", [], 500)
+    assert appmod._WEB_SEARCH_OK is None, "must stay undecided, not latch to False"
+
+
+def test_research_reports_whether_the_web_was_actually_used(clean_web_memo, monkeypatch):
+    """The reply's web_search flag is what tells anyone, including the user, that
+    live web search works. It must not be true when research came from the model."""
+    monkeypatch.setattr(appmod, "_responses_web_search", lambda *a, **k: (None, False))
+    monkeypatch.setattr(appmod, "_vimi_completion",
+                        lambda o, m, t, temperature=None: ("brief", "m"))
+    text, used_web = appmod._cpi_research(None, "q")
+    assert text == "brief" and used_web is False
+
+    monkeypatch.setattr(appmod, "_responses_web_search", lambda *a, **k: ("live", True))
+    text, used_web = appmod._cpi_research(None, "q")
+    assert text == "live" and used_web is True

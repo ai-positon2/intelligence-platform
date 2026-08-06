@@ -834,16 +834,22 @@ function fmtAnswer(text){
   return out.join("") || "<p>"+safe+"</p>";
 }
 
-function addAssistantMsg(answer, choices, credits, researched){
+function addAssistantMsg(answer, choices, credits, researched, webSearch){
   CHAT_HISTORY.push({role:"assistant", content:answer||""});
   var b=document.getElementById("cpiChatBody");
   /* Answers can spend Apollo credits from a pool the whole team shares, so each
-     one says what it cost, and says when it drew on web research as well as our
-     own records. Silence here is what let a single question quietly spend twenty. */
+     one says what it cost. Silence here is what let a single question quietly
+     spend twenty.
+     The research half is reported HONESTLY rather than as a flat "includes web
+     research": if the key has no web-search tool, _cpi_research falls back to the
+     model's background knowledge, which has no citations and a training cutoff.
+     Saying so is both fair to the reader and the only way anyone can tell whether
+     live web search is actually working in production. */
   var bits=[];
   var n=+credits||0;
   if(n>0) bits.push(n+" Apollo credit"+(n===1?"":"s")+" used");
-  if(researched) bits.push("includes web research");
+  if(webSearch) bits.push("live web research");
+  else if(researched) bits.push("background knowledge, no live web");
   var costHtml=bits.length?('<div class="cpi-bub-cost">'+esc(bits.join(" · "))+"</div>"):"";
   var choicesHtml="";
   if(choices&&choices.length){
@@ -938,7 +944,8 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
       /* Pin whatever company the server actually resolved, so the next turn
          inherits it instead of re-disambiguating. */
       if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
-      addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits, d&&d.researched);
+      addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits, d&&d.researched,
+                      d&&d.web_search);
     })
     .catch(function(){
       removeTyping(); sendBtn.disabled=false;
