@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import time
 import logging
 from pathlib import Path
@@ -93,6 +94,16 @@ _ORG_RANGE_FILTERS = (
     ("job_posted_after",  "job_posted_before", "organization_job_posted_at_range"),
     ("headcount_growth_min", "headcount_growth_max", "organization_headcount_growth_range"),
 )
+
+
+def _clean_domain(d: str) -> str:
+    """Lowercased domain with any protocol/www/trailing slash stripped, so
+    "https://www.Acme.com/" and "acme.com" compare equal. Used to turn Apollo's
+    q_organization_domains_list -- which is a fuzzy relevance input, not a
+    strict filter -- into an actual strict match on the results (see callers)."""
+    d = str(d or "").strip().lower()
+    d = re.sub(r"^https?://", "", d).rstrip("/")
+    return re.sub(r"^www\.", "", d)
 
 
 def _apply_org_filters(payload: dict, filters: dict) -> None:
@@ -291,6 +302,27 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
             return any(kw in text for kw in exclude_kws)
         orgs = [o for o in orgs if not _excluded(o)]
 
+    # q_organization_domains_list does not actually restrict Apollo's results to
+    # that domain -- a malformed or unindexed domain silently falls back to an
+    # UNFILTERED search rather than erroring or matching nothing, which would
+    # show an unrelated company as if it matched. This endpoint is also paid, so
+    # a false match here both misinforms the caller AND spends a credit for it.
+    # Enforce the filter for real, in code, against Apollo's own domain field.
+    wanted_domains = {_clean_domain(d) for d in (filters.get("domains") or [])}
+    wanted_domains.discard("")
+    if wanted_domains:
+        before = len(orgs)
+        orgs = [o for o in orgs if _clean_domain(o.get("primary_domain") or o.get("domain") or "")
+                in wanted_domains]
+        logger.info("search_companies: domain filter kept %d/%d", len(orgs), before)
+        if meta is not None:
+            # Apollo's pagination totals describe the unfiltered call and would
+            # wildly overstate how many companies actually match the domain now
+            # that we enforce it ourselves -- an honest caller can't report a
+            # total it doesn't know.
+            meta["total_entries"] = None
+            meta["total_pages"] = None
+
     max_companies = filters.get("max_companies")
     if max_companies is not None:
         orgs = orgs[:max_companies]
@@ -387,6 +419,27 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         people = people[:max_people]
 
     normalized = [_normalize_search_person(p) for p in people]
+
+    # Same fuzzy-not-strict behavior as search_companies' domain filter above:
+    # a domain Apollo does not treat as an exact match (including a malformed
+    # one with no TLD) silently falls back to an unfiltered search rather than
+    # matching nothing, which would show people from unrelated companies as if
+    # they matched the requested employer. Enforce it for real here.
+    wanted_domains = {_clean_domain(d) for d in (filters.get("company_domains") or [])}
+    wanted_domains.discard("")
+    if wanted_domains:
+        before = len(normalized)
+        normalized = [p for p in normalized
+                     if _clean_domain(p.get("organization_domain") or "") in wanted_domains]
+        logger.info("search_people: domain filter kept %d/%d", len(normalized), before)
+        if meta is not None:
+            # Apollo's pagination totals describe the unfiltered call and would
+            # wildly overstate how many people actually match the domain now
+            # that we enforce it ourselves -- an honest caller can't report a
+            # total it doesn't know.
+            meta["total_entries"] = None
+            meta["total_pages"] = None
+
     logger.info("search_people: received %d people (%s)",
                 len(normalized), _field_coverage(normalized))
     return normalized
