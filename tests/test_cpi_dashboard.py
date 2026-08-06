@@ -884,3 +884,121 @@ def test_research_reports_whether_the_web_was_actually_used(clean_web_memo, monk
     monkeypatch.setattr(appmod, "_responses_web_search", lambda *a, **k: ("live", True))
     text, used_web = appmod._cpi_research(None, "q")
     assert text == "live" and used_web is True
+
+
+# ── /search: the People "at company" field also accepts a plain name ───────
+# It used to be sent straight through as an Apollo domain filter, which is a
+# fuzzy relevance hint on Apollo's side rather than a strict one -- a name with
+# no dot in it (e.g. "Position2") never matches any real domain and, per the
+# search_people fix, now correctly returns nothing instead of Apollo's whole
+# unfiltered database. These lock in resolving that same input to the real
+# company first, via an id-keyed (exact, not fuzzy) organization_ids filter.
+
+@pytest.fixture
+def clean_name_resolve_cache():
+    appmod._CPI_NAME_RESOLVE_CACHE.clear()
+    yield
+    appmod._CPI_NAME_RESOLVE_CACHE.clear()
+
+
+def _cpi_search_body(**filters):
+    return {"entity": "people", "filters": filters}
+
+
+def test_a_plain_company_name_resolves_to_organization_ids(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setattr(ac, "search_companies",
+                        lambda filters, key, **kw: [{"id": "org1", "name": "Position2"}])
+    seen = {}
+
+    def _fake_search_people(filters, key, **kw):
+        seen["filters"] = filters
+        return []
+
+    monkeypatch.setattr(ac, "search_people", _fake_search_people)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json=_cpi_search_body(company_domains=["Position2"]))
+    assert r.status_code == 200
+    assert seen["filters"].get("organization_ids") == ["org1"]
+    assert "company_domains" not in seen["filters"]
+    assert r.get_json()["resolved_company"] == ["Position2"]
+
+
+def test_a_domain_shaped_value_skips_name_resolution_entirely(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """A real domain must never trigger the (paid) company-name search path --
+    it already means something to Apollo's domain filter as-is."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+
+    def _boom(*a, **k):
+        raise AssertionError("search_companies must not be called for a domain")
+
+    monkeypatch.setattr(ac, "search_companies", _boom)
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json=_cpi_search_body(company_domains=["acme.com"]))
+    assert r.status_code == 200
+    assert "resolved_company" not in r.get_json()
+
+
+def test_a_company_name_with_no_match_returns_a_clear_error_not_junk_results(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setattr(ac, "search_companies", lambda filters, key, **kw: [])
+
+    def _boom(*a, **k):
+        raise AssertionError("search_people must not run without a resolved company")
+
+    monkeypatch.setattr(ac, "search_people", _boom)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json=_cpi_search_body(company_domains=["Nonexistent Co"]))
+    body = r.get_json()
+    assert body["results"] == []
+    assert "Nonexistent Co" in body["error"]
+
+
+def test_company_name_resolution_is_cached_across_pages(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """Resolving a name costs a real Apollo credit (mixed_companies/search); an
+    otherwise-free people search paging through "Load more" must not pay that
+    credit again on every page for the same name."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    calls = []
+    monkeypatch.setattr(ac, "search_companies",
+                        lambda filters, key, **kw: calls.append(1) or
+                        [{"id": "org1", "name": "Position2"}])
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+
+    r1 = client.post("/p2/gtm/company-people-intelligence/search",
+                     json={"entity": "people", "filters": {"company_domains": ["Position2"]},
+                           "page": 1})
+    r2 = client.post("/p2/gtm/company-people-intelligence/search",
+                     json={"entity": "people", "filters": {"company_domains": ["Position2"]},
+                           "page": 2})
+    assert len(calls) == 1, "the name must resolve from cache on the second page"
+    assert r1.get_json()["credits"] == 1
+    assert "credits" not in r2.get_json(), "no fresh credit was actually spent on page 2"
+
+
+def test_a_not_found_company_name_is_never_cached(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """Unlike a found resolution, a miss costs 0 Apollo credits to repeat, so it
+    must not be frozen in the cache -- if the same name is indexed moments
+    later, the very next search should see it."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    responses = [[], [{"id": "org1", "name": "Position2"}]]
+    monkeypatch.setattr(ac, "search_companies", lambda filters, key, **kw: responses.pop(0))
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+
+    miss = client.post("/p2/gtm/company-people-intelligence/search",
+                       json=_cpi_search_body(company_domains=["Position2"]))
+    hit = client.post("/p2/gtm/company-people-intelligence/search",
+                      json=_cpi_search_body(company_domains=["Position2"]))
+    assert miss.get_json()["results"] == [] and "Position2" in miss.get_json()["error"]
+    assert hit.get_json().get("resolved_company") == ["Position2"]

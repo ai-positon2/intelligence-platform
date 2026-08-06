@@ -208,6 +208,7 @@ window.cpiRunSearch = function(reset){
   if(btn){ btn.disabled=true; btn.textContent="Searching…"; }
   var filters=gatherFilters();
   STATE.lastFilters=filters;
+  var typedCompany=(filters.company_domains && filters.company_domains[0]) || "";
   if(reset){ wrap.innerHTML=skeletonGrid(6); }
   fetch(SEARCH_URL, {
     method:"POST", headers:{"Content-Type":"application/json"},
@@ -215,6 +216,19 @@ window.cpiRunSearch = function(reset){
   }).then(function(r){ return r.json(); }).then(function(d){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
     if(d && d.error){ toast(d.error, "err"); }
+    /* The "at company" field also accepts a plain name now (resolved server-side
+       to the real company/companies), so a fresh search discloses what it
+       actually matched -- and any Apollo credit that resolution spent -- rather
+       than silently substituting a different filter than the one typed. Only
+       on `reset`: Load more re-hits the same cached resolution, so repeating
+       this on every page would look like a new credit is spent each time. */
+    else if(reset && d && d.resolved_company && d.resolved_company.length){
+      var names=d.resolved_company.slice(0,3).join(", ");
+      if(d.resolved_company.length>3) names += " +"+(d.resolved_company.length-3)+" more";
+      var note='Matched "'+typedCompany+'" to '+names;
+      if(d.credits) note += " ("+d.credits+" Apollo credit)";
+      toast(note, "ok");
+    }
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
        page instead of re-fetching page 1 and appending duplicate cards (which on
