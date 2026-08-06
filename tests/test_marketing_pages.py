@@ -73,3 +73,17 @@ def test_no_agent_is_named_or_slugged_for_hipaa(client):
     for path in ("/agents", "/industries/healthcare"):
         body = client.get(path).data.decode("utf-8")
         assert "hipaa" not in body.lower(), "%s still names/slugs a HIPAA agent" % path
+
+
+def test_legal_body_is_not_a_scroll_reveal_target(client):
+    """The site's fade-in-on-scroll animation adds an 'in' class via an
+    IntersectionObserver with threshold 0.12: the callback only fires once the
+    element's visible share of itself reaches 12%. A short card can cross that
+    easily, but the full policy text is one div many viewport-heights tall, so
+    its own height keeps the achievable ratio under 0.12 forever, and it never
+    fires. The div rendered at permanent opacity:0, which is what "the privacy
+    and terms pages are blank" actually was. It must never carry that class."""
+    for path in ("/privacy", "/terms"):
+        body = client.get(path).data.decode("utf-8")
+        assert 'class="legal-body"' in body
+        assert 'class="legal-body reveal"' not in body
