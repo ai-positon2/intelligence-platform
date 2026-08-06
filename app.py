@@ -829,7 +829,7 @@ INDUSTRIES = [
              "who":"Content strategists and writers building service-line pages.",
              "connects":["Search Console","AI engines","Semrush","Sheets"],
              "out":[{"t":"Briefs mapped to real demand","s":"The questions patients truly search.","w":86},{"t":"Structured and ready to write","s":"Headings, questions and sources included.","w":80},{"t":"Organized by service line","s":"So every page has a clear job.","w":74}]},
-            {"slug":"hipaa-aware-site-geo-auditor","name":"HIPAA-Aware Site & GEO Auditor","base":"SEO & GEO Audit","badge":"NEW","accent":"#6366f1","accent2":"#818cf8",
+            {"slug":"healthcare-site-geo-auditor","name":"Healthcare Site & GEO Auditor","base":"SEO & GEO Audit","badge":"NEW","accent":"#6366f1","accent2":"#818cf8",
              "role":"Site Health & AI Readiness","metric":"200+ checks · scored in seconds",
              "icon": _isvg('<path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
              "use":"Runs 200+ technical, on-page, structured-data and answer-engine checks, plus ADA and WCAG accessibility and YMYL trust signals, and returns a scored, prioritized fix-list.",
@@ -3007,10 +3007,6 @@ def integrations_page():
 @app.route("/resources")
 def resources_page():
     return render_template("agents.html", page="resources", agents=AGENTS, agent=None, related=[])
-
-@app.route("/security")
-def security_page():
-    return render_template("agents.html", page="security", agents=AGENTS, agent=None, related=[])
 
 @app.route("/login")
 def login_page():
