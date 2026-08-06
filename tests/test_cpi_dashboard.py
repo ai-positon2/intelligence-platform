@@ -1075,3 +1075,96 @@ def test_ambiguous_choices_are_cached_to_avoid_a_repeat_credit_charge(
     assert r1.get_json()["credits"] == 1
     assert "credits" not in r2.get_json()
     assert r2.get_json()["needs_company_choice"] is True
+
+
+# ── /search: an empty, single-company + title search explains why ──────────
+# The exact reported scenario: filtering People by "CMO" scoped to a real,
+# resolved company that came back with zero matches used to just say "No
+# matches. Try widening the filters." -- accurate, but not as useful as
+# actually looking and saying the role isn't on file while naming who is.
+
+def test_a_scoped_empty_title_search_gets_an_ai_explanation(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+
+    def _fake_search_people(filters, key, **kw):
+        if filters.get("titles"):
+            return []
+        return [{"id": "p1", "full_name": "Priya Shah", "title": "Head of Marketing",
+                "organization_name": "Olacabs"}]
+
+    monkeypatch.setattr(ac, "search_people", _fake_search_people)
+    monkeypatch.setattr(appmod, "_cpi_reveal_names", lambda people, key, spend=None: people)
+    monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
+    captured = {}
+
+    def _fake_answer(oai, facts, question, research=""):
+        captured["facts"] = facts
+        return "Our records have nobody matching CMO. The closest is Priya Shah, Head of Marketing."
+
+    monkeypatch.setattr(appmod, "_cpi_grounded_answer", _fake_answer)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json={"entity": "people",
+                          "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
+    body = r.get_json()
+    assert body["results"] == []
+    assert "Priya Shah" in body["ai_note"]["answer"]
+    assert captured["facts"]["no_one_holds_the_requested_title"] is True
+    assert captured["facts"]["requested_titles"] == ["CMO"]
+    assert captured["facts"]["company"] == "Olacabs"
+
+
+def test_ai_explanation_is_honest_when_nobody_at_all_is_on_file(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+    monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
+    captured = {}
+
+    def _fake_answer(oai, facts, question, research=""):
+        captured["facts"] = facts
+        return "no note needed for this assertion"
+
+    monkeypatch.setattr(appmod, "_cpi_grounded_answer", _fake_answer)
+    client.post("/p2/gtm/company-people-intelligence/search",
+               json={"entity": "people",
+                     "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
+    assert captured["facts"]["apollo_found_no_matching_people"] is True
+    assert "no_one_holds_the_requested_title" not in captured["facts"]
+
+
+def test_an_unscoped_empty_search_gets_no_ai_note(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    """No company scope means "no matches" is real friction to widen the
+    filters, not a dead end worth an OpenAI call and a possible credit to
+    explain -- must never even attempt the fallback lookup."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+
+    def _boom(*a, **k):
+        raise AssertionError("no company scope means no AI fallback lookup")
+
+    monkeypatch.setattr(appmod, "_cpi_search_no_match_note", _boom)
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json={"entity": "people", "filters": {"titles": ["CMO"]}})
+    assert "ai_note" not in r.get_json()
+
+
+def test_no_ai_note_without_an_openai_key_configured(
+        client, monkeypatch, no_postgres, clean_name_resolve_cache):
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
+    r = client.post("/p2/gtm/company-people-intelligence/search",
+                    json={"entity": "people",
+                          "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
+    body = r.get_json()
+    assert body["results"] == []
+    assert "ai_note" not in body

@@ -7178,6 +7178,51 @@ def _cpi_resolve_company_name(name: str, api_key: str, spend=None):
     return None, None, choices, True
 
 
+def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend: dict):
+    """When a people search scoped to ONE company and a specific title comes
+    back with nothing, "no matches" is not the most honest available answer:
+    look again at the same company without the title filter, and if Apollo has
+    anyone senior on file, say the role is not on record while naming the
+    closest real contacts instead of a bare dead end. This is exactly the
+    discipline chat's own answer prompt already codifies for
+    "no_one_holds_the_requested_title" / "apollo_found_no_matching_people" --
+    reused here, not reinvented, so both surfaces answer this the same way.
+    Best effort throughout: any failure just means no note, never a broken
+    search, and returns None outright with no OpenAI key configured."""
+    oai_key = os.environ.get("OPENAI_API_KEY", "")
+    if not oai_key:
+        return None
+    titles = [t for t in (filters.get("titles") or []) if t]
+    fallback = dict(filters)
+    fallback.pop("titles", None)
+    fallback["include_similar_titles"] = False
+    fallback["seniorities"] = ["c_suite", "vp", "director", "owner", "founder"]
+    fallback["max_people"] = 10
+    from tracker.apollo_client import search_people as _sp
+    try:
+        broader = _sp(fallback, api_key, per_page=10)
+    except Exception as e:
+        log.warning("cpi search no-match fallback lookup failed: %s", e)
+        broader = []
+    domain = (filters.get("company_domains") or [""])[0]
+    company_label = (resolved_names[0] if resolved_names else
+                     ((broader[0].get("organization_name") if broader else "") or domain))
+    if broader:
+        shown = _cpi_reveal_names(broader, api_key, spend=spend)
+        facts = {"no_one_holds_the_requested_title": True, "requested_titles": titles,
+                "company": company_label, "other_senior_people_at_this_company": shown}
+    else:
+        facts = {"apollo_found_no_matching_people": True, "requested_titles": titles,
+                "company": company_label}
+    question = 'Who is the %s at %s?' % (titles[0] if titles else "contact", company_label)
+    from openai import OpenAI
+    oai = OpenAI(api_key=oai_key, timeout=45.0, max_retries=1)
+    research, web = _cpi_research(
+        oai, question, _cpi_company_note({"name": company_label, "primary_domain": domain}))
+    answer = _cpi_grounded_answer(oai, facts, question, research)
+    return {"answer": answer, "researched": bool(research), "web_search": web}
+
+
 @app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
 @position2_required
 def cpi_search():
@@ -7249,6 +7294,20 @@ def cpi_search():
     out = {"results": results, "has_more": bool(has_more), "total": total, "page": page}
     if resolved_names:
         out["resolved_company"] = resolved_names
+    # A title search scoped to exactly one company that came back empty gets a
+    # real explanation instead of a bare "no matches" -- see the function for
+    # why, and why it is gated this narrowly (a plain, unscoped browse coming
+    # up empty is normal friction, not something worth spending an OpenAI call
+    # and a possible Apollo credit explaining).
+    if (entity == "people" and not results and page == 1 and filters.get("titles") and
+            (filters.get("organization_ids") or len(filters.get("company_domains") or []) == 1)):
+        try:
+            ai_note = _cpi_search_no_match_note(filters, resolved_names, api_key, spend)
+        except Exception as e:
+            log.warning("cpi search no-match note failed: %s", e)
+            ai_note = None
+        if ai_note:
+            out["ai_note"] = ai_note
     if spend["credits"]:
         out["credits"] = spend["credits"]
     return jsonify(out)
