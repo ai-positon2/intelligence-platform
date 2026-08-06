@@ -612,3 +612,95 @@ def test_enrich_by_id_returns_empty_for_a_non_organization_body(mock_post):
 def test_enrich_by_id_passes_through_a_real_organization(mock_post):
     mock_post.return_value = _mock_response({"organization": {"id": "o1", "name": "Acme"}})
     assert apollo_client.enrich_company_by_id("o1", "key")["name"] == "Acme"
+
+
+# ── Domain filters: q_organization_domains_list is fuzzy, not strict ────────
+# Apollo's own domain param does not reliably restrict results to that domain --
+# a malformed or unindexed one (e.g. "position2" with no TLD) can silently fall
+# back to an unfiltered search rather than erroring or matching nothing. These
+# lock in the code-side strict filter that catches that instead of showing
+# unrelated people/companies as if they matched the requested employer.
+
+@patch("tracker.apollo_client.requests.post")
+def test_people_domain_filter_drops_non_matching_organizations(mock_post):
+    mock_post.return_value = _mock_response({
+        "people": [
+            {"id": "p1", "first_name": "Ana", "last_name": "Real",
+             "organization": {"name": "Acme", "domain": "acme.com"}},
+            {"id": "p2", "first_name": "Bill", "last_name": "Unrelated",
+             "organization": {"name": "Microsoft", "domain": "microsoft.com"}},
+        ],
+        "pagination": {"total_entries": 83000000, "total_pages": 900000},
+    })
+    result = apollo_client.search_people({"company_domains": ["acme.com"]}, _FAKE_API_KEY)
+    assert [p["full_name"] for p in result] == ["Ana Real"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_people_domain_filter_matches_regardless_of_protocol_and_www(mock_post):
+    mock_post.return_value = _mock_response({
+        "people": [{"id": "p1", "first_name": "Ana", "last_name": "Real",
+                    "organization": {"name": "Acme", "domain": "www.acme.com"}}],
+    })
+    result = apollo_client.search_people(
+        {"company_domains": ["https://Acme.com/"]}, _FAKE_API_KEY)
+    assert len(result) == 1
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_people_domain_filter_with_no_real_match_returns_nothing(mock_post):
+    """The exact bug this guards: a malformed domain like "position2" (no TLD)
+    must never fall through to Apollo's unfiltered top-of-database results."""
+    mock_post.return_value = _mock_response({
+        "people": [{"id": "p1", "first_name": "Satya", "last_name": "Nadella",
+                    "organization": {"name": "Microsoft", "domain": "microsoft.com"}}],
+    })
+    result = apollo_client.search_people({"company_domains": ["position2"]}, _FAKE_API_KEY)
+    assert result == []
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_people_domain_filter_suppresses_apollo_unfiltered_total(mock_post):
+    """Apollo's pagination totals describe the call BEFORE our strict filter --
+    reporting them as-is would show e.g. "24 of 83,435,511 matches" next to a
+    domain-scoped result, which is a far bigger lie than no count at all."""
+    mock_post.return_value = _mock_response({
+        "people": [{"id": "p1", "first_name": "Ana", "last_name": "Real",
+                    "organization": {"domain": "acme.com"}}],
+        "pagination": {"total_entries": 83000000, "total_pages": 900000},
+    })
+    meta = {}
+    apollo_client.search_people({"company_domains": ["acme.com"]}, _FAKE_API_KEY, meta=meta)
+    assert meta["total_entries"] is None and meta["total_pages"] is None
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_people_search_without_a_domain_filter_keeps_apollos_totals(mock_post):
+    mock_post.return_value = _mock_response({
+        "people": [{"id": "p1", "first_name": "Ana", "last_name": "Real"}],
+        "pagination": {"total_entries": 500, "total_pages": 5},
+    })
+    meta = {}
+    apollo_client.search_people({}, _FAKE_API_KEY, meta=meta)
+    assert meta["total_entries"] == 500 and meta["total_pages"] == 5
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_company_domain_filter_drops_non_matching_organizations(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [
+            {"id": "org1", "name": "Acme", "primary_domain": "acme.com"},
+            {"id": "org2", "name": "Microsoft", "primary_domain": "microsoft.com"},
+        ],
+    })
+    result = apollo_client.search_companies({"domains": ["acme.com"]}, _FAKE_API_KEY)
+    assert [o["name"] for o in result] == ["Acme"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_company_domain_filter_with_no_real_match_returns_nothing(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "org1", "name": "Microsoft", "primary_domain": "microsoft.com"}],
+    })
+    result = apollo_client.search_companies({"domains": ["position2"]}, _FAKE_API_KEY)
+    assert result == []
