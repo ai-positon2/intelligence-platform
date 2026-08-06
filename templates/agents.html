@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'why' %}Why Intelligence · An honest comparison · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'security' %}Security · Intelligence by Position2{% elif page == 'industries' %}Industries · Intelligence by Position2{% elif page == 'industry' %}{{ industry.name }} · Industries · Intelligence by Position2{% elif page == 'iagent' %}{{ agent.name }} · {{ industry.name }} · Intelligence by Position2{% else %}Intelligence by Position2, Know who's ready to buy{% endif %}</title>
+<title>{% if page == 'agent' %}{{ agent.name }} · Agent · Intelligence by Position2{% elif page == 'agents' %}Agent Directory · Intelligence by Position2{% elif page == 'platform' %}Platform · Intelligence by Position2{% elif page == 'signals' %}Signals · Intelligence by Position2{% elif page == 'solutions' %}Solutions · Intelligence by Position2{% elif page == 'why' %}Why Intelligence · An honest comparison · Intelligence by Position2{% elif page == 'privacy' %}Privacy · Intelligence by Position2{% elif page == 'terms' %}Terms · Intelligence by Position2{% elif page == 'integrations' %}Integrations · Intelligence by Position2{% elif page == 'resources' %}Resources · Intelligence by Position2{% elif page == 'industries' %}Industries · Intelligence by Position2{% elif page == 'industry' %}{{ industry.name }} · Industries · Intelligence by Position2{% elif page == 'iagent' %}{{ agent.name }} · {{ industry.name }} · Intelligence by Position2{% else %}Intelligence by Position2, Know who's ready to buy{% endif %}</title>
 <meta name="description" content="Intelligence by Position2 surfaces the buying signals that show intent, across the web, your site and social, then tells your team who to reach, and why. Agentic AI platform across your entire go-to-market.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Intelligence by Position2">
@@ -729,9 +729,22 @@ footer{position:relative;z-index:3;margin-top:74px;border-top:1px solid var(--li
 .priv-pt p{font-size:13px;color:var(--dim);line-height: var(--lh-body);margin-top:3px}
 .legal{padding-top:120px;max-width:820px}
 .legal-body{margin-top:24px}
+.legal-meta{font-size:13px;color:var(--dim3);margin-top:14px}
+.legal-body h2{font-family:var(--display);font-size:26px;color:#fff;font-weight:800;margin:44px 0 6px;padding-top:22px;border-top:1px solid rgba(255,255,255,.08)}
+.legal-body h2:first-of-type{margin-top:30px;padding-top:0;border-top:none}
 .legal-body h3{font-family:var(--display);font-size:20px;color:#fff;font-weight:700;margin:26px 0 8px}
+.legal-body h4{font-family:var(--display);font-size:15px;color:#e2e6f7;font-weight:700;margin:16px 0 4px}
 .legal-body p{font-size:15px;line-height: var(--lh-body);color:var(--dim)}
+.legal-body p+p{margin-top:10px}
 .legal-body a{color:#a5b4fc;font-weight:600}
+.legal-body ul,.legal-body ol{margin:10px 0 14px;padding-left:22px}
+.legal-body li{font-size:15px;line-height: var(--lh-body);color:var(--dim);margin-bottom:7px}
+.legal-body strong{color:#e2e6f7}
+.legal-cats{display:flex;flex-direction:column;gap:10px;margin:12px 0 18px}
+.legal-cat{background:rgba(255,255,255,.03);border:1px solid var(--b1,rgba(255,255,255,.08));border-radius: var(--radius-md);padding:13px 16px}
+.legal-cat b{font-size:13.5px;color:#fff;font-weight:700}
+.legal-cat p{font-size:13.5px;margin-top:4px}
+.legal-cat span{display:inline-block;margin-top:6px;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--dim3)}
 
 /* ===== fast login ===== */
 .login-wrap{min-height:calc(100vh - 66px);display:flex;align-items:center;justify-content:center;padding:90px 0 60px}
@@ -1178,7 +1191,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 <style>:root{--display:'Poppins',system-ui,sans-serif;--serif:'Poppins',system-ui,sans-serif;--sans:'Poppins',system-ui,sans-serif;--mono:'Poppins',system-ui,sans-serif;}.hero2 .h-hero{font-size:clamp(42px,7.4vw,94px);}</style>
 {% endif %}
 </head>
-<body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% elif page=='iagent' %}{{ agent.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','security':'#34d399','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% elif page=='iagent' %}{{ agent.accent2 }}{% else %}#8b5cf6{% endif %}">
+<body data-page="{{ page }}" style="--page:{% if page=='industry' %}{{ industry.accent }}{% elif page=='iagent' %}{{ agent.accent }}{% else %}{{ {'home':'#22d3ee','agents':'#8b5cf6','agent':'#8b5cf6','platform':'#6366f1','signals':'#a78bfa','integrations':'#22d3ee','resources':'#fbbf24','login':'#67e8f9','industries':'#22d3ee'}.get(page,'#22d3ee') }}{% endif %};--page2:{% if page=='industry' %}{{ industry.accent2 }}{% elif page=='iagent' %}{{ agent.accent2 }}{% else %}#8b5cf6{% endif %}">
 <!-- page transition -->
 <style>
 #pt{position:fixed;inset:0;z-index:99997;background:radial-gradient(120% 90% at 50% 28%,#0b0f22,#04050d 72%);opacity:1;pointer-events:none;display:flex;align-items:center;justify-content:center;animation:ptReveal .85s cubic-bezier(.4,0,.2,1) .05s forwards}
@@ -1927,13 +1940,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
         <div class="priv-l">
           <span class="pill-eye"><span class="dt"></span> Privacy &amp; security</span>
           <h2 class="h-sec" style="margin-top:14px">Built privacy-first,<br><span class="ital grad">by design.</span></h2>
-          <p class="lead" style="margin-top:14px;max-width:none">Intent intelligence only earns trust when it’s handled responsibly, built around privacy and compliance, with your data staying yours.</p>
-          <a class="btn-ghost" href="/security" data-cursor style="margin-top:22px">See our security &amp; trust approach →</a>
+          <p class="lead" style="margin-top:14px;max-width:none">Intent intelligence only earns trust when it’s handled responsibly, with your data staying yours.</p>
+          <a class="btn-ghost" href="/privacy" data-cursor style="margin-top:22px">Read our privacy policy →</a>
         </div>
         <div class="priv-r">
-          <div class="priv-pt"><span class="pk"></span><div><b>Privacy-compliant</b><p>Built for US state privacy laws (CCPA/CPRA) and GDPR, we honor opt-out and Do-Not-Sell-or-Share requests.</p></div></div>
+          <div class="priv-pt"><span class="pk"></span><div><b>Privacy by design</b><p>We aim to handle every data point lawfully, fairly and transparently, and work to support your obligations under applicable privacy laws.</p></div></div>
           <div class="priv-pt"><span class="pk"></span><div><b>Your data, your control</b><p>We don’t sell your data. Request an export or deletion at any time.</p></div></div>
-          <div class="priv-pt"><span class="pk"></span><div><b>Secured in transit &amp; at rest</b><p>Encrypted connections, least-privilege access and audited data handling.</p></div></div>
+          <div class="priv-pt"><span class="pk"></span><div><b>Handled with care</b><p>Encrypted connections, least-privilege access and reviewed data handling.</p></div></div>
         </div>
       </div>
     </section>
@@ -1943,32 +1956,191 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 
 {% elif page == 'privacy' %}
   <div class="wrap sectionpad legal">
-    <span class="pill-eye reveal in"><span class="dt"></span> Privacy &amp; data</span>
-    <h1 class="h-hero reveal in" style="font-size:clamp(38px,5.4vw,64px);margin:16px 0 14px">Privacy at <span class="ital grad">Intelligence.</span></h1>
-    <p class="lead reveal">A plain-language summary of how we handle intent data, consent and your information. For our full policy or a Data Processing Agreement, just ask.</p>
+    <span class="pill-eye reveal in"><span class="dt"></span> Privacy policy</span>
+    <h1 class="h-hero reveal in" style="font-size:clamp(38px,5.4vw,64px);margin:16px 0 14px">Privacy <span class="ital grad">policy.</span></h1>
+    <p class="lead reveal">How Position2 collects, uses and protects information across our websites and services, including Intelligence.</p>
+    <p class="legal-meta reveal">Last updated August 6, 2026</p>
     <div class="legal-body reveal">
-      <h3>Our approach</h3><p>Intelligence by Position2 helps revenue teams spot buying intent from publicly available and first-party signals. We collect only what’s needed to surface and explain those signals, and we aim to handle every data point lawfully, fairly and transparently.</p>
-      <h3>What we process</h3><p>Depending on your configuration, this can include business firmographic data, publicly available company news and activity, signals from your own website and CRM, and engagement data you are entitled to use. We do not seek out sensitive personal categories.</p>
-      <h3>Website de-anonymization &amp; consent</h3><p>Where visitor identification is enabled, it is intended to be used on traffic you are permitted to process, with appropriate notice and consent in place on your properties. You are responsible for your site’s consent banner and privacy notice; we provide controls and guidance to help you stay compliant with CCPA/CPRA, GDPR and other applicable privacy laws.</p>
-      <h3>Your choices</h3><p>You can request access, correction, export or deletion of data we process on your behalf, and you can disable specific signal sources at any time. We honour valid data-subject and opt-out requests.</p>
-      <h3>Security</h3><p>Data is encrypted in transit and at rest, access is restricted on a least-privilege basis, and handling is logged and reviewed. We work with vetted sub-processors under appropriate agreements.</p>
-      <h3>Contact</h3><p>Questions, exports or deletion requests: <a href="mailto:privacy@position2.com">privacy@position2.com</a>. This summary is provided for transparency and is not a substitute for our full, contractually binding policy.</p>
+      <p>Position2, Inc. takes your privacy seriously, and is strongly committed to protecting your privacy through our compliance with this policy (the &ldquo;Privacy Policy&rdquo;) in providing our websites (the &ldquo;Sites&rdquo;), including this site, and the services available through the Sites (the &ldquo;Position2 Services&rdquo;). This Privacy Policy describes our collection and use of information, including personally identifiable information (&ldquo;PII&rdquo;), that Position2 may collect from you or that you may provide to us, whether via the Sites, through the Position2 Services or otherwise, and our practices for collecting, using, maintaining, protecting and disclosing that information.</p>
+      <p>This Privacy Policy applies to information that we collect:</p>
+      <ul>
+        <li>In connection with your access and use of the Sites and the Position2 Services.</li>
+        <li>In email, text and other electronic messages sent through or in connection with the Sites and the Position2 Services.</li>
+        <li>When you interact with our advertising and applications on third-party websites and services, if those applications or advertising include links to this Privacy Policy.</li>
+      </ul>
+      <p>Except as required by applicable law, this Privacy Policy does not apply to information collected by any third party, including through any application or content (including payment facilitation and advertising) that may link to or be accessible from or through the Sites and the Position2 Services. For California residents, see the section titled &ldquo;California Residents.&rdquo; For residents of the European Economic Area, see the section titled &ldquo;European Residents.&rdquo; Please read this Privacy Policy carefully to understand our policies and practices regarding your information and how we will treat it. If you do not agree with our policies and practices, your choice is not to visit, access, register for an account or use the Sites and the Position2 Services. By visiting, accessing, registering for an account or using the Sites and the Position2 Services, you agree to this Privacy Policy.</p>
+
+      <h2>Policy Changes</h2>
+      <p>Position2 may amend this Privacy Policy at any time at its sole discretion without prior notice to you. However, it is our policy to post any changes we make to our Privacy Policy on this page, with a notice that it has been updated upon visiting the Sites or by logging into your account. The date this Privacy Policy was last revised is identified at the top of the page. You are responsible for ensuring that we have an up-to-date, active and deliverable email address for you. Your continued use of the Sites and the Position2 Services after we make changes is deemed to be your acceptance of those changes, so we encourage you to review this Privacy Policy regularly for any changes.</p>
+
+      <h2>Information Collection and Use</h2>
+      <p>We collect several types of information from and about visitors to the Sites and users of the Position2 Services, including information:</p>
+      <ul>
+        <li>By which you may be personally identified, or PII, such as your name, e-mail address, biographical information, professional title, employment history, phone number, and other identifiers by which you may be contacted online or offline;</li>
+        <li>That is about you, but individually does not identify you, such as your IP address, geographic location, and other information about your internet connection, the equipment you use to access the Sites or the Position2 Services, and general usage details; and</li>
+        <li>That is about your company, such as its name, website, products, services, pricing, or other information relating to marketing and promotions.</li>
+      </ul>
+      <p>We collect this information:</p>
+      <ul>
+        <li>Directly from you when you provide it to us or give us access to your accounts or systems.</li>
+        <li>Automatically, as you navigate through or use the Sites, the Position2 Services or the websites, products or services offered by our partners or affiliates, through the use of cookies, browser detection and other tracking technologies.</li>
+      </ul>
+      <p>Information such as IP address, certain cookies, and technical information about your computer is collected automatically; some PII is only collected when you enter it manually on our web pages. The information we collect on or through the Sites or the Position2 Services may include information you provide by filling in forms or using interactive features, records and copies of your correspondence if you contact us, and, if you provide us access to your CRM systems, personal contact information you have received from your customers or potential customers, provided that you have obtained their consent to provide us access to it. That information will be treated as your PII.</p>
+      <p>When you register for an account with us, we will ask you for PII, which for the purposes of this Privacy Policy includes public or non-public information about you or your company (name, address, email, phone number, billing information where applicable), data relating to your use of Position2 products and services, and any other information we collect that is not otherwise publicly available.</p>
+      <p>As you navigate through and interact with the Sites and the Position2 Services, we may also use automatic data collection technologies to collect certain information about your sessions, devices, browsing actions and patterns, including traffic data, location data, logs and the resources you access, and information about your device and internet connection, including your IP address, operating system and browser type.</p>
+      <p>Certain non-identifying information would be considered part of your PII if it were combined with other identifiers in a way that enables you to be identified, but the same information is non-identifying when taken alone. We may combine your PII with non-identifying information, and may aggregate it with information collected from other users, to provide you with a better experience, to improve the Position2 Services, and to analyze and understand how our Sites are used.</p>
+      <p>We use your PII mainly to provide the Sites and Position2 Services to you and to administer your inquiries. We may also use PII to correspond with you, provide aggregated (anonymous) data to our partners and affiliates, provide the requested information, products and services, process payments, engage in product and market research, develop product enhancements and new products or services, and for any other purpose disclosed to you or with your consent. We do not store your financial information, including billing and credit card information; that information is processed by secure, third-party services in accordance with their own privacy policies.</p>
+
+      <h2>Automatic Data Collection Technologies</h2>
+      <p>We use cookies as a means of automatically collecting information about you through your interaction with the Sites and Position2 Services. If you do not accept cookies, you may not be able to use all portions of the Sites or all functionality of the Position2 Services. A cookie is a small data file that certain websites write to your hard drive when you visit them, for record-keeping purposes; you can control and/or delete cookies from being placed on your computer (for details, see aboutcookies.org). We use persistent cookies to save your registration and login details for future visits, and session cookies to enable certain features, understand how you interact with the Sites, and monitor aggregate usage and web traffic routing. Session cookies are deleted when you log off and close your browser. Third-party advertisers on the Sites may also place or read cookies on your browser. You can instruct your browser to stop accepting cookies or to prompt you before accepting one; if you do, some services and functionality may not work as intended. Please note that we do not respond to &ldquo;do not track&rdquo; requests.</p>
+
+      <h2>Disclosure of Information</h2>
+      <p>We may disclose aggregated information about our users, including our registered users, without restriction. Position2 does not sell, rent, license, or share PII with non-affiliated companies or individuals, except as described in this Privacy Policy.</p>
+      <h4>Personnel and Service Providers</h4>
+      <p>We may employ third-party companies and individuals to facilitate our Sites and the Position2 Services, to perform Site-related services (for example, maintenance, database management, web analytics and feature improvement), or to help us analyze how our Sites and Position2 Services are used. This includes trusted providers who help us process certain requests, including AI-assisted features, always under confidentiality and data-protection obligations. We also engage third parties to display our advertising on websites or services operated by those third parties. Our personnel and any third parties with access to your PII only have that access to perform these tasks on our behalf, and are obligated not to disclose or use it for any other purpose; employees and consultants given such access are subject to confidentiality agreements at least as protective of your rights as this Privacy Policy, and our third-party advertising partners are bound by confidentiality and data-security obligations.</p>
+      <h4>Compliance with Laws and Law Enforcement</h4>
+      <p>Position2 may cooperate with government and law enforcement officials and private parties to enforce our agreements with you and to comply with the law or legal process. We may disclose information about you to government or law enforcement officials or private parties where we, in our sole discretion, believe it necessary or appropriate to respond to claims and legal process (including subpoenas), to protect the property and rights of Position2 or any third party, to protect the safety of the public or any person, or to prevent or stop activity we consider to be, or to pose a risk of being, illegal, unethical or legally actionable.</p>
+      <h4>Business Transfers</h4>
+      <p>Position2 may sell, transfer, or otherwise share some or all of its assets, including your PII, in connection with a merger, acquisition, reorganization, or sale of assets, or in the event of bankruptcy. We may also disclose PII for any other purpose disclosed by us when you provide the information, or with your consent.</p>
+
+      <h2>Choices About How We Use and Disclose Your Information</h2>
+      <p>We strive to provide you with choices regarding the information you provide to us, and have created mechanisms to give you control over it, as described throughout this policy and in the &ldquo;Accessing and Deleting Your Information&rdquo; section below. We do not control third parties&rsquo; collection or use of your information to serve interest-based advertising, though those third parties may offer their own ways to opt out.</p>
+
+      <h2>California Residents</h2>
+      <p>This notice applies solely to California residents (&ldquo;consumers&rdquo;). Position2 adopts this notice to comply with the California Consumer Privacy Act of 2018 (the &ldquo;CCPA&rdquo;), and terms defined in the CCPA have the same meaning here. This notice relates to information that identifies, relates to, describes, references, is reasonably capable of being associated with, or could reasonably be linked, directly or indirectly, with a particular consumer, household or device (&ldquo;personal information&rdquo;). Personal information does not include publicly available government records, de-identified or aggregated consumer information, or information excluded from the CCPA&rsquo;s scope under sector-specific privacy laws (such as FCRA, GLBA/FIPA, the Driver&rsquo;s Privacy Protection Act, HIPAA or CMIA). We collect, use and share your personal information in the same manner, from the same sources and for the same purposes as set out in this Privacy Policy.</p>
+      <p>In the preceding twelve months, we have collected and, where noted, disclosed to service providers and Position2 personnel the following categories of personal information:</p>
+      <div class="legal-cats">
+        <div class="legal-cat"><b>Identifiers</b><p>Name, alias, postal address, unique or online identifier, IP address, email address, account name, or similar identifiers.</p><span>Collected &middot; Disclosed to service providers</span></div>
+        <div class="legal-cat"><b>California Customer Records categories</b><p>Name, signature, address, telephone number, employment and employment history, or financial information (Cal. Civ. Code &sect; 1798.80(e)).</p><span>Collected &middot; Disclosed to service providers</span></div>
+        <div class="legal-cat"><b>Protected classification characteristics</b><p>Age, race, national origin, sex, disability, and similar characteristics protected under California or federal law.</p><span>Not collected</span></div>
+        <div class="legal-cat"><b>Commercial information</b><p>Records of products or services purchased, obtained or considered, or other purchasing histories or tendencies.</p><span>Collected &middot; Disclosed to Position2 personnel</span></div>
+        <div class="legal-cat"><b>Biometric information</b><p>Fingerprints, voiceprints, iris scans, and similar physiological or behavioral data.</p><span>Not collected</span></div>
+        <div class="legal-cat"><b>Internet or network activity</b><p>Browsing history, search history, and interaction with a website, application or advertisement.</p><span>Collected &middot; Disclosed to service providers</span></div>
+        <div class="legal-cat"><b>Geolocation data</b><p>Physical location or movements.</p><span>Collected</span></div>
+        <div class="legal-cat"><b>Sensory data</b><p>Audio, electronic, visual, thermal, olfactory or similar information.</p><span>Not collected</span></div>
+        <div class="legal-cat"><b>Professional or employment-related information</b><p>Current or past job history or performance evaluations.</p><span>Collected &middot; Disclosed to Position2 personnel</span></div>
+        <div class="legal-cat"><b>Non-public education information</b><p>Education records covered by FERPA, such as grades or transcripts.</p><span>Not collected</span></div>
+        <div class="legal-cat"><b>Inferences</b><p>A profile reflecting preferences, characteristics, behavior, attitudes or aptitudes.</p><span>Not collected</span></div>
+      </div>
+      <p>We will not collect additional categories of personal information, or use the personal information we collected for materially different, unrelated, or incompatible purposes, without providing you notice. We do not sell personal information and have not sold any in the past twelve months; where we share personal information with a third party for a business purpose, we enter into a contract requiring that party to keep it confidential and use it only to perform the contract.</p>
+      <h4>Your CCPA Rights</h4>
+      <p>If you are a California resident, you have the right to request that we disclose certain information about our collection and use of your personal information over the past twelve months, including the categories and specific pieces of personal information collected, the sources, our business purpose for collecting it, and the categories of third parties with whom we share it. You also have the right to request that we delete personal information we have collected from you, subject to certain exceptions (for example, to complete a transaction you requested, detect security incidents, or comply with a legal obligation). We will not discriminate against you for exercising these rights.</p>
+      <p>You may exercise your rights by emailing <a href="mailto:privacy@position2.com">privacy@position2.com</a> with the subject line &ldquo;CCPA Consumer Privacy Request,&rdquo; calling 800-725-5507, or writing to Position2, Inc., 2880 Lakeside Drive, STE 131, Santa Clara, CA 95054. To protect your information, we will need to verify your identity before responding, which may include confirming the email address we have on file for you and other identifying details. We will confirm receipt of a verifiable request within 10 days and aim to respond within 45 days; any disclosure will cover the 12 months preceding the request. We do not charge a fee to process a request unless it is excessive, repetitive or manifestly unfounded.</p>
+      <p>We do not sell your personal information, but you have the right to direct us not to (the &ldquo;right to opt out&rdquo;) if that ever changes, and, if you are under 16, the right to require affirmative opt-in authorization before any such sale.</p>
+
+      <h2>European Residents</h2>
+      <p>We recognize that the European Economic Area (&ldquo;EEA&rdquo;) has established strict protections regarding certain PII that we may receive from visitors or users in the EEA, including requirements to provide adequate protection of that information outside the EEA. Where we collect PII relating to individuals in the EEA, it will be transferred to our servers within the United States or Canada.</p>
+      <p>Under European data protection law, in certain circumstances you may have the right to request access to any PII we hold about you and related information (including our purposes for processing it and who we share it with), to obtain rectification of inaccurate PII, to request that PII be deleted, to restrict or object to processing, to withdraw previously given consent at any time, and to request that PII be transferred directly to a third party where technically feasible. We collect, use and share PII in the same manner and for the same purposes set out in this Privacy Policy.</p>
+      <p>To exercise these rights, contact us at <a href="mailto:privacy@position2.com">privacy@position2.com</a>. We take each request seriously and will comply to the extent required by applicable law; for your protection, we may need to verify your identity first. If you feel you have not received a satisfactory response, you may consult the data protection authority in your country. By choosing to visit the Sites or use the Position2 Services, you agree that any dispute over privacy or the terms of this Privacy Policy will be governed by the laws of the State of California and the United States of America, and you agree to abide by any dispute-resolution mechanisms in our Terms of Use.</p>
+
+      <h2>Links to Third-Party Websites</h2>
+      <p>The Sites and the Position2 Services may contain links to other websites. Your use of any linked website is subject to the terms of use and privacy policy located on that third-party site, not this one.</p>
+
+      <h2>Security</h2>
+      <p>Position2 is very concerned with safeguarding your information. We employ administrative, physical, procedural and electronic safeguards designed to protect your information from unauthorized access, including firewalls, controlled and monitored access to our facilities, networks and systems, and non-disclosure agreements with employees and vendors. We will make any legally required disclosure of a breach of the security, confidentiality or integrity of your personal data via email, through conspicuous posting on the Sites, or as otherwise required by applicable statute, in the most expedient time possible and without unreasonable delay, consistent with the legitimate needs of law enforcement and any measures necessary to determine the scope of the breach and restore the integrity of our systems.</p>
+      <p>The safety and security of your information also depends on you. Where we have given you, or you have chosen, a password, you are responsible for keeping it confidential. Unfortunately, no transmission of information over the internet is completely secure; although we do our best to protect your PII, we cannot guarantee its security in transit, and any transmission is at your own risk. Position2 may transfer PII and other information to the United States and other countries for storage, processing and use by Position2 and its affiliates.</p>
+
+      <h2>Accessing and Deleting Your Information</h2>
+      <p>You can access and change certain PII by logging into your account. You can also request that Position2 delete your PII by emailing <a href="mailto:delete@position2.com">delete@position2.com</a>. If you or your company are actively using Position2 products and services, such requests may not be honored during the term of that use, and we may decline a request to change or delete information if we believe doing so would violate a law or legal requirement, or cause the information to become incorrect.</p>
+
+      <h2>Children&rsquo;s Privacy</h2>
+      <p>Our Sites and the Position2 Services are not intended for children under 13, and we do not knowingly collect personal information from children under 13. If you are under 13, please do not use the Sites or Position2 Services or provide us with any information about yourself. If we learn that we have collected personal information from a child under 13 without verified parental consent, we will delete it; if you believe we might have information from or about a child under 13, contact us at <a href="mailto:delete@position2.com">delete@position2.com</a>.</p>
+
+      <h2>Signing In With Google</h2>
+      <p>Where Intelligence offers &ldquo;Sign in with Google,&rdquo; we use it only to verify your identity, specifically your name, email address and profile photo, and to authenticate you into your account. We do not request access to your Gmail, Calendar, Drive or Google Sheets through Intelligence, and we do not use Google user data for advertising.</p>
+
+      <h2>Contact Information</h2>
+      <p>If you have any questions or comments about this Privacy Policy, or our privacy practices, please contact us at <a href="mailto:privacy@position2.com">privacy@position2.com</a>, or by mail at Position2, Inc., 2880 Lakeside Drive, STE 131, Santa Clara, CA 95054.</p>
     </div>
-    <div class="band reveal"><h3>Want the full policy?</h3><p>We’ll share our complete privacy policy and a DPA on request.</p><button class="btn-grad mag" data-demo data-cursor>Get in touch</button></div>
+    <div class="band reveal"><h3>Need a Data Processing Agreement?</h3><p>We&rsquo;ll share our DPA and a security overview on request.</p><button class="btn-grad mag" data-demo data-interest="Security / DPA" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button></div>
   </div>
 
 {% elif page == 'terms' %}
   <div class="wrap sectionpad legal">
-    <span class="pill-eye reveal in"><span class="dt"></span> Terms</span>
+    <span class="pill-eye reveal in"><span class="dt"></span> Terms of use</span>
     <h1 class="h-hero reveal in" style="font-size:clamp(38px,5.4vw,64px);margin:16px 0 14px">Terms of <span class="ital grad">use.</span></h1>
-    <p class="lead reveal">A short summary of the terms for using this site and Intelligence by Position2. Full contractual terms are provided as part of your engagement.</p>
+    <p class="lead reveal">The terms governing your access to Position2&rsquo;s websites and services, including Intelligence.</p>
+    <p class="legal-meta reveal">Last updated August 6, 2026</p>
     <div class="legal-body reveal">
-      <h3>Using this site</h3><p>This website is provided for information about Intelligence by Position2. Content may change without notice, and is offered without warranty as to completeness or fitness for a particular purpose.</p>
-      <h3>The service</h3><p>Access to the platform is governed by the agreement signed as part of your engagement with Position2. Nothing on this site constitutes an offer or binding commitment on its own.</p>
-      <h3>Acceptable use</h3><p>Don’t misuse the site or attempt to disrupt, reverse-engineer or gain unauthorized access to it. Intellectual property on this site belongs to Position2 unless stated otherwise.</p>
-      <h3>Contact</h3><p>Questions about these terms: <a href="mailto:legal@position2.com">legal@position2.com</a>.</p>
+      <p>Position2, Inc. (&ldquo;Position2,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo; or &ldquo;our&rdquo;) owns or operates websites, including www.position2.com, this site and related domains, and offers a number of commercial internet services that may be accessed via the internet through a variety of devices. These Terms of Use govern all access to and use of those websites (collectively, the &ldquo;Sites&rdquo;) and the services and products available from Position2, including those available at or through the Sites (collectively, the &ldquo;Position2 Services&rdquo;).</p>
+      <p>The Sites and the Position2 Services are owned and operated by Position2. Your visit to the Sites and access to the Position2 Services is offered subject to your acceptance, without modification, of all the terms and conditions contained here, which we may revise and update from time to time without notice to you, along with all other operating rules, policies and procedures we may publish from time to time (collectively, the &ldquo;Terms of Use&rdquo;).</p>
+
+      <h2>Consent &amp; Acknowledgements</h2>
+      <p>By accessing the Sites or using any Position2 Services, you are consenting to these Terms of Use and our privacy practices, as described in our <a href="/privacy">Privacy Policy</a>. You are representing that you are of legal age to form a binding contract and are not barred from receiving goods or services under the laws of any applicable jurisdiction, and that all information you provide to Position2 is true, accurate and complete, and that you will keep it that way. Any breach of this section, or a reasonable belief by Position2 of such a breach, gives Position2 the right to immediately terminate your account and refuse to provide any current or future Position2 Services. When using the Position2 Services, you agree to comply with all applicable local, state, federal and international laws, rules and regulations.</p>
+      <p><strong>Please read these Terms of Use carefully before accessing the Sites or otherwise using the Position2 Services. By accessing the Sites or using any part of the Position2 Services, you (either an individual or a legal entity you represent as an authorized employee or agent) agree that you are bound by these Terms of Use, including the binding arbitration terms below. If you do not agree to all the terms and conditions of these Terms of Use, you may not access the Sites, the Position2 Services, or any part of them.</strong></p>
+
+      <h2>Access to the Sites and Use of the Position2 Services</h2>
+      <p>General, public content available on the Sites may be accessed and viewed by anyone. The Position2 Services, however, are available only to individuals who are at least 18 years of age; if you do not qualify, please do not attempt to register for an account or use the Position2 Services. Position2 may refuse to offer the Position2 Services to any person or entity at any time, and may change its eligibility criteria at any time, in its sole discretion.</p>
+
+      <h2>Account Registration</h2>
+      <p>To use the Position2 Services, you must register to create an account. During registration you will be required to provide certain information and establish a username and password. You represent and warrant that this information is accurate, current and complete, and you agree to keep it that way. Position2 reserves the right to suspend or terminate your account if information provided during registration, or thereafter, proves inaccurate, outdated or incomplete. You are responsible for safeguarding your password, for taking sole responsibility for any activity under your account, whether or not authorized by you, and for immediately notifying us of any unauthorized access to or use of your account. By signing up, you agree that Position2 may send you occasional emails relevant to your use of the Position2 Services.</p>
+
+      <h2>Giving Us Access to Other Accounts and Services</h2>
+      <p>Some Position2 Services may require you to give us access to your systems (for example, your CRM) or to provide login information for accounts or services you have with third-party providers, including marketing and analytics platforms. When you provide this information or access, you consent to our use of it as described in these Terms of Use, and you represent that you have read all terms governing such access and that you have the necessary rights to give it to us.</p>
+
+      <h2>Rights to Use; Prohibited Activities</h2>
+      <p>Subject to your compliance with these Terms of Use, we grant you a personal, non-transferable, non-exclusive, revocable, limited license to access the Sites and use the Position2 Services solely as permitted here. We reserve all rights not expressly granted to you.</p>
+      <p>By accessing the Sites or using the Position2 Services, you agree not to:</p>
+      <ul>
+        <li>Make available any content that is unlawful, harmful, tortious, defamatory, vulgar, obscene, invasive of another&rsquo;s privacy, hateful, discriminatory, or otherwise objectionable, or for which you do not have sufficient legal rights.</li>
+        <li>Use the Sites or Position2 Services to violate our rights, the rights of any third party, or any applicable law, or to violate any contractual or fiduciary obligation.</li>
+        <li>Interfere with, disrupt, or adversely affect the functionality of the Sites, the Position2 Services, or any related software, hardware or telecommunications equipment.</li>
+        <li>Collect or store personal data of third parties without their knowledge and informed consent.</li>
+        <li>License, sell, transfer, assign, distribute, host or otherwise commercially exploit the Sites or Position2 Services.</li>
+        <li>Modify, prepare derivative works of, disassemble, decompile or reverse engineer any part of the Sites or Position2 Services, or use them to build a similar or competitive product without our express prior written consent.</li>
+        <li>Attempt to gain unauthorized access to another user&rsquo;s account or activities, upload viruses or harmful code, use scrapers, crawlers, bots or other automated means to access or query the Sites or Position2 Services, or attempt to circumvent any access restriction or security procedure we use.</li>
+      </ul>
+      <p>All use of the Sites and Position2 Services must be lawful, and you agree to notify us if you learn of any misuse.</p>
+
+      <h2>Position2 Communications</h2>
+      <p>You acknowledge and agree that we may send you periodic communications in connection with your use of the Sites or Position2 Services, such as administrative messages, technical bulletins, notices about fees, transactional information and product announcements, and that you will not be able to opt out of these other than by requesting that we delete your account. These electronic communications are part of your relationship with Position2, and you agree that any notice, agreement, disclosure or other communication we send electronically satisfies any legal requirement that such communications be in writing.</p>
+
+      <h2>Notices</h2>
+      <p>Any notice permitted or required under these Terms of Use, including notice of modifications, will be given by Position2 via email to the address you provide, or by posting to the Sites or otherwise through the Position2 Services. For notices by email, the date of receipt is deemed the date the notice is transmitted.</p>
+
+      <h2>Modification of the Sites and the Position2 Services</h2>
+      <p>Position2 reserves the right, at its sole discretion and at any time, to modify, suspend or discontinue, temporarily or permanently, the Sites or the Position2 Services, with or without notice. Position2 will not be liable if, for any reason, all or part of the Sites or Position2 Services are unavailable for any period. By continuing to access or use the Sites or Position2 Services after we post notice of a modification, you agree to be bound by the modified Terms of Use; if the modifications are not acceptable to you, your only recourse is to stop accessing the Sites and using the Position2 Services.</p>
+
+      <h2>Account Cancellation; Termination</h2>
+      <p>If you breach these Terms of Use, Position2 may block your access to the Sites or Position2 Services, suspend or disable your account, or terminate these Terms of Use, at its sole discretion and without prior notice. You may terminate these Terms of Use at any time by writing to <a href="mailto:delete@position2.com">delete@position2.com</a> to delete your account and discontinuing all use of the Sites and Position2 Services. We may deactivate an account due to prolonged inactivity, and may retain removed content from deleted or deactivated accounts for archival purposes. Provisions governing indemnification, prohibited uses, disclaimers of warranties, limitation of liability, and any other provision intended to survive termination will do so.</p>
+
+      <h2>Fees</h2>
+      <p>Where Position2 Services are provided under a paid engagement, applicable fees, billing terms and payment methods are set out in the agreement governing that engagement rather than on this site.</p>
+
+      <h2>Position2 Privacy Policy</h2>
+      <p>All information collected or otherwise obtained by Position2 in connection with the Sites and Position2 Services is subject to our <a href="/privacy">Privacy Policy</a>, which is incorporated into these Terms of Use by reference. By accessing the Sites or using the Position2 Services, you consent to our privacy practices as described there.</p>
+
+      <h2>Ownership</h2>
+      <p>You retain ownership of your rights in information you provide to us in connection with the Position2 Services. You grant Position2 and its affiliates, partners and service providers a worldwide, sublicensable, royalty-free, transferable and non-exclusive license to use that information, including your PII, as described in these Terms of Use, and you represent that you have the rights necessary to grant that license. The Sites, the Position2 Services and all related content are protected by copyright, trademark and other intellectual property laws; as between you and us, Position2 owns all right, title and interest in the Sites, the Position2 Services and related content. You will not remove, alter or obscure any proprietary rights notice on the Sites or the Position2 Services.</p>
+
+      <h2>Third-Party Sites</h2>
+      <p>The Sites and Position2 Services may link to third-party websites or resources. These are not under Position2&rsquo;s control, and Position2 is not responsible for their content, functions, accuracy, legality or appropriateness, and does not endorse them. If you access or use any such content, product or service, you do so entirely at your own risk.</p>
+
+      <h2>Indemnity</h2>
+      <p>You agree to defend, indemnify and hold Position2, its officers, directors, employees, agents, subsidiaries, affiliates, partners and licensors harmless from and against any claims, liabilities, damages, losses, demands, expenses or fees, including reasonable attorneys&rsquo; fees, arising out of or relating to your violation of these Terms of Use, your violation of any rights of ours or of another, your use of or access to the Sites or Position2 Services, or your violation of any applicable law in connection with that use or access.</p>
+
+      <h2>Disclaimer of Warranties</h2>
+      <p>YOU EXPRESSLY UNDERSTAND AND AGREE THAT YOUR ACCESS TO AND USE OF THE SITES AND THE POSITION2 SERVICES IS AT YOUR SOLE RISK. THE SITES AND POSITION2 SERVICES ARE PROVIDED ON AN &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE&rdquo; BASIS. POSITION2 EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. POSITION2 MAKES NO WARRANTY OR REPRESENTATION THAT THE SITES OR THE POSITION2 SERVICES WILL MEET YOUR REQUIREMENTS, THAT ACCESS WILL BE UNINTERRUPTED, TIMELY, SECURE OR ERROR-FREE, OR THAT THE RESULTS OBTAINED FROM THEIR USE WILL BE ACCURATE OR RELIABLE.</p>
+
+      <h2>Limitation of Liability</h2>
+      <p>TO THE FULLEST EXTENT PERMITTED BY LAW, NEITHER POSITION2 NOR ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, SUBSIDIARIES, AFFILIATES, PARTNERS OR LICENSORS WILL BE LIABLE TO YOU OR ANY THIRD PARTY FOR ANY INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, CONSEQUENTIAL OR EXEMPLARY DAMAGES, INCLUDING LOSS OF PROFITS, GOODWILL, USE, DATA OR OTHER INTANGIBLE LOSSES, RESULTING FROM YOUR USE OF OR INABILITY TO USE THE SITES OR THE POSITION2 SERVICES. IN NO EVENT SHALL THE AGGREGATE LIABILITY OF POSITION2 EXCEED ONE THOUSAND UNITED STATES DOLLARS ($1,000). THE FOREGOING DOES NOT AFFECT ANY LIABILITY THAT CANNOT BE EXCLUDED OR LIMITED UNDER APPLICABLE LAW.</p>
+
+      <h2>Proprietary Rights and Notices</h2>
+      <p>All trademarks, service marks, logos, trade names and other proprietary designations of Position2 used in connection with the Sites and Position2 Services are trademarks or registered trademarks of Position2; those of any third party belong to their respective owners. You will not reverse engineer, decompile or disassemble any part of the Sites or Position2 Services, create derivative works based on them without our prior written permission, use them for timesharing or service-bureau purposes, or remove any proprietary notice.</p>
+
+      <h2>Feedback</h2>
+      <p>You may, from time to time, submit or recommend features, functionality, comments, ideas or other information (&ldquo;Feedback&rdquo;) that we may incorporate into the Sites, the Position2 Services or other Position2 products. You grant Position2 a worldwide, non-exclusive, royalty-free, perpetual right and license to use and incorporate that Feedback into any Position2 product or service without obligation, payment or restriction.</p>
+
+      <h2>Governing Law</h2>
+      <p>These Terms of Use and your relationship with Position2 are governed by the laws of the State of California, without regard to its conflict-of-law provisions. Any dispute, controversy or claim arising out of or relating to these Terms of Use, or your access to or use of the Sites or Position2 Services, will be settled exclusively by binding arbitration administered under the Rules of the American Arbitration Association in Santa Clara County, California, on an individual basis, and will not be consolidated with any dispute or claim of any other party. By visiting the Sites or using the Position2 Services, you waive all rights to a trial in any action or proceeding relating to these Terms of Use.</p>
+
+      <h2>Entire Agreement; Assignment; General</h2>
+      <p>Except as expressly superseded by a written agreement between you and Position2, these Terms of Use constitute the entire understanding between us regarding the Sites and Position2 Services, and supersede any prior or contemporaneous understandings. You may not assign or transfer these Terms of Use without Position2&rsquo;s prior written consent; Position2 may assign or transfer them at its sole discretion. Our failure to exercise or enforce any right or provision is not a waiver of it; a waiver is effective only if in writing and signed by an authorized Position2 representative. If any provision is found invalid by a court of competent jurisdiction, the remainder of these Terms of Use remains in full force and effect. Any claim arising out of or related to these Terms of Use must be filed within one year after it arose, or be forever barred.</p>
+
+      <h2>Contact</h2>
+      <p>All feedback, comments, requests for technical support and other communications relating to the Sites or the Position2 Services should be directed to <a href="mailto:info@position2.com">info@position2.com</a>.</p>
     </div>
-    <div class="band reveal"><h3>Questions about terms?</h3><p>Our team is happy to walk through the specifics with you.</p><button class="btn-grad mag" data-demo data-cursor>Get in touch</button></div>
+    <div class="band reveal"><h3>Questions about these terms?</h3><p>Our team is happy to walk through the specifics with you.</p><button class="btn-grad mag" data-demo data-cursor>Get in touch</button></div>
   </div>
 
 {% elif page == 'integrations' %}
@@ -2010,35 +2182,11 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
       <a class="fcard glass tilt reveal" href="/signals" data-cursor><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><h4>The 26 buying signals</h4><p>The full catalog of intent signals we watch for, what each one means and why it matters.</p><span class="more">Explore signals &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/agents" data-cursor style="transition-delay:70ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></div><h4>Meet the agents</h4><p>19 always-on agents across intent, SEO, content, GEO and paid, and what each one ships.</p><span class="more">Browse the directory &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/platform" data-cursor style="transition-delay:140ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h4>How intent scoring works</h4><p>How type, severity, recency and signal-stacking combine into one number that ranks your worklist.</p><span class="more">See the platform &rarr;</span></a>
-      <a class="fcard glass tilt reveal" href="/security" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Privacy &amp; de-anonymization, explained</h4><p>How visitor identification works responsibly, opt-outs, CCPA/CPRA, GDPR and your controls.</p><span class="more">Read the approach &rarr;</span></a>
+      <a class="fcard glass tilt reveal" href="/privacy" data-cursor style="transition-delay:210ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Privacy &amp; de-anonymization, explained</h4><p>How visitor identification works responsibly, and the controls and opt-outs available to you.</p><span class="more">Read the policy &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="/solutions" data-cursor style="transition-delay:280ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3 3 7-8"/><path d="M16 7h4v4"/></svg></div><h4>From signal to pipeline</h4><p>The plays Position2 runs, SEO, paid, content and RevOps, the moment intent fires.</p><span class="more">See solutions &rarr;</span></a>
       <a class="fcard glass tilt reveal" href="#" data-demo data-interest="The 2026 report" data-prefill="I'd like the State of Buying Signals 2026 report." data-cursor style="transition-delay:350ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><h4>The State of Buying Signals &middot; 2026</h4><p>Our upcoming report on how B2B teams turn intent into pipeline. Request early access.</p><span class="more">Request the report &rarr;</span></a>
     </div>
     <div class="band reveal"><h3>Want the playbooks first?</h3><p>Tell us where to send our latest guides on intent-led growth and GEO, no spam, just the good stuff.</p><div class="band-cta"><button class="btn-grad mag" data-signup data-cursor>Sign up</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
-  </div>
-
-{% elif page == 'security' %}
-  <div class="wrap sectionpad">
-    <div class="hero2">
-      <div class="reveal in"><span class="pill-eye"><span class="dt"></span> Security &amp; trust</span>
-        <h1 class="h-hero">Intent intelligence,<br><span class="ital grad">handled responsibly.</span></h1>
-        <p class="lead">De-anonymization and intent data only earn trust when they&rsquo;re handled with care. Here&rsquo;s how we protect your data and honor privacy choices, by design, not as an afterthought.</p>
-      </div>
-      <div class="hero-art reveal in"><div class="art-shield"><span class="art-ring r1"></span><span class="art-ring r2"></span><svg viewBox="0 0 200 220"><defs><linearGradient id="sgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs><path d="M100 14 L176 44 V104 C176 158 142 192 100 208 C58 192 24 158 24 104 V44 Z" fill="rgba(16,185,129,.08)" stroke="url(#sgrad)" stroke-width="3"/><path class="art-check" d="M68 110 l22 22 l44 -50" fill="none" stroke="#34d399" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="art-chip art-chip-1"><span class="acd"></span>CCPA/CPRA &amp; GDPR</div><div class="art-chip art-chip-2">Encrypted &middot; least-privilege</div></div></div>
-    </div>
-    <div class="feat" style="margin-top:38px">
-      <div class="fcard glass reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/></svg></div><h4>Privacy-compliant</h4><p>Built for US state privacy laws (CCPA/CPRA) and GDPR, we honor opt-out and Do-Not-Sell-or-Share requests.</p></div>
-      <div class="fcard glass reveal" style="transition-delay:80ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8h14M5 16h14"/></svg></div><h4>Your data, your control</h4><p>We don&rsquo;t sell your data. Request an export or deletion at any time, and disable any signal source whenever you want.</p></div>
-      <div class="fcard glass reveal" style="transition-delay:160ms"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h4>Secured in transit &amp; at rest</h4><p>Encrypted connections, least-privilege access and audited handling, with vetted sub-processors under agreement.</p></div>
-    </div>
-    <div class="legal-body reveal" style="margin-top:40px">
-      <h3>What we process</h3><p>Depending on your configuration: business firmographic data, publicly available company news and activity, first-party signals from your website and CRM, and engagement data you&rsquo;re entitled to use. We do not seek out sensitive personal categories.</p>
-      <h3>De-anonymization &amp; consent</h3><p>Where visitor identification is enabled, it&rsquo;s intended for traffic you&rsquo;re permitted to process, with appropriate notice and consent on your properties. You own your site&rsquo;s consent banner and privacy notice; we provide controls and guidance to help you stay compliant with CCPA/CPRA, GDPR and other applicable privacy laws.</p>
-      <h3>Your rights</h3><p>You can request access, correction, export or deletion of data we process on your behalf, and disable specific signal sources at any time. We honour valid data-subject and opt-out requests.</p>
-      <h3>Sub-processors &amp; access</h3><p>Data is encrypted in transit and at rest, access is least-privilege, and handling is logged and reviewed. We work with vetted sub-processors under appropriate agreements, available on request.</p>
-      <h3>Request a DPA</h3><p>Need our Data Processing Agreement or a security overview for your review? We&rsquo;ll share them on request, <a href="mailto:privacy@position2.com">privacy@position2.com</a>.</p>
-    </div>
-    <div class="band reveal"><h3>Need our security overview or a DPA?</h3><p>We&rsquo;ll walk your team through how data is handled, and provide the documents your security review needs.</p><div class="band-cta"><button class="btn-grad mag" data-demo data-interest="Security / DPA" data-prefill="Please send your security overview / DPA." data-cursor>Request it</button><button class="btn-video mag" type="button" data-video data-cursor><span class="vp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>Watch the walkthrough</button></div></div>
   </div>
 
 {% elif page == 'industries' %}
@@ -2319,7 +2467,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
     {% if page!='login' %}
     <div class="foot-cols">
       <div class="foot-col"><h5>Product</h5><a href="/platform" data-cursor>Platform</a><a href="/agents" data-cursor>Agents</a><a href="/signals" data-cursor>Signals</a><a href="/integrations" data-cursor>Integrations</a></div>
-      <div class="foot-col"><h5>Company</h5><a href="/solutions" data-cursor>Solutions</a><a href="/security" data-cursor>Security</a></div>
+      <div class="foot-col"><h5>Company</h5><a href="/solutions" data-cursor>Solutions</a></div>
       <div class="foot-col"><h5>Resources</h5><a href="/resources" data-cursor>Insights</a><a href="/privacy" data-cursor>Privacy</a><a href="/terms" data-cursor>Terms</a><a href="/login" data-cursor>Log in</a></div>
     </div>
     {% else %}
