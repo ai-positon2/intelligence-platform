@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=5">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=6">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -60,6 +60,10 @@
       <div class="page-hdr-title">Contact Finder</div>
     </div>
     <div class="page-hdr-credits"><span class="d"></span>People search is free &middot; Company search &amp; Enrich each spend 1 Apollo credit</div>
+    <button class="page-hdr-hist-btn" onclick="cpiOpenHistory()">
+      <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      History
+    </button>
   </div>
 
   <div class="cpi-layout">
@@ -367,10 +371,6 @@
             <button onclick="cpiExport('csv',false)">All loaded rows <em>.csv</em></button>
           </div>
         </div>
-        <button class="cpi-tb-btn" onclick="cpiOpenHistory()">
-          <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
-          History
-        </button>
       </div>
 
       <div id="cpiResultsWrap">
