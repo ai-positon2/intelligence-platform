@@ -10,8 +10,15 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
    re-renders after a bulk enrich, and reopening a saved search. */
 /* historyId is the drawer entry this search already owns, so Load more grows it
    instead of writing a second near-identical row. */
+/* pinnedOrgId/pinnedOrgName: set when the user picks a company from the filter
+   bar's own disambiguation list (see renderCompanyChoicePicker) for a
+   candidate Apollo has no domain on file for, so there is no plain-domain
+   value to put in the field instead. gatherFilters() applies the pin only
+   while the field's text still matches pinnedOrgName, so it can never bleed
+   into an unrelated later search once the user types something else. */
 var STATE = { entity: "people", page: 1, results: [], selected: {},
-              total: null, lastFilters: {}, historyId: null };
+              total: null, lastFilters: {}, historyId: null,
+              pinnedOrgId: null, pinnedOrgName: null };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -181,6 +188,11 @@ function gatherFilters(){
     var tMin=numVal("fpTenureMin"), tMax=numVal("fpTenureMax");
     if(tMin!==null) f.days_in_title_min=Math.round(tMin*30);
     if(tMax!==null) f.days_in_title_max=Math.round(tMax*30);
+    var coEl=document.getElementById("fpCompanyDomain");
+    if(STATE.pinnedOrgId && coEl && coEl.value===STATE.pinnedOrgName){
+      f.organization_ids=[STATE.pinnedOrgId];
+      delete f.company_domains;
+    }
     return f;
   }
   applySpecs(COMPANY_FIELDS, f);
@@ -216,6 +228,18 @@ window.cpiRunSearch = function(reset){
   }).then(function(r){ return r.json(); }).then(function(d){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
     if(d && d.error){ toast(d.error, "err"); }
+    /* The name matched more than one distinct company: show the list instead
+       of guessing one or searching across all of them at once. Nothing below
+       this runs -- there is no page to render or "load more" until the user
+       picks. */
+    else if(d && d.needs_company_choice){
+      STATE.results=[]; STATE.selected={};
+      renderCompanyChoicePicker(typedCompany, d.choices||[]);
+      document.getElementById("cpiToolbar").style.display="none";
+      document.getElementById("cpiLoadMore").style.display="none";
+      if(d.credits) toast('Looked up "'+typedCompany+'" ('+d.credits+" Apollo credit)", "ok");
+      return;
+    }
     /* The "at company" field also accepts a plain name now (resolved server-side
        to the real company/companies), so a fresh search discloses what it
        actually matched -- and any Apollo credit that resolution spent -- rather
@@ -244,6 +268,46 @@ window.cpiRunSearch = function(reset){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
     wrap.innerHTML='<div class="cpi-empty"><span>Search failed. Try again in a moment.</span></div>';
   });
+};
+
+/* Reuses chat's own .cpi-choices/.cpi-choice markup and {name,domain,id,logo,
+   hq} shape, so a disambiguation list looks and behaves the same wherever it
+   shows up in this page. */
+function renderCompanyChoicePicker(query, choices){
+  var wrap=document.getElementById("cpiResultsWrap");
+  var rows=(choices||[]).map(function(c){
+    var logo=c.logo?('<img src="'+esc(safeUrl(c.logo))+'" alt="">'):esc(initials(c.name));
+    return '<button class="cpi-choice" data-pick-name="'+esc(c.name||"")+'" data-pick-domain="'+esc(c.domain||"")+'" data-pick-org-id="'+esc(c.id||"")+'">'+
+      '<div class="cpi-choice-logo">'+logo+"</div>"+
+      '<div class="cpi-choice-t"><b>'+esc(c.name)+"</b><span>"+esc([c.domain,c.hq].filter(Boolean).join(" · "))+"</span></div>"+
+    "</button>";
+  }).join("");
+  wrap.innerHTML =
+    '<div class="cpi-empty" style="align-items:stretch;text-align:left;max-width:560px;margin:10px auto;padding:26px 24px">'+
+      '<div style="text-align:center;color:var(--tx2);font-size:13px;margin-bottom:14px">'+
+        'Multiple companies match "'+esc(query)+'". Pick one to search:'+
+      "</div>"+
+      '<div class="cpi-choices">'+rows+"</div>"+
+    "</div>";
+  wrap.querySelectorAll(".cpi-choice").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      window.cpiPickCompanyChoice(btn.getAttribute("data-pick-name")||"",
+                                  btn.getAttribute("data-pick-domain")||"",
+                                  btn.getAttribute("data-pick-org-id")||"");
+    });
+  });
+}
+
+/* A picked company either has a domain -- put it in the field and let the
+   normal, free, strictly domain-filtered search path handle it, no second
+   credit spent -- or does not, in which case the id is pinned (see STATE and
+   gatherFilters) since there is nothing domain-shaped to type instead. */
+window.cpiPickCompanyChoice = function(name, domain, orgId){
+  var el=document.getElementById("fpCompanyDomain");
+  if(!el) return;
+  if(domain){ el.value=domain; STATE.pinnedOrgId=null; STATE.pinnedOrgName=null; }
+  else { el.value=name; STATE.pinnedOrgId=orgId; STATE.pinnedOrgName=name; }
+  window.cpiRunSearch(true);
 };
 
 function renderResults(){
