@@ -9655,19 +9655,59 @@ def ppc_upload():
 _REVENUE_KEYS = {"est_value", "opportunity", "revenue_impact", "pipeline_estimate",
                  "estimated_value", "pipeline_value", "deal_size", "contract_value"}
 
+# Whether the Responses API web-search tool actually works on this key and SDK.
+# None until a call settles it. Two reasons this is memoized: a key without web
+# search otherwise pays two failed round trips on EVERY research call for the life
+# of the process, and the outcome was previously unknowable from outside, since
+# web_search_used is returned by four endpoints and displayed by none. The INFO
+# lines below put the answer in the logs on the first call after a deploy.
+_WEB_SEARCH_OK = None
+_WEB_SEARCH_TOOL = None      # the tool-type name that proved to work
+
+_WEB_SEARCH_UNSUPPORTED = ("unknown parameter", "unsupported", "not supported",
+                           "invalid_value", "no such tool", "unrecognized",
+                           "does not support")
+
+
+def _web_search_unsupported(err) -> bool:
+    """"This key or SDK cannot do web search at all", as distinct from a bad
+    minute. A rate limit, timeout or 5xx must never permanently disable the tool."""
+    status = getattr(err, "status_code", None) or getattr(err, "http_status", None)
+    if isinstance(status, int) and (status in (408, 409, 429) or status >= 500):
+        return False
+    if isinstance(err, AttributeError):
+        return True          # SDK too old to expose .responses at all
+    text = str(err or "").lower()
+    return any(s in text for s in _WEB_SEARCH_UNSUPPORTED)
+
+
 def _responses_web_search(oai, model, input_msgs, max_tokens):
     """Call the Responses API with web search, trying both known tool-type names
     ('web_search' and the older 'web_search_preview'). Returns (text, True) on
     success or (None, False) if web search is unavailable on this SDK/model."""
-    for _tt in ("web_search", "web_search_preview"):
+    global _WEB_SEARCH_OK, _WEB_SEARCH_TOOL
+    if _WEB_SEARCH_OK is False:
+        return None, False
+    tool_types = (_WEB_SEARCH_TOOL,) if _WEB_SEARCH_TOOL else ("web_search", "web_search_preview")
+    unsupported = 0
+    for _tt in tool_types:
         try:
             resp = oai.responses.create(
                 model=model, tools=[{"type": _tt}], input=input_msgs, max_output_tokens=max_tokens)
             txt = (getattr(resp, "output_text", "") or "").strip()
             if txt:
+                if _WEB_SEARCH_OK is not True:
+                    _WEB_SEARCH_OK, _WEB_SEARCH_TOOL = True, _tt
+                    log.info("web search IS available on this OpenAI key (tool '%s')", _tt)
                 return txt, True
         except Exception as we:
             log.warning("web search via '%s' unavailable: %s", _tt, we)
+            if _web_search_unsupported(we):
+                unsupported += 1
+    if unsupported >= len(tool_types) and _WEB_SEARCH_OK is None:
+        _WEB_SEARCH_OK = False
+        log.info("web search is NOT available on this OpenAI key; research falls "
+                 "back to model background knowledge")
     return None, False
 
 
