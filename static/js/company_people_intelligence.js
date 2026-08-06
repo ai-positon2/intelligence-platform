@@ -1,4 +1,4 @@
-/* Company & People Intelligence: search, enrich modal, chat. */
+/* Contact Finder: search, enrich modal, chat. */
 (function(){
 "use strict";
 

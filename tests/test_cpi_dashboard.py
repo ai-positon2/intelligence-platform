@@ -1,4 +1,4 @@
-"""Tests for the Company & People Intelligence dashboard: bulk enrich, history,
+"""Tests for the Contact Finder dashboard: bulk enrich, history,
 export, and the OpenAI model/reasoning ladder.
 
 The dashboard's job is to show as much as Apollo gives away for free and to make
