@@ -565,6 +565,81 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   .cpi-card{animation:none}
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Premium filter bar: layered glass panel, labelled control groups, and
+   richer inputs/chips/buttons so the filter surface reads as a designed
+   instrument rather than a plain form. Appended for the same reason as the
+   pass above: overrides stay isolated and easy to find.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.cpi-filters{position:relative;overflow:hidden;
+  background:linear-gradient(165deg,rgba(22,26,48,.62),rgba(9,11,22,.58));
+  border-color:rgba(255,255,255,.09);border-radius:calc(var(--radius-lg) + 3px);
+  padding:22px 24px 20px;
+  box-shadow:0 34px 74px -42px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.02) inset}
+.cpi-filters::before{content:'';position:absolute;left:22px;right:22px;top:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(124,131,245,.7),rgba(34,211,238,.55),transparent)}
+.cpi-filters::after{content:'';position:absolute;top:-70px;right:-70px;width:240px;height:240px;pointer-events:none;
+  background:radial-gradient(circle,rgba(124,131,245,.15),transparent 70%);filter:blur(4px)}
+
+/* Labelled groups: the same monospace-tag language as the advanced sections,
+   applied to the always-visible rows too, so the whole panel reads as
+   structured fields rather than an undifferentiated stack of inputs. */
+.cpi-fset{position:relative;z-index:1;margin-bottom:16px}
+.cpi-fset:last-of-type{margin-bottom:2px}
+.cpi-fset-lbl{font-family:monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:#7d88b2;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.cpi-fset-lbl::before{content:'';width:3px;height:11px;border-radius:2px;flex:none;
+  background:linear-gradient(#7c83f5,#22d3ee);box-shadow:0 0 8px rgba(124,131,245,.55)}
+
+.cpi-search-input,.cpi-filter-select,.cpi-tag-input,.cpi-num-input{
+  background:linear-gradient(178deg,rgba(255,255,255,.07),rgba(255,255,255,.032));
+  border-color:rgba(255,255,255,.12);border-radius:11px;padding:10px 14px;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 8px 16px -12px rgba(0,0,0,.45);
+  transition:border-color .18s,background .18s,box-shadow .18s}
+.cpi-num-input{padding:10px 12px}
+.cpi-search-input:focus,.cpi-filter-select:focus,.cpi-tag-input:focus{
+  border-color:rgba(124,131,245,.6);
+  background:linear-gradient(178deg,rgba(255,255,255,.1),rgba(255,255,255,.045));
+  box-shadow:0 0 0 3px rgba(124,131,245,.16),0 8px 20px -12px rgba(124,131,245,.4)}
+.cpi-num-input:focus{border-color:rgba(52,211,153,.55);
+  background:linear-gradient(178deg,rgba(255,255,255,.1),rgba(255,255,255,.045));
+  box-shadow:0 0 0 3px rgba(52,211,153,.15),0 8px 20px -12px rgba(52,211,153,.35)}
+
+/* Chips: soft dimensional surface, a status dot that lights up teal when
+   selected instead of relying on background colour alone to read as "on". */
+.cpi-chip{background:linear-gradient(178deg,rgba(255,255,255,.055),rgba(255,255,255,.02));
+  border-color:rgba(255,255,255,.13);padding:7px 14px 7px 11px;
+  display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 10px -8px rgba(0,0,0,.4)}
+.cpi-chip::before{content:'';width:5px;height:5px;border-radius:50%;flex:none;
+  background:rgba(255,255,255,.25);transition:background .16s,box-shadow .16s}
+.cpi-chip:hover{background:linear-gradient(178deg,rgba(255,255,255,.09),rgba(255,255,255,.035))}
+.cpi-chip.on{box-shadow:0 8px 20px -12px rgba(124,131,245,.6),0 0 0 1px rgba(124,131,245,.22) inset}
+.cpi-chip.on::before{background:#22d3ee;box-shadow:0 0 7px #22d3ee}
+
+.cpi-toggle{padding:5px;box-shadow:0 12px 28px -18px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.03) inset}
+.cpi-toggle button{padding:10px 22px}
+.cpi-toggle button.on{box-shadow:0 12px 28px -10px rgba(124,131,245,.68),0 0 0 1px rgba(255,255,255,.15) inset}
+
+.cpi-check{padding:8px 12px;border-radius:var(--radius-pill);
+  background:rgba(255,255,255,.035);border:1px solid var(--b1);transition:.16s}
+.cpi-check:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2)}
+
+/* Buttons: Search gets a diagonal shine sweep on hover and its icon; the
+   secondary actions get a touch more presence so the row doesn't fade out
+   next to it. */
+.cpi-search-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:8px;
+  padding:10px 22px 10px 18px}
+.cpi-search-btn svg{flex:none}
+.cpi-search-btn::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.4) 50%,transparent 68%);
+  transform:translateX(-130%);transition:transform .55s ease}
+.cpi-search-btn:hover::after{transform:translateX(130%)}
+.cpi-more-btn,.cpi-clear-btn{padding:9px 16px;border-radius:var(--radius-pill);font-weight:650}
+.cpi-more-btn{background:rgba(255,255,255,.03)}
+
+@media (prefers-reduced-motion:reduce){.cpi-search-btn::after{transition:none}}
+
 /* ── Toast ── */
 .cpi-toast{position:fixed;left:50%;bottom:88px;transform:translate(-50%,20px);z-index:960;
   font-size:12.5px;font-weight:600;color:var(--tx);padding:11px 18px;border-radius:var(--radius-pill);
