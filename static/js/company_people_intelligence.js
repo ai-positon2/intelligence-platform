@@ -261,6 +261,10 @@ window.cpiRunSearch = function(reset){
     if(d && d.total!==undefined && d.total!==null) STATE.total=d.total;
     STATE.results = reset ? items : STATE.results.concat(items);
     renderResults();
+    /* A title search scoped to one company that came back empty gets a real
+       explanation instead of the bare "No matches" renderResults() just drew --
+       overwrite it with the researched note. */
+    if(!items.length && d && d.ai_note) renderAiNote(d.ai_note);
     syncLoadMoreLabel();
     document.getElementById("cpiLoadMore").style.display=(d&&d.has_more)?"":"none";
     if(items.length) saveHistory(reset);
@@ -309,6 +313,24 @@ window.cpiPickCompanyChoice = function(name, domain, orgId){
   else { el.value=name; STATE.pinnedOrgId=orgId; STATE.pinnedOrgName=name; }
   window.cpiRunSearch(true);
 };
+
+/* fmtAnswer/.cpi-bub-cost are chat's own answer-formatting pieces, reused here
+   so a search's AI explanation reads the same way an equivalent chat answer
+   would -- same bullet/paragraph formatting, same "how was this answered"
+   footer -- rather than inventing a second visual language for it. */
+function renderAiNote(note){
+  var wrap=document.getElementById("cpiResultsWrap");
+  var bits=[];
+  if(note.web_search) bits.push("live web research");
+  else if(note.researched) bits.push("background knowledge, no live web");
+  var costHtml=bits.length?('<div class="cpi-bub-cost">'+esc(bits.join(" · "))+"</div>"):"";
+  wrap.innerHTML =
+    '<div class="cpi-empty" style="align-items:stretch;text-align:left;max-width:620px;margin:10px auto;padding:24px 26px">'+
+      '<div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px;font-family:monospace">No exact match &middot; AI-assisted</div>'+
+      fmtAnswer(note.answer||"")+
+      costHtml+
+    "</div>";
+}
 
 function renderResults(){
   var wrap=document.getElementById("cpiResultsWrap");
