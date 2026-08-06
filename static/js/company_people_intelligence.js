@@ -565,24 +565,23 @@ window.cpiEnrichSelected = function(){
   });
 };
 
-window.cpiExport = function(fmt, onlySelected){
-  document.querySelectorAll(".cpi-menu.on").forEach(function(m){ m.classList.remove("on"); });
-  var rows = onlySelected ? selectedRows() : STATE.results;
+/* Shared by the toolbar's Download menu and a direct export off a history
+   entry, so both paths hit the same JSON contract and get the same
+   "Search details" sheet on .xlsx -- filters/meta are optional, so a plain
+   selection export (no known filters) still works exactly as before. */
+function doCpiDownload(entity, rows, fmt, filters, meta){
   if(!rows.length){
-    toast(onlySelected?"Select at least one row first.":"Run a search first.", "err");
+    toast("Nothing to export.", "err");
     return;
   }
-  /* POSTed as JSON and downloaded from a blob, rather than by submitting a form,
-     so the endpoint keeps a single JSON contract. The server's filename is
-     honoured by reading it back off Content-Disposition. */
-  var payload={ entity: STATE.entity, format: fmt, rows: rows };
+  var payload={ entity: entity, format: fmt, rows: rows, filters: filters||{}, meta: meta||{} };
   fetch(window.__CPI_EXPORT_URL__, {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify(payload)
   }).then(function(r){
     if(!r.ok) throw new Error("export failed");
     var name=(r.headers.get("Content-Disposition")||"").match(/filename="([^"]+)"/);
-    return r.blob().then(function(b){ return { blob:b, name:name?name[1]:("apollo-"+STATE.entity+"."+fmt) }; });
+    return r.blob().then(function(b){ return { blob:b, name:name?name[1]:("apollo-"+entity+"."+fmt) }; });
   }).then(function(o){
     var url=URL.createObjectURL(o.blob);
     var a=document.createElement("a");
@@ -591,6 +590,21 @@ window.cpiExport = function(fmt, onlySelected){
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
     toast("Downloaded "+rows.length+" row"+(rows.length===1?"":"s")+" as ."+fmt, "ok");
   }).catch(function(){ toast("Download failed. Try again in a moment.", "err"); });
+}
+
+window.cpiExport = function(fmt, onlySelected){
+  document.querySelectorAll(".cpi-menu.on").forEach(function(m){ m.classList.remove("on"); });
+  var rows = onlySelected ? selectedRows() : STATE.results;
+  if(!rows.length){
+    toast(onlySelected?"Select at least one row first.":"Run a search first.", "err");
+    return;
+  }
+  /* A selection export omits the filters -- a hand-picked subset of rows is not
+     "the results of this search" any more, so labelling it with the search's
+     filters would overstate what it actually contains. */
+  var filters = onlySelected ? {} : (STATE.lastFilters||{});
+  var meta = onlySelected ? {} : { total: STATE.total };
+  doCpiDownload(STATE.entity, rows, fmt, filters, meta);
 };
 
 /* ── History ── */
@@ -659,6 +673,24 @@ function applyFiltersToForm(f){
   if(unk) unk.checked=!!f.include_unknown_founded_year;
 }
 
+var IC_PERSON='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
+var IC_DL='<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+
+/* Buckets a history entry's timestamp into the same relative-date groups any
+   mail/notes app uses, so a growing list of saved searches reads as a
+   timeline instead of one long undifferentiated stack. */
+function histBucket(iso){
+  if(!iso) return "Earlier";
+  var d=new Date(iso), now=new Date();
+  var startOf=function(dt){ return new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()).getTime(); };
+  var days=Math.round((startOf(now)-startOf(d))/86400000);
+  if(days<=0) return "Today";
+  if(days===1) return "Yesterday";
+  if(days<7) return "This week";
+  if(days<30) return "This month";
+  return "Earlier";
+}
+
 window.cpiOpenHistory = function(){
   document.getElementById("cpiDrawerOvl").classList.add("on");
   document.getElementById("cpiDrawer").classList.add("on");
@@ -667,26 +699,70 @@ window.cpiOpenHistory = function(){
   fetch(window.__CPI_HISTORY_URL__).then(function(r){ return r.json(); }).then(function(d){
     if(!d || d.available===false){
       body.innerHTML='<div class="cpi-empty"><span>History needs a database on this environment, so nothing is being stored yet.</span></div>';
+      var clr=document.getElementById("cpiHistClearAll"); if(clr) clr.style.display="none";
       return;
     }
     var entries=d.entries||[];
+    var clr=document.getElementById("cpiHistClearAll");
+    if(clr) clr.style.display = entries.length ? "" : "none";
     if(!entries.length){
       body.innerHTML='<div class="cpi-empty"><span>No saved searches yet. Run a search and it will show up here.</span></div>';
       return;
     }
-    body.innerHTML=entries.map(function(e){
-      var when=e.created_at?new Date(e.created_at).toLocaleString():"";
-      return '<div class="cpi-hist" onclick="cpiRestoreHistory('+e.id+')">'+
-        '<div class="cpi-hist-ic">'+(e.entity==="companies"?"&#127970;":"&#128100;")+'</div>'+
-        '<div class="cpi-hist-b"><div class="cpi-hist-l">'+esc(e.label||"Saved search")+'</div>'+
-        '<div class="cpi-hist-m">'+esc(String(e.count||0))+' rows'+
-          (e.total?" of "+pmNum(e.total):"")+' · '+esc(when)+'</div></div>'+
-        '<button class="cpi-hist-del" onclick="event.stopPropagation();cpiDeleteHistory('+e.id+')" aria-label="Delete">&#10005;</button>'+
-      '</div>';
-    }).join("");
+    var groups={}, order=["Today","Yesterday","This week","This month","Earlier"];
+    entries.forEach(function(e){ var b=histBucket(e.created_at); (groups[b]=groups[b]||[]).push(e); });
+    var idx=0, html="";
+    order.forEach(function(b){
+      var list=groups[b]; if(!list||!list.length) return;
+      html += '<div class="cpi-hist-date">'+esc(b)+'</div>';
+      html += list.map(function(e){
+        var when=e.created_at?new Date(e.created_at).toLocaleString(undefined,
+          {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
+        var co=e.entity==="companies";
+        var style='style="animation-delay:'+Math.min(idx++,10)*28+'ms"';
+        return '<div class="cpi-hist" '+style+' onclick="cpiRestoreHistory('+e.id+')">'+
+          '<div class="cpi-hist-ic '+(co?"co":"pp")+'">'+(co?IC_BLD:IC_PERSON)+'</div>'+
+          '<div class="cpi-hist-b"><div class="cpi-hist-l">'+esc(e.label||"Saved search")+'</div>'+
+          '<div class="cpi-hist-m">'+esc(String(e.count||0))+' row'+(e.count===1?"":"s")+
+            (e.total&&e.total>e.count?" of "+pmNum(e.total):"")+' &middot; '+esc(when)+'</div></div>'+
+          '<div class="cpi-hist-actions">'+
+            '<button class="cpi-hist-act exp" onclick="event.stopPropagation();cpiExportHistoryEntry('+e.id+',this)" aria-label="Export" title="Export this search">'+IC_DL+'</button>'+
+            '<button class="cpi-hist-act del" onclick="event.stopPropagation();cpiDeleteHistory('+e.id+')" aria-label="Delete" title="Delete">&#10005;</button>'+
+          '</div>'+
+        '</div>';
+      }).join("");
+    });
+    body.innerHTML=html;
   }).catch(function(){
     body.innerHTML='<div class="cpi-empty"><span>Could not load history.</span></div>';
   });
+};
+/* Exports a saved search straight from the drawer -- no need to reopen it into
+   the main grid first. Always .xlsx, since that is the format that carries the
+   "Search details" sheet (the filters that produced these rows), which is the
+   whole point of exporting from history rather than just rerunning it. */
+window.cpiExportHistoryEntry = function(id, btn){
+  if(btn){ btn.disabled=true; }
+  fetch(window.__CPI_HISTORY_URL__+"/"+id).then(function(r){ return r.json(); }).then(function(d){
+    if(btn){ btn.disabled=false; }
+    if(!d || d.error){ toast("Could not export that search.", "err"); return; }
+    var entity = d.entity==="companies" ? "companies" : "people";
+    doCpiDownload(entity, d.rows||[], "xlsx", d.filters||{}, { total: d.total, label: d.label });
+  }).catch(function(){
+    if(btn){ btn.disabled=false; }
+    toast("Could not export that search.", "err");
+  });
+};
+window.cpiClearAllHistory = function(){
+  var body=document.getElementById("cpiDrawerBody");
+  var ids=Array.prototype.map.call(body.querySelectorAll(".cpi-hist"), function(el){
+    return el.getAttribute("onclick").match(/\d+/)[0];
+  });
+  if(!ids.length) return;
+  if(!window.confirm("Delete all "+ids.length+" saved search"+(ids.length===1?"":"es")+"? This cannot be undone.")) return;
+  Promise.all(ids.map(function(id){
+    return fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" }).catch(function(){});
+  })).then(function(){ window.cpiOpenHistory(); toast("Cleared search history.", "ok"); });
 };
 window.cpiCloseHistory = function(){
   document.getElementById("cpiDrawerOvl").classList.remove("on");

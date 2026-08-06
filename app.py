@@ -7950,6 +7950,29 @@ def _csv_safe(value) -> str:
     return text
 
 
+def _cpi_filters_readable(filters: dict) -> list:
+    """Turn a raw Apollo filters dict into ordered, human-readable (label, value)
+    pairs for the export's "Search details" sheet -- so the file says what
+    produced these rows, not just the rows themselves."""
+    out = []
+    for key, val in (filters or {}).items():
+        if val in (None, "", [], {}):
+            continue
+        if isinstance(val, dict):
+            val = "; ".join("%s: %s" % (k, v) for k, v in val.items() if v not in (None, "", {}))
+            if not val:
+                continue
+        elif isinstance(val, (list, tuple)):
+            val = ", ".join(str(v) for v in val if v not in (None, ""))
+            if not val:
+                continue
+        elif isinstance(val, bool):
+            val = "Yes" if val else "No"
+        label = key.replace("_", " ").strip().capitalize()
+        out.append((label, str(val)))
+    return out
+
+
 @app.route("/p2/gtm/company-people-intelligence/export", methods=["POST"])
 @position2_required
 def cpi_export():
@@ -7958,6 +7981,12 @@ def cpi_export():
     Rows come from the client rather than being re-queried, so exporting a
     selection costs no Apollo credits and returns exactly what the user ticked --
     including any enrichment they already paid to reveal.
+
+    An optional `filters` (+ `meta`) payload -- sent for a full-page export or an
+    export straight from a history entry -- gets its own "Search details" sheet
+    on .xlsx exports, so the file says what search produced these rows and not
+    only the rows themselves. Left out of .csv, which stays a flat, re-importable
+    table rather than growing a mismatched header block.
     """
     body = request.get_json(silent=True) or {}
     rows = [r for r in (body.get("rows") or []) if isinstance(r, dict)]
@@ -7966,6 +7995,8 @@ def cpi_export():
     entity = "companies" if body.get("entity") == "companies" else "people"
     cols = _CPI_COMPANY_COLS if entity == "companies" else _CPI_PERSON_COLS
     fmt = "csv" if str(body.get("format") or "").lower() == "csv" else "xlsx"
+    filters = body.get("filters") if isinstance(body.get("filters"), dict) else {}
+    meta = body.get("meta") if isinstance(body.get("meta"), dict) else {}
     stamp = datetime.now(IST).strftime("%Y-%m-%d-%H%M")
     fname = "apollo-%s-%s.%s" % (entity, stamp, fmt)
 
@@ -7999,6 +8030,28 @@ def cpi_export():
             longest = max([len(label)] + [len(_csv_safe(r.get(key))) for r in rows])
             ws.column_dimensions[get_column_letter(i)].width = min(max(longest + 2, 10), 46)
         ws.freeze_panes = "A2"
+
+        readable_filters = _cpi_filters_readable(filters)
+        if readable_filters or meta:
+            ws2 = wb.create_sheet("Search details")
+            ws2.append(["Field", "Value"])
+            for cell in ws2[1]:
+                cell.font = Font(bold=True, color="FFFFFF")
+                cell.fill = head_fill
+                cell.alignment = Alignment(vertical="center")
+            detail_rows = [("Looking for", "Companies" if entity == "companies" else "People"),
+                           ("Rows in this file", str(len(rows)))]
+            if meta.get("total") is not None:
+                detail_rows.append(("Total matches in Apollo", str(meta["total"])))
+            if meta.get("label"):
+                detail_rows.append(("Saved search", str(meta["label"])))
+            detail_rows.append(("Exported", datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")))
+            detail_rows += readable_filters
+            for label, val in detail_rows:
+                ws2.append([_csv_safe(label), _csv_safe(val)])
+            ws2.column_dimensions["A"].width = 24
+            ws2.column_dimensions["B"].width = 60
+
         out = io.BytesIO()
         wb.save(out)
         payload = out.getvalue()
