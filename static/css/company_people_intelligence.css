@@ -542,8 +542,6 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .cpi-chat-input{padding:12px 17px;transition:border-color .18s,box-shadow .18s,background .18s}
 .cpi-chat-input:focus{box-shadow:0 0 0 3px rgba(124,131,245,.14);background:rgba(255,255,255,.07)}
 .cpi-chat-send{width:41px;height:41px;box-shadow:0 8px 22px -10px rgba(124,131,245,.7)}
-.cpi-chat-foot{flex:none;padding:0 16px 11px;font-family:monospace;font-size:9.5px;letter-spacing:.05em;
-  color:var(--tx3);text-align:center}
 
 /* ── Skeleton loading (replaces the bare spinner while a search is in flight) ── */
 .cpi-skel-card{background:rgba(255,255,255,.028);border:1px solid var(--b1);
