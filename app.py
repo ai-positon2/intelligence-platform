@@ -1527,7 +1527,7 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "GTM", "CRM"],
     },
     {
-        "slug": "company-people-intelligence", "name": "Company & People Intelligence",
+        "slug": "company-people-intelligence", "name": "Contact Finder",
         "tagline": "Apollo-Powered Lookup",
         "ac": "#7c83f5", "ac2": "#22d3ee", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/>"),
         "pill1": "Apollo-Powered Lookup", "pill2": "Filters + grounded chat",
@@ -7100,7 +7100,7 @@ def linkedin_scraper_data():
     return _linkedin_data_response(LINKEDIN_INTEL_SHEET_ID, force)
 
 
-# ── Company & People Intelligence ─────────────────────────────────────────────
+# ── Contact Finder ────────────────────────────────────────────────────────────
 # Internal, staff-only Apollo search + chat agent: filter/browse companies and
 # people live against Apollo (search_people is free; search_companies and any
 # enrichment each cost 1 Apollo credit), plus a grounded NL chat ("Who is the

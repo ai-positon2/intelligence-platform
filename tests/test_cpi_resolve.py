@@ -1,4 +1,4 @@
-"""Tests for the Company & People Intelligence company-resolution helpers.
+"""Tests for the Contact Finder company-resolution helpers.
 
 These cover the three bugs that made a real lookup fail in production:
   1. Apollo returning the same company several times, which was shown to the
