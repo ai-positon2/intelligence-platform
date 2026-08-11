@@ -1079,8 +1079,14 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich
      contact info was asked for, so the paid lookup was skipped by design) --
      one click spends the credit and opens the same profile modal the results
      grid uses, rather than spending it automatically on every question. */
-  var enrichHtml = enrich && enrich.type==="person"
-    ? '<button class="cpi-enrich-chip" data-name="'+esc(enrich.name||"")+'" data-domain="'+esc(enrich.domain||"")+'" data-title="'+esc(enrich.title||"")+'" data-apollo-id="'+esc(enrich.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(enrich.name||"this person")+"</button>"
+  /* One entry or several: a list answer names more than one person and each of
+     them is separately worth a credit, so this takes either shape. */
+  var enrichList = (Array.isArray(enrich) ? enrich : (enrich ? [enrich] : []))
+    .filter(function(e){ return e && e.type==="person"; });
+  var enrichHtml = enrichList.length
+    ? '<div class="cpi-enrich-row">'+enrichList.map(function(e){
+        return '<button class="cpi-enrich-chip" data-name="'+esc(e.name||"")+'" data-domain="'+esc(e.domain||"")+'" data-title="'+esc(e.title||"")+'" data-apollo-id="'+esc(e.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(e.name||"this person")+"</button>";
+      }).join("")+"</div>"
     : "";
   b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+enrichHtml+costHtml+"</div></div>");
   var justAdded=b.lastElementChild;
@@ -1096,8 +1102,9 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich
                              btn.getAttribute("data-pick-org-id")||"");
       });
     });
-    var enrichBtn=justAdded.querySelector(".cpi-enrich-chip");
-    if(enrichBtn) enrichBtn.addEventListener("click", function(){ window.cpiEnrichChatPerson(enrichBtn); });
+    justAdded.querySelectorAll(".cpi-enrich-chip").forEach(function(btn){
+      btn.addEventListener("click", function(){ window.cpiEnrichChatPerson(btn); });
+    });
   }
   chatScroll();
 }

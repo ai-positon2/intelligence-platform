@@ -286,9 +286,12 @@ def test_the_reported_question_now_costs_nothing(monkeypatch):
 def test_the_reported_question_now_offers_an_enrich_button(monkeypatch):
     body, _facts, _billed, _seen = _ask(
         monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW]))
-    assert body["enrich"] == {"type": "person", "name": "Heidi Bullock",
-                              "title": "Chief Marketing Officer",
-                              "domain": "tealium.com", "apollo_id": ""}
+    # The publicly named person leads, because she is the answer to what was
+    # asked; the on-file people follow as the alternatives to her.
+    assert body["enrich"][0] == {"type": "person", "name": "Heidi Bullock",
+                                 "title": "Chief Marketing Officer",
+                                 "domain": "tealium.com", "apollo_id": ""}
+    assert [c["name"] for c in body["enrich"]] == ["Heidi Bullock", "Ted Purcell"]
 
 
 def test_the_other_records_gap_also_offers_the_button(monkeypatch):
@@ -299,9 +302,9 @@ def test_the_other_records_gap_also_offers_the_button(monkeypatch):
     body, facts, _billed, _seen = _ask(
         monkeypatch, _tealium_handler(titled=[], senior=[]))
     assert facts["apollo_found_no_matching_people"] is True
-    assert body["enrich"] == {"type": "person", "name": "Heidi Bullock",
-                              "title": "Chief Marketing Officer",
-                              "domain": "tealium.com", "apollo_id": ""}
+    assert body["enrich"] == [{"type": "person", "name": "Heidi Bullock",
+                               "title": "Chief Marketing Officer",
+                               "domain": "tealium.com", "apollo_id": ""}]
 
 
 def test_the_other_records_gap_also_checks_before_claiming_absence(monkeypatch):
@@ -310,7 +313,7 @@ def test_the_other_records_gap_also_checks_before_claiming_absence(monkeypatch):
         monkeypatch, _tealium_handler(titled=[], senior=[], named=[heidi]))
     assert facts["apollo_found_no_matching_people"] is True
     assert facts["public_role_holder_is_on_file"]["title"] == "VP, Marketing"
-    assert body["enrich"]["apollo_id"] == "p-heidi"
+    assert body["enrich"][0]["apollo_id"] == "p-heidi"
 
 
 def test_a_publicly_named_person_who_is_on_file_is_reported_as_on_file(monkeypatch):
@@ -323,7 +326,7 @@ def test_a_publicly_named_person_who_is_on_file_is_reported_as_on_file(monkeypat
     assert facts["public_role_holder_is_on_file"]["title"] == "VP, Marketing"
     assert "public_role_holder_not_in_our_records" not in facts
     # ...and the button carries her real Apollo id, so the enrichment is exact.
-    assert body["enrich"]["apollo_id"] == "p-heidi"
+    assert body["enrich"][0]["apollo_id"] == "p-heidi"
 
 
 def test_a_person_genuinely_not_on_file_says_so_from_a_real_check(monkeypatch):
@@ -531,7 +534,7 @@ def test_the_public_ceo_is_still_named_with_an_enrich_button(monkeypatch):
     body, facts, _matched = _ask_reveal(
         monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
     assert facts["public_role_holder"]["name"] == "Sahil Shah"
-    assert body["enrich"]["name"] == "Sahil Shah"
+    assert body["enrich"][0]["name"] == "Sahil Shah"
 
 
 def test_a_list_the_user_actually_asked_for_still_reveals(monkeypatch):

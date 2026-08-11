@@ -209,10 +209,11 @@ def test_a_plain_question_does_not_spend_the_enrichment_credit(monkeypatch):
 def test_a_plain_question_still_names_the_person_and_offers_to_enrich(monkeypatch):
     body, _facts, _e, _r = _chat(monkeypatch, wants_contact=False)
     assert "Julie Woods-Moss is the CMO of Thoughtworks." in body["answer"]
-    assert body["enrich"] == {
+    # Always a list, even for a single person, so the client has one shape.
+    assert body["enrich"] == [{
         "type": "person", "name": "Julie Woods-Moss", "title": "Chief Marketing Officer",
         "domain": "thoughtworks.com", "apollo_id": "p1",
-    }
+    }]
 
 
 def test_asking_for_contact_info_by_name_enriches_immediately(monkeypatch):
