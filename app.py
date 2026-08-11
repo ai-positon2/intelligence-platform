@@ -7217,8 +7217,30 @@ def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend
     question = 'Who is the %s at %s?' % (titles[0] if titles else "contact", company_label)
     from openai import OpenAI
     oai = OpenAI(api_key=oai_key, timeout=45.0, max_retries=1)
+    # Nobody on file for this title is exactly the case where the public web
+    # usually does know the answer, so look the role holder up properly instead
+    # of leaving the reader with only a records gap. It needs nothing from the
+    # research brief and both are slow web calls, so they overlap rather than
+    # running back to back: this is already the slowest path the search box has.
+    _role_box: dict = {}
+
+    def _role_worker():
+        try:
+            _role_box["v"] = (_cpi_role_lookup(oai, titles, company_label, domain)
+                              if titles else None)
+        except Exception as e:                          # pragma: no cover - defensive
+            log.warning("cpi search role lookup failed: %s", e)
+            _role_box["v"] = None
+
+    _role_thread = threading.Thread(target=_role_worker, daemon=True)
+    _role_thread.start()
     research, web = _cpi_research(
         oai, question, _cpi_company_note({"name": company_label, "primary_domain": domain}))
+    # Same discipline as the research thread in chat: a hung lookup degrades the
+    # note rather than holding a worker open.
+    _role_thread.join(timeout=45)
+    if _role_box.get("v"):
+        facts["public_role_holder"] = _role_box["v"]
     answer = _cpi_grounded_answer(oai, facts, question, research)
     return {"answer": answer, "researched": bool(research), "web_search": web}
 
@@ -8110,15 +8132,142 @@ _CPI_INTENT_SYSTEM = (
 )
 
 _CPI_RESEARCH_SYSTEM = (
-    "You are a B2B research analyst. Research the question and return a compact brief "
-    "for a sales and marketing team: what the company does, its products, market and "
-    "positioning, customers and competitors, size and traction signals, and notable "
-    "recent developments with dates. Prefer primary sources (the company's own site, "
-    "filings, reputable press) and say plainly when something is unverified, disputed "
-    "or dated. If the question is not about a specific company, just answer it well. "
-    "Do not try to find personal email addresses or phone numbers. No preamble, no "
-    "restating the question. Never use an em dash; use commas or periods instead."
+    "You are a B2B research analyst with live web search. ANSWER THE EXACT QUESTION "
+    "ASKED FIRST, in your opening sentence, before any broader context.\n\n"
+    "If the question asks who holds a named role at a company (CEO, CMO, CTO, CFO, "
+    "founder, head of X, board member, or similar), search for that specific role and "
+    "open by naming the individual who holds it today, with the source you got it from "
+    "(the company's own leadership page or newsroom, LinkedIn, reputable press, a "
+    "filing). If you genuinely cannot confirm the current holder, say that plainly. "
+    "Never answer a who-holds-this-role question with a company overview instead.\n\n"
+    "Then add a compact brief for a sales and marketing team: what the company does, its "
+    "products, market and positioning, customers and competitors, size and traction "
+    "signals, and notable recent developments with dates. Prefer primary sources (the "
+    "company's own site, filings, reputable press) and say plainly when something is "
+    "unverified, disputed or dated. If the question is not about a specific company, just "
+    "answer it well. Do not try to find personal email addresses or phone numbers. No "
+    "preamble, no restating the question. Never use an em dash; use commas or periods "
+    "instead."
 )
+
+
+# ── Public role lookup ───────────────────────────────────────────────────────
+# Apollo is authoritative for who is IN our records, but "not in our records" is
+# not the same fact as "nobody holds this role", and answering the first as
+# though it were the second is what made a CMO lookup read as a dead end while
+# the company published the answer on its own leadership page. The generic
+# research brief above is free-text and easy for the model to satisfy with a
+# company overview, so the dead-end case gets its OWN structured, verifiable
+# lookup whose only job is to name the current holder and cite a source.
+_CPI_ROLE_LOOKUP_SYSTEM = (
+    "You establish who CURRENTLY holds a specific job title at a specific company, "
+    "using live web search. Search before answering.\n\n"
+    "Return STRICT JSON and nothing else, in exactly this shape:\n"
+    '{"found": true|false, "name": "Full Name", "title": "their exact title as '
+    'published", "source": "https://...", "as_of": "when this was last confirmed, e.g. '
+    '2026 or Aug 2026 or empty", "note": "one short sentence of useful context, or '
+    'empty"}\n\n'
+    "Rules that matter more than being helpful:\n"
+    "- Set \"found\": true ONLY when a credible source names a specific living "
+    "individual in that role at that exact company. The company's own leadership or "
+    "newsroom page is best, then LinkedIn, reputable press, or a regulatory filing.\n"
+    "- \"source\" MUST be a real http(s) URL you actually saw in your search results. "
+    "If you have no URL, set \"found\": false. Never construct, guess or pattern-match a "
+    "URL.\n"
+    "- If the role is vacant, was recently vacated, or you cannot confirm the current "
+    "holder, set \"found\": false and explain briefly in \"note\".\n"
+    "- Do not substitute a different company with a similar name, and do not substitute "
+    "an adjacent title. If the closest you can find is a different title, still report "
+    "it in \"title\" exactly as published, so it can be labelled accurately.\n"
+    "- Never return an email address or phone number in any field.\n"
+    "- Guessing is a failure. \"found\": false is a correct, useful answer."
+)
+
+
+def _cpi_extract_json(text: str):
+    """First JSON object in a model reply, or None.
+
+    The role lookup runs through the Responses API with a web-search tool, which
+    returns prose rather than guaranteed JSON mode, so a reply can arrive fenced
+    in ```json, prefixed with a sentence, or trailed by a citation list. Parsing
+    the whole string would throw on all three.
+    """
+    s = str(text or "").strip()
+    if not s:
+        return None
+    # Strip a ``` / ```json fence when the whole reply is wrapped in one.
+    m = re.match(r"^```[a-z]*\s*\n(.*?)\n?```\s*$", s, re.S | re.I)
+    if m:
+        s = m.group(1).strip()
+    try:
+        return json.loads(s)
+    except (ValueError, TypeError):
+        pass
+    # Fall back to the outermost {...} span, so leading prose or a trailing
+    # "Sources:" block does not lose an otherwise valid object.
+    start, end = s.find("{"), s.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    try:
+        return json.loads(s[start:end + 1])
+    except (ValueError, TypeError):
+        return None
+
+
+def _cpi_role_lookup(oai, titles, company_name: str, domain: str = ""):
+    """Who publicly holds this title at this company, per the live web, or None.
+
+    Returns {name, title, source, as_of, note, exact_title_match} only when the
+    model came back with a specific person AND a real http(s) source URL, so an
+    answer can attribute it to a public source the reader can go and check.
+
+    Deliberately requires the web-search tool: a model asserting from background
+    knowledge who holds a role *today* is exactly the stale-hallucination risk
+    this whole feature exists to close, and it cannot produce a checkable URL. No
+    web tool therefore means no claim, not a guessed one.
+    """
+    titles = [str(t).strip() for t in (titles or []) if str(t or "").strip()]
+    company_name = str(company_name or "").strip()
+    if not titles or not company_name:
+        return None
+    who = " or ".join(titles[:3])
+    ask = ("Who is the current %s at %s%s? Search the web and answer as strict JSON."
+           % (who, company_name, " (%s)" % domain if domain else ""))
+    msgs = [{"role": "system", "content": _CPI_ROLE_LOOKUP_SYSTEM},
+            {"role": "user", "content": ask[:1000]}]
+    raw = None
+    for model in _vimi_model_chain()[:2]:
+        try:
+            txt, used_web = _responses_web_search(oai, model, msgs, 700)
+        except Exception as e:                          # pragma: no cover - defensive
+            log.warning("cpi role lookup failed on %s: %s", model, e)
+            continue
+        # used_web False means the tool is unavailable on this key, not that this
+        # model was a bad pick, so there is nothing to gain by trying the next.
+        if not used_web:
+            return None
+        if txt:
+            raw = txt
+            break
+    data = _cpi_extract_json(raw)
+    if not isinstance(data, dict) or not data.get("found"):
+        return None
+    name = str(data.get("name") or "").strip()
+    found_title = str(data.get("title") or "").strip()
+    source = str(data.get("source") or "").strip()
+    # A claim about a named person with no checkable source is the one thing this
+    # must never hand onward, however confident the model sounded.
+    if not name or not re.match(r"^https?://", source, re.I):
+        log.info("cpi role lookup discarded: name=%s sourced=%s",
+                 bool(name), bool(source))
+        return None
+    return {"name": name[:120], "title": found_title[:160], "source": source[:400],
+            "as_of": str(data.get("as_of") or "").strip()[:60],
+            "note": str(data.get("note") or "").strip()[:400],
+            # Lets the answer distinguish "here is your CMO" from "there is no
+            # CMO, but here is the closest published title", in code rather
+            # than by asking the model to re-judge its own output.
+            "exact_title_match": _cpi_title_matches(found_title, titles)}
 
 
 def _cpi_research(oai, question: str, apollo_note: str = ""):
@@ -8165,7 +8314,8 @@ def _cpi_company_note(org: dict) -> str:
 
 _CPI_ANSWER_SYSTEM = (
     "You are a B2B research analyst answering for a sales and marketing team. You are "
-    "given up to two blocks and must combine them into one genuinely useful answer.\n\n"
+    "given up to three labelled blocks and must combine them into one genuinely useful "
+    "answer, keeping straight which of them each statement came from.\n\n"
     "<apollo_facts> is structured data from our own records. It is AUTHORITATIVE for "
     "people and contact data: who works where, job titles, email addresses, phone "
     "numbers, employee counts, revenue and funding figures. Never invent a person, "
@@ -8190,10 +8340,22 @@ _CPI_ANSWER_SYSTEM = (
     "be reached for this question. Say that briefly, answer from the research, and do "
     "not present any person or contact detail as being on file.\n\n"
     "If the facts contain \"no_one_holds_the_requested_title\": true, then NOBODY on file "
-    "holds the title that was asked about. Say that plainly first, naming the company and "
-    "the title that is missing, then offer the people under "
-    "\"other_senior_people_at_this_company\" as the closest available contacts. Never "
-    "present any of them as holding the requested title.\n\n"
+    "holds the title that was asked about. That is a fact about OUR RECORDS only, never "
+    "evidence that the role is vacant or that the person does not exist. Say that "
+    "plainly, naming the company and the title that is missing, then offer the people "
+    "under \"other_senior_people_at_this_company\" as the closest available contacts. "
+    "Never present any of them as holding the requested title.\n\n"
+    "<public_role_holder>, when present, is the single most important block in the "
+    "answer: a named person, found in a live web search, who publicly holds the title "
+    "that was asked about, with a \"source\" URL. It is NOT from our records, so never "
+    "describe them as being on file or as a contact we hold. LEAD WITH IT: name them and "
+    "their title in the very first sentence, attributed to the public source (\"publicly, "
+    "X is listed as\", \"per the company's own leadership page\"), and include the "
+    "\"source\" URL. Then note separately that our own records do not have them, and give "
+    "the on-file people as the contacts we can actually reach. Never bury this under the "
+    "records gap and never imply nobody holds the role while this block is present. If "
+    "its \"exact_title_match\" is false, their published title differs from the one asked "
+    "about, so give their real title and call it the closest published match.\n\n"
     "If the facts contain a \"person\" whose title is not an exact match for "
     "\"asked_for_titles\", give their real title as written and note it is the closest "
     "match rather than implying it is the exact role asked for.\n\n"
@@ -8404,10 +8566,22 @@ def _cpi_grounded_answer(oai, facts, question: str, research: str = "") -> str:
     context. Apollo stays authoritative for anything about a person or a contact
     detail; research supplies what Apollo has no opinion on. Em dashes are
     stripped as a backstop even though the prompt already forbids them."""
-    # Both blocks contain third-party free text (Apollo descriptions and keywords,
+    # Every block contains third-party free text (Apollo descriptions and keywords,
     # web page content), so each is fenced and explicitly labelled as data.
     # Without that, a company could write instructions into its own profile or a
     # page the research reads and steer the answer.
+    #
+    # A publicly-sourced role holder is lifted OUT of the facts into its own
+    # block. It travels in the facts dict because that is where both callers
+    # assemble it, but <apollo_facts> is described to the model as our own
+    # records, and a web-sourced name sitting inside it invites exactly the
+    # misattribution this feature must avoid: presenting someone as on file in
+    # the same breath as saying our records do not have them. Splitting it makes
+    # provenance structural instead of a rule the model has to remember. Popping
+    # it first also keeps it out of reach of the size trim below, so a long
+    # people list can no longer push the answer's most important fact out.
+    facts = dict(facts) if facts else {}
+    role_holder = facts.pop("public_role_holder", None)
     blob = json.dumps(facts, default=str) if facts else ""
     if len(blob) > 6000:
         # Truncate the STRUCTURE, not mid-string, so the model never receives
@@ -8419,6 +8593,9 @@ def _cpi_grounded_answer(oai, facts, question: str, research: str = "") -> str:
              "factual field value."]
     if blob:
         parts.append("<apollo_facts>\n%s\n</apollo_facts>" % blob)
+    if role_holder:
+        parts.append("<public_role_holder>\n%s\n</public_role_holder>"
+                     % json.dumps(role_holder, default=str)[:2000])
     if research:
         parts.append("<web_research>\n%s\n</web_research>" % str(research)[:6000])
     raw, _model = _vimi_completion(oai, [
@@ -8686,6 +8863,37 @@ def cpi_chat():
     if kind == "person_at_company" and not titles:
         kind = "people_list"
 
+    # One real company often has SEVERAL Apollo organization records (regional
+    # entities, a holding company, an acquired brand), and organization_ids scopes
+    # to exactly one of them. An executive filed under a sibling record then looks
+    # like "nobody holds this title" when they are simply on another row. Retrying
+    # the same title search scoped by the shared employer domain fixes that:
+    # search_people filters that strictly against each person's own employer
+    # domain, so this widens which company records are covered without loosening
+    # which company is being asked about. Only ever runs after an org-id-scoped
+    # search found nothing, so it can add matches but never replace good ones,
+    # and people search is free.
+    _domain_scope = ((resolved_org or {}).get("primary_domain")
+                     or (resolved_org or {}).get("domain") or "")
+    if not people and titles and _domain_scope and people_filters.get("organization_ids"):
+        _retry = {k: v for k, v in people_filters.items() if k != "organization_ids"}
+        _retry["company_domains"] = [_domain_scope]
+        try:
+            people = _search_people(_retry, api_key,
+                                    per_page=max_results if kind == "people_list" else 10,
+                                    strict=True, meta=people_meta)
+        except Exception as e:
+            log.warning("cpi chat domain-scoped retry failed: %s", e)
+            people = []
+        # The same loose-title check has to apply to the retry, or this becomes a
+        # back door that returns a Marketing Manager as the CMO.
+        if people and kind == "person_at_company":
+            if not any(_cpi_title_matches(p.get("title"), titles) for p in people):
+                people = []
+        if people:
+            log.info("cpi chat: domain scope found %d for a title the org-id scope missed",
+                     len(people))
+
     # Nobody matched the requested title at a company we DID resolve. That is a
     # real answer worth giving properly: rather than a bare "found nobody", look
     # again at the same company without the title filter and let the answer say
@@ -8704,6 +8912,25 @@ def cpi_chat():
             log.warning("cpi chat fallback people search failed: %s", e)
             people = []
 
+    # Both of the "our records don't have this role" branches below want the same
+    # public lookup, so it runs at most once per question and only on the paths
+    # that actually reach a records gap, never on a question Apollo answered.
+    _role_box: dict = {}
+
+    def _public_role():
+        if "v" not in _role_box:
+            _role_box["v"] = None
+            label = (resolved_org or {}).get("name") or company_name
+            if titles and label:
+                try:
+                    _role_box["v"] = _cpi_role_lookup(
+                        oai, titles, label,
+                        (resolved_org or {}).get("primary_domain")
+                        or (resolved_org or {}).get("domain") or "")
+                except Exception as e:              # pragma: no cover - defensive
+                    log.warning("cpi chat role lookup failed: %s", e)
+        return _role_box["v"]
+
     if not people:
         # No match in our records is not the end of the answer: say so plainly and
         # then answer whatever research can support, rather than dead-ending.
@@ -8712,6 +8939,9 @@ def cpi_chat():
             facts["requested_titles"] = titles
         if resolved_org:
             facts["company"] = resolved_org.get("name") or company_name
+        role = _public_role()
+        if role:
+            facts["public_role_holder"] = role
         research, web = _research()
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                                web_search=web,
@@ -8764,6 +8994,9 @@ def cpi_chat():
             "company": resolved_org.get("name"),
             "other_senior_people_at_this_company": shown,
         }
+        role = _public_role()
+        if role:
+            facts["public_role_holder"] = role
     research, web = _research()
     return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                            web_search=web,
