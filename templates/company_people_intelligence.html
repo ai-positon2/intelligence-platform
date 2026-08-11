@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=9">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=10">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -426,10 +426,10 @@
 
 <!-- History drawer -->
 <div class="cpi-drawer-ovl" id="cpiDrawerOvl" onclick="cpiCloseHistory()"></div>
-<aside class="cpi-drawer" id="cpiDrawer" aria-label="Search history">
+<aside class="cpi-drawer" id="cpiDrawer" aria-label="History">
   <div class="cpi-dw-hdr">
     <div class="cpi-dw-hdr-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></div>
-    <div><b>Search history</b><span>Your saved result sets, no credits to reopen</span></div>
+    <div><b>History</b><span>Searches, answers and enriched contacts, no credits to reopen</span></div>
     <button class="cpi-dw-clear" id="cpiHistClearAll" onclick="cpiClearAllHistory()" style="display:none">Clear all</button>
     <button class="cpi-dw-x" onclick="cpiCloseHistory()" aria-label="Close">&#10005;</button>
   </div>
@@ -459,7 +459,7 @@ window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
 window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=8" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=9" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');

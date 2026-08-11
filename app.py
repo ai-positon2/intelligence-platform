@@ -18,7 +18,7 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 from flask import (
     Flask, send_file, send_from_directory, abort, jsonify,
     request, session, redirect, url_for,
-    make_response, render_template,
+    make_response, render_template, g,
 )
 import requests
 from collections import Counter
@@ -7732,6 +7732,25 @@ def cpi_enrich():
         profile = _cpi_enrich_company(body.get("domain") or "", body.get("apollo_id") or "")
     else:
         return jsonify({"error": "unknown type"}), 400
+    # An enrichment is a purchase: it is the one action on this page that
+    # definitely spent a credit, and the contact details it returns are the thing
+    # that credit bought. Recording it means a closed tab or a lost modal does
+    # not lose what was paid for. Only a real match is recorded, since a miss
+    # costs nothing and holds nothing worth keeping.
+    if isinstance(profile, dict) and profile.get("matched"):
+        co = profile.get("company") or {}
+        label = " · ".join(x for x in [
+            profile.get("name") or co.get("name") or "",
+            profile.get("title") or co.get("industry") or "",
+        ] if x) or (body.get("name") or body.get("domain") or "Enriched contact")
+        _cpi_history_save(
+            email=((_get_user() or {}).get("email") or ""),
+            entity="contact" if kind == "person" else "company_profile",
+            label=label,
+            rows=[profile],
+            filters={"type": kind,
+                     "domain": body.get("domain") or co.get("domain") or "",
+                     "apollo_id": body.get("apollo_id") or ""})
     return jsonify({"profile": profile, "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
 
 
@@ -7867,8 +7886,76 @@ def _ensure_cpi_history_table(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_cpi_history_email
             ON cpi_search_history (email, created_at DESC)
         """)
+        # Added after the table shipped, so it is a migration rather than part of
+        # the CREATE: chat entries carry prose (the question and the answer given)
+        # where a saved search carries only rows.
+        cur.execute("ALTER TABLE cpi_search_history ADD COLUMN IF NOT EXISTS answer TEXT")
     conn.commit()
     _CPI_HISTORY_TABLE_READY = True
+
+
+def _cpi_history_prune(cur, email: str) -> None:
+    """Retire anything past the TTL, then keep the per-user list bounded. These
+    rows hold revealed emails and phone numbers, so the TTL matters on its own
+    and is not just a size control."""
+    cur.execute(
+        "DELETE FROM cpi_search_history WHERE email = %s "
+        "AND created_at < now() - make_interval(days => %s)",
+        (email, _CPI_HISTORY_TTL_DAYS))
+    cur.execute(
+        "DELETE FROM cpi_search_history WHERE email = %s AND id NOT IN "
+        "(SELECT id FROM cpi_search_history WHERE email = %s "
+        " ORDER BY created_at DESC LIMIT %s)",
+        (email, email, _CPI_HISTORY_KEEP))
+
+
+def _cpi_history_save(email: str, entity: str, label: str, rows: list,
+                      answer: str = "", filters: dict = None, total=None):
+    """Record one chat exchange or one enrichment, server-side. Returns the new
+    id, or None if nothing was written.
+
+    Server-side on purpose: a saved search is something the user chooses to keep,
+    but a chat answer and a bought contact are things they would be annoyed to
+    lose, and asking the browser to remember them means a client bug or a closed
+    tab loses the record of a credit that was already spent.
+
+    Best effort in the strongest sense: no failure here may affect the answer the
+    user is waiting on, so every error is swallowed after logging. No Postgres on
+    this environment simply means no history, same as every other optional store.
+    """
+    email = (email or "").lower()
+    if not email or not label:
+        return None
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        from psycopg2.extras import Json
+        _ensure_cpi_history_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO cpi_search_history "
+                "  (email, entity, label, filters, total, rows, answer) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (email, entity, str(label)[:160], Json(filters or {}), total,
+                 Json(list(rows or [])[:_CPI_HISTORY_MAX_ROWS]), str(answer or "")[:8000]))
+            new_id = (cur.fetchone() or [None])[0]
+            _cpi_history_prune(cur, email)
+        conn.commit()
+        return new_id
+    except Exception as e:
+        # entity and label only: no personal data in the log line.
+        log.warning("cpi history save failed entity=%s: %s", entity, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _cpi_history_label(entity: str, filters: dict) -> str:
@@ -7908,13 +7995,19 @@ def cpi_history():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT id, entity, label, total, "
-                    "       COALESCE(jsonb_array_length(rows), 0), created_at "
+                    "       COALESCE(jsonb_array_length(rows), 0), created_at, "
+                    "       LEFT(COALESCE(answer, ''), 240), filters "
                     "FROM cpi_search_history WHERE email = %s "
                     "ORDER BY created_at DESC LIMIT %s",
                     (email, _CPI_HISTORY_KEEP))
+                # The answer preview is truncated in SQL rather than shipping the
+                # whole thing: the drawer shows a snippet, and a list of sixty
+                # full answers is a payload nobody reads.
                 entries = [{"id": r[0], "entity": r[1], "label": r[2], "total": r[3],
                             "count": r[4],
-                            "created_at": r[5].isoformat() if r[5] else None}
+                            "created_at": r[5].isoformat() if r[5] else None,
+                            "preview": r[6] or "",
+                            "credits": (r[7] or {}).get("credits") or 0}
                            for r in cur.fetchall()]
             return jsonify({"entries": entries, "available": True})
 
@@ -7956,16 +8049,7 @@ def cpi_history():
                     (email, entity, _cpi_history_label(entity, filters), Json(filters),
                      body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS])))
                 new_id, created = cur.fetchone()
-            # Retire anything past the TTL, then keep the list bounded per user.
-            cur.execute(
-                "DELETE FROM cpi_search_history WHERE email = %s "
-                "AND created_at < now() - make_interval(days => %s)",
-                (email, _CPI_HISTORY_TTL_DAYS))
-            cur.execute(
-                "DELETE FROM cpi_search_history WHERE email = %s AND id NOT IN "
-                "(SELECT id FROM cpi_search_history WHERE email = %s "
-                " ORDER BY created_at DESC LIMIT %s)",
-                (email, email, _CPI_HISTORY_KEEP))
+            _cpi_history_prune(cur, email)
         conn.commit()
         return jsonify({"saved": True, "available": True, "id": new_id,
                         "created_at": created.isoformat() if created else None})
@@ -8003,7 +8087,9 @@ def cpi_history_entry(entry_id: int):
                 deleted = cur.rowcount
                 conn.commit()
                 return jsonify({"deleted": bool(deleted)})
-            cur.execute("SELECT entity, label, filters, total, rows FROM cpi_search_history "
+            cur.execute("SELECT entity, label, filters, total, rows, "
+                        "       COALESCE(answer, '') "
+                        "FROM cpi_search_history "
                         "WHERE id = %s AND email = %s", (entry_id, email))
             row = cur.fetchone()
         if not row:
@@ -8011,7 +8097,8 @@ def cpi_history_entry(entry_id: int):
         # id travels back so the client can keep growing this same entry if the
         # reopened search is continued, rather than forking a near-duplicate.
         return jsonify({"id": entry_id, "entity": row[0], "label": row[1],
-                        "filters": row[2], "total": row[3], "rows": row[4]})
+                        "filters": row[2], "total": row[3], "rows": row[4],
+                        "answer": row[5]})
     except Exception as e:
         log.warning("cpi history entry %s failed: %s", entry_id, e)
         try:
@@ -9299,7 +9386,61 @@ def _cpi_chat_reply(spend: dict, **fields):
     n = int((spend or {}).get("credits") or 0)
     if n:
         fields["credits"] = n
+    _cpi_chat_remember(fields, n)
     return jsonify(fields)
+
+
+def _cpi_chat_remember(fields: dict, credits: int) -> None:
+    """Save this exchange to the user's history.
+
+    Done here because every branch of cpi_chat returns through _cpi_chat_reply,
+    so one call covers all of them -- including any added later, which is the
+    point: threading a save through ten separate return statements is how some
+    answers silently stop being recorded.
+
+    The question comes off flask.g (set once at the top of cpi_chat) and
+    everything else off the reply that is about to be sent, so no branch has to
+    hand anything over. Never raises: a history failure must not turn a good
+    answer into an error.
+    """
+    try:
+        question = str(getattr(g, "_cpi_chat_question", "") or "").strip()
+        if not question:
+            return
+        # A disambiguation turn is a question back to the user, not an answer to
+        # theirs, and they are about to re-ask it and get the real one. Recording
+        # both would put two entries in the drawer for one thing the user asked,
+        # the same near-duplicate problem replace_id exists to prevent.
+        if fields.get("choices"):
+            return
+        # Who the answer named, which is exactly what the Enrich buttons already
+        # describe, so this needs no extra plumbing to collect.
+        named = fields.get("enrich") or []
+        if isinstance(named, dict):
+            named = [named]
+        ctx = fields.get("context") or {}
+        _cpi_history_save(
+            email=((_get_user() or {}).get("email") or ""),
+            entity="chat",
+            label=question,
+            rows=[{"name": p.get("name"), "title": p.get("title"),
+                   "domain": p.get("domain"), "apollo_id": p.get("apollo_id")}
+                  for p in named if isinstance(p, dict)],
+            answer=fields.get("answer") or "",
+            filters={"question": question,
+                     "company": ctx.get("name") or "",
+                     "domain": ctx.get("domain") or "",
+                     "credits": credits,
+                     # Both halves of the provenance note, so a reopened answer
+                     # can say how it was produced instead of guessing. Storing
+                     # only "researched" made every replay claim "background
+                     # knowledge, no live web" even when the original had cited
+                     # a live source, which is a false statement about our own
+                     # answer.
+                     "researched": bool(fields.get("researched")),
+                     "web_search": bool(fields.get("web_search"))})
+    except Exception as e:                          # pragma: no cover - defensive
+        log.warning("cpi chat history hook failed: %s", e)
 
 
 @app.route("/p2/gtm/company-people-intelligence/chat", methods=["POST"])
@@ -9315,6 +9456,9 @@ def cpi_chat():
     body = request.get_json(silent=True) or {}
     message = str(body.get("message") or "").strip()[:600]
     history = body.get("history") or []
+    # Stashed once here so _cpi_chat_reply can record the exchange no matter
+    # which of its many branches ends up answering. See _cpi_chat_remember.
+    g._cpi_chat_question = message
     # Accumulates every billable Apollo call made while answering this one
     # question, so the reply can say what it cost.
     spend: dict = {"credits": 0}
