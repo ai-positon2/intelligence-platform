@@ -369,6 +369,11 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 /* Offered whenever a person is named but not enriched -- one click spends the
    Apollo credit and opens the profile modal, instead of every question
    spending it automatically. */
+/* A list answer offers one chip per person named, so they wrap instead of
+   overflowing the bubble. The row owns the top margin the chips used to set
+   individually, or a second line of chips would double it. */
+.cpi-enrich-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.cpi-enrich-row .cpi-enrich-chip{margin-top:0}
 .cpi-enrich-chip{display:inline-flex;align-items:center;gap:7px;margin-top:10px;
   font-size:12px;font-weight:650;color:#c9cdff;background:rgba(124,131,245,.12);
   border:1px solid rgba(124,131,245,.4);border-radius:var(--radius-pill);padding:8px 14px;

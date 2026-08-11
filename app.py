@@ -12,7 +12,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from functools import wraps
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 # deploy-touch: 2026-06-15T14:13:06Z
 from flask import (
@@ -7115,6 +7115,73 @@ def cpi_home():
                            export_url=url_for("cpi_export"))
 
 
+# Campaign/click-tracking parameters that carry no meaning for a reader and are
+# not part of the page's identity. OpenAI's web-search tool appends
+# "?utm_source=openai" to the sources it cites, which then travelled all the way
+# into an answer's citation link: it makes the URL uglier, tags our staff's
+# clicks as OpenAI-referred traffic in the destination's own analytics, and is
+# not what anyone would copy if they were quoting the source by hand.
+#
+# Only unambiguous tracking keys are listed. "ref", "source" and friends are
+# deliberately NOT here: they carry real routing meaning on some sites, and
+# silently rewriting a URL into one that serves different content would be a
+# worse bug than the one being fixed.
+_CPI_TRACKING_PARAMS = frozenset((
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_name", "utm_reader", "utm_brand", "utm_social",
+    "gclid", "gclsrc", "dclid", "fbclid", "msclkid", "twclid", "ttclid",
+    "igshid", "mc_cid", "mc_eid", "_hsenc", "_hsmi", "vero_id", "yclid",
+))
+
+
+def _cpi_clean_url(url: str) -> str:
+    """One URL with its tracking parameters removed, otherwise untouched.
+
+    Anything that is not a parseable http(s) URL is returned exactly as given:
+    this runs over model output, so it must never mangle a string that merely
+    looked URL-ish. A query that was ENTIRELY tracking loses its "?" too, rather
+    than being left with a bare trailing question mark.
+    """
+    raw = str(url or "").strip()
+    if not raw:
+        return raw
+    try:
+        parts = urlsplit(raw)
+        if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
+            return raw
+        kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+                if k.lower() not in _CPI_TRACKING_PARAMS]
+        if len(kept) == len(parse_qsl(parts.query, keep_blank_values=True)):
+            return raw                      # nothing to strip, keep byte-identical
+        return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                           urlencode(kept), parts.fragment))
+    except Exception:                       # pragma: no cover - defensive
+        return raw
+
+
+# Stops at whitespace and at the characters that commonly BRACKET a URL in prose
+# rather than belong to it, so a citation inside parentheses or quotes does not
+# swallow the closing mark.
+_CPI_URL_IN_TEXT = re.compile(r"https?://[^\s<>\"'`)\]}]+")
+
+
+def _cpi_strip_tracking(text: str) -> str:
+    """Every URL in a block of prose, cleaned. Applied to finished answers, so
+    a tracking parameter cannot reach the reader no matter which step of the
+    pipeline introduced it."""
+    def _one(m):
+        raw = m.group(0)
+        # Trailing sentence punctuation is not part of the URL. Peeled off
+        # before parsing and put back after, so "...openai." keeps its period.
+        trail = ""
+        while raw and raw[-1] in ".,;:!?":
+            trail = raw[-1] + trail
+            raw = raw[:-1]
+        return _cpi_clean_url(raw) + trail
+
+    return _CPI_URL_IN_TEXT.sub(_one, str(text or ""))
+
+
 def _cpi_is_domain_shaped(s: str) -> bool:
     """Same domain-detection regex as _cpi_clean_company_name, split out so the
     people-search route can decide whether the single "at company" field holds
@@ -7545,6 +7612,28 @@ def _cpi_reveal_names(people: list, api_key: str, cap: int = _CPI_CHAT_REVEAL_CA
                 p["linkedin_url"] = prof["linkedin"]
         merged.append(p)
     return merged
+
+
+# How many Enrich buttons one chat answer may offer. A list answer can name ten
+# people, and ten buttons is a wall rather than a choice -- past this the results
+# grid, with its checkboxes and one bulk call, is the better tool.
+_CPI_CHAT_ENRICH_CHIP_CAP = 6
+
+
+def _cpi_enrich_chip(p: dict, fallback_domain: str = ""):
+    """Enrich-button metadata for one person named in an answer, or None if they
+    cannot be enriched. The Apollo id is what makes the enrichment exact, so a
+    row without one is not offered. This is UI wiring for the client and must
+    never be put in `facts`, where the model would read it as something to say.
+    """
+    p = p or {}
+    if not p.get("id"):
+        return None
+    return {"type": "person",
+            "name": p.get("full_name") or "",
+            "title": p.get("title") or "",
+            "domain": p.get("organization_domain") or fallback_domain or "",
+            "apollo_id": str(p.get("id") or "")}
 
 
 def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
@@ -8277,7 +8366,11 @@ def _cpi_role_lookup(oai, titles, company_name: str, domain: str = ""):
         log.info("cpi role lookup discarded: name=%s sourced=%s",
                  bool(name), bool(source))
         return None
-    return {"name": name[:120], "title": found_title[:160], "source": source[:400],
+    # Cleaned here too, not just on the way out: the source travels into the
+    # answer prompt as a fact, and a model handed a tagged URL will faithfully
+    # reproduce the tag in prose the outbound sweep cannot always attribute.
+    return {"name": name[:120], "title": found_title[:160],
+            "source": _cpi_clean_url(source)[:400],
             "as_of": str(data.get("as_of") or "").strip()[:60],
             "note": str(data.get("note") or "").strip()[:400],
             # Lets the answer distinguish "here is your CMO" from "there is no
@@ -8378,7 +8471,8 @@ def _cpi_company_identify(oai, typed_name: str):
         log.info("cpi company identify discarded: name=%s sourced=%s",
                  bool(name), bool(source))
         return None
-    out = {"name": name[:160], "domain": domain[:120], "source": source[:400],
+    out = {"name": name[:160], "domain": domain[:120],
+           "source": _cpi_clean_url(source)[:400],
            "note": str(data.get("note") or "").strip()[:300], "typed": typed[:200]}
     _CPI_IDENTIFY_CACHE[key] = {"v": out, "ts": now}
     return out
@@ -8405,10 +8499,13 @@ def _cpi_research(oai, question: str, apollo_note: str = ""):
             log.warning("cpi research web search failed on %s: %s", model, e)
             continue
         if txt:
-            return txt, used
+            # Cleaned before it becomes a <web_research> block: the web-search
+            # tool tags the URLs it cites, and a model shown a tagged URL copies
+            # the tag into its prose verbatim.
+            return _cpi_strip_tracking(txt), used
     try:
         txt, _model = _vimi_completion(oai, msgs, 900)
-        return txt, False
+        return _cpi_strip_tracking(txt), False
     except Exception as e:
         log.warning("cpi research unavailable: %s", e)
         return "", False
@@ -9164,7 +9261,11 @@ def _cpi_grounded_answer(oai, facts, question: str, research: str = "") -> str:
         {"role": "user", "content": "\n\n".join(parts)},
     ], 1100)
     # " — " collapses to ", " rather than leaving a space before the comma.
-    return raw.replace(" — ", ", ").replace("—", ", ").strip()
+    out = raw.replace(" — ", ", ").replace("—", ", ").strip()
+    # Every chat answer funnels through here, including _cpi_web_answer's, so
+    # this is the one place that guarantees no tracking-tagged citation reaches
+    # a reader regardless of which upstream step introduced it.
+    return _cpi_strip_tracking(out)
 
 
 def _cpi_trim_facts(facts):
@@ -9582,7 +9683,9 @@ def cpi_chat():
             role_facts, enrich_meta = _role_holder_extras(role)
             facts.update(role_facts)
         research, web = _research()
-        extra = {"enrich": enrich_meta} if enrich_meta else {}
+        # Always a LIST, like every other branch: one response shape for
+        # the client to render rather than "object here, array there".
+        extra = {"enrich": [enrich_meta]} if enrich_meta else {}
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                                web_search=web,
                                answer=_cpi_grounded_answer(oai, facts, message, research),
@@ -9633,7 +9736,9 @@ def cpi_chat():
         answer = _cpi_grounded_answer(oai, facts, message, research)
         if full_profile:
             answer = answer.rstrip() + "\n\n" + full_profile
-        extra = {"enrich": enrich_meta} if enrich_meta else {}
+        # Always a LIST, like every other branch: one response shape for
+        # the client to render rather than "object here, array there".
+        extra = {"enrich": [enrich_meta]} if enrich_meta else {}
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                                web_search=web, answer=answer, **extra)
 
@@ -9682,8 +9787,24 @@ def cpi_chat():
             facts["public_role_holder"] = role
             role_facts, enrich_meta = _role_holder_extras(role)
             facts.update(role_facts)
+    # Everyone this answer names who can be enriched gets a button, not only the
+    # person the question was about. A list answer ("CMOs of macmerise") offered
+    # none at all, so the only way to act on a name it had just produced was to
+    # retype that name as a whole new question. On the consolation path this is
+    # also what makes the withheld-surname note actionable: the surnames were
+    # deliberately not bought, and these are the buttons that buy one.
+    fallback_dom = ((resolved_org or {}).get("primary_domain")
+                    or (resolved_org or {}).get("domain") or "")
+    chips = [c for c in (_cpi_enrich_chip(p, fallback_dom) for p in shown) if c]
+    if enrich_meta:
+        # The publicly named role holder leads: they are the answer to what was
+        # asked, the on-file people are the alternatives to them.
+        chips = [enrich_meta] + [c for c in chips
+                                 if not (enrich_meta.get("apollo_id")
+                                         and c["apollo_id"] == enrich_meta["apollo_id"])]
+    chips = chips[:_CPI_CHAT_ENRICH_CHIP_CAP]
     research, web = _research()
-    extra = {"enrich": enrich_meta} if enrich_meta else {}
+    extra = {"enrich": chips} if chips else {}
     return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                            web_search=web,
                            answer=_cpi_grounded_answer(oai, facts, message, research),
