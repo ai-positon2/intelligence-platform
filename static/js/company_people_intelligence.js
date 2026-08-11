@@ -1104,7 +1104,15 @@ function linkifySources(safeHtml){
   });
 }
 function fmtAnswer(text){
-  var safe=esc(String(text==null?"":text)).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>");
+  /* Data can carry literal asterisks: Apollo masks withheld surnames as
+     "Sh***a". Three in a row make the bold matcher pair the WRONG asterisks --
+     "Vivek Sh***a, Meghana Ka***i" bolded "a, Meghana Ka" -- so any run that is
+     not exactly a two-asterisk delimiter is neutralised before the bold pass.
+     The server already abbreviates those names to "Vivek Sh." (see
+     _cpi_display_name); this is the second line of defence, for asterisks that
+     arrive from anywhere else, such as quoted web-research text. */
+  var raw=String(text==null?"":text).replace(/\*{3,}/g,"…");
+  var safe=esc(raw).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>");
   safe=linkifySources(safe);
   var out=[], list=null;
   safe.split(/\n/).forEach(function(ln){
@@ -1158,7 +1166,10 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich
     .filter(function(e){ return e && e.type==="person"; });
   var enrichHtml = enrichList.length
     ? '<div class="cpi-enrich-row">'+enrichList.map(function(e){
-        return '<button class="cpi-enrich-chip" data-name="'+esc(e.name||"")+'" data-domain="'+esc(e.domain||"")+'" data-title="'+esc(e.title||"")+'" data-apollo-id="'+esc(e.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(e.name||"this person")+"</button>";
+        /* `label` is the printable form of a masked name ("Vivek Sh." for
+           "Vivek Sh***a"); `name` stays raw because it is what gets sent to
+           Apollo's people/match. */
+        return '<button class="cpi-enrich-chip" data-name="'+esc(e.name||"")+'" data-domain="'+esc(e.domain||"")+'" data-title="'+esc(e.title||"")+'" data-apollo-id="'+esc(e.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(e.label||e.name||"this person")+"</button>";
       }).join("")+"</div>"
     : "";
   b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+enrichHtml+costHtml+"</div></div>");

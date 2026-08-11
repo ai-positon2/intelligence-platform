@@ -7686,11 +7686,19 @@ def _cpi_enrich_chip(p: dict, fallback_domain: str = ""):
     p = p or {}
     if not p.get("id"):
         return None
-    return {"type": "person",
-            "name": p.get("full_name") or "",
+    name = p.get("full_name") or ""
+    chip = {"type": "person",
+            "name": name,
             "title": p.get("title") or "",
             "domain": p.get("organization_domain") or fallback_domain or "",
             "apollo_id": str(p.get("id") or "")}
+    # The button shows an abbreviated name; people/match is still sent the raw one.
+    # Apollo's masked surnames are asterisks, and "Enrich Vivek Sh***a" on a button
+    # reads as broken, but the raw string is what the match should be given.
+    label = _cpi_display_name(name)
+    if label != name:
+        chip["label"] = label
+    return chip
 
 
 def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
@@ -8743,13 +8751,25 @@ _CPI_ANSWER_SYSTEM = (
     "holds the title that was asked about. That is a fact about OUR RECORDS only, never "
     "evidence that the role is vacant or that the person does not exist. Say that "
     "plainly, naming the company and the title that is missing, then offer the people "
-    "under \"other_senior_people_at_this_company\" as the closest available contacts. "
-    "Never present any of them as holding the requested title.\n\n"
-    "If the facts contain \"some_surnames_withheld_until_enriched\": true, then some of "
-    "those closest-contact names arrive shortened, like \"Binal S.\". Give each name "
-    "exactly as it appears, never guessing the rest of one, and add a short note that "
-    "our source withholds some surnames until a contact is enriched. Do not treat a "
-    "shortened name as an error or leave the person out over it.\n\n"
+    "under \"closest_people_we_hold\" as the nearest contacts we can reach. Every one of "
+    "them MUST be given with their own title exactly as it is written in the facts: a "
+    "bare list of names is useless to the reader, who has to know how close each person "
+    "is to the role they asked about. Never present any of them as holding the requested "
+    "title. If \"these_people_all_work_in\" is present, that is the function they all sit "
+    "in and it is why they are the ones being offered: say so in the sentence that "
+    "introduces them (\"the most senior finance people we do hold are\"), so the "
+    "connection to the question is explicit rather than left to be guessed.\n\n"
+    "If the facts contain \"no_one_in_this_function_on_file\", we looked beyond the exact "
+    "title and hold nobody in that whole function at that company. Say that in one "
+    "sentence, naming the function. Do NOT offer people from other functions as "
+    "substitutes and do not pad the answer with unrelated contacts: nobody asking for the "
+    "finance lead is helped by being handed the VP of Engineering.\n\n"
+    "If the facts contain \"some_surnames_withheld_until_enriched\": true, or a person "
+    "carries \"surname_withheld_until_enriched\": true, then those names arrive shortened, "
+    "like \"Binal S.\" or \"Vivek Sh.\". Give each name exactly as it appears and NEVER "
+    "complete, guess or extend a shortened surname. Add a short note that our source "
+    "withholds some surnames until a contact is enriched. Do not treat a shortened name "
+    "as an error or leave the person out over it.\n\n"
     "<public_role_holder>, when present, is the single most important block in the "
     "answer: a named person, found in a live web search, who publicly holds the title "
     "that was asked about, with a \"source\" URL. It is NOT from our records, so never "
@@ -9299,6 +9319,291 @@ def _cpi_title_matches(person_title: str, requested: list) -> bool:
     return False
 
 
+# ── Which business function a title belongs to ───────────────────────────────
+# Asking for a CFO and being handed six unrelated senior people is not an answer,
+# it is a list of strangers: nobody who wants the finance lead has any use for the
+# VP of Engineering. So when the requested title is not on file, the fallback is
+# scoped to the SAME function as the title that was asked for, and a person is
+# only offered if their own title positively places them in it.
+#
+# Matched on the alias-expanded tokens _cpi_title_matches already uses, so "CFO",
+# "Chief Financial Officer" and "SVP, Finance & Accounting" all land in finance
+# without three separate spellings here.
+#
+# Each entry: key, human label, the tokens that place a title in it, and the
+# canonical titles to search Apollo with. The token lists are deliberately narrow.
+# A title matching nothing is classified as nothing and therefore never offered as
+# a same-function contact, which is the safe direction to fail: a missing name is
+# a smaller error than a wrong one.
+_CPI_FUNCTIONS = (
+    ("finance", "finance", (
+        "financial", "finance", "accounting", "accountant", "controller",
+        "treasurer", "treasury", "audit", "auditor", "tax", "fpa", "payroll",
+        "bookkeeping", "bookkeeper", "investor",
+    ), (
+        "CFO", "Chief Financial Officer", "VP Finance", "Head of Finance",
+        "Finance Director", "Financial Controller", "Chief Accounting Officer",
+        "VP Accounting", "Head of Accounting", "Treasurer", "Finance Manager",
+    )),
+    ("marketing", "marketing", (
+        "marketing", "brand", "demand", "growth", "communications", "pr",
+        "advertising", "content", "seo", "campaigns",
+    ), (
+        "CMO", "Chief Marketing Officer", "VP Marketing", "Head of Marketing",
+        "Marketing Director", "VP Brand", "Head of Growth", "Head of Demand Generation",
+        "VP Communications", "Marketing Manager",
+    )),
+    ("sales", "sales", (
+        "sales", "revenue", "commercial", "account", "accounts", "business",
+        "bd", "partnerships", "channel",
+    ), (
+        "CRO", "Chief Revenue Officer", "VP Sales", "Head of Sales",
+        "Sales Director", "Chief Commercial Officer", "VP Business Development",
+        "Head of Partnerships", "Sales Manager",
+    )),
+    ("technology", "engineering and technology", (
+        "technology", "technical", "engineering", "engineer", "software",
+        "development", "developer", "architect", "infrastructure", "devops",
+        "platform", "it",
+    ), (
+        "CTO", "Chief Technology Officer", "VP Engineering", "Head of Engineering",
+        "Engineering Director", "Chief Information Officer", "VP Technology",
+        "Head of IT", "Engineering Manager",
+    )),
+    ("product", "product", (
+        "product", "ux", "design", "designer", "research",
+    ), (
+        "CPO", "Chief Product Officer", "VP Product", "Head of Product",
+        "Product Director", "Head of Design", "Product Manager",
+    )),
+    ("data", "data and analytics", (
+        "data", "analytics", "analyst", "science", "scientist", "intelligence",
+        "insights", "bi",
+    ), (
+        "Chief Data Officer", "VP Data", "Head of Data", "Head of Analytics",
+        "Director of Analytics", "Chief Analytics Officer", "Data Manager",
+    )),
+    ("security", "security", (
+        "security", "infosec", "cybersecurity", "ciso", "privacy", "risk",
+    ), (
+        "CISO", "Chief Information Security Officer", "VP Security",
+        "Head of Security", "Director of Security", "Chief Risk Officer",
+    )),
+    ("hr", "people and HR", (
+        "human", "resources", "people", "talent", "recruiting", "recruitment",
+        "hiring", "culture", "learning", "compensation",
+    ), (
+        "CHRO", "Chief Human Resources Officer", "Chief People Officer",
+        "VP Human Resources", "Head of People", "HR Director", "Head of Talent",
+        "HR Manager",
+    )),
+    ("legal", "legal", (
+        "legal", "counsel", "compliance", "regulatory", "attorney", "paralegal",
+        "governance",
+    ), (
+        "General Counsel", "Chief Legal Officer", "VP Legal", "Head of Legal",
+        "Chief Compliance Officer", "Legal Director",
+    )),
+    ("operations", "operations", (
+        "operations", "operating", "operational", "ops", "supply", "chain",
+        "logistics", "procurement", "sourcing", "manufacturing", "quality",
+        "facilities",
+    ), (
+        "COO", "Chief Operating Officer", "VP Operations", "Head of Operations",
+        "Operations Director", "Chief Supply Chain Officer", "Head of Procurement",
+        "Operations Manager",
+    )),
+    ("customer", "customer success and support", (
+        "customer", "client", "success", "support", "service", "experience",
+        "care", "retention",
+    ), (
+        "Chief Customer Officer", "VP Customer Success", "Head of Customer Success",
+        "VP Customer Experience", "Head of Support", "Customer Success Manager",
+    )),
+    ("medical", "medical and clinical", (
+        "medical", "clinical", "physician", "nursing", "nurse", "health",
+        "pharmacy", "pharmacist", "care", "patient",
+    ), (
+        "Chief Medical Officer", "Chief Nursing Officer", "VP Clinical",
+        "Head of Clinical Operations", "Medical Director", "Chief Clinical Officer",
+    )),
+    ("executive", "the executive team", (
+        "executive", "president", "chairman", "chairperson", "founder", "owner",
+        "proprietor", "partner", "principal", "managing", "general", "gm",
+        "strategy", "corporate",
+    ), (
+        "CEO", "Chief Executive Officer", "President", "Founder", "Owner",
+        "Managing Director", "General Manager", "Chief of Staff",
+        "Chief Strategy Officer",
+    )),
+)
+
+# Apollo's own department strings, when the plan returns them, mapped onto the same
+# keys. A second, independent signal: a title we cannot classify may still be
+# placeable by the department Apollo filed the person under.
+_CPI_DEPARTMENT_FUNCTIONS = {
+    "finance": "finance", "accounting": "finance", "master_finance": "finance",
+    "marketing": "marketing", "master_marketing": "marketing",
+    "sales": "sales", "master_sales": "sales", "business_development": "sales",
+    "engineering": "technology", "information_technology": "technology",
+    "master_engineering_technical": "technology", "master_information_technology": "technology",
+    "product_management": "product", "design": "product",
+    "data_science": "data", "business_intelligence": "data",
+    "information_security": "security",
+    "human_resources": "hr", "master_human_resources": "hr", "recruiting": "hr",
+    "legal": "legal", "master_legal": "legal", "compliance": "legal",
+    "operations": "operations", "master_operations": "operations",
+    "support": "customer", "customer_service": "customer", "customer_success": "customer",
+    "medical_health": "medical", "master_medical_health": "medical",
+    "c_suite": "executive", "executive": "executive",
+}
+
+
+def _cpi_title_functions(title: str) -> frozenset:
+    """Which business function(s) a job title belongs to. Empty when unclassifiable.
+
+    More than one is normal and correct: "VP Finance & Operations" really does sit
+    in both, and someone asking for either should be offered them.
+    """
+    have = _cpi_title_tokens(title)
+    if not have:
+        return frozenset()
+    return frozenset(key for key, _label, tokens, _titles in _CPI_FUNCTIONS
+                     if have & set(tokens))
+
+
+def _cpi_person_functions(p: dict) -> frozenset:
+    """A person's function(s), from their title, from Apollo's own department fields
+    when this plan returns them, and from their seniority.
+
+    Anyone at C-suite level or above counts as being in "the executive team"
+    whatever their specialism, because that is the only honest way to answer a
+    question about the CEO: a Chief Creative Officer is a real alternative contact
+    when no CEO is on file, while no keyword list would ever have placed them
+    there. It does not loosen the functional cases -- a CFO question asks for
+    "finance", and being C-suite is not being in finance.
+    """
+    p = p or {}
+    found = set(_cpi_title_functions(p.get("title") or ""))
+    for raw in list(p.get("departments") or []) + list(p.get("subdepartments") or []):
+        key = _CPI_DEPARTMENT_FUNCTIONS.get(str(raw or "").strip().lower())
+        if key:
+            found.add(key)
+    if _cpi_seniority_rank(p) <= _CPI_SENIORITY_ORDER.index("c_suite"):
+        found.add("executive")
+    return frozenset(found)
+
+
+def _cpi_requested_functions(titles: list) -> frozenset:
+    """The function(s) the question was about, from the titles it asked for."""
+    out: set = set()
+    for t in (titles or []):
+        out |= _cpi_title_functions(t)
+    return frozenset(out)
+
+
+def _cpi_function_label(keys) -> str:
+    """"finance", or "finance and operations" for a title spanning two."""
+    labels = [label for key, label, _t, _c in _CPI_FUNCTIONS if key in (keys or ())]
+    if not labels:
+        return ""
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
+def _cpi_function_search_titles(keys, cap: int = 24) -> list:
+    """Canonical titles to search Apollo with for these functions."""
+    out: list = []
+    for key, _label, _tokens, titles in _CPI_FUNCTIONS:
+        if key in (keys or ()):
+            out.extend(titles)
+    return list(dict.fromkeys(out))[:cap]
+
+
+# Most senior first. Apollo's own seniority string when it has one, otherwise read
+# off the title, because the free search tier often returns no seniority at all and
+# an unranked list buries the person most likely to be worth contacting.
+_CPI_SENIORITY_ORDER = ("owner", "founder", "c_suite", "partner", "vp", "head",
+                        "director", "manager", "senior", "entry", "intern")
+_CPI_TITLE_SENIORITY = (
+    ("owner", ("owner", "proprietor")),
+    ("founder", ("founder", "cofounder")),
+    ("c_suite", ("chief", "chairman", "chairperson", "president")),
+    ("partner", ("partner",)),
+    ("vp", ("vice",)),
+    ("head", ("head",)),
+    ("director", ("director",)),
+    ("manager", ("manager", "lead", "supervisor")),
+)
+
+
+def _cpi_seniority_rank(p: dict) -> int:
+    """Sort key: 0 is the most senior, and anything unplaceable sorts last."""
+    raw = str((p or {}).get("seniority") or "").strip().lower()
+    if raw in _CPI_SENIORITY_ORDER:
+        return _CPI_SENIORITY_ORDER.index(raw)
+    have = _cpi_title_tokens((p or {}).get("title") or "")
+    # "Vice President" beats "Director" beats "Manager": first match in the table
+    # wins, and the table is ordered by seniority.
+    for level, tokens in _CPI_TITLE_SENIORITY:
+        if have & set(tokens):
+            return _CPI_SENIORITY_ORDER.index(level)
+    return len(_CPI_SENIORITY_ORDER)
+
+
+# Enough to be useful, few enough to read. The point of this list is the two or
+# three people worth contacting, not a directory dump.
+_CPI_CONSOLATION_MAX = 5
+
+
+def _cpi_same_function_people(org_id: str, want_functions, api_key: str,
+                              limit: int = _CPI_CONSOLATION_MAX) -> list:
+    """The most senior people at this company IN the requested function, or the
+    most senior people overall when the requested title cannot be classified.
+
+    Searched by the function's canonical titles rather than by seniority alone,
+    then filtered in code against each person's OWN title: Apollo runs with
+    include_similar_titles, so the search is a recall net, not a guarantee, and
+    without the code-side check a request for the CFO comes back with the VP of
+    Engineering again. Deliberately unfiltered by seniority at the API so that a
+    company whose most senior finance person is a Finance Manager still gets an
+    answer; the ranking below is what puts the seniors first.
+
+    Free: mixed_people/api_search costs no credits, and no surname is un-masked
+    here (see the consolation note in cpi_chat).
+    """
+    if not (org_id and api_key):
+        return []
+    want = frozenset(want_functions or ())
+    filters = {"organization_ids": [org_id], "max_people": 25}
+    if not want:
+        # Nothing to scope to, so this is the old behavior on purpose: a broad
+        # senior list beats no list at all when we cannot tell what was asked for.
+        filters["seniorities"] = ["c_suite", "vp", "director", "owner", "founder"]
+    elif want == frozenset({"executive"}):
+        # "Who is the CEO" asks for a level, not a specialism, so it is searched
+        # as one. A title list would have to guess at every C-suite variant that
+        # exists ("Chief Creative Officer", "Chief of Staff") and would miss the
+        # ones it did not think of.
+        filters["seniorities"] = ["c_suite", "owner", "founder"]
+    else:
+        filters["titles"] = _cpi_function_search_titles(want)
+    try:
+        from tracker.apollo_client import search_people as _sp
+        rows = _sp(filters, api_key, per_page=25, strict=True) or []
+    except Exception as e:
+        log.warning("cpi chat same-function fallback failed: %s", e)
+        return []
+    if want:
+        before = len(rows)
+        rows = [r for r in rows if _cpi_person_functions(r) & want]
+        log.info("cpi chat fallback: %d/%d rows are actually in %s",
+                 len(rows), before, ",".join(sorted(want)))
+    rows.sort(key=_cpi_seniority_rank)
+    return rows[:limit]
+
+
 def _cpi_person_name_tokens(name: str) -> set:
     """Person name -> comparison tokens, accents folded and honorifics dropped."""
     t = unicodedata.normalize("NFKD", str(name or ""))
@@ -9329,6 +9634,73 @@ def _cpi_person_name_matches(candidate: str, wanted: str) -> bool:
     if len(want) < 2:
         return False
     return want.issubset(_cpi_person_name_tokens(candidate))
+
+
+# Apollo returns a withheld surname as an asterisk mask: "Vivek Sh***a". The chat
+# renderer treats **...** as bold, so two masked names in one sentence made the
+# text BETWEEN them bold -- "Vivek Sh**a, Meghana Ka**i" rendered with "a, Meghana
+# Ka" in bold, which reads as a rendering bug and drew the eye to nothing.
+#
+# Escaping the asterisks would keep them on screen, and "Sh***a" is not a name
+# anyone can use. Abbreviating says the same thing in the form a reader already
+# understands, and carries no markup: "Vivek Sh." Only the masked token is
+# touched, no letters are invented, and the row keeps its name_masked flag so the
+# answer can still explain why the surname is short and offer to buy it.
+_CPI_MASKED_TOKEN = re.compile(r"^([^\W\d_]*)[\*]+[^\s]*$", re.UNICODE)
+
+
+def _cpi_display_name(name: str) -> str:
+    """A masked Apollo name made safe to print: "Vivek Sh***a" -> "Vivek Sh.".
+
+    A token whose mask leaves no real letters at all is dropped rather than
+    printed as a bare full stop.
+    """
+    raw = str(name or "").strip()
+    if "*" not in raw:
+        return raw
+    out = []
+    for token in raw.split():
+        if "*" not in token:
+            out.append(token)
+            continue
+        m = _CPI_MASKED_TOKEN.match(token)
+        prefix = (m.group(1) if m else re.split(r"\*", token, 1)[0]).strip(".,;:")
+        if prefix:
+            out.append(prefix + ".")
+    return " ".join(out).strip()
+
+
+def _cpi_display_person(p: dict) -> dict:
+    """One person row with its name made printable. A copy: the caller's row keeps
+    the raw Apollo name, which is what people/match should still be given."""
+    if not isinstance(p, dict) or "*" not in str(p.get("full_name") or ""):
+        return p
+    out = dict(p)
+    out["full_name"] = _cpi_display_name(p.get("full_name"))
+    if "*" in str(out.get("last_name") or ""):
+        out["last_name"] = _cpi_display_name(out.get("last_name"))
+    return out
+
+
+def _cpi_display_people(rows) -> list:
+    return [_cpi_display_person(p) for p in (rows or [])]
+
+
+# What the answer is told about a person who is being offered as a same-function
+# contact rather than as the answer. Compact and ordered on purpose: the whole
+# point of this list is "who they are and what they do", and a full search row
+# buries the title among twenty other keys, which is how a list of six people came
+# back with no titles at all.
+def _cpi_contact_brief(p: dict) -> dict:
+    p = _cpi_display_person(p or {})
+    brief = {"name": p.get("full_name") or "", "title": p.get("title") or ""}
+    for src, dst in (("seniority", "seniority"), ("city", "city"),
+                     ("country", "country"), ("linkedin_url", "linkedin")):
+        if p.get(src):
+            brief[dst] = p[src]
+    if p.get("name_masked") or _cpi_name_incomplete(p):
+        brief["surname_withheld_until_enriched"] = True
+    return brief
 
 
 def _cpi_person_on_file(name: str, domain: str, api_key: str):
@@ -9805,17 +10177,20 @@ def cpi_chat():
     # the role is not on file while naming the closest senior people. The
     # no_title_match flag is what stops that list from being passed off as the
     # role that was actually asked for.
+    #
+    # Scoped to the FUNCTION that was asked about, not merely to seniority. A
+    # question about the CFO used to come back with "closest senior people" that
+    # were six unrelated executives -- an engineering VP and a marketing head are
+    # not a substitute for the finance lead, and offering them as one wasted the
+    # reader's time and made the whole answer look guessed. Now the fallback looks
+    # for finance leadership specifically, and if we hold nobody in finance it says
+    # so instead of reaching for whoever else is senior.
     no_title_match = False
+    want_functions = _cpi_requested_functions(titles) if titles else frozenset()
+    function_label = _cpi_function_label(want_functions)
     if not people and resolved_org and resolved_org.get("id") and (titles or seniorities):
         no_title_match = True
-        fallback = {"organization_ids": [resolved_org["id"]],
-                    "seniorities": ["c_suite", "vp", "director", "owner", "founder"],
-                    "max_people": 10}
-        try:
-            people = _search_people(fallback, api_key, per_page=10, strict=True)
-        except Exception as e:
-            log.warning("cpi chat fallback people search failed: %s", e)
-            people = []
+        people = _cpi_same_function_people(resolved_org["id"], want_functions, api_key)
 
     # Both of the "our records don't have this role" branches below want the same
     # public lookup, so it runs at most once per question and only on the paths
@@ -9877,6 +10252,12 @@ def cpi_chat():
             facts["requested_titles"] = titles
         if resolved_org:
             facts["company"] = resolved_org.get("name") or company_name
+        # We did not merely fail to find the exact title: we then looked for anyone
+        # in that whole function and found nobody either. Worth saying, because it
+        # is the difference between "not under that title" and "not in our records
+        # at all", and it is why no alternative contacts are being offered.
+        if no_title_match and function_label:
+            facts["no_one_in_this_function_on_file"] = function_label
         role = _public_role()
         enrich_meta = None
         if role:
@@ -9904,7 +10285,9 @@ def cpi_chat():
         # correctly does not require paying for their email and phone too.
         if api_key:
             top = _cpi_reveal_names([top], api_key, spend=spend)[0]
-        facts = {"person": top, "asked_for_titles": titles}
+        # If the reveal could not un-mask them, the model must still never be handed
+        # "Vivek Sh***a" to copy into prose.
+        facts = {"person": _cpi_display_person(top), "asked_for_titles": titles}
         full_profile = ""
         enrich_meta = None
         if wants_contact:
@@ -9928,11 +10311,8 @@ def cpi_chat():
             # up front -- offer a button instead. This metadata is UI wiring
             # for the client, not a fact for the model, so it travels outside
             # `facts` and must never reach the answer prompt.
-            enrich_meta = {"type": "person", "name": top.get("full_name") or "",
-                           "title": top.get("title") or "",
-                           "domain": (top.get("organization_domain")
-                                      or (resolved_org or {}).get("primary_domain") or ""),
-                           "apollo_id": top.get("id") or ""}
+            enrich_meta = _cpi_enrich_chip(
+                top, (resolved_org or {}).get("primary_domain") or "")
         research, web = _research()
         answer = _cpi_grounded_answer(oai, facts, message, research)
         if full_profile:
@@ -9958,9 +10338,12 @@ def cpi_chat():
     # spend is one Enrich click away. A list the user DID ask for
     # ("list the VPs at X") still reveals: there the names are the answer.
     consolation = bool(no_title_match and titles)
-    shown = (people[:max_results] if consolation
+    # No slice on the consolation path: _cpi_same_function_people already returns at
+    # most _CPI_CONSOLATION_MAX, and a second cap here would be a second place to
+    # change it.
+    shown = (people if consolation
              else _cpi_reveal_names(people[:max_results], api_key, spend=spend))
-    facts = {"people": shown}
+    facts = {"people": _cpi_display_people(shown)}
     try:
         total_entries = int(people_meta.get("total_entries"))
     except (TypeError, ValueError):
@@ -9976,8 +10359,17 @@ def cpi_chat():
             "no_one_holds_the_requested_title": True,
             "requested_titles": titles,
             "company": resolved_org.get("name"),
-            "other_senior_people_at_this_company": shown,
+            # Compact briefs, not raw search rows: each one is a name AND a title,
+            # so an answer cannot list six people without saying what any of them
+            # do, which is what made the old list useless.
+            "closest_people_we_hold": [_cpi_contact_brief(p) for p in shown],
         }
+        # Named, so the answer can say WHY these particular people are the ones
+        # being offered ("the most senior finance people we hold") instead of
+        # calling them "closest senior people" and leaving the reader to guess the
+        # connection to the question.
+        if function_label:
+            facts["these_people_all_work_in"] = function_label
         # Their surnames were not bought (see above), so some may arrive as
         # "Binal S.". Flagged so the answer says why rather than printing a
         # half-name that reads like a rendering bug.

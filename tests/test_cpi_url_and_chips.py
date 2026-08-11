@@ -259,9 +259,12 @@ def test_the_named_role_holder_leads_and_is_not_duplicated(monkeypatch):
             "source": "https://in.linkedin.com/company/macmerise",
             "exact_title_match": True}
     # A title question whose title nobody matches sends this down the
-    # consolation path, where the role holder is found on file as _BINAL.
-    body, facts = _ask_list(monkeypatch, [dict(_BINAL, title="Chief Creative Officer")],
-                            message="ceo of macmerise", intent="person_at_company",
+    # consolation path, where the role holder is found on file as _BINAL. Their
+    # on-file title has to be in the SAME function as the question (marketing,
+    # since _ask_list asks for a CMO) or the same-function fallback correctly
+    # declines to offer them and there is no consolation list to de-duplicate.
+    body, facts = _ask_list(monkeypatch, [dict(_BINAL, title="VP Marketing")],
+                            message="cmo of macmerise", intent="person_at_company",
                             role=role)
     assert facts["no_one_holds_the_requested_title"] is True
     ids = [c["apollo_id"] for c in body["enrich"]]

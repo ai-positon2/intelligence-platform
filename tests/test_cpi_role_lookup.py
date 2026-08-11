@@ -17,6 +17,7 @@ So these cover two things:
 
 import os
 import sys
+import json as _json
 import types
 
 import pytest
@@ -414,14 +415,32 @@ _ROLE = {"name": "Julie Woods-Moss", "title": "Chief Marketing Officer",
 
 def test_chat_the_exact_reported_scenario_now_names_the_public_cmo(monkeypatch):
     """Apollo has senior people at Thoughtworks but nobody titled CMO. The answer
-    must be handed the publicly published CMO instead of only a records gap."""
+    must be handed the publicly published CMO instead of only a records gap.
+
+    The one senior person on file here runs Delivery, so they are NOT offered as
+    an alternative: a marketing question is not answered by an operations lead,
+    and the answer is told the marketing gap is a whole-function gap so it can say
+    so rather than padding itself with whoever else is senior.
+    """
     senior = [{"id": "p1", "full_name": "Sam Rao", "title": "Head of Delivery"}]
     facts, calls = _chat(monkeypatch, [[], senior], _ROLE)
-    assert facts["no_one_holds_the_requested_title"] is True
     assert facts["public_role_holder"]["name"] == "Julie Woods-Moss"
     assert facts["public_role_holder"]["source"].startswith("https://")
-    # The on-file people are still offered as the reachable contacts.
-    assert facts["other_senior_people_at_this_company"][0]["full_name"] == "Sam Rao"
+    assert facts["no_one_in_this_function_on_file"] == "marketing"
+    assert "Sam Rao" not in _json.dumps(facts)
+
+
+def test_chat_offers_the_people_it_does_hold_in_the_asked_function(monkeypatch):
+    """The other half of the same behavior: when the company DOES have marketing
+    leadership on file, just nobody titled CMO, those people are the answer's
+    alternatives and each one is given with their own title."""
+    senior = [{"id": "p1", "full_name": "Sam Rao", "title": "VP Marketing"},
+              {"id": "p2", "full_name": "Ada Lin", "title": "Head of Brand"}]
+    facts, _calls = _chat(monkeypatch, [[], senior], _ROLE)
+    assert facts["no_one_holds_the_requested_title"] is True
+    assert facts["these_people_all_work_in"] == "marketing"
+    assert [(x["name"], x["title"]) for x in facts["closest_people_we_hold"]] == [
+        ("Sam Rao", "VP Marketing"), ("Ada Lin", "Head of Brand")]
 
 
 def test_chat_attaches_the_role_holder_when_apollo_has_nobody_at_all(monkeypatch):
@@ -479,7 +498,8 @@ def test_the_domain_retry_still_refuses_a_wrong_title(monkeypatch):
     wrong = [{"id": "p9", "full_name": "Someone Else", "title": "Marketing Manager"}]
     senior = [{"id": "p1", "full_name": "Sam Rao", "title": "Head of Delivery"}]
     facts, _calls = _chat(monkeypatch, [[], wrong, senior], _ROLE)
-    assert facts["no_one_holds_the_requested_title"] is True
+    assert "person" not in facts, "the Marketing Manager is not the CMO"
+    assert "Someone Else" not in _json.dumps(facts)
     assert facts["public_role_holder"]["name"] == "Julie Woods-Moss"
 
 
