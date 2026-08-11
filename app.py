@@ -8524,7 +8524,14 @@ _CPI_ANSWER_SYSTEM = (
     "\"returned_count\", the \"people\" list is a partial sample, not the full set -- name a "
     "few of them as examples but phrase the list as \"including\" or \"such as\", never as if "
     "it were everyone. If \"total_matching_count\" equals \"returned_count\" (or there is no "
-    "\"total_matching_count\" at all), the list you were given IS the complete answer."
+    "\"total_matching_count\" at all), the list you were given IS the complete answer.\n\n"
+    "If the facts contain \"full_apollo_profile_follows\": true, keep your own part to "
+    "ONE short lead sentence naming the person and their title, nothing else: a complete, "
+    "field-by-field record of everything Apollo returned (contact details, company "
+    "firmographics, all of it) is appended immediately after your answer in its own "
+    "format. Do not add bullets, do not restate contact details or company figures "
+    "yourself, and do not say the record is attached or coming next -- it is already "
+    "part of the same message, right below what you write."
 )
 
 
@@ -8547,6 +8554,74 @@ def _cpi_answer_person(profile: dict, wants_contact: bool) -> dict:
     if wants_contact:
         allowed = allowed + _CPI_ANSWER_CONTACT_FIELDS
     return {k: v for k, v in (profile or {}).items() if k in allowed}
+
+
+def _cpi_render_full_profile(enriched: dict) -> str:
+    """Every field Apollo actually returned for a matched, enriched person and
+    their employer, as a labelled bullet list -- code-rendered, not left to the
+    model, so nothing captured can be quietly summarized away.
+
+    A single person_at_company match is exactly the case worth spending the
+    1-credit enrichment on to get right (see the caller), and the point of
+    paying for it is to see what it reveals. Contact fields are included
+    unconditionally here regardless of whether the question asked for them:
+    withholding part of what a credit already bought is the waste, not the
+    showing of it. Verbose derived lists (employment history, technologies,
+    keyword tags) are left out for legibility, not withheld -- this is a
+    contact card, not the raw record.
+    """
+    p = enriched or {}
+    if not p:
+        return ""
+
+    def bullets(pairs):
+        out = []
+        for label, value in pairs:
+            if value not in (None, "", [], {}, 0, False):
+                out.append("- **%s:** %s" % (label, value))
+        return out
+
+    loc = p.get("location") or ", ".join(
+        x for x in [p.get("city"), p.get("state"), p.get("country")] if x)
+    emails, seen = [], set()
+    for e in list(p.get("emails") or []) + [{"email": p.get("email")},
+                                            {"email": p.get("apollo_email")}]:
+        addr = str((e or {}).get("email") or "").strip()
+        if addr and addr not in seen:
+            seen.add(addr)
+            tag = " (%s)" % e["status"] if e.get("status") else ""
+            emails.append(addr + tag)
+    phones = [str(ph.get("number") or "").strip()
+             for ph in (p.get("phones") or []) if isinstance(ph, dict) and ph.get("number")]
+
+    lines = bullets([
+        ("Name", p.get("name")), ("Title", p.get("title")),
+        ("Headline", p.get("headline")), ("Seniority", p.get("seniority")),
+        ("Department", ", ".join(p.get("departments") or [])),
+        ("Location", loc), ("Email", ", ".join(emails)),
+        ("Phone", ", ".join(phones)), ("LinkedIn", p.get("linkedin")),
+        ("Twitter", p.get("twitter")), ("Facebook", p.get("facebook")),
+    ])
+
+    co = p.get("company") or {}
+    co_bullets = bullets([
+        ("Name", co.get("name")), ("Domain", co.get("domain")),
+        ("Website", co.get("website")), ("Industry", co.get("industry")),
+        ("Employees", co.get("employees")), ("Revenue", co.get("revenue")),
+        ("Founded", co.get("founded")), ("HQ", co.get("hq")),
+        ("Phone", co.get("phone")), ("LinkedIn", co.get("linkedin")),
+        ("Description", co.get("description")),
+    ])
+    if co_bullets:
+        # A plain (non-bulleted) line here so fmtAnswer() closes the person
+        # list and opens a visually distinct second one for the company,
+        # rather than running both together under one heading.
+        lines.append("Everything Apollo has on the company:")
+        lines += co_bullets
+
+    if not lines:
+        return ""
+    return "Everything Apollo has on file for this person:\n" + "\n".join(lines)
 
 
 def _cpi_norm_name(s: str) -> str:
@@ -9250,17 +9325,25 @@ def cpi_chat():
                                       top.get("organization_domain")
                                       or (resolved_org or {}).get("primary_domain") or "",
                                       top.get("id") or "", spend=spend)
+        full_profile = ""
         if enriched.get("matched"):
-            # Contact fields reach the answer prompt only when the user actually
-            # asked for them: enriching to get the name right must not cause an
-            # email address to be volunteered. Allowlisted, not denylisted, so a
-            # new field on the normalizer cannot leak by default.
+            # Allowlisted, not denylisted, so a new field on the normalizer
+            # cannot leak into the model's OWN prose by default; wants_contact
+            # still governs that. But the full record appended below is
+            # unconditional: the 1-credit enrichment above was already spent
+            # specifically to reveal all of this, on every person_at_company
+            # question, whether or not contact info was asked for -- showing
+            # only part of what that credit bought is the actual waste.
             facts = {"person": _cpi_answer_person(enriched, wants_contact),
-                     "asked_for_titles": titles}
+                     "asked_for_titles": titles,
+                     "full_apollo_profile_follows": True}
+            full_profile = _cpi_render_full_profile(enriched)
         research, web = _research()
+        answer = _cpi_grounded_answer(oai, facts, message, research)
+        if full_profile:
+            answer = answer.rstrip() + "\n\n" + full_profile
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
-                               web_search=web,
-                               answer=_cpi_grounded_answer(oai, facts, message, research))
+                               web_search=web, answer=answer)
 
     # Revealed ONCE, then reused by whichever facts shape this answer takes. The
     # no-title-match branch below used to call _cpi_reveal_names a second time on
