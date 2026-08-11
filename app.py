@@ -8504,6 +8504,11 @@ _CPI_ANSWER_SYSTEM = (
     "plainly, naming the company and the title that is missing, then offer the people "
     "under \"other_senior_people_at_this_company\" as the closest available contacts. "
     "Never present any of them as holding the requested title.\n\n"
+    "If the facts contain \"some_surnames_withheld_until_enriched\": true, then some of "
+    "those closest-contact names arrive shortened, like \"Binal S.\". Give each name "
+    "exactly as it appears, never guessing the rest of one, and add a short note that "
+    "our source withholds some surnames until a contact is enriched. Do not treat a "
+    "shortened name as an error or leave the person out over it.\n\n"
     "<public_role_holder>, when present, is the single most important block in the "
     "answer: a named person, found in a live web search, who publicly holds the title "
     "that was asked about, with a \"source\" URL. It is NOT from our records, so never "
@@ -9636,7 +9641,19 @@ def cpi_chat():
     # no-title-match branch below used to call _cpi_reveal_names a second time on
     # the same list, which re-billed every one of those people on any environment
     # without the id cache to absorb it.
-    shown = _cpi_reveal_names(people[:max_results], api_key, spend=spend)
+    #
+    # ...but NOT on the consolation path. When the question was "who is the CEO"
+    # and nobody on file holds that title, this list is the nearest senior
+    # contacts offered INSTEAD of an answer: people nobody asked about. Paying
+    # ~1 credit each to un-mask their surnames spends real money on a substitute
+    # for the answer, which is how "ceo of macmerise" cost 4 credits for a reply
+    # that named two people the user had not asked for and enriched nobody. The
+    # free search rows are shown as they came, and anyone actually worth the
+    # spend is one Enrich click away. A list the user DID ask for
+    # ("list the VPs at X") still reveals: there the names are the answer.
+    consolation = bool(no_title_match and titles)
+    shown = (people[:max_results] if consolation
+             else _cpi_reveal_names(people[:max_results], api_key, spend=spend))
     facts = {"people": shown}
     try:
         total_entries = int(people_meta.get("total_entries"))
@@ -9648,13 +9665,18 @@ def cpi_chat():
         facts["total_matching_count"] = total_entries
         facts["returned_count"] = len(shown)
     enrich_meta = None
-    if no_title_match and titles:
+    if consolation:
         facts = {
             "no_one_holds_the_requested_title": True,
             "requested_titles": titles,
             "company": resolved_org.get("name"),
             "other_senior_people_at_this_company": shown,
         }
+        # Their surnames were not bought (see above), so some may arrive as
+        # "Binal S.". Flagged so the answer says why rather than printing a
+        # half-name that reads like a rendering bug.
+        if any(_cpi_name_incomplete(p) for p in shown):
+            facts["some_surnames_withheld_until_enriched"] = True
         role = _public_role()
         if role:
             facts["public_role_holder"] = role
