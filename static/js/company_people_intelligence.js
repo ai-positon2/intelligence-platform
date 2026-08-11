@@ -674,6 +674,13 @@ function applyFiltersToForm(f){
 }
 
 var IC_PERSON='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
+var IC_CHAT='<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H8l-5 3 1.4-4.2A8 8 0 1121 12z"/></svg>';
+/* Single-line clamp for drawer metadata: a full answer is far too long to sit
+   under an entry title, and CSS truncation would still ship the whole string. */
+function trimTo(s, n){
+  s=String(s||"").replace(/\s+/g," ").trim();
+  return s.length>n ? s.slice(0,n-1)+"…" : s;
+}
 var IC_DL='<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
 
 /* Buckets a history entry's timestamp into the same relative-date groups any
@@ -706,7 +713,7 @@ window.cpiOpenHistory = function(){
     var clr=document.getElementById("cpiHistClearAll");
     if(clr) clr.style.display = entries.length ? "" : "none";
     if(!entries.length){
-      body.innerHTML='<div class="cpi-empty"><span>No saved searches yet. Run a search and it will show up here.</span></div>';
+      body.innerHTML='<div class="cpi-empty"><span>Nothing saved yet. Searches you run, questions you ask the assistant, and contacts you enrich all show up here.</span></div>';
       return;
     }
     var groups={}, order=["Today","Yesterday","This week","This month","Earlier"];
@@ -719,14 +726,36 @@ window.cpiOpenHistory = function(){
         var when=e.created_at?new Date(e.created_at).toLocaleString(undefined,
           {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
         var co=e.entity==="companies";
+        var isChat=e.entity==="chat";
+        var isContact=e.entity==="contact"||e.entity==="company_profile";
         var style='style="animation-delay:'+Math.min(idx++,10)*28+'ms"';
-        return '<div class="cpi-hist" '+style+' onclick="cpiRestoreHistory('+e.id+')">'+
-          '<div class="cpi-hist-ic '+(co?"co":"pp")+'">'+(co?IC_BLD:IC_PERSON)+'</div>'+
+        /* Three kinds of entry now share this drawer, so each says what it is
+           and what reopening it will do, rather than all reading "N rows". */
+        var ic, cls, meta;
+        if(isChat){
+          ic=IC_CHAT; cls="ch";
+          meta=(e.preview? trimTo(e.preview,90)+" · " : "")+when;
+        }else if(isContact){
+          ic=IC_PERSON; cls="ct";
+          meta="Enriched contact · already paid for · "+when;
+        }else{
+          ic=co?IC_BLD:IC_PERSON; cls=co?"co":"pp";
+          meta=String(e.count||0)+" row"+(e.count===1?"":"s")+
+            (e.total&&e.total>e.count?" of "+pmNum(e.total):"")+" · "+when;
+        }
+        /* Export builds a spreadsheet from search-row shape, which a chat answer
+           and an enriched profile do not have -- offering the button would hand
+           back a broken file, so it is only on the entries it works for. */
+        var exportBtn = (isChat||isContact) ? "" :
+          '<button class="cpi-hist-act exp" onclick="event.stopPropagation();cpiExportHistoryEntry('+e.id+',this)" aria-label="Export" title="Export this search">'+IC_DL+'</button>';
+        var opener = isChat ? "cpiReopenChat" : (isContact ? "cpiReopenContact" : "cpiRestoreHistory");
+        return '<div class="cpi-hist" '+style+' onclick="'+opener+'('+e.id+')">'+
+          '<div class="cpi-hist-ic '+cls+'">'+ic+'</div>'+
           '<div class="cpi-hist-b"><div class="cpi-hist-l">'+esc(e.label||"Saved search")+'</div>'+
-          '<div class="cpi-hist-m">'+esc(String(e.count||0))+' row'+(e.count===1?"":"s")+
-            (e.total&&e.total>e.count?" of "+pmNum(e.total):"")+' &middot; '+esc(when)+'</div></div>'+
-          '<div class="cpi-hist-actions">'+
-            '<button class="cpi-hist-act exp" onclick="event.stopPropagation();cpiExportHistoryEntry('+e.id+',this)" aria-label="Export" title="Export this search">'+IC_DL+'</button>'+
+          '<div class="cpi-hist-m">'+esc(meta)+
+            (e.credits?' &middot; '+esc(String(e.credits))+" credit"+(e.credits===1?"":"s"):"")+
+          '</div></div>'+
+          '<div class="cpi-hist-actions">'+exportBtn+
             '<button class="cpi-hist-act del" onclick="event.stopPropagation();cpiDeleteHistory('+e.id+')" aria-label="Delete" title="Delete">&#10005;</button>'+
           '</div>'+
         '</div>';
@@ -759,10 +788,13 @@ window.cpiClearAllHistory = function(){
     return el.getAttribute("onclick").match(/\d+/)[0];
   });
   if(!ids.length) return;
-  if(!window.confirm("Delete all "+ids.length+" saved search"+(ids.length===1?"":"es")+"? This cannot be undone.")) return;
+  /* The drawer now also holds saved answers and enriched contacts, so the
+     confirmation says "entries" rather than promising only searches will go. */
+  if(!window.confirm("Delete all "+ids.length+" saved "+(ids.length===1?"entry":"entries")+
+                     " (searches, answers and enriched contacts)? This cannot be undone.")) return;
   Promise.all(ids.map(function(id){
     return fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" }).catch(function(){});
-  })).then(function(){ window.cpiOpenHistory(); toast("Cleared search history.", "ok"); });
+  })).then(function(){ window.cpiOpenHistory(); toast("Cleared history.", "ok"); });
 };
 window.cpiCloseHistory = function(){
   document.getElementById("cpiDrawerOvl").classList.remove("on");
@@ -795,6 +827,47 @@ window.cpiDeleteHistory = function(id){
   fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" })
     .then(function(){ window.cpiOpenHistory(); })
     .catch(function(){ toast("Could not delete that entry.", "err"); });
+};
+/* Puts a saved exchange back into the chat panel, question and answer, exactly
+   as it was answered. Deliberately a REPLAY and not a re-ask: re-running the
+   question would spend credits again and could answer differently, which is not
+   what "open my history" should mean. Any Enrich buttons that came with it are
+   restored too, so a contact the answer named is still one click away. */
+window.cpiReopenChat = function(id){
+  fetch(window.__CPI_HISTORY_URL__+"/"+id).then(function(r){ return r.json(); }).then(function(d){
+    if(!d || d.error){ toast("Could not reopen that answer.", "err"); return; }
+    var q=(d.filters&&d.filters.question)||d.label||"";
+    if(q) addUserMsg(q);
+    /* Credits are passed as 0 because reopening spends nothing; the provenance
+       flags are replayed as recorded so the footer describes how the answer was
+       ORIGINALLY produced rather than asserting something that was never true. */
+    addAssistantMsg(d.answer||"(no answer was recorded for this one)", null,
+                    0, !!(d.filters&&d.filters.researched),
+                    !!(d.filters&&d.filters.web_search),
+                    (d.rows||[]).map(function(p){
+                      return {type:"person", name:p.name, title:p.title,
+                              domain:p.domain, apollo_id:p.apollo_id};
+                    }));
+    window.cpiCloseHistory();
+    toast("Reopened a saved answer (no credits spent)", "ok");
+  }).catch(function(){ toast("Could not reopen that answer.", "err"); });
+};
+/* Reopens an enriched profile straight from storage. The credit for this was
+   already spent when it was first enriched, so this must NOT go back to
+   /enrich -- it renders the saved record into the same modal instead. */
+window.cpiReopenContact = function(id){
+  fetch(window.__CPI_HISTORY_URL__+"/"+id).then(function(r){ return r.json(); }).then(function(d){
+    var p=(d&&d.rows&&d.rows[0])||null;
+    if(!p){ toast("Could not reopen that contact.", "err"); return; }
+    var isCo = d.entity==="company_profile";
+    document.getElementById("pmOvl").classList.add("on");
+    document.getElementById("pmWrap").classList.add("on");
+    document.body.style.overflow="hidden";
+    document.getElementById("pmHero").innerHTML = isCo ? companyHero(p) : personHero(p);
+    document.getElementById("pmBody").innerHTML = isCo ? companyBody(p) : personBody(p);
+    window.cpiCloseHistory();
+    toast("Reopened a saved contact (no credits spent)", "ok");
+  }).catch(function(){ toast("Could not reopen that contact.", "err"); });
 };
 
 /* ── Enrich modal ── */

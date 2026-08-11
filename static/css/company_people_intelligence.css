@@ -555,6 +555,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .cpi-hist-ic.pp svg{stroke:#c2c6fb}
 .cpi-hist-ic.co{background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,131,245,.14));border:1px solid rgba(34,211,238,.3)}
 .cpi-hist-ic.co svg{stroke:#a8f0fb}
+/* A saved chat answer and a bought contact sit in the same drawer as searches,
+   so each gets its own tint: the entries behave differently when opened and
+   should not look interchangeable. */
+.cpi-hist-ic.ch{background:linear-gradient(135deg,rgba(52,211,153,.2),rgba(34,211,238,.12));border:1px solid rgba(52,211,153,.3)}
+.cpi-hist-ic.ch svg{stroke:#9df3cf}
+.cpi-hist-ic.ct{background:linear-gradient(135deg,rgba(251,191,36,.18),rgba(244,114,182,.12));border:1px solid rgba(251,191,36,.3)}
+.cpi-hist-ic.ct svg{stroke:#fcd77f}
 .cpi-hist-b{min-width:0;flex:1}
 .cpi-hist-l{font-size:12.5px;font-weight:650;color:var(--tx);line-height:1.35;
   overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
