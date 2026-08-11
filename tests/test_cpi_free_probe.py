@@ -64,6 +64,16 @@ _TEALIUM_ROW = {"id": "p1", "full_name": "Ted Purcell",
                 "organization_name": "Tealium",
                 "organization_domain": "tealium.com"}
 
+# Somebody in MARKETING at the same company, for the tests about what a CMO
+# question is offered instead. It used to be _TEALIUM_ROW, a Chief Revenue
+# Officer, which is exactly the substitution the same-function fallback now
+# refuses: see test_a_senior_person_outside_the_asked_function_is_not_offered.
+_TEALIUM_MKT_ROW = {"id": "p2", "full_name": "Dana Whitfield",
+                    "title": "VP Marketing",
+                    "organization_id": "org-tealium",
+                    "organization_name": "Tealium",
+                    "organization_domain": "tealium.com"}
+
 
 # ── _cpi_probe_company_free: pinning a company for 0 credits ────────────────
 
@@ -265,19 +275,24 @@ def _ask(monkeypatch, people_handler, role=_ROLE, message="CMO of tealium",
 def _tealium_handler(titled=(), senior=(), named=()):
     """search_people answers by which stage is asking."""
     def _h(f):
+        ts = list(f.get("titles") or [])
         if f.get("keywords"):                      # the name lookup
             return list(named)
-        if f.get("titles"):                        # the title-scoped search
-            return list(titled)
-        if f.get("seniorities"):                   # the senior fallback
+        # The question names ONE title; the same-function fallback searches a
+        # whole function's canonical titles ("CMO", "VP Marketing", "Head of
+        # Growth", ...), or a seniority band when the question was about the
+        # executive team. That is what tells the two searches apart here.
+        if len(ts) > 1 or f.get("seniorities"):    # the fallback
             return list(senior)
+        if ts:                                     # the title-scoped search
+            return list(titled)
         return [_TEALIUM_ROW]                      # the free probe
     return _h
 
 
 def test_the_reported_question_now_costs_nothing(monkeypatch):
     body, facts, billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW]))
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW]))
     assert billed == [], "no mixed_companies/search means no credit"
     assert not body.get("credits")
     assert facts["no_one_holds_the_requested_title"] is True
@@ -285,13 +300,13 @@ def test_the_reported_question_now_costs_nothing(monkeypatch):
 
 def test_the_reported_question_now_offers_an_enrich_button(monkeypatch):
     body, _facts, _billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW]))
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW]))
     # The publicly named person leads, because she is the answer to what was
     # asked; the on-file people follow as the alternatives to her.
     assert body["enrich"][0] == {"type": "person", "name": "Heidi Bullock",
                                  "title": "Chief Marketing Officer",
                                  "domain": "tealium.com", "apollo_id": ""}
-    assert [c["name"] for c in body["enrich"]] == ["Heidi Bullock", "Ted Purcell"]
+    assert [c["name"] for c in body["enrich"]] == ["Heidi Bullock", "Dana Whitfield"]
 
 
 def test_the_other_records_gap_also_offers_the_button(monkeypatch):
@@ -322,7 +337,7 @@ def test_a_publicly_named_person_who_is_on_file_is_reported_as_on_file(monkeypat
     heidi = {"id": "p-heidi", "full_name": "Heidi Bullock", "title": "VP, Marketing",
              "organization_domain": "tealium.com"}
     body, facts, _billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW], named=[heidi]))
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW], named=[heidi]))
     assert facts["public_role_holder_is_on_file"]["title"] == "VP, Marketing"
     assert "public_role_holder_not_in_our_records" not in facts
     # ...and the button carries her real Apollo id, so the enrichment is exact.
@@ -331,7 +346,7 @@ def test_a_publicly_named_person_who_is_on_file_is_reported_as_on_file(monkeypat
 
 def test_a_person_genuinely_not_on_file_says_so_from_a_real_check(monkeypatch):
     _body, facts, _billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW], named=[]))
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW], named=[]))
     assert facts["public_role_holder_not_in_our_records"] is True
     assert "public_role_holder_is_on_file" not in facts
 
@@ -340,7 +355,7 @@ def test_nothing_is_claimed_either_way_when_there_is_no_public_name(monkeypatch)
     """No role holder means nobody was looked up, so the answer must not be
     handed either flag to reason from."""
     _body, facts, _billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW]), role=None)
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW]), role=None)
     assert "public_role_holder_is_on_file" not in facts
     assert "public_role_holder_not_in_our_records" not in facts
 
@@ -348,7 +363,7 @@ def test_nothing_is_claimed_either_way_when_there_is_no_public_name(monkeypatch)
 def test_the_enrich_metadata_never_reaches_the_model(monkeypatch):
     """It is UI wiring, not a fact. In the facts it would become prose."""
     _body, facts, _billed, _seen = _ask(
-        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_ROW]))
+        monkeypatch, _tealium_handler(titled=[], senior=[_TEALIUM_MKT_ROW]))
     blob = _json.dumps(facts, default=str)
     assert "apollo_id" not in blob
 
@@ -480,12 +495,13 @@ _MAC_ORG_ROW = {"id": "m1", "full_name": "Binal S.", "name_masked": True,
 
 def _mac_handler(titled=(), senior=(), named=()):
     def _h(f):
+        ts = list(f.get("titles") or [])
         if f.get("keywords"):
             return list(named)
-        if f.get("titles"):
-            return list(titled)
-        if f.get("seniorities"):
+        if len(ts) > 1 or f.get("seniorities"):    # the same-function fallback
             return list(senior)
+        if ts:
+            return list(titled)
         return [_MAC_ORG_ROW]
     return _h
 
@@ -508,7 +524,7 @@ def test_the_consolation_people_are_still_offered(monkeypatch):
     closest reachable contacts and still belong in the answer."""
     _body, facts, _matched = _ask_reveal(
         monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
-    assert len(facts["other_senior_people_at_this_company"]) == 4
+    assert len(facts["closest_people_we_hold"]) == 4
 
 
 def test_a_shortened_name_is_flagged_so_the_answer_can_explain_it(monkeypatch):
@@ -561,4 +577,4 @@ def test_the_person_who_was_asked_for_is_still_revealed(monkeypatch):
 def test_the_prompt_explains_a_shortened_name():
     p = appmod._CPI_ANSWER_SYSTEM
     assert "some_surnames_withheld_until_enriched" in p
-    assert "never guessing the rest of one" in p
+    assert "NEVER complete, guess or extend a shortened surname" in p
