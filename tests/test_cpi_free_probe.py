@@ -413,3 +413,149 @@ def test_the_prompt_forbids_guessing_whether_we_hold_the_person():
     assert "public_role_holder_not_in_our_records" in p
     # The old prompt told the model to assert the negative unconditionally.
     assert "Then note separately that our own records do not have them" not in p
+
+
+# ── The consolation list must not be paid for ───────────────────────────────
+#
+# Reported against "ceo of macmerise": 4 Apollo credits for a reply that named
+# the CEO from the public web, listed two other people, and enriched nobody.
+# The company resolve was already free by then (the probe above). The 4 credits
+# were _cpi_reveal_names un-masking the surnames of the SENIOR-FALLBACK list --
+# people nobody asked about, offered as a substitute because Apollo had no CEO
+# on file. Paying ~1 credit each to complete their names spends money on the
+# consolation prize. A list the user actually asked for still reveals.
+
+def _ask_reveal(monkeypatch, people_handler, titles=("CEO",),
+                intent="person_at_company", message="ceo of macmerise"):
+    """Like _ask, but with the real _cpi_reveal_names left in place and Apollo's
+    billable bulk_match stubbed so the credit count is observable."""
+    import tracker.apollo_client as ac
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.setattr(appmod, "OpenAI", lambda **kw: types.SimpleNamespace(),
+                        raising=False)
+    monkeypatch.setattr(appmod, "_vimi_chat_json", lambda oai, msgs, mt: (_json.dumps({
+        "intent": intent, "titles": list(titles), "company_name": "Macmerise",
+        "seniorities": [], "max_results": 10}), "m"))
+    _people_stub(monkeypatch, people_handler)
+    monkeypatch.setattr(ac, "search_companies", lambda *a, **k: [])
+    matched = []
+
+    def _bulk(ids, api_key):
+        matched.extend(ids)
+        return {i: {"id": i, "first_name": "Binal", "last_name": "Shah",
+                    "name": "Binal Shah", "title": "CMO"} for i in ids}
+
+    monkeypatch.setattr(ac, "bulk_match_people", _bulk)
+    # No Postgres in tests, so the id cache is a no-op; make that explicit
+    # rather than relying on it.
+    monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {})
+    monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
+    monkeypatch.setattr(appmod, "_cpi_role_lookup", lambda *a, **k: _MAC_ROLE)
+    monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
+    facts_box = {}
+    monkeypatch.setattr(appmod, "_cpi_grounded_answer",
+                        lambda oai, facts, q, research="":
+                        facts_box.setdefault("f", facts) and "answer")
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
+    r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    assert r.status_code == 200
+    return r.get_json(), facts_box.get("f", {}), matched
+
+
+_MAC_ROLE = {"name": "Sahil Shah", "title": "Founder & CEO",
+             "source": "https://in.linkedin.com/company/macmerise",
+             "exact_title_match": True}
+
+_MAC_ORG_ROW = {"id": "m1", "full_name": "Binal S.", "name_masked": True,
+                "title": "CMO", "organization_id": "org-mac",
+                "organization_name": "Macmerise",
+                "organization_domain": "macmerise.com"}
+
+
+def _mac_handler(titled=(), senior=(), named=()):
+    def _h(f):
+        if f.get("keywords"):
+            return list(named)
+        if f.get("titles"):
+            return list(titled)
+        if f.get("seniorities"):
+            return list(senior)
+        return [_MAC_ORG_ROW]
+    return _h
+
+
+def _masked(n):
+    return [{"id": "p%d" % i, "full_name": "Person%d" % i, "name_masked": True,
+             "title": "CMO"} for i in range(n)]
+
+
+def test_the_consolation_list_is_not_paid_for(monkeypatch):
+    body, facts, matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
+    assert facts["no_one_holds_the_requested_title"] is True
+    assert matched == [], "no bulk_match on people the user did not ask about"
+    assert not body.get("credits"), "the whole question must now be free"
+
+
+def test_the_consolation_people_are_still_offered(monkeypatch):
+    """Not paying for their surnames must not mean dropping them: they are the
+    closest reachable contacts and still belong in the answer."""
+    _body, facts, _matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
+    assert len(facts["other_senior_people_at_this_company"]) == 4
+
+
+def test_a_shortened_name_is_flagged_so_the_answer_can_explain_it(monkeypatch):
+    _body, facts, _matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
+    assert facts["some_surnames_withheld_until_enriched"] is True
+
+
+def test_no_flag_when_every_consolation_name_came_back_whole(monkeypatch):
+    """The flag must describe reality, not appear by default: a full name needs
+    no apology attached to it."""
+    whole = [{"id": "p1", "full_name": "Binal Shah", "last_name": "Shah",
+              "title": "CMO"}]
+    _body, facts, matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=[], senior=whole))
+    assert "some_surnames_withheld_until_enriched" not in facts
+    assert matched == []
+
+
+def test_the_public_ceo_is_still_named_with_an_enrich_button(monkeypatch):
+    """The saving must not cost the actual answer: the name asked for still
+    arrives, and is still actionable."""
+    body, facts, _matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=[], senior=_masked(4)))
+    assert facts["public_role_holder"]["name"] == "Sahil Shah"
+    assert body["enrich"]["name"] == "Sahil Shah"
+
+
+def test_a_list_the_user_actually_asked_for_still_reveals(monkeypatch):
+    """The other side of the rule: "list the CMOs at Macmerise" is a question
+    whose answer IS the names, so completing them is what was asked for."""
+    _body, facts, matched = _ask_reveal(
+        monkeypatch, _mac_handler(titled=_masked(3)),
+        titles=("CMO",), intent="people_list", message="list the CMOs at macmerise")
+    assert matched, "an explicitly requested list still completes its names"
+    assert facts["people"][0]["full_name"] == "Binal Shah"
+
+
+def test_the_person_who_was_asked_for_is_still_revealed(monkeypatch):
+    """A single person_at_company match is the answer itself, so the cheap
+    un-masking of that ONE name is still worth it."""
+    hit = [{"id": "p1", "full_name": "Sahil S.", "name_masked": True,
+            "title": "Chief Executive Officer",
+            "organization_domain": "macmerise.com"}]
+    _body, facts, matched = _ask_reveal(monkeypatch, _mac_handler(titled=hit))
+    assert matched == ["p1"]
+    assert facts["person"]["full_name"] == "Binal Shah"  # the stub's reveal
+
+
+def test_the_prompt_explains_a_shortened_name():
+    p = appmod._CPI_ANSWER_SYSTEM
+    assert "some_surnames_withheld_until_enriched" in p
+    assert "never guessing the rest of one" in p
