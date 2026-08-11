@@ -100,9 +100,16 @@ def test_dedup_falls_back_to_name_when_domain_missing():
 
 @pytest.fixture
 def fake_search(monkeypatch):
-    """Stub tracker.apollo_client.search_companies and record the filters it got."""
+    """Stub tracker.apollo_client.search_companies and record the filters it got.
+
+    Also clears the resolve cache _cpi_resolve_company_direct now keeps: these
+    tests reuse the same company names ("Acme", "Position2") across many test
+    functions expecting different Apollo responses each time, and a real cache
+    surviving between them would serve one test's stubbed result to the next.
+    """
     calls = []
     results = {"rows": []}
+    appmod._CPI_ORG_RESOLVE_CACHE.clear()
 
     def _fake(filters, api_key, page=1, per_page=25, strict=False):
         calls.append(filters)
