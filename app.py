@@ -7138,7 +7138,7 @@ _CPI_NAME_RESOLVE_CACHE: dict = {}
 _CPI_NAME_RESOLVE_TTL_S = 24 * 3600
 
 
-def _cpi_resolve_company_name(name: str, api_key: str, spend=None):
+def _cpi_resolve_company_name(name: str, api_key: str, spend=None, oai=None):
     """(org_id, org_name, choices, found) for a plain company name typed into
     the People filter bar's single "at company" field, which otherwise only
     understands a domain. Exactly one of org_id/org_name or choices is
@@ -7157,12 +7157,27 @@ def _cpi_resolve_company_name(name: str, api_key: str, spend=None):
     if cached and now - cached["ts"] < _CPI_NAME_RESOLVE_TTL_S:
         return cached["id"], cached["name"], cached["choices"], True
     from tracker.apollo_client import search_companies as _sc
-    rows = _sc({"name": name, "max_companies": 10}, api_key, strict=True)
-    if rows and spend is not None:
-        spend["credits"] = spend.get("credits", 0) + 1
-    rows = _cpi_dedup_orgs(rows)
+
+    def _by_name(q: str) -> list:
+        rows = _sc({"name": q, "max_companies": 10}, api_key, strict=True)
+        if rows and spend is not None:
+            spend["credits"] = spend.get("credits", 0) + 1
+        return _cpi_dedup_orgs(rows)
+
+    rows = _by_name(name)
     if not rows:
-        return None, None, None, False
+        # Same second chance chat gets: a misspelled or unofficial name is
+        # identified against the live web and looked up again under the name the
+        # company actually uses, rather than reported as no such company. What
+        # gets cached below is still keyed on the string the user TYPED, which is
+        # what the lookup at the top of this function reads, so retyping the same
+        # misspelling skips both the web call and the extra company search.
+        ident = _cpi_company_identify(oai, name)
+        if not ident or _cpi_norm_name(ident["name"]) == key:
+            return None, None, None, False
+        rows = _by_name(ident["name"])
+        if not rows:
+            return None, None, None, False
     if len(rows) == 1:
         org_id, org_name = rows[0].get("id"), rows[0].get("name")
         _CPI_NAME_RESOLVE_CACHE[key] = {"id": org_id, "name": org_name, "choices": None, "ts": now}
@@ -7176,6 +7191,21 @@ def _cpi_resolve_company_name(name: str, api_key: str, spend=None):
     } for c in rows]
     _CPI_NAME_RESOLVE_CACHE[key] = {"id": None, "name": None, "choices": choices, "ts": now}
     return None, None, choices, True
+
+
+def _cpi_oai():
+    """A configured OpenAI client, or None when this environment has no key.
+
+    Every Contact Finder path that reaches for the model has to make the same
+    check, and "no key" has to degrade rather than raise: the search grid and the
+    company-name resolver both work perfectly well without one, they just lose
+    the researched extras.
+    """
+    key = os.environ.get("OPENAI_API_KEY", "")
+    if not key:
+        return None
+    from openai import OpenAI
+    return OpenAI(api_key=key, timeout=45.0, max_retries=1)
 
 
 def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend: dict):
@@ -7215,34 +7245,12 @@ def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend
         facts = {"apollo_found_no_matching_people": True, "requested_titles": titles,
                 "company": company_label}
     question = 'Who is the %s at %s?' % (titles[0] if titles else "contact", company_label)
-    from openai import OpenAI
-    oai = OpenAI(api_key=oai_key, timeout=45.0, max_retries=1)
-    # Nobody on file for this title is exactly the case where the public web
-    # usually does know the answer, so look the role holder up properly instead
-    # of leaving the reader with only a records gap. It needs nothing from the
-    # research brief and both are slow web calls, so they overlap rather than
-    # running back to back: this is already the slowest path the search box has.
-    _role_box: dict = {}
-
-    def _role_worker():
-        try:
-            _role_box["v"] = (_cpi_role_lookup(oai, titles, company_label, domain)
-                              if titles else None)
-        except Exception as e:                          # pragma: no cover - defensive
-            log.warning("cpi search role lookup failed: %s", e)
-            _role_box["v"] = None
-
-    _role_thread = threading.Thread(target=_role_worker, daemon=True)
-    _role_thread.start()
-    research, web = _cpi_research(
-        oai, question, _cpi_company_note({"name": company_label, "primary_domain": domain}))
-    # Same discipline as the research thread in chat: a hung lookup degrades the
-    # note rather than holding a worker open.
-    _role_thread.join(timeout=45)
-    if _role_box.get("v"):
-        facts["public_role_holder"] = _role_box["v"]
-    answer = _cpi_grounded_answer(oai, facts, question, research)
-    return {"answer": answer, "researched": bool(research), "web_search": web}
+    oai = _cpi_oai()
+    if oai is None:                                     # pragma: no cover - guarded above
+        return None
+    answer, researched, web = _cpi_web_answer(oai, facts, question, titles,
+                                              company_label, domain)
+    return {"answer": answer, "researched": researched, "web_search": web}
 
 
 @app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
@@ -7274,7 +7282,7 @@ def cpi_search():
         if company_query and not _cpi_is_domain_shaped(company_query):
             try:
                 org_id, org_name, choices, found = _cpi_resolve_company_name(
-                    company_query, api_key, spend)
+                    company_query, api_key, spend, oai=_cpi_oai())
             except Exception as e:
                 log.warning("cpi company-name resolve failed: %s", e)
                 return jsonify({"results": [], "has_more": False, "error": "Search failed."})
@@ -8097,6 +8105,7 @@ _CPI_INTENT_SYSTEM = (
     ' "titles": ["..."],\n'
     ' "seniorities": ["..."],\n'
     ' "company_name": "...",\n'
+    ' "company_name_typed": "...",\n'
     ' "person_locations": ["..."],\n'
     ' "company_locations": ["..."],\n'
     ' "industries": ["..."],\n'
@@ -8110,7 +8119,14 @@ _CPI_INTENT_SYSTEM = (
     "does not use those exact words: \"leadership\", \"leadership team\", \"executives\", "
     "\"decision makers\", \"senior leaders\" -> [\"c_suite\",\"vp\",\"director\"]; \"founders\" -> "
     "[\"founder\",\"owner\"]; \"management\"/\"managers\" -> [\"manager\",\"director\"]. "
-    "company_name: the company mentioned, exactly as the user wrote it. wants_contact_info: "
+    "company_name: the company mentioned, spelled the way the company itself spells it. "
+    "This string is used to look the company up by name, and a typo finds nothing at all, "
+    "so fix an obvious misspelling or dropped letter (\"thoughworks\" -> \"Thoughtworks\", "
+    "\"micrsoft\" -> \"Microsoft\", \"salesfroce\" -> \"Salesforce\") and expand a well-known "
+    "abbreviation to the real name. Do NOT stretch a name into a different company: if you "
+    "cannot tell which company was meant, pass the string through unchanged. "
+    "company_name_typed: what the user actually wrote, verbatim, and only when you changed "
+    "company_name, so the answer can confirm which company it read. wants_contact_info: "
     "true only if they explicitly ask for an email address or phone number. wants_count: true "
     "when the question is asking how many people match (\"how many VPs of sales does Acme "
     "have\", \"does Acme have a CFO\"), even if they also want the list.\n\n"
@@ -8270,6 +8286,104 @@ def _cpi_role_lookup(oai, titles, company_name: str, domain: str = ""):
             "exact_title_match": _cpi_title_matches(found_title, titles)}
 
 
+# ── Which company did they mean? ─────────────────────────────────────────────
+# A name typed into chat is not a database key. "cmo of thoughworks" is a
+# perfectly clear question to a human and resolved to nothing here, because the
+# name went to Apollo's company search exactly as typed and Apollo does not
+# index the misspelling. The intent parser now corrects obvious typos on its
+# way past (free, no extra call), but that only covers what one model recognizes
+# from memory; a rebrand, a legal name, a brand owned by a differently-named
+# parent, or a company too small to be recognized all still miss. So a name that
+# Apollo cannot resolve gets one live web lookup to establish which real company
+# was meant, and the answer is then re-resolved against Apollo by that company's
+# own domain. The domain is what makes this safe: Apollo's domain match is
+# verified exactly in code (see _cpi_resolve_company), so a wrong guess here
+# fails to resolve rather than answering about the wrong business.
+_CPI_COMPANY_IDENTIFY_SYSTEM = (
+    "You identify which real company a person meant by the name they typed. What they "
+    "typed is often misspelled, abbreviated, a brand rather than the registered name, or "
+    "a former name. Use live web search.\n\n"
+    "Return STRICT JSON and nothing else, in exactly this shape:\n"
+    '{"found": true|false, "name": "the name the company itself uses", "domain": '
+    '"example.com", "source": "https://...", "note": "one short sentence if anything '
+    'about the match needs qualifying, else empty"}\n\n'
+    "Rules that matter more than being helpful:\n"
+    "- \"domain\" is the company's own primary website domain, bare: no scheme, no www, "
+    "no path. Return one only if you actually saw it in your search results.\n"
+    "- \"source\" MUST be a real http(s) URL you actually saw. If you have none, set "
+    "\"found\": false.\n"
+    "- Correct obvious misspellings, but do not stretch. If the string could plausibly "
+    "be several different companies, or you cannot tell what was meant, set \"found\": "
+    "false. A near-miss on a company name means answering about the wrong business, "
+    "which is worse than not answering.\n"
+    "- Never return a person, a product, a job title or an industry term as the company.\n"
+    "- Guessing is a failure. \"found\": false is a correct, useful answer."
+)
+
+# Keyed on the normalized typed string. This is a live web call on a slow path,
+# and the same misspelling gets typed repeatedly, so the result is worth holding
+# for the process lifetime. Only successful identifications are cached: a miss
+# costs nothing to repeat and may succeed once the web catches up.
+_CPI_IDENTIFY_CACHE: dict = {}
+_CPI_IDENTIFY_TTL_S = 24 * 3600
+
+
+def _cpi_company_identify(oai, typed_name: str):
+    """{name, domain, source, note, typed} for the company someone meant, or None.
+
+    Same discipline as _cpi_role_lookup: requires the web-search tool and a real
+    source URL, because a model resolving a company name from background
+    knowledge alone is guessing, and a guessed company is answered about
+    confidently and wrongly.
+    """
+    typed = str(typed_name or "").strip()
+    if not typed or oai is None:
+        return None
+    key = _cpi_norm_name(typed) or typed.lower()
+    now = time.time()
+    cached = _CPI_IDENTIFY_CACHE.get(key)
+    if cached and now - cached["ts"] < _CPI_IDENTIFY_TTL_S:
+        return cached["v"]
+    msgs = [{"role": "system", "content": _CPI_COMPANY_IDENTIFY_SYSTEM},
+            {"role": "user", "content": ('Which company is "%s"? Search the web and answer '
+                                         'as strict JSON.' % typed)[:1000]}]
+    raw = None
+    for model in _vimi_model_chain()[:2]:
+        try:
+            txt, used_web = _responses_web_search(oai, model, msgs, 500)
+        except Exception as e:                          # pragma: no cover - defensive
+            log.warning("cpi company identify failed on %s: %s", model, e)
+            continue
+        # No web tool on this key is a fact about the key, not about this model,
+        # so there is nothing to gain by trying the next one.
+        if not used_web:
+            return None
+        if txt:
+            raw = txt
+            break
+    data = _cpi_extract_json(raw)
+    if not isinstance(data, dict) or not data.get("found"):
+        return None
+    name = str(data.get("name") or "").strip()
+    source = str(data.get("source") or "").strip()
+    domain = re.sub(r"^https?://", "", str(data.get("domain") or "").strip().lower())
+    domain = re.sub(r"^www\.", "", domain).split("/")[0].strip()
+    # A domain that is not actually domain-shaped ("n/a", "unknown", a full URL
+    # with a path) would be forwarded into an Apollo domain filter, which treats
+    # its domain param as a fuzzy relevance hint and quietly returns an
+    # unrelated company. Drop it and fall back to the name instead.
+    if not _cpi_is_domain_shaped(domain):
+        domain = ""
+    if not name or not re.match(r"^https?://", source, re.I):
+        log.info("cpi company identify discarded: name=%s sourced=%s",
+                 bool(name), bool(source))
+        return None
+    out = {"name": name[:160], "domain": domain[:120], "source": source[:400],
+           "note": str(data.get("note") or "").strip()[:300], "typed": typed[:200]}
+    _CPI_IDENTIFY_CACHE[key] = {"v": out, "ts": now}
+    return out
+
+
 def _cpi_research(oai, question: str, apollo_note: str = ""):
     """Researched context to sit alongside the Apollo record. (text, used_web).
 
@@ -8298,6 +8412,41 @@ def _cpi_research(oai, question: str, apollo_note: str = ""):
     except Exception as e:
         log.warning("cpi research unavailable: %s", e)
         return "", False
+
+
+def _cpi_web_answer(oai, facts: dict, question: str, titles, company_label: str,
+                    domain: str = ""):
+    """(answer, researched, used_web) for a question our own records cannot
+    settle, answered from the public web instead of dead-ended.
+
+    Three surfaces now reach this: a title nobody on file holds, a company with
+    nobody on file at all, and a company that is not in our records at all. All
+    three want the same two slow web calls, and neither call needs the other's
+    output, so they overlap rather than running back to back. A hung role lookup
+    degrades the answer rather than holding a worker open, same discipline as the
+    research thread in chat.
+    """
+    _box: dict = {}
+    titles = [t for t in (titles or []) if t]
+
+    def _worker():
+        try:
+            _box["v"] = (_cpi_role_lookup(oai, titles, company_label, domain)
+                         if (titles and company_label) else None)
+        except Exception as e:                          # pragma: no cover - defensive
+            log.warning("cpi web answer role lookup failed: %s", e)
+            _box["v"] = None
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    research, web = _cpi_research(
+        oai, question,
+        _cpi_company_note({"name": company_label, "primary_domain": domain}))
+    thread.join(timeout=45)
+    facts = dict(facts or {})
+    if _box.get("v"):
+        facts["public_role_holder"] = _box["v"]
+    return _cpi_grounded_answer(oai, facts, question, research), bool(research), web
 
 
 def _cpi_company_note(org: dict) -> str:
@@ -8339,6 +8488,16 @@ _CPI_ANSWER_SYSTEM = (
     "If the facts contain \"apollo_lookup_unavailable\": true, our own records could not "
     "be reached for this question. Say that briefly, answer from the research, and do "
     "not present any person or contact detail as being on file.\n\n"
+    "If the facts contain \"company_not_in_our_records\": true, we hold no record of that "
+    "company at all, so we have no contacts there. That is a fact about our records and "
+    "nothing else: it is not evidence the company does not exist, and it is never a "
+    "reason to decline. Answer the question that was asked from the other blocks, and "
+    "note the records gap in one short sentence, after the answer rather than instead of "
+    "it.\n\n"
+    "If the facts contain \"interpreted_company_name_as\", the name the user typed was "
+    "read as a differently spelled company. Say which company you are answering about in "
+    "the opening sentence, naming both (\"reading X as Y\"), so a wrong reading is "
+    "obvious and the user can correct it.\n\n"
     "If the facts contain \"no_one_holds_the_requested_title\": true, then NOBODY on file "
     "holds the title that was asked about. That is a fact about OUR RECORDS only, never "
     "evidence that the role is vacant or that the person does not exist. Say that "
@@ -8444,8 +8603,41 @@ def _cpi_dedup_orgs(candidates: list) -> list:
     return out
 
 
-def _cpi_resolve_company(name: str, api_key: str, domain: str = "",
-                         spend=None):
+def _cpi_resolve_company(name: str, api_key: str, domain: str = "", spend=None,
+                         oai=None, notes=None):
+    """(org, choices) for a company name, with one web-assisted second chance.
+
+    Wraps the direct Apollo resolution below. When that finds nothing and an
+    OpenAI client is available, the typed string is identified against the live
+    web and Apollo is asked again using the real company's own name and domain.
+    That is what turns "cmo of thoughworks" from a dead end into an answer.
+
+    `notes`, if given a dict, receives {"identified": {...}} whenever the web
+    identified a company, INCLUDING when Apollo still has no record of it. The
+    caller needs it either way: to say which company it read the name as, and to
+    research the right company when our own records cannot help at all.
+    """
+    org, choices = _cpi_resolve_company_direct(name, api_key, domain=domain, spend=spend)
+    if org or choices:
+        return org, choices
+    ident = _cpi_company_identify(oai, name or domain)
+    if not ident:
+        return None, None
+    if notes is not None:
+        notes["identified"] = ident
+    # Same normalization both sides, so "Thoughtworks" identified from
+    # "Thoughtworks, Ltd." is not treated as a new name worth re-searching.
+    if (_cpi_norm_name(ident["name"]) == _cpi_norm_name(name)
+            and not ident.get("domain")):
+        return None, None
+    log.info("cpi company identify: %r understood as %r (%s)",
+             str(name)[:60], ident["name"][:60], ident.get("domain") or "no domain")
+    return _cpi_resolve_company_direct(ident["name"], api_key,
+                                       domain=ident.get("domain") or "", spend=spend)
+
+
+def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
+                                spend=None):
     """(org, choices) -- at most one is non-None. `choices` is a disambiguation
     payload only when the name is genuinely ambiguous, meaning it still maps to
     more than one DISTINCT company after deduping; `org` is the one resolved
@@ -8701,6 +8893,13 @@ def cpi_chat():
 
     kind = str(intent.get("intent") or "unclear")
     company_name = str(intent.get("company_name") or "").strip()
+    # Only set when the parser corrected a misspelling on its way past, so the
+    # answer can confirm which company it read rather than silently swapping one
+    # for another.
+    typed_company = str(intent.get("company_name_typed") or "").strip()[:200]
+    # Filled in by _cpi_resolve_company when the live web had to identify which
+    # company a typed name actually meant.
+    resolve_notes: dict = {}
     titles = [t for t in (intent.get("titles") or []) if isinstance(t, str) and t.strip()][:8]
     seniorities = [s for s in (intent.get("seniorities") or []) if isinstance(s, str)][:6]
     wants_contact = bool(intent.get("wants_contact_info"))
@@ -8740,7 +8939,8 @@ def cpi_chat():
         try:
             resolved_org, choices = _cpi_resolve_company(company_name, api_key,
                                                          domain=selected_domain,
-                                                         spend=spend)
+                                                         spend=spend, oai=oai,
+                                                         notes=resolve_notes)
         except Exception as e:
             # Apollo was unreachable. Saying "no such company" here would assert
             # a negative fact that was never established.
@@ -8755,8 +8955,33 @@ def cpi_chat():
                        "you mean?" % (company_name or selected_domain),
                 choices=choices)
         if not resolved_org:
-            return _cpi_chat_reply(spend, answer="I couldn't find a company called “%s” in "
-                                                 "Apollo." % (company_name or selected_domain))
+            # Not in our records is not the same fact as not answerable, and this
+            # is the branch that made a plain question look broken: "I couldn't
+            # find a company called thoughworks in Apollo" was the entire reply
+            # to "cmo of thoughworks". Our records being silent about a company
+            # says nothing about who runs it, so answer the question that was
+            # actually asked from the public web, and be clear that we hold no
+            # contacts there.
+            ident = resolve_notes.get("identified") or {}
+            label = ident.get("name") or company_name or selected_domain
+            facts = {"company_not_in_our_records": True, "company": label}
+            if titles:
+                facts["requested_titles"] = titles
+            # Whichever step corrected the name, the reader has to be able to see
+            # that it happened: a silent correction is how a confident answer
+            # about the wrong company gets believed. Either step can be the one
+            # that changed it, so compare what the user actually typed (the
+            # parser's own record of it when it corrected the spelling, otherwise
+            # the string it passed through) against what is being answered about.
+            read_as = ident.get("name") or company_name
+            typed = typed_company or company_name
+            if typed and _cpi_norm_name(typed) != _cpi_norm_name(read_as):
+                facts["interpreted_company_name_as"] = {"typed": typed,
+                                                        "understood_as": read_as}
+            answer, researched, web = _cpi_web_answer(
+                oai, facts, message, titles, label, ident.get("domain") or "")
+            return _cpi_chat_reply(spend, researched=researched, web_search=web,
+                                   answer=answer)
 
     # Echoed back so the client can pin this company for follow-up turns.
     ctx = ({"org_id": resolved_org.get("id"), "name": resolved_org.get("name"),
