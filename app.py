@@ -9316,34 +9316,50 @@ def cpi_chat():
         # Prefer a person whose real title actually matches what was asked for,
         # rather than whatever Apollo happened to rank first.
         top = next((p for p in people if _cpi_title_matches(p.get("title"), titles)), people[0])
+        # search_people can mask/truncate last names depending on Apollo plan
+        # type, and a name is the minimum this answer needs to be useful. This
+        # is NOT the paid enrichment below: _cpi_reveal_names only spends a
+        # credit on the (common) case where the name actually came back
+        # masked, and 0 otherwise -- it exists specifically so naming someone
+        # correctly does not require paying for their email and phone too.
+        if api_key:
+            top = _cpi_reveal_names([top], api_key, spend=spend)[0]
         facts = {"person": top, "asked_for_titles": titles}
-        # Always try to reveal this person's real name/title -- search_people can
-        # mask/truncate last names depending on Apollo plan type, and a single
-        # named person is exactly the case worth spending the 1-credit lookup on
-        # to get right, whether or not contact info was asked for.
-        enriched = _cpi_enrich_person(top.get("full_name") or "",
-                                      top.get("organization_domain")
-                                      or (resolved_org or {}).get("primary_domain") or "",
-                                      top.get("id") or "", spend=spend)
         full_profile = ""
-        if enriched.get("matched"):
-            # Allowlisted, not denylisted, so a new field on the normalizer
-            # cannot leak into the model's OWN prose by default; wants_contact
-            # still governs that. But the full record appended below is
-            # unconditional: the 1-credit enrichment above was already spent
-            # specifically to reveal all of this, on every person_at_company
-            # question, whether or not contact info was asked for -- showing
-            # only part of what that credit bought is the actual waste.
-            facts = {"person": _cpi_answer_person(enriched, wants_contact),
-                     "asked_for_titles": titles,
-                     "full_apollo_profile_follows": True}
-            full_profile = _cpi_render_full_profile(enriched)
+        enrich_meta = None
+        if wants_contact:
+            # The question asked for contact info by name ("what's her
+            # email"), so there is no reason to make the user click for it --
+            # spend the 1-credit enrichment now and show everything it
+            # returns. Allowlisted, not denylisted, so a new field on the
+            # normalizer cannot leak into the model's OWN prose by default.
+            enriched = _cpi_enrich_person(top.get("full_name") or "",
+                                          top.get("organization_domain")
+                                          or (resolved_org or {}).get("primary_domain") or "",
+                                          top.get("id") or "", spend=spend)
+            if enriched.get("matched"):
+                facts = {"person": _cpi_answer_person(enriched, True),
+                         "asked_for_titles": titles,
+                         "full_apollo_profile_follows": True}
+                full_profile = _cpi_render_full_profile(enriched)
+        if not full_profile and top.get("id"):
+            # Nobody asked for contact info, so the credit for the full
+            # enrichment (email, phone, company firmographics) is not spent
+            # up front -- offer a button instead. This metadata is UI wiring
+            # for the client, not a fact for the model, so it travels outside
+            # `facts` and must never reach the answer prompt.
+            enrich_meta = {"type": "person", "name": top.get("full_name") or "",
+                           "title": top.get("title") or "",
+                           "domain": (top.get("organization_domain")
+                                      or (resolved_org or {}).get("primary_domain") or ""),
+                           "apollo_id": top.get("id") or ""}
         research, web = _research()
         answer = _cpi_grounded_answer(oai, facts, message, research)
         if full_profile:
             answer = answer.rstrip() + "\n\n" + full_profile
+        extra = {"enrich": enrich_meta} if enrich_meta else {}
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
-                               web_search=web, answer=answer)
+                               web_search=web, answer=answer, **extra)
 
     # Revealed ONCE, then reused by whichever facts shape this answer takes. The
     # no-title-match branch below used to call _cpi_reveal_names a second time on

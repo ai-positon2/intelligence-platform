@@ -137,10 +137,18 @@ def test_a_malformed_phone_entry_does_not_crash_rendering():
     assert "+44 20 7946 0000" in out
 
 
-# ── Wiring: the chat panel shows it unconditionally on a real match ─────────
+# ── Wiring: full enrichment is opt-in, not automatic ────────────────────────
+# Reported: a plain "CMO of X" question was auto-spending the 1-credit
+# enrichment on every question, whether or not anyone wanted the contact
+# details it reveals. The fix is not to stop enriching -- it is to enrich only
+# when the question actually asked for contact info ("what's her email"), and
+# otherwise hand back a name (revealed if masked, via the much cheaper
+# _cpi_reveal_names) plus an "enrich" affordance the client renders as a
+# button, so the credit is spent on a click or an explicit ask, never by
+# default.
 
 def _chat(monkeypatch, message="CMO of Thoughtworks", wants_contact=False,
-          enriched=None):
+          enriched=None, revealed_name="Julie Woods-Moss"):
     import json as _json
     import tracker.apollo_client as ac
     monkeypatch.setenv("OPENAI_API_KEY", "k")
@@ -152,17 +160,29 @@ def _chat(monkeypatch, message="CMO of Thoughtworks", wants_contact=False,
     monkeypatch.setattr(appmod, "_cpi_resolve_company", lambda *a, **k: (
         {"id": "org1", "name": "Thoughtworks, Ltd.", "primary_domain": "thoughtworks.com"},
         None))
-    found = [{"id": "p1", "full_name": "Julie Woods-Moss",
+    found = [{"id": "p1", "full_name": "Julie W.",
              "title": "Chief Marketing Officer", "organization_domain": "thoughtworks.com"}]
     monkeypatch.setattr(ac, "search_people", lambda f, k, **kw: found)
-    monkeypatch.setattr(appmod, "_cpi_enrich_person",
-                        lambda *a, **k: enriched if enriched is not None else dict(_ENRICHED))
+    enrich_calls = []
+    reveal_calls = []
+
+    def _enrich(*a, **k):
+        enrich_calls.append(1)
+        return enriched if enriched is not None else dict(_ENRICHED)
+
+    def _reveal(people, key, spend=None, **kw):
+        reveal_calls.append(1)
+        return [dict(p, full_name=revealed_name) for p in people]
+
+    monkeypatch.setattr(appmod, "_cpi_enrich_person", _enrich)
+    monkeypatch.setattr(appmod, "_cpi_reveal_names", _reveal)
     monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
     seen = {}
 
     def _answer(oai, facts, question, research=""):
         seen["facts"] = facts
-        return "Julie Woods-Moss is the CMO of Thoughtworks."
+        return "%s is the CMO of Thoughtworks." % facts["person"].get(
+            "full_name", facts["person"].get("name", revealed_name))
 
     monkeypatch.setattr(appmod, "_cpi_grounded_answer", _answer)
     c = appmod.app.test_client()
@@ -170,34 +190,53 @@ def _chat(monkeypatch, message="CMO of Thoughtworks", wants_contact=False,
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
     r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
     assert r.status_code == 200
-    return r.get_json(), seen.get("facts", {})
+    return r.get_json(), seen.get("facts", {}), enrich_calls, reveal_calls
 
 
-def test_the_full_profile_is_appended_to_the_chat_answer(monkeypatch):
-    body, facts = _chat(monkeypatch)
+def test_a_plain_question_does_not_spend_the_enrichment_credit(monkeypatch):
+    """The exact behavior requested: "CMO of X" alone must not run the paid
+    enrichment at all -- only the free/cheap name reveal."""
+    body, facts, enrich_calls, reveal_calls = _chat(monkeypatch, wants_contact=False)
+    assert enrich_calls == [], "no contact info was asked for"
+    assert reveal_calls == [1], "only the cheap, conditional name reveal ran"
+    assert "Everything Apollo has on file" not in body["answer"]
+    assert "full_apollo_profile_follows" not in facts
+
+
+def test_a_plain_question_still_names_the_person_and_offers_to_enrich(monkeypatch):
+    body, _facts, _e, _r = _chat(monkeypatch, wants_contact=False)
     assert "Julie Woods-Moss is the CMO of Thoughtworks." in body["answer"]
+    assert body["enrich"] == {
+        "type": "person", "name": "Julie Woods-Moss", "title": "Chief Marketing Officer",
+        "domain": "thoughtworks.com", "apollo_id": "p1",
+    }
+
+
+def test_asking_for_contact_info_by_name_enriches_immediately(monkeypatch):
+    """"what's her email" must not make the user click for it -- the intent
+    parser already flagged wants_contact_info, so spend the credit now."""
+    body, facts, enrich_calls, _r = _chat(monkeypatch, wants_contact=True)
+    assert len(enrich_calls) == 1
     assert "**Email:** julie.woodsmoss@thoughtworks.com" in body["answer"]
     assert "**Industry:** Information Technology & Services" in body["answer"]
     assert facts["full_apollo_profile_follows"] is True
-
-
-def test_contact_fields_are_shown_even_when_not_asked_for(monkeypatch):
-    """The exact behavior change requested: previously an email/phone reached
-    the answer ONLY when wants_contact_info was true. The enrichment already
-    spent the credit regardless, so the appended record must show them either
-    way."""
-    body, _facts = _chat(monkeypatch, wants_contact=False)
-    assert "**Email:**" in body["answer"]
-    assert "**Phone:**" in body["answer"]
+    assert "enrich" not in body, "already fully shown, nothing left to click for"
 
 
 def test_nothing_is_appended_when_apollo_could_not_enrich_the_match(monkeypatch):
-    """search_people found a name, but the enrichment call itself came back
+    """Contact info was asked for, but the enrichment call itself came back
     unmatched (e.g. a masked/ambiguous last name Apollo could not resolve
     further) -- there is nothing paid-for to show beyond the search hit."""
-    body, facts = _chat(monkeypatch, enriched={"matched": False})
+    body, facts, enrich_calls, _r = _chat(monkeypatch, wants_contact=True,
+                                          enriched={"matched": False})
+    assert len(enrich_calls) == 1
     assert "Everything Apollo has on file" not in body["answer"]
     assert "full_apollo_profile_follows" not in facts
+
+
+def test_the_enrich_button_metadata_never_reaches_the_model(monkeypatch):
+    _body, facts, _e, _r = _chat(monkeypatch, wants_contact=False)
+    assert "enrich" not in facts and "apollo_id" not in facts
 
 
 def test_the_prompt_tells_the_model_not_to_duplicate_the_appended_record():

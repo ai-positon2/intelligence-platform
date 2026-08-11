@@ -946,17 +946,16 @@ function companyBody(c){
   return out;
 }
 
-window.cpiOpenEnrich = function(type, idx){
-  var item=STATE.results[idx]; if(!item) return;
+/* Shared by every "Enrich" entry point (results grid, chat panel): opens the
+   profile modal, shows a skeleton, then fetches and renders the real profile.
+   Pulled out so a chat-originated person -- which has no index into
+   STATE.results -- can drive the exact same modal as the grid's own button. */
+function cpiRunEnrich(type, heroSeed, body){
   document.getElementById("pmOvl").classList.add("on");
   document.getElementById("pmWrap").classList.add("on");
   document.body.style.overflow="hidden";
-  document.getElementById("pmHero").innerHTML = type==="person" ? personHero({name:item.full_name,title:item.title}) : companyHero({name:item.name,logo:item.logo_url});
+  document.getElementById("pmHero").innerHTML = type==="person" ? personHero(heroSeed) : companyHero(heroSeed);
   document.getElementById("pmBody").innerHTML = '<div class="pm-sk" style="width:40%;height:11px;margin-bottom:14px"></div><div class="pm-sk" style="width:100%;height:52px;margin-bottom:9px"></div><div class="pm-sk" style="width:100%;height:52px"></div>';
-
-  var body = type==="person"
-    ? { type:"person", name: item.full_name, domain: item.organization_domain, apollo_id: item.id }
-    : { type:"company", domain: item.primary_domain, apollo_id: item.id };
 
   fetch(ENRICH_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) })
     .then(function(r){ return r.json(); })
@@ -968,6 +967,26 @@ window.cpiOpenEnrich = function(type, idx){
     .catch(function(){
       document.getElementById("pmBody").innerHTML='<div class="pm-empty"><b>Enrichment failed</b>Could not reach Apollo just now. Try again in a moment.</div>';
     });
+}
+window.cpiOpenEnrich = function(type, idx){
+  var item=STATE.results[idx]; if(!item) return;
+  var heroSeed = type==="person" ? {name:item.full_name,title:item.title} : {name:item.name,logo:item.logo_url};
+  var body = type==="person"
+    ? { type:"person", name: item.full_name, domain: item.organization_domain, apollo_id: item.id }
+    : { type:"company", domain: item.primary_domain, apollo_id: item.id };
+  cpiRunEnrich(type, heroSeed, body);
+};
+/* The chat panel's own "Enrich" button: a person named in a chat answer has no
+   row in STATE.results to index into, so its identifying fields ride in
+   data-* attributes on the button itself instead (same reasoning as the
+   disambiguation choice buttons above -- no value gets built into a handler
+   string, so a name containing a quote cannot break anything). */
+window.cpiEnrichChatPerson = function(btn){
+  var name=btn.getAttribute("data-name")||"", domain=btn.getAttribute("data-domain")||"",
+      title=btn.getAttribute("data-title")||"", apolloId=btn.getAttribute("data-apollo-id")||"";
+  btn.disabled=true; btn.textContent="Enriching…";
+  cpiRunEnrich("person", {name:name, title:title},
+    {type:"person", name:name, domain:domain, apollo_id:apolloId});
 };
 window.cpiCloseModal = function(){
   document.getElementById("pmOvl").classList.remove("on");
@@ -1025,7 +1044,7 @@ function fmtAnswer(text){
   return out.join("") || "<p>"+safe+"</p>";
 }
 
-function addAssistantMsg(answer, choices, credits, researched, webSearch){
+function addAssistantMsg(answer, choices, credits, researched, webSearch, enrich){
   CHAT_HISTORY.push({role:"assistant", content:answer||""});
   var b=document.getElementById("cpiChatBody");
   /* Answers can spend Apollo credits from a pool the whole team shares, so each
@@ -1056,7 +1075,14 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch){
       "</button>";
     }).join("")+"</div>";
   }
-  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+costHtml+"</div></div>");
+  /* Present whenever a person was named but not enriched (see cpi_chat: no
+     contact info was asked for, so the paid lookup was skipped by design) --
+     one click spends the credit and opens the same profile modal the results
+     grid uses, rather than spending it automatically on every question. */
+  var enrichHtml = enrich && enrich.type==="person"
+    ? '<button class="cpi-enrich-chip" data-name="'+esc(enrich.name||"")+'" data-domain="'+esc(enrich.domain||"")+'" data-title="'+esc(enrich.title||"")+'" data-apollo-id="'+esc(enrich.apollo_id||"")+'">'+SVG_LI+" Enrich "+esc(enrich.name||"this person")+"</button>"
+    : "";
+  b.insertAdjacentHTML("beforeend", '<div class="cpi-msg assistant"><div class="cpi-msg-av">'+ARENA_AV+'</div><div class="cpi-bub">'+fmtAnswer(answer||"I could not find an answer for that.")+choicesHtml+enrichHtml+costHtml+"</div></div>");
   var justAdded=b.lastElementChild;
   if(justAdded){
     justAdded.querySelectorAll(".cpi-choice").forEach(function(btn){
@@ -1070,6 +1096,8 @@ function addAssistantMsg(answer, choices, credits, researched, webSearch){
                              btn.getAttribute("data-pick-org-id")||"");
       });
     });
+    var enrichBtn=justAdded.querySelector(".cpi-enrich-chip");
+    if(enrichBtn) enrichBtn.addEventListener("click", function(){ window.cpiEnrichChatPerson(enrichBtn); });
   }
   chatScroll();
 }
@@ -1136,7 +1164,7 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
          inherits it instead of re-disambiguating. */
       if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
       addAssistantMsg(d&&d.answer, d&&d.choices, d&&d.credits, d&&d.researched,
-                      d&&d.web_search);
+                      d&&d.web_search, d&&d.enrich);
     })
     .catch(function(){
       removeTyping(); sendBtn.disabled=false;
