@@ -8745,6 +8745,93 @@ def _cpi_org_cache_key(name: str, domain: str) -> str:
     return ("n:" + norm) if norm else ""
 
 
+# _CPI_ORG_RESOLVE_CACHE above is process-memory only, and Railway restarts
+# this process on every deploy -- which for this repo means every push. That
+# made the in-memory cache blind to its own point: the first question about a
+# company right after a deploy always re-paid the resolution credit, no matter
+# how many times it had already been resolved before the restart. This mirrors
+# cpi_person_enrichment's table (same positive-only, no-negative-caching
+# philosophy) so a resolution survives the process that paid for it.
+_CPI_ORG_RESOLVE_TABLE_READY = False
+
+
+def _ensure_cpi_org_resolve_table(conn) -> None:
+    global _CPI_ORG_RESOLVE_TABLE_READY
+    if _CPI_ORG_RESOLVE_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_org_resolve (
+                cache_key TEXT PRIMARY KEY,
+                org JSONB,
+                choices JSONB,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _CPI_ORG_RESOLVE_TABLE_READY = True
+
+
+def _cpi_org_db_read(key: str):
+    """(org, choices) from the durable cache, or None on a miss/expired/no-DB."""
+    if not key:
+        return None
+    conn = _pg_conn()
+    if not conn:
+        return None
+    try:
+        _ensure_cpi_org_resolve_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT org, choices, updated_at FROM cpi_org_resolve "
+                        "WHERE cache_key = %s", (key,))
+            row = cur.fetchone()
+        if not row:
+            return None
+        org, choices, updated_at = row
+        if updated_at and (datetime.now(timezone.utc) - updated_at).total_seconds() < _CPI_ORG_RESOLVE_TTL_S:
+            return (org, choices)
+        return None
+    except Exception as e:
+        log.warning("cpi org db-cache read failed: %s", e)
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_org_db_write(keys: set, org, choices) -> None:
+    if not keys:
+        return
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        from psycopg2.extras import Json
+        _ensure_cpi_org_resolve_table(conn)
+        with conn.cursor() as cur:
+            for k in keys:
+                cur.execute(
+                    "INSERT INTO cpi_org_resolve (cache_key, org, choices, updated_at) "
+                    "VALUES (%s, %s, %s, now()) "
+                    "ON CONFLICT (cache_key) DO UPDATE SET org = EXCLUDED.org, "
+                    "choices = EXCLUDED.choices, updated_at = now()",
+                    (k, Json(org) if org else None, Json(choices) if choices else None))
+        conn.commit()
+    except Exception as e:
+        log.warning("cpi org db-cache write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
                                 spend=None):
     """(org, choices) -- at most one is non-None. `choices` is a disambiguation
@@ -8776,6 +8863,13 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
         cached = _CPI_ORG_RESOLVE_CACHE.get(query_key)
         if cached and now - cached["ts"] < _CPI_ORG_RESOLVE_TTL_S:
             return cached["org"], cached["choices"]
+        # In-memory missed -- maybe a prior process (before the last deploy)
+        # already paid for this one. Check the durable cache before Apollo.
+        db_hit = _cpi_org_db_read(query_key)
+        if db_hit is not None:
+            org, choices = db_hit
+            _CPI_ORG_RESOLVE_CACHE[query_key] = {"org": org, "choices": choices, "ts": now}
+            return org, choices
 
     def _remember(org, choices):
         # A miss is intentionally not cached (see the module comment above).
@@ -8798,6 +8892,7 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
         for k in keys:
             if k:
                 _CPI_ORG_RESOLVE_CACHE[k] = entry
+        _cpi_org_db_write(keys, org, choices)
         return org, choices
 
     if domain:
