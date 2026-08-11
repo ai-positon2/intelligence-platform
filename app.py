@@ -8636,6 +8636,40 @@ def _cpi_resolve_company(name: str, api_key: str, domain: str = "", spend=None,
                                        domain=ident.get("domain") or "", spend=spend)
 
 
+# Two questions about the same company should not each pay to resolve it.
+# mixed_companies/search bills 1 credit on any call that returns a result, and
+# nothing about that fact is visible in the answer -- a chat panel that reads
+# "our records have nobody matching that" next to "1 Apollo credit used" reads
+# as paying for nothing, when what was actually purchased was identifying
+# WHICH company to even ask about. That purchase is only worth making once:
+# whoever next asks about the same company, in the same conversation or a
+# completely different one, should get it for free.
+#
+# Deliberately positive-only, matching _CPI_NAME_RESOLVE_CACHE's own reasoning:
+# a name search that comes back with nothing costs 0 credits (mixed_companies/
+# search only bills a call that returns at least one row), so there is no
+# credit to save by caching a miss, only staleness risk from doing so. The one
+# gap this leaves is a domain search that returns hits but no EXACT domain
+# match (see the guard below) -- that call did cost a credit despite the
+# function going on to report nothing found, and a repeat of the exact same
+# domain would pay again. Accepted rather than cached: it is a narrow edge
+# case, and caching a negative risks a genuinely new company at that domain
+# being told it does not exist.
+_CPI_ORG_RESOLVE_CACHE: dict = {}
+_CPI_ORG_RESOLVE_TTL_S = 24 * 3600
+
+
+def _cpi_org_cache_key(name: str, domain: str) -> str:
+    """One cache key for a company, preferring the domain: unlike a name, it
+    does not change when a query is retyped, abbreviated, or corrected, so
+    keying on it is what lets a later, differently-spelled question about the
+    same company still land on an already-paid-for resolution."""
+    if domain:
+        return "d:" + domain
+    norm = _cpi_norm_name(name)
+    return ("n:" + norm) if norm else ""
+
+
 def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
                                 spend=None):
     """(org, choices) -- at most one is non-None. `choices` is a disambiguation
@@ -8645,7 +8679,8 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
     plausible companies, and never asks the user to choose between duplicates of
     a single one. Passing `domain` resolves exactly and skips disambiguation
     entirely (that is the path used when the user picks from a choices list).
-    Costs 1 Apollo credit per call (mixed_companies/search)."""
+    Costs 1 Apollo credit per call (mixed_companies/search), except when served
+    from the resolve cache above."""
     from tracker.apollo_client import search_companies as _sc
 
     def _search(filters: dict) -> list:
@@ -8660,6 +8695,36 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
     name, name_domain = _cpi_clean_company_name(name)
     domain = (domain or name_domain or "").strip().lower()
 
+    query_key = _cpi_org_cache_key(name, domain)
+    now = time.time()
+    if query_key:
+        cached = _CPI_ORG_RESOLVE_CACHE.get(query_key)
+        if cached and now - cached["ts"] < _CPI_ORG_RESOLVE_TTL_S:
+            return cached["org"], cached["choices"]
+
+    def _remember(org, choices):
+        # A miss is intentionally not cached (see the module comment above).
+        if not org and not choices:
+            return org, choices
+        # Stored under the query that was actually searched AND, when an org
+        # was resolved, under BOTH that org's own domain and its own normalized
+        # name -- not just whichever one _cpi_org_cache_key would prefer -- so a
+        # later question that names the same company a different way (by
+        # domain when this one searched by name, or vice versa) still hits.
+        keys = {query_key} if query_key else set()
+        if org:
+            org_domain = _cpi_domain_key(org)
+            org_name = _cpi_norm_name(org.get("name"))
+            if org_domain:
+                keys.add("d:" + org_domain)
+            if org_name:
+                keys.add("n:" + org_name)
+        entry = {"org": org, "choices": choices, "ts": now}
+        for k in keys:
+            if k:
+                _CPI_ORG_RESOLVE_CACHE[k] = entry
+        return org, choices
+
     if domain:
         hits = _search({"domains": [domain], "max_companies": 5})
         # Only an ACTUAL domain match counts. q_organization_domains_list is a
@@ -8669,20 +8734,20 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
         want = re.sub(r"^www\.", "", domain)
         exact = [c for c in hits if _cpi_domain_key(c) == want]
         if exact:
-            return exact[0], None
+            return _remember(exact[0], None)
         # Fall through to a name search: a domain that Apollo does not index
         # should not dead-end when we still have a usable company name.
         if not name:
-            return None, None
+            return _remember(None, None)
 
     if not name:
-        return None, None
+        return _remember(None, None)
 
     candidates = _search({"name": name, "max_companies": 8})
     if not candidates:
-        return None, None
+        return _remember(None, None)
     if len(candidates) == 1:
-        return candidates[0], None
+        return _remember(candidates[0], None)
 
     query_norm = _cpi_norm_name(name)
     # An empty normalized key (a name made entirely of stripped filler, e.g.
@@ -8691,7 +8756,7 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
     exact = ([c for c in candidates if _cpi_norm_name(c.get("name")) == query_norm]
              if query_norm else [])
     if len(exact) == 1:
-        return exact[0], None
+        return _remember(exact[0], None)
 
     pool = (exact if len(exact) > 1 else candidates)[:5]
     choices = [{
@@ -8704,7 +8769,7 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
         "logo": c.get("logo_url"),
         "hq": ", ".join(x for x in [c.get("city"), c.get("state"), c.get("country")] if x),
     } for c in pool]
-    return None, choices
+    return _remember(None, choices)
 
 
 _CPI_TITLE_ALIASES = {

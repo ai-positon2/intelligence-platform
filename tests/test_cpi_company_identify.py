@@ -49,13 +49,15 @@ def _web(reply, used=True, record=None):
 
 @pytest.fixture(autouse=True)
 def clear_caches():
-    """Both resolvers memoize, so a leaked entry would let one test decide
+    """All three resolvers memoize, so a leaked entry would let one test decide
     another's outcome."""
     appmod._CPI_IDENTIFY_CACHE.clear()
     appmod._CPI_NAME_RESOLVE_CACHE.clear()
+    appmod._CPI_ORG_RESOLVE_CACHE.clear()
     yield
     appmod._CPI_IDENTIFY_CACHE.clear()
     appmod._CPI_NAME_RESOLVE_CACHE.clear()
+    appmod._CPI_ORG_RESOLVE_CACHE.clear()
 
 
 # ── _cpi_company_identify: it names a company only when it really found one ───

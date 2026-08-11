@@ -997,8 +997,23 @@ function removeTyping(){ var t=document.getElementById("cpiTyping"); if(t) t.rem
 /* Answers now arrive as a lead paragraph plus bullets, so a little structure gets
    rendered. esc() runs FIRST and every tag introduced below is one we generate
    ourselves, so nothing in the model's output can inject markup. */
+/* A citation URL (the answer prompt requires one whenever it names a publicly
+   sourced person) would otherwise sit in the paragraph at full body-text size,
+   wrapping mid-URL and dominating the message -- the actual complaint behind
+   an answer that "needs its alignment fixed". Rendered small, muted and
+   monospace instead, matching the quieter treatment .cpi-bub .src already
+   gets. Runs on the ESCAPED string, so `url` here is already HTML-safe and
+   must not be escaped again (that would turn a real "&" into "&amp;amp;"). */
+function linkifySources(safeHtml){
+  return safeHtml.replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, function(url){
+    return safeUrl(url) ?
+      '<a class="src-link" href="'+url+'" target="_blank" rel="noopener noreferrer">'+url+"</a>" :
+      url;
+  });
+}
 function fmtAnswer(text){
   var safe=esc(String(text==null?"":text)).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>");
+  safe=linkifySources(safe);
   var out=[], list=null;
   safe.split(/\n/).forEach(function(ln){
     var m=ln.match(/^\s*(?:[-*•])\s+(.*)$/);

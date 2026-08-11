@@ -337,12 +337,17 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   font-size:12px;font-weight:700;background:linear-gradient(135deg,#7c83f5,#a78bfa);color:#08111c}
 .cpi-msg.user .cpi-msg-av{background:rgba(255,255,255,.08);color:var(--tx2)}
 .cpi-bub{background:rgba(255,255,255,.045);border:1px solid var(--b1);border-radius:var(--radius-md);
-  padding:11px 14px;font-size:13px;line-height:1.55;color:var(--tx);max-width:82%}
+  padding:11px 14px;font-size:13px;line-height:1.55;color:var(--tx);max-width:82%;overflow-wrap:anywhere}
 .cpi-msg.user .cpi-bub{background:linear-gradient(135deg,rgba(124,131,245,.24),rgba(167,139,250,.16));
   border-color:rgba(124,131,245,.35)}
 .cpi-bub p{margin:0 0 6px}
 .cpi-bub p:last-child{margin-bottom:0}
 .cpi-bub .src{margin-top:8px;font-size:10.5px;color:var(--tx3);font-family:monospace}
+/* A source citation inline in a sentence ("Source: https://...") must read as
+   a quiet footnote, not as a wall of full-size text -- see linkifySources(). */
+.cpi-bub .src-link{font-family:monospace;font-size:11px;color:#8fd8c4;word-break:break-all;
+  text-decoration:none;border-bottom:1px dashed rgba(148,203,153,.45)}
+.cpi-bub .src-link:hover{color:#b8ecd9;border-bottom-color:#6ee7b7}
 /* Cost footnote: legible but quiet, so it informs without competing with the answer. */
 .cpi-bub-cost{margin-top:9px;padding-top:7px;border-top:1px solid rgba(255,255,255,.07);
   font-size:10.5px;letter-spacing:.02em;color:var(--tx3)}
