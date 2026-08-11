@@ -141,6 +141,67 @@ def test_the_cache_expires(monkeypatch):
     assert len(calls) == 2
 
 
+# ── the durable (DB-backed) cache: survives a process restart ───────────────
+#
+# _CPI_ORG_RESOLVE_CACHE lives in process memory, and Railway restarts this
+# process on every deploy to this repo -- which is every push. That silently
+# defeated the whole point of the cache above: the first question about any
+# company asked right after a deploy always re-paid its resolution credit,
+# even though it had already been resolved (possibly minutes earlier) by the
+# process that just got replaced. These tests fake the DB layer itself (a
+# plain dict standing in for Postgres) so they exercise the real read/write
+# wiring in _cpi_resolve_company_direct without needing a live database.
+
+def test_a_restart_does_not_re_pay_when_the_durable_cache_still_has_it(monkeypatch):
+    calls = _fake_search(monkeypatch, [_ACME])
+    store = {}
+    monkeypatch.setattr(appmod, "_cpi_org_db_write",
+                        lambda keys, org, choices: store.update({k: (org, choices) for k in keys}))
+    monkeypatch.setattr(appmod, "_cpi_org_db_read", lambda key: store.get(key))
+
+    org1, _c1 = appmod._cpi_resolve_company_direct("Acme Health", "key")
+    assert org1["id"] == "a1" and len(calls) == 1
+
+    # The process restart Railway does on every deploy -- memory is gone.
+    appmod._CPI_ORG_RESOLVE_CACHE.clear()
+
+    org2, _c2 = appmod._cpi_resolve_company_direct("Acme Health", "key")
+    assert org2["id"] == "a1"
+    assert len(calls) == 1, "the durable cache must absorb this, not Apollo"
+
+
+def test_a_durable_cache_miss_falls_through_to_apollo_normally(monkeypatch):
+    """No DB configured (or a genuine miss) must behave exactly like today:
+    resolve from Apollo, no error, still populates the in-memory cache."""
+    calls = _fake_search(monkeypatch, [_ACME])
+    monkeypatch.setattr(appmod, "_cpi_org_db_write", lambda keys, org, choices: None)
+    monkeypatch.setattr(appmod, "_cpi_org_db_read", lambda key: None)
+
+    org1, _c1 = appmod._cpi_resolve_company_direct("Acme Health", "key")
+    org2, _c2 = appmod._cpi_resolve_company_direct("Acme Health", "key")
+    assert org1["id"] == org2["id"] == "a1"
+    assert len(calls) == 1, "the in-memory cache still absorbs the second call"
+
+
+def test_disambiguation_choices_also_survive_a_restart(monkeypatch):
+    calls = _fake_search(monkeypatch, [
+        {"id": "a", "name": "Acme", "primary_domain": "acme.com"},
+        {"id": "b", "name": "Acme", "primary_domain": "acme.net"}])
+    store = {}
+    monkeypatch.setattr(appmod, "_cpi_org_db_write",
+                        lambda keys, org, choices: store.update({k: (org, choices) for k in keys}))
+    monkeypatch.setattr(appmod, "_cpi_org_db_read", lambda key: store.get(key))
+
+    org1, choices1 = appmod._cpi_resolve_company_direct("Acme", "key")
+    assert org1 is None and len(choices1) == 2
+
+    appmod._CPI_ORG_RESOLVE_CACHE.clear()
+
+    org2, choices2 = appmod._cpi_resolve_company_direct("Acme", "key")
+    assert org2 is None and len(choices2) == 2
+    assert len(calls) == 1
+
+
 # ── End to end: two chat questions about the same company ───────────────────
 
 def _chat_message(monkeypatch, message, seen_calls):
