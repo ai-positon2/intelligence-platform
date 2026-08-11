@@ -160,6 +160,9 @@ def _chat(monkeypatch, message="CMO of Thoughtworks", wants_contact=False,
     monkeypatch.setattr(appmod, "_cpi_resolve_company", lambda *a, **k: (
         {"id": "org1", "name": "Thoughtworks, Ltd.", "primary_domain": "thoughtworks.com"},
         None))
+    # Pinned via the paid resolver above; the free probe is off so these tests
+    # stay about enrichment rather than about how the company got resolved.
+    monkeypatch.setattr(appmod, "_cpi_probe_company_free", lambda *a, **k: None)
     found = [{"id": "p1", "full_name": "Julie W.",
              "title": "Chief Marketing Officer", "organization_domain": "thoughtworks.com"}]
     monkeypatch.setattr(ac, "search_people", lambda f, k, **kw: found)

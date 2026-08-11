@@ -368,6 +368,11 @@ def _chat(monkeypatch, people_by_call, role_result, message="CMO of thoughtworks
         "seniorities": [], "max_results": 10}), "m"))
     monkeypatch.setattr(appmod, "_cpi_resolve_company", lambda *a, **k: (
         {"id": "org1", "name": "Thoughtworks, Ltd.", "primary_domain": "thoughtworks.com"}, None))
+    # These tests are about what happens AFTER the company is pinned, so the
+    # free pre-resolve probe is switched off: left live it would consume the
+    # first people_by_call entry and silently shift every later stage's stub.
+    # The probe has its own tests in test_cpi_free_probe.py.
+    monkeypatch.setattr(appmod, "_cpi_probe_company_free", lambda *a, **k: None)
     calls = {"people": 0, "role": 0}
 
     def _sp(filters, key, **kw):
@@ -506,6 +511,9 @@ def test_a_failing_domain_retry_falls_through_to_the_records_gap(monkeypatch):
     monkeypatch.setattr(appmod, "_cpi_resolve_company", lambda *a, **k: (
         {"id": "org1", "name": "Thoughtworks, Ltd.",
          "primary_domain": "thoughtworks.com"}, None))
+    # Off, so "the retry" really is call 2 here: the free pre-resolve probe
+    # would otherwise take call 1 and move the failure onto the first search.
+    monkeypatch.setattr(appmod, "_cpi_probe_company_free", lambda *a, **k: None)
     monkeypatch.setattr(ac, "search_people", _sp)
     monkeypatch.setattr(appmod, "_cpi_reveal_names", lambda p, k, spend=None: p)
     monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("brief", True))
