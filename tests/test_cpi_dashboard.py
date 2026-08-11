@@ -76,7 +76,7 @@ _ROW = {"full_name": "Ada Lovelace", "title": "CMO", "email": "ada@acme.com",
 
 
 def test_export_csv_has_headers_and_bom(client):
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "csv", "rows": [_ROW]})
     assert r.status_code == 200
     assert r.headers["Content-Disposition"].startswith('attachment; filename="apollo-people-')
@@ -90,7 +90,7 @@ def test_export_csv_has_headers_and_bom(client):
 def test_export_xlsx_is_a_real_workbook(client):
     import io
     import openpyxl
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "xlsx", "rows": [_ROW]})
     assert r.status_code == 200
     ws = openpyxl.load_workbook(io.BytesIO(r.data)).active
@@ -101,7 +101,7 @@ def test_export_xlsx_is_a_real_workbook(client):
 
 
 def test_export_companies_uses_company_columns(client):
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "companies", "format": "csv",
                           "rows": [{"name": "Acme", "primary_domain": "acme.com",
                                     "technologies": ["salesforce", "hubspot"]}]})
@@ -111,13 +111,13 @@ def test_export_companies_uses_company_columns(client):
 
 
 def test_export_rejects_empty_selection(client):
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "rows": []})
     assert r.status_code == 400
 
 
 def test_export_defaults_to_xlsx_for_unknown_format(client):
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "exe", "rows": [_ROW]})
     assert r.status_code == 200
     assert r.headers["Content-Disposition"].endswith('.xlsx"')
@@ -128,7 +128,7 @@ def test_xlsx_export_with_filters_adds_a_search_details_sheet(client):
     the file should say so, not just list the rows."""
     import io
     import openpyxl
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "xlsx", "rows": [_ROW],
                           "filters": {"titles": ["CMO"], "seniorities": ["c_suite"]},
                           "meta": {"total": 42, "label": "CMO · Acme"}})
@@ -148,7 +148,7 @@ def test_xlsx_export_without_filters_has_no_search_details_sheet(client):
     no half-empty details sheet added when there is nothing to say."""
     import io
     import openpyxl
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "xlsx", "rows": [_ROW]})
     wb = openpyxl.load_workbook(io.BytesIO(r.data))
     assert "Search details" not in wb.sheetnames
@@ -157,7 +157,7 @@ def test_xlsx_export_without_filters_has_no_search_details_sheet(client):
 def test_csv_export_ignores_filters_and_stays_a_flat_table(client):
     """CSV has no second sheet to put search context in, so filters/meta must
     never leak into the data rows -- the header stays exactly the column list."""
-    r = client.post("/p2/gtm/company-people-intelligence/export",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/export",
                     json={"entity": "people", "format": "csv", "rows": [_ROW],
                           "filters": {"titles": ["CMO"]}, "meta": {"total": 42}})
     body = r.data.decode("utf-8-sig")
@@ -199,7 +199,7 @@ def test_bulk_enrich_is_capped_and_deduped(client, monkeypatch, no_postgres):
 
     # 120 ids, each duplicated once.
     ids = [f"p{i}" for i in range(120)] * 2
-    r = client.post("/p2/gtm/company-people-intelligence/enrich-bulk", json={"ids": ids})
+    r = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk", json={"ids": ids})
     assert r.status_code == 200
     body = r.get_json()
     assert len(seen["ids"]) == appmod._CPI_BULK_ENRICH_CAP
@@ -219,7 +219,7 @@ def test_bulk_enrich_reports_cache_hits_separately(client, monkeypatch):
     monkeypatch.setattr(ac, "bulk_match_people",
                         lambda ids, key: {"p2": {"id": "p2", "first_name": "Fresh"}})
 
-    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["p1", "p2"]}).get_json()
     assert body["cached"] == 1
     assert body["fetched"] == 1
@@ -231,7 +231,7 @@ def test_bulk_enrich_empty_input_never_calls_apollo(client, monkeypatch):
     import tracker.apollo_client as ac
     monkeypatch.setattr(ac, "bulk_match_people",
                         lambda ids, key: called.append(ids) or {})
-    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["", "  ", None]}).get_json()
     assert body == {"profiles": {}, "fetched": 0, "cached": 0}
     assert not called
@@ -248,7 +248,7 @@ def test_bulk_enrich_survives_apollo_failure_with_cached_rows(client, monkeypatc
         raise RuntimeError("apollo down")
     monkeypatch.setattr(ac, "bulk_match_people", _boom)
 
-    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["p1", "p2"]}).get_json()
     assert "error" not in body
     assert set(body["profiles"]) == {"p1"}
@@ -256,7 +256,7 @@ def test_bulk_enrich_survives_apollo_failure_with_cached_rows(client, monkeypatc
 
 def test_bulk_enrich_without_apollo_key_is_explicit(client, monkeypatch):
     monkeypatch.delenv("APOLLO_API_KEY", raising=False)
-    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["p1"]}).get_json()
     assert "not configured" in body["error"]
 
@@ -280,12 +280,12 @@ def test_person_row_keeps_contact_fields_and_flags_enriched():
 # ── History ──────────────────────────────────────────────────────────────────
 
 def test_history_degrades_without_postgres(client, no_postgres):
-    body = client.get("/p2/gtm/company-people-intelligence/history").get_json()
+    body = client.get("/p2/b2b-agents/company-people-intelligence/history").get_json()
     assert body == {"entries": [], "available": False}
 
 
 def test_history_entry_404s_without_postgres(client, no_postgres):
-    assert client.get("/p2/gtm/company-people-intelligence/history/1").status_code == 404
+    assert client.get("/p2/b2b-agents/company-people-intelligence/history/1").status_code == 404
 
 
 @pytest.mark.parametrize("entity,filters,expected", [
@@ -658,7 +658,7 @@ def test_paging_grows_the_existing_history_entry(fake_pg, client):
     the last one, evicting real history against the 60-per-user cap."""
     import datetime as _dt
     conn = fake_pg(rows=[(7, _dt.datetime(2026, 8, 6))])   # the UPDATE finds row 7
-    body = client.post("/p2/gtm/company-people-intelligence/history",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/history",
                        json={"entity": "people", "filters": {"titles": ["CMO"]},
                              "rows": [{"id": "p1"}], "replace_id": 7}).get_json()
     assert body["saved"] is True and body["id"] == 7
@@ -669,7 +669,7 @@ def test_paging_grows_the_existing_history_entry(fake_pg, client):
 def test_a_new_search_inserts_a_fresh_entry(fake_pg, client):
     import datetime as _dt
     conn = fake_pg(rows=[(9, _dt.datetime(2026, 8, 6))])
-    body = client.post("/p2/gtm/company-people-intelligence/history",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/history",
                        json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}]}).get_json()
     assert body["id"] == 9
     assert "INSERT" in conn.verbs() and "UPDATE" not in conn.verbs()
@@ -680,7 +680,7 @@ def test_an_unknown_replace_id_falls_through_to_an_insert(fake_pg, client):
     still land under the signed-in user rather than being dropped."""
     import datetime as _dt
     conn = fake_pg(rows=[None, (11, _dt.datetime(2026, 8, 6))])
-    body = client.post("/p2/gtm/company-people-intelligence/history",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/history",
                        json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}],
                              "replace_id": 999999}).get_json()
     assert body["id"] == 11
@@ -692,7 +692,7 @@ def test_history_save_scopes_every_write_to_the_signed_in_user(fake_pg, client):
     """email in the WHERE clause is the authorization boundary here."""
     import datetime as _dt
     conn = fake_pg(rows=[(7, _dt.datetime(2026, 8, 6))])
-    client.post("/p2/gtm/company-people-intelligence/history",
+    client.post("/p2/b2b-agents/company-people-intelligence/history",
                 json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}],
                       "replace_id": 7})
     for sql, params in conn.log:
@@ -706,7 +706,7 @@ def test_expired_history_is_pruned_by_age_not_only_by_count(fake_pg, client):
     retained indefinitely just because the count cap has not been reached."""
     import datetime as _dt
     conn = fake_pg(rows=[(9, _dt.datetime(2026, 8, 6))])
-    client.post("/p2/gtm/company-people-intelligence/history",
+    client.post("/p2/b2b-agents/company-people-intelligence/history",
                 json={"entity": "people", "filters": {}, "rows": [{"id": "p1"}]})
     aged = [(sql, params) for sql, params in conn.log
             if sql.startswith("DELETE") and "make_interval" in sql]
@@ -726,7 +726,7 @@ def test_capped_is_only_true_when_rows_were_actually_dropped(client, no_postgres
     cap = appmod._CPI_BULK_ENRICH_CAP
 
     def _post(n):
-        return client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+        return client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                            json={"ids": ["id%d" % i for i in range(n)]}).get_json()
 
     assert _post(cap - 1)["capped"] is False
@@ -740,7 +740,7 @@ def test_duplicate_ids_do_not_count_towards_the_cap(client, no_postgres, monkeyp
                         lambda ids, key: {i: {"id": i} for i in ids})
     monkeypatch.setenv("APOLLO_API_KEY", "k")
     ids = ["same"] * (appmod._CPI_BULK_ENRICH_CAP + 20)
-    body = client.post("/p2/gtm/company-people-intelligence/enrich-bulk",
+    body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ids}).get_json()
     assert body["capped"] is False and body["fetched"] == 1
 
@@ -977,7 +977,7 @@ def test_a_plain_company_name_resolves_to_organization_ids(
         return []
 
     monkeypatch.setattr(ac, "search_people", _fake_search_people)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json=_cpi_search_body(company_domains=["Position2"]))
     assert r.status_code == 200
     assert seen["filters"].get("organization_ids") == ["org1"]
@@ -997,7 +997,7 @@ def test_a_domain_shaped_value_skips_name_resolution_entirely(
 
     monkeypatch.setattr(ac, "search_companies", _boom)
     monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json=_cpi_search_body(company_domains=["acme.com"]))
     assert r.status_code == 200
     assert "resolved_company" not in r.get_json()
@@ -1013,7 +1013,7 @@ def test_a_company_name_with_no_match_returns_a_clear_error_not_junk_results(
         raise AssertionError("search_people must not run without a resolved company")
 
     monkeypatch.setattr(ac, "search_people", _boom)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json=_cpi_search_body(company_domains=["Nonexistent Co"]))
     body = r.get_json()
     assert body["results"] == []
@@ -1033,10 +1033,10 @@ def test_company_name_resolution_is_cached_across_pages(
                         [{"id": "org1", "name": "Position2"}])
     monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
 
-    r1 = client.post("/p2/gtm/company-people-intelligence/search",
+    r1 = client.post("/p2/b2b-agents/company-people-intelligence/search",
                      json={"entity": "people", "filters": {"company_domains": ["Position2"]},
                            "page": 1})
-    r2 = client.post("/p2/gtm/company-people-intelligence/search",
+    r2 = client.post("/p2/b2b-agents/company-people-intelligence/search",
                      json={"entity": "people", "filters": {"company_domains": ["Position2"]},
                            "page": 2})
     assert len(calls) == 1, "the name must resolve from cache on the second page"
@@ -1055,9 +1055,9 @@ def test_a_not_found_company_name_is_never_cached(
     monkeypatch.setattr(ac, "search_companies", lambda filters, key, **kw: responses.pop(0))
     monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
 
-    miss = client.post("/p2/gtm/company-people-intelligence/search",
+    miss = client.post("/p2/b2b-agents/company-people-intelligence/search",
                        json=_cpi_search_body(company_domains=["Position2"]))
-    hit = client.post("/p2/gtm/company-people-intelligence/search",
+    hit = client.post("/p2/b2b-agents/company-people-intelligence/search",
                       json=_cpi_search_body(company_domains=["Position2"]))
     assert miss.get_json()["results"] == [] and "Position2" in miss.get_json()["error"]
     assert hit.get_json().get("resolved_company") == ["Position2"]
@@ -1079,7 +1079,7 @@ def test_an_ambiguous_company_name_returns_choices_instead_of_guessing(
         raise AssertionError("search_people must not run before the user picks one")
 
     monkeypatch.setattr(ac, "search_people", _boom)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json=_cpi_search_body(company_domains=["Ola"]))
     body = r.get_json()
     assert body["needs_company_choice"] is True
@@ -1109,7 +1109,7 @@ def test_picking_one_choice_by_domain_runs_a_normal_domain_search(
         return []
 
     monkeypatch.setattr(ac, "search_people", _fake_search_people)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json=_cpi_search_body(company_domains=["ola1.com"]))
     assert r.status_code == 200
     assert seen["filters"].get("company_domains") == ["ola1.com"]
@@ -1126,9 +1126,9 @@ def test_ambiguous_choices_are_cached_to_avoid_a_repeat_credit_charge(
                         lambda filters, key, **kw: calls.append(1) or orgs)
     monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
 
-    r1 = client.post("/p2/gtm/company-people-intelligence/search",
+    r1 = client.post("/p2/b2b-agents/company-people-intelligence/search",
                      json=_cpi_search_body(company_domains=["Ola"]))
-    r2 = client.post("/p2/gtm/company-people-intelligence/search",
+    r2 = client.post("/p2/b2b-agents/company-people-intelligence/search",
                      json=_cpi_search_body(company_domains=["Ola"]))
     assert len(calls) == 1, "the same ambiguous name must resolve from cache the second time"
     assert r1.get_json()["credits"] == 1
@@ -1164,7 +1164,7 @@ def test_a_scoped_empty_title_search_gets_an_ai_explanation(
         return "Our records have nobody matching CMO. The closest is Priya Shah, Head of Marketing."
 
     monkeypatch.setattr(appmod, "_cpi_grounded_answer", _fake_answer)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
     body = r.get_json()
@@ -1189,7 +1189,7 @@ def test_ai_explanation_is_honest_when_nobody_at_all_is_on_file(
         return "no note needed for this assertion"
 
     monkeypatch.setattr(appmod, "_cpi_grounded_answer", _fake_answer)
-    client.post("/p2/gtm/company-people-intelligence/search",
+    client.post("/p2/b2b-agents/company-people-intelligence/search",
                json={"entity": "people",
                      "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
     assert captured["facts"]["apollo_found_no_matching_people"] is True
@@ -1210,7 +1210,7 @@ def test_an_unscoped_empty_search_gets_no_ai_note(
         raise AssertionError("no company scope means no AI fallback lookup")
 
     monkeypatch.setattr(appmod, "_cpi_search_no_match_note", _boom)
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json={"entity": "people", "filters": {"titles": ["CMO"]}})
     assert "ai_note" not in r.get_json()
 
@@ -1221,7 +1221,7 @@ def test_no_ai_note_without_an_openai_key_configured(
     monkeypatch.setenv("APOLLO_API_KEY", "k")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(ac, "search_people", lambda filters, key, **kw: [])
-    r = client.post("/p2/gtm/company-people-intelligence/search",
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
                     json={"entity": "people",
                           "filters": {"titles": ["CMO"], "company_domains": ["olacabs.com"]}})
     body = r.get_json()

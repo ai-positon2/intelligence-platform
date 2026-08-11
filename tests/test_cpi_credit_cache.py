@@ -231,7 +231,7 @@ def _chat_message(monkeypatch, message, seen_calls):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    return c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    return c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": message})
 
 
 def test_a_second_chat_question_about_the_same_company_is_free(monkeypatch):

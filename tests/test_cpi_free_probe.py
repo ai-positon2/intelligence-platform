@@ -257,7 +257,7 @@ def _ask(monkeypatch, people_handler, role=_ROLE, message="CMO of tealium",
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": message})
     assert r.status_code == 200
     return r.get_json(), facts_box.get("f", {}), billed, seen_people
 
@@ -402,7 +402,7 @@ def test_the_probe_runs_before_the_paid_search_not_after(monkeypatch):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    c.post("/p2/gtm/company-people-intelligence/chat",
+    c.post("/p2/b2b-agents/company-people-intelligence/chat",
            json={"message": "CMO of Tealium"})
     assert order and order[0] == "probe"
     assert "paid" not in order, "a confirmed free probe must skip the paid search"
@@ -463,7 +463,7 @@ def _ask_reveal(monkeypatch, people_handler, titles=("CEO",),
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": message})
     assert r.status_code == 200
     return r.get_json(), facts_box.get("f", {}), matched
 

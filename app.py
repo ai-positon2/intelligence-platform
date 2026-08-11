@@ -1406,7 +1406,7 @@ APP_AGENTS = [
     },
     {
         # Connected via "external_url" instead of "seo_slug" -- it embeds the same
-        # Position2-hosted watchtower tool as the internal /p2/gtm copy (its own
+        # Position2-hosted watchtower tool as the internal /p2/b2b-agents copy (its own
         # host masked behind this path), not a SERP-app tool. "uncapped": True
         # means it's exempt from AGENT_RUN_CAP everywhere that cap is enforced
         # (app_use, app_use_log_run, app.html, app_detail.html, app_embed.html):
@@ -3543,10 +3543,30 @@ def p2_context_chapter(slug):
     """Legacy URL, kept as a redirect so old bookmarks and links still work."""
     return redirect(url_for("p2_playbook_chapter", slug=slug), code=301)
 
-@app.route("/p2/gtm")
+@app.route("/p2/b2b-agents")
 @position2_required
-def gtm():
-    return render_template("gtm.html", user=_get_user())
+def b2b_agents():
+    return render_template("b2b_agents.html", user=_get_user())
+
+
+# ── /p2/gtm/* -> /p2/b2b-agents/* ────────────────────────────────────────────
+# The section was renamed from "GTM" to "B2B Agents". One catch-all covers the
+# whole old tree rather than a redirect per route, so nothing can be missed and
+# a route added later inherits the alias for free.
+#
+# 308 rather than 301 deliberately. Several of these paths are POST endpoints
+# (chat, search, enrich, export, history) and a 301 lets the browser retry them
+# as GET, which silently loses the body; 308 preserves both method and body.
+# That matters most in the minutes after this deploy, when a browser still
+# holding the previous JS bundle will POST to the old URLs.
+@app.route("/p2/gtm", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/gtm/", methods=["GET", "POST", "DELETE"])
+@app.route("/p2/gtm/<path:rest>", methods=["GET", "POST", "DELETE"])
+def b2b_agents_gtm_legacy_redirect(rest=""):
+    target = "/p2/b2b-agents" + (("/" + rest) if rest else "")
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8", "ignore")
+    return redirect(target, code=308)
 
 
 # LinkedIn Strategy Researcher — external Position2-hosted tool (watchtower), embedded
@@ -3555,8 +3575,8 @@ def gtm():
 # co-branded client-portal copy of this agent, which is capped).
 LINKEDIN_RESEARCHER_URL = "https://watchtower-by-position2.vercel.app/linkedin.html"
 
-@app.route("/p2/gtm/linkedin-strategy-researcher")
-@app.route("/p2/gtm/linkedin-strategy-researcher/")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/")
 @position2_required
 def linkedin_strategy_researcher():
     """Competitive LinkedIn analysis tool, embedded from watchtower. Uncapped."""
@@ -3564,25 +3584,27 @@ def linkedin_strategy_researcher():
         user=_get_user(),
         title="LinkedIn Strategy Researcher",
         embed_url=LINKEDIN_RESEARCHER_URL,
-        breadcrumb=[("Hub", "/p2/hub"), ("GTM", "/p2/gtm")],
+        breadcrumb=[("Hub", "/p2/hub"), ("B2B Agents", "/p2/b2b-agents")],
         current="LinkedIn Strategy Researcher",
         accent="#a855f7",
     )
 
 
-@app.route("/p2/gtm/sentiment-pulse")
-@app.route("/p2/gtm/sentiment-pulse/")
+@app.route("/p2/b2b-agents/sentiment-pulse")
+@app.route("/p2/b2b-agents/sentiment-pulse/")
 @position2_required
 def call_sentiment():
     # HIDDEN 2026-07-23: Sentiment Pulse was a demo/proxy dashboard (seeded
     # "Cedar Valley Health" data), not a real data pipeline, so it is pulled from
     # the live surface. Endpoint is kept registered (legacy redirects still resolve
     # to it) but no longer serves the page. To restore, remove the abort() and
-    # uncomment the render line below, then un-hide the card in templates/gtm.html.
+    # uncomment the render line below, then un-hide the card in templates/b2b_agents.html.
     abort(404)
     return render_template("call_sentiment.html", user=_get_user())  # noqa: retained for restore
 
 
+@app.route("/b2b-agents/call-sentiment")
+@app.route("/b2b-agents/call-sentiment/")
 @app.route("/gtm/call-sentiment")
 @app.route("/gtm/call-sentiment/")
 @position2_required
@@ -3593,20 +3615,20 @@ def call_sentiment_legacy():
 @app.route("/ppc")
 @app.route("/ppc/")
 def ppc_redirect():
-    return redirect("/p2/gtm", code=301)
+    return redirect("/p2/b2b-agents", code=301)
 
 @app.route("/ppc/ad-intelligence")
 @app.route("/ppc/ad-intelligence/")
 def ppc_ad_intelligence_redirect():
-    return redirect("/p2/gtm/ad-intelligence", code=301)
+    return redirect("/p2/b2b-agents/ad-intelligence", code=301)
 
 @app.route("/ppc/anonymous-visitors")
 def ppc_anonymous_visitors_redirect():
-    return redirect("/p2/gtm/anonymous-visitors", code=301)
+    return redirect("/p2/b2b-agents/anonymous-visitors", code=301)
 
 @app.route("/ppc/linkedin-scraper")
 def ppc_linkedin_scraper_redirect():
-    return redirect("/p2/gtm/linkedin-intelligence", code=301)
+    return redirect("/p2/b2b-agents/linkedin-intelligence", code=301)
 
 @app.route("/p2/seo")
 @position2_required
@@ -3619,22 +3641,25 @@ _SERP_BASE = "https://seo-apps-production-37a6.up.railway.app"
 # ── Ad Intelligence (built React app served directly — no iframe) ────────────
 AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 
-@app.route("/p2/gtm/ad-intelligence")
-@app.route("/p2/gtm/ad-intelligence/")
+@app.route("/p2/b2b-agents/ad-intelligence")
+@app.route("/p2/b2b-agents/ad-intelligence/")
 @position2_required
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
 
+@app.route("/b2b-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/gtm/ad-intelligence/assets/<path:filename>")
 @app.route("/ppc/ad-intelligence/assets/<path:filename>")
 def ad_intelligence_assets(filename):
     return send_from_directory("ad_intelligence/assets", filename)
 
+@app.route("/b2b-agents/ad-intelligence/favicon.svg")
 @app.route("/gtm/ad-intelligence/favicon.svg")
 @app.route("/ppc/ad-intelligence/favicon.svg")
 def ad_intelligence_favicon():
     return send_from_directory("ad_intelligence", "favicon.svg")
 
+@app.route("/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/gtm/ad-intelligence/icons.svg")
 @app.route("/ppc/ad-intelligence/icons.svg")
 def ad_intelligence_icons():
@@ -4321,6 +4346,32 @@ def atrack():
         log.warning("atrack failed: %s", e)
     return jsonify({"ok": True})
 
+# ── Renamed pages in historical analytics ────────────────────────────────────
+# Page views are appended to a sheet with whatever title and path the page had
+# AT THE TIME, and every "top pages" view groups by that string. So renaming a
+# section splits one page into two rows that each undercount, and the split is
+# silent: nothing errors, the totals just quietly stop matching reality. Renaming
+# something that has already been persisted means aliasing it at every READ path,
+# not only at the route.
+#
+# Old label first, current label second. Substring match, because the recorded
+# value is sometimes the title and sometimes the full path.
+_PAGE_LABEL_ALIASES = (
+    ("GTM Dashboards", "B2B Agents Dashboards"),   # renamed 2026-08-11
+    ("/p2/gtm", "/p2/b2b-agents"),
+)
+
+
+def _page_label(s) -> str:
+    """One page's analytics label, with pre-rename names folded into current
+    ones so a rename does not fork its own history."""
+    out = str(s or "")
+    for old, new in _PAGE_LABEL_ALIASES:
+        if old in out:
+            out = out.replace(old, new)
+    return out
+
+
 _VISITOR_ANALYTICS_CACHE = {"data": None, "ts": 0.0}
 _VISITOR_ANALYTICS_CACHE_TTL = 300  # seconds — this aggregation resolves hundreds of
                                     # visitor IPs and re-reads two Sheets tabs; too
@@ -4389,7 +4440,8 @@ def _fetch_visitor_analytics_uncached() -> dict:
     by_day = Counter(c(r,"Date") for r in human if c(r,"Date"))
     series = sorted(by_day.items())[-30:]
 
-    top_pages = Counter(c(r,"Page Title") or c(r,"Page URL") for r in human).most_common(15)
+    top_pages = Counter(_page_label(c(r,"Page Title") or c(r,"Page URL"))
+                        for r in human).most_common(15)
     top_landing = Counter(c(r,"Landing Page") for r in human if c(r,"Landing Page")).most_common(10)
     referrers = Counter((c(r,"Referrer Host") or "direct") for r in human).most_common(12)
     utm_source = Counter(c(r,"UTM Source") for r in human if c(r,"UTM Source")).most_common(10)
@@ -5051,11 +5103,12 @@ def _fetch_member_analytics_uncached() -> dict:
     for e, rows in pv_by_email.items():
         mem_name = (members.get(e) or {}).get("name") or "—"
         for r in rows:
-            title = pc(r, 5) or pc(r, 6) or "—"
+            title = _page_label(pc(r, 5) or pc(r, 6) or "—")
             post_page_counter[title] += 1
             post_page_rows.append({
                 "ts": pc(r, 0), "email": e, "name": mem_name,
-                "title": pc(r, 5) or "—", "url": pc(r, 6) or "", "duration": pc(r, 8) or "—",
+                "title": _page_label(pc(r, 5) or "—"),
+                "url": _page_label(pc(r, 6) or ""), "duration": pc(r, 8) or "—",
             })
     post_page_rows.sort(key=lambda x: x["ts"] or "", reverse=True)
     total_post_page_views = len(post_page_rows)
@@ -5191,7 +5244,7 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     # Top pages
     page_counts: dict = {}
     for r in page_data:
-        t = col(r, 5)
+        t = _page_label(col(r, 5))
         if t:
             page_counts[t] = page_counts.get(t, 0) + 1
     top_pages = sorted(page_counts.items(), key=lambda x: x[1], reverse=True)[:15]
@@ -5383,8 +5436,9 @@ def _fetch_usage_data(internal: bool = True) -> dict:
     login_table = [{"ts": col(r,0), "email": col(r,5), "name": col(r,6),
                     "browser": col(r,LC["br"]), "os": col(r,LC["os"]), "device": col(r,LC["dev"])}
                    for r in reversed(login_data)]
-    page_table  = [{"ts": col(r,0), "email": col(r,4), "title": col(r,5),
-                    "url": col(r,6), "duration": col(r,8)}
+    page_table  = [{"ts": col(r,0), "email": col(r,4),
+                    "title": _page_label(col(r,5)),
+                    "url": _page_label(col(r,6)), "duration": col(r,8)}
                    for r in reversed(page_data)]
 
     return dict(total_logins=total_logins, unique_users=unique_users,
@@ -6753,13 +6807,14 @@ def _fetch_anon_visitors_data(force: bool = False) -> dict:
     return _result
 
 
-@app.route("/p2/gtm/anonymous-visitors")
+@app.route("/p2/b2b-agents/anonymous-visitors")
 @position2_required
 def anonymous_visitors():
     """Anonymous Visitors dashboard shell — loads data async."""
     return render_template("anonymous_visitors.html", user=_get_user())
 
 
+@app.route("/b2b-agents/anonymous-visitors/data")
 @app.route("/gtm/anonymous-visitors/data")
 @app.route("/ppc/anonymous-visitors/data")
 @position2_required
@@ -7065,13 +7120,13 @@ def _linkedin_data_response(sheet_id: str, force: bool):
     return resp
 
 
-@app.route("/p2/gtm/linkedin-scraper")
+@app.route("/p2/b2b-agents/linkedin-scraper")
 @position2_required
 def linkedin_scraper_old_redirect():
-    return redirect("/p2/gtm/linkedin-intelligence", code=301)
+    return redirect("/p2/b2b-agents/linkedin-intelligence", code=301)
 
 
-@app.route("/p2/gtm/linkedin-intelligence")
+@app.route("/p2/b2b-agents/linkedin-intelligence")
 @position2_required
 def linkedin_scraper():
     """LinkedIn Intelligence dashboard — Post & People Intelligence, live from Google Sheets."""
@@ -7081,13 +7136,13 @@ def linkedin_scraper():
                                    "employerTokens": ["position"]})
 
 
-@app.route("/p2/gtm/linkedin-scraper/data")
+@app.route("/p2/b2b-agents/linkedin-scraper/data")
 @position2_required
 def linkedin_scraper_data_old_redirect():
-    return redirect("/p2/gtm/linkedin-intelligence/data", code=301)
+    return redirect("/p2/b2b-agents/linkedin-intelligence/data", code=301)
 
 
-@app.route("/p2/gtm/linkedin-intelligence/data")
+@app.route("/p2/b2b-agents/linkedin-intelligence/data")
 @position2_required
 def linkedin_scraper_data():
     """JSON data endpoint for the LinkedIn Intelligence dashboard (gzipped, cached).
@@ -7104,7 +7159,7 @@ def linkedin_scraper_data():
 # CMO of Acme?") that resolves ambiguous company names by asking rather than
 # guessing. See tracker/apollo_client.py for the underlying search functions.
 
-@app.route("/p2/gtm/company-people-intelligence")
+@app.route("/p2/b2b-agents/company-people-intelligence")
 @position2_required
 def cpi_home():
     return render_template("company_people_intelligence.html", user=_get_user(),
@@ -7320,7 +7375,7 @@ def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend
     return {"answer": answer, "researched": researched, "web_search": web}
 
 
-@app.route("/p2/gtm/company-people-intelligence/search", methods=["POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/search", methods=["POST"])
 @position2_required
 def cpi_search():
     """Live Apollo search for the results grid. People search is free; company
@@ -7720,7 +7775,7 @@ def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
         return {"matched": False}
 
 
-@app.route("/p2/gtm/company-people-intelligence/enrich", methods=["POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/enrich", methods=["POST"])
 @position2_required
 def cpi_enrich():
     body = request.get_json(silent=True) or {}
@@ -7761,7 +7816,7 @@ def cpi_enrich():
 _CPI_BULK_ENRICH_CAP = 50
 
 
-@app.route("/p2/gtm/company-people-intelligence/enrich-bulk", methods=["POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/enrich-bulk", methods=["POST"])
 @position2_required
 def cpi_enrich_bulk():
     """Reveal a chosen set of people by Apollo id, in one batch.
@@ -7979,7 +8034,7 @@ def _cpi_history_label(entity: str, filters: dict) -> str:
                                        else "All people")
 
 
-@app.route("/p2/gtm/company-people-intelligence/history", methods=["GET", "POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/history", methods=["GET", "POST"])
 @position2_required
 def cpi_history():
     """POST saves a result set; GET lists this user's recent saved searches."""
@@ -8067,7 +8122,7 @@ def cpi_history():
             pass
 
 
-@app.route("/p2/gtm/company-people-intelligence/history/<int:entry_id>",
+@app.route("/p2/b2b-agents/company-people-intelligence/history/<int:entry_id>",
            methods=["GET", "DELETE"])
 @position2_required
 def cpi_history_entry(entry_id: int):
@@ -8179,7 +8234,7 @@ def _cpi_filters_readable(filters: dict) -> list:
     return out
 
 
-@app.route("/p2/gtm/company-people-intelligence/export", methods=["POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/export", methods=["POST"])
 @position2_required
 def cpi_export():
     """Download the selected rows as .csv or .xlsx.
@@ -9443,7 +9498,7 @@ def _cpi_chat_remember(fields: dict, credits: int) -> None:
         log.warning("cpi chat history hook failed: %s", e)
 
 
-@app.route("/p2/gtm/company-people-intelligence/chat", methods=["POST"])
+@app.route("/p2/b2b-agents/company-people-intelligence/chat", methods=["POST"])
 @position2_required
 def cpi_chat():
     """Grounded NL Q&A over live Apollo data. Stateless: the client resends the
@@ -10074,7 +10129,7 @@ _ACCOUNTS_HTML_UNUSED = """
       </a>
       <div class="bc">
         <a href="/hub">Hub</a><span class="bc-sep">›</span>
-        <a href="/gtm">GTM</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
         <span class="bc-cur">Signal Tracker</span>
       </div>
     </div>
@@ -10451,7 +10506,7 @@ THREE SURFACES: (1) public marketing site, logged out; (2) /app member workspace
 account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com only
 (this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/Signal Tracker, Admin dashboards.
 
-ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/gtm/anonymous-visitors):
+ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/b2b-agents/anonymous-visitors):
 Identifies which COMPANIES (not usually individual people) visit the Position2 site, by fusing three
 signals per visitor IP: IPinfo (org/ASN/hostname/privacy), reverse DNS, and RDAP registrant/netblock.
 Each visitor gets a connection_type: "business" (a real company network — the only type that gets
@@ -10471,7 +10526,7 @@ recency (signals decay after about 90 days). Sourced from Apollo.io + news feeds
 refreshed weekly via a GitHub Actions pipeline. Exact company/signal counts per account are in the LIVE
 DATA section below when available — use those numbers, never a memorised figure.
 
-AD INTELLIGENCE (/p2/gtm/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
+AD INTELLIGENCE (/p2/b2b-agents/ad-intelligence): tracks competitors' running ads (headline, CTA, format,
 keywords, messaging angle, first/last seen) pulled from a shared Google Sheet.
 
 SEO STUDIO (/p2/seo/<tool>) and the /app agents: a suite of SEO/GEO tools (Keyword Finder, Content Brief

@@ -71,7 +71,7 @@ def _chat(monkeypatch, message="CMO of tealium", people=None, role=None,
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "Reporting@Position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": message})
     assert r.status_code == 200
     return r.get_json()
 
@@ -165,7 +165,7 @@ def test_a_disambiguation_prompt_is_not_saved(saved, monkeypatch):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat",
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat",
                json={"message": "CMO of Delta"})
     assert r.status_code == 200
     assert r.get_json().get("choices")
@@ -176,7 +176,7 @@ def test_an_empty_question_saves_nothing(saved, monkeypatch):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    c.post("/p2/gtm/company-people-intelligence/chat", json={"message": "   "})
+    c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": "   "})
     assert saved == []
 
 
@@ -207,7 +207,7 @@ def _enrich(monkeypatch, profile, kind="person"):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/enrich",
+    r = c.post("/p2/b2b-agents/company-people-intelligence/enrich",
                json={"type": kind, "name": "Binal Shah", "domain": "tealium.com",
                      "apollo_id": "p-binal"})
     assert r.status_code == 200
