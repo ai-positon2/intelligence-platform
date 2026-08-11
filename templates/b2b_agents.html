@@ -78,8 +78,8 @@
         <div class="card-body">
           <div class="card-name">ABM Signal Tracker</div>
           <div class="card-desc">
-            Real-time signals across 1,500+ companies — funding rounds, C-suite changes,
-            M&A, IPO alerts, and news mentions.
+            Real-time signals across {% if tracked_companies %}{{ "{:,}".format(tracked_companies) }}+ companies{% else %}every tracked company{% endif %}:
+            funding rounds, C-suite changes, M&A, IPO alerts, and news mentions.
           </div>
           <div class="card-footer">
             <div class="card-tags">

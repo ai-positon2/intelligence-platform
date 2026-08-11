@@ -124,7 +124,12 @@
     <section class="lx-sec" data-cz-reveal>
       <div class="lx-sec-eyebrow">By the numbers</div>
       <div class="lx-stats2">
-        <div><b data-lxn="1200" data-lxs="+">0</b><span>companies tracked</span></div>
+        {# Counted from the Signal Tracker dashboards themselves, not typed in here,
+           so it cannot drift the next time a dashboard is rebuilt. Omitted rather
+           than guessed if none of them could be read. #}
+        {% if tracked_companies %}
+        <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
+        {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
         <div><b data-lxn="21">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>

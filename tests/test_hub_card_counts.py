@@ -144,9 +144,19 @@ def test_the_seo_card_count_matches_the_tool_list():
 # ── The "by the numbers" band, same hand-maintained-number risk ─────────────
 
 def _hub_band():
-    with open(_HUB) as fh:
-        body = _strip_comments(fh.read())
-    band = body.split('class="lx-stats2"', 1)[1].split("</div>\n    </section>", 1)[0]
+    """Parsed from the RENDERED page, not the template: the companies figure is a
+    Jinja expression now, so the template source no longer holds the number."""
+    os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
+    os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
+    os.environ.setdefault("FLASK_SECRET_KEY", "test")
+    import sys
+    sys.path.insert(0, _ROOT)
+    import app as appmod
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
+    body = _strip_comments(c.get("/p2/hub").get_data(as_text=True))
+    band = body.split('class="lx-stats2"', 1)[1].split("</section>", 1)[0]
     return dict((label.strip(), int(n)) for n, label in
                 re.findall(r'data-lxn="(\d+)"[^>]*>0</b><span>([^<]+)</span>', band))
 
@@ -169,9 +179,9 @@ def test_the_hub_band_dashboard_total_matches_the_live_cards(hub_card, dashboard
 
 
 def test_the_card_copy_makes_no_unverifiable_headcount_claim(hub_card):
-    """The band claims "1200+ companies tracked" while the ABM Signal Tracker
-    card claims "1,500+ companies". Both are hardcoded and neither can be checked
-    from here, so the hub card deliberately cites no figure rather than picking a
-    side and contradicting the band three rows below it."""
+    """The B2B Agents card cites no company figure of its own. The two places that
+    do quote one (the band below, and the ABM card on the dashboard page) now both
+    derive it from the dashboards, which is what stopped them disagreeing; adding a
+    third hardcoded figure here would restart the problem."""
     assert not re.search(r"\d[\d,]*\+", hub_card["desc"]), \
-        "cite a number here only once the two existing figures agree"
+        "quote the derived tracked_companies value or no figure at all"

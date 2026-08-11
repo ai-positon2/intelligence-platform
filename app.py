@@ -3478,7 +3478,8 @@ def p2_root():
 @app.route("/p2/hub")
 @position2_required
 def hub():
-    return render_template("hub.html", user=_get_user())
+    return render_template("hub.html", user=_get_user(),
+                           tracked_companies=_tracked_company_floor())
 
 CX_CHAPTERS = [
     {"slug": "what-it-is", "num": 1, "icon": "💡", "title": "What it is",
@@ -3546,7 +3547,8 @@ def p2_context_chapter(slug):
 @app.route("/p2/b2b-agents")
 @position2_required
 def b2b_agents():
-    return render_template("b2b_agents.html", user=_get_user())
+    return render_template("b2b_agents.html", user=_get_user(),
+                           tracked_companies=_tracked_company_floor())
 
 
 # ── /p2/gtm/* -> /p2/b2b-agents/* ────────────────────────────────────────────
@@ -10195,16 +10197,61 @@ def _read_last_refreshed(path: Path) -> str:
         return "unknown"
 
 
-def _read_company_count(path: Path) -> str:
+# Every Signal Tracker dashboard is a self-contained HTML file whose build script
+# stamps meta.total_companies into the embedded payload, so the file itself knows
+# how many companies it tracks. Reading that back is how any surface can quote a
+# company count without hardcoding one that goes stale the next time a dashboard
+# is rebuilt (which is exactly how the hub came to advertise "1200+" while the
+# ABM card said "1,500+").
+#
+# Cached on (mtime, size) because the payloads run to several megabytes and the
+# hub asks for all of them on every render. A rebuild changes both, so a refreshed
+# dashboard invalidates its own entry.
+_COMPANY_COUNT_CACHE: dict = {}
+# Matched rather than sliced at a fixed offset: the previous version read the ten
+# characters after the key and split on a comma, so it silently returned nothing
+# whenever total_companies happened to be the last key in its object.
+_COMPANY_COUNT_RE = re.compile(r'"total_companies"\s*:\s*(\d+)')
+
+
+def _company_count(path: Path) -> int:
+    """Companies tracked by one dashboard, or 0 if the file cannot be read."""
     try:
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        idx = text.find('"total_companies":')
-        if idx == -1:
-            return "—"
-        snippet = text[idx + 18:idx + 28].strip().split(",")[0].strip()
-        return snippet if snippet.isdigit() else "—"
+        st = path.stat()
     except Exception:
-        return "—"
+        return 0
+    key, stamp = str(path), (st.st_mtime_ns, st.st_size)
+    hit = _COMPANY_COUNT_CACHE.get(key)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    try:
+        m = _COMPANY_COUNT_RE.search(path.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return 0
+    count = int(m.group(1)) if m else 0
+    _COMPANY_COUNT_CACHE[key] = (stamp, count)
+    return count
+
+
+def _read_company_count(path: Path) -> str:
+    n = _company_count(path)
+    return str(n) if n else "—"
+
+
+def _tracked_company_total() -> int:
+    """Companies tracked across every registered account universe."""
+    return sum(_company_count(cfg["dashboard"]) for cfg in ACCOUNTS.values())
+
+
+def _tracked_company_floor(step: int = 100) -> int:
+    """The tracked total rounded DOWN to `step`, for copy that appends a "+".
+
+    Rounding down keeps the claim true between dashboard rebuilds: the real
+    number only ever grows past the figure shown, never falls short of it.
+    Returns 0 when nothing could be counted, so callers can omit the claim
+    instead of printing a number nobody verified.
+    """
+    return (_tracked_company_total() // step) * step
 
 
 # ── Shared Sheets helper ──────────────────────────────────────────────────────
