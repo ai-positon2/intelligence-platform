@@ -53,7 +53,7 @@ intelligence-platform/
 │                            marketing routes, /api/demo-request, /api/track|atrack|identify,
 │                            /app/* + run history, /p2/* + admin analytics, client-portal routes
 │                            (incl. external-tool agents, now real postMessage-metered),
-│                            internal /p2/gtm external-tool route, LinkedIn Intelligence
+│                            internal /p2/b2b-agents external-tool route, LinkedIn Intelligence
 │                            (per-sheet), Postgres history. Does NOT build Signal Tracker
 │                            dashboards - just serves the pre-built HTML files (see below).
 ├── visitor_intelligence/ ← de-anonymization engine: resolver.py (IP resolution + connection-type gate +
@@ -73,7 +73,7 @@ intelligence-platform/
 │                            the JSON never reached the DB. Always use --prune now; the JSON is the
 │                            source of truth and stale DB rows must be reconciled away, not just left.
 ├── northstar-company-details.csv ← NorthStar's 35-company universe (fully researched as of this cycle)
-├── ad_intelligence/      ← built React app (Vite) served by Flask; assets at /p2/gtm/ad-intelligence/assets/
+├── ad_intelligence/      ← built React app (Vite) served by Flask; assets at /p2/b2b-agents/ad-intelligence/assets/
 ├── static/
 │   ├── css/ds-tokens.css, ds-components.css        ← internal design tokens + shared components
 │   ├── css/gtm.css, hub.css, seo.css, linkedin.css, admin.css, aurora-app.css, grid-tokens.css,
@@ -87,7 +87,7 @@ intelligence-platform/
 │   ├── agents.html          ← THE SINGLE SHARED MARKETING TEMPLATE (public site), {% if page %} variants
 │   ├── app.html, app_base.html, app_embed.html, app_history.html, app_history_detail.html, app_settings.html
 │   ├── hub.html, gtm.html, seo.html, accounts.html, embed.html, context.html (=Playbook), 403.html
-│   ├── linkedin_scraper.html   ← serves BOTH /p2/gtm/linkedin-intelligence AND the client LinkedIn dashboard
+│   ├── linkedin_scraper.html   ← serves BOTH /p2/b2b-agents/linkedin-intelligence AND the client LinkedIn dashboard
 │   │                              (client_mode flag hides internal chrome; data_url injected per surface)
 │   ├── anonymous_visitors.html, call_sentiment.html
 │   ├── admin_usage.html, admin_visitors.html, admin_members.html (Public Page Analytics - now has
@@ -207,16 +207,16 @@ Sometimes an agent isn't built in this repo OR in seo-apps - the user builds it 
 **How we integrate one:**
 1. Confirm the frontend has no `X-Frame-Options`/CSP `frame-ancestors` blocking iframing (checked via response headers).
 2. Add the agent to `APP_AGENTS` like any other (name, icon, colors, copy, tags) - no `seo_slug`.
-3. Add its slug to the client's `agents` list, and its full URL to that client's `external_tools` map (client-portal) - or, for an internal-only copy, add a small dedicated route that renders `templates/embed.html` with the URL (see `/p2/gtm/linkedin-strategy-researcher`, uncapped by design).
+3. Add its slug to the client's `agents` list, and its full URL to that client's `external_tools` map (client-portal) - or, for an internal-only copy, add a small dedicated route that renders `templates/embed.html` with the URL (see `/p2/b2b-agents/linkedin-strategy-researcher`, uncapped by design).
 4. `client_embed.html` (client portals) and `embed.html` (internal `/p2` pages) both just iframe the URL - the masking is free, since the browser's address bar shows OUR path, not the iframe's `src`.
 5. **Metering requires the external tool's cooperation.** We can't see inside a cross-origin iframe, so the only way to get a true "run" signal is for the external tool to call `window.parent.postMessage({...}, 'https://intelligence.position2.com')` at the moment of a real action, guarded by `if (window.parent !== window)` so it's a no-op standalone. **This is now deployed and working** for LinkedIn Strategy Researcher (`source:'p2-agent'`, `agent-run-started`/`agent-run-finished`) - `client_embed.html`'s external branch listens for it, verifies the message's origin matches the tool's own origin, and calls the same log-run/finish-run endpoints a SERP tool uses. This is the template to reuse for any future external-tool integration.
-6. **Internal vs. client copies of the same external tool can have different metering rules** - see LinkedIn Strategy Researcher: capped on the NorthStar portal, fully uncapped on `/p2/gtm` (internal staff tool, not a client deliverable).
+6. **Internal vs. client copies of the same external tool can have different metering rules** - see LinkedIn Strategy Researcher: capped on the NorthStar portal, fully uncapped on `/p2/b2b-agents` (internal staff tool, not a client deliverable).
 
 ---
 
 ## LINKEDIN INTELLIGENCE (internal + per-client, multi-sheet) - unchanged
 
-Route `/p2/gtm/linkedin-intelligence` (old `/p2/gtm/linkedin-scraper` 301-redirects). Renders `templates/linkedin_scraper.html`; all content is drawn client-side by `static/js/linkedin.js` from `window.__LI_DATA_URL__` (JSON). The sheet is "one row per person x post engagement," header-mapped (column order can drift safely).
+Route `/p2/b2b-agents/linkedin-intelligence` (old `/p2/b2b-agents/linkedin-scraper` 301-redirects). Renders `templates/linkedin_scraper.html`; all content is drawn client-side by `static/js/linkedin.js` from `window.__LI_DATA_URL__` (JSON). The sheet is "one row per person x post engagement," header-mapped (column order can drift safely).
 
 - `_fetch_linkedin_intel_data(force, sheet_id)` + `_linkedin_data_response(sheet_id, force)` with **per-sheet caches** (`_LI_CACHES`, `_LI_GZS`, `_LI_TABS`) so the internal dashboard and each client portal read independent sheets.
 - `templates/linkedin_scraper.html` has a `client_mode` flag: when true it hides the internal topbar, the Vimi widget, and the Ctrl-K command palette, and injects a client-gated `data_url`.
@@ -283,7 +283,7 @@ One template `templates/agents.html`, `{% if page %}` chain. Routes: `/`, `/logi
 
 ## SURFACE 3 - INTERNAL STAFF APP `/p2/*`
 
-`/p2/hub`, `/p2/gtm` (+ `/p2/gtm/sentiment-pulse` MOCK data, `/p2/gtm/ad-intelligence` React app, `/p2/gtm/linkedin-intelligence`, `/p2/gtm/linkedin-strategy-researcher` - external tool, staff-only, uncapped), `/p2/seo` + `/p2/seo/<tool>` (SEO Studio, proxies seo-apps; iframe route-sync via postMessage), `/p2/accounts` + `/p2/signal-tracker/<account_id>` (this is where the internal, un-co-branded NorthStar Signal Tracker HTML is served from), `/p2/playbook` (old `/p2/context` redirects; template still `context.html`), and the admin dashboards above. Sentiment Pulse = seeded PRNG mock data (Vimi discloses this).
+`/p2/hub`, `/p2/b2b-agents` (+ `/p2/b2b-agents/sentiment-pulse` MOCK data, `/p2/b2b-agents/ad-intelligence` React app, `/p2/b2b-agents/linkedin-intelligence`, `/p2/b2b-agents/linkedin-strategy-researcher` - external tool, staff-only, uncapped), `/p2/seo` + `/p2/seo/<tool>` (SEO Studio, proxies seo-apps; iframe route-sync via postMessage), `/p2/accounts` + `/p2/signal-tracker/<account_id>` (this is where the internal, un-co-branded NorthStar Signal Tracker HTML is served from), `/p2/playbook` (old `/p2/context` redirects; template still `context.html`), and the admin dashboards above. Sentiment Pulse = seeded PRNG mock data (Vimi discloses this).
 
 **GTM bucket cards:** Target Accounts, Ad Intelligence, Anonymous Visitors, LinkedIn Intelligence, LinkedIn Strategy Researcher, Job Change Alert (coming soon). Card color themes live in `static/css/gtm.css` (`c-signals`, `c-adint`, `c-visitors`, `c-linkedin`, `c-lir`, `c-job`).
 

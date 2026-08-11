@@ -403,7 +403,7 @@ def _chat(monkeypatch, people_by_call, role_result, message="CMO of thoughtworks
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat", json={"message": message})
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat", json={"message": message})
     assert r.status_code == 200
     return seen.get("facts", {}), calls
 
@@ -524,7 +524,7 @@ def test_a_failing_domain_retry_falls_through_to_the_records_gap(monkeypatch):
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "reporting@position2.com", "name": "T"}
-    r = c.post("/p2/gtm/company-people-intelligence/chat",
+    r = c.post("/p2/b2b-agents/company-people-intelligence/chat",
                json={"message": "CMO of thoughtworks"})
     assert r.status_code == 200
     assert seen["f"]["public_role_holder"]["name"] == "Julie Woods-Moss"
