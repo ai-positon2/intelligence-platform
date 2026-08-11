@@ -8510,11 +8510,19 @@ _CPI_ANSWER_SYSTEM = (
     "describe them as being on file or as a contact we hold. LEAD WITH IT: name them and "
     "their title in the very first sentence, attributed to the public source (\"publicly, "
     "X is listed as\", \"per the company's own leadership page\"), and include the "
-    "\"source\" URL. Then note separately that our own records do not have them, and give "
-    "the on-file people as the contacts we can actually reach. Never bury this under the "
-    "records gap and never imply nobody holds the role while this block is present. If "
-    "its \"exact_title_match\" is false, their published title differs from the one asked "
-    "about, so give their real title and call it the closest published match.\n\n"
+    "\"source\" URL. Never bury this under the records gap and never imply nobody holds "
+    "the role while this block is present. If its \"exact_title_match\" is false, their "
+    "published title differs from the one asked about, so give their real title and call "
+    "it the closest published match.\n\n"
+    "Whether that publicly-named person is in our own records is a SEPARATE, "
+    "code-established fact, and you must not guess at it. If "
+    "\"public_role_holder_is_on_file\" is present, that is their own on-file record, "
+    "found by looking them up by name: say we do hold them and give the on-file title as "
+    "written, which is often different from their published one. If "
+    "\"public_role_holder_not_in_our_records\": true, that absence was actually checked, "
+    "so say plainly we do not hold them and offer the other on-file people as the "
+    "contacts we can reach instead. If NEITHER key is present, nobody checked: say "
+    "nothing at all about whether we hold them.\n\n"
     "If the facts contain a \"person\" whose title is not an exact match for "
     "\"asked_for_titles\", give their real title as written and note it is the closest "
     "match rather than implying it is the exact role asked for.\n\n"
@@ -8942,6 +8950,63 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
     return _remember(None, choices)
 
 
+def _cpi_probe_company_free(typed_name: str, api_key: str):
+    """The Apollo organization for `typed_name`, resolved WITHOUT spending a
+    credit, or None. Same {id, name, primary_domain} shape the paid resolver
+    returns, so callers need no special handling.
+
+    Why: answering "who is the CMO of Tealium" always began by paying
+    mixed_companies/search 1 credit purely to learn Apollo's organization id for
+    Tealium, even when the answer that came back was "nobody on file" -- which
+    reads, fairly, as having paid for nothing. But mixed_people/api_search is
+    free AND returns each person's employer id and name, so a single free people
+    search scoped to the company's domain yields the very same organization id
+    the paid search was being bought for.
+
+    The domain is guessed from the typed name (tealium -> tealium.com), so the
+    guard against answering about the wrong business is what confirms the guess:
+    Apollo's OWN employer name for people found at that domain must normalize
+    exactly equal to the typed name. "Delta" guesses delta.com and finds "Delta
+    Air Lines", which is not an exact normalized match, so this returns None and
+    the caller falls through to the paid resolver and its disambiguation prompt,
+    exactly as before. Only .com is tried: a miss costs nothing but that
+    fall-through, whereas probing a list of TLDs would add latency to every
+    question. search_people enforces the employer domain strictly in code
+    (Apollo treats its own domain param as a fuzzy hint), so a row that comes
+    back really does work at that exact domain.
+    """
+    typed = str(typed_name or "").strip()
+    norm = _cpi_norm_name(typed)
+    if not (typed and norm and api_key):
+        return None
+    # An input that is already a domain is resolved exactly by the normal path.
+    if _cpi_is_domain_shaped(typed):
+        return None
+    guess = re.sub(r"[^a-z0-9\-]", "", norm.replace(" ", "")) + ".com"
+    if not _cpi_is_domain_shaped(guess):
+        return None
+    try:
+        from tracker.apollo_client import search_people as _sp
+        rows = _sp({"company_domains": [guess], "max_people": 10}, api_key,
+                   per_page=10, strict=True)
+    except Exception as e:
+        log.warning("cpi free company probe failed domain=%s: %s", guess, e)
+        return None
+    for r in (rows or []):
+        org_name = str(r.get("organization_name") or "").strip()
+        org_id = str(r.get("organization_id") or "").strip()
+        # No id means nothing downstream can scope a people search to this
+        # company, so it is not a usable resolution -- let the paid path run.
+        if not (org_name and org_id) or _cpi_norm_name(org_name) != norm:
+            continue
+        dom = re.sub(r"^https?://", "",
+                     str(r.get("organization_domain") or guess).strip().lower()).rstrip("/")
+        dom = re.sub(r"^www\.", "", dom).split("/")[0] or guess
+        log.info("cpi free probe pinned an org at %s for 0 credits", dom)
+        return {"id": org_id, "name": org_name, "primary_domain": dom}
+    return None
+
+
 _CPI_TITLE_ALIASES = {
     "ceo": "chief executive officer", "cfo": "chief financial officer",
     "cmo": "chief marketing officer", "cto": "chief technology officer",
@@ -8986,6 +9051,70 @@ def _cpi_title_matches(person_title: str, requested: list) -> bool:
         if want and want.issubset(have):
             return True
     return False
+
+
+def _cpi_person_name_tokens(name: str) -> set:
+    """Person name -> comparison tokens, accents folded and honorifics dropped."""
+    t = unicodedata.normalize("NFKD", str(name or ""))
+    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
+    t = re.sub(r"[^a-z0-9]+", " ", t)
+    drop = {"mr", "mrs", "ms", "dr", "prof", "jr", "sr", "ii", "iii", "iv",
+            "phd", "mba", "cfa", "cpa"}
+    return {w for w in t.split() if w and w not in drop}
+
+
+def _cpi_person_name_matches(candidate: str, wanted: str) -> bool:
+    """Is `candidate` (a row Apollo returned) the same person as `wanted` (a name
+    that came from public research)?
+
+    The name lookup below scopes on q_keywords, which is a fuzzy relevance hint
+    rather than a filter, so a row coming back is NOT evidence that it is the
+    person asked about -- checked here in code, or a same-company namesake gets
+    presented as the published role holder.
+
+    Every meaningful word of the wanted name must appear in the candidate's, so
+    "Heidi Bullock" matches "Heidi A. Bullock" but not "Heidi Chen". A one-word
+    wanted name is refused: a single token does not identify a person. Apollo
+    masks some last names by plan tier ("Heidi B."), which fails this check
+    deliberately -- a masked row cannot be confirmed to be the right person, and
+    the caller offers on-demand enrichment for exactly that case.
+    """
+    want = _cpi_person_name_tokens(wanted)
+    if len(want) < 2:
+        return False
+    return want.issubset(_cpi_person_name_tokens(candidate))
+
+
+def _cpi_person_on_file(name: str, domain: str, api_key: str):
+    """The Apollo row for one NAMED person at one employer domain, or None.
+
+    Free: mixed_people/api_search costs no credits, and search_people enforces
+    the employer domain strictly in code (Apollo treats its domain param as a
+    fuzzy hint), so a hit here is a real hit at that exact company.
+
+    This exists because the answer used to assert "our records do not have X on
+    file" about a publicly-named person without anything ever having looked. The
+    only search that had run was filtered BY TITLE, which says nothing about
+    whether that person is on file under a DIFFERENT title -- the common case
+    when a company's published CMO sits in Apollo as "SVP, Marketing".
+    """
+    name = str(name or "").strip()
+    domain = re.sub(r"^https?://", "", str(domain or "").strip().lower()).rstrip("/")
+    domain = re.sub(r"^www\.", "", domain)
+    if not (name and domain and api_key):
+        return None
+    try:
+        from tracker.apollo_client import search_people as _sp
+        rows = _sp({"keywords": name, "company_domains": [domain], "max_people": 25},
+                   api_key, per_page=25, strict=True)
+    except Exception as e:
+        # No personal data in the log line: a domain only.
+        log.warning("cpi person-on-file lookup failed domain=%s: %s", domain, e)
+        return None
+    for r in (rows or []):
+        if _cpi_person_name_matches(r.get("full_name"), name):
+            return r
+    return None
 
 
 def _cpi_grounded_answer(oai, facts, question: str, research: str = "") -> str:
@@ -9171,52 +9300,61 @@ def cpi_chat():
         resolved_org = {"id": context_org_id, "name": context_name,
                         "primary_domain": context_domain}
     elif company_name or selected_domain:
-        try:
-            resolved_org, choices = _cpi_resolve_company(company_name, api_key,
-                                                         domain=selected_domain,
-                                                         spend=spend, oai=oai,
-                                                         notes=resolve_notes)
-        except Exception as e:
-            # Apollo was unreachable. Saying "no such company" here would assert
-            # a negative fact that was never established.
-            log.warning("cpi chat company resolve failed: %s", e)
-            return _cpi_chat_reply(spend, answer="I couldn't reach Apollo just now, so I "
-                                                 "can't confirm anything about that company "
-                                                 "yet. Try again in a moment.")
-        if choices:
-            return _cpi_chat_reply(
-                spend,
-                answer="I found a few companies matching “%s”, which one did "
-                       "you mean?" % (company_name or selected_domain),
-                choices=choices)
-        if not resolved_org:
-            # Not in our records is not the same fact as not answerable, and this
-            # is the branch that made a plain question look broken: "I couldn't
-            # find a company called thoughworks in Apollo" was the entire reply
-            # to "cmo of thoughworks". Our records being silent about a company
-            # says nothing about who runs it, so answer the question that was
-            # actually asked from the public web, and be clear that we hold no
-            # contacts there.
-            ident = resolve_notes.get("identified") or {}
-            label = ident.get("name") or company_name or selected_domain
-            facts = {"company_not_in_our_records": True, "company": label}
-            if titles:
-                facts["requested_titles"] = titles
-            # Whichever step corrected the name, the reader has to be able to see
-            # that it happened: a silent correction is how a confident answer
-            # about the wrong company gets believed. Either step can be the one
-            # that changed it, so compare what the user actually typed (the
-            # parser's own record of it when it corrected the spelling, otherwise
-            # the string it passed through) against what is being answered about.
-            read_as = ident.get("name") or company_name
-            typed = typed_company or company_name
-            if typed and _cpi_norm_name(typed) != _cpi_norm_name(read_as):
-                facts["interpreted_company_name_as"] = {"typed": typed,
-                                                        "understood_as": read_as}
-            answer, researched, web = _cpi_web_answer(
-                oai, facts, message, titles, label, ident.get("domain") or "")
-            return _cpi_chat_reply(spend, researched=researched, web_search=web,
-                                   answer=answer)
+        # Try to pin the company for free before paying to. Only for questions
+        # about PEOPLE: a company_info question needs the firmographics that
+        # only the paid company record carries, so probing first would just
+        # delay a call that has to happen anyway. Skipped when the user picked a
+        # domain explicitly, since that already resolves exactly.
+        if company_name and not selected_domain and kind != "company_info":
+            resolved_org = _cpi_probe_company_free(company_name, api_key)
+        if resolved_org is None:
+            try:
+                resolved_org, choices = _cpi_resolve_company(company_name, api_key,
+                                                             domain=selected_domain,
+                                                             spend=spend, oai=oai,
+                                                             notes=resolve_notes)
+            except Exception as e:
+                # Apollo was unreachable. Saying "no such company" here would
+                # assert a negative fact that was never established.
+                log.warning("cpi chat company resolve failed: %s", e)
+                return _cpi_chat_reply(spend, answer="I couldn't reach Apollo just now, so I "
+                                                     "can't confirm anything about that company "
+                                                     "yet. Try again in a moment.")
+            if choices:
+                return _cpi_chat_reply(
+                    spend,
+                    answer="I found a few companies matching “%s”, which one did "
+                           "you mean?" % (company_name or selected_domain),
+                    choices=choices)
+            if not resolved_org:
+                # Not in our records is not the same fact as not answerable, and
+                # this is the branch that made a plain question look broken: "I
+                # couldn't find a company called thoughworks in Apollo" was the
+                # entire reply to "cmo of thoughworks". Our records being silent
+                # about a company says nothing about who runs it, so answer the
+                # question that was actually asked from the public web, and be
+                # clear that we hold no contacts there.
+                ident = resolve_notes.get("identified") or {}
+                label = ident.get("name") or company_name or selected_domain
+                facts = {"company_not_in_our_records": True, "company": label}
+                if titles:
+                    facts["requested_titles"] = titles
+                # Whichever step corrected the name, the reader has to be able to
+                # see that it happened: a silent correction is how a confident
+                # answer about the wrong company gets believed. Either step can be
+                # the one that changed it, so compare what the user actually typed
+                # (the parser's own record of it when it corrected the spelling,
+                # otherwise the string it passed through) against what is being
+                # answered about.
+                read_as = ident.get("name") or company_name
+                typed = typed_company or company_name
+                if typed and _cpi_norm_name(typed) != _cpi_norm_name(read_as):
+                    facts["interpreted_company_name_as"] = {"typed": typed,
+                                                            "understood_as": read_as}
+                answer, researched, web = _cpi_web_answer(
+                    oai, facts, message, titles, label, ident.get("domain") or "")
+                return _cpi_chat_reply(spend, researched=researched, web_search=web,
+                                       answer=answer)
 
     # Echoed back so the client can pin this company for follow-up turns.
     ctx = ({"org_id": resolved_org.get("id"), "name": resolved_org.get("name"),
@@ -9391,6 +9529,39 @@ def cpi_chat():
                     log.warning("cpi chat role lookup failed: %s", e)
         return _role_box["v"]
 
+    def _role_holder_extras(role):
+        """(extra_facts, enrich_meta) for a publicly-named role holder.
+
+        Two things were wrong with naming this person and stopping. First, the
+        answer asserted that our records do not have them -- a negative nobody
+        had actually checked, and usually false: the only search that ran was
+        filtered by TITLE, so a published CMO filed in Apollo as "SVP Marketing"
+        was reported as absent. That is now looked up by name, for free, and the
+        claim either way is code-established rather than assumed.
+
+        Second, there was no way to act on the name. Apollo's people/match can
+        resolve someone by name plus employer domain even when the title-scoped
+        search never surfaced them, so an Enrich button is offered whenever we
+        have a domain to match against -- with their real Apollo id when we found
+        them on file, and by name plus domain when we did not. Either way it
+        spends nothing until the user clicks it.
+        """
+        who = (role or {}).get("name") or ""
+        dom = ((resolved_org or {}).get("primary_domain")
+               or (resolved_org or {}).get("domain") or "")
+        if not who or not dom:
+            return {}, None
+        on_file = _cpi_person_on_file(who, dom, api_key)
+        if on_file:
+            return ({"public_role_holder_is_on_file": _cpi_answer_person(on_file, False)},
+                    {"type": "person", "name": on_file.get("full_name") or who,
+                     "title": on_file.get("title") or (role or {}).get("title") or "",
+                     "domain": dom, "apollo_id": on_file.get("id") or ""})
+        return ({"public_role_holder_not_in_our_records": True},
+                {"type": "person", "name": who,
+                 "title": (role or {}).get("title") or "",
+                 "domain": dom, "apollo_id": ""})
+
     if not people:
         # No match in our records is not the end of the answer: say so plainly and
         # then answer whatever research can support, rather than dead-ending.
@@ -9400,12 +9571,17 @@ def cpi_chat():
         if resolved_org:
             facts["company"] = resolved_org.get("name") or company_name
         role = _public_role()
+        enrich_meta = None
         if role:
             facts["public_role_holder"] = role
+            role_facts, enrich_meta = _role_holder_extras(role)
+            facts.update(role_facts)
         research, web = _research()
+        extra = {"enrich": enrich_meta} if enrich_meta else {}
         return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                                web_search=web,
-                               answer=_cpi_grounded_answer(oai, facts, message, research))
+                               answer=_cpi_grounded_answer(oai, facts, message, research),
+                               **extra)
 
     if kind == "person_at_company" and not no_title_match:
         # Prefer a person whose real title actually matches what was asked for,
@@ -9471,6 +9647,7 @@ def cpi_chat():
     if total_entries is not None and total_entries > len(shown):
         facts["total_matching_count"] = total_entries
         facts["returned_count"] = len(shown)
+    enrich_meta = None
     if no_title_match and titles:
         facts = {
             "no_one_holds_the_requested_title": True,
@@ -9481,10 +9658,14 @@ def cpi_chat():
         role = _public_role()
         if role:
             facts["public_role_holder"] = role
+            role_facts, enrich_meta = _role_holder_extras(role)
+            facts.update(role_facts)
     research, web = _research()
+    extra = {"enrich": enrich_meta} if enrich_meta else {}
     return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
                            web_search=web,
-                           answer=_cpi_grounded_answer(oai, facts, message, research))
+                           answer=_cpi_grounded_answer(oai, facts, message, research),
+                           **extra)
 
 
 @app.route("/health")

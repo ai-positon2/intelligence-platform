@@ -221,6 +221,9 @@ def _chat_message(monkeypatch, message, seen_calls):
 
     monkeypatch.setattr(ac, "search_companies", _sc)
     monkeypatch.setattr(ac, "search_people", lambda f, k, **kw: [])
+    # This test is about the PAID resolver's cache, so the free pre-resolve
+    # probe is switched off rather than left to short-circuit it.
+    monkeypatch.setattr(appmod, "_cpi_probe_company_free", lambda *a, **k: None)
     monkeypatch.setattr(appmod, "_cpi_reveal_names", lambda p, k, spend=None: p)
     monkeypatch.setattr(appmod, "_cpi_role_lookup", lambda *a, **k: None)
     monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
