@@ -225,6 +225,47 @@ def test_a_cfo_question_does_not_ask_for_engineering():
     assert not (asked & appmod._cpi_title_functions("Head of Human Resources"))
 
 
+# ── The revenue leader crossover ───────────────────────────────────────────
+
+@pytest.mark.parametrize("title", [
+    "CRO", "Chief Revenue Officer", "VP Revenue", "Head of Revenue",
+])
+def test_a_revenue_leader_counts_as_marketing_too(title):
+    """At many companies the CRO owns marketing as well as sales, so a CMO
+    question should be offered them when no CMO is on file."""
+    fns = appmod._cpi_title_functions(title)
+    assert "marketing" in fns
+    assert "sales" in fns, "they have not stopped being the sales leader"
+
+
+@pytest.mark.parametrize("title", [
+    "Revenue Operations Manager", "Revenue Analyst", "Director of Revenue Operations",
+])
+def test_the_revenue_team_does_not_count_as_marketing(title):
+    """The rationale is ownership of the revenue org, which a manager or an analyst
+    does not have. Offering one as the closest marketing contact is the exact
+    substitution this scoping exists to prevent."""
+    fns = appmod._cpi_title_functions(title)
+    assert "marketing" not in fns
+    assert "sales" in fns
+
+
+def test_the_crossover_runs_one_way_only():
+    """"A CRO's remit usually includes marketing" makes a CRO a reasonable answer to
+    a marketing question. It does not make a marketing head a reasonable answer to a
+    revenue one."""
+    assert "sales" not in appmod._cpi_title_functions("CMO")
+    assert "sales" not in appmod._cpi_title_functions("Head of Marketing")
+
+
+def test_a_marketing_question_actually_searches_for_the_revenue_leader():
+    """A crossover rule with nothing to apply to would be dead: Apollo has to be
+    asked for the CRO before one can be classified as marketing."""
+    titles = appmod._cpi_function_search_titles(frozenset({"marketing"}))
+    assert "Chief Revenue Officer" in titles
+    assert "CMO" in titles, "and still for the title actually asked about"
+
+
 def test_apollos_own_department_can_place_someone_a_title_cannot():
     """A second, independent signal for the plans that return it."""
     p = {"title": "Head of Special Projects", "departments": ["finance"]}
@@ -498,6 +539,20 @@ def test_the_masked_names_from_the_screenshot_never_reach_the_client(monkeypatch
         "Vikram Mu.", "Amit Ch."]
     assert facts["some_surnames_withheld_until_enriched"] is True
     assert [c["label"] for c in body["enrich"]] == ["Vikram Mu.", "Amit Ch."]
+
+
+def test_a_cmo_question_is_offered_the_revenue_leader_but_not_their_team(monkeypatch):
+    """The crossover, end to end. The CRO is offered because a revenue leader
+    usually owns marketing; the revenue ops manager and the engineering VP are
+    not."""
+    roster = [{"id": "p1", "full_name": "Vivek Sharma", "title": "VP Engineering"},
+              {"id": "p7", "full_name": "Priya Nair", "title": "Chief Revenue Officer"},
+              {"id": "p8", "full_name": "Karan Bose", "title": "Revenue Operations Manager"}]
+    _body, facts, _m = _ask(monkeypatch, roster, titles=("CMO",),
+                            message="CMO of Lenovo India")
+    assert [(p["name"], p["title"]) for p in facts["closest_people_we_hold"]] == [
+        ("Priya Nair", "Chief Revenue Officer")]
+    assert facts["these_people_all_work_in"] == "marketing"
 
 
 def test_the_person_who_was_asked_for_is_also_printable(monkeypatch):
