@@ -213,9 +213,9 @@ def test_the_export_records_whether_company_details_were_on():
     """The spreadsheet's "Search details" sheet is how someone later works out why
     one file has company columns and another does not."""
     out = dict(appmod._cpi_filters_readable({"titles": ["CFO"], "company_detail": False}))
-    assert out["Company detail"] == "No"
+    assert out["Employer details fetched"] == "No"
     on = dict(appmod._cpi_filters_readable({"company_detail": True}))
-    assert on["Company detail"] == "Yes"
+    assert on["Employer details fetched"] == "Yes"
 
 
 # ── One credit for the whole page ────────────────────────────────────────────

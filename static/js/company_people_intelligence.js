@@ -1138,7 +1138,11 @@ window.cpiExport = function(fmt, onlySelected){
      "the results of this search" any more, so labelling it with the search's
      filters would overstate what it actually contains. */
   var filters = onlySelected ? {} : (STATE.lastFilters||{});
-  var meta = onlySelected ? {} : { total: STATE.total };
+  /* The rejection counts are part of what produced this page: without them the
+     file reads as everything Apollo offered, when it is deliberately less. Left
+     out of a hand-picked selection, which is not "the results of this search"
+     any more and so cannot claim the search's bookkeeping either. */
+  var meta = onlySelected ? {} : { total: STATE.total, rejected: STATE.rejected||{} };
   doCpiDownload(STATE.entity, rows, fmt, filters, meta);
 };
 
