@@ -30,6 +30,7 @@ this plan never returns to us. Re-checking those in code would mean overruling a
 real filter with less information than it had.
 """
 
+import inspect
 import json as _json
 import os
 import sys
@@ -588,3 +589,234 @@ def test_every_industry_seen_on_a_paid_record_is_recorded(monkeypatch):
     assert seen and [o["industry"] for o in seen[0]][:2] == \
         ["hospital & health care", "medical practice"]
     assert spend["credits"] == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Round two: the chat's CLOSED-VOCABULARY filters.
+#
+# The first pass fixed what the chat's filters MEANT. This pass covers what they
+# are allowed to SAY. The search page got pickers so a person cannot type a value
+# Apollo has no such thing as; the chat asks a language model for those same
+# strings and sent whatever came back.
+#
+# Measured against this account on the free people endpoint, person_titles=
+# ["chief marketing officer"]:
+#
+#   person_seniorities ["c_suite"]              68,174 people
+#                      ["C_Suite"]                   0   same word, capitalized
+#                      ["C-Suite"]                   0   hyphen for underscore
+#                      ["executive"]                 0   not a value Apollo has
+#                      ["c_suite", "executive"] 68,174   one bad value is skipped
+#
+# So the filter is closed AND case sensitive, and only an all-bad list breaks:
+# exactly what a model produces for "the executives at Acme". The result was a
+# confident "nobody matches" for a question Apollo was never really asked.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _answer_prompt():
+    """The whole _CPI_ANSWER_SYSTEM literal. Sliced to the next module-level name
+    rather than a fixed character count, which silently truncated as the prompt
+    grew and made a rule look absent when it was simply past the window."""
+    src = inspect.getsource(appmod)
+    start = src.index("_CPI_ANSWER_SYSTEM = (")
+    return src[start:src.index("\n_CPI_", start + 1)]
+
+
+@pytest.mark.parametrize("asked,expected", [
+    # The three spellings a model actually produces for the top level.
+    (["C-Suite"], ["c_suite"]),
+    (["C_Suite"], ["c_suite"]),
+    (["executive"], ["c_suite"]),
+    (["executives"], ["c_suite"]),
+    (["Executives"], ["c_suite"]),
+    (["c-level"], ["c_suite"]),
+    (["CXO"], ["c_suite"]),
+    # And the rest of the vocabulary, spelled loosely.
+    (["Vice President"], ["vp"]),
+    (["VPs"], ["vp"]),
+    (["SVP"], ["vp"]),
+    (["Founders"], ["founder"]),
+    (["co-founder"], ["founder"]),
+    (["Owners"], ["owner"]),
+    (["Managers"], ["manager"]),
+    (["Directors"], ["director"]),
+    (["interns"], ["intern"]),
+    (["entry level"], ["entry"]),
+    # Already correct, and unchanged.
+    (["c_suite", "vp", "director"], ["c_suite", "vp", "director"]),
+    # De-duplicated: two spellings of one level are one filter.
+    (["C-Suite", "executive", "c_suite"], ["c_suite"]),
+])
+def test_a_seniority_is_normalized_onto_apollos_own_nine_values(asked, expected):
+    kept, dropped = appmod._cpi_clean_seniorities(asked)
+    assert kept == expected
+    assert dropped == []
+
+
+def test_a_seniority_apollo_has_no_such_value_for_is_dropped_and_reported():
+    """Dropped rather than sent, because Apollo returns zero people for an
+    all-unrecognized list, and reported rather than swallowed, because the answer
+    would otherwise be narrower than the reader thinks."""
+    kept, dropped = appmod._cpi_clean_seniorities(["board member", "wizard"])
+    assert kept == []
+    assert dropped == ["board member", "wizard"]
+
+
+def test_every_value_the_normalizer_produces_is_one_apollo_accepts():
+    """The whole point. Anything this function emits goes straight to Apollo, and
+    Apollo answers an unrecognized value with silence, not an error."""
+    every = (list(appmod._CPI_APOLLO_SENIORITIES) +
+             list(appmod._CPI_SENIORITY_ALIASES) +
+             ["C-Suite", "Executives", "Vice President", "junior", "IC"])
+    kept, _dropped = appmod._cpi_clean_seniorities(every)
+    for value in kept:
+        assert value in appmod._CPI_APOLLO_SENIORITIES, value
+
+
+def test_the_alias_table_never_points_at_a_value_apollo_does_not_have():
+    for word, target in appmod._CPI_SENIORITY_ALIASES.items():
+        assert target in appmod._CPI_APOLLO_SENIORITIES, (word, target)
+
+
+def test_the_nine_values_are_exactly_apollos_documented_set():
+    """Written down so a future edit cannot quietly add a tenth that returns
+    nothing, or drop one that works."""
+    assert set(appmod._CPI_APOLLO_SENIORITIES) == {
+        "owner", "founder", "c_suite", "vp", "director", "manager", "senior",
+        "entry", "intern"}
+
+
+def test_a_question_about_executives_reaches_apollo_as_c_suite(monkeypatch):
+    """End to end through the real route: the word the model produced for
+    "executives" used to go to Apollo verbatim and match nobody."""
+    _body, facts, calls = _ask(
+        monkeypatch, "who are the executives at Acme",
+        {"intent": "people_list", "titles": [], "seniorities": ["executive"],
+         "company_name": ""})
+    assert calls["people"][0]["seniorities"] == ["c_suite"]
+    assert "seniority_words_apollo_does_not_have_so_they_were_ignored" not in facts
+
+
+def test_an_unusable_seniority_is_named_in_the_answers_facts(monkeypatch):
+    """So an empty or over-broad answer can say which part of the question was not
+    applied, instead of implying all of it was."""
+    _body, facts, calls = _ask(
+        monkeypatch, "list the board members at healthcare companies",
+        {"intent": "people_list", "titles": [], "seniorities": ["board member"],
+         "industries": ["healthcare"]})
+    assert "seniorities" not in calls["people"][0] or \
+        calls["people"][0]["seniorities"] == []
+    assert facts["seniority_words_apollo_does_not_have_so_they_were_ignored"] == \
+        "board member"
+
+
+def test_the_answer_prompt_is_told_what_an_ignored_seniority_means():
+    block = _answer_prompt()
+    assert "seniority_words_apollo_does_not_have_so_they_were_ignored" in block
+    assert "nobody" in block
+
+
+# ── Classification codes in a question ────────────────────────────────────────
+
+def test_a_quoted_naics_code_is_applied_for_free(monkeypatch):
+    """NAICS and SIC exist on the PEOPLE endpoint and Apollo enforces both exactly,
+    so a coded question needs no paid company lookup and no verification pass."""
+    _body, facts, calls = _ask(
+        monkeypatch, "CMOs at companies in NAICS 5415",
+        {"intent": "people_list", "titles": ["CMO"], "naics_codes": ["5415"]})
+    assert calls["companies"] == [], "a code question must not spend a credit"
+    assert calls["people"][0]["naics_codes"] == ["5415"]
+    assert facts["codes_applied_by_apollo_directly"] == {"NAICS": "5415"}
+
+
+def test_a_six_digit_code_in_a_question_is_refused_with_the_rule(monkeypatch):
+    """Real NAICS codes are 6 digits and Apollo takes 2 to 5, so a question quoting
+    an official code was answered with an empty page and no explanation."""
+    _body, facts, calls = _ask(
+        monkeypatch, "CMOs at companies in NAICS 541511",
+        {"intent": "people_list", "titles": ["CMO"], "naics_codes": ["541511"]})
+    assert "naics_codes" not in calls["people"][0]
+    note = facts["codes_that_are_not_a_valid_length_so_they_were_ignored"]
+    assert note["naics"]["codes"] == "541511"
+    assert "54151" in note["naics"]["rule"]
+
+
+def test_a_mixed_bag_of_codes_keeps_the_good_ones(monkeypatch):
+    _body, facts, calls = _ask(
+        monkeypatch, "CMOs in NAICS 5415 and 541511",
+        {"intent": "people_list", "titles": ["CMO"],
+         "naics_codes": ["5415", "541511"], "sic_codes": ["7372"]})
+    assert calls["people"][0]["naics_codes"] == ["5415"]
+    assert calls["people"][0]["sic_codes"] == ["7372"]
+    assert facts["codes_that_are_not_a_valid_length_so_they_were_ignored"][
+        "naics"]["codes"] == "541511"
+
+
+def test_the_parser_is_told_never_to_invent_a_code_from_an_industry_name():
+    """A guessed code is worse than none: it is a precise-looking filter for the
+    wrong industry, and the industry path already maps plain words properly."""
+    src = inspect.getsource(appmod)
+    block = src[src.index("_CPI_INTENT_SYSTEM"):src.index("_CPI_RESEARCH_SYSTEM")]
+    assert "naics_codes" in block and "sic_codes" in block
+    assert "Never derive a code from an industry name" in block
+
+
+# ── Values that may be the cause of an empty answer ───────────────────────────
+
+def test_an_unrecognized_technology_is_flagged_rather_than_read_as_a_finding(monkeypatch):
+    """A model writing "SFDC" produced "no companies match", which reads as nobody
+    using Salesforce. Measured: an invented technology uid returns 0 people, which
+    is indistinguishable from a real one nobody uses."""
+    _body, facts, _calls = _ask(
+        monkeypatch, "CMOs at companies using SFDC",
+        {"intent": "people_list", "titles": ["CMO"], "technologies": ["SFDC"]},
+        orgs=[])
+    assert "no_companies_on_file_match_these_constraints" in facts
+    odd = facts["these_values_could_not_be_confirmed_as_ones_apollo_uses"]
+    assert odd["technology"] == "SFDC"
+
+
+def test_a_real_technology_that_simply_matched_nothing_is_not_blamed(monkeypatch):
+    """The distinction has to cut both ways, or the note becomes noise attached to
+    every empty result."""
+    _body, facts, _calls = _ask(
+        monkeypatch, "CMOs at companies using Marketo",
+        {"intent": "people_list", "titles": ["CMO"], "technologies": ["Marketo"]},
+        orgs=[])
+    assert "no_companies_on_file_match_these_constraints" in facts
+    assert "these_values_could_not_be_confirmed_as_ones_apollo_uses" not in facts
+
+
+def test_an_invented_place_is_flagged_too(monkeypatch):
+    _body, facts, _calls = _ask(
+        monkeypatch, "CMOs at companies in Zzyzxville",
+        {"intent": "people_list", "titles": ["CMO"],
+         "company_locations": ["Zzyzxville"]}, orgs=[])
+    odd = facts["these_values_could_not_be_confirmed_as_ones_apollo_uses"]
+    assert odd["headquarters"] == "Zzyzxville"
+
+
+def test_a_real_place_is_not_flagged(monkeypatch):
+    _body, facts, _calls = _ask(
+        monkeypatch, "CMOs at companies in Texas",
+        {"intent": "people_list", "titles": ["CMO"],
+         "company_locations": ["Texas"]}, orgs=[])
+    assert "these_values_could_not_be_confirmed_as_ones_apollo_uses" not in facts
+
+
+def test_the_flag_is_only_raised_when_nothing_matched(monkeypatch):
+    """It explains an empty result. Attached to a good answer it would cast doubt
+    on rows that are perfectly fine."""
+    _body, facts, _calls = _ask(
+        monkeypatch, "CMOs at healthcare companies using SFDC",
+        {"intent": "people_list", "titles": ["CMO", "Chief Marketing Officer"],
+         "industries": ["healthcare"]})
+    assert "these_values_could_not_be_confirmed_as_ones_apollo_uses" not in facts
+
+
+def test_the_answer_prompt_will_not_state_the_flag_as_proof_either_way():
+    """The seed lists are not exhaustive, so absence is a hint. The wording has to
+    stay on the right side of that."""
+    block = _answer_prompt()
+    assert "these_values_could_not_be_confirmed_as_ones_apollo_uses" in block
+    assert "not exhaustive" in block
