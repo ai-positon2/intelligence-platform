@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=11">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=12">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -63,7 +63,7 @@
        still costs nothing, but describing employers the 30-day cache has not seen
        before spends one credit for the whole page. Better to say so here than to
        have someone discover it from the balance. #}
-    <div class="page-hdr-credits"><span class="d"></span>Finding people is free &middot; describing their companies costs 1 credit per page, cached 30 days &middot; Company search &amp; Enrich each spend 1 credit</div>
+    <div class="page-hdr-credits"><span class="d"></span>Finding people is free &middot; describing their companies is optional and costs 1 credit per page, cached 30 days &middot; Company search &amp; Enrich each spend 1 credit</div>
     <button class="page-hdr-hist-btn" onclick="cpiOpenHistory()">
       <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
       History
@@ -215,6 +215,13 @@
         <div class="cpi-filter-row">
           <button class="cpi-more-btn" id="fpMoreBtn" onclick="cpiToggleAdvanced('fpAdvanced','fpMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
+          {# Sits beside Search rather than among the filters because it does not
+             change WHO comes back, only how much is known about them, and because
+             it is the one control on this page that decides whether a click
+             spends a credit. Default on: the thin card was the complaint. #}
+          <label class="cpi-check cpi-check-cost" title="Adds each person's employer: industry, headcount, HQ, revenue, funding and tech stack. Apollo charges 1 credit per page for this, whatever the number of companies on it, and the answers are cached for 30 days so repeat searches are free.">
+            <input type="checkbox" id="fpCompanyDetail" checked onchange="cpiSyncCostLabels()">Company details<s>&middot; up to 1 credit/page</s>
+          </label>
           <button class="cpi-search-btn" id="cpiSearchBtn" onclick="cpiRunSearch(true)"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.3" fill="none" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>Search</button>
         </div>
       </div>
@@ -463,7 +470,7 @@ window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
 window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=11" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=12" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');

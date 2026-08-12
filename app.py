@@ -7388,6 +7388,13 @@ def cpi_search():
     body = request.get_json(silent=True) or {}
     entity = "companies" if body.get("entity") == "companies" else "people"
     filters = body.get("filters") or {}
+    # Staff-facing switch for the one part of a people search that can cost a
+    # credit (see _cpi_attach_employer_facts). Popped rather than read, because
+    # everything left in `filters` goes on to build an Apollo payload, and a key
+    # Apollo does not know is a key some future filter loop could pass through by
+    # accident. Absent means on: the thin card is what this replaced.
+    filters = dict(filters)
+    company_detail = filters.pop("company_detail", True) is not False
     try:
         page = max(1, min(int(body.get("page") or 1), 500))
     except (TypeError, ValueError):
@@ -7437,7 +7444,11 @@ def cpi_search():
             # people work, so the employers get described once for the whole page
             # (see _cpi_attach_employer_facts for the cost and the caching) and
             # each person's seniority and function get read off their own title.
-            firmo = _cpi_attach_employer_facts(results, api_key, spend)
+            if company_detail:
+                firmo = _cpi_attach_employer_facts(results, api_key, spend)
+            # Outside the toggle on purpose: reading a title costs nothing, so
+            # turning off the paid company lookup should not also throw away the
+            # free classification that comes with every row.
             for r in results:
                 r.update(_cpi_derive_role(r.get("title")))
         else:
@@ -7461,6 +7472,12 @@ def cpi_search():
     # instead of both silently claiming to be free.
     if firmo and firmo.get("orgs"):
         out["companies_described"] = firmo
+    if entity == "people":
+        # Echoed back so the results header describes the rows it is actually
+        # showing rather than the state of a checkbox the user may already have
+        # flipped since. Only meaningful for people: the Companies tab pays for
+        # full records either way and has nothing to switch off.
+        out["company_detail"] = company_detail
     # A title search scoped to exactly one company that came back empty gets a
     # real explanation instead of a bare "no matches" -- see the function for
     # why, and why it is gated this narrowly (a plain, unscoped browse coming

@@ -705,6 +705,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .cpi-check{padding:8px 12px;border-radius:var(--radius-pill);
   background:rgba(255,255,255,.035);border:1px solid var(--b1);transition:.16s}
 .cpi-check:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.2)}
+/* The one control on the page that decides whether a click spends a credit, so
+   it sits right of the secondary buttons and carries its price inline. Dims when
+   off, so "no company detail" is legible at a glance rather than only from the
+   checkbox state. */
+.cpi-check-cost{margin-left:auto}
+.cpi-check-cost s{text-decoration:none;color:var(--tx3);font-size:11.5px}
+.cpi-check-cost.off{opacity:.62}
 
 /* Buttons: Search gets a diagonal shine sweep on hover and its icon; the
    secondary actions get a touch more presence so the row doesn't fade out
