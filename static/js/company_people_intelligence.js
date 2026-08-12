@@ -18,7 +18,16 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
    into an unrelated later search once the user types something else. */
 /* firmo: what the last fetch did to describe these people's employers (see
    firmoNote). Per-fetch, not cumulative. */
-var STATE = { entity: "people", page: 1, results: [], selected: {},
+/* entity is what the FILTER PANEL is set to, i.e. what the next search will look
+   for. shownEntity is what the rows currently on screen actually are. They are
+   two different facts and were one variable: flipping the toggle relabelled a
+   grid of people as companies without refetching, so the next re-render drew them
+   through the company card (every field blank, every name "Unknown"), an export
+   built company columns out of person rows, and Load more appended companies to
+   the bottom of a people list. Anything describing the rows must read
+   shownEntity; only the search itself reads entity. */
+var STATE = { entity: "people", shownEntity: null, page: 1, results: [],
+              selected: {},
               total: null, lastFilters: {}, historyId: null,
               pinnedOrgId: null, pinnedOrgName: null, firmo: null,
               companyDetail: undefined, rejected: null, rejectedLabels: {} };
@@ -55,9 +64,14 @@ window.cpiSetEntity = function(entity){
   });
   document.getElementById("cpiFiltersPeople").style.display = entity==="people" ? "" : "none";
   document.getElementById("cpiFiltersCompanies").style.display = entity==="companies" ? "" : "none";
-  /* People and company rows have different shapes and export columns, so a
-     selection cannot survive the switch. Clear it rather than mixing the two. */
-  if(changed){ STATE.selected={}; STATE.firmo=null; updateBulk(); }
+  /* The rows on screen and any selection of them belong to the search that
+     fetched them, so switching tabs leaves both alone. What it cannot leave alone
+     is Load more: that continues the DISPLAYED search, and continuing a people
+     search from the companies panel appended companies to a list of people. */
+  if(changed && STATE.shownEntity && STATE.shownEntity!==entity){
+    var more=document.getElementById("cpiLoadMore");
+    if(more) more.style.display="none";
+  }
   syncLoadMoreLabel();
 };
 
@@ -664,6 +678,9 @@ window.cpiRunSearch = function(reset){
        the Companies tab also spent a fresh Apollo credit per click). */
     if(items.length){ STATE.page = (STATE.page||1) + 1; }
     if(d && d.total!==undefined && d.total!==null) STATE.total=d.total;
+    /* Stamped here, where the rows arrive, so nothing downstream has to trust
+       the toggle to know what they are. */
+    if(items.length || reset) STATE.shownEntity = STATE.entity;
     STATE.results = reset ? items : STATE.results.concat(items);
     renderResults();
     /* A title search scoped to one company that came back empty gets a real
@@ -742,7 +759,7 @@ function renderAiNote(note){
    the difference between a search that was free and one that spent a credit, and
    nobody should have to guess which they just ran. */
 function firmoNote(){
-  if(STATE.entity!=="people") return "";
+  if(STATE.shownEntity!=="people") return "";
   var f=STATE.firmo;
   if(!f||!f.orgs){
     /* Says why the cards are thin, and where to change it. Without this, turning
@@ -763,24 +780,32 @@ function firmoNote(){
    page of 24 arrive as 18: unexplained, that reads as Apollo being thin on matches
    rather than as the filters doing their job. Broken down per reason, so a filter
    quietly doing nothing is visible as a reason that never appears. */
-function rejectedNote(){
+/* One source of truth for what was removed and why, because two places now say
+   it: the count line when some rows survived, and the empty state when none did.
+   Returns null when nothing was removed. */
+function rejectedReasons(){
   var r=STATE.rejected;
-  if(!r) return "";
-  var keys=Object.keys(r);
-  if(!keys.length) return "";
+  if(!r) return null;
+  var keys=Object.keys(r).filter(function(k){ return r[k]; });
+  if(!keys.length) return null;
   var total=0;
   keys.forEach(function(k){ total+=r[k]; });
   keys.sort(function(a,b){ return r[b]-r[a]; });
-  var parts=keys.map(function(k){
+  return { total: total, text: keys.map(function(k){
     return pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
-  });
-  return ' <s>&middot; '+pmNum(total)+" removed: "+esc(parts.join(", "))+"</s>";
+  }).join(", ") };
+}
+
+function rejectedNote(){
+  var why=rejectedReasons();
+  if(!why) return "";
+  return ' <s>&middot; '+pmNum(why.total)+" removed: "+esc(why.text)+"</s>";
 }
 
 /* "1 companies" is the kind of small wrongness that makes a page feel unfinished,
    and the singular case is common: a scoped search often returns exactly one. */
 function noun(n){
-  if(STATE.entity==="people") return n===1 ? "person" : "people";
+  if(STATE.shownEntity==="people") return n===1 ? "person" : "people";
   return n===1 ? "company" : "companies";
 }
 
@@ -788,7 +813,20 @@ function renderResults(){
   var wrap=document.getElementById("cpiResultsWrap");
   var bar=document.getElementById("cpiToolbar");
   if(!STATE.results.length){
-    wrap.innerHTML='<div class="cpi-empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg><span>No matches. Try widening the filters.</span></div>';
+    /* "No matches" is a claim about Apollo, and it is often not what happened:
+       several of Apollo's filters are relevance hints, so rows come back that do
+       not satisfy them and are removed afterwards. When that removes ALL of them
+       the count and its breakdown were the thing that explained it -- and both
+       live in the toolbar, which hides itself when there are no rows, so the
+       explanation disappeared exactly when it was the whole story. */
+    var why=rejectedReasons();
+    wrap.innerHTML='<div class="cpi-empty"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-3.4-3.4"/></svg><span>'+
+      (why
+        ? "Apollo returned "+pmNum(why.total)+" "+noun(why.total)+
+          ", and on checking, none of them matched: "+esc(why.text)+
+          ". Try widening those filters."
+        : "No matches. Try widening the filters.")+
+      "</span></div>";
     if(bar) bar.style.display="none";
     updateBulk();
     return;
@@ -803,20 +841,12 @@ function renderResults(){
       + firmoNote() + rejectedNote();
   }
   wrap.innerHTML='<div class="cpi-grid">'+STATE.results.map(function(r,i){
-    return STATE.entity==="people" ? personCard(r,i) : companyCard(r,i);
+    return STATE.shownEntity==="people" ? personCard(r,i) : companyCard(r,i);
   }).join("")+"</div>";
   updateBulk();
   syncSelectAllLabel();
 }
 
-/* Company favicon by domain. Apollo's free people search returns no logo, and a
-   real mark next to every row is most of what makes the grid feel finished, so
-   this falls back to the public favicon service and hides itself if that 404s.
-   Same class of third-party asset call the page already makes for webfonts. */
-function logoFor(domain){
-  domain=String(domain||"").replace(/^https?:\/\//i,"").replace(/\/.*$/,"").trim();
-  return domain ? "https://www.google.com/s2/favicons?domain="+encodeURIComponent(domain)+"&sz=64" : "";
-}
 function row(svg, inner){ return '<div class="cpi-row">'+svg+'<span>'+inner+'</span></div>'; }
 
 var IC_BLD='<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h2M9 13h2M9 17h2M15 9h0M15 13h0"/></svg>';
@@ -843,11 +873,17 @@ function pmMoney(n, printed){
 function pmGrowth(pct){
   if(pct===null||pct===undefined||pct==="") return "";
   var n=+pct; if(isNaN(n)) return "";
-  /* Apollo reports this as a fraction on some records and as whole percent on
-     others. Treating 0.14 as "0.1%" understates a real 14% growth by two orders
-     of magnitude, so a value inside ±1 is read as the fraction it almost
-     certainly is. */
-  if(Math.abs(n)<=1) n=n*100;
+  /* Apollo returns this as a FRACTION: 0.19 is 19% growth. Every observed value
+     in this repo's fixtures is one (0.08, 0.19), and the External Usage export has
+     multiplied the same Apollo field by 100 unconditionally since long before this
+     page existed.
+
+     This used to scale only values inside ±1, on the belief that some records
+     arrive as whole percent. The cost of that hedge was silent and one-directional:
+     a company that grew 150% arrives as 1.5 and was printed as "+1.5%", so the
+     fastest-growing employers on the page looked like the flattest. One
+     convention, matching the rest of the app. */
+  n = n * 100;
   return (n>0?"+":"")+n.toFixed(n%1?1:0)+"%";
 }
 /* City, state and country joined with the repeats removed. Apollo stores the
@@ -889,7 +925,13 @@ function personCard(p,i){
 
   var rows=[];
   if(p.organization_name){
-    var lg=safeUrl(p.organization_logo)||logoFor(p.organization_domain);
+    /* Apollo's own logo, or none. This used to fall back to Google's public
+       favicon service, which meant the browser announced every company on the
+       page to a third party, one request per card, as the grid was scrolled:
+       the prospect list being worked, leaving the building to buy a 16px image.
+       Where Apollo has no logo the row shows the name alone, which is what it
+       was always going to show if the favicon 404'd anyway. */
+    var lg=safeUrl(p.organization_logo);
     var co=(lg?'<img class="cpi-row-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'"> ':"")
       +'<b>'+esc(p.organization_name)+'</b>';
     var extra=[];
@@ -966,7 +1008,9 @@ function personCard(p,i){
 function companyCard(c,i){
   var loc=placeLine(c.city,c.state,c.country);
   var sel=STATE.selected[c.id]?" sel":"";
-  var src=safeUrl(c.logo_url)||logoFor(c.primary_domain);
+  /* Apollo returns a logo for companies on the search itself; no third-party
+     favicon lookup, for the same reason as the person card above. */
+  var src=safeUrl(c.logo_url);
   var logo=src?('<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.parentNode.textContent=\''+esc(initials(c.name))+'\'">'):esc(initials(c.name));
 
   var rows=[];
@@ -1021,11 +1065,15 @@ window.cpiToggleSelectAll = function(){
   renderResults();
 };
 function selectedRows(){ return Object.keys(STATE.selected).map(function(k){ return STATE.selected[k]; }); }
+/* Names the count, because the line right next to this button says "Showing 24 of
+   79,421 matches in Apollo" and a button called "Select all" sitting beside that
+   reads as selecting all 79,421. It selects the 24 that are loaded. */
 function syncSelectAllLabel(){
   var btn=document.getElementById("cpiSelectAll");
   if(!btn||!STATE.results.length) return;
   var all=STATE.results.every(function(r){ return !rowKey(r) || STATE.selected[r.id]; });
-  btn.lastChild.textContent = all ? " Clear all" : " Select all";
+  var n=STATE.results.length;
+  btn.lastChild.textContent = all ? (" Clear "+n) : (" Select these "+n);
 }
 function updateBulk(){
   var bar=document.getElementById("cpiBulk"), n=selectedRows().length;
@@ -1034,7 +1082,7 @@ function updateBulk(){
   var lbl=document.getElementById("cpiBulkN");
   if(lbl) lbl.innerHTML="<b>"+n+"</b> selected";
   var enr=document.getElementById("cpiBulkEnrich");
-  if(enr) enr.style.display = STATE.entity==="people" ? "" : "none";
+  if(enr) enr.style.display = STATE.shownEntity==="people" ? "" : "none";
 }
 
 window.cpiToggleMenu = function(id){
@@ -1143,7 +1191,7 @@ window.cpiExport = function(fmt, onlySelected){
      out of a hand-picked selection, which is not "the results of this search"
      any more and so cannot claim the search's bookkeeping either. */
   var meta = onlySelected ? {} : { total: STATE.total, rejected: STATE.rejected||{} };
-  doCpiDownload(STATE.entity, rows, fmt, filters, meta);
+  doCpiDownload(STATE.shownEntity||STATE.entity, rows, fmt, filters, meta);
 };
 
 /* ── History ── */
@@ -1155,7 +1203,8 @@ function saveHistory(isNewSearch){
   if(isNewSearch) STATE.historyId = null;
   fetch(window.__CPI_HISTORY_URL__, {
     method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ entity: STATE.entity, filters: STATE.lastFilters||{},
+    body: JSON.stringify({ entity: STATE.shownEntity||STATE.entity,
+                           filters: STATE.lastFilters||{},
                            total: STATE.total, rows: STATE.results,
                            replace_id: STATE.historyId||0 })
   }).then(function(r){ return r.json(); }).then(function(d){
@@ -1371,6 +1420,9 @@ window.cpiRestoreHistory = function(id){
     if(!d || d.error){ toast("Could not reopen that search.", "err"); return; }
     STATE.entity = d.entity==="companies" ? "companies" : "people";
     window.cpiSetEntity(STATE.entity);
+    /* These rows are of the kind the entry recorded, whatever the panel was
+       showing a moment ago. */
+    STATE.shownEntity = STATE.entity;
     STATE.results = d.rows||[];
     STATE.total = d.total;
     STATE.selected = {};
@@ -1675,7 +1727,7 @@ function detailEmployer(r, pre){
   var g=function(k){ return r[pre+k]; };
   var name=pre?g("name"):r.name;
   var domain=pre?g("domain"):r.primary_domain;
-  var logo=safeUrl(pre?g("logo"):r.logo_url)||logoFor(domain);
+  var logo=safeUrl(pre?g("logo"):r.logo_url);
   var industry=pre?g("industry"):r.industry;
   var desc=pre?g("description"):r.short_description;
   var head=logo?('<img src="'+esc(logo)+'" alt="" onerror="this.style.display=\'none\'">'):esc(initials(name));
@@ -1777,7 +1829,7 @@ window.cpiOpenDetails = function(idx){
                   company:{name:r.organization_name, employees:r.organization_employees,
                            linkedin:r.organization_linkedin, website:r.organization_website,
                            domain:r.organization_domain}})
-    : companyHero({name:r.name, logo:r.logo_url||logoFor(r.primary_domain), industry:r.industry,
+    : companyHero({name:r.name, logo:r.logo_url, industry:r.industry,
                    description:r.short_description, employees:r.estimated_num_employees,
                    hq:placeLine(r.city,r.state,r.country),
                    revenue:(r.revenue_printed||(r.annual_revenue?pmNum(r.annual_revenue):"")),

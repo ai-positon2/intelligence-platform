@@ -9322,6 +9322,11 @@ _CPI_PERSON_COLS = [
     ("organization_state", "Company state"),
     ("organization_country", "Company country"),
     ("organization_phone", "Company phone"),
+    # On the card this is "+19% headcount 12mo", one of the strongest buying
+    # signals the free tier gives away. The file had no column for it at all, so
+    # the fact the screen led with did not survive being exported.
+    ("organization_growth6", "Company headcount growth 6mo %"),
+    ("organization_growth12", "Company headcount growth 12mo %"),
     ("organization_technologies", "Company technologies"),
     ("organization_keywords", "Company keywords"),
     ("organization_description", "Company description"),
@@ -9334,7 +9339,7 @@ _CPI_COMPANY_COLS = [
     ("industries", "Other industries"),
     ("estimated_num_employees", "Employees"), ("annual_revenue", "Annual revenue"),
     ("revenue_printed", "Revenue (as Apollo prints it)"),
-    ("growth6", "Headcount growth 6mo"), ("growth12", "Headcount growth 12mo"),
+    ("growth6", "Headcount growth 6mo %"), ("growth12", "Headcount growth 12mo %"),
     ("total_funding", "Total funding"),
     ("latest_funding_round_date", "Latest round"), ("founded_year", "Founded"),
     ("publicly_traded_symbol", "Ticker"), ("phone", "Phone"),
@@ -9455,6 +9460,27 @@ def _cpi_filters_readable(filters: dict) -> list:
     return out
 
 
+# Apollo returns headcount growth as a fraction: 0.19 is 19%. These columns used
+# to dump that fraction raw under a header with no unit on it, so a card reading
+# "+19%" exported as "0.19" while the External Usage workbook, reading the same
+# Apollo field, wrote 19.0 under a header ending in "%". Three renderings of one
+# number. The headers here now name the unit and the values match them.
+_CPI_EXPORT_PERCENT_COLS = {"growth6", "growth12",
+                            "organization_growth6", "organization_growth12"}
+
+
+def _cpi_export_percent(val) -> str:
+    """A fraction as the percent its column header promises. Anything unparseable
+    is left exactly as Apollo sent it rather than being silently dropped."""
+    if val in (None, ""):
+        return ""
+    try:
+        pct = float(val) * 100
+    except (TypeError, ValueError):
+        return _csv_safe(val)
+    return str(int(pct)) if pct == int(pct) else str(round(pct, 1))
+
+
 def _cpi_export_cell(row: dict, key: str) -> str:
     """One exported cell, including the columns that are derived rather than
     stored.
@@ -9470,6 +9496,8 @@ def _cpi_export_cell(row: dict, key: str) -> str:
         if row.get("enriched") or row.get("email") or row.get("phones"):
             return "Yes"
         return "No, not enriched"
+    if key in _CPI_EXPORT_PERCENT_COLS:
+        return _cpi_export_percent(row.get(key))
     return _csv_safe(row.get(key))
 
 
