@@ -20,7 +20,8 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
    firmoNote). Per-fetch, not cumulative. */
 var STATE = { entity: "people", page: 1, results: [], selected: {},
               total: null, lastFilters: {}, historyId: null,
-              pinnedOrgId: null, pinnedOrgName: null, firmo: null };
+              pinnedOrgId: null, pinnedOrgName: null, firmo: null,
+              companyDetail: undefined };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -60,18 +61,35 @@ window.cpiSetEntity = function(entity){
   syncLoadMoreLabel();
 };
 
+/* Default on, and treated as on if the control is missing, so the richer card is
+   what an untouched page produces. */
+function companyDetailOn(){
+  var el=document.getElementById("fpCompanyDetail");
+  return el ? !!el.checked : true;
+}
+
 /* Each Companies page is a fresh mixed_companies/search call, which Apollo bills
-   a credit for. A People page is free to search, but describing employers the
-   cache has not seen before costs one credit for the whole page -- so the label
-   says "up to", which is the only claim that is true both when the next page is
-   more people at companies already described and when it is not. */
+   a credit for. A People page is free to search; describing employers the cache
+   has not already seen costs one credit for the whole page, so with the toggle on
+   the label says "up to" -- the only claim true both when the next page is more
+   people at companies already described and when it is not. With it off, a People
+   page really is free, and the label has to say so or the toggle looks decorative. */
 function syncLoadMoreLabel(){
   var btn=document.getElementById("cpiLoadMore");
   if(!btn) return;
   btn.innerHTML = STATE.entity==="companies"
     ? 'Load more <s>&middot; 1 Apollo credit</s>'
-    : 'Load more <s>&middot; up to 1 Apollo credit</s>';
+    : (companyDetailOn() ? 'Load more <s>&middot; up to 1 Apollo credit</s>'
+                         : 'Load more <s>&middot; free</s>');
 }
+
+/* Keeps everything that quotes a price in step with the toggle: the Load more
+   button, and the toggle's own dimmed state. */
+window.cpiSyncCostLabels = function(){
+  var lbl=document.querySelector(".cpi-check-cost");
+  if(lbl) lbl.classList.toggle("off", !companyDetailOn());
+  syncLoadMoreLabel();
+};
 
 window.cpiToggleChip = function(el){ el.classList.toggle("on"); };
 
@@ -134,6 +152,9 @@ window.cpiClearFilters = function(){
   });
   var sim=document.getElementById("fpSimilarTitles"); if(sim) sim.checked=true;
   var unk=document.getElementById("fcUnknownFounded"); if(unk) unk.checked=false;
+  /* Clear means back to the defaults, and the default is on. */
+  var det=document.getElementById("fpCompanyDetail"); if(det) det.checked=true;
+  window.cpiSyncCostLabels();
   document.querySelectorAll("#fpSeniority .cpi-chip.on, #fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
   ["fpAdvanced","fcAdvanced"].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove("on"); });
   ["fpMoreBtn","fcMoreBtn"].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove("on"); });
@@ -182,6 +203,11 @@ function gatherFilters(){
   if(STATE.entity==="people"){
     applySpecs(PEOPLE_FIELDS, f);
     f.include_similar_titles = !!(document.getElementById("fpSimilarTitles")||{}).checked;
+    /* Travels inside `filters` rather than beside them so it is saved, restored
+       and exported with the rest of the search: reopening a saved entry then
+       reproduces the same rows, not a differently-detailed version of them. The
+       server pops it before anything reaches Apollo. */
+    f.company_detail = companyDetailOn();
     if(!f.titles) f.titles=[];
     var sen=chipVals("#fpSeniority .cpi-chip.on"); if(sen.length) f.seniorities=sen;
     var em=chipVals("#fpEmailStatus .cpi-chip.on"); if(em.length) f.email_status=em;
@@ -260,6 +286,10 @@ window.cpiRunSearch = function(reset){
     /* How the company detail on these rows was obtained. Kept per page rather
        than accumulated, because it describes what the last fetch did. */
     STATE.firmo=(d&&d.companies_described)||null;
+    /* Read back from the response, not from the checkbox: the checkbox is what
+       the user will ask for NEXT, and after they flip it the label would
+       otherwise describe rows that were fetched under the old setting. */
+    STATE.companyDetail=(d&&d.company_detail!==undefined)?!!d.company_detail:undefined;
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
        page instead of re-fetching page 1 and appending duplicate cards (which on
@@ -344,8 +374,15 @@ function renderAiNote(note){
    the difference between a search that was free and one that spent a credit, and
    nobody should have to guess which they just ran. */
 function firmoNote(){
+  if(STATE.entity!=="people") return "";
   var f=STATE.firmo;
-  if(!f||!f.orgs) return "";
+  if(!f||!f.orgs){
+    /* Says why the cards are thin, and where to change it. Without this, turning
+       the toggle off looks like the page lost the data rather than being asked
+       not to fetch it. */
+    return STATE.companyDetail===false
+      ? ' <s>&middot; company details off</s>' : "";
+  }
   var what=f.orgs===1?"employer":(pmNum(f.orgs)+" employers");
   var how=f.fetched
     ? "described &middot; 1 credit"
@@ -775,6 +812,12 @@ function applyFiltersToForm(f){
   if(sim && f.include_similar_titles!==undefined) sim.checked=!!f.include_similar_titles;
   var unk=document.getElementById("fcUnknownFounded");
   if(unk) unk.checked=!!f.include_unknown_founded_year;
+  /* Restored from the entry, but only when it was actually recorded: entries saved
+     before this toggle existed have no value, and reading `undefined` as "off"
+     would silently reopen an old search with less detail than it was run with. */
+  var det=document.getElementById("fpCompanyDetail");
+  if(det) det.checked = (f.company_detail===undefined) ? true : !!f.company_detail;
+  window.cpiSyncCostLabels();
 }
 
 var IC_PERSON='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';

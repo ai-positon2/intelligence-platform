@@ -124,6 +124,100 @@ def _search(client, **filters):
     return r.get_json()
 
 
+# ── The staff toggle ─────────────────────────────────────────────────────────
+# Describing employers is the only part of a people search that can spend a
+# credit, so staff can switch it off. These pin the two things that matter: off
+# really means no billable call, and off does not quietly cost the free detail.
+
+def test_turning_company_details_off_makes_the_search_free(client, monkeypatch):
+    calls = _stub_search(monkeypatch, [_person()], [_org()])
+    out = _search(client, titles=["VP"], company_detail=False)
+    assert calls["companies"] == [], "no billable company call may be made"
+    assert not out.get("credits")
+    assert "companies_described" not in out
+    assert out["company_detail"] is False
+    # The people themselves still come back in full.
+    assert out["results"][0]["full_name"] == "Ada Lovelace"
+    assert out["results"][0]["organization_name"] == "Acme"
+    assert not out["results"][0].get("organization_industry")
+
+
+def test_the_free_classification_survives_the_toggle(client, monkeypatch):
+    """Reading a title costs nothing, so switching off the paid company lookup
+    must not also throw away the seniority and function that come free."""
+    _stub_search(monkeypatch, [_person(title="Chief Financial Officer")], [_org()])
+    row = _search(client, titles=["CFO"], company_detail=False)["results"][0]
+    assert row["seniority_from_title"] == "C-suite"
+    assert row["functions_from_title"] == ["finance"]
+
+
+def test_company_details_default_to_on(client, monkeypatch):
+    """The thin card is what this feature replaced, so an untouched page, and any
+    caller that does not know about the toggle, gets the full one."""
+    calls = _stub_search(monkeypatch, [_person()], [_org()])
+    out = _search(client, titles=["VP"])
+    assert len(calls["companies"]) == 1
+    assert out["company_detail"] is True
+    assert out["results"][0]["organization_industry"] == "information technology"
+
+
+@pytest.mark.parametrize("sent,expected", [
+    (False, False), (True, True), ("no", True), (None, True),
+])
+def test_only_an_explicit_false_switches_it_off(client, monkeypatch, sent, expected):
+    """A missing or malformed value must fail towards the richer result, not
+    towards silently showing less than the page promises."""
+    _stub_search(monkeypatch, [_person()], [_org()])
+    out = _search(client, titles=["VP"], company_detail=sent)
+    assert out["company_detail"] is expected
+
+
+def test_the_toggle_never_reaches_apollo(client, monkeypatch):
+    """It rides inside `filters` so it is saved and restored with the search, but
+    everything left in `filters` goes on to build an Apollo payload, so it has to
+    be removed before that happens."""
+    calls = _stub_search(monkeypatch, [_person()], [_org()])
+    _search(client, titles=["VP"], company_detail=True)
+    assert calls["people"], "the people search must still have run"
+    for sent in calls["people"] + calls["companies"]:
+        assert "company_detail" not in sent
+
+
+def test_the_companies_tab_has_nothing_to_switch_off(client, monkeypatch):
+    """That tab pays for full records either way, so echoing a toggle state for it
+    would imply a choice that does not exist."""
+    _stub_search(monkeypatch, [], [_org()])
+    r = client.post("/p2/b2b-agents/company-people-intelligence/search",
+                    json={"entity": "companies", "filters": {"name": "Acme"}})
+    assert "company_detail" not in r.get_json()
+
+
+def test_the_toggle_is_wired_end_to_end():
+    """Three separate places have to agree or the control is decorative: the
+    checkbox exists, the search sends its state, and the Load more button stops
+    quoting a price when it is off."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    html = open(os.path.join(root, "templates",
+                             "company_people_intelligence.html")).read()
+    js = open(os.path.join(root, "static", "js",
+                           "company_people_intelligence.js")).read()
+    assert 'id="fpCompanyDetail" checked' in html, "must exist and default to on"
+    assert "f.company_detail = companyDetailOn();" in js
+    assert "return el ? !!el.checked : true;" in js, "a missing control means on"
+    assert "companyDetailOn() ? 'Load more <s>&middot; up to 1 Apollo credit</s>'" in js
+    # Restoring a saved search must not read a missing value as "off".
+    assert "(f.company_detail===undefined) ? true : !!f.company_detail" in js
+
+
+def test_the_export_records_whether_company_details_were_on():
+    """The spreadsheet's "Search details" sheet is how someone later works out why
+    one file has company columns and another does not."""
+    out = dict(appmod._cpi_filters_readable({"titles": ["CFO"], "company_detail": False}))
+    assert out["Company detail"] == "No"
+    on = dict(appmod._cpi_filters_readable({"company_detail": True}))
+    assert on["Company detail"] == "Yes"
+
+
 # ── One credit for the whole page ────────────────────────────────────────────
 
 def test_a_page_of_people_gets_its_employers_described(client, monkeypatch):
