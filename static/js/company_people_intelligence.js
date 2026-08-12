@@ -152,11 +152,39 @@ function addIndustry(pre, value){
   closeIndustryList(pre);
 }
 
+/* The labelled filter groups each carry a z-index, which makes every one of them
+   its own stacking context. An open dropdown therefore cannot rise above the
+   groups that come after it unless its own group is lifted for as long as it is
+   open. */
+function liftIndustryGroup(pre, on){
+  var list=document.getElementById(pre+"IndustryList");
+  var group=list && list.closest(".cpi-fset");
+  if(group) group.classList.toggle("cpi-fset-lift", !!on);
+}
+
+/* A list that always opens downward at a fixed height runs off the bottom of the
+   window whenever its field sits low on the page, which is the same "cannot see
+   the options" problem in a different guise. Give it the room that is actually
+   there, and open it upward when that side has more. */
+function placeIndustryList(pre){
+  var list=document.getElementById(pre+"IndustryList");
+  var combo=document.getElementById(pre+"IndustryCombo");
+  if(!list||!combo) return;
+  var GAP=5, EDGE=14, IDEAL=290, FLOOR=150;
+  var r=combo.getBoundingClientRect();
+  var below=window.innerHeight-r.bottom-GAP-EDGE;
+  var above=r.top-GAP-EDGE;
+  var up=below<Math.min(IDEAL, above);
+  list.classList.toggle("up", up);
+  list.style.maxHeight=Math.max(FLOOR, Math.min(IDEAL, up?above:below))+"px";
+}
+
 function closeIndustryList(pre){
   var list=document.getElementById(pre+"IndustryList");
   var input=document.getElementById(pre+"Industry");
   if(list) list.classList.remove("on");
   if(input) input.setAttribute("aria-expanded","false");
+  liftIndustryGroup(pre, false);
   INDUSTRY_CUR=-1;
 }
 
@@ -183,6 +211,11 @@ function renderIndustryList(pre, entries, query){
   }
   list.classList.add("on");
   if(input) input.setAttribute("aria-expanded","true");
+  liftIndustryGroup(pre, true);
+  placeIndustryList(pre);
+  /* Scrolled to the bottom of a previous query, the next one would open already
+     scrolled past its first option. */
+  list.scrollTop=0;
 }
 
 function loadIndustries(pre){
@@ -251,6 +284,16 @@ function initIndustryCombo(pre){
 }
 document.addEventListener("click", function(e){
   if(!e.target.closest(".cpi-combo")){ closeIndustryList("fp"); closeIndustryList("fc"); }
+});
+/* Room below the field changes as the page scrolls or the window resizes, so an
+   already-open list is re-measured rather than left where it no longer fits. */
+["scroll","resize"].forEach(function(evt){
+  window.addEventListener(evt, function(){
+    ["fp","fc"].forEach(function(pre){
+      var list=document.getElementById(pre+"IndustryList");
+      if(list && list.classList.contains("on")) placeIndustryList(pre);
+    });
+  }, {passive:true});
 });
 
 /* Declarative filter specs, so a new Apollo filter is one line here plus one
