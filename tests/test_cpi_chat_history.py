@@ -251,10 +251,19 @@ def test_a_company_profile_is_saved_under_its_own_kind(saved, monkeypatch):
     assert saved[0]["entity"] == "company_profile"
 
 
-def test_the_enrich_reply_is_unchanged_by_saving(saved, monkeypatch):
+def test_the_enrich_reply_says_nothing_about_having_been_saved(saved, monkeypatch):
+    """Saving is a side effect, so nothing about the history row may leak into the
+    reply: no row id, no saved flag, nothing for the client to start depending on.
+
+    Asserted as an absence rather than as an exact key set. The previous version
+    pinned {"profile", "apollo"} and so failed the moment the reply started
+    reporting what the enrichment actually cost, which is a change this test has
+    no business objecting to.
+    """
     body = _enrich(monkeypatch, _PROFILE)
     assert body["profile"]["name"] == "Binal Shah"
-    assert set(body) == {"profile", "apollo"}
+    for leaked in ("saved", "history", "history_id", "entry_id", "label", "rows"):
+        assert leaked not in body, leaked
 
 
 # ── The saver itself ────────────────────────────────────────────────────────

@@ -937,7 +937,7 @@ function personCard(p,i){
      one card-width line: the row ellipsises, and a truncated price is no price at
      all. The full list lives in the Details view. */
   if(!p.enriched && !p.email){
-    rows.push('<div class="cpi-row hint">'+IC_ML+'<span>Enrich for email, phone &amp; history <s>&middot; 1 credit</s></span></div>');
+    rows.push('<div class="cpi-row hint">'+IC_ML+'<span>Enrich for email &amp; history <s>&middot; 1 credit</s></span></div>');
   }
 
   var socials="";
@@ -1576,6 +1576,14 @@ function cpiRunEnrich(type, heroSeed, body){
       var p=(d&&d.profile)||{};
       document.getElementById("pmHero").innerHTML = type==="person" ? personHero(p) : companyHero(p);
       document.getElementById("pmBody").innerHTML = type==="person" ? personBody(p) : companyBody(p);
+      /* What it actually cost, rather than the button's static price. A miss is
+         free and a record already bought is free, and both used to be billed to
+         the reader as one credit. */
+      if(d && d.credits!==undefined){
+        if(d.credits>0) toast(d.credits+" Apollo credit spent.", "ok");
+        else if(p && p.matched) toast("Already enriched, so this cost nothing.", "ok");
+        else toast("No match, so this cost nothing.", "ok");
+      }
     })
     .catch(function(){
       document.getElementById("pmBody").innerHTML='<div class="pm-empty"><b>Enrichment failed</b>Could not reach Apollo just now. Try again in a moment.</div>';
@@ -1691,9 +1699,10 @@ function personDetailsBody(r, idx){
        spend one is informed rather than hopeful. */
     out+=pmSection("Contact", "not revealed yet",
       '<div class="pm-ct-no"><b>Nothing revealed on this person yet</b>'+
-      "Apollo's free search returns identity and role only. Enriching adds their verified email and status, direct and mobile phone numbers, their own city and country, full career history and photo"+
+      "Apollo's free search returns identity and role only. Enriching adds their verified work email and its status, their own city and country, full career history and photo"+
       (r.name_masked?", and reveals the surname Apollo is masking here":"")+
-      ". That costs 1 credit, and is cached afterwards so reopening this person is free.</div>"+
+      ". That costs 1 credit, and is cached afterwards so reopening this person is free. "+
+      "A direct or mobile number comes back only for people already in the connected Apollo or CRM account: Apollo reveals any other number through a separate metered request this tool does not make, so treat a phone as a bonus rather than the reason to spend.</div>"+
       '<div style="margin-top:12px"><button class="cpi-enrich-btn" style="margin-left:0" onclick=\'cpiCloseModal();cpiOpenEnrich("person",'+idx+')\'>Enrich this person &middot; 1 credit</button></div>');
   }
   out+=detailEmployer(r);
