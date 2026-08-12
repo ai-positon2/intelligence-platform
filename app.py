@@ -8392,7 +8392,9 @@ def _cpi_id_cache_read(ids: list) -> dict:
             rows = cur.fetchall()
         now = datetime.now(timezone.utc)
         for apollo_id, payload, updated_at in rows:
-            if not payload or int(payload.get("sv") or 0) < _PE_SHAPE_VERSION:
+            if not payload:
+                continue
+            if int(payload.get(_CPI_ID_CACHE_SV_KEY) or 0) < _CPI_ID_CACHE_VERSION:
                 continue
             if updated_at and (now - updated_at).days < _CPE_POS_TTL_DAYS:
                 out[apollo_id] = payload
@@ -8408,7 +8410,13 @@ def _cpi_id_cache_read(ids: list) -> dict:
 
 
 def _cpi_id_cache_write(profiles: dict) -> None:
-    """profiles: apollo_id -> normalized (already-matched) profile."""
+    """profiles: apollo_id -> the RAW Apollo person record that was matched.
+
+    Raw, not normalized: _cpi_person_row is what reads these back, and it reads
+    Apollo's own field names. Each row is stamped so a future change to that
+    function can invalidate the cache instead of rendering old rows through new
+    code.
+    """
     if not profiles:
         return
     conn = _pg_conn()
@@ -8419,12 +8427,14 @@ def _cpi_id_cache_write(profiles: dict) -> None:
         _ensure_cpi_person_enrich_table(conn)
         with conn.cursor() as cur:
             for apollo_id, prof in profiles.items():
+                stamped = dict(prof or {})
+                stamped[_CPI_ID_CACHE_SV_KEY] = _CPI_ID_CACHE_VERSION
                 cur.execute(
                     "INSERT INTO cpi_person_enrichment (apollo_id, payload, updated_at) "
                     "VALUES (%s, %s, now()) "
                     "ON CONFLICT (apollo_id) DO UPDATE SET payload = EXCLUDED.payload, "
                     "updated_at = now()",
-                    (apollo_id, Json(prof)))
+                    (apollo_id, Json(stamped)))
         conn.commit()
     except Exception as e:
         log.warning("cpi id-cache write failed: %s", e)
@@ -8560,7 +8570,20 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
         return {"matched": False}
     if email:
         profiles = _enrich_people([email])
-        return profiles.get(email.strip().lower(), {"matched": False})
+        hit = profiles.get(email.strip().lower(), {"matched": False})
+        # This path bills exactly like the id path and was the only one not saying
+        # so, which made an enrich-by-email look free.
+        if spend is not None and isinstance(hit, dict) and hit.get("matched"):
+            spend["credits"] = spend.get("credits", 0) + 1
+        return hit
+    # Already bought. Bulk enrich caches the raw record by Apollo id for the
+    # positive TTL, and this path went straight to Apollo regardless, so enriching
+    # a person from the grid and then opening their profile paid twice for one
+    # record.
+    if apollo_id:
+        cached = _cpi_id_cache_read([apollo_id]).get(apollo_id)
+        if cached:
+            return _apollo_person_normalize(cached, cached.get("email") or "")
     # The Apollo person id is the only unambiguous identifier here: matching on
     # name plus domain can resolve to the wrong one of two same-named people at
     # the same employer, and the enriched record then replaces the person the
@@ -8568,6 +8591,20 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
     payload = {}
     if apollo_id:
         payload["id"] = apollo_id
+    # A masked surname is not a name. Apollo withholds them on the free search as
+    # asterisks ("Vivek Sh***a"), and sending that as an identifying detail asks
+    # Apollo to match a person whose surname is punctuation: at best it is ignored,
+    # at worst it is weighed and the match fails. A miss costs nothing and returns
+    # "not matched", so the failure was free, silent, and indistinguishable from
+    # Apollo genuinely not holding this person.
+    if name and "*" in name:
+        # Only the tokens Apollo did not mask, sent as first_name, which is its own
+        # documented field for exactly this. Dropped entirely when an id is present:
+        # the id is already exact and a partial name can only dilute it.
+        clean = " ".join(t for t in name.split() if "*" not in t)
+        name = ""
+        if clean and not apollo_id:
+            payload["first_name"] = clean
     if name:
         payload["name"] = name
     if domain:
@@ -8585,6 +8622,10 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
         # A match is what Apollo bills for; a miss costs nothing.
         if spend is not None:
             spend["credits"] = spend.get("credits", 0) + 1
+        # Shared with bulk enrich, so the next click on this person is free
+        # whichever path bought them.
+        if apollo_id:
+            _cpi_id_cache_write({apollo_id: p})
         return _apollo_person_normalize(p, p.get("email") or "")
     except Exception as e:
         # No personal data in the log line: an id and a domain only.
@@ -8639,11 +8680,19 @@ def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
 def cpi_enrich():
     body = request.get_json(silent=True) or {}
     kind = body.get("type")
+    # Both helpers have always taken a spend dict and the route never passed one,
+    # so the single action on this page that definitely costs a credit was the one
+    # that reported nothing. The button's static "1 credit" was a guess at its own
+    # cost: wrong on a miss, which is free, and wrong on a cache hit, which is now
+    # possible.
+    spend = {"credits": 0}
     if kind == "person":
         profile = _cpi_enrich_person(body.get("name") or "", body.get("domain") or "",
-                                      body.get("apollo_id") or "", body.get("email") or "")
+                                      body.get("apollo_id") or "", body.get("email") or "",
+                                      spend=spend)
     elif kind == "company":
-        profile = _cpi_enrich_company(body.get("domain") or "", body.get("apollo_id") or "")
+        profile = _cpi_enrich_company(body.get("domain") or "", body.get("apollo_id") or "",
+                                      spend=spend)
     else:
         return jsonify({"error": "unknown type"}), 400
     # An enrichment is a purchase: it is the one action on this page that
@@ -8665,7 +8714,12 @@ def cpi_enrich():
             filters={"type": kind,
                      "domain": body.get("domain") or co.get("domain") or "",
                      "apollo_id": body.get("apollo_id") or ""})
-    return jsonify({"profile": profile, "apollo": bool(os.environ.get("APOLLO_API_KEY", ""))})
+    return jsonify({"profile": profile,
+                    "apollo": bool(os.environ.get("APOLLO_API_KEY", "")),
+                    # 0 is a real answer here: a miss and a cache hit both cost
+                    # nothing, and saying so is the difference between a credit
+                    # counter that can be trusted and one that always says 1.
+                    "credits": spend["credits"]})
 
 
 # Bulk reveal is the one place staff can spend a lot of Apollo credit in a single
@@ -8673,6 +8727,17 @@ def cpi_enrich():
 # the whole team shares one finite pool -- an uncapped "enrich all" over a few
 # pages of results could quietly drain it.
 _CPI_BULK_ENRICH_CAP = 50
+
+# Shape stamp for the by-id enrichment cache. It holds RAW Apollo person records,
+# not the normalized profiles the person_enrichment table holds, so it needs a
+# version of its own: the read used to be gated on "sv", which is stamped by
+# _apollo_person_normalize and therefore never present on anything written here.
+# Every cached row failed that gate, so the cache returned nothing, ever. Bulk
+# enrich re-bought people it had already paid for and reported "cached: 0" while
+# doing it, which read as an honest number rather than a broken mechanism.
+# Under a private key, because the value shares a dict with Apollo's own fields.
+_CPI_ID_CACHE_SV_KEY = "_cpi_sv"
+_CPI_ID_CACHE_VERSION = 1
 
 
 @app.route("/p2/b2b-agents/company-people-intelligence/enrich-bulk", methods=["POST"])
