@@ -114,108 +114,11 @@ _ORG_RANGE_FILTERS = (
 # the same shape as the title verification in the app: ask Apollo broadly, then
 # guarantee the answer ourselves.
 #
-# Apollo's taxonomy is the LinkedIn-style one, so a person typing "healthcare"
-# means eight of its values and none of them is spelled "healthcare". These
-# families map what staff type onto what Apollo stores. A term that is not a
-# family falls through to substring matching in both directions, so a request for
-# an exact Apollo value ("computer software") or a fragment of one ("software")
-# still works without needing an entry here.
-_INDUSTRY_FAMILIES = {
-    "healthcare": ("hospital & health care", "health, wellness & fitness",
-                   "medical practice", "medical devices", "pharmaceuticals",
-                   "biotechnology", "mental health care", "veterinary",
-                   "alternative medicine", "health care"),
-    "technology": ("computer software", "information technology & services",
-                   "internet", "computer & network security", "computer hardware",
-                   "computer networking", "semiconductors", "nanotechnology",
-                   "wireless", "telecommunications"),
-    "software": ("computer software", "internet",
-                 "information technology & services"),
-    "finance": ("financial services", "banking", "insurance",
-                "investment banking", "investment management", "capital markets",
-                "venture capital & private equity", "accounting"),
-    "retail": ("retail", "consumer goods", "consumer services",
-               "apparel & fashion", "luxury goods & jewelry", "supermarkets",
-               "wholesale", "consumer electronics"),
-    "manufacturing": ("industrial automation", "machinery",
-                      "electrical/electronic manufacturing", "automotive",
-                      "aviation & aerospace", "chemicals", "building materials",
-                      "plastics", "packaging & containers", "textiles"),
-    "education": ("education management", "higher education", "e-learning",
-                  "primary/secondary education",
-                  "professional training & coaching"),
-    "marketing": ("marketing & advertising", "public relations & communications",
-                  "market research", "design", "graphic design"),
-    "media": ("media production", "broadcast media", "publishing",
-              "online media", "entertainment", "music", "motion pictures & film",
-              "newspapers"),
-    "real estate": ("real estate", "commercial real estate", "construction",
-                    "architecture & planning", "building materials"),
-    "energy": ("oil & energy", "renewables & environment", "utilities",
-               "mining & metals"),
-    "logistics": ("transportation/trucking/railroad", "logistics & supply chain",
-                  "package/freight delivery", "maritime", "airlines/aviation",
-                  "warehousing"),
-    "hospitality": ("hospitality", "restaurants", "food & beverages",
-                    "leisure, travel & tourism", "recreational facilities & services",
-                    "food production"),
-    "legal": ("law practice", "legal services"),
-    "government": ("government administration", "public policy",
-                   "government relations", "military", "political organization",
-                   "legislative office", "public safety"),
-    "nonprofit": ("nonprofit organization management", "philanthropy",
-                  "civic & social organization", "international affairs",
-                  "religious institutions"),
-    "staffing": ("staffing & recruiting", "human resources",
-                 "professional training & coaching"),
-    "consulting": ("management consulting", "business supplies & equipment",
-                   "outsourcing/offshoring"),
-}
-# Read as aliases of a family rather than families of their own, so the table
-# above stays a list of distinct industries instead of a thesaurus.
-_INDUSTRY_ALIASES = {
-    "health": "healthcare", "health care": "healthcare", "medical": "healthcare",
-    "healthtech": "healthcare", "health tech": "healthcare", "pharma": "healthcare",
-    "biotech": "healthcare", "life sciences": "healthcare",
-    "tech": "technology", "it": "technology", "saas": "software",
-    "fintech": "finance", "financial": "finance", "banking": "finance",
-    "ecommerce": "retail", "e-commerce": "retail", "consumer": "retail",
-    "cpg": "retail", "industrial": "manufacturing", "advertising": "marketing",
-    "adtech": "marketing", "martech": "marketing", "edtech": "education",
-    "proptech": "real estate", "property": "real estate",
-    "supply chain": "logistics", "transportation": "logistics",
-    "travel": "hospitality", "food": "hospitality", "restaurant": "hospitality",
-    "non-profit": "nonprofit", "ngo": "nonprofit", "charity": "nonprofit",
-    "public sector": "government", "recruiting": "staffing", "hr": "staffing",
-}
-
-
-def _industry_norm(s: str) -> str:
-    """Lowercased with punctuation and spacing removed, so "Hospital & Health
-    Care", "hospital and health care" and "hospital/health-care" all compare
-    equal. Apollo is not consistent about any of the three."""
-    s = str(s or "").strip().lower().replace("&", "and")
-    return re.sub(r"[^a-z0-9]+", "", s)
-
-
-def _industry_wanted(terms) -> set:
-    """The requested industry terms expanded to every Apollo value they mean."""
-    out: set = set()
-    for raw in (terms or []):
-        term = str(raw or "").strip().lower()
-        if not term:
-            continue
-        family = _INDUSTRY_ALIASES.get(term, term)
-        values = _INDUSTRY_FAMILIES.get(family)
-        # The term itself is always kept as a candidate, so an exact Apollo value
-        # or a fragment of one works whether or not it names a family.
-        out.add(_industry_norm(term))
-        if family != term:
-            out.add(_industry_norm(family))
-        for v in (values or ()):
-            out.add(_industry_norm(v))
-    out.discard("")
-    return out
+# The vocabulary and the typed-term-to-Apollo-value mapping live in
+# apollo_taxonomy, because the picker in the UI and the filter here have to agree
+# on them exactly: a dropdown offering a value this matcher would reject is worse
+# than no dropdown.
+from tracker.apollo_taxonomy import expand as _industry_expand, norm as _industry_norm
 
 
 def _industry_matches(org: dict, wanted: set) -> bool:
@@ -254,7 +157,7 @@ def filter_by_industry(orgs: list, terms, label: str = "") -> tuple:
     back so a caller can say what happened rather than quietly showing a short
     page.
     """
-    wanted = _industry_wanted(terms)
+    wanted = _industry_expand(terms)
     if not wanted:
         return list(orgs or []), 0
     kept = [o for o in (orgs or []) if _industry_matches(o, wanted)]
@@ -276,11 +179,31 @@ def _clean_domain(d: str) -> str:
     return re.sub(r"^www\.", "", d)
 
 
+# Apollo takes technologies as uids, not display names: underscores replace
+# spaces and periods, per its own documentation ("google_analytics",
+# "wordpress_org"). Sending "Google Analytics" verbatim is not an error and does
+# not warn -- it simply matches no company, so the filter appeared to be applied
+# and silently narrowed nothing. Normalized on the way out, and compared the same
+# way on the way back, since Apollo RETURNS display names.
+_TECH_FILTERS = ("technologies", "technologies_all", "exclude_technologies")
+
+
+def tech_uid(name: str) -> str:
+    """"Google Analytics" -> "google_analytics", Apollo's own uid spelling."""
+    s = str(name or "").strip().lower()
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", s)).strip("_")
+
+
 def _apply_org_filters(payload: dict, filters: dict) -> None:
     """Fill in every org-level Apollo filter both search endpoints share."""
     for src, param in _ORG_LIST_FILTERS:
         if filters.get(src):
-            payload[param] = list(filters[src])
+            values = list(filters[src])
+            if src in _TECH_FILTERS:
+                values = [u for u in dict.fromkeys(tech_uid(v) for v in values) if u]
+                if not values:
+                    continue
+            payload[param] = values
     for min_key, max_key, param in _ORG_RANGE_FILTERS:
         rng = _range(filters, min_key, max_key)
         if rng is not None:

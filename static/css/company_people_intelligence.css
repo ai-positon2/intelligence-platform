@@ -147,6 +147,37 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .cpi-range-sep{color:var(--tx3);font-size:12px}
 /* Visible label for controls a placeholder cannot describe, notably date inputs. */
 .cpi-fld-lbl{color:var(--tx2);font-size:11.5px;letter-spacing:.01em;white-space:nowrap}
+/* Industry combobox. Apollo's taxonomy has no value spelled "healthcare", so the
+   filter is unusable without a way to see the real values, and a plain text box
+   invited exactly the guesses that returned nothing. */
+.cpi-combo{position:relative;flex:1;min-width:220px}
+.cpi-combo-chips{display:flex;flex-wrap:wrap;gap:5px}
+.cpi-combo-chips:not(:empty){margin-bottom:6px}
+.cpi-chip-sel{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  color:#dfe3ff;background:rgba(124,131,245,.18);border:1px solid rgba(124,131,245,.42);
+  border-radius:var(--radius-pill);padding:4px 6px 4px 10px;max-width:100%}
+.cpi-chip-sel s{text-decoration:none;color:#a6adcf;font-weight:500}
+.cpi-chip-sel button{display:flex;align-items:center;justify-content:center;width:15px;height:15px;
+  flex:none;border:0;border-radius:50%;background:rgba(255,255,255,.12);color:#e6e8ff;
+  font-size:11px;line-height:1;cursor:pointer;padding:0}
+.cpi-chip-sel button:hover{background:rgba(248,113,113,.55)}
+.cpi-combo-list{display:none;position:absolute;z-index:40;left:0;right:0;top:calc(100% + 5px);
+  max-height:290px;overflow-y:auto;background:#0d1220;border:1px solid rgba(255,255,255,.14);
+  border-radius:var(--radius-md);box-shadow:0 22px 48px -18px rgba(0,0,0,.85);padding:5px}
+.cpi-combo-list.on{display:block}
+.cpi-opt{display:block;width:100%;text-align:left;background:transparent;border:0;cursor:pointer;
+  padding:7px 10px;border-radius:8px;color:var(--tx);font-size:12.5px;line-height:1.35}
+.cpi-opt:hover,.cpi-opt.cur{background:rgba(124,131,245,.16)}
+.cpi-opt b{font-weight:650}
+/* A family is not an Apollo industry, it is a shortcut for several, so it says
+   which ones rather than letting a reader assume Apollo has a "healthcare". */
+.cpi-opt s{display:block;text-decoration:none;color:var(--tx3);font-size:10.5px;margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpi-opt-tag{float:right;font-family:monospace;font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:#6ee7b7;background:rgba(52,211,153,.12);
+  border:1px solid rgba(52,211,153,.3);border-radius:var(--radius-pill);padding:1px 6px;margin-left:8px}
+.cpi-opt-none{padding:9px 10px;color:var(--tx3);font-size:12px;line-height:1.5}
+
 .cpi-check{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx2);
   cursor:pointer;user-select:none;white-space:nowrap}
 .cpi-check input{accent-color:#7c83f5;width:14px;height:14px;cursor:pointer}

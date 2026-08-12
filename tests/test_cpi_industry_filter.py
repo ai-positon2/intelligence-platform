@@ -212,8 +212,11 @@ def test_the_company_search_returns_only_the_industry_asked_for(client, monkeypa
     out = r.get_json()
     assert [c["name"] for c in out["results"]] == \
         ["American Society of Clinical Oncology", "Calm.com, Inc."]
-    assert out["industry_dropped"] == 2
-    assert out["industry_wanted"] == ["Healthcare"]
+    # Reported per reason, so a filter that is quietly doing nothing shows up as
+    # a reason that never appears.
+    assert out["rejected"] == {"industry": 2}
+    assert out["rejected_total"] == 2
+    assert out["rejected_labels"]["industry"] == "outside the industry"
 
 
 def test_apollos_total_is_dropped_once_we_filter_it_ourselves(client, monkeypatch):
@@ -235,7 +238,7 @@ def test_an_unfiltered_company_search_keeps_its_total(client, monkeypatch):
     out = r.get_json()
     assert out["total"] == 9900
     assert len(out["results"]) == 4
-    assert "industry_dropped" not in out
+    assert "rejected" not in out
 
 
 # ── The people search ────────────────────────────────────────────────────────
@@ -254,7 +257,7 @@ def test_people_are_filtered_by_their_employers_industry(client, monkeypatch):
                           "filters": {"titles": ["VP"], "industries": ["Healthcare"]}})
     out = r.get_json()
     assert [p["id"] for p in out["results"]] == ["1", "4"]
-    assert out["industry_dropped"] == 2
+    assert out["rejected"] == {"industry": 2}
 
 
 def test_a_persons_employer_is_judged_on_its_full_classification(client, monkeypatch):
@@ -271,7 +274,7 @@ def test_a_persons_employer_is_judged_on_its_full_classification(client, monkeyp
                           "filters": {"titles": ["VP"], "industries": ["Healthcare"]}})
     out = r.get_json()
     assert [p["id"] for p in out["results"]] == ["9"]
-    assert not out.get("industry_dropped")
+    assert not out.get("rejected")
 
 
 def test_an_industry_search_turns_the_company_lookup_back_on(client, monkeypatch):
@@ -306,6 +309,6 @@ def test_the_page_says_what_it_removed():
     header explains it."""
     js = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                            "static", "js", "company_people_intelligence.js")).read()
-    assert "function industryNote()" in js
-    assert '" outside "' in js
-    assert "firmoNote() + industryNote()" in js
+    assert "function rejectedNote()" in js
+    assert '" removed: "' in js
+    assert "firmoNote() + rejectedNote()" in js

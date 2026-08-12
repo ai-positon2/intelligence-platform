@@ -7169,6 +7169,7 @@ def cpi_home():
                            chat_url=url_for("cpi_chat"),
                            enrich_bulk_url=url_for("cpi_enrich_bulk"),
                            history_url=url_for("cpi_history"),
+                           industries_url=url_for("cpi_industries"),
                            export_url=url_for("cpi_export"))
 
 
@@ -7395,13 +7396,15 @@ def cpi_search():
     # accident. Absent means on: the thin card is what this replaced.
     filters = dict(filters)
     company_detail = filters.pop("company_detail", True) is not False
-    # An industry filter cannot be honored without the employer's own
-    # classification, and on the people side that only arrives with the company
-    # lookup (Apollo's free people search returns no industry at all). Asking for
-    # an industry AND no company detail is a contradiction, so the filter that was
-    # typed wins and the response says the lookup was turned back on.
-    industry_forced = bool(entity == "people" and filters.get("industries")
-                           and not company_detail)
+    # Several filters describe the EMPLOYER, and none of them can be honored
+    # without the employer's own record: Apollo's free people search returns no
+    # industry, no headcount, no HQ and no tech stack. Asking for one of these
+    # AND no company detail is a contradiction, so the filter that was typed wins,
+    # the lookup runs, and the response says it was turned back on.
+    needs_employer = [k for k in ("industries", "employee_min", "employee_max",
+                                  "company_locations", "technologies")
+                      if filters.get(k) is not None and filters.get(k) != []]
+    industry_forced = bool(entity == "people" and needs_employer and not company_detail)
     if industry_forced:
         company_detail = True
     try:
@@ -7444,7 +7447,7 @@ def cpi_search():
                 list(filters.get("organization_ids") or []) + [org_id]))
             resolved_names = [org_name]
     firmo = None
-    industry_dropped = 0
+    verify_dropped: dict = {}
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
@@ -7456,21 +7459,25 @@ def cpi_search():
             # each person's seniority and function get read off their own title.
             if company_detail:
                 firmo = _cpi_attach_employer_facts(results, api_key, spend)
-                # Only possible once the employers are described, which is why
-                # asking for an industry forces that lookup above.
-                if filters.get("industries"):
-                    results, industry_dropped = _cpi_filter_people_by_industry(
-                        results, filters["industries"])
             # Outside the toggle on purpose: reading a title costs nothing, so
             # turning off the paid company lookup should not also throw away the
             # free classification that comes with every row.
             for r in results:
                 r.update(_cpi_derive_role(r.get("title")))
+            # Every employer-level check needs the lookup above, which is why
+            # requesting one forces it on. With it off, only the title check can
+            # run, and the others are simply not requested.
+            results, verify_dropped = _cpi_verify_rows(results, filters, True)
         else:
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
                                     per_page=per_page, meta=meta)
+            _cpi_record_industries(raw)
             results = [_cpi_company_row(o) for o in raw]
+            # search_companies already enforced the industry for every caller;
+            # this adds the size, HQ and technology checks and reports all of them
+            # from one place, so the two tabs cannot disagree.
+            results, verify_dropped = _cpi_verify_rows(results, filters, False)
     except Exception as e:
         log.warning("cpi search failed (entity=%s): %s", entity, e)
         return jsonify({"results": [], "has_more": False, "error": "Search failed."})
@@ -7495,14 +7502,21 @@ def cpi_search():
         out["company_detail"] = company_detail
         if industry_forced:
             out["industry_forced_company_detail"] = True
-    # Rows Apollo returned for an industry search that are not actually in that
-    # industry get removed rather than shown, so this says how many, and no page
-    # ever silently shrinks. Also covers the Companies tab, where the same check
-    # runs inside search_companies.
-    dropped = industry_dropped or meta.get("industry_dropped") or 0
-    if dropped:
-        out["industry_dropped"] = dropped
-        out["industry_wanted"] = list(filters.get("industries") or [])
+    # Rows Apollo returned that do not actually satisfy the filters get removed
+    # rather than shown, so this says how many and why. No page ever silently
+    # shrinks, and a filter that is quietly doing nothing is visible as a reason
+    # that never appears.
+    rejected = dict(verify_dropped)
+    if meta.get("industry_dropped"):
+        # search_companies removed these before the shared pass ever saw them.
+        rejected["industry"] = rejected.get("industry", 0) + meta["industry_dropped"]
+    if rejected:
+        out["rejected"] = rejected
+        out["rejected_total"] = sum(rejected.values())
+        out["rejected_labels"] = {k: _CPI_VERIFY_LABELS.get(k, k) for k in rejected}
+        # Apollo's own total counted its looser match, so it overstates the real
+        # number by whatever proportion this page just removed.
+        out["total"] = None
     # A title search scoped to exactly one company that came back empty gets a
     # real explanation instead of a bare "no matches" -- see the function for
     # why, and why it is gated this narrowly (a plain, unscoped browse coming
@@ -7562,20 +7576,290 @@ def _cpi_company_row(o: dict) -> dict:
     }
 
 
-def _cpi_filter_people_by_industry(rows: list, terms) -> tuple:
-    """(kept, dropped) people whose EMPLOYER really is in the requested industry.
+# ── Learning Apollo's real industry values ────────────────────────────────────
+# Apollo publishes no endpoint that enumerates its industries, so the picker is
+# seeded from a written-down copy of the taxonomy (see tracker/apollo_taxonomy).
+# A seeded value Apollo does not actually use would send a search that matches
+# nothing, which is the exact failure the picker exists to prevent, so every
+# industry string seen on a real Apollo record is recorded here. Those are correct
+# by construction, they are merged over the seed when the picker is read, and they
+# are marked as confirmed so an unconfirmed value is visibly unconfirmed.
+_CPI_INDUSTRY_SEEN: set = set()
+_CPI_INDUSTRY_TABLE_READY = False
+# Enough to hold Apollo's whole taxonomy several times over. A cap only matters
+# because this set is fed by third-party strings.
+_CPI_INDUSTRY_SEEN_MAX = 2000
 
-    A person row carries the employer's classification under organization_* keys,
-    so it is presented to the shared matcher in the shape that reads, rather than
-    giving that matcher a second set of key names to know about. One definition of
-    "is this company in this industry" for both tabs.
+
+def _ensure_cpi_industry_table(conn) -> None:
+    global _CPI_INDUSTRY_TABLE_READY
+    if _CPI_INDUSTRY_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_industry_seen (
+                value TEXT PRIMARY KEY,
+                hits INTEGER NOT NULL DEFAULT 1,
+                last_seen TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _CPI_INDUSTRY_TABLE_READY = True
+
+
+def _cpi_record_industries(orgs) -> None:
+    """Note every industry these Apollo records are classified under.
+
+    Best-effort throughout: this only improves a dropdown, so it must never make a
+    search fail or slow one down noticeably. Values already known are skipped
+    before touching the database at all, which after the first few searches is
+    almost all of them.
     """
-    from tracker.apollo_client import filter_by_industry
-    view = [{"industry": r.get("organization_industry"),
-             "industries": r.get("organization_industries"), "_row": r}
-            for r in (rows or [])]
-    kept, dropped = filter_by_industry(view, terms, "cpi people")
-    return [v["_row"] for v in kept], dropped
+    values = set()
+    for o in (orgs or []):
+        if not isinstance(o, dict):
+            continue
+        for raw in [o.get("industry")] + list(o.get("industries") or []):
+            v = (raw.get("name") if isinstance(raw, dict) else raw)
+            v = str(v or "").strip().lower()
+            # Apollo's longest real value is 36 characters; anything far past that
+            # is not an industry and does not belong in a picker.
+            if v and len(v) <= 80:
+                values.add(v)
+    fresh = values - _CPI_INDUSTRY_SEEN
+    if not fresh or len(_CPI_INDUSTRY_SEEN) >= _CPI_INDUSTRY_SEEN_MAX:
+        return
+    _CPI_INDUSTRY_SEEN.update(fresh)
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        _ensure_cpi_industry_table(conn)
+        with conn.cursor() as cur:
+            for v in fresh:
+                cur.execute(
+                    "INSERT INTO cpi_industry_seen (value) VALUES (%s) "
+                    "ON CONFLICT (value) DO UPDATE SET hits = cpi_industry_seen.hits + 1, "
+                    "last_seen = now()", (v,))
+        conn.commit()
+        log.info("cpi industry vocabulary: learned %d new value(s)", len(fresh))
+    except Exception as e:
+        log.warning("cpi industry vocabulary write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_industries_seen() -> set:
+    """Every industry value Apollo has been observed to use, process cache first."""
+    if _CPI_INDUSTRY_SEEN:
+        return set(_CPI_INDUSTRY_SEEN)
+    conn = _pg_conn()
+    if not conn:
+        return set()
+    try:
+        _ensure_cpi_industry_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM cpi_industry_seen ORDER BY hits DESC "
+                        "LIMIT %s", (_CPI_INDUSTRY_SEEN_MAX,))
+            rows = [r[0] for r in cur.fetchall() if r and r[0]]
+        _CPI_INDUSTRY_SEEN.update(rows)
+        return set(rows)
+    except Exception as e:
+        log.warning("cpi industry vocabulary read failed: %s", e)
+        return set()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.route("/p2/b2b-agents/company-people-intelligence/industries")
+@position2_required
+def cpi_industries():
+    """Industry picker entries for what has been typed so far. Costs nothing and
+    touches no external service: it reads the written-down taxonomy plus whatever
+    values Apollo has already been seen to use."""
+    from tracker.apollo_taxonomy import suggest
+    q = (request.args.get("q") or "").strip()[:60]
+    entries = suggest(q, learned=_cpi_industries_seen())
+    return jsonify({"query": q, "entries": entries})
+
+
+# ── Verifying what Apollo actually returned ───────────────────────────────────
+# Audited every filter this page exposes against what Apollo does with it. They
+# fall into three groups.
+#
+# STRICT SERVER-SIDE, trust Apollo: person_seniorities, contact_email_status,
+#   NAICS/SIC codes (prefix match, documented), the numeric ranges (revenue,
+#   founded year, funding, open jobs, headcount growth, tenure, years of
+#   experience), and organization_ids. These are Apollo's own structured fields
+#   compared numerically or by exact code, and there is nothing for us to add.
+#
+# RELEVANCE MATCHES DRESSED AS FILTERS, verify in code: everything below. Apollo
+#   treats each as a hint that widens recall, so it returns rows that do not
+#   satisfy the filter. The pattern is the one already proven for domains,
+#   industries and chat titles: ask Apollo broadly, then guarantee the answer here
+#   against the record's own fields, and say what was removed.
+#
+# UNVERIFIABLE ON THIS PLAN, left to Apollo and labelled honestly:
+#   person_locations and contact_email_status describe fields the free people
+#   search does not return, so there is nothing to check them against without
+#   paying per person. market_segments is documented as matching "the
+#   organization's tags and name" and has no canonical field behind it at all, so
+#   it is relabelled in the UI as the keyword match it is rather than pretending
+#   to be a segment filter.
+_CPI_VERIFY_LABELS = {
+    "industry": "outside the industry",
+    "employees": "outside the size range",
+    "hq": "headquartered elsewhere",
+    "technology": "not using the technology",
+    "title": "the wrong title",
+}
+
+
+def _cpi_org_view(r: dict, is_people: bool) -> dict:
+    """One row presented as a company, whichever tab it came from.
+
+    A person row carries their employer under organization_* keys and a company
+    row carries the same facts under its own names. Normalizing here means every
+    check below is written once and cannot come to two different conclusions about
+    the same employer depending on which tab asked.
+    """
+    if not is_people:
+        return {
+            "industry": r.get("industry"), "industries": r.get("industries"),
+            "employees": r.get("estimated_num_employees"),
+            "city": r.get("city"), "state": r.get("state"),
+            "country": r.get("country"), "address": r.get("raw_address"),
+            "technologies": r.get("technologies"),
+        }
+    return {
+        "industry": r.get("organization_industry"),
+        "industries": r.get("organization_industries"),
+        "employees": r.get("organization_employees"),
+        "city": r.get("organization_city"), "state": r.get("organization_state"),
+        "country": r.get("organization_country"),
+        "address": r.get("organization_address"),
+        "technologies": r.get("organization_technologies"),
+    }
+
+
+def _cpi_place_matches(org: dict, wanted) -> bool:
+    """Whether a company's HQ is in one of the requested places.
+
+    Apollo's organization_locations takes free text ("United States", "San
+    Francisco, CA", "japan") and matches it loosely, so a request for one country
+    comes back with companies in others. Checked here against the city, state,
+    country and raw address it returned, case-insensitively and per comma-separated
+    part, so "San Francisco, CA" matches a record holding those in two fields.
+    """
+    have = " | ".join(str(x or "").lower() for x in
+                      (org.get("city"), org.get("state"), org.get("country"),
+                       org.get("address")))
+    if not have.strip(" |"):
+        return False
+    for term in (wanted or []):
+        parts = [p.strip().lower() for p in str(term or "").split(",") if p.strip()]
+        if parts and all(p in have for p in parts):
+            return True
+    return False
+
+
+def _cpi_tech_matches(org: dict, wanted) -> bool:
+    """Whether a company uses any of the requested technologies.
+
+    Apollo takes these as uids with underscores for spaces and periods
+    ("google_analytics", "wordpress_org") but returns them as display names
+    ("Google Analytics"), so both sides are normalized to compare at all.
+    """
+    have = {_cpi_tech_uid(t) for t in (org.get("technologies") or [])}
+    have.discard("")
+    if not have:
+        return False
+    return any(_cpi_tech_uid(t) in have for t in (wanted or []))
+
+
+def _cpi_tech_uid(name: str) -> str:
+    """Apollo's uid spelling for a technology. Imported rather than reimplemented:
+    the request side normalizes filters with it and this side normalizes Apollo's
+    display names back, and the two agreeing is the whole point."""
+    from tracker.apollo_client import tech_uid
+    return tech_uid(name)
+
+
+def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
+    """(kept, {reason: dropped_count}) after enforcing every filter Apollo treats
+    as a hint rather than a rule.
+
+    A row missing the field a check needs is dropped by that check, not waved
+    through: an unverifiable row is exactly the row that produced "I searched for
+    Healthcare and got a venture firm". The one exception is a check whose filter
+    was not requested, which never runs.
+    """
+    from tracker.apollo_taxonomy import expand as _industry_expand
+    from tracker.apollo_client import _industry_matches
+
+    wanted_industry = _industry_expand(filters.get("industries"))
+    emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
+    places = filters.get("company_locations") if is_people else filters.get("locations")
+    techs = filters.get("technologies")
+    # Only when the user has explicitly asked NOT to include similar titles.
+    # Leaving it checked is a request for Apollo's fuzzy match, and overriding
+    # that in code would make the checkbox do nothing.
+    strict_titles = bool(is_people and filters.get("titles")
+                         and filters.get("include_similar_titles") is False)
+
+    dropped: dict = {}
+    kept = []
+    for r in (rows or []):
+        org = _cpi_org_view(r, is_people)
+        reason = ""
+        if wanted_industry and not _industry_matches(org, wanted_industry):
+            reason = "industry"
+        elif (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
+                org.get("employees"), emp_min, emp_max):
+            reason = "employees"
+        elif places and not _cpi_place_matches(org, places):
+            reason = "hq"
+        elif techs and not _cpi_tech_matches(org, techs):
+            reason = "technology"
+        elif strict_titles and not _cpi_title_matches(r.get("title"), filters["titles"]):
+            reason = "title"
+        if reason:
+            dropped[reason] = dropped.get(reason, 0) + 1
+        else:
+            kept.append(r)
+    if dropped:
+        log.info("cpi verify: kept %d/%d (%s)", len(kept), len(rows or []),
+                 ", ".join("%s=%d" % kv for kv in sorted(dropped.items())))
+    return kept, dropped
+
+
+def _cpi_size_ok(employees, emp_min, emp_max) -> bool:
+    """Whether a headcount really is inside the requested range.
+
+    Apollo only filters by discrete buckets, so a request for 100 to 2000 sends
+    every bucket that overlaps it, including "51,200" -- and companies with 51
+    employees come back for a search whose floor was 100. The number Apollo
+    returns is the one that settles it.
+    """
+    try:
+        n = int(employees)
+    except (TypeError, ValueError):
+        return False
+    if emp_min is not None and n < emp_min:
+        return False
+    if emp_max is not None and n > emp_max:
+        return False
+    return True
 
 
 def _cpi_org_phone(o: dict) -> str:
@@ -7784,6 +8068,9 @@ def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
                     fresh[org_id] = _cpi_employer_facts(o)
             if orgs:
                 spend["credits"] = spend.get("credits", 0) + 1
+                # Every paid record teaches the industry picker one more value
+                # Apollo genuinely uses.
+                _cpi_record_industries(orgs)
         except Exception as e:
             log.warning("cpi employer firmographics lookup failed: %s", e)
         if fresh:
