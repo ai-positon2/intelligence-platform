@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=15">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=16">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -105,8 +105,16 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Location &amp; company size</div>
           <div class="cpi-filter-row">
-            <input class="cpi-search-input" id="fpLocation" placeholder="Person location, e.g. Austin, TX" style="flex:1;min-width:160px" aria-label="Person location" title="Where the PERSON lives, which is Apollo&#39;s own field on the person. The free search does not return anyone&#39;s city, so unlike Industry and company HQ this one cannot be re-checked here without enriching each person. Independent of the company HQ filter, and both apply together.">
-            <input class="cpi-search-input" id="fpCompanyLocation" placeholder="Company HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="Employer HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
+            <div class="cpi-combo" id="fpLocationCombo" style="flex:1;min-width:160px">
+                <div class="cpi-combo-chips" id="fpLocationChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpLocation" placeholder="Person location, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpLocationList" aria-label="Person location" title="Where the PERSON lives, which is Apollo&#39;s own field on the person. The free search does not return anyone&#39;s city, so unlike Industry and company HQ this one cannot be re-checked here without enriching each person. Independent of the company HQ filter, and both apply together.">
+                <div class="cpi-combo-list" id="fpLocationList" role="listbox" aria-label="Locations"></div>
+              </div>
+            <div class="cpi-combo" id="fpCompanyLocationCombo" style="flex:1;min-width:160px">
+                <div class="cpi-combo-chips" id="fpCompanyLocationChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpCompanyLocation" placeholder="Employer HQ, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpCompanyLocationList" aria-label="Employer HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
+                <div class="cpi-combo-list" id="fpCompanyLocationList" role="listbox" aria-label="Locations"></div>
+              </div>
             <select class="cpi-filter-select" id="fpEmpRange" aria-label="Employer size" title="Apollo can only filter by fixed buckets, so it returns companies outside the range you pick. The exact range is enforced here against each company&#39;s own headcount, and rows outside it are removed.">
               <option value="">Any company size</option>
               <option value="1,10">1-10 employees</option>
@@ -122,9 +130,18 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Verification &amp; keywords</div>
           <div class="cpi-filter-row">
+            {# Apollo documents four email statuses. Measured against this account
+               on a 79,421-person baseline, only two of them filter anything:
+               "verified" returned 44,635 and "unavailable" 31,819, while
+               "unverified" and "likely to engage" each returned the untouched
+               79,421, meaning Apollo ignored them. The two that do nothing are
+               not offered, because a chip that visibly turns on and changes no
+               result is the exact mismatch this page is meant not to have. The
+               third value was also being sent as "likely_to_engage", which is not
+               even Apollo's spelling of it. #}
             <div class="cpi-chip-group" id="fpEmailStatus">
-              {% for s in [("verified","Verified email"),("likely_to_engage","Likely to engage"),("unverified","Unverified"),("unavailable","Unavailable")] %}
-              <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
+              {% for s in [("verified","Verified email"),("unavailable","No email available")] %}
+              <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)" title="Apollo's own email status for the person. Only these two values filter anything on this account: Apollo ignores 'unverified' and 'likely to engage', so they are not offered.">{{ s[1] }}</span>
               {% endfor %}
             </div>
             <input class="cpi-search-input" id="fpKeywords" placeholder="Keywords" style="flex:1;min-width:140px" aria-label="Keywords">
@@ -166,8 +183,16 @@
               <input class="cpi-num-input" id="fpFoundedMax" type="number" placeholder="Founded before" style="width:126px" aria-label="Employer founded on or before year">
             </div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpNaics" placeholder="NAICS codes, e.g. 5415" aria-label="Employer NAICS codes">
-              <input class="cpi-tag-input" id="fpSic" placeholder="SIC codes, e.g. 7372" aria-label="Employer SIC codes">
+              <div class="cpi-combo" id="fpNaicsCombo">
+                <div class="cpi-combo-chips" id="fpNaicsChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpNaics" placeholder="Employer NAICS, code or industry" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpNaicsList" aria-label="Employer NAICS codes">
+                <div class="cpi-combo-list" id="fpNaicsList" role="listbox" aria-label="NAICS codes"></div>
+              </div>
+              <div class="cpi-combo" id="fpSicCombo">
+                <div class="cpi-combo-chips" id="fpSicChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpSic" placeholder="Employer SIC, code or industry" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpSicList" aria-label="Employer SIC codes">
+                <div class="cpi-combo-list" id="fpSicList" role="listbox" aria-label="SIC codes"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
               <select class="cpi-filter-select" id="fpDeptName" aria-label="Department to size">
@@ -197,11 +222,23 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Technologies</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Employer uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
-              <input class="cpi-tag-input" id="fpTechnologiesAll" placeholder="Uses ALL of" aria-label="Employer uses all of these technologies">
+              <div class="cpi-combo" id="fpTechnologiesCombo">
+                <div class="cpi-combo-chips" id="fpTechnologiesChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpTechnologies" placeholder="Uses ANY of, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpTechnologiesList" aria-label="Employer uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
+                <div class="cpi-combo-list" id="fpTechnologiesList" role="listbox" aria-label="Technologies"></div>
+              </div>
+              <div class="cpi-combo" id="fpTechnologiesAllCombo">
+                <div class="cpi-combo-chips" id="fpTechnologiesAllChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpTechnologiesAll" placeholder="Uses ALL of, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpTechnologiesAllList" aria-label="Employer uses all of these technologies">
+                <div class="cpi-combo-list" id="fpTechnologiesAllList" role="listbox" aria-label="Technologies"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpTechnologiesNot" placeholder="Does NOT use, e.g. Marketo" aria-label="Employer does not use these technologies">
+              <div class="cpi-combo" id="fpTechnologiesNotCombo">
+                <div class="cpi-combo-chips" id="fpTechnologiesNotChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpTechnologiesNot" placeholder="Does NOT use, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpTechnologiesNotList" aria-label="Employer does not use these technologies">
+                <div class="cpi-combo-list" id="fpTechnologiesNotList" role="listbox" aria-label="Technologies"></div>
+              </div>
             </div>
           </div>
 
@@ -209,7 +246,11 @@
             <div class="cpi-adv-lbl">Hiring signals</div>
             <div class="cpi-filter-row">
               <input class="cpi-tag-input" id="fpJobTitles" placeholder="Hiring for title(s), e.g. sales manager" aria-label="Employer hiring for job titles">
-              <input class="cpi-tag-input" id="fpJobLocations" placeholder="Hiring in, e.g. atlanta, japan" aria-label="Employer hiring in locations">
+              <div class="cpi-combo" id="fpJobLocationsCombo">
+                <div class="cpi-combo-chips" id="fpJobLocationsChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpJobLocations" placeholder="Hiring in, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpJobLocationsList" aria-label="Employer hiring in locations">
+                <div class="cpi-combo-list" id="fpJobLocationsList" role="listbox" aria-label="Locations"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
               <input class="cpi-num-input" id="fpJobsMin" type="number" min="0" placeholder="Min jobs" aria-label="Minimum open jobs">
@@ -247,8 +288,16 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Location &amp; size</div>
           <div class="cpi-filter-row">
-            <input class="cpi-search-input" id="fcLocation" placeholder="HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
-            <input class="cpi-search-input" id="fcExcludeLocation" placeholder="Exclude HQ location" style="flex:1;min-width:160px" aria-label="Exclude HQ location">
+            <div class="cpi-combo" id="fcLocationCombo" style="flex:1;min-width:160px">
+                <div class="cpi-combo-chips" id="fcLocationChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcLocation" placeholder="HQ location, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcLocationList" aria-label="HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
+                <div class="cpi-combo-list" id="fcLocationList" role="listbox" aria-label="Locations"></div>
+              </div>
+            <div class="cpi-combo" id="fcExcludeLocationCombo" style="flex:1;min-width:160px">
+                <div class="cpi-combo-chips" id="fcExcludeLocationChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcExcludeLocation" placeholder="Exclude HQ location" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcExcludeLocationList" aria-label="Exclude HQ location">
+                <div class="cpi-combo-list" id="fcExcludeLocationList" role="listbox" aria-label="Locations"></div>
+              </div>
             <select class="cpi-filter-select" id="fcEmpRange" aria-label="Company size" title="Apollo can only filter by fixed buckets, so it returns companies outside the range you pick. The exact range is enforced here against each company&#39;s own headcount, and rows outside it are removed.">
               <option value="">Any company size</option>
               <option value="1,10">1-10 employees</option>
@@ -289,12 +338,28 @@
               <input class="cpi-num-input" id="fcFoundedMax" type="number" placeholder="Founded before" style="width:126px" aria-label="Founded on or before year">
             </div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcNaics" placeholder="NAICS codes, e.g. 5415" aria-label="NAICS codes">
-              <input class="cpi-tag-input" id="fcNaicsNot" placeholder="Exclude NAICS" aria-label="Exclude NAICS codes">
+              <div class="cpi-combo" id="fcNaicsCombo">
+                <div class="cpi-combo-chips" id="fcNaicsChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcNaics" placeholder="NAICS, code or industry" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcNaicsList" aria-label="NAICS codes">
+                <div class="cpi-combo-list" id="fcNaicsList" role="listbox" aria-label="NAICS codes"></div>
+              </div>
+              <div class="cpi-combo" id="fcNaicsNotCombo">
+                <div class="cpi-combo-chips" id="fcNaicsNotChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcNaicsNot" placeholder="Exclude NAICS code" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcNaicsNotList" aria-label="Exclude NAICS codes">
+                <div class="cpi-combo-list" id="fcNaicsNotList" role="listbox" aria-label="NAICS codes"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcSic" placeholder="SIC codes, e.g. 7372" aria-label="SIC codes">
-              <input class="cpi-tag-input" id="fcSicNot" placeholder="Exclude SIC" aria-label="Exclude SIC codes">
+              <div class="cpi-combo" id="fcSicCombo">
+                <div class="cpi-combo-chips" id="fcSicChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcSic" placeholder="SIC, code or industry" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcSicList" aria-label="SIC codes">
+                <div class="cpi-combo-list" id="fcSicList" role="listbox" aria-label="SIC codes"></div>
+              </div>
+              <div class="cpi-combo" id="fcSicNotCombo">
+                <div class="cpi-combo-chips" id="fcSicNotChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcSicNot" placeholder="Exclude SIC code" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcSicNotList" aria-label="Exclude SIC codes">
+                <div class="cpi-combo-list" id="fcSicNotList" role="listbox" aria-label="SIC codes"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
               <select class="cpi-filter-select" id="fcDeptName" aria-label="Department to size">
@@ -343,11 +408,23 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Technologies</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
-              <input class="cpi-tag-input" id="fcTechnologiesAll" placeholder="Uses ALL of" aria-label="Uses all of these technologies">
+              <div class="cpi-combo" id="fcTechnologiesCombo">
+                <div class="cpi-combo-chips" id="fcTechnologiesChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcTechnologies" placeholder="Uses ANY of, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcTechnologiesList" aria-label="Uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
+                <div class="cpi-combo-list" id="fcTechnologiesList" role="listbox" aria-label="Technologies"></div>
+              </div>
+              <div class="cpi-combo" id="fcTechnologiesAllCombo">
+                <div class="cpi-combo-chips" id="fcTechnologiesAllChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcTechnologiesAll" placeholder="Uses ALL of, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcTechnologiesAllList" aria-label="Uses all of these technologies">
+                <div class="cpi-combo-list" id="fcTechnologiesAllList" role="listbox" aria-label="Technologies"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcTechnologiesNot" placeholder="Does NOT use, e.g. Marketo" aria-label="Does not use these technologies">
+              <div class="cpi-combo" id="fcTechnologiesNotCombo">
+                <div class="cpi-combo-chips" id="fcTechnologiesNotChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcTechnologiesNot" placeholder="Does NOT use, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcTechnologiesNotList" aria-label="Does not use these technologies">
+                <div class="cpi-combo-list" id="fcTechnologiesNotList" role="listbox" aria-label="Technologies"></div>
+              </div>
             </div>
           </div>
 
@@ -355,7 +432,11 @@
             <div class="cpi-adv-lbl">Hiring signals</div>
             <div class="cpi-filter-row">
               <input class="cpi-tag-input" id="fcJobTitles" placeholder="Hiring for title(s), e.g. sales manager" aria-label="Hiring for job titles">
-              <input class="cpi-tag-input" id="fcJobLocations" placeholder="Hiring in, e.g. atlanta, japan" aria-label="Hiring in locations">
+              <div class="cpi-combo" id="fcJobLocationsCombo">
+                <div class="cpi-combo-chips" id="fcJobLocationsChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcJobLocations" placeholder="Hiring in, type to search" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcJobLocationsList" aria-label="Hiring in locations">
+                <div class="cpi-combo-list" id="fcJobLocationsList" role="listbox" aria-label="Locations"></div>
+              </div>
             </div>
             <div class="cpi-filter-row">
               <input class="cpi-num-input" id="fcJobsMin" type="number" min="0" placeholder="Min jobs" aria-label="Minimum open jobs">
@@ -483,8 +564,9 @@ window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
 window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 window.__CPI_INDUSTRIES_URL__ = "{{ industries_url }}";
+window.__CPI_VOCAB_URL__ = "{{ vocab_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=15" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=16" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');

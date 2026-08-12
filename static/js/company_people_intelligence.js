@@ -100,37 +100,88 @@ window.cpiToggleAdvanced = function(panelId, btnId){
   if(btn) btn.classList.toggle("on", on);
 };
 
-/* ── Industry combobox ── */
-/* Apollo's classification is the LinkedIn taxonomy, in which nothing at all is
-   spelled "healthcare": it is "hospital & health care", "medical practice",
-   "pharmaceuticals" and six more. A text box therefore invited a word that cannot
-   match, which is how a healthcare search came back with a venture firm. This
-   offers the real values, and offers "healthcare" as an explicit shortcut for the
-   nine of them, naming which nine rather than implying Apollo has such a value.
-   Suggestions come from the server, which merges the written-down taxonomy with
-   every industry string Apollo has actually been seen to use. */
-var INDUSTRY_SEL = { fp: [], fc: [] };
-var INDUSTRY_CACHE = {};
-var INDUSTRY_CUR = -1;
+/* ── Vocabulary comboboxes ── */
+/* Several Apollo filters accept only values Apollo already knows, and say nothing
+   when given anything else: the search just comes back empty, or quietly wider
+   than asked for. Measured on this account, an invented technology uid returns 0
+   people, an invented place returns 0, and a misspelled place returns a different
+   set rather than an error. Industry is the worst of them, because Apollo's
+   classification is the LinkedIn taxonomy in which nothing at all is spelled
+   "healthcare": it is "hospital & health care", "medical practice",
+   "pharmaceuticals" and six more.
 
-function industryPrefix(el){ return el && el.id.indexOf("fc")===0 ? "fc" : "fp"; }
+   So every one of those filters is a picker rather than a text box, all driven by
+   the same widget below. Suggestions come from the server, which merges a
+   written-down copy of each vocabulary with every value Apollo has actually been
+   observed to return, so the list improves as the tool is used and an unconfirmed
+   value is visibly unconfirmed.
 
-function renderIndustryChips(pre){
-  var wrap=document.getElementById(pre+"IndustryChips");
+   Typing is never blocked: an unlisted value is still a legitimate search. The
+   two code vocabularies are the exception, because Apollo enforces their shape and
+   rejects anything else, so those are checked before a chip is made. */
+var COMBO_SPECS = [
+  /* [input id, Apollo filter key, vocabulary, what one entry is called] */
+  ["fpIndustry",         "industries",           "industry",   "industry"],
+  ["fpLocation",         "person_locations",     "location",   "location"],
+  ["fpCompanyLocation",  "company_locations",    "location",   "location"],
+  ["fpNaics",            "naics_codes",          "naics",      "NAICS code"],
+  ["fpSic",              "sic_codes",            "sic",        "SIC code"],
+  ["fpTechnologies",     "technologies",         "technology", "technology"],
+  ["fpTechnologiesAll",  "technologies_all",     "technology", "technology"],
+  ["fpTechnologiesNot",  "exclude_technologies", "technology", "technology"],
+  ["fpJobLocations",     "job_locations",        "location",   "location"],
+  ["fcIndustry",         "industries",           "industry",   "industry"],
+  ["fcLocation",         "locations",            "location",   "location"],
+  ["fcExcludeLocation",  "exclude_locations",    "location",   "location"],
+  ["fcNaics",            "naics_codes",          "naics",      "NAICS code"],
+  ["fcNaicsNot",         "exclude_naics_codes",  "naics",      "NAICS code"],
+  ["fcSic",              "sic_codes",            "sic",        "SIC code"],
+  ["fcSicNot",           "exclude_sic_codes",    "sic",        "SIC code"],
+  ["fcTechnologies",     "technologies",         "technology", "technology"],
+  ["fcTechnologiesAll",  "technologies_all",     "technology", "technology"],
+  ["fcTechnologiesNot",  "exclude_technologies", "technology", "technology"],
+  ["fcJobLocations",     "job_locations",        "location",   "location"]
+];
+
+/* The shapes Apollo enforces, and what to say when one is not met. Kept in step
+   with tracker/apollo_vocab.py, which rejects the same values server-side: this
+   copy exists to answer immediately, not to be the only guard. */
+var COMBO_FORMATS = {
+  naics: [/^[0-9]{2,5}$/, "NAICS codes are 2 to 5 digits here. Official codes are 6 digits, so drop the last one or two: 541511 becomes 54151."],
+  sic:   [/^[0-9]{4}$/,   "SIC codes are exactly 4 digits."]
+};
+
+var COMBO = {};        /* input id -> {sel: [values]} */
+var COMBO_CACHE = {};  /* vocabulary + query -> entries, so retyping is instant */
+var COMBO_CUR = -1;    /* highlighted option in the one open list */
+
+function comboSpec(key){
+  for(var i=0;i<COMBO_SPECS.length;i++){ if(COMBO_SPECS[i][0]===key) return COMBO_SPECS[i]; }
+  return null;
+}
+function comboState(key){
+  if(!COMBO[key]) COMBO[key]={sel:[]};
+  return COMBO[key];
+}
+/* The selected values of one combo, which is what a search is built from. */
+function comboSel(key){ return comboState(key).sel; }
+
+function renderComboChips(key){
+  var wrap=document.getElementById(key+"Chips");
   if(!wrap) return;
-  wrap.innerHTML=INDUSTRY_SEL[pre].map(function(v,i){
+  wrap.innerHTML=comboSel(key).map(function(v,i){
     return '<span class="cpi-chip-sel">'+esc(v)+
-      '<button type="button" onclick="cpiIndustryRemove(\''+pre+'\','+i+')" '+
+      '<button type="button" onclick="cpiComboRemove(\''+key+'\','+i+')" '+
       'aria-label="Remove '+esc(v)+'">&times;</button></span>';
   }).join("");
 }
 
-window.cpiIndustryRemove = function(pre, i){
-  INDUSTRY_SEL[pre].splice(i,1);
-  renderIndustryChips(pre);
+window.cpiComboRemove = function(key, i){
+  comboSel(key).splice(i,1);
+  renderComboChips(key);
 };
 
-function setIndustries(pre, values){
+function setComboValues(key, values){
   /* De-duplicated case-insensitively, because "Healthcare" and "healthcare" are
      one filter and two chips would only look like a mistake. */
   var seen={}, out=[];
@@ -141,23 +192,51 @@ function setIndustries(pre, values){
     if(seen[k]) return;
     seen[k]=1; out.push(v);
   });
-  INDUSTRY_SEL[pre]=out;
-  renderIndustryChips(pre);
+  comboState(key).sel=out;
+  renderComboChips(key);
 }
 
-function addIndustry(pre, value){
-  setIndustries(pre, INDUSTRY_SEL[pre].concat([value]));
-  var input=document.getElementById(pre+"Industry");
+function addComboValue(key, value){
+  var spec=comboSpec(key);
+  var fmt=spec && COMBO_FORMATS[spec[2]];
+  value=String(value==null?"":value).trim();
+  if(fmt && !fmt[0].test(value)){
+    /* Refused here rather than sent, because Apollo's own schema rejects it and
+       the search would come back empty with nothing to explain why. */
+    comboNote(key, fmt[1], value);
+    return;
+  }
+  setComboValues(key, comboSel(key).concat([value]));
+  var input=document.getElementById(key);
   if(input){ input.value=""; input.focus(); }
-  closeIndustryList(pre);
+  closeCombo(key);
+}
+
+/* A refusal has to be visible in the list itself: the input is where the eye
+   already is, and an alert for a mistyped code would be far too much.
+
+   Stamped with the value it refused, because the request for that same text is
+   usually still in flight and its response would otherwise land a moment later
+   and replace the explanation with an ordinary list. */
+function comboNote(key, message, forValue){
+  var list=document.getElementById(key+"List");
+  if(!list) return;
+  COMBO_SPECS.forEach(function(other){ if(other[0]!==key) closeCombo(other[0]); });
+  list.innerHTML='<div class="cpi-opt-none cpi-opt-warn">'+esc(message)+'</div>';
+  list.classList.add("on");
+  list.dataset.q=String(forValue==null?"":forValue);
+  list.dataset.warn="1";
+  liftComboGroup(key, true);
+  placeComboList(key);
+  COMBO_CUR=-1;
 }
 
 /* The labelled filter groups each carry a z-index, which makes every one of them
    its own stacking context. An open dropdown therefore cannot rise above the
    groups that come after it unless its own group is lifted for as long as it is
    open. */
-function liftIndustryGroup(pre, on){
-  var list=document.getElementById(pre+"IndustryList");
+function liftComboGroup(key, on){
+  var list=document.getElementById(key+"List");
   var group=list && list.closest(".cpi-fset");
   if(group) group.classList.toggle("cpi-fset-lift", !!on);
 }
@@ -166,9 +245,9 @@ function liftIndustryGroup(pre, on){
    window whenever its field sits low on the page, which is the same "cannot see
    the options" problem in a different guise. Give it the room that is actually
    there, and open it upward when that side has more. */
-function placeIndustryList(pre){
-  var list=document.getElementById(pre+"IndustryList");
-  var combo=document.getElementById(pre+"IndustryCombo");
+function placeComboList(key){
+  var list=document.getElementById(key+"List");
+  var combo=document.getElementById(key+"Combo");
   if(!list||!combo) return;
   var GAP=5, EDGE=14, IDEAL=290, FLOOR=150;
   var r=combo.getBoundingClientRect();
@@ -179,98 +258,148 @@ function placeIndustryList(pre){
   list.style.maxHeight=Math.max(FLOOR, Math.min(IDEAL, up?above:below))+"px";
 }
 
-function closeIndustryList(pre){
-  var list=document.getElementById(pre+"IndustryList");
-  var input=document.getElementById(pre+"Industry");
-  if(list) list.classList.remove("on");
+function closeCombo(key){
+  var list=document.getElementById(key+"List");
+  var input=document.getElementById(key);
+  if(list){
+    list.classList.remove("on");
+    delete list.dataset.q;
+    delete list.dataset.warn;
+  }
   if(input) input.setAttribute("aria-expanded","false");
-  liftIndustryGroup(pre, false);
-  INDUSTRY_CUR=-1;
+  liftComboGroup(key, false);
+  COMBO_CUR=-1;
 }
 
-function renderIndustryList(pre, entries, query){
-  var list=document.getElementById(pre+"IndustryList");
-  var input=document.getElementById(pre+"Industry");
+function closeAllCombos(){
+  COMBO_SPECS.forEach(function(spec){ closeCombo(spec[0]); });
+}
+
+function renderComboList(key, entries, query){
+  var spec=comboSpec(key);
+  var noun=spec?spec[3]:"value";
+  var list=document.getElementById(key+"List");
+  var input=document.getElementById(key);
   if(!list) return;
+  /* Exactly one list open, enforced where a list actually opens rather than only
+     on focus: these panels overlap each other, and two at once leaves one
+     floating over the field being typed into. */
+  COMBO_SPECS.forEach(function(other){ if(other[0]!==key) closeCombo(other[0]); });
   if(!entries.length){
-    /* Never a dead end: an unlisted value is still a legitimate search, it just
-       cannot be promised to match Apollo's own classification. */
-    list.innerHTML='<div class="cpi-opt-none">Nothing in Apollo\'s industry list matches '+
-      '<b>'+esc(query)+'</b>. Press Enter to filter on it anyway.</div>';
+    var fmt=spec && COMBO_FORMATS[spec[2]];
+    if(fmt && query && !fmt[0].test(query.trim())){
+      list.innerHTML='<div class="cpi-opt-none cpi-opt-warn">'+esc(fmt[1])+'</div>';
+    } else {
+      /* Never a dead end for a free-text vocabulary: an unlisted value is still a
+         legitimate search, it just cannot be promised to match. */
+      list.innerHTML='<div class="cpi-opt-none">No '+esc(noun)+' on file matches '+
+        '<b>'+esc(query)+'</b>.'+(fmt?"":" Press Enter to filter on it anyway.")+'</div>';
+    }
   } else {
     list.innerHTML=entries.map(function(e,i){
-      var tag=e.kind==="family"
-        ? '<span class="cpi-opt-tag">'+e.covers.length+' industries</span>'
+      var covers=e.covers||[];
+      var tag=covers.length
+        ? '<span class="cpi-opt-tag">'+covers.length+' industries</span>'
         : (e.confirmed?'<span class="cpi-opt-tag">seen in apollo</span>':"");
-      var sub=e.kind==="family" ? '<s>'+esc(e.covers.join(", "))+'</s>' : "";
+      /* A family says which industries it stands for; a code says what it means.
+         Either way the second line is what stops the value being a guess. */
+      var sub=e.note ? e.note : (covers.length ? covers.join(", ") : "");
       return '<button type="button" class="cpi-opt'+(i===0?" cur":"")+'" role="option" '+
-        'data-industry="'+esc(e.value)+'" data-pre="'+pre+'">'+tag+
-        '<b>'+esc(e.value)+'</b>'+sub+'</button>';
+        'data-value="'+esc(e.value)+'" data-combo="'+esc(key)+'">'+tag+
+        '<b>'+esc(e.value)+'</b>'+(sub?'<s>'+esc(sub)+'</s>':"")+'</button>';
     }).join("");
-    INDUSTRY_CUR=0;
+    COMBO_CUR=0;
   }
   list.classList.add("on");
   if(input) input.setAttribute("aria-expanded","true");
-  liftIndustryGroup(pre, true);
-  placeIndustryList(pre);
+  /* Which query this list is the answer to. Enter reads it before trusting the
+     highlighted option, because a list still showing the results of an earlier
+     keystroke would otherwise commit a value the user never typed: entering the
+     real 6-digit NAICS code 541511 added 5132, left highlighted from "software".
+  */
+  list.dataset.q=String(query==null?"":query);
+  delete list.dataset.warn;
+  liftComboGroup(key, true);
+  placeComboList(key);
   /* Scrolled to the bottom of a previous query, the next one would open already
      scrolled past its first option. */
   list.scrollTop=0;
 }
 
-function loadIndustries(pre){
-  var input=document.getElementById(pre+"Industry");
-  if(!input) return;
+function comboUrl(vocab, q){
+  /* Industry has its own endpoint and its own families; the rest share one. */
+  if(vocab==="industry") return window.__CPI_INDUSTRIES_URL__+"?q="+encodeURIComponent(q);
+  return window.__CPI_VOCAB_URL__+"?kind="+encodeURIComponent(vocab)+
+    "&q="+encodeURIComponent(q);
+}
+
+function loadCombo(key){
+  var spec=comboSpec(key);
+  var input=document.getElementById(key);
+  if(!spec||!input) return;
   var q=input.value.trim();
-  var cached=INDUSTRY_CACHE[q.toLowerCase()];
-  if(cached){ renderIndustryList(pre, cached, q); return; }
-  fetch(window.__CPI_INDUSTRIES_URL__+"?q="+encodeURIComponent(q))
+  var ck=spec[2]+"\n"+q.toLowerCase();
+  if(COMBO_CACHE[ck]){ renderComboList(key, COMBO_CACHE[ck], q); return; }
+  fetch(comboUrl(spec[2], q))
     .then(function(r){ return r.json(); })
     .then(function(d){
       var entries=(d&&d.entries)||[];
-      INDUSTRY_CACHE[q.toLowerCase()]=entries;
+      COMBO_CACHE[ck]=entries;
+      var list=document.getElementById(key+"List");
+      /* A refusal already shown for this exact text stands: the response is a
+         list of near matches, but the value cannot be used whatever it resembles. */
+      if(list && list.dataset.warn==="1" && list.dataset.q===q) return;
       /* Only render if the box still says what was asked for: a slow response to
          an earlier keystroke must not replace the list for a later one. */
-      if(input.value.trim()===q) renderIndustryList(pre, entries, q);
+      if(input.value.trim()===q) renderComboList(key, entries, q);
     })
     .catch(function(){ /* the list is an aid; typing still works without it */ });
 }
 
-function moveIndustryCur(pre, delta){
-  var opts=document.querySelectorAll("#"+pre+"IndustryList .cpi-opt");
+function moveComboCur(key, delta){
+  var opts=document.querySelectorAll("#"+key+"List .cpi-opt");
   if(!opts.length) return;
-  INDUSTRY_CUR=(INDUSTRY_CUR+delta+opts.length)%opts.length;
-  opts.forEach(function(o,i){ o.classList.toggle("cur", i===INDUSTRY_CUR); });
-  opts[INDUSTRY_CUR].scrollIntoView({block:"nearest"});
+  COMBO_CUR=(COMBO_CUR+delta+opts.length)%opts.length;
+  opts.forEach(function(o,i){ o.classList.toggle("cur", i===COMBO_CUR); });
+  opts[COMBO_CUR].scrollIntoView({block:"nearest"});
 }
 
-function initIndustryCombo(pre){
-  var input=document.getElementById(pre+"Industry");
+function initCombo(key){
+  var input=document.getElementById(key);
   if(!input) return;
   var timer=null;
   input.addEventListener("input", function(){
     if(timer) clearTimeout(timer);
-    timer=setTimeout(function(){ loadIndustries(pre); }, 120);
+    timer=setTimeout(function(){ loadCombo(key); }, 120);
   });
-  input.addEventListener("focus", function(){ loadIndustries(pre); });
+  input.addEventListener("focus", function(){
+    /* Only one list open at a time, or an earlier one stays floating over the
+       field being typed into. */
+    closeAllCombos();
+    loadCombo(key);
+  });
   input.addEventListener("keydown", function(e){
-    if(e.key==="ArrowDown"){ e.preventDefault(); moveIndustryCur(pre, 1); return; }
-    if(e.key==="ArrowUp"){ e.preventDefault(); moveIndustryCur(pre, -1); return; }
-    if(e.key==="Escape"){ closeIndustryList(pre); return; }
+    if(e.key==="ArrowDown"){ e.preventDefault(); moveComboCur(key, 1); return; }
+    if(e.key==="ArrowUp"){ e.preventDefault(); moveComboCur(key, -1); return; }
+    if(e.key==="Escape"){ closeCombo(key); return; }
     if(e.key==="Enter"){
       e.preventDefault();
-      var cur=document.querySelectorAll("#"+pre+"IndustryList .cpi-opt")[INDUSTRY_CUR];
-      if(cur){ addIndustry(pre, cur.getAttribute("data-industry")); }
-      else if(input.value.trim()){ addIndustry(pre, input.value.trim()); }
+      var typed=input.value.trim();
+      var list=document.getElementById(key+"List");
+      /* Only a list rendered for exactly what is in the box may speak for it. */
+      var fresh=list && list.dataset.q===typed && list.dataset.warn!=="1";
+      var cur=fresh?document.querySelectorAll("#"+key+"List .cpi-opt")[COMBO_CUR]:null;
+      if(cur){ addComboValue(key, cur.getAttribute("data-value")); }
+      else if(typed){ addComboValue(key, typed); }
       return;
     }
     /* Backspace on an empty box removes the last chip, the convention every
        tag input follows. */
-    if(e.key==="Backspace" && !input.value && INDUSTRY_SEL[pre].length){
-      window.cpiIndustryRemove(pre, INDUSTRY_SEL[pre].length-1);
+    if(e.key==="Backspace" && !input.value && comboSel(key).length){
+      window.cpiComboRemove(key, comboSel(key).length-1);
     }
   });
-  var list=document.getElementById(pre+"IndustryList");
+  var list=document.getElementById(key+"List");
   if(list){
     /* Delegated, and mousedown rather than click, so choosing an option is not
        cancelled by the input losing focus first. */
@@ -278,20 +407,21 @@ function initIndustryCombo(pre){
       var opt=e.target.closest(".cpi-opt");
       if(!opt) return;
       e.preventDefault();
-      addIndustry(opt.getAttribute("data-pre"), opt.getAttribute("data-industry"));
+      addComboValue(opt.getAttribute("data-combo"), opt.getAttribute("data-value"));
     });
   }
 }
+
 document.addEventListener("click", function(e){
-  if(!e.target.closest(".cpi-combo")){ closeIndustryList("fp"); closeIndustryList("fc"); }
+  if(!e.target.closest(".cpi-combo")) closeAllCombos();
 });
 /* Room below the field changes as the page scrolls or the window resizes, so an
    already-open list is re-measured rather than left where it no longer fits. */
 ["scroll","resize"].forEach(function(evt){
   window.addEventListener(evt, function(){
-    ["fp","fc"].forEach(function(pre){
-      var list=document.getElementById(pre+"IndustryList");
-      if(list && list.classList.contains("on")) placeIndustryList(pre);
+    COMBO_SPECS.forEach(function(spec){
+      var list=document.getElementById(spec[0]+"List");
+      if(list && list.classList.contains("on")) placeComboList(spec[0]);
     });
   }, {passive:true});
 });
@@ -302,13 +432,9 @@ document.addEventListener("click", function(e){
          | "one" (single value -> one-element array) | "num" (number or omit) */
 var PEOPLE_FIELDS = [
   ["fpTitles","titles","csv"], ["fpCompanyDomain","company_domains","one"],
-  ["fpLocation","person_locations","one"], ["fpCompanyLocation","company_locations","one"],
   ["fpKeywords","keywords","str"], ["fpLinkedinUrls","linkedin_urls","csv"],
   ["fpSegments","market_segments","csv"],
-  ["fpNaics","naics_codes","csv"], ["fpSic","sic_codes","csv"],
-  ["fpTechnologies","technologies","csv"], ["fpTechnologiesAll","technologies_all","csv"],
-  ["fpTechnologiesNot","exclude_technologies","csv"],
-  ["fpJobTitles","job_titles","csv"], ["fpJobLocations","job_locations","csv"],
+  ["fpJobTitles","job_titles","csv"],
   ["fpJobPostedAfter","job_posted_after","str"],
   ["fpRevenueMin","revenue_min","num"], ["fpRevenueMax","revenue_max","num"],
   ["fpFoundedMin","founded_min","num"], ["fpFoundedMax","founded_max","num"],
@@ -319,14 +445,9 @@ var PEOPLE_FIELDS = [
 ];
 var COMPANY_FIELDS = [
   ["fcName","name","str"], ["fcDomain","domains","one"],
-  ["fcLocation","locations","one"], ["fcExcludeLocation","exclude_locations","one"],
   ["fcExcludeKeywords","exclude_keywords","csv"],
   ["fcSegments","market_segments","csv"],
-  ["fcNaics","naics_codes","csv"], ["fcNaicsNot","exclude_naics_codes","csv"],
-  ["fcSic","sic_codes","csv"], ["fcSicNot","exclude_sic_codes","csv"],
-  ["fcTechnologies","technologies","csv"], ["fcTechnologiesAll","technologies_all","csv"],
-  ["fcTechnologiesNot","exclude_technologies","csv"],
-  ["fcJobTitles","job_titles","csv"], ["fcJobLocations","job_locations","csv"],
+  ["fcJobTitles","job_titles","csv"],
   ["fcJobPostedAfter","job_posted_after","str"],
   ["fcFundedAfter","funded_after","str"], ["fcFundedBefore","funded_before","str"],
   ["fcRevenueMin","revenue_min","num"], ["fcRevenueMax","revenue_max","num"],
@@ -350,9 +471,10 @@ window.cpiClearFilters = function(){
   var unk=document.getElementById("fcUnknownFounded"); if(unk) unk.checked=false;
   /* Clear means back to the defaults, and the default is on. */
   var det=document.getElementById("fpCompanyDetail"); if(det) det.checked=true;
-  setIndustries("fp", []); setIndustries("fc", []);
-  ["fpIndustry","fcIndustry"].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value="";
+  COMBO_SPECS.forEach(function(spec){
+    setComboValues(spec[0], []);
+    var el=document.getElementById(spec[0]); if(el) el.value="";
+    closeCombo(spec[0]);
   });
   window.cpiSyncCostLabels();
   document.querySelectorAll("#fpSeniority .cpi-chip.on, #fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
@@ -363,6 +485,27 @@ window.cpiClearFilters = function(){
 function splitCsv(v){ return (v||"").split(",").map(function(s){return s.trim();}).filter(Boolean); }
 function numVal(id){ var el=document.getElementById(id); if(!el||el.value==="") return null; var n=+el.value; return isNaN(n)?null:n; }
 function chipVals(sel){ var out=[]; document.querySelectorAll(sel).forEach(function(c){ out.push(c.getAttribute("data-val")); }); return out; }
+
+/* Every picker on the active tab, read from its chips. Two combos can name the
+   same Apollo filter (industry exists on both tabs), which is safe because only
+   one tab's prefix is ever asked for. */
+function applyCombos(prefix, f){
+  COMBO_SPECS.forEach(function(spec){
+    if(spec[0].indexOf(prefix)!==0) return;
+    var vals=comboSel(spec[0]);
+    if(vals.length) f[spec[1]]=vals.slice();
+  });
+}
+
+/* Reopening a saved search has to refill the pickers too, or the chips would show
+   an empty filter bar above results that were produced by a full one. */
+function restoreCombos(prefix, f){
+  COMBO_SPECS.forEach(function(spec){
+    if(spec[0].indexOf(prefix)!==0) return;
+    setComboValues(spec[0], f[spec[1]]||[]);
+    var el=document.getElementById(spec[0]); if(el) el.value="";
+  });
+}
 
 function applySpecs(specs, f){
   specs.forEach(function(spec){
@@ -410,7 +553,7 @@ function gatherFilters(){
     f.company_detail = companyDetailOn();
     /* From the chips, not the input box: the box holds whatever is being typed
        right now, which is a half-finished word rather than a filter. */
-    if(INDUSTRY_SEL.fp.length) f.industries = INDUSTRY_SEL.fp.slice();
+    applyCombos("fp", f);
     if(!f.titles) f.titles=[];
     var sen=chipVals("#fpSeniority .cpi-chip.on"); if(sen.length) f.seniorities=sen;
     var em=chipVals("#fpEmailStatus .cpi-chip.on"); if(em.length) f.email_status=em;
@@ -432,7 +575,7 @@ function gatherFilters(){
   applyEmpRange("fcEmpRange", f);
   applyDeptCounts("fcDeptName","fcDeptMin","fcDeptMax", f);
   if((document.getElementById("fcUnknownFounded")||{}).checked) f.include_unknown_founded_year=true;
-  if(INDUSTRY_SEL.fc.length) f.industries = INDUSTRY_SEL.fc.slice();
+  applyCombos("fc", f);
   return f;
 }
 
@@ -501,6 +644,19 @@ window.cpiRunSearch = function(reset){
        toggle. */
     if(reset && d && d.industry_forced_company_detail){
       toast("Company details were needed to check the industry, so they were fetched for this page.", "ok");
+    }
+    /* Codes Apollo would have rejected were not sent. Said out loud, because the
+       search that ran is not the search that was asked for, and an empty page
+       would otherwise read as "no such companies". */
+    if(d && d.invalid_codes){
+      /* One toast, not one per vocabulary: a second would replace the first
+         before it had been read. */
+      var parts=[];
+      Object.keys(d.invalid_codes).forEach(function(kind){
+        var bad=d.invalid_codes[kind]||{};
+        parts.push((bad.codes||[]).join(", ")+" was not used. "+(bad.hint||""));
+      });
+      toast(parts.join(" "), "err");
     }
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
@@ -1053,7 +1209,7 @@ function applyFiltersToForm(f){
   /* Restored from the entry, but only when it was actually recorded: entries saved
      before this toggle existed have no value, and reading `undefined` as "off"
      would silently reopen an old search with less detail than it was run with. */
-  setIndustries(STATE.entity==="people"?"fp":"fc", f.industries||[]);
+  restoreCombos(STATE.entity==="people"?"fp":"fc", f);
   var det=document.getElementById("fpCompanyDetail");
   if(det) det.checked = (f.company_detail===undefined) ? true : !!f.company_detail;
   window.cpiSyncCostLabels();
@@ -1799,8 +1955,7 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
 
 /* The script is deferred, so the DOM is parsed by the time this runs and there is
    no readyState to wait on. */
-initIndustryCombo("fp");
-initIndustryCombo("fc");
+COMBO_SPECS.forEach(function(spec){ initCombo(spec[0]); });
 window.cpiSyncCostLabels();
 
 })();

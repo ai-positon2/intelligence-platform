@@ -7170,6 +7170,7 @@ def cpi_home():
                            enrich_bulk_url=url_for("cpi_enrich_bulk"),
                            history_url=url_for("cpi_history"),
                            industries_url=url_for("cpi_industries"),
+                           vocab_url=url_for("cpi_vocab"),
                            export_url=url_for("cpi_export"))
 
 
@@ -7396,6 +7397,25 @@ def cpi_search():
     # accident. Absent means on: the thin card is what this replaced.
     filters = dict(filters)
     company_detail = filters.pop("company_detail", True) is not False
+    # NAICS and SIC are the two filters on this page with a shape Apollo enforces:
+    # 2 to 5 digits and exactly 4. Official NAICS codes are SIX digits, so pasting
+    # one from any government source is rejected by Apollo -- previously without a
+    # word to the user, who saw an empty page and read it as "no such companies".
+    # Malformed codes are dropped here and named in the response.
+    bad_codes: dict = {}
+    for key, kind in (("naics_codes", "naics"), ("exclude_naics_codes", "naics"),
+                      ("sic_codes", "sic"), ("exclude_sic_codes", "sic")):
+        if not filters.get(key):
+            continue
+        from tracker import apollo_vocab as _av
+        good, bad = _av.split_valid(kind, filters.get(key))
+        if bad:
+            bad_codes.setdefault(kind, {"codes": [], "hint": _av.hint(kind)})
+            bad_codes[kind]["codes"].extend(bad)
+        if good:
+            filters[key] = good
+        else:
+            filters.pop(key, None)
     # Several filters describe the EMPLOYER, and none of them can be honored
     # without the employer's own record: Apollo's free people search returns no
     # industry, no headcount, no HQ and no tech stack. Asking for one of these
@@ -7474,6 +7494,7 @@ def cpi_search():
             raw = _search_companies(filters, api_key, page=page,
                                     per_page=per_page, meta=meta)
             _cpi_record_industries(raw)
+            _cpi_record_vocab(raw)
             results = [_cpi_company_row(o) for o in raw]
             # search_companies already enforced the industry for every caller;
             # this adds the size, HQ and technology checks and reports all of them
@@ -7532,6 +7553,11 @@ def cpi_search():
             ai_note = None
         if ai_note:
             out["ai_note"] = ai_note
+    # Codes Apollo would have rejected outright. Reported whatever else happened,
+    # including on an otherwise good page, because the search that ran was not the
+    # search that was asked for.
+    if bad_codes:
+        out["invalid_codes"] = bad_codes
     if spend["credits"]:
         out["credits"] = spend["credits"]
     return jsonify(out)
@@ -7692,6 +7718,164 @@ def cpi_industries():
     q = (request.args.get("q") or "").strip()[:60]
     entries = suggest(q, learned=_cpi_industries_seen())
     return jsonify({"query": q, "entries": entries})
+
+
+# ── Learning Apollo's other closed vocabularies ───────────────────────────────
+# Industry got a picker first and proved the shape; NAICS, SIC, technologies and
+# locations had the same problem and no picker at all. One table for all four,
+# keyed by kind, rather than four near-identical tables. The industry values keep
+# their own table because it is already populated in production and there is
+# nothing to gain from moving live data to make the code look tidier.
+_CPI_VOCAB_SEEN: dict = {}
+_CPI_VOCAB_TABLE_READY = False
+_CPI_VOCAB_SEEN_MAX = 4000
+_CPI_VOCAB_WRITE_MAX = 120
+
+
+def _ensure_cpi_vocab_table(conn) -> None:
+    global _CPI_VOCAB_TABLE_READY
+    if _CPI_VOCAB_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_vocab_seen (
+                kind TEXT NOT NULL,
+                value TEXT NOT NULL,
+                hits INTEGER NOT NULL DEFAULT 1,
+                last_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (kind, value)
+            )
+        """)
+    conn.commit()
+    _CPI_VOCAB_TABLE_READY = True
+
+
+def _cpi_vocab_learn(kind: str, values) -> None:
+    """Note values of `kind` that Apollo has really returned.
+
+    Best-effort exactly as the industry version is: this only improves a
+    dropdown, so it must never make a search fail. Known values are filtered out
+    before the database is touched at all.
+    """
+    cache = _CPI_VOCAB_SEEN.setdefault(kind, set())
+    fresh = {v for v in (
+        str(x or "").strip() for x in (values or [])) if v and len(v) <= 120}
+    fresh -= cache
+    if not fresh or len(cache) >= _CPI_VOCAB_SEEN_MAX:
+        return
+    # A page of 100 companies can carry over a thousand technology names, and the
+    # first search after a deploy would otherwise do a thousand inserts inside the
+    # request. Whatever is left over arrives on the next search: this only fills a
+    # dropdown, so it has all the time in the world.
+    if len(fresh) > _CPI_VOCAB_WRITE_MAX:
+        fresh = set(sorted(fresh)[:_CPI_VOCAB_WRITE_MAX])
+    cache.update(fresh)
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        _ensure_cpi_vocab_table(conn)
+        with conn.cursor() as cur:
+            for v in fresh:
+                cur.execute(
+                    "INSERT INTO cpi_vocab_seen (kind, value) VALUES (%s, %s) "
+                    "ON CONFLICT (kind, value) DO UPDATE SET "
+                    "hits = cpi_vocab_seen.hits + 1, last_seen = now()",
+                    (kind, v))
+        conn.commit()
+        log.info("cpi vocabulary %s: learned %d new value(s)", kind, len(fresh))
+    except Exception as e:
+        log.warning("cpi vocabulary %s write failed: %s", kind, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_vocab_seen(kind: str) -> set:
+    """Every value of `kind` Apollo has been observed to use, cache first."""
+    cached = _CPI_VOCAB_SEEN.get(kind)
+    if cached:
+        return set(cached)
+    conn = _pg_conn()
+    if not conn:
+        return set()
+    try:
+        _ensure_cpi_vocab_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM cpi_vocab_seen WHERE kind = %s "
+                        "ORDER BY hits DESC LIMIT %s",
+                        (kind, _CPI_VOCAB_SEEN_MAX))
+            rows = [r[0] for r in cur.fetchall() if r and r[0]]
+        _CPI_VOCAB_SEEN.setdefault(kind, set()).update(rows)
+        return set(rows)
+    except Exception as e:
+        log.warning("cpi vocabulary %s read failed: %s", kind, e)
+        return set()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_record_vocab(orgs) -> None:
+    """Harvest technologies and HQ locations from Apollo company records.
+
+    Both are values Apollo either recognizes or silently fails to match, and both
+    are returned on the records themselves, so what Apollo actually uses is right
+    here in the response. NAICS and SIC are not harvested: the free search does
+    not return them, so their pickers stay seed-only.
+
+    Locations are recorded at the same three levels the picker offers, so a search
+    for "Ontario" can be answered by a province seen on a real record rather than
+    only by what this file happened to write down.
+    """
+    techs, places = set(), set()
+    for o in (orgs or []):
+        if not isinstance(o, dict):
+            continue
+        for t in (o.get("technologies") or o.get("technology_names")
+                  or o.get("organization_technologies") or []):
+            t = str(t or "").strip()
+            if t:
+                techs.add(t)
+        city = str(o.get("city") or o.get("organization_city") or "").strip()
+        state = str(o.get("state") or o.get("organization_state") or "").strip()
+        country = str(o.get("country") or o.get("organization_country") or "").strip()
+        if country:
+            places.add(country)
+        if state:
+            places.add("%s, %s" % (state, country) if country else state)
+        if city and state:
+            places.add("%s, %s" % (city, state))
+    if techs:
+        _cpi_vocab_learn("technology", techs)
+    if places:
+        _cpi_vocab_learn("location", places)
+
+
+@app.route("/p2/b2b-agents/company-people-intelligence/vocab")
+@position2_required
+def cpi_vocab():
+    """Picker entries for the NAICS, SIC, technology and location filters.
+
+    Same contract as the industry picker: costs nothing, calls nothing, and
+    returns Apollo's own values rather than asking anyone to guess at them.
+    """
+    from tracker import apollo_vocab as av
+    kind = (request.args.get("kind") or "").strip().lower()
+    if kind not in av.kinds():
+        return jsonify({"error": "unknown vocabulary", "kinds": list(av.kinds())}), 400
+    q = (request.args.get("q") or "").strip()[:60]
+    entries = av.suggest(kind, q, learned=_cpi_vocab_seen(kind))
+    return jsonify({"query": q, "kind": kind, "entries": entries,
+                    "hint": av.hint(kind)})
 
 
 # ── Verifying what Apollo actually returned ───────────────────────────────────
@@ -8090,6 +8274,7 @@ def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
                 # Every paid record teaches the industry picker one more value
                 # Apollo genuinely uses.
                 _cpi_record_industries(orgs)
+                _cpi_record_vocab(orgs)
         except Exception as e:
             log.warning("cpi employer firmographics lookup failed: %s", e)
         if fresh:
@@ -10673,6 +10858,7 @@ def _cpi_chat_company_scope(employer: dict, api_key: str, spend: dict) -> tuple:
         # Every paid record teaches the industry picker one more value Apollo
         # genuinely uses.
         _cpi_record_industries(orgs)
+        _cpi_record_vocab(orgs)
     kept, rejected = _cpi_verify_rows(orgs, employer, False)
     return kept[:_CPI_CHAT_SCOPE_MAX], rejected
 
