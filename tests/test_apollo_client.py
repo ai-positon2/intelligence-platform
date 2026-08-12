@@ -26,10 +26,16 @@ def _mock_rate_limit_then_ok(json_data: dict) -> list[MagicMock]:
 
 @patch("tracker.apollo_client.requests.post")
 def test_search_companies_basic(mock_post):
+    # The `industry` values are load-bearing now, not decoration: an industry
+    # search verifies each company against Apollo's own classification, so a
+    # fixture without one is a company we cannot confirm is in the industry and is
+    # dropped. Real Apollo organization records carry this field.
     mock_post.return_value = _mock_response({
         "organizations": [
-            {"id": "org1", "name": "Acme Health", "primary_domain": "acme.com", "short_description": ""},
-            {"id": "org2", "name": "Beta Care", "primary_domain": "betacare.com", "short_description": ""},
+            {"id": "org1", "name": "Acme Health", "primary_domain": "acme.com",
+             "industry": "hospital & health care", "short_description": ""},
+            {"id": "org2", "name": "Beta Care", "primary_domain": "betacare.com",
+             "industry": "medical practice", "short_description": ""},
         ],
         "pagination": {"total_pages": 1},
     })
@@ -37,7 +43,11 @@ def test_search_companies_basic(mock_post):
     filters = {
         "employee_min": 100,
         "employee_max": 2000,
-        "industries": ["Hospital & Health Care"],
+        # The word a person types, not an Apollo value: "healthcare" is a family
+        # covering both fixtures' industries. Asking for the exact value
+        # "Hospital & Health Care" would correctly keep only the first, which is
+        # the precision this filter now has.
+        "industries": ["Healthcare"],
         "locations": ["United States"],
         "max_companies": 500,
     }

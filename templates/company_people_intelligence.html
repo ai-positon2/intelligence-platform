@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=12">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=13">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -145,7 +145,7 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Employer firmographics</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpIndustry" placeholder="Industry / keyword tags, e.g. SaaS, fintech" aria-label="Employer industry or keyword tags">
+              <input class="cpi-tag-input" id="fpIndustry" placeholder="Industry, e.g. Healthcare, Software, Finance" title="Checked against Apollo's own classification of each company, not against what it mentions. Broad terms work: Healthcare covers hospitals, medical practices, devices, pharma and biotech. An exact Apollo industry (computer software, hospital &amp; health care) works too." aria-label="Employer industry">
               <input class="cpi-tag-input" id="fpSegments" placeholder="Market segments, e.g. B2B, Enterprise" aria-label="Employer market segments">
             </div>
             <div class="cpi-filter-row">
@@ -255,7 +255,7 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Industry &amp; keywords</div>
           <div class="cpi-filter-row">
-            <input class="cpi-tag-input" id="fcIndustry" placeholder="Industry / keyword tags, e.g. SaaS, fintech" aria-label="Industry or keyword tags">
+            <input class="cpi-tag-input" id="fcIndustry" placeholder="Industry, e.g. Healthcare, Software, Finance" title="Checked against Apollo's own classification of each company, not against what it mentions. Broad terms work: Healthcare covers hospitals, medical practices, devices, pharma and biotech. An exact Apollo industry (computer software, hospital &amp; health care) works too." aria-label="Industry">
             <input class="cpi-tag-input" id="fcExcludeKeywords" placeholder="Exclude keywords" aria-label="Exclude keywords">
           </div>
         </div>
@@ -470,7 +470,7 @@ window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
 window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=12" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=13" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');

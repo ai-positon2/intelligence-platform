@@ -21,7 +21,7 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
 var STATE = { entity: "people", page: 1, results: [], selected: {},
               total: null, lastFilters: {}, historyId: null,
               pinnedOrgId: null, pinnedOrgName: null, firmo: null,
-              companyDetail: undefined };
+              companyDetail: undefined, industryDropped: 0, industryWanted: [] };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -290,6 +290,14 @@ window.cpiRunSearch = function(reset){
        the user will ask for NEXT, and after they flip it the label would
        otherwise describe rows that were fetched under the old setting. */
     STATE.companyDetail=(d&&d.company_detail!==undefined)?!!d.company_detail:undefined;
+    STATE.industryDropped=(d&&d.industry_dropped)||0;
+    STATE.industryWanted=(d&&d.industry_wanted)||[];
+    /* Apollo has no industry filter, so an industry search needs the company
+       lookup to verify what it found. Saying so beats appearing to ignore the
+       toggle. */
+    if(reset && d && d.industry_forced_company_detail){
+      toast("Company details were needed to check the industry, so they were fetched for this page.", "ok");
+    }
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
        page instead of re-fetching page 1 and appending duplicate cards (which on
@@ -390,6 +398,17 @@ function firmoNote(){
   return ' <s>&middot;</s> '+what+" "+how;
 }
 
+/* Apollo's industry input is a relevance match over company names and tags, so it
+   hands back companies that merely mention an industry. Those are removed after
+   the fact, which makes a page of 24 arrive as 18: unexplained, that looks like
+   Apollo is thin on matches rather than like the filter doing its job. */
+function industryNote(){
+  var n=STATE.industryDropped;
+  if(!n) return "";
+  var want=(STATE.industryWanted||[]).slice(0,2).join(", ");
+  return ' <s>&middot; '+pmNum(n)+" outside "+esc(want||"the industry")+" removed</s>";
+}
+
 function renderResults(){
   var wrap=document.getElementById("cpiResultsWrap");
   var bar=document.getElementById("cpiToolbar");
@@ -406,7 +425,7 @@ function renderResults(){
     cnt.innerHTML = (STATE.total && STATE.total>shown
       ? "Showing <b>"+pmNum(shown)+"</b> of <b>"+pmNum(STATE.total)+"</b> <s>matches in Apollo</s>"
       : "<b>"+pmNum(shown)+"</b> <s>"+(STATE.entity==="people"?"people":"companies")+"</s>")
-      + firmoNote();
+      + firmoNote() + industryNote();
   }
   wrap.innerHTML='<div class="cpi-grid">'+STATE.results.map(function(r,i){
     return STATE.entity==="people" ? personCard(r,i) : companyCard(r,i);

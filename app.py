@@ -7395,6 +7395,15 @@ def cpi_search():
     # accident. Absent means on: the thin card is what this replaced.
     filters = dict(filters)
     company_detail = filters.pop("company_detail", True) is not False
+    # An industry filter cannot be honored without the employer's own
+    # classification, and on the people side that only arrives with the company
+    # lookup (Apollo's free people search returns no industry at all). Asking for
+    # an industry AND no company detail is a contradiction, so the filter that was
+    # typed wins and the response says the lookup was turned back on.
+    industry_forced = bool(entity == "people" and filters.get("industries")
+                           and not company_detail)
+    if industry_forced:
+        company_detail = True
     try:
         page = max(1, min(int(body.get("page") or 1), 500))
     except (TypeError, ValueError):
@@ -7435,6 +7444,7 @@ def cpi_search():
                 list(filters.get("organization_ids") or []) + [org_id]))
             resolved_names = [org_name]
     firmo = None
+    industry_dropped = 0
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
@@ -7446,6 +7456,11 @@ def cpi_search():
             # each person's seniority and function get read off their own title.
             if company_detail:
                 firmo = _cpi_attach_employer_facts(results, api_key, spend)
+                # Only possible once the employers are described, which is why
+                # asking for an industry forces that lookup above.
+                if filters.get("industries"):
+                    results, industry_dropped = _cpi_filter_people_by_industry(
+                        results, filters["industries"])
             # Outside the toggle on purpose: reading a title costs nothing, so
             # turning off the paid company lookup should not also throw away the
             # free classification that comes with every row.
@@ -7478,6 +7493,16 @@ def cpi_search():
         # flipped since. Only meaningful for people: the Companies tab pays for
         # full records either way and has nothing to switch off.
         out["company_detail"] = company_detail
+        if industry_forced:
+            out["industry_forced_company_detail"] = True
+    # Rows Apollo returned for an industry search that are not actually in that
+    # industry get removed rather than shown, so this says how many, and no page
+    # ever silently shrinks. Also covers the Companies tab, where the same check
+    # runs inside search_companies.
+    dropped = industry_dropped or meta.get("industry_dropped") or 0
+    if dropped:
+        out["industry_dropped"] = dropped
+        out["industry_wanted"] = list(filters.get("industries") or [])
     # A title search scoped to exactly one company that came back empty gets a
     # real explanation instead of a bare "no matches" -- see the function for
     # why, and why it is gated this narrowly (a plain, unscoped browse coming
@@ -7535,6 +7560,22 @@ def _cpi_company_row(o: dict) -> dict:
         "twitter_url": o.get("twitter_url"),
         "facebook_url": o.get("facebook_url"),
     }
+
+
+def _cpi_filter_people_by_industry(rows: list, terms) -> tuple:
+    """(kept, dropped) people whose EMPLOYER really is in the requested industry.
+
+    A person row carries the employer's classification under organization_* keys,
+    so it is presented to the shared matcher in the shape that reads, rather than
+    giving that matcher a second set of key names to know about. One definition of
+    "is this company in this industry" for both tabs.
+    """
+    from tracker.apollo_client import filter_by_industry
+    view = [{"industry": r.get("organization_industry"),
+             "industries": r.get("organization_industries"), "_row": r}
+            for r in (rows or [])]
+    kept, dropped = filter_by_industry(view, terms, "cpi people")
+    return [v["_row"] for v in kept], dropped
 
 
 def _cpi_org_phone(o: dict) -> str:
