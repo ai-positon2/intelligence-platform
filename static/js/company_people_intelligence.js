@@ -21,7 +21,7 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
 var STATE = { entity: "people", page: 1, results: [], selected: {},
               total: null, lastFilters: {}, historyId: null,
               pinnedOrgId: null, pinnedOrgName: null, firmo: null,
-              companyDetail: undefined, industryDropped: 0, industryWanted: [] };
+              companyDetail: undefined, rejected: null, rejectedLabels: {} };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -100,6 +100,159 @@ window.cpiToggleAdvanced = function(panelId, btnId){
   if(btn) btn.classList.toggle("on", on);
 };
 
+/* ── Industry combobox ── */
+/* Apollo's classification is the LinkedIn taxonomy, in which nothing at all is
+   spelled "healthcare": it is "hospital & health care", "medical practice",
+   "pharmaceuticals" and six more. A text box therefore invited a word that cannot
+   match, which is how a healthcare search came back with a venture firm. This
+   offers the real values, and offers "healthcare" as an explicit shortcut for the
+   nine of them, naming which nine rather than implying Apollo has such a value.
+   Suggestions come from the server, which merges the written-down taxonomy with
+   every industry string Apollo has actually been seen to use. */
+var INDUSTRY_SEL = { fp: [], fc: [] };
+var INDUSTRY_CACHE = {};
+var INDUSTRY_CUR = -1;
+
+function industryPrefix(el){ return el && el.id.indexOf("fc")===0 ? "fc" : "fp"; }
+
+function renderIndustryChips(pre){
+  var wrap=document.getElementById(pre+"IndustryChips");
+  if(!wrap) return;
+  wrap.innerHTML=INDUSTRY_SEL[pre].map(function(v,i){
+    return '<span class="cpi-chip-sel">'+esc(v)+
+      '<button type="button" onclick="cpiIndustryRemove(\''+pre+'\','+i+')" '+
+      'aria-label="Remove '+esc(v)+'">&times;</button></span>';
+  }).join("");
+}
+
+window.cpiIndustryRemove = function(pre, i){
+  INDUSTRY_SEL[pre].splice(i,1);
+  renderIndustryChips(pre);
+};
+
+function setIndustries(pre, values){
+  /* De-duplicated case-insensitively, because "Healthcare" and "healthcare" are
+     one filter and two chips would only look like a mistake. */
+  var seen={}, out=[];
+  (values||[]).forEach(function(v){
+    v=String(v==null?"":v).trim();
+    if(!v) return;
+    var k=v.toLowerCase();
+    if(seen[k]) return;
+    seen[k]=1; out.push(v);
+  });
+  INDUSTRY_SEL[pre]=out;
+  renderIndustryChips(pre);
+}
+
+function addIndustry(pre, value){
+  setIndustries(pre, INDUSTRY_SEL[pre].concat([value]));
+  var input=document.getElementById(pre+"Industry");
+  if(input){ input.value=""; input.focus(); }
+  closeIndustryList(pre);
+}
+
+function closeIndustryList(pre){
+  var list=document.getElementById(pre+"IndustryList");
+  var input=document.getElementById(pre+"Industry");
+  if(list) list.classList.remove("on");
+  if(input) input.setAttribute("aria-expanded","false");
+  INDUSTRY_CUR=-1;
+}
+
+function renderIndustryList(pre, entries, query){
+  var list=document.getElementById(pre+"IndustryList");
+  var input=document.getElementById(pre+"Industry");
+  if(!list) return;
+  if(!entries.length){
+    /* Never a dead end: an unlisted value is still a legitimate search, it just
+       cannot be promised to match Apollo's own classification. */
+    list.innerHTML='<div class="cpi-opt-none">Nothing in Apollo\'s industry list matches '+
+      '<b>'+esc(query)+'</b>. Press Enter to filter on it anyway.</div>';
+  } else {
+    list.innerHTML=entries.map(function(e,i){
+      var tag=e.kind==="family"
+        ? '<span class="cpi-opt-tag">'+e.covers.length+' industries</span>'
+        : (e.confirmed?'<span class="cpi-opt-tag">seen in apollo</span>':"");
+      var sub=e.kind==="family" ? '<s>'+esc(e.covers.join(", "))+'</s>' : "";
+      return '<button type="button" class="cpi-opt'+(i===0?" cur":"")+'" role="option" '+
+        'data-industry="'+esc(e.value)+'" data-pre="'+pre+'">'+tag+
+        '<b>'+esc(e.value)+'</b>'+sub+'</button>';
+    }).join("");
+    INDUSTRY_CUR=0;
+  }
+  list.classList.add("on");
+  if(input) input.setAttribute("aria-expanded","true");
+}
+
+function loadIndustries(pre){
+  var input=document.getElementById(pre+"Industry");
+  if(!input) return;
+  var q=input.value.trim();
+  var cached=INDUSTRY_CACHE[q.toLowerCase()];
+  if(cached){ renderIndustryList(pre, cached, q); return; }
+  fetch(window.__CPI_INDUSTRIES_URL__+"?q="+encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var entries=(d&&d.entries)||[];
+      INDUSTRY_CACHE[q.toLowerCase()]=entries;
+      /* Only render if the box still says what was asked for: a slow response to
+         an earlier keystroke must not replace the list for a later one. */
+      if(input.value.trim()===q) renderIndustryList(pre, entries, q);
+    })
+    .catch(function(){ /* the list is an aid; typing still works without it */ });
+}
+
+function moveIndustryCur(pre, delta){
+  var opts=document.querySelectorAll("#"+pre+"IndustryList .cpi-opt");
+  if(!opts.length) return;
+  INDUSTRY_CUR=(INDUSTRY_CUR+delta+opts.length)%opts.length;
+  opts.forEach(function(o,i){ o.classList.toggle("cur", i===INDUSTRY_CUR); });
+  opts[INDUSTRY_CUR].scrollIntoView({block:"nearest"});
+}
+
+function initIndustryCombo(pre){
+  var input=document.getElementById(pre+"Industry");
+  if(!input) return;
+  var timer=null;
+  input.addEventListener("input", function(){
+    if(timer) clearTimeout(timer);
+    timer=setTimeout(function(){ loadIndustries(pre); }, 120);
+  });
+  input.addEventListener("focus", function(){ loadIndustries(pre); });
+  input.addEventListener("keydown", function(e){
+    if(e.key==="ArrowDown"){ e.preventDefault(); moveIndustryCur(pre, 1); return; }
+    if(e.key==="ArrowUp"){ e.preventDefault(); moveIndustryCur(pre, -1); return; }
+    if(e.key==="Escape"){ closeIndustryList(pre); return; }
+    if(e.key==="Enter"){
+      e.preventDefault();
+      var cur=document.querySelectorAll("#"+pre+"IndustryList .cpi-opt")[INDUSTRY_CUR];
+      if(cur){ addIndustry(pre, cur.getAttribute("data-industry")); }
+      else if(input.value.trim()){ addIndustry(pre, input.value.trim()); }
+      return;
+    }
+    /* Backspace on an empty box removes the last chip, the convention every
+       tag input follows. */
+    if(e.key==="Backspace" && !input.value && INDUSTRY_SEL[pre].length){
+      window.cpiIndustryRemove(pre, INDUSTRY_SEL[pre].length-1);
+    }
+  });
+  var list=document.getElementById(pre+"IndustryList");
+  if(list){
+    /* Delegated, and mousedown rather than click, so choosing an option is not
+       cancelled by the input losing focus first. */
+    list.addEventListener("mousedown", function(e){
+      var opt=e.target.closest(".cpi-opt");
+      if(!opt) return;
+      e.preventDefault();
+      addIndustry(opt.getAttribute("data-pre"), opt.getAttribute("data-industry"));
+    });
+  }
+}
+document.addEventListener("click", function(e){
+  if(!e.target.closest(".cpi-combo")){ closeIndustryList("fp"); closeIndustryList("fc"); }
+});
+
 /* Declarative filter specs, so a new Apollo filter is one line here plus one
    input in the template rather than another branch in a growing if-chain.
    kind: "str" (trimmed string) | "csv" (comma list -> array)
@@ -108,7 +261,7 @@ var PEOPLE_FIELDS = [
   ["fpTitles","titles","csv"], ["fpCompanyDomain","company_domains","one"],
   ["fpLocation","person_locations","one"], ["fpCompanyLocation","company_locations","one"],
   ["fpKeywords","keywords","str"], ["fpLinkedinUrls","linkedin_urls","csv"],
-  ["fpIndustry","industries","csv"], ["fpSegments","market_segments","csv"],
+  ["fpSegments","market_segments","csv"],
   ["fpNaics","naics_codes","csv"], ["fpSic","sic_codes","csv"],
   ["fpTechnologies","technologies","csv"], ["fpTechnologiesAll","technologies_all","csv"],
   ["fpTechnologiesNot","exclude_technologies","csv"],
@@ -124,7 +277,7 @@ var PEOPLE_FIELDS = [
 var COMPANY_FIELDS = [
   ["fcName","name","str"], ["fcDomain","domains","one"],
   ["fcLocation","locations","one"], ["fcExcludeLocation","exclude_locations","one"],
-  ["fcIndustry","industries","csv"], ["fcExcludeKeywords","exclude_keywords","csv"],
+  ["fcExcludeKeywords","exclude_keywords","csv"],
   ["fcSegments","market_segments","csv"],
   ["fcNaics","naics_codes","csv"], ["fcNaicsNot","exclude_naics_codes","csv"],
   ["fcSic","sic_codes","csv"], ["fcSicNot","exclude_sic_codes","csv"],
@@ -154,6 +307,10 @@ window.cpiClearFilters = function(){
   var unk=document.getElementById("fcUnknownFounded"); if(unk) unk.checked=false;
   /* Clear means back to the defaults, and the default is on. */
   var det=document.getElementById("fpCompanyDetail"); if(det) det.checked=true;
+  setIndustries("fp", []); setIndustries("fc", []);
+  ["fpIndustry","fcIndustry"].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value="";
+  });
   window.cpiSyncCostLabels();
   document.querySelectorAll("#fpSeniority .cpi-chip.on, #fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
   ["fpAdvanced","fcAdvanced"].forEach(function(id){ var el=document.getElementById(id); if(el) el.classList.remove("on"); });
@@ -208,6 +365,9 @@ function gatherFilters(){
        reproduces the same rows, not a differently-detailed version of them. The
        server pops it before anything reaches Apollo. */
     f.company_detail = companyDetailOn();
+    /* From the chips, not the input box: the box holds whatever is being typed
+       right now, which is a half-finished word rather than a filter. */
+    if(INDUSTRY_SEL.fp.length) f.industries = INDUSTRY_SEL.fp.slice();
     if(!f.titles) f.titles=[];
     var sen=chipVals("#fpSeniority .cpi-chip.on"); if(sen.length) f.seniorities=sen;
     var em=chipVals("#fpEmailStatus .cpi-chip.on"); if(em.length) f.email_status=em;
@@ -229,6 +389,7 @@ function gatherFilters(){
   applyEmpRange("fcEmpRange", f);
   applyDeptCounts("fcDeptName","fcDeptMin","fcDeptMax", f);
   if((document.getElementById("fcUnknownFounded")||{}).checked) f.include_unknown_founded_year=true;
+  if(INDUSTRY_SEL.fc.length) f.industries = INDUSTRY_SEL.fc.slice();
   return f;
 }
 
@@ -290,8 +451,8 @@ window.cpiRunSearch = function(reset){
        the user will ask for NEXT, and after they flip it the label would
        otherwise describe rows that were fetched under the old setting. */
     STATE.companyDetail=(d&&d.company_detail!==undefined)?!!d.company_detail:undefined;
-    STATE.industryDropped=(d&&d.industry_dropped)||0;
-    STATE.industryWanted=(d&&d.industry_wanted)||[];
+    STATE.rejected=(d&&d.rejected)||null;
+    STATE.rejectedLabels=(d&&d.rejected_labels)||{};
     /* Apollo has no industry filter, so an industry search needs the company
        lookup to verify what it found. Saying so beats appearing to ignore the
        toggle. */
@@ -398,15 +559,30 @@ function firmoNote(){
   return ' <s>&middot;</s> '+what+" "+how;
 }
 
-/* Apollo's industry input is a relevance match over company names and tags, so it
-   hands back companies that merely mention an industry. Those are removed after
-   the fact, which makes a page of 24 arrive as 18: unexplained, that looks like
-   Apollo is thin on matches rather than like the filter doing its job. */
-function industryNote(){
-  var n=STATE.industryDropped;
-  if(!n) return "";
-  var want=(STATE.industryWanted||[]).slice(0,2).join(", ");
-  return ' <s>&middot; '+pmNum(n)+" outside "+esc(want||"the industry")+" removed</s>";
+/* Several of Apollo's filters are relevance hints rather than rules, so it returns
+   rows that do not satisfy them. Those are removed after the fact, which makes a
+   page of 24 arrive as 18: unexplained, that reads as Apollo being thin on matches
+   rather than as the filters doing their job. Broken down per reason, so a filter
+   quietly doing nothing is visible as a reason that never appears. */
+function rejectedNote(){
+  var r=STATE.rejected;
+  if(!r) return "";
+  var keys=Object.keys(r);
+  if(!keys.length) return "";
+  var total=0;
+  keys.forEach(function(k){ total+=r[k]; });
+  keys.sort(function(a,b){ return r[b]-r[a]; });
+  var parts=keys.map(function(k){
+    return pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
+  });
+  return ' <s>&middot; '+pmNum(total)+" removed: "+esc(parts.join(", "))+"</s>";
+}
+
+/* "1 companies" is the kind of small wrongness that makes a page feel unfinished,
+   and the singular case is common: a scoped search often returns exactly one. */
+function noun(n){
+  if(STATE.entity==="people") return n===1 ? "person" : "people";
+  return n===1 ? "company" : "companies";
 }
 
 function renderResults(){
@@ -424,8 +600,8 @@ function renderResults(){
   if(cnt){
     cnt.innerHTML = (STATE.total && STATE.total>shown
       ? "Showing <b>"+pmNum(shown)+"</b> of <b>"+pmNum(STATE.total)+"</b> <s>matches in Apollo</s>"
-      : "<b>"+pmNum(shown)+"</b> <s>"+(STATE.entity==="people"?"people":"companies")+"</s>")
-      + firmoNote() + industryNote();
+      : "<b>"+pmNum(shown)+"</b> <s>"+noun(shown)+"</s>")
+      + firmoNote() + rejectedNote();
   }
   wrap.innerHTML='<div class="cpi-grid">'+STATE.results.map(function(r,i){
     return STATE.entity==="people" ? personCard(r,i) : companyCard(r,i);
@@ -834,6 +1010,7 @@ function applyFiltersToForm(f){
   /* Restored from the entry, but only when it was actually recorded: entries saved
      before this toggle existed have no value, and reading `undefined` as "off"
      would silently reopen an old search with less detail than it was run with. */
+  setIndustries(STATE.entity==="people"?"fp":"fc", f.industries||[]);
   var det=document.getElementById("fpCompanyDetail");
   if(det) det.checked = (f.company_detail===undefined) ? true : !!f.company_detail;
   window.cpiSyncCostLabels();
@@ -1576,5 +1753,11 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
       addAssistantMsg("Something went wrong reaching the assistant. Try again.");
     });
 }
+
+/* The script is deferred, so the DOM is parsed by the time this runs and there is
+   no readyState to wait on. */
+initIndustryCombo("fp");
+initIndustryCombo("fc");
+window.cpiSyncCostLabels();
 
 })();

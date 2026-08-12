@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=13">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=14">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -100,9 +100,9 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Location &amp; company size</div>
           <div class="cpi-filter-row">
-            <input class="cpi-search-input" id="fpLocation" placeholder="Person location, e.g. Austin, TX" style="flex:1;min-width:160px" aria-label="Person location">
-            <input class="cpi-search-input" id="fpCompanyLocation" placeholder="Company HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="Employer HQ location">
-            <select class="cpi-filter-select" id="fpEmpRange" aria-label="Employer size">
+            <input class="cpi-search-input" id="fpLocation" placeholder="Person location, e.g. Austin, TX" style="flex:1;min-width:160px" aria-label="Person location" title="Where the PERSON lives, which is Apollo&#39;s own field on the person. The free search does not return anyone&#39;s city, so unlike Industry and company HQ this one cannot be re-checked here without enriching each person. Independent of the company HQ filter, and both apply together.">
+            <input class="cpi-search-input" id="fpCompanyLocation" placeholder="Company HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="Employer HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
+            <select class="cpi-filter-select" id="fpEmpRange" aria-label="Employer size" title="Apollo can only filter by fixed buckets, so it returns companies outside the range you pick. The exact range is enforced here against each company&#39;s own headcount, and rows outside it are removed.">
               <option value="">Any company size</option>
               <option value="1,10">1-10 employees</option>
               <option value="11,50">11-50 employees</option>
@@ -145,8 +145,12 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Employer firmographics</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpIndustry" placeholder="Industry, e.g. Healthcare, Software, Finance" title="Checked against Apollo's own classification of each company, not against what it mentions. Broad terms work: Healthcare covers hospitals, medical practices, devices, pharma and biotech. An exact Apollo industry (computer software, hospital &amp; health care) works too." aria-label="Employer industry">
-              <input class="cpi-tag-input" id="fpSegments" placeholder="Market segments, e.g. B2B, Enterprise" aria-label="Employer market segments">
+              <div class="cpi-combo" id="fpIndustryCombo">
+                <div class="cpi-combo-chips" id="fpIndustryChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fpIndustry" placeholder="Industry, type to search Apollo's list" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fpIndustryList" aria-label="Employer industry">
+                <div class="cpi-combo-list" id="fpIndustryList" role="listbox" aria-label="Apollo industries"></div>
+              </div>
+              <input class="cpi-tag-input" id="fpSegments" placeholder="Market segments, e.g. B2B, Enterprise" aria-label="Employer market segments" title="Apollo matches this against the company&#39;s keyword tags and its NAME, not against a verified classification, so it widens a search rather than narrowing it. Use Industry for a check against what Apollo says a company actually is.">
             </div>
             <div class="cpi-filter-row">
               <input class="cpi-num-input" id="fpRevenueMin" type="number" placeholder="Min revenue $" style="width:126px" aria-label="Minimum employer revenue">
@@ -188,7 +192,7 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Technologies</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fpTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Employer uses any of these technologies">
+              <input class="cpi-tag-input" id="fpTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Employer uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
               <input class="cpi-tag-input" id="fpTechnologiesAll" placeholder="Uses ALL of" aria-label="Employer uses all of these technologies">
             </div>
             <div class="cpi-filter-row">
@@ -238,9 +242,9 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Location &amp; size</div>
           <div class="cpi-filter-row">
-            <input class="cpi-search-input" id="fcLocation" placeholder="HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="HQ location">
+            <input class="cpi-search-input" id="fcLocation" placeholder="HQ location, e.g. United States" style="flex:1;min-width:160px" aria-label="HQ location" title="The company&#39;s head office. Apollo matches this loosely, so it is checked again here against the city, state and country on each company, and rows outside it are removed. Type any level: United States, Texas, or Austin, Texas.">
             <input class="cpi-search-input" id="fcExcludeLocation" placeholder="Exclude HQ location" style="flex:1;min-width:160px" aria-label="Exclude HQ location">
-            <select class="cpi-filter-select" id="fcEmpRange" aria-label="Company size">
+            <select class="cpi-filter-select" id="fcEmpRange" aria-label="Company size" title="Apollo can only filter by fixed buckets, so it returns companies outside the range you pick. The exact range is enforced here against each company&#39;s own headcount, and rows outside it are removed.">
               <option value="">Any company size</option>
               <option value="1,10">1-10 employees</option>
               <option value="11,50">11-50 employees</option>
@@ -255,7 +259,11 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Industry &amp; keywords</div>
           <div class="cpi-filter-row">
-            <input class="cpi-tag-input" id="fcIndustry" placeholder="Industry, e.g. Healthcare, Software, Finance" title="Checked against Apollo's own classification of each company, not against what it mentions. Broad terms work: Healthcare covers hospitals, medical practices, devices, pharma and biotech. An exact Apollo industry (computer software, hospital &amp; health care) works too." aria-label="Industry">
+            <div class="cpi-combo" id="fcIndustryCombo">
+                <div class="cpi-combo-chips" id="fcIndustryChips"></div>
+                <input class="cpi-tag-input cpi-combo-input" id="fcIndustry" placeholder="Industry, type to search Apollo's list" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fcIndustryList" aria-label="Industry">
+                <div class="cpi-combo-list" id="fcIndustryList" role="listbox" aria-label="Apollo industries"></div>
+              </div>
             <input class="cpi-tag-input" id="fcExcludeKeywords" placeholder="Exclude keywords" aria-label="Exclude keywords">
           </div>
         </div>
@@ -264,7 +272,7 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Firmographics</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcSegments" placeholder="Market segments, e.g. B2B, Enterprise" aria-label="Market segments">
+              <input class="cpi-tag-input" id="fcSegments" placeholder="Market segments, e.g. B2B, Enterprise" aria-label="Market segments" title="Apollo matches this against the company&#39;s keyword tags and its NAME, not against a verified classification, so it widens a search rather than narrowing it. Use Industry for a check against what Apollo says a company actually is.">
               <label class="cpi-check"><input type="checkbox" id="fcUnknownFounded">Include unknown founding year</label>
             </div>
             <div class="cpi-filter-row">
@@ -330,7 +338,7 @@
           <div class="cpi-adv-sec">
             <div class="cpi-adv-lbl">Technologies</div>
             <div class="cpi-filter-row">
-              <input class="cpi-tag-input" id="fcTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Uses any of these technologies">
+              <input class="cpi-tag-input" id="fcTechnologies" placeholder="Uses ANY of, e.g. Salesforce, HubSpot" aria-label="Uses any of these technologies" title="Sent to Apollo in its own uid spelling (Google Analytics becomes google_analytics), then checked again against the technologies Apollo lists for each company. Type the ordinary product name.">
               <input class="cpi-tag-input" id="fcTechnologiesAll" placeholder="Uses ALL of" aria-label="Uses all of these technologies">
             </div>
             <div class="cpi-filter-row">
@@ -469,8 +477,9 @@ window.__CPI_CHAT_URL__ = "{{ chat_url }}";
 window.__CPI_ENRICH_BULK_URL__ = "{{ enrich_bulk_url }}";
 window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
+window.__CPI_INDUSTRIES_URL__ = "{{ industries_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=13" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=14" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');
