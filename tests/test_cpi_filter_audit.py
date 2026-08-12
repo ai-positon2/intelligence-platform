@@ -5,11 +5,16 @@ like filters and behave like relevance hints, so it returns rows that do not
 satisfy them. Each filter was checked and falls into one of three groups, and this
 file pins the group each one is in so a future change cannot quietly move it.
 
-STRICT SERVER-SIDE, trusted: person_seniorities, contact_email_status, NAICS/SIC
-  codes, organization_ids, and the numeric ranges (revenue, founded year, funding,
-  open jobs, headcount growth, tenure, years of experience). Apollo compares its
-  own structured fields numerically or by exact code. Tests here assert only that
+STRICT SERVER-SIDE, trusted: person_seniorities, NAICS/SIC codes,
+  organization_ids, and the numeric ranges (revenue, founded year, funding, open
+  jobs, headcount growth, tenure, years of experience). Apollo compares its own
+  structured fields numerically or by exact code. Tests here assert only that
   these reach the payload correctly, since there is nothing to re-check.
+
+  contact_email_status was in this group and does not belong there. Measured
+  against this account, only two of its four documented values filter anything;
+  see test_cpi_vocab_pickers.py, which pins the two that work being the only two
+  offered.
 
 RELEVANCE MATCHES, verified in code: industries, employee range, HQ location,
   technologies, and titles when similar titles are switched off. Tests assert a
@@ -22,6 +27,7 @@ UNVERIFIABLE ON THIS PLAN, labelled honestly: person_locations and email status
 """
 
 import os
+import re
 import sys
 
 import pytest
@@ -397,6 +403,13 @@ def test_market_segments_is_labelled_as_the_keyword_match_it_is():
             "%sSegments must say it matches names and tags" % pre
 
 
+def _combo_keys(js):
+    """The input ids the page turns into pickers, read from the registry itself so
+    a new picker is covered by these tests without touching them."""
+    block = js[js.index("var COMBO_SPECS"):js.index("var COMBO_FORMATS")]
+    return re.findall(r'\["(\w+)",\s*"', block)
+
+
 def test_the_person_location_filter_does_not_promise_verification():
     """Apollo's free people search returns no city or country, so a person-level
     location cannot be checked without paying per person."""
@@ -415,14 +428,24 @@ def test_the_industry_input_is_a_picker_not_a_free_text_box():
         assert 'id="%sIndustryChips"' % pre in html
 
 
-def test_the_industry_chips_are_what_gets_searched():
-    """The input box holds a half-typed word; the chips hold the filter."""
+def test_the_picker_chips_are_what_gets_searched():
+    """The input box holds a half-typed word; the chips hold the filter.
+
+    Asserted through the combo registry rather than against one hand-written line
+    per filter, so adding a picker cannot leave this test passing while the new
+    filter quietly reads its half-typed box instead of its chips.
+    """
     js = open(os.path.join(_ROOT, "static", "js",
                           "company_people_intelligence.js")).read()
-    assert "f.industries = INDUSTRY_SEL.fp.slice()" in js
-    assert "f.industries = INDUSTRY_SEL.fc.slice()" in js
-    assert '["fpIndustry","industries","csv"]' not in js, \
-        "the old free-text spec must be gone or it will overwrite the chips"
+    assert 'applyCombos("fp", f)' in js
+    assert 'applyCombos("fc", f)' in js
+    # Every picker's id must be absent from the plain-text field specs, or
+    # applySpecs would set the same Apollo key from the box and overwrite the
+    # chips with whatever was mid-word when Search was pressed.
+    specs = js[js.index("var PEOPLE_FIELDS"):js.index("window.cpiClearFilters")]
+    for key in _combo_keys(js):
+        assert '["%s"' % key not in specs, \
+            "%s is a picker, so it must not also be a free-text spec" % key
 
 
 def test_the_result_count_is_grammatical_in_the_singular():
