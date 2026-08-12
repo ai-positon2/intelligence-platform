@@ -16,9 +16,11 @@ var CHAT_URL   = window.__CPI_CHAT_URL__;
    value to put in the field instead. gatherFilters() applies the pin only
    while the field's text still matches pinnedOrgName, so it can never bleed
    into an unrelated later search once the user types something else. */
+/* firmo: what the last fetch did to describe these people's employers (see
+   firmoNote). Per-fetch, not cumulative. */
 var STATE = { entity: "people", page: 1, results: [], selected: {},
               total: null, lastFilters: {}, historyId: null,
-              pinnedOrgId: null, pinnedOrgName: null };
+              pinnedOrgId: null, pinnedOrgName: null, firmo: null };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -54,19 +56,21 @@ window.cpiSetEntity = function(entity){
   document.getElementById("cpiFiltersCompanies").style.display = entity==="companies" ? "" : "none";
   /* People and company rows have different shapes and export columns, so a
      selection cannot survive the switch. Clear it rather than mixing the two. */
-  if(changed){ STATE.selected={}; updateBulk(); }
+  if(changed){ STATE.selected={}; STATE.firmo=null; updateBulk(); }
   syncLoadMoreLabel();
 };
 
 /* Each Companies page is a fresh mixed_companies/search call, which Apollo bills
-   a credit for, while People pages are free. The button says which it is, so the
-   cost is known before the click rather than inferred from the balance later. */
+   a credit for. A People page is free to search, but describing employers the
+   cache has not seen before costs one credit for the whole page -- so the label
+   says "up to", which is the only claim that is true both when the next page is
+   more people at companies already described and when it is not. */
 function syncLoadMoreLabel(){
   var btn=document.getElementById("cpiLoadMore");
   if(!btn) return;
   btn.innerHTML = STATE.entity==="companies"
     ? 'Load more <s>&middot; 1 Apollo credit</s>'
-    : 'Load more <s>&middot; free</s>';
+    : 'Load more <s>&middot; up to 1 Apollo credit</s>';
 }
 
 window.cpiToggleChip = function(el){ el.classList.toggle("on"); };
@@ -253,6 +257,9 @@ window.cpiRunSearch = function(reset){
       if(d.credits) note += " ("+d.credits+" Apollo credit)";
       toast(note, "ok");
     }
+    /* How the company detail on these rows was obtained. Kept per page rather
+       than accumulated, because it describes what the last fetch did. */
+    STATE.firmo=(d&&d.companies_described)||null;
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
        page instead of re-fetching page 1 and appending duplicate cards (which on
@@ -332,6 +339,20 @@ function renderAiNote(note){
     "</div>";
 }
 
+/* The company detail on a people page is bought once for the whole page and
+   cached for 30 days, so whether this page cost anything is worth stating: it is
+   the difference between a search that was free and one that spent a credit, and
+   nobody should have to guess which they just ran. */
+function firmoNote(){
+  var f=STATE.firmo;
+  if(!f||!f.orgs) return "";
+  var what=f.orgs===1?"employer":(pmNum(f.orgs)+" employers");
+  var how=f.fetched
+    ? "described &middot; 1 credit"
+    : "described <s>from cache, free</s>";
+  return ' <s>&middot;</s> '+what+" "+how;
+}
+
 function renderResults(){
   var wrap=document.getElementById("cpiResultsWrap");
   var bar=document.getElementById("cpiToolbar");
@@ -345,9 +366,10 @@ function renderResults(){
   var shown=STATE.results.length;
   var cnt=document.getElementById("cpiCount");
   if(cnt){
-    cnt.innerHTML = STATE.total && STATE.total>shown
+    cnt.innerHTML = (STATE.total && STATE.total>shown
       ? "Showing <b>"+pmNum(shown)+"</b> of <b>"+pmNum(STATE.total)+"</b> <s>matches in Apollo</s>"
-      : "<b>"+pmNum(shown)+"</b> <s>"+(STATE.entity==="people"?"people":"companies")+"</s>";
+      : "<b>"+pmNum(shown)+"</b> <s>"+(STATE.entity==="people"?"people":"companies")+"</s>")
+      + firmoNote();
   }
   wrap.innerHTML='<div class="cpi-grid">'+STATE.results.map(function(r,i){
     return STATE.entity==="people" ? personCard(r,i) : companyCard(r,i);
@@ -372,9 +394,62 @@ var IC_TAG='<svg viewBox="0 0 24 24"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0
 var IC_CLK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>';
 var IC_HIST='<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>';
 var IC_ML='<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
+var IC_STACK='<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>';
+var IC_PH='<svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.6a2 2 0 01-.5 2.1L8.1 9.6a16 16 0 006 6l1.2-1.1a2 2 0 012.1-.5c.8.3 1.7.5 2.6.6a2 2 0 011.7 2z"/></svg>';
+
+/* Both the card and the free details view need the same money/growth phrasing,
+   so neither can drift into describing the same figure differently. */
+function pmMoney(n, printed){
+  /* Apollo's organization_revenue_printed is a bare figure ("62B"), so it needs
+     the currency symbol the numeric path already adds. Guarded, because some
+     records do print one and "$$62B" is worse than either. */
+  if(printed){
+    printed=String(printed).trim();
+    return /^[$€£¥]/.test(printed) ? printed : ("$"+printed);
+  }
+  return (n||n===0) ? ("$"+pmNum(n)) : "";
+}
+function pmGrowth(pct){
+  if(pct===null||pct===undefined||pct==="") return "";
+  var n=+pct; if(isNaN(n)) return "";
+  /* Apollo reports this as a fraction on some records and as whole percent on
+     others. Treating 0.14 as "0.1%" understates a real 14% growth by two orders
+     of magnitude, so a value inside ±1 is read as the fraction it almost
+     certainly is. */
+  if(Math.abs(n)<=1) n=n*100;
+  return (n>0?"+":"")+n.toFixed(n%1?1:0)+"%";
+}
+/* City, state and country joined with the repeats removed. Apollo stores the
+   city-states and single-province capitals with the same name in two fields, so a
+   plain join produced "Beijing, Beijing, China" and "Singapore, Singapore,
+   Singapore". Case-insensitive, since the two fields are not always capitalised
+   the same way. */
+function placeLine(){
+  var out=[], seen={};
+  Array.prototype.slice.call(arguments).forEach(function(part){
+    part=String(part==null?"":part).trim();
+    if(!part) return;
+    var key=part.toLowerCase();
+    if(seen[key]) return;
+    seen[key]=1; out.push(part);
+  });
+  return out.join(", ");
+}
+/* Whether two Apollo URL-ish values point at the same host, ignoring scheme, www
+   and any path. Used to suppress a row that would repeat its neighbour verbatim. */
+function sameHost(a, b){
+  var norm=function(v){ return String(v==null?"":v).trim().toLowerCase()
+    .replace(/^https?:\/\//,"").replace(/^www\./,"").replace(/\/.*$/,""); };
+  a=norm(a); b=norm(b);
+  return !!a && a===b;
+}
+function coHq(p, prefix){
+  prefix = prefix===undefined ? "organization_" : prefix;
+  return placeLine(p[prefix+"city"],p[prefix+"state"],p[prefix+"country"]);
+}
 
 function personCard(p,i){
-  var loc=[p.city,p.state,p.country].filter(Boolean).join(", ");
+  var loc=placeLine(p.city,p.state,p.country);
   var sel=STATE.selected[p.id]?" sel":"";
   var photo=safeUrl(p.photo_url);
   var av = photo
@@ -383,7 +458,7 @@ function personCard(p,i){
 
   var rows=[];
   if(p.organization_name){
-    var lg=logoFor(p.organization_domain);
+    var lg=safeUrl(p.organization_logo)||logoFor(p.organization_domain);
     var co=(lg?'<img class="cpi-row-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'"> ':"")
       +'<b>'+esc(p.organization_name)+'</b>';
     var extra=[];
@@ -394,11 +469,32 @@ function personCard(p,i){
     if(!extra.length && p.organization_domain) extra.push("<s>"+esc(p.organization_domain)+"</s>");
     rows.push('<div class="cpi-row">'+IC_BLD+'<span>'+co+(extra.length?" · "+extra.join(" · "):"")+'</span></div>');
   }
+  /* The person's own location when a credit has revealed it, the employer's HQ
+     when it has not. Labelled either way, because "London" meaning "this person
+     is in London" and "London" meaning "their head office is" are different
+     facts and a sales rep acts differently on each. */
   if(loc) rows.push(row(IC_PIN, esc(loc)));
+  else if(coHq(p)) rows.push(row(IC_PIN, esc(coHq(p))+' <s>HQ</s>'));
+  var money=[];
+  if(pmMoney(p.organization_revenue,p.organization_revenue_printed)) money.push(esc(pmMoney(p.organization_revenue,p.organization_revenue_printed))+" revenue");
+  if(p.organization_funding) money.push("$"+pmNum(p.organization_funding)+" raised");
+  if(pmGrowth(p.organization_growth12)) money.push(esc(pmGrowth(p.organization_growth12))+" headcount <s>12mo</s>");
+  if(money.length) rows.push(row(IC_HIST, money.join(" · ")));
   var tags=[];
   if(p.seniority) tags.push(esc(String(p.seniority).replace(/_/g," ")));
   (p.departments||[]).slice(0,2).forEach(function(d){ tags.push(esc(String(d).replace(/_/g," "))); });
+  /* Read off the title rather than returned by Apollo, so it says so. Only when
+     Apollo's own seniority is absent, which on the free tier is always. */
+  if(!tags.length){
+    var derived=[];
+    if(p.seniority_from_title) derived.push(esc(p.seniority_from_title));
+    (p.functions_from_title||[]).slice(0,2).forEach(function(f){ derived.push(esc(f)); });
+    if(derived.length) tags.push(derived.join(" · ")+' <s>from title</s>');
+  }
   if(tags.length) rows.push(row(IC_TAG, tags.join(" · ")));
+  if((p.organization_technologies||[]).length){
+    rows.push(row(IC_STACK, esc(p.organization_technologies.slice(0,4).join(", "))));
+  }
   if(p.email) rows.push(row(IC_ML,'<b>'+esc(p.email)+'</b>'+(p.email_status?' <span class="cpi-badge '+(p.email_status==="verified"?"ok":"dim")+'">'+esc(p.email_status.replace(/_/g," "))+'</span>':"")));
   if(p.title_start_date) rows.push(row(IC_CLK,"In role since "+esc(pmMon(p.title_start_date))));
   if((p.past_companies||[]).length) rows.push(row(IC_HIST,"Previously "+esc(p.past_companies.filter(Boolean).join(", "))));
@@ -406,14 +502,17 @@ function personCard(p,i){
      every row, so an otherwise-thin card still says something verifiable. */
   if(p.last_refreshed_at) rows.push(row(IC_CLK,"Apollo data refreshed <s>"+esc(pmMon(p.last_refreshed_at))+"</s>"));
   /* Names the missing fields rather than leaving dead space, and says what the
-     click costs, so nobody spends a credit without knowing. */
-  if(!p.enriched && !loc && !p.email){
-    rows.push('<div class="cpi-row hint">'+IC_ML+'<span>Enrich for email, phone, location &amp; seniority <s>&middot; 1 credit</s></span></div>');
+     click costs, so nobody spends a credit without knowing. Short enough to fit
+     one card-width line: the row ellipsises, and a truncated price is no price at
+     all. The full list lives in the Details view. */
+  if(!p.enriched && !p.email){
+    rows.push('<div class="cpi-row hint">'+IC_ML+'<span>Enrich for email, phone &amp; history <s>&middot; 1 credit</s></span></div>');
   }
 
   var socials="";
   if(p.linkedin_url) socials+='<a class="cpi-card-link" href="'+esc(safeUrl(p.linkedin_url))+'" target="_blank" rel="noopener noreferrer" title="LinkedIn">'+SVG_LI+'</a>';
   if(p.organization_domain) socials+='<a class="cpi-card-link" href="'+esc(safeUrl("https://"+String(p.organization_domain).replace(/^https?:\/\//i,"")))+'" target="_blank" rel="noopener noreferrer" title="Company website">'+SVG_WEB+'</a>';
+  if(p.organization_linkedin) socials+='<a class="cpi-card-link" href="'+esc(safeUrl(p.organization_linkedin))+'" target="_blank" rel="noopener noreferrer" title="Company LinkedIn">'+SVG_LI+'</a>';
 
   return '<div class="cpi-card'+sel+(p.enriched?" enr":"")+'" data-spotlight>'+
     '<button class="cpi-card-check'+(sel?" on":"")+'" onclick="cpiToggleSelect('+i+')" aria-label="Select"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>'+
@@ -428,12 +527,13 @@ function personCard(p,i){
     '</div>'+
     (rows.length?'<div class="cpi-rows">'+rows.join("")+'</div>':'')+
     '<div class="cpi-card-footer">'+socials+
+      '<button class="cpi-ghost-btn" onclick="cpiOpenDetails('+i+')">Details</button>'+
       '<button class="cpi-enrich-btn" onclick=\'cpiOpenEnrich("person",'+i+')\'>Enrich &rarr;</button>'+
     '</div></div>';
 }
 
 function companyCard(c,i){
-  var loc=[c.city,c.state,c.country].filter(Boolean).join(", ");
+  var loc=placeLine(c.city,c.state,c.country);
   var sel=STATE.selected[c.id]?" sel":"";
   var src=safeUrl(c.logo_url)||logoFor(c.primary_domain);
   var logo=src?('<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.parentNode.textContent=\''+esc(initials(c.name))+'\'">'):esc(initials(c.name));
@@ -441,16 +541,19 @@ function companyCard(c,i){
   var rows=[];
   var firmo=[];
   if(c.estimated_num_employees) firmo.push('<b>'+pmNum(c.estimated_num_employees)+'</b> employees');
+  if(pmGrowth(c.growth12)) firmo.push(esc(pmGrowth(c.growth12))+' <s>12mo</s>');
   if(c.industry) firmo.push(esc(c.industry));
   if(c.founded_year) firmo.push("est. "+esc(c.founded_year));
   if(firmo.length) rows.push(row(IC_BLD, firmo.join(" · ")));
-  if(loc) rows.push(row(IC_PIN, esc(loc)));
+  if(loc) rows.push(row(IC_PIN, esc(c.raw_address||loc)));
   var money=[];
-  if(c.annual_revenue) money.push('<b>$'+pmNum(c.annual_revenue)+'</b> revenue');
+  if(pmMoney(c.annual_revenue,c.revenue_printed)) money.push('<b>'+esc(pmMoney(c.annual_revenue,c.revenue_printed))+'</b> revenue');
   if(c.total_funding) money.push('$'+pmNum(c.total_funding)+' raised');
   if(c.publicly_traded_symbol) money.push(esc(c.publicly_traded_symbol));
   if(money.length) rows.push(row(IC_HIST, money.join(" · ")));
-  if((c.technologies||[]).length) rows.push(row(IC_TAG, esc(c.technologies.slice(0,4).join(", "))));
+  if((c.technologies||[]).length) rows.push(row(IC_STACK, esc(c.technologies.slice(0,4).join(", "))));
+  if((c.keywords||[]).length) rows.push(row(IC_TAG, esc(c.keywords.slice(0,4).join(", "))));
+  if(c.phone) rows.push(row(IC_PH, esc(c.phone)));
   if(c.latest_funding_round_date) rows.push(row(IC_CLK,"Last round "+esc(pmMon(c.latest_funding_round_date))));
 
   var socials="";
@@ -466,6 +569,7 @@ function companyCard(c,i){
     '</div>'+
     (rows.length?'<div class="cpi-rows">'+rows.join("")+'</div>':'')+
     '<div class="cpi-card-footer">'+socials+
+      '<button class="cpi-ghost-btn" onclick="cpiOpenDetails('+i+')">Details</button>'+
       '<button class="cpi-enrich-btn" onclick=\'cpiOpenEnrich("company",'+i+')\'>Enrich &rarr;</button>'+
     '</div></div>';
 }
@@ -1024,9 +1128,7 @@ function companyBody(c){
    Pulled out so a chat-originated person -- which has no index into
    STATE.results -- can drive the exact same modal as the grid's own button. */
 function cpiRunEnrich(type, heroSeed, body){
-  document.getElementById("pmOvl").classList.add("on");
-  document.getElementById("pmWrap").classList.add("on");
-  document.body.style.overflow="hidden";
+  pmOpenModal();
   document.getElementById("pmHero").innerHTML = type==="person" ? personHero(heroSeed) : companyHero(heroSeed);
   document.getElementById("pmBody").innerHTML = '<div class="pm-sk" style="width:40%;height:11px;margin-bottom:14px"></div><div class="pm-sk" style="width:100%;height:52px;margin-bottom:9px"></div><div class="pm-sk" style="width:100%;height:52px"></div>';
 
@@ -1041,6 +1143,156 @@ function cpiRunEnrich(type, heroSeed, body){
       document.getElementById("pmBody").innerHTML='<div class="pm-empty"><b>Enrichment failed</b>Could not reach Apollo just now. Try again in a moment.</div>';
     });
 }
+/* ── Free details view ── */
+/* Apollo's own UI shows a full profile panel the moment you click a search
+   result. This is that panel, built entirely from fields already in hand: no
+   request, no credit, instant. It exists because the previous card was the only
+   view of a row, so everything that did not fit in six lines was invisible even
+   though it had already been fetched and paid for.
+   Same pm-* chrome as the paid modal on purpose -- one visual language, and the
+   Enrich button inside it is the upgrade path rather than a competing entry
+   point. */
+function pmOpenModal(){
+  document.getElementById("pmOvl").classList.add("on");
+  document.getElementById("pmWrap").classList.add("on");
+  document.body.style.overflow="hidden";
+}
+
+/* pmKV drops empty values, so a section whose every field was blank would render
+   as a bare heading over nothing. Checking the assembled html rather than the
+   inputs means one guard covers every field type. */
+function pmSection(title, tag, inner){
+  if(!inner) return "";
+  return '<div class="pm-sec"><h4 class="pm-h4">'+esc(title)+(tag?"<s>"+esc(tag)+"</s>":"")+"</h4>"+inner+"</div>";
+}
+function pmKvBlock(){
+  var html=Array.prototype.slice.call(arguments).join("");
+  return html ? '<div class="pm-kv">'+html+"</div>" : "";
+}
+function pmTagBlock(list, cap){
+  list=(list||[]).slice(0,cap||14);
+  if(!list.length) return "";
+  return '<div class="pm-tags">'+list.map(function(t){ return '<span class="pm-tag">'+esc(t)+"</span>"; }).join("")+"</div>";
+}
+
+/* The employer, described as fully as the row allows. Shared by the person view
+   and the company view so a company never looks better as a search result than it
+   does under the person who works there. */
+function detailEmployer(r, pre){
+  pre = pre===undefined ? "organization_" : pre;
+  var g=function(k){ return r[pre+k]; };
+  var name=pre?g("name"):r.name;
+  var domain=pre?g("domain"):r.primary_domain;
+  var logo=safeUrl(pre?g("logo"):r.logo_url)||logoFor(domain);
+  var industry=pre?g("industry"):r.industry;
+  var desc=pre?g("description"):r.short_description;
+  var head=logo?('<img src="'+esc(logo)+'" alt="" onerror="this.style.display=\'none\'">'):esc(initials(name));
+  var card = name ? ('<div class="pm-cocard"><div class="pm-cotop"><div class="pm-colg">'+head+"</div>"+
+    '<div style="min-width:0"><div class="pm-coname">'+esc(name)+"</div>"+
+    (industry?'<div class="pm-coind">'+esc(industry)+"</div>":"")+"</div></div>"+
+    (desc?'<div style="font-size:12.3px;color:#98a3c2;line-height:1.6;margin-top:12px">'+esc(desc)+"</div>":"")+
+    "</div>") : "";
+  var website=pre?g("website"):r.website_url;
+  var hq=pre?coHq(r,pre):placeLine(r.city,r.state,r.country);
+  var kv=pmKvBlock(
+    pmKV("Employees", (pre?g("employees"):r.estimated_num_employees) ? pmNum(pre?g("employees"):r.estimated_num_employees) : ""),
+    pmKV("Headcount growth 6mo", pmGrowth(pre?g("growth6"):r.growth6)),
+    pmKV("Headcount growth 12mo", pmGrowth(pre?g("growth12"):r.growth12)),
+    pmKV("Revenue", pmMoney(pre?g("revenue"):r.annual_revenue, pre?g("revenue_printed"):r.revenue_printed)),
+    pmKV("Total funding", (pre?g("funding"):r.total_funding) ? "$"+pmNum(pre?g("funding"):r.total_funding) : ""),
+    pmKV("Latest round", pmMon(pre?g("funding_date"):r.latest_funding_round_date) || ""),
+    pmKV("Founded", pre?g("founded"):r.founded_year),
+    pmKV("Ticker", pre?g("ticker"):r.publicly_traded_symbol),
+    pmKV("HQ", hq),
+    pmKV("Address", pre?g("address"):r.raw_address),
+    pmKV("Phone", pre?g("phone"):r.phone),
+    /* pmKV renders a URL stripped of its scheme and www, so a website of
+       "https://lenovo.com" and a domain of "lenovo.com" printed as two identical
+       tiles. Only worth its own row when it says something the website does not,
+       and the section heading already carries the domain either way. */
+    pmKV("Domain", sameHost(domain, website) ? "" : domain),
+    pmKV("Website", website, true),
+    pmKV("LinkedIn", pre?g("linkedin"):r.linkedin_url, true),
+    pmKV("Apollo org ID", pre?r.organization_id:r.id)
+  );
+  var tech=pmTagBlock(pre?g("technologies"):r.technologies, 12);
+  var kws=pmTagBlock(pre?g("keywords"):r.keywords, 14);
+  var inner=card+kv+
+    (tech?'<div class="pm-kv-h">Technologies</div>'+tech:"")+
+    (kws?'<div class="pm-kv-h">Keywords</div>'+kws:"");
+  return pmSection(pre?"Employer":"Firmographics", domain||"apollo", inner);
+}
+
+function personDetailsBody(r, idx){
+  var loc=placeLine(r.city,r.state,r.country);
+  var out=pmSection("Role", "apollo search", pmKvBlock(
+    pmKV("Title", r.title),
+    pmKV("Headline", r.headline),
+    pmKV("Seniority", r.seniority ? String(r.seniority).replace(/_/g," ") : ""),
+    /* Two visibly different labels for the same idea, because they have
+       different warranties: one is Apollo's, one is ours. */
+    pmKV("Seniority (read from title)", r.seniority?"":r.seniority_from_title),
+    pmKV("Function (read from title)", (r.functions_from_title||[]).join(", ")),
+    pmKV("Departments", (r.departments||[]).map(function(d){ return String(d).replace(/_/g," "); }).join(", ")),
+    pmKV("In role since", r.title_start_date?pmMon(r.title_start_date):""),
+    pmKV("Previously", (r.past_companies||[]).filter(Boolean).join(", ")),
+    pmKV("Location", loc),
+    pmKV("LinkedIn", r.linkedin_url, true),
+    pmKV("X / Twitter", r.twitter_url, true),
+    pmKV("Apollo record refreshed", r.last_refreshed_at?pmMon(r.last_refreshed_at):""),
+    pmKV("Apollo ID", r.id)
+  ));
+
+  var ct=(r.email?pmCt(SVG_MAIL,"Email",r.email,"mailto:"+r.email,
+            r.email_status?('<span class="pm-vf"'+(r.email_status==="verified"?"":' style="color:#9aa5c6;border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.05)"')+">"+esc(String(r.email_status).replace(/_/g," "))+"</span>"):""):"")+
+    (r.phones||[]).map(function(n){ return pmCt(SVG_PH,"Phone",n,"tel:"+String(n).replace(/[^\d+]/g,""),""); }).join("");
+  if(ct){
+    out+=pmSection("Contact", "revealed", '<div class="pm-ct">'+ct+"</div>");
+  } else {
+    /* Names exactly what a credit buys and what is already here, so the choice to
+       spend one is informed rather than hopeful. */
+    out+=pmSection("Contact", "not revealed yet",
+      '<div class="pm-ct-no"><b>Nothing revealed on this person yet</b>'+
+      "Apollo's free search returns identity and role only. Enriching adds their verified email and status, direct and mobile phone numbers, their own city and country, full career history and photo"+
+      (r.name_masked?", and reveals the surname Apollo is masking here":"")+
+      ". That costs 1 credit, and is cached afterwards so reopening this person is free.</div>"+
+      '<div style="margin-top:12px"><button class="cpi-enrich-btn" style="margin-left:0" onclick=\'cpiCloseModal();cpiOpenEnrich("person",'+idx+')\'>Enrich this person &middot; 1 credit</button></div>');
+  }
+  out+=detailEmployer(r);
+  return out;
+}
+
+function companyDetailsBody(r, idx){
+  var out=detailEmployer(r, "");
+  out+=pmSection("Go deeper", "1 credit",
+    '<div class="pm-ct-no"><b>Everything above is already paid for</b>'+
+    "Enriching this company re-reads it from Apollo's organization record, which adds its head-office phone and address where the search did not carry them, plus the leadership contacts Apollo holds.</div>"+
+    '<div style="margin-top:12px"><button class="cpi-enrich-btn" style="margin-left:0" onclick=\'cpiCloseModal();cpiOpenEnrich("company",'+idx+')\'>Enrich this company &middot; 1 credit</button></div>');
+  return out;
+}
+
+window.cpiOpenDetails = function(idx){
+  var r=STATE.results[idx];
+  if(!r) return;
+  var isPerson = STATE.entity==="people";
+  pmOpenModal();
+  var hero = isPerson
+    ? personHero({name:r.full_name, title:r.title, headline:r.headline, photo:r.photo_url,
+                  seniority:(r.seniority?String(r.seniority).replace(/_/g," "):r.seniority_from_title),
+                  location:placeLine(r.city,r.state,r.country)||coHq(r),
+                  linkedin:r.linkedin_url,
+                  company:{name:r.organization_name, employees:r.organization_employees,
+                           linkedin:r.organization_linkedin, website:r.organization_website,
+                           domain:r.organization_domain}})
+    : companyHero({name:r.name, logo:r.logo_url||logoFor(r.primary_domain), industry:r.industry,
+                   description:r.short_description, employees:r.estimated_num_employees,
+                   hq:placeLine(r.city,r.state,r.country),
+                   revenue:(r.revenue_printed||(r.annual_revenue?pmNum(r.annual_revenue):"")),
+                   linkedin:r.linkedin_url, website:r.website_url});
+  document.getElementById("pmHero").innerHTML=hero;
+  document.getElementById("pmBody").innerHTML=isPerson?personDetailsBody(r,idx):companyDetailsBody(r,idx);
+};
+
 window.cpiOpenEnrich = function(type, idx){
   var item=STATE.results[idx]; if(!item) return;
   var heroSeed = type==="person" ? {name:item.full_name,title:item.title} : {name:item.name,logo:item.logo_url};

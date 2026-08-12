@@ -83,7 +83,7 @@ def test_export_csv_has_headers_and_bom(client):
     # utf-8-sig BOM, so Excel reads non-ASCII company names correctly.
     assert r.data.startswith(b"\xef\xbb\xbf")
     body = r.data.decode("utf-8-sig")
-    assert body.splitlines()[0].startswith("Name,Title,Seniority,Email")
+    assert body.splitlines()[0].startswith("Name,Title,Seniority,")
     assert "Ada Lovelace" in body and "marketing" in body
 
 
@@ -162,8 +162,11 @@ def test_csv_export_ignores_filters_and_stays_a_flat_table(client):
                           "filters": {"titles": ["CMO"]}, "meta": {"total": 42}})
     body = r.data.decode("utf-8-sig")
     lines = body.splitlines()
-    assert lines[0].startswith("Name,Title,Seniority,Email")
+    assert lines[0].startswith("Name,Title,Seniority,")
+    # The point of the test: one header plus one data row, and nothing from
+    # `filters`/`meta` appended as an extra line.
     assert len(lines) == 2
+    assert "42" not in lines[0] and "CMO" not in lines[0]
 
 
 def test_filters_readable_formats_lists_dicts_and_bools():
