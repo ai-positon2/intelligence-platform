@@ -8700,20 +8700,43 @@ def cpi_enrich():
     # that credit bought. Recording it means a closed tab or a lost modal does
     # not lose what was paid for. Only a real match is recorded, since a miss
     # costs nothing and holds nothing worth keeping.
-    if isinstance(profile, dict) and profile.get("matched"):
-        co = profile.get("company") or {}
-        label = " · ".join(x for x in [
-            profile.get("name") or co.get("name") or "",
-            profile.get("title") or co.get("industry") or "",
-        ] if x) or (body.get("name") or body.get("domain") or "Enriched contact")
-        _cpi_history_save(
-            email=((_get_user() or {}).get("email") or ""),
-            entity="contact" if kind == "person" else "company_profile",
-            label=label,
-            rows=[profile],
-            filters={"type": kind,
-                     "domain": body.get("domain") or co.get("domain") or "",
-                     "apollo_id": body.get("apollo_id") or ""})
+    # Guarded for the same reason the chat's hook is: the credit is already spent
+    # by the time this runs, so a failure to record it must not turn a paid-for
+    # profile into an error the user sees instead of their contact.
+    try:
+        if isinstance(profile, dict) and profile.get("matched"):
+            co = profile.get("company") or {}
+            label = " · ".join(x for x in [
+                profile.get("name") or co.get("name") or "",
+                profile.get("title") or co.get("industry") or "",
+            ] if x) or (body.get("name") or body.get("domain") or "Enriched contact")
+            domain = body.get("domain") or co.get("domain") or ""
+            # An Apollo id names the person; without one, the name and the employer
+            # together do, and that is what was matched on. Enriching the same person
+            # twice then refreshes one entry instead of filling the drawer with
+            # identical ones. Blank on both counts means there is nothing to key on, so
+            # it falls back to a plain insert rather than colliding with the next
+            # nameless record.
+            key = str(profile.get("id") or body.get("apollo_id") or "").strip()
+            if not key:
+                key = "|".join(x for x in (str(body.get("name") or "").strip().lower(),
+                                           str(domain).strip().lower()) if x)
+            _cpi_history_save(
+                email=((_get_user() or {}).get("email") or ""),
+                entity="contact" if kind == "person" else "company_profile",
+                label=label,
+                rows=[profile],
+                filters={"type": kind,
+                         "domain": domain,
+                         "apollo_id": body.get("apollo_id") or "",
+                         # What this actually cost. The drawer shows a credit count
+                         # per entry, and it was reading a key only the chat wrote, so
+                         # the one entry that definitely spent a credit was the one
+                         # showing no cost at all.
+                         "credits": spend["credits"]},
+                dedupe=key)
+    except Exception as e:
+        log.warning("cpi enrich history hook failed: %s", e)
     return jsonify({"profile": profile,
                     "apollo": bool(os.environ.get("APOLLO_API_KEY", "")),
                     # 0 is a real answer here: a miss and a cache hit both cost
@@ -8784,8 +8807,40 @@ def cpi_enrich_bulk():
 
     merged = dict(cached)
     merged.update(fetched)
+    rows = {i: _cpi_person_row(p) for i, p in merged.items()}
+    # A bulk reveal is the biggest purchase this page can make -- up to fifty
+    # credits in one click -- and it was the one purchase that went unrecorded,
+    # while a single reveal of one person has always been saved. A closed tab
+    # therefore lost exactly the contacts that cost the most to get. Saved under
+    # its own kind because these rows are already in search-row shape, so the
+    # entry reopens into the grid and exports like any saved search.
+    #
+    # Guarded like the chat's own hook: the credits are spent by the time this
+    # runs, so nothing here may turn a successful reveal into an error. The saver
+    # swallows its own database failures, but the label and the signed-in user are
+    # assembled out here.
+    if rows:
+        try:
+            named = [r.get("full_name") for r in rows.values() if r.get("full_name")]
+            label = "%d contact%s revealed" % (len(rows), "" if len(rows) == 1 else "s")
+            if named:
+                label += ": " + ", ".join(named[:3])
+                if len(named) > 3:
+                    label += " +%d more" % (len(named) - 3)
+            _cpi_history_save(
+                email=((_get_user() or {}).get("email") or ""),
+                entity="revealed",
+                label=label,
+                rows=list(rows.values()),
+                total=len(rows),
+                # len(fetched), not len(ids): the cached ones were paid for on an
+                # earlier click and counting them again would inflate the total
+                # this drawer reports.
+                filters={"credits": len(fetched), "from_cache": len(cached)})
+        except Exception as e:
+            log.warning("cpi bulk reveal history hook failed: %s", e)
     return jsonify({
-        "profiles": {i: _cpi_person_row(p) for i, p in merged.items()},
+        "profiles": rows,
         "fetched": len(fetched), "cached": len(cached),
         "capped": was_capped,
     })
@@ -8876,6 +8931,24 @@ def _ensure_cpi_history_table(conn) -> None:
     _CPI_HISTORY_TABLE_READY = True
 
 
+def _cpi_history_expire(cur) -> None:
+    """Retire expired rows for every user, not just whoever is being served.
+
+    _cpi_history_prune runs only when someone writes, and only over their own
+    rows, which made the ninety days conditional on continued use: a person who
+    stopped using the tool kept their revealed emails and phone numbers
+    indefinitely, because nothing they did ever triggered their own cleanup.
+    These rows hold contact data, so ninety days has to mean ninety days.
+
+    Called from the drawer's own read, so any use of the tool by anyone retires
+    everyone's expired rows. Cheap: the table is capped at sixty rows per user.
+    """
+    cur.execute(
+        "DELETE FROM cpi_search_history "
+        "WHERE created_at < now() - make_interval(days => %s)",
+        (_CPI_HISTORY_TTL_DAYS,))
+
+
 def _cpi_history_prune(cur, email: str) -> None:
     """Retire anything past the TTL, then keep the per-user list bounded. These
     rows hold revealed emails and phone numbers, so the TTL matters on its own
@@ -8892,9 +8965,17 @@ def _cpi_history_prune(cur, email: str) -> None:
 
 
 def _cpi_history_save(email: str, entity: str, label: str, rows: list,
-                      answer: str = "", filters: dict = None, total=None):
-    """Record one chat exchange or one enrichment, server-side. Returns the new
-    id, or None if nothing was written.
+                      answer: str = "", filters: dict = None, total=None,
+                      dedupe: str = ""):
+    """Record one chat exchange or one enrichment, server-side. Returns the id
+    written, or None if nothing was written.
+
+    `dedupe` names the thing the entry is about, e.g. an Apollo person id. When
+    given, an existing entry for the same user, kind and thing is refreshed in
+    place instead of a second one being inserted: enriching the same person four
+    times used to write four identical entries, each taking one of the sixty
+    slots and evicting real history, which is the near-duplicate problem
+    replace_id already solves for a search that gets paged.
 
     Server-side on purpose: a saved search is something the user chooses to keep,
     but a chat answer and a bought contact are things they would be annoyed to
@@ -8914,14 +8995,41 @@ def _cpi_history_save(email: str, entity: str, label: str, rows: list,
     try:
         from psycopg2.extras import Json
         _ensure_cpi_history_table(conn)
+        filters = dict(filters or {})
+        if dedupe:
+            filters["dedupe"] = str(dedupe)
+        label = str(label)[:160]
+        rows = Json(list(rows or [])[:_CPI_HISTORY_MAX_ROWS])
+        answer = str(answer or "")[:8000]
         with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO cpi_search_history "
-                "  (email, entity, label, filters, total, rows, answer) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                (email, entity, str(label)[:160], Json(filters or {}), total,
-                 Json(list(rows or [])[:_CPI_HISTORY_MAX_ROWS]), str(answer or "")[:8000]))
-            new_id = (cur.fetchone() or [None])[0]
+            new_id = None
+            if dedupe:
+                # Credits are added rather than overwritten. Re-enriching the same
+                # person is normally a free cache hit, and letting a 0 replace the
+                # 1 that was really spent would erase the record of the purchase
+                # this entry exists to keep. Two real charges show as two.
+                cur.execute(
+                    "UPDATE cpi_search_history SET label = %s, "
+                    "  filters = %s::jsonb || jsonb_build_object('credits', "
+                    "    COALESCE((filters->>'credits')::numeric, 0) + %s), "
+                    "  total = %s, rows = %s, answer = %s, created_at = now() "
+                    "WHERE id = (SELECT id FROM cpi_search_history "
+                    "            WHERE email = %s AND entity = %s "
+                    "              AND filters->>'dedupe' = %s "
+                    "            ORDER BY created_at DESC LIMIT 1) "
+                    "RETURNING id",
+                    (label, Json(filters), filters.get("credits") or 0, total, rows,
+                     answer, email, entity, str(dedupe)))
+                got = cur.fetchone()
+                if got:
+                    new_id = got[0]
+            if new_id is None:
+                cur.execute(
+                    "INSERT INTO cpi_search_history "
+                    "  (email, entity, label, filters, total, rows, answer) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                    (email, entity, label, Json(filters), total, rows, answer))
+                new_id = (cur.fetchone() or [None])[0]
             _cpi_history_prune(cur, email)
         conn.commit()
         return new_id
@@ -8940,23 +9048,101 @@ def _cpi_history_save(email: str, entity: str, label: str, rows: list,
             pass
 
 
+# What a saved search is called in the drawer, in the order the pieces read best.
+# The prefix is what makes a bare value legible: "54151" on its own says nothing,
+# "NAICS 54151" says what kind of thing it is.
+_CPI_LABEL_LISTS = (
+    ("titles", ""), ("seniorities", ""), ("industries", ""),
+    ("keywords", ""), ("name", ""),
+    ("naics_codes", "NAICS "), ("sic_codes", "SIC "),
+    ("technologies", "uses "), ("technologies_all", "uses "),
+    ("market_segments", ""), ("job_titles", "hiring "),
+    ("email_status", ""),
+)
+# One place only, and the most specific one first: a line listing the company,
+# its country and the person's country reads as three filters when it is one
+# search.
+_CPI_LABEL_PLACES = ("company_domains", "domains", "person_locations",
+                     "locations", "company_locations")
+# (low key, high key, unit, compact, shape). A year is not compacted: "founded
+# 2K-2K" is what happens when every number goes through the same shortener.
+_CPI_LABEL_SPANS = (
+    ("employee_min", "employee_max", "", True, "%s employees"),
+    ("revenue_min", "revenue_max", "", True, "%s revenue"),
+    ("total_funding_min", "total_funding_max", "", True, "%s funding"),
+    ("founded_min", "founded_max", "", False, "founded %s"),
+    ("headcount_growth_min", "headcount_growth_max", "%", True,
+     "%s headcount growth"),
+)
+
+
+def _cpi_label_num(n) -> str:
+    """1200000 -> '1.2M'. Same compaction the cards use, so a label reads the way
+    the screen does rather than spelling out eight digits in a drawer line."""
+    try:
+        n = float(n)
+    except (TypeError, ValueError):
+        return str(n)
+    for size, suffix in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if abs(n) >= size:
+            return ("%.1f" % (n / size)).replace(".0", "") + suffix
+    return str(int(n)) if float(n).is_integer() else str(n)
+
+
+def _cpi_label_span(f: dict, lo_key: str, hi_key: str, unit: str = "",
+                    compact: bool = True) -> str:
+    """'50-200', '20%+' or 'under 200' for a pair of range filters. The unit goes
+    on whichever number ends the phrase, which is where it reads naturally."""
+    lo, hi = f.get(lo_key), f.get(hi_key)
+    blank = (None, "")
+    # The employee filter's top bucket is open-ended and carries a sentinel rather
+    # than nothing, so it has to be read as "no upper bound" and not as 999999999.
+    if hi not in blank and isinstance(hi, (int, float)) and hi >= 999999999:
+        hi = None
+    if lo in blank and hi in blank:
+        return ""
+    num = _cpi_label_num if compact else (lambda n: str(n))
+    if hi in blank:
+        return "%s%s+" % (num(lo), unit)
+    if lo in blank:
+        return "under %s%s" % (num(hi), unit)
+    return "%s-%s%s" % (num(lo), num(hi), unit)
+
+
 def _cpi_history_label(entity: str, filters: dict) -> str:
-    """Short human label for a saved search, e.g. 'CMO · United States · 24 results'."""
+    """Short human label for a saved search, e.g. 'CMO · United States'.
+
+    Reads every filter that narrows the search, not a chosen few. It used to read
+    nine keys out of fifty, so a search by NAICS code, technology, revenue band or
+    funding was labelled "All people" -- a drawer full of entries that all claimed
+    to be the same unfiltered search, none of which was.
+    """
     f = filters or {}
     parts = []
-    for key in ("titles", "seniorities", "industries"):
-        vals = [str(v) for v in (f.get(key) or []) if v]
+    for key, prefix in _CPI_LABEL_LISTS:
+        val = f.get(key)
+        if isinstance(val, str):
+            if val.strip():
+                parts.append(prefix + val.strip())
+            continue
+        vals = [str(v).strip() for v in (val or []) if str(v or "").strip()]
         if vals:
-            parts.append(", ".join(vals[:3]))
-    for key in ("name", "keywords"):
-        if f.get(key):
-            parts.append(str(f[key]))
-    for key in ("company_domains", "domains", "person_locations", "locations",
-                "company_locations"):
-        vals = [str(v) for v in (f.get(key) or []) if v]
+            parts.append(prefix + ", ".join(vals[:3]))
+    for key in _CPI_LABEL_PLACES:
+        val = f.get(key)
+        vals = ([val] if isinstance(val, str) and val.strip()
+                else [str(v).strip() for v in (val or []) if str(v or "").strip()])
         if vals:
             parts.append(vals[0])
             break
+    for lo_key, hi_key, unit, compact, shape in _CPI_LABEL_SPANS:
+        span = _cpi_label_span(f, lo_key, hi_key, unit, compact)
+        if span:
+            parts.append(shape % span)
+    if f.get("organization_ids") and not parts:
+        # A pinned company has no readable name in the filters, only its Apollo
+        # id, so say what the search was scoped to rather than printing the id.
+        parts.append("one specific company")
     return " · ".join(parts)[:160] or ("All companies" if entity == "companies"
                                        else "All people")
 
@@ -8975,6 +9161,10 @@ def cpi_history():
         _ensure_cpi_history_table(conn)
         if request.method == "GET":
             with conn.cursor() as cur:
+                # Before listing, not after: an expired entry must not be shown
+                # once and swept later.
+                _cpi_history_expire(cur)
+                conn.commit()
                 cur.execute(
                     "SELECT id, entity, label, total, "
                     "       COALESCE(jsonb_array_length(rows), 0), created_at, "
@@ -9186,7 +9376,13 @@ def _csv_safe(value) -> str:
 # question a reader of an old spreadsheet really does ask. So it stays, under a
 # label that says what it is rather than sitting in a list of constraints looking
 # like one.
-_CPI_EXPORT_NON_FILTERS = {"max_people", "max_companies"}
+#
+# The last three are the history drawer's own bookkeeping, which shares this
+# `filters` bag: what an entry cost, how much of it came from cache, and the key
+# that stops the same contact being saved twice. A reader of the Search details
+# sheet would take them for constraints on the search, which none of them is.
+_CPI_EXPORT_NON_FILTERS = {"max_people", "max_companies",
+                           "credits", "from_cache", "dedupe"}
 
 # Auto-generated labels mangled the ones that are not plain words: "Naics codes",
 # "Sic codes", "Hq". Only the keys where capitalize() gets it wrong are listed;

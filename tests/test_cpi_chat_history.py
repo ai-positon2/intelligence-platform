@@ -39,10 +39,12 @@ def saved(monkeypatch):
     # Signature mirrors the real _cpi_history_save exactly, so a caller that
     # drifts from it fails here rather than being silently swallowed by the
     # hook's own except clause.
-    def _save(email, entity, label, rows, answer="", filters=None, total=None):
+    def _save(email, entity, label, rows, answer="", filters=None, total=None,
+              dedupe=""):
         captured.append({"email": email, "entity": entity, "label": label,
                          "rows": rows, "answer": answer,
-                         "filters": filters or {}, "total": total})
+                         "filters": filters or {}, "total": total,
+                         "dedupe": dedupe})
         return len(captured)
 
     monkeypatch.setattr(appmod, "_cpi_history_save", _save)

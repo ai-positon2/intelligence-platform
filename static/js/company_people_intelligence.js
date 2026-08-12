@@ -1274,6 +1274,9 @@ window.cpiOpenHistory = function(){
         var co=e.entity==="companies";
         var isChat=e.entity==="chat";
         var isContact=e.entity==="contact"||e.entity==="company_profile";
+        /* A bulk reveal. Its rows are in search-row shape, so unlike a single
+           enriched contact it reopens into the grid and exports like a search. */
+        var isRevealed=e.entity==="revealed";
         var style='style="animation-delay:'+Math.min(idx++,10)*28+'ms"';
         /* Three kinds of entry now share this drawer, so each says what it is
            and what reopening it will do, rather than all reading "N rows". */
@@ -1284,6 +1287,10 @@ window.cpiOpenHistory = function(){
         }else if(isContact){
           ic=IC_PERSON; cls="ct";
           meta="Enriched contact · already paid for · "+when;
+        }else if(isRevealed){
+          ic=IC_PERSON; cls="ct";
+          meta=String(e.count||0)+" contact"+(e.count===1?"":"s")+
+            " · already paid for · "+when;
         }else{
           ic=co?IC_BLD:IC_PERSON; cls=co?"co":"pp";
           meta=String(e.count||0)+" row"+(e.count===1?"":"s")+
@@ -1331,16 +1338,29 @@ window.cpiExportHistoryEntry = function(id, btn){
 window.cpiClearAllHistory = function(){
   var body=document.getElementById("cpiDrawerBody");
   var ids=Array.prototype.map.call(body.querySelectorAll(".cpi-hist"), function(el){
-    return el.getAttribute("onclick").match(/\d+/)[0];
-  });
+    var m=String(el.getAttribute("onclick")||"").match(/\d+/);
+    return m?m[0]:null;
+  }).filter(Boolean);
   if(!ids.length) return;
   /* The drawer now also holds saved answers and enriched contacts, so the
      confirmation says "entries" rather than promising only searches will go. */
   if(!window.confirm("Delete all "+ids.length+" saved "+(ids.length===1?"entry":"entries")+
                      " (searches, answers and enriched contacts)? This cannot be undone.")) return;
+  /* Each delete is its own request, so some can fail while others succeed. It
+     used to swallow every failure and then say "Cleared history." regardless,
+     which told the user their contact data was gone when it was still there. */
   Promise.all(ids.map(function(id){
-    return fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" }).catch(function(){});
-  })).then(function(){ window.cpiOpenHistory(); toast("Cleared history.", "ok"); });
+    return fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ return !!(d && d.deleted); })
+      .catch(function(){ return false; });
+  })).then(function(results){
+    var gone=results.filter(Boolean).length, left=results.length-gone;
+    window.cpiOpenHistory();
+    if(!left){ toast("Cleared history.", "ok"); return; }
+    toast(gone?("Deleted "+gone+", but "+left+" could not be deleted. Try again.")
+             :"Nothing could be deleted. Try again in a moment.", "err");
+  });
 };
 window.cpiCloseHistory = function(){
   document.getElementById("cpiDrawerOvl").classList.remove("on");
@@ -1355,23 +1375,45 @@ window.cpiRestoreHistory = function(id){
     STATE.total = d.total;
     STATE.selected = {};
     STATE.page = 1;
-    /* Put the filters back on screen and keep them as lastFilters, so what the
-       panel shows, what a re-run would query, and what the entry is labelled
-       with all stay the same thing. */
-    STATE.lastFilters = d.filters||{};
-    applyFiltersToForm(STATE.lastFilters);
-    /* Continuing this reopened search grows its own entry rather than forking a
-       near-duplicate in the drawer. */
-    STATE.historyId = d.id||null;
+    /* Describes what the LAST FETCH did, so it cannot survive into a set of rows
+       it never applied to. Left standing, the export of a reopened entry printed
+       the previous search's "Removed on checking" counts as if they were this
+       one's, which is a wrong statement about the file rather than a missing
+       one. */
+    STATE.rejected = null; STATE.rejectedLabels = {}; STATE.firmo = null;
+    var revealed = d.entity==="revealed";
+    if(revealed){
+      /* Not a search: nobody typed filters to get these people, so the panel is
+         left exactly as the user had it and no filters are claimed for the rows. */
+      STATE.lastFilters = {};
+      STATE.historyId = null;
+    }else{
+      /* Put the filters back on screen and keep them as lastFilters, so what the
+         panel shows, what a re-run would query, and what the entry is labelled
+         with all stay the same thing. */
+      STATE.lastFilters = d.filters||{};
+      applyFiltersToForm(STATE.lastFilters);
+      /* Continuing this reopened search grows its own entry rather than forking a
+         near-duplicate in the drawer. */
+      STATE.historyId = d.id||null;
+    }
     renderResults();
     document.getElementById("cpiLoadMore").style.display="none";
     window.cpiCloseHistory();
-    toast("Reopened "+(STATE.results.length)+" saved rows (no credits spent)", "ok");
+    toast("Reopened "+(STATE.results.length)+(revealed?" revealed contacts":" saved rows")+
+          " (no credits spent)", "ok");
   }).catch(function(){ toast("Could not reopen that search.", "err"); });
 };
 window.cpiDeleteHistory = function(id){
   fetch(window.__CPI_HISTORY_URL__+"/"+id, { method:"DELETE" })
-    .then(function(){ window.cpiOpenHistory(); })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      window.cpiOpenHistory();
+      /* Refreshing the list is not proof the row went: the route answers
+         {deleted:false} for an id it did not remove, and reporting nothing left
+         the user believing deleted contact data was gone. */
+      if(!(d && d.deleted)) toast("Could not delete that entry.", "err");
+    })
     .catch(function(){ toast("Could not delete that entry.", "err"); });
 };
 /* Puts a saved exchange back into the chat panel, question and answer, exactly
