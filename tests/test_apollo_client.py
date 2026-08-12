@@ -177,6 +177,38 @@ def test_search_companies_builds_real_payload(mock_post):
 
 
 @patch("tracker.apollo_client.requests.post")
+def test_search_people_scopes_to_an_organization_id(mock_post):
+    """Every company-scoped lookup in the app ends up here: the chat resolves a
+    company name to an org id and then asks for people at that id. Nothing was
+    asserting the id reaches the payload, and if it silently did not, the search
+    would answer "who is the CFO of Acme" with CFOs of anywhere."""
+    mock_post.return_value = _mock_response({"people": []})
+    apollo_client.search_people({"organization_ids": ["o1", "o2"],
+                                 "titles": ["CFO"]}, _FAKE_API_KEY)
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["organization_ids"] == ["o1", "o2"]
+    assert sent["person_titles"] == ["CFO"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_search_companies_looks_companies_up_by_id(mock_post):
+    """This endpoint bills per call, not per company, so passing a list of ids
+    describes a whole page of employers for one credit. Without the filter
+    reaching the payload, the same request would come back as an unfiltered
+    search: a billed call returning the wrong companies entirely."""
+    mock_post.return_value = _mock_response({"organizations": []})
+    apollo_client.search_companies({"organization_ids": ["o1", "o2", "o3"]},
+                                   _FAKE_API_KEY, per_page=100)
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["organization_ids"] == ["o1", "o2", "o3"]
+    assert sent["per_page"] == 100
+    # No name/domain relevance input alongside it: those are fuzzy, and mixing
+    # one in would let Apollo return something other than the ids asked for.
+    assert "q_organization_name" not in sent
+    assert "q_organization_domains_list" not in sent
+
+
+@patch("tracker.apollo_client.requests.post")
 def test_search_companies_normalizes_accounts_bucket_id(mock_post):
     """mixed_companies/search splits results into "organizations" (id IS the org
     id) and "accounts" (id is an ACCOUNT id; the real org id is a separate

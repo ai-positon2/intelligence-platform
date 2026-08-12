@@ -211,8 +211,10 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     label_ids (list, Apollo list/label IDs -- ids not names),
     total_funding_min/max, latest_funding_min/max, funded_after/funded_before
     (ISO dates, most recent round), exclude_keywords (client-side post-filter --
-    Apollo has no native text-exclusion param), max_companies (caps the returned
-    list length).
+    Apollo has no native text-exclusion param), organization_ids (list, Apollo
+    org IDs -- the same namespace search_people takes, so a single call can
+    describe every distinct employer on a page of people), max_companies (caps
+    the returned list length).
 
     The remaining filter keys are shared with search_people and documented on
     _apply_org_filters / _ORG_LIST_FILTERS / _ORG_RANGE_FILTERS: industries
@@ -233,6 +235,12 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         payload["q_organization_name"] = filters["name"]
     if filters.get("domains"):
         payload["q_organization_domains_list"] = list(filters["domains"])
+    if filters.get("organization_ids"):
+        # Same param and same id namespace search_people uses. Looking companies
+        # up by id is what makes one paid call able to describe a whole page of
+        # them at once: this endpoint charges per CALL, not per company, so N ids
+        # in one request cost the same single credit as one id would.
+        payload["organization_ids"] = list(filters["organization_ids"])
     if filters.get("locations"):
         payload["organization_locations"] = list(filters["locations"])
     if filters.get("exclude_locations"):

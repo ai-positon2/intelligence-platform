@@ -7427,11 +7427,19 @@ def cpi_search():
             filters["organization_ids"] = list(dict.fromkeys(
                 list(filters.get("organization_ids") or []) + [org_id]))
             resolved_names = [org_name]
+    firmo = None
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
             results = _search_people(filters, api_key, page=page,
                                      per_page=per_page, meta=meta)
+            # The free people endpoint says almost nothing about where these
+            # people work, so the employers get described once for the whole page
+            # (see _cpi_attach_employer_facts for the cost and the caching) and
+            # each person's seniority and function get read off their own title.
+            firmo = _cpi_attach_employer_facts(results, api_key, spend)
+            for r in results:
+                r.update(_cpi_derive_role(r.get("title")))
         else:
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
@@ -7448,6 +7456,11 @@ def cpi_search():
     out = {"results": results, "has_more": bool(has_more), "total": total, "page": page}
     if resolved_names:
         out["resolved_company"] = resolved_names
+    # Says how the company detail on these rows was obtained, so a page that cost
+    # a credit and a page served entirely from cache are told apart on screen
+    # instead of both silently claiming to be free.
+    if firmo and firmo.get("orgs"):
+        out["companies_described"] = firmo
     # A title search scoped to exactly one company that came back empty gets a
     # real explanation instead of a bare "no matches" -- see the function for
     # why, and why it is gated this narrowly (a plain, unscoped browse coming
@@ -7492,7 +7505,294 @@ def _cpi_company_row(o: dict) -> dict:
         "technologies": [t for t in (o.get("technology_names") or []) if t][:12],
         "keywords": [k for k in (o.get("keywords") or []) if k][:10],
         "city": o.get("city"), "state": o.get("state"), "country": o.get("country"),
+        # Depth Apollo returns on the same paid record and the grid was throwing
+        # away: a company card that shows headcount and nothing else reads as a
+        # thin imitation of Apollo's own, when the payload it was built from
+        # already held the phone number, the address and the growth trend.
+        "revenue_printed": o.get("organization_revenue_printed"),
+        "phone": _cpi_org_phone(o),
+        "raw_address": o.get("raw_address"),
+        "industries": _pe_names(o.get("industries"), 4),
+        "growth6": o.get("organization_headcount_six_month_growth"),
+        "growth12": o.get("organization_headcount_twelve_month_growth"),
+        "twitter_url": o.get("twitter_url"),
+        "facebook_url": o.get("facebook_url"),
     }
+
+
+def _cpi_org_phone(o: dict) -> str:
+    """A company's phone number, from whichever of Apollo's three shapes it used."""
+    o = o or {}
+    return (o.get("phone") or ((o.get("primary_phone") or {}) or {}).get("number")
+            or o.get("sanitized_phone") or "") or ""
+
+
+# ── Employer firmographics for a page of people ───────────────────────────────
+# Apollo's free people search returns seven fields per person and nothing about
+# the employer past id/name/domain -- verified live against this account, one row
+# is id / first_name / last_name / title / linkedin_url / last_refreshed_at /
+# organization{id,name,domain}. Nearly everything Apollo's own web UI shows
+# alongside a person (industry, headcount, HQ, revenue, funding, tech stack) is
+# COMPANY data, and every API that hands company data over is paid. So a grid
+# built on the free endpoint alone cannot look like Apollo's no matter how it is
+# styled: the facts genuinely are not in the response.
+#
+# What makes closing that gap affordable is that mixed_companies/search charges
+# per CALL, not per company. One call filtered to a page's distinct
+# organization_ids describes all of them for a single credit, so a 24-row page of
+# people at 24 different employers costs exactly what a 24-row page at one
+# employer costs. Results are then cached by org id for 30 days, because
+# headcount and industry do not change between two searches in the same
+# afternoon -- which is why, in steady use, most pages spend nothing at all.
+_CPI_FIRMO_CACHE: dict = {}
+_CPI_FIRMO_TTL_S = 30 * 24 * 3600
+# One page of results is 24 rows, so this only ever bites on a page whose people
+# work at more employers than that -- impossible today, but a cap keeps a future
+# larger page size from silently sending an unbounded id list to Apollo.
+_CPI_FIRMO_MAX_ORGS = 50
+_CPI_FIRMO_TABLE_READY = False
+
+
+def _ensure_cpi_firmo_table(conn) -> None:
+    global _CPI_FIRMO_TABLE_READY
+    if _CPI_FIRMO_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_org_firmo (
+                org_id TEXT PRIMARY KEY,
+                payload JSONB,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+    conn.commit()
+    _CPI_FIRMO_TABLE_READY = True
+
+
+def _cpi_firmo_db_read(org_ids: list) -> dict:
+    """{org_id: facts} for whichever ids are cached and still fresh.
+
+    One query for the whole page rather than one per id: a 24-employer page would
+    otherwise open 24 connections to save 1 credit.
+    """
+    if not org_ids:
+        return {}
+    conn = _pg_conn()
+    if not conn:
+        return {}
+    try:
+        _ensure_cpi_firmo_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT org_id, payload, updated_at FROM cpi_org_firmo "
+                        "WHERE org_id = ANY(%s)", (list(org_ids),))
+            rows = cur.fetchall()
+        out = {}
+        now = datetime.now(timezone.utc)
+        for org_id, payload, updated_at in rows:
+            if not payload:
+                continue
+            if updated_at and (now - updated_at).total_seconds() >= _CPI_FIRMO_TTL_S:
+                continue
+            out[org_id] = payload
+        return out
+    except Exception as e:
+        log.warning("cpi firmo cache read failed: %s", e)
+        return {}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_firmo_db_write(facts: dict) -> None:
+    """Persist what this page paid for. Positive results only -- an id Apollo had
+    nothing for is never written, so a gap that was really a bad request or an
+    unreachable Apollo cannot harden into a cached 'this company has no data'."""
+    if not facts:
+        return
+    conn = _pg_conn()
+    if not conn:
+        return
+    try:
+        from psycopg2.extras import Json
+        _ensure_cpi_firmo_table(conn)
+        with conn.cursor() as cur:
+            for org_id, payload in facts.items():
+                cur.execute(
+                    "INSERT INTO cpi_org_firmo (org_id, payload, updated_at) "
+                    "VALUES (%s, %s, now()) ON CONFLICT (org_id) DO UPDATE SET "
+                    "payload = EXCLUDED.payload, updated_at = now()",
+                    (org_id, Json(payload)))
+        conn.commit()
+    except Exception as e:
+        log.warning("cpi firmo cache write failed: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_employer_facts(o: dict) -> dict:
+    """One Apollo org -> the organization_* fields a person row carries.
+
+    Deliberately the same key names the person normalizer already uses, so a row
+    that came back with firmographics attached and a row that had them merged in
+    afterwards are indistinguishable to the grid and to the export.
+    """
+    o = o or {}
+    return {
+        # website_url last, because some records carry only that: a full URL where
+        # a bare domain belongs still beats an employer row with no link at all.
+        "organization_domain": (o.get("primary_domain") or o.get("domain")
+                                or o.get("website_url")),
+        "organization_logo": o.get("logo_url"),
+        "organization_industry": o.get("industry"),
+        "organization_industries": _pe_names(o.get("industries"), 4),
+        "organization_employees": o.get("estimated_num_employees"),
+        "organization_founded": o.get("founded_year"),
+        "organization_revenue": o.get("annual_revenue"),
+        "organization_revenue_printed": o.get("organization_revenue_printed"),
+        "organization_funding": o.get("total_funding"),
+        "organization_funding_date": o.get("latest_funding_round_date"),
+        "organization_ticker": o.get("publicly_traded_symbol"),
+        "organization_website": o.get("website_url"),
+        "organization_linkedin": o.get("linkedin_url"),
+        "organization_twitter": o.get("twitter_url"),
+        "organization_phone": _cpi_org_phone(o),
+        "organization_city": o.get("city"),
+        "organization_state": o.get("state"),
+        "organization_country": o.get("country"),
+        "organization_address": o.get("raw_address"),
+        "organization_description": (o.get("short_description") or "")[:420] or None,
+        "organization_keywords": _pe_names(o.get("keywords"), 12),
+        "organization_technologies": _pe_names(
+            o.get("technology_names") or o.get("current_technologies"), 12),
+        "organization_growth6": o.get("organization_headcount_six_month_growth"),
+        "organization_growth12": o.get("organization_headcount_twelve_month_growth"),
+    }
+
+
+def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
+    """Fill in every person row's employer firmographics, in place.
+
+    Returns {"orgs": n, "cached": n, "fetched": n} for the caller to report.
+
+    Never raises and never blanks anything: a row keeps whatever it already had,
+    so a page still renders exactly as before if Apollo is unreachable or the
+    company lookup comes back empty. Merging only into empty keys also means a
+    field the person's own record carried always wins over the employer's copy.
+    """
+    stats = {"orgs": 0, "cached": 0, "fetched": 0}
+    if not rows or not api_key:
+        return stats
+    ids = list(dict.fromkeys(
+        [str(r.get("organization_id")) for r in rows if r.get("organization_id")]
+    ))[:_CPI_FIRMO_MAX_ORGS]
+    if not ids:
+        return stats
+    stats["orgs"] = len(ids)
+
+    now = time.time()
+    facts: dict = {}
+    for org_id in ids:
+        hit = _CPI_FIRMO_CACHE.get(org_id)
+        if hit and now - hit["ts"] < _CPI_FIRMO_TTL_S:
+            facts[org_id] = hit["facts"]
+    missing = [i for i in ids if i not in facts]
+    if missing:
+        from_db = _cpi_firmo_db_read(missing)
+        for org_id, payload in from_db.items():
+            facts[org_id] = payload
+            _CPI_FIRMO_CACHE[org_id] = {"facts": payload, "ts": now}
+        missing = [i for i in ids if i not in facts]
+    stats["cached"] = len(facts)
+
+    if missing:
+        fresh: dict = {}
+        try:
+            from tracker.apollo_client import search_companies as _search_companies
+            orgs = _search_companies({"organization_ids": missing,
+                                      "max_companies": len(missing)},
+                                     api_key, per_page=min(len(missing), 100)) or []
+            for o in orgs:
+                org_id = str(o.get("id") or "")
+                if org_id in missing:
+                    fresh[org_id] = _cpi_employer_facts(o)
+            if orgs:
+                spend["credits"] = spend.get("credits", 0) + 1
+        except Exception as e:
+            log.warning("cpi employer firmographics lookup failed: %s", e)
+        if fresh:
+            for org_id, payload in fresh.items():
+                facts[org_id] = payload
+                _CPI_FIRMO_CACHE[org_id] = {"facts": payload, "ts": now}
+            _cpi_firmo_db_write(fresh)
+        stats["fetched"] = len(fresh)
+
+    for r in rows:
+        payload = facts.get(str(r.get("organization_id") or ""))
+        if not payload:
+            continue
+        for key, val in payload.items():
+            if val in (None, "", [], 0):
+                continue
+            if r.get(key) in (None, "", [], 0):
+                r[key] = val
+    log.info("cpi employer firmographics: %d orgs, %d cached, %d fetched",
+             stats["orgs"], stats["cached"], stats["fetched"])
+    return stats
+
+
+# Apollo's own seniority/department fields come only from paid enrichment, and its
+# free search returns neither -- but it does return the job title, which already
+# carries both answers. Reading them off the title is free, deterministic and uses
+# the exact taxonomy the chat already answers questions with, so the grid and the
+# chat cannot disagree about whether a Chief Revenue Officer counts as marketing.
+#
+# Kept under distinct *_from_title keys, never written into Apollo's own
+# `seniority`/`departments` fields, so nothing derived here is ever displayed or
+# exported as something Apollo asserted.
+_CPI_SENIORITY_LABELS = {
+    "owner": "Owner", "founder": "Founder", "c_suite": "C-suite",
+    "partner": "Partner", "vp": "VP", "head": "Head of function",
+    "director": "Director", "manager": "Manager", "senior": "Senior",
+    "entry": "Entry level", "intern": "Intern",
+}
+
+
+def _cpi_derive_role(title: str) -> dict:
+    """{"seniority_from_title": "VP", "functions_from_title": ["marketing"]}.
+
+    Either key is omitted when the title does not place the person, because a
+    guess is worth less here than an honest blank: the whole point of the pair is
+    that a reader can trust them.
+    """
+    out: dict = {}
+    title = str(title or "").strip()
+    if not title:
+        return out
+    rank = _cpi_seniority_rank({"title": title})
+    if rank < len(_CPI_SENIORITY_ORDER):
+        label = _CPI_SENIORITY_LABELS.get(_CPI_SENIORITY_ORDER[rank])
+        if label:
+            out["seniority_from_title"] = label
+    # "executive" is dropped here alone. It exists in the taxonomy as a seniority
+    # band worded for chat prose ("the most senior people we hold"), and printed
+    # as a function chip it would both duplicate the seniority beside it and read
+    # as a department nobody works in.
+    funcs = _cpi_title_functions(title) - {"executive"}
+    if funcs:
+        # Ordered by _CPI_FUNCTIONS rather than by set iteration, so the same
+        # title always renders its functions in the same order.
+        out["functions_from_title"] = [label for key, label, _t, _c in _CPI_FUNCTIONS
+                                       if key in funcs]
+    return out
 
 
 # ── Id-keyed name reveal cache ────────────────────────────────────────────────
@@ -7909,10 +8209,13 @@ def _cpi_person_row(p: dict) -> dict:
         "past_companies": [h.get("organization_name") for h in past[:3]],
         "organization_id": org.get("id") or p.get("organization_id"),
         "organization_name": org.get("name"),
-        "organization_domain": org.get("primary_domain") or org.get("website_url"),
-        "organization_logo": org.get("logo_url"),
-        "organization_industry": org.get("industry"),
-        "organization_employees": org.get("estimated_num_employees"),
+        # people/bulk_match returns the employer as a full organization record, so
+        # the same firmographics the free path has to buy separately are already
+        # sitting in this response. Reading them through the shared mapper means an
+        # enriched row and a searched row carry identical company fields, and this
+        # one is free: the credit was spent on the person.
+        **{k: v for k, v in _cpi_employer_facts(org).items() if v not in (None, "", [])},
+        **_cpi_derive_role(p.get("title")),
         "enriched": True,
     }
 
@@ -8181,22 +8484,48 @@ def cpi_history_entry(entry_id: int):
 # ── Export ────────────────────────────────────────────────────────────────────
 _CPI_PERSON_COLS = [
     ("full_name", "Name"), ("title", "Title"), ("seniority", "Seniority"),
+    # Both derived from the title rather than returned by Apollo, and labelled as
+    # such in the header: a column called "Seniority" holding a value Apollo never
+    # asserted is exactly the kind of quiet fiction a spreadsheet carries forever.
+    ("seniority_from_title", "Seniority (from title)"),
+    ("functions_from_title", "Function (from title)"),
     ("email", "Email"), ("email_status", "Email status"), ("phones", "Phone"),
-    ("organization_name", "Company"), ("organization_domain", "Domain"),
-    ("organization_industry", "Industry"), ("organization_employees", "Employees"),
     ("city", "City"), ("state", "State"), ("country", "Country"),
     ("departments", "Departments"), ("past_companies", "Previous companies"),
-    ("linkedin_url", "LinkedIn"), ("id", "Apollo ID"),
+    ("linkedin_url", "LinkedIn"),
+    ("organization_name", "Company"), ("organization_domain", "Domain"),
+    ("organization_industry", "Industry"),
+    ("organization_employees", "Company employees"),
+    ("organization_revenue", "Company revenue"),
+    ("organization_funding", "Company total funding"),
+    ("organization_founded", "Company founded"),
+    ("organization_ticker", "Company ticker"),
+    ("organization_city", "Company city"),
+    ("organization_state", "Company state"),
+    ("organization_country", "Company country"),
+    ("organization_phone", "Company phone"),
+    ("organization_technologies", "Company technologies"),
+    ("organization_keywords", "Company keywords"),
+    ("organization_description", "Company description"),
+    ("organization_website", "Company website"),
+    ("organization_linkedin", "Company LinkedIn"),
+    ("id", "Apollo ID"),
 ]
 _CPI_COMPANY_COLS = [
     ("name", "Company"), ("primary_domain", "Domain"), ("industry", "Industry"),
+    ("industries", "Other industries"),
     ("estimated_num_employees", "Employees"), ("annual_revenue", "Annual revenue"),
-    ("total_funding", "Total funding"), ("founded_year", "Founded"),
-    ("publicly_traded_symbol", "Ticker"),
+    ("revenue_printed", "Revenue (as Apollo prints it)"),
+    ("growth6", "Headcount growth 6mo"), ("growth12", "Headcount growth 12mo"),
+    ("total_funding", "Total funding"),
+    ("latest_funding_round_date", "Latest round"), ("founded_year", "Founded"),
+    ("publicly_traded_symbol", "Ticker"), ("phone", "Phone"),
     ("city", "City"), ("state", "State"), ("country", "Country"),
+    ("raw_address", "Address"),
     ("technologies", "Technologies"), ("keywords", "Keywords"),
     ("short_description", "Description"),
-    ("website_url", "Website"), ("linkedin_url", "LinkedIn"), ("id", "Apollo ID"),
+    ("website_url", "Website"), ("linkedin_url", "LinkedIn"),
+    ("twitter_url", "X / Twitter"), ("id", "Apollo ID"),
 ]
 
 
@@ -9548,15 +9877,21 @@ def _cpi_function_search_titles(keys, cap: int = 24) -> list:
 # an unranked list buries the person most likely to be worth contacting.
 _CPI_SENIORITY_ORDER = ("owner", "founder", "c_suite", "partner", "vp", "head",
                         "director", "manager", "senior", "entry", "intern")
+# Third element: tokens that DISQUALIFY the row even when its own tokens matched.
+# Needed because _cpi_title_tokens expands "vp" into "vice president", so every
+# VP carried the c_suite token "president" and, c_suite being checked first,
+# every VP ranked as C-suite. That put a VP of Sales level with the CEO in the
+# chat's own ordering of who to contact, and would have printed "C-suite" under
+# their name in the grid.
 _CPI_TITLE_SENIORITY = (
-    ("owner", ("owner", "proprietor")),
-    ("founder", ("founder", "cofounder")),
-    ("c_suite", ("chief", "chairman", "chairperson", "president")),
-    ("partner", ("partner",)),
-    ("vp", ("vice",)),
-    ("head", ("head",)),
-    ("director", ("director",)),
-    ("manager", ("manager", "lead", "supervisor")),
+    ("owner", ("owner", "proprietor"), ()),
+    ("founder", ("founder", "cofounder"), ()),
+    ("c_suite", ("chief", "chairman", "chairperson", "president"), ("vice",)),
+    ("partner", ("partner",), ()),
+    ("vp", ("vice",), ()),
+    ("head", ("head",), ()),
+    ("director", ("director",), ()),
+    ("manager", ("manager", "lead", "supervisor"), ()),
 )
 
 
@@ -9568,8 +9903,8 @@ def _cpi_seniority_rank(p: dict) -> int:
     have = _cpi_title_tokens((p or {}).get("title") or "")
     # "Vice President" beats "Director" beats "Manager": first match in the table
     # wins, and the table is ordered by seniority.
-    for level, tokens in _CPI_TITLE_SENIORITY:
-        if have & set(tokens):
+    for level, tokens, blockers in _CPI_TITLE_SENIORITY:
+        if have & set(tokens) and not (have & set(blockers)):
             return _CPI_SENIORITY_ORDER.index(level)
     return len(_CPI_SENIORITY_ORDER)
 

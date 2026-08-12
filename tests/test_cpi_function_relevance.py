@@ -162,11 +162,24 @@ def test_the_js_still_neutralises_asterisk_runs():
     assert "e.label||e.name" in src, "the button must prefer the printable label"
 
 
-def test_the_js_bundle_is_cache_busted():
-    """A renderer fix nobody's browser downloads is not a fix."""
+def test_the_js_and_css_bundles_are_cache_busted_together():
+    """A renderer fix nobody's browser downloads is not a fix.
+
+    Pinned to the relationship rather than to a number: asserting "?v=10" made
+    this fail on every legitimate bump while catching nothing real. The failure
+    actually worth catching is a JS bump that forgets the stylesheet, which ships
+    new markup to a browser still holding the old CSS.
+    """
+    import re as _re
     html = open(os.path.join(_ROOT, "templates",
                              "company_people_intelligence.html")).read()
-    assert "company_people_intelligence.js?v=10" in html
+    js = _re.search(r"company_people_intelligence\.js\?v=(\d+)", html)
+    css = _re.search(r"company_people_intelligence\.css'\) \}\}\?v=(\d+)", html)
+    assert js, "the JS bundle must carry a ?v= cache buster"
+    assert css, "the stylesheet must carry a ?v= cache buster"
+    assert js.group(1) == css.group(1), (
+        "JS is at v=%s but CSS is at v=%s: bump both together"
+        % (js.group(1), css.group(1)))
 
 
 # ══ Part two: relevance ═════════════════════════════════════════════════════
