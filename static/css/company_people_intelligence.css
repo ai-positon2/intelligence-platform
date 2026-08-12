@@ -162,9 +162,23 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   font-size:11px;line-height:1;cursor:pointer;padding:0}
 .cpi-chip-sel button:hover{background:rgba(248,113,113,.55)}
 .cpi-combo-list{display:none;position:absolute;z-index:40;left:0;right:0;top:calc(100% + 5px);
-  max-height:290px;overflow-y:auto;background:#0d1220;border:1px solid rgba(255,255,255,.14);
+  max-height:290px;overflow-y:auto;overscroll-behavior:contain;
+  background:#0d1220;border:1px solid rgba(255,255,255,.14);
   border-radius:var(--radius-md);box-shadow:0 22px 48px -18px rgba(0,0,0,.85);padding:5px}
 .cpi-combo-list.on{display:block}
+/* Flipped above the field when there is more room up there than down. */
+.cpi-combo-list.up{top:auto;bottom:calc(100% + 5px)}
+/* This page hides the window scrollbars, so the list has to show its own or a
+   long taxonomy reads as a list that just stops. Same 4px thumb the other
+   scrollable panels in the app use. */
+.cpi-combo-list{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+.cpi-combo-list::-webkit-scrollbar{width:4px}
+.cpi-combo-list::-webkit-scrollbar-track{background:transparent}
+.cpi-combo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:var(--radius-pill)}
+/* Each labelled group is its own stacking context (z-index below), so an open
+   list would otherwise be painted under the groups that follow it. Lifting the
+   group that owns the open list keeps it above its neighbours. */
+.cpi-fset.cpi-fset-lift{z-index:50}
 .cpi-opt{display:block;width:100%;text-align:left;background:transparent;border:0;cursor:pointer;
   padding:7px 10px;border-radius:8px;color:var(--tx);font-size:12.5px;line-height:1.35}
 .cpi-opt:hover,.cpi-opt.cur{background:rgba(124,131,245,.16)}
@@ -684,15 +698,21 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
    pass above: overrides stay isolated and easy to find.
    ══════════════════════════════════════════════════════════════════════════ */
 
-.cpi-filters{position:relative;overflow:hidden;
-  background:linear-gradient(165deg,rgba(22,26,48,.62),rgba(9,11,22,.58));
+/* The corner glow used to be an oversized ::after that spilled past the panel,
+   which forced overflow:hidden here to clip it. That clip also cut off the
+   industry dropdown at the panel's bottom edge, scrollbar and all, so the list
+   looked both truncated and unscrollable. Painting the glow as a background
+   layer instead gets the same look for free: border-radius clips backgrounds
+   on its own, so nothing needs to be hidden and popovers can leave the panel. */
+.cpi-filters{position:relative;
+  background:
+    radial-gradient(circle 120px at calc(100% - 50px) 50px,rgba(124,131,245,.15),transparent 70%),
+    linear-gradient(165deg,rgba(22,26,48,.62),rgba(9,11,22,.58));
   border-color:rgba(255,255,255,.09);border-radius:calc(var(--radius-lg) + 3px);
   padding:22px 24px 20px;
   box-shadow:0 34px 74px -42px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.02) inset}
 .cpi-filters::before{content:'';position:absolute;left:22px;right:22px;top:0;height:1px;pointer-events:none;
   background:linear-gradient(90deg,transparent,rgba(124,131,245,.7),rgba(34,211,238,.55),transparent)}
-.cpi-filters::after{content:'';position:absolute;top:-70px;right:-70px;width:240px;height:240px;pointer-events:none;
-  background:radial-gradient(circle,rgba(124,131,245,.15),transparent 70%);filter:blur(4px)}
 
 /* Labelled groups: the same monospace-tag language as the advanced sections,
    applied to the always-visible rows too, so the whole panel reads as
