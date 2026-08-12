@@ -7402,6 +7402,7 @@ def cpi_search():
     # AND no company detail is a contradiction, so the filter that was typed wins,
     # the lookup runs, and the response says it was turned back on.
     needs_employer = [k for k in ("industries", "employee_min", "employee_max",
+                                  "revenue_min", "revenue_max",
                                   "company_locations", "technologies")
                       if filters.get(k) is not None and filters.get(k) != []]
     industry_forced = bool(entity == "people" and needs_employer and not company_detail)
@@ -7719,6 +7720,7 @@ def cpi_industries():
 _CPI_VERIFY_LABELS = {
     "industry": "outside the industry",
     "employees": "outside the size range",
+    "revenue": "outside the revenue range",
     "hq": "headquartered elsewhere",
     "technology": "not using the technology",
     "title": "the wrong title",
@@ -7737,6 +7739,7 @@ def _cpi_org_view(r: dict, is_people: bool) -> dict:
         return {
             "industry": r.get("industry"), "industries": r.get("industries"),
             "employees": r.get("estimated_num_employees"),
+            "revenue": r.get("annual_revenue"),
             "city": r.get("city"), "state": r.get("state"),
             "country": r.get("country"), "address": r.get("raw_address"),
             "technologies": r.get("technologies"),
@@ -7745,6 +7748,7 @@ def _cpi_org_view(r: dict, is_people: bool) -> dict:
         "industry": r.get("organization_industry"),
         "industries": r.get("organization_industries"),
         "employees": r.get("organization_employees"),
+        "revenue": r.get("organization_revenue"),
         "city": r.get("organization_city"), "state": r.get("organization_state"),
         "country": r.get("organization_country"),
         "address": r.get("organization_address"),
@@ -7809,6 +7813,7 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
 
     wanted_industry = _industry_expand(filters.get("industries"))
     emp_min, emp_max = filters.get("employee_min"), filters.get("employee_max")
+    rev_min, rev_max = filters.get("revenue_min"), filters.get("revenue_max")
     places = filters.get("company_locations") if is_people else filters.get("locations")
     techs = filters.get("technologies")
     # Only when the user has explicitly asked NOT to include similar titles.
@@ -7827,6 +7832,9 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
         elif (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
                 org.get("employees"), emp_min, emp_max):
             reason = "employees"
+        elif (rev_min is not None or rev_max is not None) and not _cpi_num_in_range(
+                org.get("revenue"), rev_min, rev_max):
+            reason = "revenue"
         elif places and not _cpi_place_matches(org, places):
             reason = "hq"
         elif techs and not _cpi_tech_matches(org, techs):
@@ -7851,13 +7859,24 @@ def _cpi_size_ok(employees, emp_min, emp_max) -> bool:
     employees come back for a search whose floor was 100. The number Apollo
     returns is the one that settles it.
     """
+    return _cpi_num_in_range(employees, emp_min, emp_max)
+
+
+def _cpi_num_in_range(value, lo, hi) -> bool:
+    """Whether a figure Apollo returned really is inside the requested bounds.
+
+    Shared by the headcount and revenue checks because the reasoning is the same
+    for both: the request is a hint to Apollo and the returned number is what
+    settles it. A record with no figure at all is NOT inside a range that was
+    asked for, so it fails here rather than being waved through.
+    """
     try:
-        n = int(employees)
+        n = int(value)
     except (TypeError, ValueError):
         return False
-    if emp_min is not None and n < emp_min:
+    if lo is not None and n < lo:
         return False
-    if emp_max is not None and n > emp_max:
+    if hi is not None and n > hi:
         return False
     return True
 
@@ -9024,6 +9043,11 @@ _CPI_INTENT_SYSTEM = (
     ' "person_locations": ["..."],\n'
     ' "company_locations": ["..."],\n'
     ' "industries": ["..."],\n'
+    ' "technologies": ["..."],\n'
+    ' "employee_min": null,\n'
+    ' "employee_max": null,\n'
+    ' "revenue_min": null,\n'
+    ' "revenue_max": null,\n'
     ' "keywords": "...",\n'
     ' "wants_contact_info": false,\n'
     ' "wants_count": false,\n'
@@ -9046,11 +9070,26 @@ _CPI_INTENT_SYSTEM = (
     "when the question is asking how many people match (\"how many VPs of sales does Acme "
     "have\", \"does Acme have a CFO\"), even if they also want the list.\n\n"
     "Interpret loosely worded asks rather than giving up: \"who runs marketing at Acme\" means "
-    "titles like [\"CMO\",\"VP of Marketing\",\"Head of Marketing\"], \"who's in charge of sales\" "
-    "means seniorities [\"c_suite\",\"vp\",\"director\"] with titles/keywords about sales, and an "
-    "industry mentioned colloquially (\"healthtech companies\", \"fintech startups\") goes in "
-    "industries as Apollo-style keyword tags (e.g. \"Healthcare\", \"Financial Services\"). Only "
-    "use \"unclear\" when there truly is not enough here to run any search at all.\n\n"
+    "titles like [\"CMO\",\"VP of Marketing\",\"Head of Marketing\"], and \"who's in charge of "
+    "sales\" means seniorities [\"c_suite\",\"vp\",\"director\"] with titles/keywords about "
+    "sales. Only use \"unclear\" when there truly is not enough here to run any search at "
+    "all.\n\n"
+    "industries: the industry as the user said it, in plain words, one entry per industry "
+    "(\"healthcare\", \"fintech\", \"pharma\", \"commercial real estate\"). Do NOT try to spell "
+    "it the way the data vendor does and do not expand it into a list of related industries: "
+    "a later step maps the plain word onto that vendor's own industry names, and a guessed "
+    "spelling defeats it. Only fill this in when the question is about companies in an "
+    "industry, never for a question about one named company.\n\n"
+    "technologies: named software the companies should be using (\"Salesforce\", "
+    "\"HubSpot\", \"Shopify\"), only when the question actually asks for it.\n"
+    "employee_min / employee_max: company headcount bounds, as integers, ONLY when the "
+    "question states them (\"200 to 500 employees\" -> 200 and 500; \"under 50 people\" -> "
+    "null and 50; \"1000+ employees\" -> 1000 and null). Vague words like \"startups\", "
+    "\"SMBs\" or \"enterprises\" state no number, so leave both null rather than inventing a "
+    "range the user did not ask for.\n"
+    "revenue_min / revenue_max: annual revenue bounds in whole dollars, same rule, with "
+    "the units expanded (\"over $10M\" -> 10000000 and null; \"$1M to $5M\" -> 1000000 and "
+    "5000000). No currency symbols, commas or decimals.\n\n"
     "If the latest message is picking one company from a list offered earlier in the "
     "conversation (e.g. \"the second one\", \"I mean Acme Inc\", \"the one in Texas\"), use "
     "the conversation history to resolve company_name to that specific company's name, and "
@@ -9473,6 +9512,36 @@ _CPI_ANSWER_SYSTEM = (
     "few of them as examples but phrase the list as \"including\" or \"such as\", never as if "
     "it were everyone. If \"total_matching_count\" equals \"returned_count\" (or there is no "
     "\"total_matching_count\" at all), the list you were given IS the complete answer.\n\n"
+    "Some questions constrain the EMPLOYER (an industry, a headcount or revenue band, an "
+    "HQ location, a technology). Those constraints are checked in code against each "
+    "company's own record before any person is listed, and the facts say what happened:\n"
+    "- \"people_were_searched_only_inside_these_companies\" means the people listed come "
+    "from that specific set of verified companies and nowhere else. Say the list is drawn "
+    "from the companies we could confirm match, give the number, and never imply it covers "
+    "everyone in that industry or size band.\n"
+    "- \"no_companies_on_file_match_these_constraints\" means no company passed those "
+    "checks, so there is no people list to give. Say that plainly, naming the constraints, "
+    "and do not offer people from companies that failed them.\n"
+    "- \"companies_offered_by_the_search_but_rejected_on_checking\" and "
+    "\"people_offered_but_rejected_on_checking_their_titles\" are counts of rows the "
+    "vendor's own search returned that our checks then rejected, by reason. Mention them "
+    "in one short clause at most: they explain why a list is shorter than expected, they "
+    "are not the answer.\n"
+    "- \"employer_constraints_could_not_be_applied\" means the company lookup failed, so "
+    "those constraints were NOT applied to this list. Say so before the list, in the "
+    "opening sentence.\n"
+    "- \"apollo_loose_match_total_is_only_an_upper_bound\" is a count from a deliberately "
+    "loose search (similar titles, an industry matched as a keyword) that was then narrowed "
+    "in code. It is an upper bound and nothing else: never state it as the number of people "
+    "who match. For a how-many question, lead with how many we actually verified and call "
+    "the loose figure at most \"no more than\".\n"
+    "- \"person_location_asked_for_but_not_independently_verified\" means the where-do-they-"
+    "live filter was applied by the vendor but could not be re-checked on our side. Note it "
+    "in one short clause so the reader knows which part of the answer is less certain.\n"
+    "- \"contact_details_are_not_included_and_need_enriching\": true means emails and phone "
+    "numbers were asked for but not fetched for a list. Say in one sentence that each "
+    "person's details can be pulled individually with the buttons below the answer. Never "
+    "imply any contact detail is already in hand.\n\n"
     "If the facts contain \"full_apollo_profile_follows\": true, keep your own part to "
     "ONE short lead sentence naming the person and their title, nothing else: a complete, "
     "field-by-field record of everything Apollo returned (contact details, company "
@@ -10506,6 +10575,195 @@ def _cpi_trim_facts(facts):
     return out
 
 
+# ── The employer half of a chat question ─────────────────────────────────────
+# Audited the same way the search filters were, and the answer came out in three
+# groups rather than "verify everything":
+#
+#   * Industry is not filtered by Apollo AT ALL. `industries` maps onto a free
+#     text relevance match over a company's NAME and keyword tags (see the long
+#     note in apollo_client). Verified live on this account: asking the people
+#     search for CMOs with the keyword "Healthcare" returned ten people whose
+#     employers were HealthCare Global, CU Healthcare PayCard, Serenity
+#     Healthcare, Simplify Healthcare, Invo Healthcare, Naru Healthcare and so
+#     on, every one of them selected for having the word in its name, one a
+#     payment card vendor, and not a single hospital, insurer, pharma or biotech
+#     company among them. The chat sent an industry as q_keywords, which is
+#     looser still, and then reported Apollo's own count of that search (295) as
+#     the number of healthcare CMOs.
+#   * Headcount, revenue, HQ and technology ARE filtered by Apollo, but loosely:
+#     headcount by overlapping buckets, HQ by fuzzy text. The figure on the
+#     record is what settles it, so these are re-checked in code.
+#   * Seniority, person location and email status are filtered by Apollo against
+#     data this plan never returns to us: a free people row carries no seniority,
+#     no city and no country. Re-checking those in code would mean overruling a
+#     real filter with less information than it had, so they are deliberately
+#     left alone, and the answer is told not to claim they were verified.
+#
+# Since a free people row carries no employer facts at all, the first two groups
+# are enforced by asking about COMPANIES first: one paid company search (1 credit
+# per call, whatever the number of companies it describes), verified with the same
+# _cpi_verify_rows the results grid uses, and then the free people search is
+# scoped to the organization ids that survived. Searching people first and paying
+# to describe their employers afterwards costs the same credit and answers a worse
+# question, because it can only filter the employers Apollo happened to return.
+_CPI_CHAT_SCOPE_MAX = 25
+
+
+def _cpi_int_or_none(v):
+    """An integer bound from the intent parser, or None. A model can return "200",
+    200.0, "1,000" or nonsense for the same question, and only a real number may
+    become a constraint the answer then claims to have applied. Parsed through the
+    string form, which is also what rejects a JSON true as a headcount."""
+    if v is None:
+        return None
+    try:
+        return int(float(str(v).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def _cpi_chat_employer_filters(intent: dict) -> dict:
+    """The employer constraints in a parsed question, as company search filters.
+
+    Empty for a question that constrains nothing about the employer, which is the
+    common case and has to stay free: no employer constraint, no paid call.
+    """
+    intent = intent or {}
+    out: dict = {}
+
+    def _strs(key, cap):
+        return [str(x).strip() for x in (intent.get(key) or [])
+                if isinstance(x, (str, int, float)) and str(x).strip()][:cap]
+
+    inds = _strs("industries", 6)
+    if inds:
+        out["industries"] = inds
+    techs = _strs("technologies", 6)
+    if techs:
+        out["technologies"] = techs
+    places = _strs("company_locations", 4)
+    if places:
+        # search_companies calls the HQ filter "locations"; search_people calls the
+        # same thing "company_locations". This dict is for the company call.
+        out["locations"] = places
+    for key in ("employee_min", "employee_max", "revenue_min", "revenue_max"):
+        n = _cpi_int_or_none(intent.get(key))
+        if n is not None:
+            out[key] = n
+    return out
+
+
+def _cpi_chat_company_scope(employer: dict, api_key: str, spend: dict) -> tuple:
+    """(orgs, rejected) -- the companies that genuinely match the employer
+    constraints in the question, and why the others did not.
+
+    One paid company search, then the same verification the results grid runs, so
+    a company matched on its NAME containing the industry word is dropped here
+    instead of being reported as an answer.
+    """
+    from tracker.apollo_client import search_companies as _sc
+    # Two pages' worth asked for, one page's worth kept: the verification below
+    # drops rows, and asking for exactly the cap would leave a short list every
+    # time Apollo's relevance match brought back companies in other industries.
+    orgs = _sc(dict(employer), api_key, per_page=min(_CPI_CHAT_SCOPE_MAX * 2, 100),
+               strict=True) or []
+    if orgs:
+        # Billed per call, not per company, and 0 when nothing came back.
+        spend["credits"] = spend.get("credits", 0) + 1
+        # Every paid record teaches the industry picker one more value Apollo
+        # genuinely uses.
+        _cpi_record_industries(orgs)
+    kept, rejected = _cpi_verify_rows(orgs, employer, False)
+    return kept[:_CPI_CHAT_SCOPE_MAX], rejected
+
+
+def _cpi_range_words(lo, hi) -> str:
+    """"200 to 500", "under 50", "1000 or more", or "" for no bounds at all."""
+    if lo is not None and hi is not None:
+        return "%s to %s" % (lo, hi)
+    if lo is not None:
+        return "%s or more" % lo
+    if hi is not None:
+        return "up to %s" % hi
+    return ""
+
+
+def _cpi_constraint_note(employer: dict) -> dict:
+    """The employer constraints in plain words, so the answer can say which ones
+    it applied instead of leaving the reader to assume all of them were."""
+    employer = employer or {}
+    out: dict = {}
+    for key, label in (("industries", "industry"), ("technologies", "technology"),
+                       ("locations", "headquarters")):
+        if employer.get(key):
+            out[label] = ", ".join(str(x) for x in employer[key])
+    size = _cpi_range_words(employer.get("employee_min"), employer.get("employee_max"))
+    if size:
+        out["employees"] = size
+    rev = _cpi_range_words(employer.get("revenue_min"), employer.get("revenue_max"))
+    if rev:
+        out["annual revenue"] = "$" + rev.replace(" to ", " to $")
+    return out
+
+
+def _cpi_reject_note(rejected: dict) -> dict:
+    """{reason: n} in the words the reader gets, biggest reason first."""
+    labelled = {_CPI_VERIFY_LABELS.get(k, k): v
+                for k, v in (rejected or {}).items() if v}
+    return dict(sorted(labelled.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _cpi_verify_chat_people(rows: list, titles: list) -> tuple:
+    """(kept, dropped) after checking that the people in a list answer really do
+    hold something like the title that was asked for.
+
+    The single-person branch has verified this for a while, because presenting a
+    Marketing Manager as the CMO states something Apollo never said. A LIST was
+    never checked at all, so "list the VPs of sales at Acme" could answer with
+    account executives, which is the same error printed five times.
+
+    Kept a little wider than the single-person check on purpose: a loosely worded
+    ask ("who runs marketing") is expanded by the parser into several candidate
+    titles, and someone whose own title places them in the same FUNCTION at the
+    same level or above is a legitimate answer to it even when no title string
+    matches word for word. Both halves are needed. Function alone is far too wide,
+    because an Account Executive sits in sales exactly as a VP of Sales does, and
+    seniority alone is what made an earlier version of the consolation list offer
+    six senior strangers from unrelated departments.
+
+    The level to clear is the loosest of the titles asked about, and never stricter
+    than director: asking for the VP of Finance is asking about finance leadership,
+    so the finance director belongs in the answer, while the account executive
+    (whose title places them at no level at all) does not. A question that asks for
+    a lower level in so many words ("sales managers") keeps its own looser bar.
+
+    "executive" is dropped from the requested functions, which is enough because
+    an intersection needs both sides: it is a catch-all that the token "president"
+    attaches to every VP title and that _cpi_person_functions attaches to everyone
+    at C-suite level, so leaving it in the request would make any senior title
+    match any other.
+    """
+    if not titles:
+        return list(rows or []), 0
+    want_functions = _cpi_requested_functions(titles) - {"executive"}
+    asked = [r for r in (_cpi_seniority_rank({"title": t}) for t in titles)
+             if r < len(_CPI_SENIORITY_ORDER)]
+    bar = max(asked + [_CPI_SENIORITY_ORDER.index("director")])
+    kept, dropped = [], 0
+    for p in (rows or []):
+        same_function = bool(want_functions
+                             and (_cpi_person_functions(p) & want_functions)
+                             and _cpi_seniority_rank(p) <= bar)
+        if _cpi_title_matches(p.get("title"), titles) or same_function:
+            kept.append(p)
+        else:
+            dropped += 1
+    if dropped:
+        log.info("cpi chat: dropped %d/%d people whose titles did not match %s",
+                 dropped, len(rows or []), titles)
+    return kept, dropped
+
+
 def _cpi_chat_reply(spend: dict, **fields):
     """One chat reply, carrying what it cost.
 
@@ -10805,10 +11063,64 @@ def cpi_chat():
         people_filters["company_locations"] = intent["company_locations"]
     if intent.get("person_locations"):
         people_filters["person_locations"] = intent["person_locations"]
-    if intent.get("industries"):
-        people_filters["keywords"] = " ".join(str(x) for x in intent["industries"])[:200]
-    elif intent.get("keywords"):
+    if intent.get("keywords"):
         people_filters["keywords"] = str(intent["keywords"])[:200]
+
+    # An industry, a size, a revenue band, an HQ or a technology constrains the
+    # EMPLOYER, and none of it can be honored against a free people row: that row
+    # carries no industry, no headcount and no HQ. So the companies are
+    # established first, and the people search is scoped to the ones that really
+    # do match. See the note on _CPI_CHAT_SCOPE_MAX for why this direction and not
+    # the other. Skipped when the question is already about one named company:
+    # there the company is not in question, and re-selecting companies would only
+    # be able to contradict the one the user asked about.
+    employer = ({} if (resolved_org and resolved_org.get("id"))
+                else _cpi_chat_employer_filters(intent))
+    scope_facts: dict = {}
+    if employer:
+        try:
+            scope_orgs, scope_rejected = _cpi_chat_company_scope(employer, api_key, spend)
+        except Exception as e:
+            # Apollo was unreachable for the company half. The people search can
+            # still run, but it then answers a LOOSER question than the one asked,
+            # and the answer has to say so rather than presenting whoever comes
+            # back as being in that industry.
+            log.warning("cpi chat company scope failed: %s", e)
+            scope_orgs, scope_rejected = None, {}
+            scope_facts = {"employer_constraints_could_not_be_applied":
+                           _cpi_constraint_note(employer)}
+        # Taken before the branch below, because a company with no id cannot be
+        # searched inside: an empty id list would be dropped by search_people and
+        # the global result reported as if it had been scoped, which is the same
+        # trap the organization_ids comment above describes.
+        scope_ids = [o["id"] for o in (scope_orgs or []) if o.get("id")]
+        if scope_orgs is not None and not scope_ids:
+            # No company matched. Answering with people anyway would be answering
+            # a question nobody asked, so this is reported as the finding it is.
+            facts = {"no_companies_on_file_match_these_constraints":
+                     _cpi_constraint_note(employer)}
+            if scope_rejected:
+                facts["companies_offered_by_the_search_but_rejected_on_checking"] = \
+                    _cpi_reject_note(scope_rejected)
+            research, web = _research()
+            return _cpi_chat_reply(spend, context=ctx, researched=bool(research),
+                                   web_search=web,
+                                   answer=_cpi_grounded_answer(oai, facts, message,
+                                                               research))
+        if scope_ids:
+            people_filters["organization_ids"] = scope_ids
+            # The HQ constraint is now guaranteed by WHICH companies these are, and
+            # Apollo's own fuzzy location match could only take verified companies
+            # back out again.
+            people_filters.pop("company_locations", None)
+            scope_facts = {"people_were_searched_only_inside_these_companies": {
+                "constraints_verified": _cpi_constraint_note(employer),
+                "companies": len(scope_ids),
+                "examples": [o.get("name") for o in scope_orgs[:5] if o.get("name")],
+            }}
+            if scope_rejected:
+                scope_facts["companies_offered_by_the_search_but_rejected_on_checking"] = \
+                    _cpi_reject_note(scope_rejected)
 
     people_meta: dict = {}
     try:
@@ -10872,6 +11184,15 @@ def cpi_chat():
         if people:
             log.info("cpi chat: domain scope found %d for a title the org-id scope missed",
                      len(people))
+
+    # The single-person branch has verified titles in code for a while. A LIST
+    # never was, so "list the VPs of sales at Acme" could answer with account
+    # executives Apollo threw in under include_similar_titles: the same error the
+    # one-person path was hardened against, printed five times. Anything dropped
+    # here is reported below rather than quietly disappearing, and emptying the
+    # list drops through to the "nobody holds that title" path, which is the
+    # honest answer.
+    people, title_dropped = _cpi_verify_chat_people(people, titles)
 
     # Nobody matched the requested title at a company we DID resolve. That is a
     # real answer worth giving properly: rather than a bare "found nobody", look
@@ -10954,6 +11275,9 @@ def cpi_chat():
             facts["requested_titles"] = titles
         if resolved_org:
             facts["company"] = resolved_org.get("name") or company_name
+        facts.update(scope_facts)
+        if title_dropped:
+            facts["people_offered_but_rejected_on_checking_their_titles"] = title_dropped
         # We did not merely fail to find the exact title: we then looked for anyone
         # in that whole function and found nobody either. Worth saying, because it
         # is the difference between "not under that title" and "not in our records
@@ -11007,6 +11331,9 @@ def cpi_chat():
                          "asked_for_titles": titles,
                          "full_apollo_profile_follows": True}
                 full_profile = _cpi_render_full_profile(enriched)
+        # Merged after the wants_contact reassignment above, so a question that
+        # constrained the employer still says which constraints were checked.
+        facts.update(scope_facts)
         if not full_profile and top.get("id"):
             # Nobody asked for contact info, so the credit for the full
             # enrichment (email, phone, company firmographics) is not spent
@@ -11046,6 +11373,23 @@ def cpi_chat():
     shown = (people if consolation
              else _cpi_reveal_names(people[:max_results], api_key, spend=spend))
     facts = {"people": _cpi_display_people(shown)}
+    facts.update(scope_facts)
+    if title_dropped:
+        facts["people_offered_but_rejected_on_checking_their_titles"] = title_dropped
+    if intent.get("person_locations"):
+        # Where a PERSON lives is filtered by Apollo against fields this plan does
+        # not return to us (a free people row has no city and no country), so this
+        # one cannot be checked the way the others were. Saying so is the only
+        # honest option: the alternative is an answer that sounds equally sure
+        # about the part we verified and the part we could not.
+        facts["person_location_asked_for_but_not_independently_verified"] = \
+            ", ".join(str(x) for x in intent["person_locations"])[:120]
+    if wants_contact:
+        # The question asked for emails or phone numbers and this is a list, so
+        # nothing was enriched: doing it for everyone would spend a credit per
+        # person on a question that might have been idle curiosity. The buttons
+        # under the answer do it one person at a time.
+        facts["contact_details_are_not_included_and_need_enriching"] = True
     try:
         total_entries = int(people_meta.get("total_entries"))
     except (TypeError, ValueError):
@@ -11053,8 +11397,17 @@ def cpi_chat():
     # Only worth telling the model about when it changes what "the list" means:
     # a total that matches what was returned is not a partial sample.
     if total_entries is not None and total_entries > len(shown):
-        facts["total_matching_count"] = total_entries
         facts["returned_count"] = len(shown)
+        if titles or title_dropped or employer:
+            # Apollo's total describes the search we SENT, and that search asked
+            # loosely on purpose: similar titles included, an industry treated as
+            # a keyword over company names, and then narrowed in code afterwards.
+            # It is the one number in this answer a reader cannot check, and it
+            # used to be the headline of it: 295 "healthcare CMOs" who were really
+            # 295 people at companies with the word "healthcare" in their name.
+            facts["apollo_loose_match_total_is_only_an_upper_bound"] = total_entries
+        else:
+            facts["total_matching_count"] = total_entries
     enrich_meta = None
     if consolation:
         facts = {
