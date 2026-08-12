@@ -9352,6 +9352,10 @@ _CPI_FUNCTIONS = (
         "CMO", "Chief Marketing Officer", "VP Marketing", "Head of Marketing",
         "Marketing Director", "VP Brand", "Head of Growth", "Head of Demand Generation",
         "VP Communications", "Marketing Manager",
+        # Searched here too, because a revenue leader counts as marketing (see
+        # _CPI_LEADER_CROSSOVERS). Without this the crossover would be a rule with
+        # nothing to apply to: Apollo would never surface the CRO to begin with.
+        "Chief Revenue Officer", "VP Revenue",
     )),
     ("sales", "sales", (
         "sales", "revenue", "commercial", "account", "accounts", "business",
@@ -9459,6 +9463,19 @@ _CPI_DEPARTMENT_FUNCTIONS = {
 }
 
 
+# A revenue LEADER usually owns marketing as well as sales, so a CMO question
+# should be offered the CRO when no CMO is on file. Their team should not be: a
+# Revenue Operations Manager is a sales-side role, and offering one as the closest
+# marketing contact is exactly the substitution this scoping exists to prevent.
+# Head of Revenue is the lowest rung that counts, because below that the title
+# describes a specialism rather than ownership of the revenue org.
+#
+# One-directional on purpose. "The CRO's remit usually includes marketing" makes a
+# CRO a reasonable answer to a marketing question; it does not make a marketing
+# head a reasonable answer to a revenue one.
+_CPI_LEADER_CROSSOVERS = (("revenue", "marketing", "head"),)
+
+
 def _cpi_title_functions(title: str) -> frozenset:
     """Which business function(s) a job title belongs to. Empty when unclassifiable.
 
@@ -9468,8 +9485,13 @@ def _cpi_title_functions(title: str) -> frozenset:
     have = _cpi_title_tokens(title)
     if not have:
         return frozenset()
-    return frozenset(key for key, _label, tokens, _titles in _CPI_FUNCTIONS
-                     if have & set(tokens))
+    found = {key for key, _label, tokens, _titles in _CPI_FUNCTIONS
+             if have & set(tokens)}
+    for token, extra, min_level in _CPI_LEADER_CROSSOVERS:
+        if token in have and _cpi_seniority_rank({"title": title}) <= \
+                _CPI_SENIORITY_ORDER.index(min_level):
+            found.add(extra)
+    return frozenset(found)
 
 
 def _cpi_person_functions(p: dict) -> frozenset:
