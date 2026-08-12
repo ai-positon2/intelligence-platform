@@ -9097,13 +9097,27 @@ def cpi_history_entry(entry_id: int):
 
 # ── Export ────────────────────────────────────────────────────────────────────
 _CPI_PERSON_COLS = [
-    ("full_name", "Name"), ("title", "Title"), ("seniority", "Seniority"),
+    ("full_name", "Name"),
+    # On screen a masked surname sits next to a badge and a tooltip saying Apollo
+    # withheld it and enrichment reveals it. In a file it was just the name:
+    # "Vivek Sh***a" under a header called Name, with nothing to say it is
+    # incomplete. A spreadsheet outlives the session that made it and gets
+    # filtered, mail-merged and pasted into a CRM, so the flag the screen carries
+    # has to travel with it. The raw value stays as Apollo returned it, since the
+    # asterisked form still tells two same-first-name people apart.
+    ("name_withheld", "Surname withheld by Apollo"),
+    ("title", "Title"), ("seniority", "Seniority"),
     # Both derived from the title rather than returned by Apollo, and labelled as
     # such in the header: a column called "Seniority" holding a value Apollo never
     # asserted is exactly the kind of quiet fiction a spreadsheet carries forever.
     ("seniority_from_title", "Seniority (from title)"),
     ("functions_from_title", "Function (from title)"),
     ("email", "Email"), ("email_status", "Email status"), ("phones", "Phone"),
+    # An empty Email means one of two entirely different things: nobody has spent
+    # a credit on this person yet, or a credit was spent and Apollo holds no
+    # address. The card on screen distinguishes them with an Enrich prompt; the
+    # file could not, so every blank read as "Apollo has nothing".
+    ("contact_revealed", "Contact details revealed"),
     ("city", "City"), ("state", "State"), ("country", "Country"),
     ("departments", "Departments"), ("past_companies", "Previous companies"),
     ("linkedin_url", "LinkedIn"),
@@ -9164,13 +9178,71 @@ def _csv_safe(value) -> str:
     return text
 
 
+# Keys that travel with the filters but constrain nothing: internal page-size
+# caps, which the sheet already covers with "Rows in this file".
+#
+# company_detail is deliberately NOT here. It is not a filter either, but it is
+# the reason one file has employer columns and another has them blank, which is a
+# question a reader of an old spreadsheet really does ask. So it stays, under a
+# label that says what it is rather than sitting in a list of constraints looking
+# like one.
+_CPI_EXPORT_NON_FILTERS = {"max_people", "max_companies"}
+
+# Auto-generated labels mangled the ones that are not plain words: "Naics codes",
+# "Sic codes", "Hq". Only the keys where capitalize() gets it wrong are listed;
+# everything else still falls through to the generic rule.
+_CPI_EXPORT_LABELS = {
+    "naics_codes": "NAICS codes",
+    "exclude_naics_codes": "NAICS codes excluded",
+    "sic_codes": "SIC codes",
+    "exclude_sic_codes": "SIC codes excluded",
+    "company_domains": "At company (name or domain)",
+    "domains": "Domain",
+    "locations": "HQ location",
+    "exclude_locations": "HQ location excluded",
+    "company_locations": "Employer HQ location",
+    "person_locations": "Person location",
+    "employee_min": "Employees from",
+    "employee_max": "Employees up to",
+    "revenue_min": "Revenue from",
+    "revenue_max": "Revenue up to",
+    "technologies_all": "Uses ALL of these technologies",
+    "exclude_technologies": "Does not use these technologies",
+    "include_similar_titles": "Similar titles included",
+    "days_in_title_min": "Days in current role, from",
+    "days_in_title_max": "Days in current role, up to",
+    "linkedin_urls": "LinkedIn profile URLs",
+    "organization_ids": "Scoped to specific companies",
+    # Not a constraint on which rows came back, only on how much was fetched about
+    # each one, so it is labelled as the fetch it is.
+    "company_detail": "Employer details fetched",
+}
+
+
 def _cpi_filters_readable(filters: dict) -> list:
     """Turn a raw Apollo filters dict into ordered, human-readable (label, value)
     pairs for the export's "Search details" sheet -- so the file says what
-    produced these rows, not just the rows themselves."""
+    produced these rows, not just the rows themselves.
+
+    Two things it deliberately does not do. It does not list keys that are not
+    filters, because the sheet is read as the search's constraints. And it does not
+    print Apollo organization ids: a company-scoped search is the commonest scoped
+    search there is, and a column of 24-character hex told the reader nothing about
+    which company, which is precisely the question this sheet exists to answer.
+    """
     out = []
     for key, val in (filters or {}).items():
+        if key in _CPI_EXPORT_NON_FILTERS:
+            continue
         if val in (None, "", [], {}):
+            continue
+        if key == "organization_ids":
+            ids = [v for v in (val if isinstance(val, (list, tuple)) else [val]) if v]
+            if not ids:
+                continue
+            out.append((_CPI_EXPORT_LABELS[key],
+                        "%d compan%s, resolved by name" % (len(ids),
+                                                           "y" if len(ids) == 1 else "ies")))
             continue
         if isinstance(val, dict):
             val = "; ".join("%s: %s" % (k, v) for k, v in val.items() if v not in (None, "", {}))
@@ -9182,9 +9254,27 @@ def _cpi_filters_readable(filters: dict) -> list:
                 continue
         elif isinstance(val, bool):
             val = "Yes" if val else "No"
-        label = key.replace("_", " ").strip().capitalize()
+        label = _CPI_EXPORT_LABELS.get(key) or key.replace("_", " ").strip().capitalize()
         out.append((label, str(val)))
     return out
+
+
+def _cpi_export_cell(row: dict, key: str) -> str:
+    """One exported cell, including the columns that are derived rather than
+    stored.
+
+    name_withheld is derived from the row rather than trusted from it: the flag is
+    read where it exists, and an asterisk in the name is treated as proof on its
+    own, so a row saved to history before the flag existed still exports honestly.
+    """
+    if key == "name_withheld":
+        masked = bool(row.get("name_masked")) or "*" in str(row.get("full_name") or "")
+        return "Yes, enrich to reveal" if masked else ""
+    if key == "contact_revealed":
+        if row.get("enriched") or row.get("email") or row.get("phones"):
+            return "Yes"
+        return "No, not enriched"
+    return _csv_safe(row.get(key))
 
 
 @app.route("/p2/b2b-agents/company-people-intelligence/export", methods=["POST"])
@@ -9221,7 +9311,7 @@ def cpi_export():
         w = _csv.writer(buf)
         w.writerow([label for _k, label in cols])
         for r in rows:
-            w.writerow([_csv_safe(r.get(k)) for k, _label in cols])
+            w.writerow([_cpi_export_cell(r, k) for k, _label in cols])
         payload = buf.getvalue().encode("utf-8-sig")   # BOM so Excel reads UTF-8
         mime = "text/csv; charset=utf-8"
     else:
@@ -9239,9 +9329,9 @@ def cpi_export():
             cell.fill = head_fill
             cell.alignment = Alignment(vertical="center")
         for r in rows:
-            ws.append([_csv_safe(r.get(k)) for k, _label in cols])
+            ws.append([_cpi_export_cell(r, k) for k, _label in cols])
         for i, (key, label) in enumerate(cols, start=1):
-            longest = max([len(label)] + [len(_csv_safe(r.get(key))) for r in rows])
+            longest = max([len(label)] + [len(_cpi_export_cell(r, key)) for r in rows])
             ws.column_dimensions[get_column_letter(i)].width = min(max(longest + 2, 10), 46)
         ws.freeze_panes = "A2"
 
@@ -9257,6 +9347,16 @@ def cpi_export():
                            ("Rows in this file", str(len(rows)))]
             if meta.get("total") is not None:
                 detail_rows.append(("Total matches in Apollo", str(meta["total"])))
+            # Rows Apollo returned that the filters were then enforced against.
+            # Without this the file looks like everything Apollo offered, when it is
+            # deliberately less, and the difference is the whole point of the
+            # verification pass.
+            rejected = meta.get("rejected") if isinstance(meta.get("rejected"), dict) else {}
+            for reason, n in sorted(rejected.items(), key=lambda kv: (-(kv[1] or 0), kv[0])):
+                if not n:
+                    continue
+                detail_rows.append(("Removed on checking: %s"
+                                    % _CPI_VERIFY_LABELS.get(reason, reason), str(n)))
             if meta.get("label"):
                 detail_rows.append(("Saved search", str(meta["label"])))
             detail_rows.append(("Exported", datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")))

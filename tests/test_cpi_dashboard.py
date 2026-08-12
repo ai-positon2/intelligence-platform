@@ -83,7 +83,10 @@ def test_export_csv_has_headers_and_bom(client):
     # utf-8-sig BOM, so Excel reads non-ASCII company names correctly.
     assert r.data.startswith(b"\xef\xbb\xbf")
     body = r.data.decode("utf-8-sig")
-    assert body.splitlines()[0].startswith("Name,Title,Seniority,")
+    # Compared against the declared column list rather than a hand-typed prefix,
+    # which broke as soon as a column was added.
+    assert body.splitlines()[0] == ",".join(
+        lbl for _k, lbl in appmod._CPI_PERSON_COLS)
     assert "Ada Lovelace" in body and "marketing" in body
 
 
@@ -162,7 +165,7 @@ def test_csv_export_ignores_filters_and_stays_a_flat_table(client):
                           "filters": {"titles": ["CMO"]}, "meta": {"total": 42}})
     body = r.data.decode("utf-8-sig")
     lines = body.splitlines()
-    assert lines[0].startswith("Name,Title,Seniority,")
+    assert lines[0] == ",".join(lbl for _k, lbl in appmod._CPI_PERSON_COLS)
     # The point of the test: one header plus one data row, and nothing from
     # `filters`/`meta` appended as an extra line.
     assert len(lines) == 2
@@ -179,8 +182,8 @@ def test_filters_readable_formats_lists_dicts_and_bools():
         "seniorities": [],
     }))
     assert out["Titles"] == "CMO, VP Marketing"
-    assert out["Employee min"] == "50"
-    assert out["Include similar titles"] == "Yes"
+    assert out["Employees from"] == "50"
+    assert out["Similar titles included"] == "Yes"
     assert out["Department counts"] == "marketing: {'min': 2}"
     assert "Keywords" not in out and "Seniorities" not in out
 
