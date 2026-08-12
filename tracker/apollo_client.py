@@ -96,6 +96,176 @@ _ORG_RANGE_FILTERS = (
 )
 
 
+# ── Industry, verified rather than hoped for ──────────────────────────────────
+# Apollo has no industry filter. `industries` is mapped onto
+# q_organization_keyword_tags because that is the closest thing it offers, and
+# that parameter is a free-text RELEVANCE match over a company's name and
+# keyword tags, not a classification filter. Verified live against this account:
+# searching people with q_organization_keyword_tags=["Healthcare"] returns SCALE
+# Healthcare, Hummingbird Healthcare, Voca Healthcare and LiquidAgents
+# Healthcare -- companies selected for having the word in their NAME. On the
+# company endpoint the same input returned a venture firm, a meditation app and
+# a compliance-automation vendor, none of which are healthcare companies, each
+# of which mentions healthcare somewhere in its tags.
+#
+# So the parameter stays, as a recall net, and the actual filter is enforced
+# here in code against `industry`/`industries` -- the fields that hold Apollo's
+# own canonical classification. Same shape as the domain enforcement below, and
+# the same shape as the title verification in the app: ask Apollo broadly, then
+# guarantee the answer ourselves.
+#
+# Apollo's taxonomy is the LinkedIn-style one, so a person typing "healthcare"
+# means eight of its values and none of them is spelled "healthcare". These
+# families map what staff type onto what Apollo stores. A term that is not a
+# family falls through to substring matching in both directions, so a request for
+# an exact Apollo value ("computer software") or a fragment of one ("software")
+# still works without needing an entry here.
+_INDUSTRY_FAMILIES = {
+    "healthcare": ("hospital & health care", "health, wellness & fitness",
+                   "medical practice", "medical devices", "pharmaceuticals",
+                   "biotechnology", "mental health care", "veterinary",
+                   "alternative medicine", "health care"),
+    "technology": ("computer software", "information technology & services",
+                   "internet", "computer & network security", "computer hardware",
+                   "computer networking", "semiconductors", "nanotechnology",
+                   "wireless", "telecommunications"),
+    "software": ("computer software", "internet",
+                 "information technology & services"),
+    "finance": ("financial services", "banking", "insurance",
+                "investment banking", "investment management", "capital markets",
+                "venture capital & private equity", "accounting"),
+    "retail": ("retail", "consumer goods", "consumer services",
+               "apparel & fashion", "luxury goods & jewelry", "supermarkets",
+               "wholesale", "consumer electronics"),
+    "manufacturing": ("industrial automation", "machinery",
+                      "electrical/electronic manufacturing", "automotive",
+                      "aviation & aerospace", "chemicals", "building materials",
+                      "plastics", "packaging & containers", "textiles"),
+    "education": ("education management", "higher education", "e-learning",
+                  "primary/secondary education",
+                  "professional training & coaching"),
+    "marketing": ("marketing & advertising", "public relations & communications",
+                  "market research", "design", "graphic design"),
+    "media": ("media production", "broadcast media", "publishing",
+              "online media", "entertainment", "music", "motion pictures & film",
+              "newspapers"),
+    "real estate": ("real estate", "commercial real estate", "construction",
+                    "architecture & planning", "building materials"),
+    "energy": ("oil & energy", "renewables & environment", "utilities",
+               "mining & metals"),
+    "logistics": ("transportation/trucking/railroad", "logistics & supply chain",
+                  "package/freight delivery", "maritime", "airlines/aviation",
+                  "warehousing"),
+    "hospitality": ("hospitality", "restaurants", "food & beverages",
+                    "leisure, travel & tourism", "recreational facilities & services",
+                    "food production"),
+    "legal": ("law practice", "legal services"),
+    "government": ("government administration", "public policy",
+                   "government relations", "military", "political organization",
+                   "legislative office", "public safety"),
+    "nonprofit": ("nonprofit organization management", "philanthropy",
+                  "civic & social organization", "international affairs",
+                  "religious institutions"),
+    "staffing": ("staffing & recruiting", "human resources",
+                 "professional training & coaching"),
+    "consulting": ("management consulting", "business supplies & equipment",
+                   "outsourcing/offshoring"),
+}
+# Read as aliases of a family rather than families of their own, so the table
+# above stays a list of distinct industries instead of a thesaurus.
+_INDUSTRY_ALIASES = {
+    "health": "healthcare", "health care": "healthcare", "medical": "healthcare",
+    "healthtech": "healthcare", "health tech": "healthcare", "pharma": "healthcare",
+    "biotech": "healthcare", "life sciences": "healthcare",
+    "tech": "technology", "it": "technology", "saas": "software",
+    "fintech": "finance", "financial": "finance", "banking": "finance",
+    "ecommerce": "retail", "e-commerce": "retail", "consumer": "retail",
+    "cpg": "retail", "industrial": "manufacturing", "advertising": "marketing",
+    "adtech": "marketing", "martech": "marketing", "edtech": "education",
+    "proptech": "real estate", "property": "real estate",
+    "supply chain": "logistics", "transportation": "logistics",
+    "travel": "hospitality", "food": "hospitality", "restaurant": "hospitality",
+    "non-profit": "nonprofit", "ngo": "nonprofit", "charity": "nonprofit",
+    "public sector": "government", "recruiting": "staffing", "hr": "staffing",
+}
+
+
+def _industry_norm(s: str) -> str:
+    """Lowercased with punctuation and spacing removed, so "Hospital & Health
+    Care", "hospital and health care" and "hospital/health-care" all compare
+    equal. Apollo is not consistent about any of the three."""
+    s = str(s or "").strip().lower().replace("&", "and")
+    return re.sub(r"[^a-z0-9]+", "", s)
+
+
+def _industry_wanted(terms) -> set:
+    """The requested industry terms expanded to every Apollo value they mean."""
+    out: set = set()
+    for raw in (terms or []):
+        term = str(raw or "").strip().lower()
+        if not term:
+            continue
+        family = _INDUSTRY_ALIASES.get(term, term)
+        values = _INDUSTRY_FAMILIES.get(family)
+        # The term itself is always kept as a candidate, so an exact Apollo value
+        # or a fragment of one works whether or not it names a family.
+        out.add(_industry_norm(term))
+        if family != term:
+            out.add(_industry_norm(family))
+        for v in (values or ()):
+            out.add(_industry_norm(v))
+    out.discard("")
+    return out
+
+
+def _industry_matches(org: dict, wanted: set) -> bool:
+    """Whether this company's OWN classification matches the request.
+
+    Deliberately reads `industry`/`industries` and nothing else. Matching against
+    keywords, name or description is what returned a venture firm for a
+    healthcare search: those fields say what a company talks about, not what it
+    is.
+
+    Substring in both directions, because a request can be broader than the
+    stored value ("healthcare" vs "mental health care") or narrower than it
+    ("hospital & health care" vs a record filed under plain "health care").
+
+    Assumes a non-empty `wanted`. filter_by_industry is the only caller and
+    already returns early when nothing was asked for, so guarding here as well
+    just puts the decision in two places.
+    """
+    have = [org.get("industry")] + list(org.get("industries") or [])
+    for raw in have:
+        got = _industry_norm(raw.get("name") if isinstance(raw, dict) else raw)
+        if not got:
+            continue
+        for want in wanted:
+            if want in got or got in want:
+                return True
+    return False
+
+
+def filter_by_industry(orgs: list, terms, label: str = "") -> tuple:
+    """(kept, dropped_count) for orgs that really are in the requested industry.
+
+    A company Apollo returned no classification at all for is dropped, not kept:
+    an unverifiable row is exactly the row this function exists to stop, and
+    keeping it would put the original bug back for that record. The count comes
+    back so a caller can say what happened rather than quietly showing a short
+    page.
+    """
+    wanted = _industry_wanted(terms)
+    if not wanted:
+        return list(orgs or []), 0
+    kept = [o for o in (orgs or []) if _industry_matches(o, wanted)]
+    dropped = len(orgs or []) - len(kept)
+    if dropped:
+        logger.info("%sindustry filter kept %d/%d (wanted %s)",
+                    (label + ": ") if label else "", len(kept), len(orgs or []),
+                    ",".join(sorted(wanted)[:6]))
+    return kept, dropped
+
+
 def _clean_domain(d: str) -> str:
     """Lowercased domain with any protocol/www/trailing slash stripped, so
     "https://www.Acme.com/" and "acme.com" compare equal. Used to turn Apollo's
@@ -330,6 +500,24 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
             # total it doesn't know.
             meta["total_entries"] = None
             meta["total_pages"] = None
+
+    # q_organization_keyword_tags is a relevance match over name and tags, not an
+    # industry filter, so the industry the caller asked for is enforced here
+    # against Apollo's own classification. See filter_by_industry.
+    if filters.get("industries"):
+        before = len(orgs)
+        orgs, industry_dropped = filter_by_industry(orgs, filters["industries"],
+                                                    "search_companies")
+        if meta is not None and industry_dropped:
+            meta["industry_dropped"] = industry_dropped
+            # Apollo's totals describe its own looser match, so they overstate how
+            # many companies are really in this industry by whatever proportion
+            # this page just dropped. An honest caller cannot report a total it
+            # does not know.
+            meta["total_entries"] = None
+            meta["total_pages"] = None
+            logger.info("search_companies: %d/%d survived the industry check",
+                        len(orgs), before)
 
     max_companies = filters.get("max_companies")
     if max_companies is not None:
