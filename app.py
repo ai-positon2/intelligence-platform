@@ -9229,6 +9229,8 @@ _CPI_INTENT_SYSTEM = (
     ' "company_locations": ["..."],\n'
     ' "industries": ["..."],\n'
     ' "technologies": ["..."],\n'
+    ' "naics_codes": ["..."],\n'
+    ' "sic_codes": ["..."],\n'
     ' "employee_min": null,\n'
     ' "employee_max": null,\n'
     ' "revenue_min": null,\n'
@@ -9267,6 +9269,13 @@ _CPI_INTENT_SYSTEM = (
     "industry, never for a question about one named company.\n\n"
     "technologies: named software the companies should be using (\"Salesforce\", "
     "\"HubSpot\", \"Shopify\"), only when the question actually asks for it.\n"
+    "naics_codes / sic_codes: only when the question itself quotes a classification "
+    "code (\"companies in NAICS 5415\", \"SIC 7372 companies\"). Copy the digits "
+    "across and nothing else. Never derive a code from an industry name: the industry "
+    "goes in industries, where a later step maps it properly, and a guessed code is a "
+    "precise-looking filter for the wrong industry. NAICS is accepted at 2 to 5 "
+    "digits and SIC at exactly 4, so pass a longer NAICS code through unchanged "
+    "rather than truncating it yourself; a later step explains the rule.\n"
     "employee_min / employee_max: company headcount bounds, as integers, ONLY when the "
     "question states them (\"200 to 500 employees\" -> 200 and 500; \"under 50 people\" -> "
     "null and 50; \"1000+ employees\" -> 1000 and null). Vague words like \"startups\", "
@@ -9707,6 +9716,12 @@ _CPI_ANSWER_SYSTEM = (
     "- \"no_companies_on_file_match_these_constraints\" means no company passed those "
     "checks, so there is no people list to give. Say that plainly, naming the constraints, "
     "and do not offer people from companies that failed them.\n"
+    "- \"these_values_could_not_be_confirmed_as_ones_apollo_uses\" appears beside that and "
+    "names the constraint values that may be the CAUSE of the empty result rather than a "
+    "finding about the world. Say the value could not be confirmed as one the vendor "
+    "recognizes and suggest the ordinary name for it, instead of stating that no company "
+    "uses that tool or is in that place. Never present it as proof the value is wrong "
+    "either: the lists behind this check are not exhaustive.\n"
     "- \"companies_offered_by_the_search_but_rejected_on_checking\" and "
     "\"people_offered_but_rejected_on_checking_their_titles\" are counts of rows the "
     "vendor's own search returned that our checks then rejected, by reason. Mention them "
@@ -9726,7 +9741,19 @@ _CPI_ANSWER_SYSTEM = (
     "- \"contact_details_are_not_included_and_need_enriching\": true means emails and phone "
     "numbers were asked for but not fetched for a list. Say in one sentence that each "
     "person's details can be pulled individually with the buttons below the answer. Never "
-    "imply any contact detail is already in hand.\n\n"
+    "imply any contact detail is already in hand.\n"
+    "- \"seniority_words_apollo_does_not_have_so_they_were_ignored\" lists levels the "
+    "question asked for that the vendor has no such value for, so that part of the request "
+    "was NOT applied. Say which words were ignored in one short clause. This matters most "
+    "when the answer is empty or broader than expected: it is the difference between nobody "
+    "matching and that filter never having been asked for.\n"
+    "- \"codes_that_are_not_a_valid_length_so_they_were_ignored\" lists classification codes "
+    "that were dropped for being the wrong length, with the rule. Name the code and the rule "
+    "in one clause, so the reader can retype it, and be clear the answer does not reflect "
+    "that constraint.\n"
+    "- \"codes_applied_by_apollo_directly\" lists classification codes that WERE applied. "
+    "You may state these as reliable: the vendor filters on them exactly, unlike the "
+    "industry match.\n\n"
     "If the facts contain \"full_apollo_profile_follows\": true, keep your own part to "
     "ONE short lead sentence naming the person and their title, nothing else: a complete, "
     "field-by-field record of everything Apollo returned (contact details, company "
@@ -10807,6 +10834,134 @@ def _cpi_int_or_none(v):
         return None
 
 
+# Apollo's person_seniorities vocabulary, complete and verbatim. Measured against
+# this account on the free people endpoint, with person_titles=["chief marketing
+# officer"]:
+#
+#   ["c_suite"]              68,174 people
+#   ["C_Suite"]                   0     same word, capitalized
+#   ["C-Suite"]                   0     hyphen instead of underscore
+#   ["executive"]                 0     a word Apollo does not have
+#   ["c_suite", "executive"] 68,174     one bad value in a list is skipped
+#
+# So the filter is closed AND case sensitive, and a bad value only breaks things
+# when EVERY value is bad, which is exactly what a language model produces when it
+# writes "executive" or "C-Suite" for "the executives at Acme". The search page is
+# safe because its chips are written down in the template; the chat asked a model
+# for these strings and sent whatever came back, so "who are the executives at
+# Acme" could return "nobody matches" having never asked Apollo anything at all.
+_CPI_APOLLO_SENIORITIES = ("owner", "founder", "c_suite", "vp", "director",
+                           "manager", "senior", "entry", "intern")
+
+# What a model writes -> what Apollo calls it. Only unambiguous renamings: a word
+# that could mean two levels is dropped rather than guessed at, because inventing
+# a level is how a question about founders comes back full of middle managers.
+_CPI_SENIORITY_ALIASES = {
+    "csuite": "c_suite", "cxo": "c_suite", "clevel": "c_suite",
+    "executive": "c_suite", "executives": "c_suite", "chief": "c_suite",
+    "cofounder": "founder", "coowner": "owner", "proprietor": "owner",
+    "vicepresident": "vp", "vps": "vp", "svp": "vp", "evp": "vp", "avp": "vp",
+    "directors": "director", "managers": "manager", "management": "manager",
+    "individualcontributor": "senior", "ic": "senior",
+    "junior": "entry", "entrylevel": "entry", "graduate": "entry",
+    "internship": "intern", "interns": "intern",
+    "founders": "founder", "owners": "owner",
+}
+
+
+def _cpi_clean_seniorities(values) -> tuple:
+    """(kept, dropped) for the seniority words a parsed question produced.
+
+    Case and punctuation are normalized first, so "C-Suite" becomes c_suite rather
+    than being thrown away. Anything still unrecognized is dropped and handed back,
+    because a filter Apollo cannot read is not a narrower search, it is an empty
+    one, and the reader is owed the difference.
+    """
+    kept, dropped = [], []
+    for raw in (values or []):
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        key = re.sub(r"[^a-z0-9]+", "", raw.strip().lower())
+        exact = re.sub(r"[^a-z0-9_]+", "_", raw.strip().lower()).strip("_")
+        if exact in _CPI_APOLLO_SENIORITIES:
+            value = exact
+        elif key in {s.replace("_", "") for s in _CPI_APOLLO_SENIORITIES}:
+            value = next(s for s in _CPI_APOLLO_SENIORITIES
+                         if s.replace("_", "") == key)
+        else:
+            value = _CPI_SENIORITY_ALIASES.get(key, "")
+        if value:
+            if value not in kept:
+                kept.append(value)
+        elif raw.strip() not in dropped:
+            dropped.append(raw.strip())
+    return kept, dropped
+
+
+def _cpi_unknown_vocab_values(employer: dict) -> dict:
+    """Constraint values that are not in any vocabulary Apollo is known to use.
+
+    Only consulted when a constrained question found no companies at all, because
+    that is the moment the two possible explanations diverge and matter: "no
+    company on file is like that" is a fact about the world, and "that is not a
+    value the vendor has" is a fact about the request. Measured on this account, an
+    invented technology and an invented place both return zero and look identical
+    from here, so a model writing "SFDC" produced an answer that read as though
+    nobody uses Salesforce.
+
+    Absence from these lists is a hint, never a verdict: the seeds are not
+    exhaustive, so the wording this feeds says the value could not be confirmed
+    rather than that it does not exist.
+    """
+    from tracker import apollo_vocab as av
+    out: dict = {}
+    for key, kind, label in (("technologies", "technology", "technology"),
+                             ("locations", "location", "headquarters")):
+        odd = []
+        for raw in (employer.get(key) or []):
+            value = str(raw or "").strip()
+            if not value:
+                continue
+            known = av.suggest(kind, value, learned=_cpi_vocab_seen(kind), limit=5)
+            if not any(av.norm(e["value"]) == av.norm(value) for e in known):
+                odd.append(value)
+        if odd:
+            out[label] = ", ".join(odd[:4])
+    inds = [str(x).strip() for x in (employer.get("industries") or []) if str(x).strip()]
+    if inds:
+        from tracker.apollo_taxonomy import industries_for
+        unmapped = [i for i in inds if not industries_for(i)]
+        if unmapped:
+            out["industry"] = ", ".join(unmapped[:4])
+    return out
+
+
+def _cpi_chat_codes(intent: dict) -> tuple:
+    """(filters, rejected) for the NAICS and SIC codes in a parsed question.
+
+    These live on the PEOPLE search as well as the company one and Apollo applies
+    both strictly, so a coded question stays free: there is nothing to verify
+    afterwards and no reason to pay for a company lookup to honor it.
+
+    Malformed codes are separated out rather than sent. Apollo takes NAICS at 2 to
+    5 digits, and a question that quotes a real 6-digit code would otherwise be
+    answered with an empty page.
+    """
+    from tracker import apollo_vocab as av
+    out, rejected = {}, {}
+    for key, kind in (("naics_codes", "naics"), ("sic_codes", "sic")):
+        raw = [str(x).strip() for x in (intent.get(key) or [])
+               if isinstance(x, (str, int)) and str(x).strip()][:6]
+        if not raw:
+            continue
+        good, bad = av.split_valid(kind, raw)
+        if good:
+            out[key] = good
+        if bad:
+            rejected[kind] = {"codes": bad, "hint": av.hint(kind)}
+    return out, rejected
+
+
 def _cpi_chat_employer_filters(intent: dict) -> dict:
     """The employer constraints in a parsed question, as company search filters.
 
@@ -11090,7 +11245,12 @@ def cpi_chat():
     # company a typed name actually meant.
     resolve_notes: dict = {}
     titles = [t for t in (intent.get("titles") or []) if isinstance(t, str) and t.strip()][:8]
-    seniorities = [s for s in (intent.get("seniorities") or []) if isinstance(s, str)][:6]
+    # Normalized against Apollo's own nine values, because it is closed and case
+    # sensitive: an all-unrecognized list makes Apollo return nothing, which the
+    # answer would then report as nobody matching.
+    seniorities, seniority_dropped = _cpi_clean_seniorities(
+        (intent.get("seniorities") or [])[:8])
+    seniorities = seniorities[:6]
     wants_contact = bool(intent.get("wants_contact_info"))
     try:
         max_results = min(int(intent.get("max_results") or 10), 20)
@@ -11251,6 +11411,28 @@ def cpi_chat():
         people_filters["person_locations"] = intent["person_locations"]
     if intent.get("keywords"):
         people_filters["keywords"] = str(intent["keywords"])[:200]
+    # NAICS and SIC apply to the people endpoint too and Apollo enforces both
+    # strictly, so a coded question is answered for free and needs no verification
+    # pass. Malformed codes never reach Apollo.
+    code_filters, bad_codes = _cpi_chat_codes(intent)
+    people_filters.update(code_filters)
+
+    # Everything the parser produced that Apollo could not be asked for. Carried
+    # into whichever branch answers, because a constraint that was silently
+    # discarded changes what the answer means and the reader cannot see it
+    # otherwise.
+    parse_notes: dict = {}
+    if seniority_dropped:
+        parse_notes["seniority_words_apollo_does_not_have_so_they_were_ignored"] = \
+            ", ".join(seniority_dropped[:6])
+    if bad_codes:
+        parse_notes["codes_that_are_not_a_valid_length_so_they_were_ignored"] = {
+            kind: {"codes": ", ".join(v["codes"][:6]), "rule": v["hint"]}
+            for kind, v in bad_codes.items()}
+    if code_filters:
+        parse_notes["codes_applied_by_apollo_directly"] = {
+            k.replace("_codes", "").upper(): ", ".join(v)
+            for k, v in code_filters.items()}
 
     # An industry, a size, a revenue band, an HQ or a technology constrains the
     # EMPLOYER, and none of it can be honored against a free people row: that row
@@ -11285,6 +11467,12 @@ def cpi_chat():
             # a question nobody asked, so this is reported as the finding it is.
             facts = {"no_companies_on_file_match_these_constraints":
                      _cpi_constraint_note(employer)}
+            # Which of those constraints might be the reason rather than the
+            # finding. Without this, an unrecognized value reads as a fact about
+            # the world: nobody uses that tool, nobody is in that place.
+            odd = _cpi_unknown_vocab_values(employer)
+            if odd:
+                facts["these_values_could_not_be_confirmed_as_ones_apollo_uses"] = odd
             if scope_rejected:
                 facts["companies_offered_by_the_search_but_rejected_on_checking"] = \
                     _cpi_reject_note(scope_rejected)
@@ -11462,6 +11650,7 @@ def cpi_chat():
         if resolved_org:
             facts["company"] = resolved_org.get("name") or company_name
         facts.update(scope_facts)
+        facts.update(parse_notes)
         if title_dropped:
             facts["people_offered_but_rejected_on_checking_their_titles"] = title_dropped
         # We did not merely fail to find the exact title: we then looked for anyone
@@ -11560,6 +11749,7 @@ def cpi_chat():
              else _cpi_reveal_names(people[:max_results], api_key, spend=spend))
     facts = {"people": _cpi_display_people(shown)}
     facts.update(scope_facts)
+    facts.update(parse_notes)
     if title_dropped:
         facts["people_offered_but_rejected_on_checking_their_titles"] = title_dropped
     if intent.get("person_locations"):
