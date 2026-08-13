@@ -7217,6 +7217,10 @@ def cpi_home():
                            history_url=url_for("cpi_history"),
                            industries_url=url_for("cpi_industries"),
                            vocab_url=url_for("cpi_vocab"),
+                           count_url=url_for("cpi_count"),
+                           credits_url=url_for("cpi_credits"),
+                           list_url=url_for("cpi_list"),
+                           parse_url=url_for("cpi_parse_query"),
                            export_url=url_for("cpi_export"))
 
 
@@ -7507,6 +7511,7 @@ def cpi_search():
                        "needs_company_choice": True, "choices": choices}
                 if spend["credits"]:
                     out["credits"] = spend["credits"]
+                    _cpi_credit_record("company-resolve", spend["credits"])
                 return jsonify(out)
             filters = dict(filters)
             filters.pop("company_domains", None)
@@ -7606,6 +7611,7 @@ def cpi_search():
         out["invalid_codes"] = bad_codes
     if spend["credits"]:
         out["credits"] = spend["credits"]
+        _cpi_credit_record("search-" + entity, spend["credits"])
     return jsonify(out)
 
 
@@ -8795,6 +8801,7 @@ def cpi_enrich():
                 dedupe=key)
     except Exception as e:
         log.warning("cpi enrich history hook failed: %s", e)
+    _cpi_credit_record("enrich", spend["credits"])
     return jsonify({"profile": profile,
                     "apollo": bool(os.environ.get("APOLLO_API_KEY", "")),
                     # 0 is a real answer here: a miss and a cache hit both cost
@@ -8897,6 +8904,10 @@ def cpi_enrich_bulk():
                 filters={"credits": len(fetched), "from_cache": len(cached)})
         except Exception as e:
             log.warning("cpi bulk reveal history hook failed: %s", e)
+    # len(fetched) for the same reason the history entry uses it: the cached ones
+    # were paid for on an earlier click, and charging them to today would make
+    # the ledger climb every time somebody re-opened the same selection.
+    _cpi_credit_record("enrich-bulk", len(fetched))
     return jsonify({
         "profiles": rows,
         "fetched": len(fetched), "cached": len(cached),
@@ -9570,6 +9581,430 @@ def _cpi_export_cell(row: dict, key: str) -> str:
     if key in _CPI_EXPORT_PERCENT_COLS:
         return _cpi_export_percent(row.get(key))
     return _csv_safe(row.get(key))
+
+
+# ── The working list ──────────────────────────────────────────────────────────
+# Real prospecting is several searches feeding one list, and until now every
+# search discarded the last one: you could select rows, enrich them and export
+# them, but only within a single result set. The list is the working set that
+# survives across searches, across the People/Companies tabs and across a reload.
+#
+# Stored server-side per user for the same reason chat answers and paid reveals
+# are: it can hold contacts that cost real money to reveal, and asking the
+# browser to remember those means a closed tab throws away a purchase.
+#
+# Deduplicated on the Apollo id, so adding the same person from two different
+# searches keeps one row. A row with no id (Apollo occasionally returns one)
+# falls back to name + employer, which is the same key the enrich history uses.
+_CPI_LIST_TABLE_READY = False
+_CPI_LIST_MAX = 500             # rows per user; a list past this is an export
+_CPI_LIST_TTL_DAYS = 90         # matches history: these rows can hold contacts
+
+
+def _ensure_cpi_list_table(conn) -> None:
+    global _CPI_LIST_TABLE_READY
+    if _CPI_LIST_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_list_rows (
+                email TEXT NOT NULL,
+                entity TEXT NOT NULL,
+                dedupe_key TEXT NOT NULL,
+                row JSONB NOT NULL,
+                added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (email, entity, dedupe_key)
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cpi_list_email
+            ON cpi_list_rows (email, added_at DESC)
+        """)
+    conn.commit()
+    _CPI_LIST_TABLE_READY = True
+
+
+def _cpi_list_key(row: dict, entity: str) -> str:
+    """The identity of one row, for deduplication.
+
+    Apollo's id when there is one. Otherwise name plus employer, lowercased,
+    which is the same fallback the enrich history uses for a person Apollo could
+    not match: two different keys for the same person would silently double them.
+    """
+    row = row or {}
+    rid = str(row.get("id") or row.get("apollo_id") or "").strip()
+    if rid:
+        return rid
+    if entity == "companies":
+        parts = [row.get("name"), row.get("primary_domain")]
+    else:
+        parts = [row.get("full_name") or row.get("name"),
+                 row.get("organization_name") or row.get("organization_domain")]
+    key = "|".join(str(p or "").strip().lower() for p in parts).strip("|")
+    return key or "?"
+
+
+@app.route("/p2/b2b-agents/company-people-intelligence/list",
+           methods=["GET", "POST", "DELETE"])
+@position2_required
+def cpi_list():
+    """GET the working list, POST rows onto it, DELETE some or all of it."""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    conn = _pg_conn()
+    if not conn:
+        return jsonify({"rows": [], "available": False})
+    try:
+        _ensure_cpi_list_table(conn)
+        from psycopg2.extras import Json
+        with conn.cursor() as cur:
+            # Expiry runs on every touch, for everyone, same as the history
+            # drawer: there is no scheduler in this app and these rows can hold
+            # revealed contact details.
+            cur.execute(
+                "DELETE FROM cpi_list_rows "
+                "WHERE added_at < now() - make_interval(days => %s)",
+                (_CPI_LIST_TTL_DAYS,))
+
+            if request.method == "POST":
+                body = request.get_json(silent=True) or {}
+                entity = "companies" if body.get("entity") == "companies" else "people"
+                rows = [r for r in (body.get("rows") or []) if isinstance(r, dict)]
+                if not rows:
+                    conn.commit()
+                    return jsonify({"added": 0, "available": True,
+                                    "count": _cpi_list_count(cur, email)})
+                cur.execute("SELECT COUNT(*) FROM cpi_list_rows WHERE email = %s",
+                            (email,))
+                have = int((cur.fetchone() or [0])[0])
+                room = max(0, _CPI_LIST_MAX - have)
+                added = 0
+                for r in rows[:room]:
+                    # ON CONFLICT DO NOTHING, not DO UPDATE: a row already on the
+                    # list may have been enriched since, and overwriting it with
+                    # the un-enriched search row would throw away a paid reveal.
+                    cur.execute(
+                        "INSERT INTO cpi_list_rows (email, entity, dedupe_key, row) "
+                        "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                        (email, entity, _cpi_list_key(r, entity), Json(r)))
+                    added += cur.rowcount
+                conn.commit()
+                out = {"added": added, "available": True,
+                       "count": _cpi_list_count(cur, email)}
+                if len(rows) > room:
+                    out["full"] = True
+                    out["cap"] = _CPI_LIST_MAX
+                return jsonify(out)
+
+            if request.method == "DELETE":
+                body = request.get_json(silent=True) or {}
+                keys = [str(k) for k in (body.get("keys") or []) if str(k or "").strip()]
+                if body.get("all"):
+                    cur.execute("DELETE FROM cpi_list_rows WHERE email = %s", (email,))
+                elif keys:
+                    cur.execute("DELETE FROM cpi_list_rows WHERE email = %s "
+                                "AND dedupe_key = ANY(%s)", (email, keys))
+                removed = cur.rowcount
+                conn.commit()
+                return jsonify({"removed": removed, "available": True,
+                                "count": _cpi_list_count(cur, email)})
+
+            cur.execute(
+                "SELECT entity, dedupe_key, row FROM cpi_list_rows "
+                "WHERE email = %s ORDER BY added_at DESC LIMIT %s",
+                (email, _CPI_LIST_MAX))
+            fetched = cur.fetchall()
+            conn.commit()
+        rows = [dict(r[2] or {}, _key=r[1], _entity=r[0]) for r in fetched]
+        return jsonify({"rows": rows, "count": len(rows), "available": True,
+                        "cap": _CPI_LIST_MAX})
+    except Exception as e:
+        log.warning("cpi list %s failed: %s", request.method, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"rows": [], "available": False})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _cpi_list_count(cur, email: str) -> int:
+    cur.execute("SELECT COUNT(*) FROM cpi_list_rows WHERE email = %s", (email,))
+    return int((cur.fetchone() or [0])[0])
+
+
+# ── Typed sentence to filter panel ────────────────────────────────────────────
+@app.route("/p2/b2b-agents/company-people-intelligence/parse-query", methods=["POST"])
+@position2_required
+def cpi_parse_query():
+    """Turn "CMOs at healthcare companies over 200 people" into filter values.
+
+    The same _CPI_INTENT_SYSTEM parse the chat already runs, pointed at the
+    filter panel instead of at an Apollo call. Deliberately it only FILLS THE
+    CONTROLS: nothing is searched, nothing is spent, and the user sees every
+    value it set and can change any of them before running anything. That is what
+    keeps it an accelerator rather than a black box, and it is why this returns
+    filters rather than results.
+
+    Costs an OpenAI call and 0 Apollo credits.
+    """
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("q") or "").strip()[:400]
+    if not text:
+        return jsonify({"filters": {}})
+    oai = _cpi_oai()
+    if oai is None:
+        return jsonify({"filters": {}, "error": "The assistant is not configured here."})
+    try:
+        msgs = [{"role": "system", "content": _CPI_INTENT_SYSTEM},
+                {"role": "user", "content": text}]
+        raw, _model = _vimi_chat_json(oai, msgs, 500)
+        intent = json.loads(raw or "{}")
+    except Exception as e:
+        log.warning("cpi parse-query failed: %s", e)
+        return jsonify({"filters": {}, "error": "Could not read that query."})
+    if not isinstance(intent, dict):
+        return jsonify({"filters": {}})
+    # Only keys the filter panel actually has a control for. The intent parser
+    # answers a chat question and carries chat-shaped fields too (an intent name,
+    # a person's name, a max_results); passing those through would set filters the
+    # user cannot see, which is the one thing this must not do.
+    allow = ("titles", "seniorities", "industries", "keywords",
+             "person_locations", "company_locations", "locations",
+             "technologies", "naics_codes", "sic_codes", "market_segments",
+             "job_titles", "email_status")
+    out = {}
+    for k in allow:
+        v = intent.get(k)
+        if isinstance(v, list):
+            v = [str(x).strip() for x in v if str(x or "").strip()]
+            if v:
+                out[k] = v
+        elif isinstance(v, str) and v.strip():
+            out[k] = v.strip()
+    for lo, hi, src in (("employee_min", "employee_max", "employees"),
+                        ("revenue_min", "revenue_max", "revenue")):
+        rng = intent.get(src)
+        if isinstance(rng, dict):
+            if isinstance(rng.get("min"), (int, float)):
+                out[lo] = rng["min"]
+            if isinstance(rng.get("max"), (int, float)):
+                out[hi] = rng["max"]
+    for key in ("employee_min", "employee_max", "revenue_min", "revenue_max",
+                "founded_min", "founded_max"):
+        v = intent.get(key)
+        if isinstance(v, (int, float)):
+            out[key] = v
+    company = str(intent.get("company_name") or "").strip()
+    if company:
+        out["company_domains"] = [company]
+    return jsonify({"filters": out, "entity": (
+        "companies" if str(intent.get("intent") or "").startswith("compan") else "people")})
+
+
+# ── The free match count ──────────────────────────────────────────────────────
+# Shaping a search used to mean running it. Apollo's people search is free and
+# returns its own total, so the count can be shown while the filters are still
+# being set, which is the difference between building a query and guessing at one.
+#
+# THE WHOLE ENDPOINT IS BUILT AROUND NOT SPENDING. Three separate things on the
+# search path cost credits, and this refuses all three rather than trying to be
+# clever about them, because it runs on a debounce while somebody types:
+#
+#   1. The Companies tab. mixed_companies/search bills per call, so there is no
+#      free way to count companies at all. Refused outright, with a reason.
+#   2. The employer lookup (_cpi_attach_employer_facts), 1 credit per page.
+#      Never called here; company_detail is dropped, not forwarded.
+#   3. Resolving a typed company NAME to an Apollo id, 1 credit. Refused, with a
+#      reason; a typed DOMAIN needs no resolution and is fine.
+#
+# The number is also honestly labelled. Apollo's total counts what IT matched,
+# and _cpi_verify_rows then drops rows that do not really satisfy the filters, so
+# whenever a verified filter is set the total is an UPPER BOUND, not the answer.
+# Saying "2,400 matches" when the page will show 300 is exactly the kind of claim
+# this app exists not to make.
+_CPI_COUNT_VERIFIED_FILTERS = ("industries", "employee_min", "employee_max",
+                               "revenue_min", "revenue_max", "company_locations",
+                               "technologies", "technologies_all", "titles")
+
+
+@app.route("/p2/b2b-agents/company-people-intelligence/count", methods=["POST"])
+@position2_required
+def cpi_count():
+    """How many people Apollo says match, for 0 credits. See the note above."""
+    body = request.get_json(silent=True) or {}
+    if body.get("entity") == "companies":
+        return jsonify({"count": None,
+                        "reason": "Company search costs a credit per run, so there "
+                                  "is no free way to preview the count."})
+    filters = dict(body.get("filters") or {})
+    # Dropped, never forwarded: this is the paid employer lookup.
+    filters.pop("company_detail", None)
+    raw_domains = filters.get("company_domains") or []
+    typed = (raw_domains[0] or "").strip() if len(raw_domains) == 1 else ""
+    if typed and not _cpi_is_domain_shaped(typed):
+        return jsonify({"count": None,
+                        "reason": "Looking up a company by name costs a credit, so "
+                                  "the count waits until you search."})
+    api_key = os.environ.get("APOLLO_API_KEY", "")
+    if not api_key:
+        return jsonify({"count": None, "reason": "Apollo is not configured here."})
+    # Same shape guard the search route applies, so a malformed code counts the
+    # same way it searches rather than counting a filter that will be dropped.
+    from tracker import apollo_vocab as _av
+    for key, kind in (("naics_codes", "naics"), ("exclude_naics_codes", "naics"),
+                      ("sic_codes", "sic"), ("exclude_sic_codes", "sic")):
+        if not filters.get(key):
+            continue
+        good, _bad = _av.split_valid(kind, filters.get(key))
+        if good:
+            filters[key] = good
+        else:
+            filters.pop(key, None)
+    meta: dict = {}
+    try:
+        from tracker.apollo_client import search_people as _search_people
+        # per_page=1: the rows are thrown away, only Apollo's own total is wanted.
+        _search_people(filters, api_key, page=1, per_page=1, meta=meta)
+    except Exception as e:
+        log.warning("cpi count failed: %s", e)
+        return jsonify({"count": None, "reason": "Could not reach Apollo."})
+    total = meta.get("total_entries")
+    if total is None:
+        # search_people blanks the totals when it enforces a domain itself, since
+        # Apollo's pagination describes the unfiltered call. No honest number.
+        return jsonify({"count": None,
+                        "reason": "Apollo does not report a total for this filter set."})
+    approx = [k for k in _CPI_COUNT_VERIFIED_FILTERS
+              if filters.get(k) not in (None, [], "")]
+    return jsonify({"count": int(total), "approx": bool(approx)})
+
+
+# ── The credit ledger ─────────────────────────────────────────────────────────
+# Every paid action already tells the user what it cost, which leaves the other
+# half unsaid: what the shared pool has left. Apollo's own usage endpoint
+# (usage_stats/api_usage_stats) reports per-endpoint RATE LIMITS rather than a
+# credit balance, and needs a master key this app does not hold, so a true
+# account balance cannot be read from here. Rather than print a number this app
+# cannot stand behind, the ledger records what THIS TOOL spent, which it knows
+# exactly, and the header says precisely that.
+#
+# Written at the four places a spend is reported to the user, never anywhere
+# else, so the number in the header and the number on the screen come from the
+# same event and cannot drift apart.
+_CPI_LEDGER_TABLE_READY = False
+_CPI_LEDGER_TTL_DAYS = 400      # a little over a year, so "last 12 months" is whole
+
+
+def _ensure_cpi_ledger_table(conn) -> None:
+    global _CPI_LEDGER_TABLE_READY
+    if _CPI_LEDGER_TABLE_READY:
+        return
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS cpi_credit_ledger (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                action TEXT NOT NULL,
+                credits INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cpi_ledger_at
+            ON cpi_credit_ledger (created_at DESC)
+        """)
+    conn.commit()
+    _CPI_LEDGER_TABLE_READY = True
+
+
+def _cpi_credit_record(action: str, credits) -> None:
+    """Record a spend. Never raises and never blocks the answer it describes.
+
+    Called with the same number that is about to be sent to the browser, so a
+    question that reported 4 credits contributes exactly 4 here. A zero is not
+    written: a cache hit is not a purchase, and rows of zeroes would make the
+    ledger read as activity rather than as spend.
+    """
+    try:
+        n = int(credits or 0)
+    except (TypeError, ValueError):
+        return
+    if n <= 0:
+        return
+    # Everything below is inside the guard, not just the SQL. This runs AFTER the
+    # credit is spent and immediately before the reply that reports it, so a
+    # failure reading the session or opening a connection would turn a purchase
+    # the user already paid for into a 500. Same rule the history hooks follow.
+    conn = None
+    try:
+        email = ((_get_user() or {}).get("email") or "").lower()
+        conn = _pg_conn()
+        if not conn:
+            return
+        _ensure_cpi_ledger_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO cpi_credit_ledger (email, action, credits) "
+                "VALUES (%s, %s, %s)", (email, str(action)[:40], n))
+            cur.execute(
+                "DELETE FROM cpi_credit_ledger "
+                "WHERE created_at < now() - make_interval(days => %s)",
+                (_CPI_LEDGER_TTL_DAYS,))
+        conn.commit()
+    except Exception as e:
+        log.warning("cpi credit ledger write failed action=%s: %s", action, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.route("/p2/b2b-agents/company-people-intelligence/credits")
+@position2_required
+def cpi_credits():
+    """What this tool has spent from the shared Apollo pool.
+
+    Deliberately not called a balance. This is the app's own record of its own
+    spending, which is the part it can prove; the pool also funds the de-anon
+    engine and the External Usage person enrichment off the same key, and no
+    endpoint available here reports the account total.
+    """
+    email = ((_get_user() or {}).get("email") or "").lower()
+    conn = _pg_conn()
+    if not conn:
+        return jsonify({"available": False})
+    try:
+        _ensure_cpi_ledger_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COALESCE(SUM(credits), 0), "
+                "       COALESCE(SUM(credits) FILTER (WHERE email = %s), 0) "
+                "FROM cpi_credit_ledger "
+                "WHERE created_at >= date_trunc('month', now())", (email,))
+            month_all, month_mine = cur.fetchone()
+            cur.execute(
+                "SELECT COALESCE(SUM(credits), 0) FROM cpi_credit_ledger "
+                "WHERE created_at >= date_trunc('day', now())")
+            today_all = (cur.fetchone() or [0])[0]
+        return jsonify({"available": True, "month": int(month_all),
+                        "month_mine": int(month_mine), "today": int(today_all)})
+    except Exception as e:
+        log.warning("cpi credit summary failed: %s", e)
+        return jsonify({"available": False})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @app.route("/p2/b2b-agents/company-people-intelligence/export", methods=["POST"])
@@ -11598,6 +12033,7 @@ def _cpi_chat_reply(spend: dict, **fields):
     if n:
         fields["credits"] = n
     _cpi_chat_remember(fields, n)
+    _cpi_credit_record("chat", n)
     return jsonify(fields)
 
 

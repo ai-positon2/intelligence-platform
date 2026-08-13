@@ -798,3 +798,113 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 .cpi-toast.on{opacity:1;transform:translate(-50%,0)}
 .cpi-toast.err{border-color:rgba(251,113,133,.45);color:#fecdd3}
 .cpi-toast.ok{border-color:rgba(52,211,153,.45);color:#a7f3d0}
+
+/* ── Spend, list badge, ask bar, query bar, live count ──────────────────────
+   Added with the working list and the free match count. */
+
+/* What this tool has spent. Sits in the header beside History and stays quiet:
+   it is a standing fact, not an alert, so it must not compete with the title. */
+.page-hdr-spend{margin-left:auto;font-size:11.5px;color:var(--tx3);white-space:nowrap;
+  padding:5px 11px;border:1px solid var(--b1);border-radius:var(--radius-pill);
+  background:rgba(255,255,255,.03)}
+.page-hdr-spend b{color:var(--tx2);font-weight:700}
+.page-hdr-spend s{text-decoration:none;color:var(--tx3);opacity:.75}
+/* The header's own flex puts History at the end; with the spend pill taking the
+   auto margin, the buttons need their own so they still group to the right. */
+.page-hdr-spend + .page-hdr-hist-btn{margin-left:10px}
+.cpi-list-n{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;
+  padding:0 5px;border-radius:var(--radius-pill);background:rgba(124,131,245,.32);
+  border:1px solid rgba(124,131,245,.5);color:#dfe1ff;font-size:10.5px;font-weight:750}
+
+/* One sentence in, filters out. Deliberately the widest thing above the panel:
+   it is the intended way in, and the filter fieldsets are the fallback. */
+.cpi-ask{display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:6px 6px 6px 13px;
+  border:1px solid rgba(124,131,245,.34);border-radius:var(--radius-pill);
+  background:linear-gradient(90deg,rgba(124,131,245,.10),rgba(34,211,238,.06));
+  transition:border-color .16s,background .16s}
+.cpi-ask:focus-within{border-color:rgba(124,131,245,.65);background:linear-gradient(90deg,rgba(124,131,245,.16),rgba(34,211,238,.09))}
+.cpi-ask-ic{width:15px;height:15px;flex:none;color:#a9b0ff}
+.cpi-ask-input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--tx);
+  font-size:13px;font-family:inherit;padding:7px 0}
+.cpi-ask-input::placeholder{color:var(--tx3)}
+.cpi-ask-btn{flex:none;font-size:12px;font-weight:700;color:#0b1020;cursor:pointer;
+  padding:8px 15px;border:0;border-radius:var(--radius-pill);
+  background:linear-gradient(135deg,#8b93ff,#4fd8ef);transition:.16s}
+.cpi-ask-btn:hover{filter:brightness(1.08)}
+.cpi-ask-btn:disabled{opacity:.6;cursor:default;filter:none}
+.cpi-ask-note{font-size:11.5px;color:#a7f3d0;margin:-4px 0 10px;padding-left:4px}
+
+/* The query, said back. One line of chips above the panel, each removing its own
+   filter, so what is about to be searched is readable without opening anything. */
+.cpi-qbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 11px}
+.cpi-qbar-lbl{font-family:monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--tx3);margin-right:2px}
+.cpi-qchip{display:inline-flex;align-items:center;gap:5px;max-width:100%;
+  font-size:11.5px;color:var(--tx2);padding:4px 5px 4px 9px;border-radius:var(--radius-pill);
+  border:1px solid rgba(124,131,245,.38);background:rgba(124,131,245,.13)}
+.cpi-qchip i{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:#a9b0ff;opacity:.9}
+.cpi-qchip button{width:15px;height:15px;flex:none;border:0;border-radius:50%;cursor:pointer;
+  background:rgba(255,255,255,.10);color:#c8cdf0;font-size:11px;line-height:1;transition:.14s}
+.cpi-qchip button:hover{background:rgba(251,113,133,.28);color:#fff}
+.cpi-qbar-clear{font-size:11px;font-weight:650;color:var(--tx3);background:transparent;border:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:4px 6px}
+.cpi-qbar-clear:hover{color:#fda4af}
+
+/* Apollo's own count, shown while the filters are still being set. Muted, and
+   right-aligned against the Search button it describes. */
+.cpi-count-live{margin-left:auto;font-size:11.5px;color:var(--tx3);white-space:nowrap;
+  padding-right:4px}
+.cpi-count-live b{color:var(--tx2);font-weight:700}
+
+/* How many filters are set inside the collapsed advanced panel. Without it the
+   long tail is invisible while still narrowing the search. */
+.cpi-more-n{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
+  padding:0 4px;margin-left:5px;border-radius:var(--radius-pill);
+  background:rgba(124,131,245,.34);border:1px solid rgba(124,131,245,.5);
+  color:#dfe1ff;font-size:10px;font-weight:750}
+
+/* The working list drawer reuses the history drawer's shell; these are the
+   parts a list has and a log does not. */
+.cpi-dw-actions{flex:none;display:flex;gap:8px;padding:12px 16px 0}
+.cpi-dw-item{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;
+  background:rgba(255,255,255,.032);border:1px solid var(--b1);border-radius:var(--radius-md)}
+.cpi-dw-item-main{flex:1;min-width:0}
+.cpi-dw-title{font-size:12.5px;font-weight:650;color:var(--tx);display:flex;align-items:center;gap:7px}
+.cpi-dw-meta{font-size:11px;color:var(--tx3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpi-dw-badge{font-family:monospace;font-size:8.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:#a7f3d0;padding:2px 6px;border-radius:var(--radius-pill);
+  background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.32)}
+.cpi-dw-x-sm{width:22px;height:22px;flex:none;border-radius:50%;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);color:#9aa4c4;font-size:12px;cursor:pointer;transition:.16s}
+.cpi-dw-x-sm:hover{background:rgba(251,113,133,.2);color:#fff;border-color:rgba(251,113,133,.4)}
+
+/* Three columns is a lot below a laptop's width: the filter panel and the chat
+   both want room, and the grid loses first. Chat drops under the results rather
+   than being squeezed, which is also the order they are used in. */
+@media (max-width: 1400px){
+  .cpi-ask-input{font-size:12.5px}
+  .cpi-qchip{font-size:11px}
+}
+
+/* Each rejection reason as a button that removes the filter it blames. The
+   empty state already explained WHY nothing matched; this is the recovery. */
+.cpi-relax-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:6px;margin-top:12px;font-size:11.5px;color:var(--tx3)}
+.cpi-relax{font-size:11.5px;font-weight:650;color:#c9cdff;cursor:pointer;
+  padding:5px 11px;border-radius:var(--radius-pill);
+  border:1px solid rgba(124,131,245,.42);background:rgba(124,131,245,.12);transition:.15s}
+.cpi-relax:hover{border-color:rgba(124,131,245,.8);background:rgba(124,131,245,.24);color:#fff}
+.cpi-relax-dim{font-size:11.5px;color:var(--tx3);padding:5px 2px}
+.cpi-relax-sep{color:var(--tx3);opacity:.5}
+/* The price of the click, on the button. */
+.cpi-bulk-cost{text-decoration:none;opacity:.8;font-size:10.5px;font-weight:600;margin-left:5px}
+
+/* A combo's input is a flex item inside the combo wrapper, and .cpi-tag-input
+   carries min-width:200px so it holds its own in a plain filter row. Inside a
+   combo that wrapper can be narrower than 200px (the location pair is
+   min-width:160px each), and a flex item cannot shrink below its own min-width,
+   so the input overflowed its wrapper and painted across the next field. Its
+   own min-width:0 is what lets it follow the wrapper instead, which is the same
+   flex rule that bites everywhere else in this file. */
+.cpi-combo .cpi-combo-input{min-width:0;width:100%}
