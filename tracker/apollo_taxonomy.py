@@ -253,7 +253,18 @@ def industries_for(term: str) -> list:
     return exact or [i for i in SEED_INDUSTRIES if t in norm(i) or norm(i) in t]
 
 
-def suggest(query: str, learned=None, limit: int = 40) -> list:
+# How many entries one picker request may return. It used to be 40, which was
+# below the size of every vocabulary this app holds, so the list was a hard
+# alphabetical stop rather than a list: opening the industry picker and scrolling
+# to the bottom reached "executive office" and nothing after it, and 107 of the
+# 147 industries Apollo actually uses could not be browsed to at all. The cap now
+# sits above every seed vocabulary, so browsing reaches the end of the real list,
+# and `meta` reports when it is hit anyway (a user's learned locations can exceed
+# it) so a capped list can say so instead of ending silently.
+PICKER_LIMIT = 300
+
+
+def suggest(query: str, learned=None, limit: int = PICKER_LIMIT, meta=None) -> list:
     """Ranked picker entries for a partly-typed query.
 
     Each entry is {value, kind, confirmed, covers}:
@@ -265,6 +276,12 @@ def suggest(query: str, learned=None, limit: int = 40) -> list:
     Families rank above individual industries, and a prefix match above a
     mid-string one, because someone typing "heal" wants "healthcare" first and
     "mental health care" after it, not alphabetically.
+
+    If `meta` is passed a dict it is filled in with {"total", "truncated"}: how
+    many entries actually matched, before `limit` was applied. Same out-param
+    shape apollo_client.search_people uses for Apollo's pagination totals, and
+    for the same reason: a caller that shows a capped list must be able to say
+    it is capped rather than presenting the first N as the whole vocabulary.
     """
     q = norm(query)
     learned_norm = {norm(v): v for v in (learned or []) if str(v or "").strip()}
@@ -293,4 +310,7 @@ def suggest(query: str, learned=None, limit: int = 40) -> list:
     out.sort(key=lambda e: e["_rank"])
     for e in out:
         e.pop("_rank", None)
+    if meta is not None:
+        meta["total"] = len(out)
+        meta["truncated"] = len(out) > limit
     return out[:limit]

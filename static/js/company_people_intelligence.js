@@ -157,6 +157,14 @@ var COMBO_SPECS = [
   ["fcJobLocations",     "job_locations",        "location",   "location"]
 ];
 
+/* Written out rather than derived from the singular: "industry" pluralizes to
+   "industries", not "industrys", and there are only five nouns to cover. */
+var COMBO_PLURALS = {
+  "industry": "industries", "location": "locations", "technology": "technologies",
+  "NAICS code": "NAICS codes", "SIC code": "SIC codes"
+};
+function comboPlural(noun){ return COMBO_PLURALS[noun] || (noun+"s"); }
+
 /* The shapes Apollo enforces, and what to say when one is not met. Kept in step
    with tracker/apollo_vocab.py, which rejects the same values server-side: this
    copy exists to answer immediately, not to be the only guard. */
@@ -289,7 +297,7 @@ function closeAllCombos(){
   COMBO_SPECS.forEach(function(spec){ closeCombo(spec[0]); });
 }
 
-function renderComboList(key, entries, query){
+function renderComboList(key, entries, query, meta){
   var spec=comboSpec(key);
   var noun=spec?spec[3]:"value";
   var list=document.getElementById(key+"List");
@@ -321,7 +329,15 @@ function renderComboList(key, entries, query){
       return '<button type="button" class="cpi-opt'+(i===0?" cur":"")+'" role="option" '+
         'data-value="'+esc(e.value)+'" data-combo="'+esc(key)+'">'+tag+
         '<b>'+esc(e.value)+'</b>'+(sub?'<s>'+esc(sub)+'</s>':"")+'</button>';
-    }).join("");
+    }).join("")
+    /* A capped list has to say so. Without this the list simply stops, which
+       reads as the end of the vocabulary rather than the end of one page of it,
+       and there is nothing on screen to suggest that typing would reach more. */
+    + (meta && meta.truncated
+        ? '<div class="cpi-opt-none cpi-opt-more">Showing the first '+
+          esc(String(entries.length))+' of '+esc(String(meta.total))+
+          ' '+esc(comboPlural(noun))+'. Keep typing to narrow the list.</div>'
+        : "");
     COMBO_CUR=0;
   }
   list.classList.add("on");
@@ -353,19 +369,26 @@ function loadCombo(key){
   if(!spec||!input) return;
   var q=input.value.trim();
   var ck=spec[2]+"\n"+q.toLowerCase();
-  if(COMBO_CACHE[ck]){ renderComboList(key, COMBO_CACHE[ck], q); return; }
+  /* Cached with its meta, not just its entries: a cached list that lost the
+     "showing N of M" fact would silently claim to be the whole vocabulary the
+     second time it was opened. */
+  if(COMBO_CACHE[ck]){
+    renderComboList(key, COMBO_CACHE[ck].entries, q, COMBO_CACHE[ck].meta);
+    return;
+  }
   fetch(comboUrl(spec[2], q))
     .then(function(r){ return r.json(); })
     .then(function(d){
       var entries=(d&&d.entries)||[];
-      COMBO_CACHE[ck]=entries;
+      var meta={total:(d&&d.total), truncated:!!(d&&d.truncated)};
+      COMBO_CACHE[ck]={entries:entries, meta:meta};
       var list=document.getElementById(key+"List");
       /* A refusal already shown for this exact text stands: the response is a
          list of near matches, but the value cannot be used whatever it resembles. */
       if(list && list.dataset.warn==="1" && list.dataset.q===q) return;
       /* Only render if the box still says what was asked for: a slow response to
          an earlier keystroke must not replace the list for a later one. */
-      if(input.value.trim()===q) renderComboList(key, entries, q);
+      if(input.value.trim()===q) renderComboList(key, entries, q, meta);
     })
     .catch(function(){ /* the list is an aid; typing still works without it */ });
 }

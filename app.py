@@ -7763,8 +7763,15 @@ def cpi_industries():
     values Apollo has already been seen to use."""
     from tracker.apollo_taxonomy import suggest
     q = (request.args.get("q") or "").strip()[:60]
-    entries = suggest(q, learned=_cpi_industries_seen())
-    return jsonify({"query": q, "entries": entries})
+    meta = {}
+    entries = suggest(q, learned=_cpi_industries_seen(), meta=meta)
+    # total/truncated travel with the list so the picker can say it is showing
+    # part of the vocabulary. A list that just stops reads as the end of the
+    # vocabulary, which is how 107 of Apollo's 147 industries came to look as
+    # though they did not exist.
+    return jsonify({"query": q, "entries": entries,
+                    "total": meta.get("total", len(entries)),
+                    "truncated": bool(meta.get("truncated"))})
 
 
 # ── Learning Apollo's other closed vocabularies ───────────────────────────────
@@ -7920,8 +7927,11 @@ def cpi_vocab():
     if kind not in av.kinds():
         return jsonify({"error": "unknown vocabulary", "kinds": list(av.kinds())}), 400
     q = (request.args.get("q") or "").strip()[:60]
-    entries = av.suggest(kind, q, learned=_cpi_vocab_seen(kind))
+    meta = {}
+    entries = av.suggest(kind, q, learned=_cpi_vocab_seen(kind), meta=meta)
     return jsonify({"query": q, "kind": kind, "entries": entries,
+                    "total": meta.get("total", len(entries)),
+                    "truncated": bool(meta.get("truncated")),
                     "hint": av.hint(kind)})
 
 

@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=20">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=21">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -95,8 +95,14 @@
         <div class="cpi-fset">
           <div class="cpi-fset-lbl">Seniority</div>
           <div class="cpi-filter-row">
+            {# Apollo accepts eleven seniorities and this offered nine: "partner"
+               and "head" were missing, so a search for the partners at a firm or
+               the heads of a function could not be expressed here at all, even
+               though app.py's own _CPI_SENIORITY_ORDER has ranked all eleven
+               since this page shipped. Order follows that same tuple, which is
+               seniority order rather than alphabetical. #}
             <div class="cpi-chip-group" id="fpSeniority">
-              {% for s in [("owner","Owner"),("founder","Founder"),("c_suite","C-Suite"),("vp","VP"),("director","Director"),("manager","Manager"),("senior","Senior"),("entry","Entry"),("intern","Intern")] %}
+              {% for s in [("owner","Owner"),("founder","Founder"),("c_suite","C-Suite"),("partner","Partner"),("vp","VP"),("head","Head"),("director","Director"),("manager","Manager"),("senior","Senior"),("entry","Entry"),("intern","Intern")] %}
               <span class="cpi-chip" data-val="{{ s[0] }}" onclick="cpiToggleChip(this)">{{ s[1] }}</span>
               {% endfor %}
             </div>
@@ -566,7 +572,7 @@ window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 window.__CPI_INDUSTRIES_URL__ = "{{ industries_url }}";
 window.__CPI_VOCAB_URL__ = "{{ vocab_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=20" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=21" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');
