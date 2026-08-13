@@ -14,7 +14,7 @@ was called.
 The ledger is deliberately not called a balance. Apollo's usage endpoint reports
 per-endpoint rate limits and needs a master key this app does not hold, so the
 account total cannot be read from here; what the app can prove is its own
-spending, recorded at the four places a spend is reported to the user so the
+spending, recorded at the five places a spend is reported to the user so the
 header and the screen can never disagree.
 """
 
@@ -277,13 +277,32 @@ def test_the_ledger_never_raises(monkeypatch):
     appmod._cpi_credit_record("enrich", 2)      # must not raise
 
 
+def _app_src():
+    return open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "app.py"), encoding="utf-8").read()
+
+
 def test_every_paid_reply_records_what_it_reported():
-    """The header and the screen must come from the same event. Each of the four
+    """The header and the screen must come from the same event. Each of the five
     places that attaches `credits` to a reply also records it."""
-    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            "app.py"), encoding="utf-8").read()
+    src = _app_src()
     for action in ("company-resolve", "search-", "enrich", "enrich-bulk", "chat"):
         assert '_cpi_credit_record("%s' % action in src, action
+
+
+def test_the_ledger_comment_counts_its_own_call_sites():
+    """The comment above the ledger names how many places write to it, and that
+    number was wrong on the first pass: it said four when there were five. A
+    comment that miscounts the thing it documents is the same defect class this
+    page keeps finding in its own UI, so the two are pinned together. Adding a
+    sixth spend path is fine; leaving the sentence saying five is not."""
+    src = _app_src()
+    sites = src.count("_cpi_credit_record(") - src.count("def _cpi_credit_record(")
+    words = {4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"}
+    assert sites in words, "unexpected number of ledger call sites: %d" % sites
+    assert ("Written at the %s places" % words[sites]) in src, (
+        "the ledger comment does not say %r; there are %d call sites"
+        % (words[sites], sites))
 
 
 def test_the_summary_is_not_called_a_balance():

@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=22">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=23">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -504,6 +504,20 @@
       <div class="cpi-toolbar" id="cpiToolbar" style="display:none">
         <span class="cpi-tb-count" id="cpiCount"></span>
         <span class="cpi-tb-spacer"></span>
+        {# Cards read one person at a time; a table reads a whole page at once
+           and is how anyone actually compares twenty-four of them. The choice is
+           remembered, because it is a working preference rather than a per-search
+           decision. #}
+        <div class="cpi-viewtoggle" id="cpiViewToggle" role="group" aria-label="Result layout">
+          <button type="button" class="on" data-view="cards" onclick="cpiSetView('cards')" aria-label="Card view">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/></svg>
+            Cards
+          </button>
+          <button type="button" data-view="table" onclick="cpiSetView('table')" aria-label="Table view">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16"/></svg>
+            Table
+          </button>
+        </div>
         <button class="cpi-tb-btn" id="cpiSelectAll" onclick="cpiToggleSelectAll()">
           <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           Select all
@@ -637,7 +651,7 @@ window.__CPI_CREDITS_URL__ = "{{ credits_url }}";
 window.__CPI_LIST_URL__ = "{{ list_url }}";
 window.__CPI_PARSE_URL__ = "{{ parse_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=22" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=23" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');

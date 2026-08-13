@@ -3,8 +3,8 @@
 Reported: the location picker "only shows locations till Czech Republic and not
 the entire list", and other filters stop the same way. Czech Republic was the
 40th location alphabetically and the picker returned 40 entries, so the list was
-a hard alphabetical stop: 164 of the 204 places this app knows could not be
-browsed to at all, and the same cap hid 107 of Apollo's 147 industries, 81 NAICS
+a hard alphabetical stop: 163 of the 203 places this app offers could not be
+browsed to at all, and the same cap hid 128 of Apollo's 147 industries, 81 NAICS
 codes, 95 SIC codes and 128 technologies. A list that simply stops reads as the
 end of the vocabulary rather than the end of one page of it, which is this
 codebase's recurring defect: a surface asserting something its data does not

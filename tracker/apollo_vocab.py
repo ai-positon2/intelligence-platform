@@ -659,8 +659,9 @@ def split_valid(kind: str, values) -> tuple:
 #
 # It used to be 40, which was smaller than every vocabulary here, so the picker
 # was an alphabetical dead end: the location list stopped at "Czech Republic"
-# and 164 of its 204 places could not be browsed to at all. Every seed list
-# below (location 204, technology 168, sic 135, naics 121) now fits, and `meta`
+# and 163 of the 203 places it offers could not be browsed to at all. Every
+# seed list below fits (location 204 written down, 203 distinct once
+# "Singapore" is counted once; technology 168, sic 135, naics 121), and `meta`
 # reports a cap that is hit anyway, since learned values can push past it.
 PICKER_LIMIT = 300
 

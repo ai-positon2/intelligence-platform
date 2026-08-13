@@ -908,3 +908,128 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
    own min-width:0 is what lets it follow the wrapper instead, which is the same
    flex rule that bites everywhere else in this file. */
 .cpi-combo .cpi-combo-input{min-width:0;width:100%}
+
+/* ── Table view ─────────────────────────────────────────────────────────────
+   Cards are for judging one prospect; the table is for comparing a page of
+   them. Same rows and same actions, so this is layout only. */
+
+.cpi-viewtoggle{display:inline-flex;gap:2px;padding:2px;border-radius:var(--radius-pill);
+  border:1px solid var(--b1);background:rgba(255,255,255,.035)}
+.cpi-viewtoggle button{display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  font-size:11.5px;font-weight:650;font-family:inherit;color:var(--tx3);
+  padding:6px 12px;border:0;border-radius:var(--radius-pill);background:transparent;
+  transition:color .15s,background .15s}
+.cpi-viewtoggle button svg{width:13px;height:13px;fill:none;stroke:currentColor;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cpi-viewtoggle button:hover{color:var(--tx2)}
+.cpi-viewtoggle button.on{color:var(--tx);
+  background:linear-gradient(135deg,rgba(124,131,245,.30),rgba(167,139,250,.22));
+  box-shadow:0 1px 0 rgba(255,255,255,.07) inset}
+
+/* Its own scroller: a wide table must never make the PAGE scroll sideways, and
+   the rounded frame is what stops the last column looking cut off. */
+.cpi-tbl-wrap{overflow-x:auto;overscroll-behavior-x:contain;
+  border:1px solid var(--b1);border-radius:var(--radius-lg);
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.012));
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+.cpi-tbl-wrap::-webkit-scrollbar{height:8px}
+.cpi-tbl-wrap::-webkit-scrollbar-track{background:transparent}
+.cpi-tbl-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:var(--radius-pill)}
+.cpi-tbl{width:100%;border-collapse:separate;border-spacing:0;min-width:940px;
+  font-size:12.5px;color:var(--tx);
+  /* Fixed layout is what makes the percentage widths below authoritative and the
+     ellipsis predictable; with auto layout the browser sizes to content and a
+     long title stretches the table instead of truncating. */
+  table-layout:fixed}
+
+/* Sticky head, so the columns stay named however far down the page you read. */
+.cpi-tbl thead th{position:sticky;top:0;z-index:2;padding:0;text-align:left;
+  background:linear-gradient(180deg,#101529,#0d1120);
+  border-bottom:1px solid rgba(255,255,255,.10);white-space:nowrap}
+.cpi-tbl thead th::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(124,131,245,.5),rgba(34,211,238,.35),transparent)}
+.cpi-tbl thead th button{width:100%;display:inline-flex;align-items:center;gap:5px;
+  font-family:monospace;font-size:9.5px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--tx3);background:transparent;border:0;
+  cursor:pointer;padding:11px 12px;transition:color .15s}
+.cpi-tbl thead th.num button{justify-content:flex-end}
+.cpi-tbl thead th button:hover{color:var(--tx2)}
+.cpi-tbl thead th.sorted button{color:#c2c6fb}
+.cpi-th-ar{font-style:normal;font-size:10px;opacity:.9;min-width:7px}
+
+.cpi-tbl tbody td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.055);
+  vertical-align:middle;max-width:0}
+.cpi-tbl tbody tr:last-child td{border-bottom:0}
+.cpi-tbl tbody tr{transition:background .13s}
+.cpi-tbl tbody tr:nth-child(even){background:rgba(255,255,255,.014)}
+.cpi-tbl tbody tr:hover{background:rgba(124,131,245,.10)}
+.cpi-tbl tbody tr.sel{background:rgba(124,131,245,.17)}
+.cpi-tbl tbody tr.sel:hover{background:rgba(124,131,245,.22)}
+/* A row whose contact has been bought reads differently from one that has not. */
+.cpi-tbl tbody tr.enr td:first-child{box-shadow:inset 2px 0 0 rgba(52,211,153,.65)}
+
+/* Column widths. max-width:0 on the cells plus these percentages is what makes
+   the truncation below actually truncate instead of stretching the table. */
+.cpi-tbl .w-chk{width:38px;padding-left:14px;padding-right:0}
+.cpi-tbl .w-name{width:22%}
+.cpi-tbl .w-title{width:17%}
+.cpi-tbl .w-co{width:16%}
+.cpi-tbl .w-ind{width:13%}
+.cpi-tbl .w-loc{width:13%}
+.cpi-tbl .w-mail{width:15%}
+.cpi-tbl .w-num{width:82px;white-space:nowrap}
+.cpi-tbl .w-act{width:150px;padding-right:14px}
+.cpi-tbl td.num,.cpi-tbl th.num{text-align:right}
+/* Tabular figures, so a column of numbers lines up on its digits. */
+.cpi-td-n{font-variant-numeric:tabular-nums;color:var(--tx2);font-weight:600}
+.cpi-td-dim{color:var(--tx3)}
+.cpi-td-dim s{text-decoration:none;opacity:.75;font-size:10.5px}
+
+/* One line, ellipsised, with the full value on hover: a table earns its density
+   by never wrapping a cell to three lines. */
+.cpi-td-t{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpi-td-t s{text-decoration:none;color:var(--tx3);font-size:10px;margin-left:3px}
+
+.cpi-td-person{display:flex;align-items:center;gap:9px;min-width:0}
+.cpi-td-av{width:28px;height:28px;flex:none;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;font-size:10.5px;font-weight:700;
+  color:#0d1024;overflow:hidden;
+  background:linear-gradient(135deg,#8b93ff,#a78bfa);
+  box-shadow:0 0 0 1px rgba(255,255,255,.09)}
+.cpi-td-av.ph{background:#161c31}
+.cpi-td-av img{width:100%;height:100%;object-fit:cover;display:block}
+.cpi-td-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--tx);text-decoration:none;display:flex;align-items:center;gap:6px}
+.cpi-td-nm b{font-weight:650;overflow:hidden;text-overflow:ellipsis}
+a.cpi-td-nm:hover b{color:#c2c6fb;text-decoration:underline;text-underline-offset:2px}
+.cpi-td-co{display:flex;align-items:center;gap:7px;min-width:0;color:var(--tx2);
+  text-decoration:none}
+a.cpi-td-co:hover{color:#c2c6fb}
+.cpi-td-logo{width:16px;height:16px;flex:none;border-radius:4px;object-fit:contain;
+  background:rgba(255,255,255,.06)}
+.cpi-td-mail{color:#a7f3d0;text-decoration:none;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;display:inline-block;max-width:100%;vertical-align:bottom}
+.cpi-td-mail:hover{text-decoration:underline;text-underline-offset:2px}
+
+/* Actions stay put while the row scrolls under them horizontally. */
+.cpi-td-acts{display:flex;gap:6px;justify-content:flex-end}
+.cpi-ghost-btn.sm,.cpi-enrich-btn.sm{font-size:11px;padding:5px 10px}
+/* Smaller badges: the card versions are sized for a 46px avatar and overwhelm a
+   28px row. */
+.cpi-masked.sm,.cpi-badge.sm{font-size:8px;padding:1px 5px;flex:none}
+/* The row checkbox is absolutely positioned on a card; in a cell it is static. */
+.cpi-tbl .cpi-card-check{position:static;top:auto;right:auto}
+.cpi-tbl-note{margin-top:9px;font-size:11px;color:var(--tx3);padding-left:2px}
+
+/* No column is hidden at any width. The wrapper scrolls sideways instead, which
+   is one mechanism rather than two, and it never silently drops a field the
+   reader might be looking for. */
+
+/* Table view gives the results the full width and moves the chat beneath them.
+   A table competing with a 390px chat panel gets ~700px for eight columns, which
+   is how every cell ends up an ellipsis. Cards are the reading layout and belong
+   beside the assistant; the table is the comparing layout and wants the room.
+   One click back to Cards restores the side-by-side, so nothing is lost. */
+.cpi-layout.wide{grid-template-columns:minmax(0,1fr)}
+/* Full-bleed the chat would stretch its bubbles to an unreadable line length. */
+.cpi-layout.wide .cpi-chat{max-width:760px}
