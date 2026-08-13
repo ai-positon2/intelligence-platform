@@ -2277,6 +2277,51 @@ def _pe_emails(p: dict, contact: dict, email: str) -> list:
     return out[:6]
 
 
+_CPI_GROWTH_FIELDS = (
+    ("organization_headcount_six_month_growth", "6mo"),
+    ("organization_headcount_twelve_month_growth", "12mo"),
+)
+
+
+def _cpi_growth_pair(org: dict) -> tuple:
+    """The raw 6mo/12mo headcount-growth values off an Apollo org record, read
+    in one place so the fraction convention every renderer assumes (pmGrowth in
+    the JS, _cpi_export_percent here) has exactly one point to sanity-check.
+    Returns the values completely unconverted; nothing here scales them.
+
+    That convention was settled from repo evidence (fixtures recording 0.19 and
+    0.08, and the older External Usage export multiplying the same field by 100
+    since before this page existed), not a live probe: the free Apollo endpoint
+    strips org firmographics down to id/name/domain, and this repo has no
+    production key, so it could not be checked from the sandbox. If Apollo ever
+    actually sends a whole percent instead of a fraction for this field, every
+    fraction-multiplying renderer would print ~100x too high without saying so.
+    A value that already looks like a whole percent -- an integer of magnitude
+    2 or more -- logs loudly instead of silently trusting the convention, so the
+    first fast-growing company someone looks at with a real key either confirms
+    it or gets caught right here.
+    """
+    org = org or {}
+    out = []
+    for field, label in _CPI_GROWTH_FIELDS:
+        v = org.get(field)
+        out.append(v)
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            continue
+        if n == int(n) and abs(n) >= 2:
+            log.warning(
+                "cpi growth field %s=%s for %s looks like it may already be a "
+                "whole percent, not the fraction every renderer assumes -- if "
+                "this company really grew %s%% in %s, no action needed; if the "
+                "page or export instead show %s%%, the fraction convention "
+                "documented on _cpi_growth_pair needs revisiting",
+                field, v, org.get("name") or org.get("id") or "?", v, label,
+                n * 100)
+    return tuple(out)
+
+
 def _apollo_org_normalize(org: dict) -> dict:
     """One Apollo organization record -> the trimmed shape the Company card
     renders. Shared by a matched person's own employer and by the domain-only
@@ -2285,6 +2330,7 @@ def _apollo_org_normalize(org: dict) -> dict:
     if not org:
         return {}
     hq = ", ".join([x for x in [org.get("city"), org.get("state"), org.get("country")] if x])
+    _g6, _g12 = _cpi_growth_pair(org)
     return {
         "name": org.get("name") or "",
         "domain": org.get("primary_domain") or org.get("domain") or "",
@@ -2305,8 +2351,8 @@ def _apollo_org_normalize(org: dict) -> dict:
         "description": (org.get("short_description") or "")[:420],
         "keywords": _pe_names(org.get("keywords"), 14),
         "technologies": _pe_names(org.get("current_technologies"), 12),
-        "growth6": org.get("organization_headcount_six_month_growth"),
-        "growth12": org.get("organization_headcount_twelve_month_growth"),
+        "growth6": _g6,
+        "growth12": _g12,
         "growth24": org.get("organization_headcount_twenty_four_month_growth"),
     }
 
@@ -7570,6 +7616,7 @@ def _cpi_company_row(o: dict) -> dict:
     so there is real firmographic depth here to show. Still all optional: Apollo
     leaves plenty of these blank for smaller companies.
     """
+    _g6, _g12 = _cpi_growth_pair(o)
     return {
         "id": o.get("id"),
         "name": o.get("name"),
@@ -7596,8 +7643,8 @@ def _cpi_company_row(o: dict) -> dict:
         "phone": _cpi_org_phone(o),
         "raw_address": o.get("raw_address"),
         "industries": _pe_names(o.get("industries"), 4),
-        "growth6": o.get("organization_headcount_six_month_growth"),
-        "growth12": o.get("organization_headcount_twelve_month_growth"),
+        "growth6": _g6,
+        "growth12": _g12,
         "twitter_url": o.get("twitter_url"),
         "facebook_url": o.get("facebook_url"),
     }
@@ -8191,6 +8238,7 @@ def _cpi_employer_facts(o: dict) -> dict:
     afterwards are indistinguishable to the grid and to the export.
     """
     o = o or {}
+    _g6, _g12 = _cpi_growth_pair(o)
     return {
         # website_url last, because some records carry only that: a full URL where
         # a bare domain belongs still beats an employer row with no link at all.
@@ -8218,8 +8266,8 @@ def _cpi_employer_facts(o: dict) -> dict:
         "organization_keywords": _pe_names(o.get("keywords"), 12),
         "organization_technologies": _pe_names(
             o.get("technology_names") or o.get("current_technologies"), 12),
-        "organization_growth6": o.get("organization_headcount_six_month_growth"),
-        "organization_growth12": o.get("organization_headcount_twelve_month_growth"),
+        "organization_growth6": _g6,
+        "organization_growth12": _g12,
     }
 
 
@@ -9197,6 +9245,14 @@ def cpi_history():
             replace_id = int(body.get("replace_id") or 0)
         except (TypeError, ValueError):
             replace_id = 0
+        # A paged search that has grown past the per-entry cap used to be
+        # truncated here with nothing to show for it: the drawer would reopen
+        # 120 rows and call it the whole search, with no sign anything was cut.
+        # The client surfaces this the same way it surfaces a capped bulk
+        # enrich, so a user paging deep enough to hit it finds out from the
+        # page, not from noticing the reopened count is short.
+        kept_rows = rows[:_CPI_HISTORY_MAX_ROWS]
+        truncated = len(rows) > _CPI_HISTORY_MAX_ROWS
         from psycopg2.extras import Json
         with conn.cursor() as cur:
             new_id = created = None
@@ -9209,7 +9265,7 @@ def cpi_history():
                     "total = %s, rows = %s, created_at = now() "
                     "WHERE id = %s AND email = %s RETURNING id, created_at",
                     (entity, _cpi_history_label(entity, filters), Json(filters),
-                     body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS]),
+                     body.get("total"), Json(kept_rows),
                      replace_id, email))
                 got = cur.fetchone()
                 if got:
@@ -9219,12 +9275,17 @@ def cpi_history():
                     "INSERT INTO cpi_search_history (email, entity, label, filters, total, rows) "
                     "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at",
                     (email, entity, _cpi_history_label(entity, filters), Json(filters),
-                     body.get("total"), Json(rows[:_CPI_HISTORY_MAX_ROWS])))
+                     body.get("total"), Json(kept_rows)))
                 new_id, created = cur.fetchone()
             _cpi_history_prune(cur, email)
         conn.commit()
-        return jsonify({"saved": True, "available": True, "id": new_id,
-                        "created_at": created.isoformat() if created else None})
+        out = {"saved": True, "available": True, "id": new_id,
+               "created_at": created.isoformat() if created else None}
+        if truncated:
+            out["truncated"] = True
+            out["kept"] = _CPI_HISTORY_MAX_ROWS
+            out["of"] = len(rows)
+        return jsonify(out)
     except Exception as e:
         log.warning("cpi history %s failed: %s", request.method, e)
         try:
@@ -10560,6 +10621,14 @@ def _cpi_resolve_company_direct(name: str, api_key: str, domain: str = "",
     return _remember(None, choices)
 
 
+# Extensions guessed for a typed company name with no domain of its own. Order
+# is not significant: every guess rides in the same free search (see below) and
+# each candidate row is checked against the typed name independently, so trying
+# more here never changes which one wins, only whether a non-.com company is
+# found at all.
+_CPI_FREE_PROBE_TLDS = (".com", ".io", ".co", ".ai", ".net")
+
+
 def _cpi_probe_company_free(typed_name: str, api_key: str):
     """The Apollo organization for `typed_name`, resolved WITHOUT spending a
     credit, or None. Same {id, name, primary_domain} shape the paid resolver
@@ -10579,11 +10648,19 @@ def _cpi_probe_company_free(typed_name: str, api_key: str):
     exactly equal to the typed name. "Delta" guesses delta.com and finds "Delta
     Air Lines", which is not an exact normalized match, so this returns None and
     the caller falls through to the paid resolver and its disambiguation prompt,
-    exactly as before. Only .com is tried: a miss costs nothing but that
-    fall-through, whereas probing a list of TLDs would add latency to every
-    question. search_people enforces the employer domain strictly in code
-    (Apollo treats its own domain param as a fuzzy hint), so a row that comes
-    back really does work at that exact domain.
+    exactly as before. search_people enforces the employer domain strictly in
+    code (Apollo treats its own domain param as a fuzzy hint), so a row that
+    comes back really does work at one of the guessed domains.
+
+    _CPI_FREE_PROBE_TLDS names every extension guessed. This used to try only
+    .com, on the reasoning that trying more would mean more round trips for one
+    question. That reasoning was based on a wrong model of the call: Apollo's
+    company_domains filter already takes a LIST, so every guess rides in the
+    same single free request instead of one request per extension, and the
+    per-row name check below still has to pass before any of them is trusted.
+    Guessing more costs nothing extra; guessing only .com just meant "Tealium
+    Health" (a real, different company on .io) fell through to the paid
+    resolver every time someone asked about the .com Tealium.
     """
     typed = str(typed_name or "").strip()
     norm = _cpi_norm_name(typed)
@@ -10592,15 +10669,20 @@ def _cpi_probe_company_free(typed_name: str, api_key: str):
     # An input that is already a domain is resolved exactly by the normal path.
     if _cpi_is_domain_shaped(typed):
         return None
-    guess = re.sub(r"[^a-z0-9\-]", "", norm.replace(" ", "")) + ".com"
-    if not _cpi_is_domain_shaped(guess):
+    base = re.sub(r"[^a-z0-9\-]", "", norm.replace(" ", ""))
+    guesses = []
+    for tld in _CPI_FREE_PROBE_TLDS:
+        g = base + tld
+        if _cpi_is_domain_shaped(g):
+            guesses.append(g)
+    if not guesses:
         return None
     try:
         from tracker.apollo_client import search_people as _sp
-        rows = _sp({"company_domains": [guess], "max_people": 10}, api_key,
+        rows = _sp({"company_domains": guesses, "max_people": 10}, api_key,
                    per_page=10, strict=True)
     except Exception as e:
-        log.warning("cpi free company probe failed domain=%s: %s", guess, e)
+        log.warning("cpi free company probe failed domains=%s: %s", guesses, e)
         return None
     for r in (rows or []):
         org_name = str(r.get("organization_name") or "").strip()
@@ -10610,8 +10692,8 @@ def _cpi_probe_company_free(typed_name: str, api_key: str):
         if not (org_name and org_id) or _cpi_norm_name(org_name) != norm:
             continue
         dom = re.sub(r"^https?://", "",
-                     str(r.get("organization_domain") or guess).strip().lower()).rstrip("/")
-        dom = re.sub(r"^www\.", "", dom).split("/")[0] or guess
+                     str(r.get("organization_domain") or guesses[0]).strip().lower()).rstrip("/")
+        dom = re.sub(r"^www\.", "", dom).split("/")[0] or guesses[0]
         log.info("cpi free probe pinned an org at %s for 0 credits", dom)
         return {"id": org_id, "name": org_name, "primary_domain": dom}
     return None

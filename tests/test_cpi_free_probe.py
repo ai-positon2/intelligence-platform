@@ -82,7 +82,30 @@ def test_a_plain_name_is_pinned_from_the_guessed_domain(monkeypatch):
     org = appmod._cpi_probe_company_free("Tealium", "key")
     assert org == {"id": "org-tealium", "name": "Tealium",
                    "primary_domain": "tealium.com"}
-    assert seen[0]["company_domains"] == ["tealium.com"]
+    # Every extension is guessed in the SAME free call (company_domains takes a
+    # list), not one call per extension, so a non-.com company is reachable at
+    # no extra cost. tealium.com is still first, since _CPI_FREE_PROBE_TLDS
+    # lists it first and the row itself is what confirms the match either way.
+    assert seen[0]["company_domains"][0] == "tealium.com"
+    assert set(seen[0]["company_domains"]) == {
+        "tealium." + tld.lstrip(".") for tld in appmod._CPI_FREE_PROBE_TLDS}
+    assert len(seen) == 1, "one probe must mean one search_people call"
+
+
+def test_a_company_only_reachable_off_dot_com_still_resolves(monkeypatch):
+    """The actual defect: "Tealium Health" (real, on tealium.io) used to fall
+    through to the paid resolver on every question about it, purely because
+    the guess tried was tealium.com. The name match still has to pass -- this
+    is not "assume the first row back is right", it is "look at every guessed
+    domain in the one free call instead of just one of them"."""
+    row = dict(_TEALIUM_ROW, organization_id="org-tealium-health",
+              organization_name="Tealium Health", organization_domain="tealium.io")
+    seen = _people_stub(monkeypatch, lambda f: [row])
+    org = appmod._cpi_probe_company_free("Tealium Health", "key")
+    assert org == {"id": "org-tealium-health", "name": "Tealium Health",
+                   "primary_domain": "tealium.io"}
+    assert "tealiumhealth.io" in seen[0]["company_domains"]
+    assert len(seen) == 1
 
 
 def test_the_probe_never_touches_the_company_search(monkeypatch):

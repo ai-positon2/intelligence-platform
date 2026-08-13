@@ -1200,7 +1200,7 @@ window.cpiExport = function(fmt, onlySelected){
    search is one row in the drawer no matter how deep it is paged. */
 function saveHistory(isNewSearch){
   if(!STATE.results.length) return;
-  if(isNewSearch) STATE.historyId = null;
+  if(isNewSearch){ STATE.historyId = null; STATE.historyTruncated = false; }
   fetch(window.__CPI_HISTORY_URL__, {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ entity: STATE.shownEntity||STATE.entity,
@@ -1209,6 +1209,16 @@ function saveHistory(isNewSearch){
                            replace_id: STATE.historyId||0 })
   }).then(function(r){ return r.json(); }).then(function(d){
     if(d && d.id) STATE.historyId = d.id;
+    /* The server keeps only the first _CPI_HISTORY_MAX_ROWS of a paged
+       search; past that, "Load more" keeps growing the grid but the saved
+       entry stops growing with it. Told once per entry rather than on every
+       page past the cap, since the fact does not change on the second page
+       that trips it. */
+    if(d && d.truncated && !STATE.historyTruncated){
+      STATE.historyTruncated = true;
+      toast("History keeps the first "+d.kept+" of this search's "+d.of+
+            " rows; paging further won't add more to the saved entry.", "err");
+    }
   }).catch(function(){ /* history is best-effort, never blocks a search */ });
 }
 
