@@ -7773,7 +7773,7 @@ def cpi_industries():
     entries = suggest(q, learned=_cpi_industries_seen(), meta=meta)
     # total/truncated travel with the list so the picker can say it is showing
     # part of the vocabulary. A list that just stops reads as the end of the
-    # vocabulary, which is how 107 of Apollo's 147 industries came to look as
+    # vocabulary, which is how 128 of Apollo's 147 industries came to look as
     # though they did not exist.
     return jsonify({"query": q, "entries": entries,
                     "total": meta.get("total", len(entries)),
@@ -9892,7 +9892,7 @@ def cpi_count():
 # cannot stand behind, the ledger records what THIS TOOL spent, which it knows
 # exactly, and the header says precisely that.
 #
-# Written at the four places a spend is reported to the user, never anywhere
+# Written at the five places a spend is reported to the user, never anywhere
 # else, so the number in the header and the number on the screen come from the
 # same event and cannot drift apart.
 _CPI_LEDGER_TABLE_READY = False

@@ -256,7 +256,9 @@ def industries_for(term: str) -> list:
 # How many entries one picker request may return. It used to be 40, which was
 # below the size of every vocabulary this app holds, so the list was a hard
 # alphabetical stop rather than a list: opening the industry picker and scrolling
-# to the bottom reached "executive office" and nothing after it, and 107 of the
+# to the bottom reached "executive office" and nothing after it. Families sort
+# above individual industries, so those first 40 entries were 21 families and
+# only 19 industries: 128 of the
 # 147 industries Apollo actually uses could not be browsed to at all. The cap now
 # sits above every seed vocabulary, so browsing reaches the end of the real list,
 # and `meta` reports when it is hit anyway (a user's learned locations can exceed

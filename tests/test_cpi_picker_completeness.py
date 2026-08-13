@@ -7,8 +7,9 @@ Two separate defects were behind that.
 
 1. THE CAP. suggest() returned 40 entries and every vocabulary here is larger
    than 40, so with nothing typed the picker was a hard alphabetical stop rather
-   than a list. Czech Republic is the 40th location; 164 of the other 203 could
-   not be browsed to. Industry lost 107 of 147, NAICS 81 of 121, SIC 95 of 135,
+   than a list. Czech Republic is the 40th location; the other 163 of 203 could
+   not be browsed to. Industry lost 128 of 147 (its 21 families sort first, so
+   those 40 entries were 21 families and 19 industries), NAICS 81 of 121, SIC 95 of 135,
    technology 128 of 168. Typing narrowed the list, so a value could still be
    reached by guessing its spelling, but the picker exists precisely so that
    nobody has to guess Apollo's spelling.

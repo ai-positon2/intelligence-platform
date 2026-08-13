@@ -30,7 +30,16 @@ var STATE = { entity: "people", shownEntity: null, page: 1, results: [],
               selected: {},
               total: null, lastFilters: {}, historyId: null,
               pinnedOrgId: null, pinnedOrgName: null, firmo: null,
-              companyDetail: undefined, rejected: null, rejectedLabels: {} };
+              companyDetail: undefined, rejected: null, rejectedLabels: {},
+              /* Layout is a working preference, not a property of a search, so
+                 it is remembered across visits. Read defensively: localStorage
+                 throws in some privacy modes, and an unreadable preference is a
+                 reason to fall back to cards, not to break the page. */
+              view: (function(){
+                try{ return localStorage.getItem("cpi-view")==="table" ? "table" : "cards"; }
+                catch(e){ return "cards"; }
+              })(),
+              sortKey: null, sortDir: "asc" };
 var CHAT_HISTORY = [];
 /* The last real question the user typed, replayed verbatim when they pick a
    company from a disambiguation list so the original role/title is not lost. */
@@ -904,11 +913,213 @@ function renderResults(){
       : "<b>"+pmNum(shown)+"</b> <s>"+noun(shown)+"</s>")
       + firmoNote() + rejectedNote();
   }
-  wrap.innerHTML='<div class="cpi-grid">'+STATE.results.map(function(r,i){
-    return STATE.shownEntity==="people" ? personCard(r,i) : companyCard(r,i);
-  }).join("")+"</div>";
+  wrap.innerHTML = STATE.view==="table"
+    ? renderTable()
+    : '<div class="cpi-grid">'+STATE.results.map(function(r,i){
+        return STATE.shownEntity==="people" ? personCard(r,i) : companyCard(r,i);
+      }).join("")+"</div>";
   updateBulk();
   syncSelectAllLabel();
+}
+
+/* ── Table view ──
+   The cards read one person at a time, which is right for judging a single
+   prospect and wrong for comparing twenty-four. Same rows, same selection, same
+   actions: only the layout differs, so nothing here re-fetches or re-derives
+   anything the cards did not already have.
+
+   Every column is declared once with how to render it AND how to sort it, so a
+   column cannot end up sorting by something other than what it displays. */
+function tdTrunc(html, plain){
+  return '<span class="cpi-td-t"'+(plain?' title="'+esc(plain)+'"':"")+'>'+html+'</span>';
+}
+
+function coCell(r){
+  var name=r.organization_name||r.name;
+  if(!name) return '<span class="cpi-td-dim">–</span>';
+  var lg=safeUrl(r.organization_logo||r.logo_url);
+  var dom=r.organization_domain||r.primary_domain;
+  var inner=(lg?'<img class="cpi-td-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':"")+
+    '<span class="cpi-td-t">'+esc(name)+'</span>';
+  return dom
+    ? '<a class="cpi-td-co" href="'+esc(safeUrl("https://"+String(dom).replace(/^https?:\/\//i,"")))+
+      '" target="_blank" rel="noopener noreferrer" title="'+esc(name+" · "+dom)+'">'+inner+"</a>"
+    : '<span class="cpi-td-co" title="'+esc(name)+'">'+inner+"</span>";
+}
+
+var TABLE_COLS = {
+  people: [
+    {key:"full_name", label:"Name", cls:"w-name", sort:function(r){ return (r.full_name||"").toLowerCase(); },
+     cell:function(r,i){
+       var photo=safeUrl(r.photo_url);
+       var av=photo
+         ? '<span class="cpi-td-av ph"><img src="'+esc(photo)+'" alt="" loading="lazy" onerror="this.parentNode.textContent=\''+esc(initials(r.full_name))+'\'"></span>'
+         : '<span class="cpi-td-av">'+esc(initials(r.full_name))+'</span>';
+       var badges=(r.name_masked?'<span class="cpi-masked sm" title="Apollo masks this surname on the current plan. Enrich to reveal it.">masked</span>':"")+
+                  (r.enriched?'<span class="cpi-badge ok sm">enriched</span>':"");
+       var nm='<b>'+esc(r.full_name||"Unknown")+"</b>"+badges;
+       return '<div class="cpi-td-person">'+av+
+         (r.linkedin_url
+            ? '<a class="cpi-td-nm" href="'+esc(safeUrl(r.linkedin_url))+'" target="_blank" rel="noopener noreferrer" title="'+esc(r.full_name||"")+'">'+nm+"</a>"
+            : '<span class="cpi-td-nm" title="'+esc(r.full_name||"")+'">'+nm+"</span>")+"</div>";
+     }},
+    {key:"title", label:"Title", cls:"w-title", sort:function(r){ return cleanTitle(r.title||r.headline).toLowerCase(); },
+     cell:function(r){ var t=cleanTitle(r.title||r.headline);
+       return t?tdTrunc(esc(t), t):'<span class="cpi-td-dim">–</span>'; }},
+    {key:"organization_name", label:"Company", cls:"w-co", sort:function(r){ return (r.organization_name||"").toLowerCase(); },
+     cell:function(r){ return coCell(r); }},
+    {key:"organization_industry", label:"Industry", cls:"w-ind", sort:function(r){ return (r.organization_industry||"").toLowerCase(); },
+     cell:function(r){ return r.organization_industry?tdTrunc(esc(r.organization_industry), r.organization_industry):'<span class="cpi-td-dim">–</span>'; }},
+    {key:"organization_employees", label:"Size", cls:"w-num", num:true, sort:function(r){ return +r.organization_employees||-1; },
+     cell:function(r){ return r.organization_employees?'<span class="cpi-td-n">'+pmNum(r.organization_employees)+"</span>":'<span class="cpi-td-dim">–</span>'; }},
+    {key:"location", label:"Location", cls:"w-loc", sort:function(r){ return (placeLine(r.city,r.state,r.country)||coHq(r)||"").toLowerCase(); },
+     cell:function(r){
+       var own=placeLine(r.city,r.state,r.country);
+       if(own) return tdTrunc(esc(own), own);
+       var hq=coHq(r);
+       /* Labelled, because "their head office is in London" is a different fact
+          from "this person is in London" and a rep acts differently on each. */
+       return hq?tdTrunc(esc(hq)+' <s>HQ</s>', hq+" (company HQ)"):'<span class="cpi-td-dim">–</span>';
+     }},
+    {key:"email", label:"Email", cls:"w-mail", sort:function(r){ return (r.email||"~").toLowerCase(); },
+     cell:function(r){
+       if(r.email) return '<a class="cpi-td-mail" href="mailto:'+esc(r.email)+'" title="'+esc(r.email)+'">'+esc(r.email)+"</a>"+
+         (r.email_status==="verified"?'<span class="cpi-badge ok sm">ok</span>':"");
+       return '<span class="cpi-td-dim">Enrich <s>1 credit</s></span>';
+     }}
+  ],
+  companies: [
+    {key:"name", label:"Company", cls:"w-name", sort:function(r){ return (r.name||"").toLowerCase(); },
+     cell:function(r){ return '<div class="cpi-td-person">'+coCell(r)+"</div>"; }},
+    {key:"industry", label:"Industry", cls:"w-ind", sort:function(r){ return (r.industry||"").toLowerCase(); },
+     cell:function(r){ return r.industry?tdTrunc(esc(r.industry), r.industry):'<span class="cpi-td-dim">–</span>'; }},
+    {key:"estimated_num_employees", label:"Size", cls:"w-num", num:true, sort:function(r){ return +r.estimated_num_employees||-1; },
+     cell:function(r){ return r.estimated_num_employees?'<span class="cpi-td-n">'+pmNum(r.estimated_num_employees)+"</span>":'<span class="cpi-td-dim">–</span>'; }},
+    {key:"annual_revenue", label:"Revenue", cls:"w-num", num:true, sort:function(r){ return +r.annual_revenue||-1; },
+     cell:function(r){ var m=pmMoney(r.annual_revenue,r.revenue_printed);
+       return m?'<span class="cpi-td-n">'+esc(m)+"</span>":'<span class="cpi-td-dim">–</span>'; }},
+    {key:"total_funding", label:"Funding", cls:"w-num", num:true, sort:function(r){ return +r.total_funding||-1; },
+     cell:function(r){ return r.total_funding?'<span class="cpi-td-n">$'+pmNum(r.total_funding)+"</span>":'<span class="cpi-td-dim">–</span>'; }},
+    {key:"hq", label:"HQ", cls:"w-loc", sort:function(r){ return (placeLine(r.city,r.state,r.country)||"").toLowerCase(); },
+     cell:function(r){ var h=placeLine(r.city,r.state,r.country);
+       return h?tdTrunc(esc(h), h):'<span class="cpi-td-dim">–</span>'; }},
+    {key:"founded_year", label:"Founded", cls:"w-num", num:true, sort:function(r){ return +r.founded_year||-1; },
+     cell:function(r){ return r.founded_year?'<span class="cpi-td-n">'+esc(String(r.founded_year))+"</span>":'<span class="cpi-td-dim">–</span>'; }}
+  ]
+};
+
+/* Indices, not rows. Every action on this page addresses a row by its position
+   in STATE.results (cpiToggleSelect, cpiOpenDetails, cpiOpenEnrich), so sorting
+   a copy of the array would silently point every button at the wrong person.
+   The display order is a permutation of indices and the original index travels
+   with each rendered row. */
+function tableOrder(cols){
+  var order=STATE.results.map(function(_r,i){ return i; });
+  if(!STATE.sortKey) return order;
+  var col=null;
+  cols.forEach(function(c){ if(c.key===STATE.sortKey) col=c; });
+  if(!col) return order;
+  var dir=STATE.sortDir==="desc"?-1:1;
+  return order.slice().sort(function(a,b){
+    var x=col.sort(STATE.results[a]), y=col.sort(STATE.results[b]);
+    if(x<y) return -1*dir;
+    if(x>y) return 1*dir;
+    return a-b;                     /* stable: equal values keep Apollo's order */
+  });
+}
+
+window.cpiSortBy = function(key){
+  if(STATE.sortKey===key) STATE.sortDir = STATE.sortDir==="asc" ? "desc" : "asc";
+  else { STATE.sortKey=key; STATE.sortDir="asc"; }
+  renderResults();
+};
+
+function renderTable(){
+  var cols=TABLE_COLS[STATE.shownEntity==="companies"?"companies":"people"];
+  var order=tableOrder(cols);
+  var head=cols.map(function(c){
+    var on=STATE.sortKey===c.key;
+    var arrow=on?(STATE.sortDir==="asc"?"↑":"↓"):"";
+    return '<th class="'+c.cls+(c.num?" num":"")+(on?" sorted":"")+'">'+
+      '<button type="button" onclick="cpiSortBy(\''+esc(c.key)+'\')" '+
+      'aria-label="Sort by '+esc(c.label)+'">'+esc(c.label)+
+      '<i class="cpi-th-ar">'+arrow+"</i></button></th>";
+  }).join("");
+  var body=order.map(function(i){
+    var r=STATE.results[i];
+    var sel=STATE.selected[r.id]?" sel":"";
+    var cells=cols.map(function(c){
+      return '<td class="'+c.cls+(c.num?" num":"")+'">'+c.cell(r,i)+"</td>";
+    }).join("");
+    return '<tr class="'+sel.trim()+(r.enriched?" enr":"")+'">'+
+      '<td class="w-chk"><button class="cpi-card-check'+(sel?" on":"")+'" '+
+        'onclick="cpiToggleSelect('+i+')" aria-label="Select row"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button></td>'+
+      cells+
+      '<td class="w-act"><div class="cpi-td-acts">'+
+        '<button class="cpi-ghost-btn sm" onclick="cpiOpenDetails('+i+')">Details</button>'+
+        (STATE.shownEntity==="people"
+          ? '<button class="cpi-enrich-btn sm" onclick=\'cpiOpenEnrich("person",'+i+')\'>Enrich</button>'
+          : '<button class="cpi-enrich-btn sm" onclick=\'cpiOpenEnrich("company",'+i+')\'>Enrich</button>')+
+      "</div></td></tr>";
+  }).join("");
+  /* Sorting reorders the rows that are LOADED, which is not the same as the top
+     of the whole result set. With more matches than rows on screen, saying so is
+     the difference between "the biggest companies that matched" and "the biggest
+     of the two dozen fetched so far".
+
+     Guarded on a column that really exists in this tab's set: the two tabs have
+     different columns, so a sort key left over from the other one sorts nothing,
+     and a note claiming a sort that is not in effect is its own small lie. */
+  var sortLive=cols.some(function(c){ return c.key===STATE.sortKey; });
+  var note = (sortLive && STATE.total && STATE.total>STATE.results.length)
+    ? '<div class="cpi-tbl-note">Sorted within the '+pmNum(STATE.results.length)+
+      ' rows loaded so far, not across all '+pmNum(STATE.total)+
+      ' matches. Load more to sort over more of them.</div>'
+    : "";
+  return '<div class="cpi-tbl-wrap"><table class="cpi-tbl"><thead><tr>'+
+    '<th class="w-chk"></th>'+head+'<th class="w-act"></th>'+
+    "</tr></thead><tbody>"+body+"</tbody></table></div>"+note;
+}
+
+window.cpiSetView = function(view){
+  STATE.view = view==="table" ? "table" : "cards";
+  try{ localStorage.setItem("cpi-view", STATE.view); }catch(e){}
+  document.querySelectorAll("#cpiViewToggle button").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-view")===STATE.view);
+  });
+  /* The table takes the whole width and the chat moves below it. Done here
+     rather than in renderResults so the layout follows the CHOSEN view even
+     before a search has run. */
+  var lay=document.querySelector(".cpi-layout");
+  if(lay) lay.classList.toggle("wide", STATE.view==="table");
+  if(STATE.results.length) renderResults();
+};
+
+/* Apollo returns some titles with the same role stated twice, joined by a comma,
+   an ampersand or a slash: "Marketing Director, Marketing Director" and
+   "Director, Marketing & Director, Marketing" are both real values from one
+   search. Only an EXACT repeat is collapsed, so "Director, Marketing & Sales"
+   and "VP Sales / EMEA" survive untouched. The stored value is never changed:
+   this is a display cleanup, and the Details view and every export still carry
+   Apollo's string as Apollo sent it. */
+function cleanTitle(t){
+  var s=String(t==null?"":t).trim();
+  if(!s) return "";
+  /* Each separator is tried in turn and a split that does not come out all-equal
+     simply falls through to the next, so the order below is readability only and
+     does not change any result: "Director, Marketing & Director, Marketing"
+     fails the comma split (three unequal parts) and is then caught by " & ".
+     Splitting on ONE separator is what matters; which one is found first is not. */
+  var seps=[/\s+&\s+/, /\s+\/\s+/, /\s+\|\s+/, /\s*,\s*/];
+  for(var i=0;i<seps.length;i++){
+    var parts=s.split(seps[i]);
+    if(parts.length<2) continue;
+    var first=parts[0].trim().toLowerCase();
+    if(!first) continue;
+    var same=parts.every(function(p){ return p.trim().toLowerCase()===first; });
+    if(same) return parts[0].trim();
+  }
+  return s;
 }
 
 function row(svg, inner){ return '<div class="cpi-row">'+svg+'<span>'+inner+'</span></div>'; }
@@ -2671,5 +2882,8 @@ renderQueryBar();
 syncMoreBadge();
 loadSpend();
 loadList().catch(function(){ /* the badge is optional */ });
+/* Reflect the remembered layout on the toggle before any results exist, so the
+   control never disagrees with the view the first search will render in. */
+window.cpiSetView(STATE.view);
 
 })();
