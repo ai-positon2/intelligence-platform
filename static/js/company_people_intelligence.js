@@ -2347,6 +2347,13 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
     .then(function(r){ return r.json(); })
     .then(function(d){
       removeTyping(); sendBtn.disabled=false;
+      /* The question moved off the pinned company (it asked about an industry, a
+         place, a size), so stop sending that company with the next turn. Without
+         this the pin outlives the subject: the server drops it for one answer and
+         the client hands it straight back on the following question. Cleared
+         before the line below so a reply that carries a company of its own still
+         wins. */
+      if(d && d.clear_context){ ACTIVE_COMPANY = null; }
       /* Pin whatever company the server actually resolved, so the next turn
          inherits it instead of re-disambiguating. */
       if(d && d.context && d.context.org_id){ ACTIVE_COMPANY = d.context; }
