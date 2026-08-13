@@ -10184,6 +10184,14 @@ _CPI_INTENT_SYSTEM = (
     "the conversation history to resolve company_name to that specific company's name, and "
     "carry over whatever titles/roles were being asked about in the turn before the list was "
     "shown.\n\n"
+    "Otherwise the history is context, not the question. A company discussed earlier only "
+    "belongs in company_name when the LATEST message is still about that company, either by "
+    "naming it or by pointing back at it (\"their CFO\", \"who else works there\", \"how big "
+    "is it\"). When the latest message instead describes companies by attribute (an industry, "
+    "a place, a size, a technology), leave company_name EMPTY, even if the turn before it was "
+    "about one named company: \"list VPs of Sales at healthcare companies in Texas\" asks "
+    "about healthcare companies in Texas and nothing else, so it takes industries "
+    "[\"healthcare\"] and a location, with no company_name at all.\n\n"
     "intent is \"person_at_company\" for a specific role at a specific company (\"who is the "
     "CMO of Acme\"), \"people_list\" for broader multi-person requests (\"list VPs of sales in "
     "healthcare\") or any count question, \"company_info\" for questions about a company itself "
@@ -11909,6 +11917,71 @@ def _cpi_chat_employer_filters(intent: dict) -> dict:
     return out
 
 
+# Words that point back at a company named earlier in the conversation rather
+# than at a new one. "do they have a CFO", "is it in healthcare", "who works
+# there" are all still about the pinned company, so they must not trip the
+# population guard below.
+#
+# "there" is only counted in the phrasings where it means "at that company".
+# English also uses it as a bare placeholder, and "are there any healthcare
+# companies in Texas" is exactly the kind of question this guard exists to let
+# through: reading that "there" as a reference would put the previous company
+# straight back on the search.
+_CPI_CHAT_BACKREF = re.compile(
+    r"\b(they|them|their|theirs|it|its)\b"
+    r"|\b(that|this|the|the same) (company|firm|org|organisation|organization)\b"
+    r"|\b(work|works|working|worked|else|anyone|anybody|employed) there\b",
+    re.I)
+
+
+def _cpi_chat_names_company(message: str, *names) -> bool:
+    """Does this message itself name that company?
+
+    Compared as a contiguous run of normalized tokens, not as a substring: the
+    normalizer strips "co" and "company" to a bare token, and a substring test
+    would then read "co" out of the middle of "coffee" and conclude the user had
+    named a company they never mentioned.
+
+    Several names are accepted because the parser rewrites what the user typed:
+    a corrected spelling ("snowflke" -> "Snowflake") or an expanded abbreviation
+    ("MSFT" -> "Microsoft") is still the user naming that company, and only the
+    verbatim string it kept is in the message.
+    """
+    haystack = _cpi_norm_name(message).split()
+    if not haystack:
+        return False
+    for name in names:
+        want = _cpi_norm_name(name).split()
+        if not want:
+            continue
+        for i in range(len(haystack) - len(want) + 1):
+            if haystack[i:i + len(want)] == want:
+                return True
+    return False
+
+
+def _cpi_chat_asks_about_a_population(intent: dict) -> bool:
+    """Is this question about a SET of companies rather than about one company?
+
+    An industry, a technology, an HQ, a size band, a revenue band or a
+    classification code describes companies by attribute. Nobody asks for
+    "healthcare companies in Texas" and means the one company they were reading
+    about a moment ago, so a company carried over from an earlier turn has to be
+    dropped when this is true -- otherwise the earlier company silently becomes
+    the entire search, which is the bug this exists to prevent: "list VPs of
+    Sales at healthcare companies in Texas" answered "nobody in sales at
+    Snowflake", because Snowflake was still pinned from the question before it.
+
+    person_locations is deliberately NOT counted. It constrains where the PEOPLE
+    are, not which companies they work for, so "any of them in Texas?" is a
+    legitimate follow-up about the company already being discussed.
+    """
+    intent = intent or {}
+    if _cpi_chat_employer_filters(intent):
+        return True
+    return bool(_cpi_chat_codes(intent)[0])
+
+
 def _cpi_chat_company_scope(employer: dict, api_key: str, spend: dict) -> tuple:
     """(orgs, rejected) -- the companies that genuinely match the employer
     constraints in the question, and why the others did not.
@@ -12032,6 +12105,13 @@ def _cpi_chat_reply(spend: dict, **fields):
     n = int((spend or {}).get("credits") or 0)
     if n:
         fields["credits"] = n
+    # This turn stopped being about the company the client had pinned, so tell it
+    # to forget that company. Sent from here rather than from the branch that
+    # decided it, because any of them can be the one that answers. Skipped when
+    # this reply carries a company of its own: that one supersedes the old pin
+    # already, and sending both would be telling the client two things at once.
+    if getattr(g, "_cpi_chat_clear_context", False) and not fields.get("context"):
+        fields["clear_context"] = True
     _cpi_chat_remember(fields, n)
     _cpi_credit_record("chat", n)
     return jsonify(fields)
@@ -12175,6 +12255,42 @@ def cpi_chat():
         max_results = 10
 
     has_pick = bool(selected_org_id or selected_domain)
+
+    # ── One conversation, two different questions ────────────────────────────
+    # A company stays pinned across turns so "and their VP of Sales?" does not
+    # have to name it again. That inheritance is wrong the moment the user stops
+    # asking about that company and starts asking about a POPULATION of
+    # companies: "list VPs of Sales at healthcare companies in Texas" was
+    # answered "no matching people at Snowflake", because Snowflake was pinned by
+    # the question before it and a pinned company suppresses the industry, HQ,
+    # size and technology filters entirely (see the employer note further down).
+    # The answer then described a company the user had stopped asking about, with
+    # nothing on screen to show the swap had happened.
+    #
+    # Both routes into that state are closed here, in Python rather than by
+    # asking the parser to be careful: the context pin the client sent, and a
+    # company_name the parser lifted out of the conversation history. The test is
+    # the message itself. If this turn describes companies by attribute, and does
+    # not name that company, and does not point back at it ("their", "there"),
+    # then it is not this turn's company.
+    if _cpi_chat_asks_about_a_population(intent) and not has_pick \
+            and not _CPI_CHAT_BACKREF.search(message):
+        if company_name and not _cpi_chat_names_company(message, company_name,
+                                                        typed_company):
+            log.info("cpi chat: dropping carried-over company %r, this question "
+                     "asks about a population of companies", company_name)
+            company_name, typed_company = "", ""
+        if context_org_id and not _cpi_chat_names_company(message, context_name):
+            log.info("cpi chat: unpinning %r, this question asks about a "
+                     "population of companies", context_name)
+            context_org_id, context_domain, context_name = "", "", ""
+            # The client keeps the pin until it is told otherwise, so without
+            # this the very next turn re-sends the company we just dropped.
+            # Stashed on g for the same reason the question is: every branch
+            # answers through _cpi_chat_reply, and threading a flag through all
+            # of them is how one of them ends up forgetting it.
+            g._cpi_chat_clear_context = True
+
     if kind == "unclear" and not titles and not company_name and not has_pick:
         # Nothing to look up in Apollo does not mean nothing to answer. Research
         # the question and answer it properly instead of handing back a menu of
