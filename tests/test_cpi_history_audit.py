@@ -465,6 +465,60 @@ def test_listing_the_drawer_expires_before_it_lists(client, monkeypatch):
     assert order[1].startswith("SELECT")
 
 
+# ── A paged search that outgrows the per-entry cap ───────────────────────────
+#
+# _CPI_HISTORY_MAX_ROWS caps how many result rows one entry stores. Paging deep
+# enough to cross it used to be truncated with nothing to show for it: the
+# insert/update wrote the first 120 rows and the response said only "saved",
+# so a search left off at row 200 silently reopened as a search of 120.
+
+def _rows(n):
+    return [{"id": "p%d" % i} for i in range(n)]
+
+
+def test_a_search_within_the_cap_is_not_flagged(client, fake_pg):
+    fake_pg()
+    r = client.post(_HISTORY, json={"entity": "people", "rows": _rows(50),
+                                    "total": 50})
+    body = r.get_json()
+    assert body["saved"] is True
+    assert "truncated" not in body
+
+
+def test_a_search_past_the_cap_says_so(client, fake_pg):
+    fake_pg()
+    r = client.post(_HISTORY, json={"entity": "people", "rows": _rows(200),
+                                    "total": 200})
+    body = r.get_json()
+    assert body["saved"] is True
+    assert body["truncated"] is True
+    assert body["kept"] == appmod._CPI_HISTORY_MAX_ROWS
+    assert body["of"] == 200
+
+
+def test_a_paged_save_that_crosses_the_cap_also_says_so(client, fake_pg):
+    """The same signal on the replace_id path a "Load more" actually takes, not
+    just on a fresh insert."""
+    conn = fake_pg()
+    r = client.post(_HISTORY, json={"entity": "people", "rows": _rows(150),
+                                    "total": 150, "replace_id": 7})
+    body = r.get_json()
+    assert body["truncated"] is True
+    update_params = _stmts(conn, "UPDATE")[0][1]
+    stored_rows = update_params[4]
+    assert len(stored_rows.adapted) == appmod._CPI_HISTORY_MAX_ROWS
+
+
+def test_the_stored_rows_are_still_capped(client, fake_pg):
+    """The response gains a warning; the row cap itself is unchanged."""
+    conn = fake_pg()
+    client.post(_HISTORY, json={"entity": "people", "rows": _rows(200),
+                                "total": 200})
+    insert_params = _stmts(conn, "INSERT INTO cpi_search_history")[0][1]
+    stored_rows = insert_params[5]
+    assert len(stored_rows.adapted) == appmod._CPI_HISTORY_MAX_ROWS
+
+
 # ── What an entry is called ──────────────────────────────────────────────────
 
 def _label(**filters):
