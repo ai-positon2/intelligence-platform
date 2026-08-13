@@ -806,6 +806,15 @@ function firmoNote(){
 /* One source of truth for what was removed and why, because two places now say
    it: the count line when some rows survived, and the empty state when none did.
    Returns null when nothing was removed. */
+/* Which filter each rejection reason came from, so a reason can offer to relax
+   the exact thing that caused it. A reason with no entry here is still shown,
+   just not clickable: guessing at which control to clear would be worse than
+   leaving it to the reader. */
+var REJECT_FILTER = {
+  industry:"industries", employees:"employee_min", revenue:"revenue_min",
+  hq:"company_locations", technology:"technologies", title:"titles"
+};
+
 function rejectedReasons(){
   var r=STATE.rejected;
   if(!r) return null;
@@ -814,10 +823,42 @@ function rejectedReasons(){
   var total=0;
   keys.forEach(function(k){ total+=r[k]; });
   keys.sort(function(a,b){ return r[b]-r[a]; });
-  return { total: total, text: keys.map(function(k){
+  return { total: total, keys: keys, text: keys.map(function(k){
     return pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
   }).join(", ") };
 }
+
+/* The same reasons, each one a button that drops the filter it blames and runs
+   the search again. An explanation the reader has to act on by hand is only
+   half of one, and the filter responsible is already known here. */
+function rejectedActions(){
+  var why=rejectedReasons();
+  if(!why) return "";
+  var r=STATE.rejected;
+  var parts=why.keys.map(function(k){
+    var label=pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
+    var filt=REJECT_FILTER[k];
+    if(!filt) return '<span class="cpi-relax-dim">'+esc(label)+"</span>";
+    return '<button type="button" class="cpi-relax" onclick="cpiRelax(\''+esc(k)+'\')" '+
+      'title="Remove that filter and search again">'+esc(label)+"</button>";
+  });
+  return '<div class="cpi-relax-row"><span>Removed '+pmNum(why.total)+": </span>"+
+    parts.join('<span class="cpi-relax-sep">·</span>')+"</div>";
+}
+
+/* Drop the filter a rejection reason blames, then re-run. Both halves of an
+   employee or revenue band go together: clearing only the floor and leaving the
+   ceiling would re-run a search that still excludes for the same reason. */
+window.cpiRelax = function(reasonKey){
+  var filt=REJECT_FILTER[reasonKey];
+  if(!filt) return;
+  window.cpiDropFilter(filt);
+  if(filt==="employee_min") window.cpiDropFilter("employee_max");
+  if(filt==="revenue_min") window.cpiDropFilter("revenue_max");
+  if(filt==="technologies") window.cpiDropFilter("technologies_all");
+  toast("Removed that filter. Searching again.", "ok");
+  window.cpiRunSearch(true);
+};
 
 function rejectedNote(){
   var why=rejectedReasons();
@@ -847,9 +888,9 @@ function renderResults(){
       (why
         ? "Apollo returned "+pmNum(why.total)+" "+noun(why.total)+
           ", and on checking, none of them matched: "+esc(why.text)+
-          ". Try widening those filters."
+          ". Remove a filter to widen the search:"
         : "No matches. Try widening the filters.")+
-      "</span></div>";
+      "</span>"+(why?rejectedActions():"")+"</div>";
     if(bar) bar.style.display="none";
     updateBulk();
     return;
@@ -1106,6 +1147,20 @@ function updateBulk(){
   if(lbl) lbl.innerHTML="<b>"+n+"</b> selected";
   var enr=document.getElementById("cpiBulkEnrich");
   if(enr) enr.style.display = STATE.shownEntity==="people" ? "" : "none";
+  /* What the click will cost, on the button, before it is clicked. Only rows
+     that are not already enriched can charge, which is the same set
+     cpiEnrichSelected actually sends, so the quoted price is the real one.
+     Says "up to" because a row Apollo has cached costs nothing. */
+  if(enr && STATE.shownEntity==="people"){
+    var pay=selectedRows().filter(function(r){ return r.id && !r.enriched; }).length;
+    var lab=enr.querySelector(".cpi-bulk-cost");
+    if(!lab){
+      lab=document.createElement("s");
+      lab.className="cpi-bulk-cost";
+      enr.appendChild(lab);
+    }
+    lab.textContent = pay ? (" · up to "+pay+" credit"+(pay===1?"":"s")) : " · free";
+  }
 }
 
 window.cpiToggleMenu = function(id){
@@ -2093,9 +2148,528 @@ function sendChat(text, selectedDomain, selectedName, selectedOrgId){
     });
 }
 
+/* ── Saying the query back ── */
+/* What a filter is called in the chip bar. Only keys that are really filters:
+   include_similar_titles and company_detail are settings about HOW to search,
+   not part of what is being asked for, and showing them as removable chips
+   would invite someone to "remove" a checkbox. */
+var QBAR_LABELS = {
+  titles:"Title", seniorities:"Seniority", industries:"Industry",
+  keywords:"Keywords", name:"Name", company_domains:"At company",
+  domains:"Domain", person_locations:"Person in", company_locations:"HQ in",
+  locations:"HQ in", exclude_locations:"Not HQ in", job_locations:"Hiring in",
+  technologies:"Uses", technologies_all:"Uses all", exclude_technologies:"Not using",
+  naics_codes:"NAICS", exclude_naics_codes:"Not NAICS",
+  sic_codes:"SIC", exclude_sic_codes:"Not SIC",
+  market_segments:"Segment", job_titles:"Hiring for", email_status:"Email",
+  linkedin_urls:"LinkedIn", exclude_keywords:"Excluding",
+  employee_min:"Employees ≥", employee_max:"Employees ≤",
+  revenue_min:"Revenue ≥", revenue_max:"Revenue ≤",
+  founded_min:"Founded ≥", founded_max:"Founded ≤",
+  total_funding_min:"Funding ≥", total_funding_max:"Funding ≤",
+  latest_funding_min:"Last round ≥", latest_funding_max:"Last round ≤",
+  num_jobs_min:"Open jobs ≥", num_jobs_max:"Open jobs ≤",
+  headcount_growth_min:"Growth ≥", headcount_growth_max:"Growth ≤",
+  headcount_growth_months:"Growth window", yoe_min:"Experience ≥",
+  yoe_max:"Experience ≤", days_in_title_min:"In role ≥",
+  days_in_title_max:"In role ≤", job_posted_after:"Jobs posted after",
+  job_posted_before:"Jobs posted before", funded_after:"Funded after",
+  funded_before:"Funded before", department_counts:"Department"
+};
+/* Not filters: settings about how the search runs, or values already shown by
+   their own control. */
+var QBAR_SKIP = {include_similar_titles:1, company_detail:1,
+                 include_unknown_founded_year:1, max_people:1, max_companies:1};
+
+/* Chip filters carry Apollo's own value ("c_suite"), which is not what the chip
+   says on screen ("C-Suite"). Read the label back off the chip rather than
+   keeping a second copy of the mapping here: the group is the source of truth
+   for its own wording, so adding a seniority cannot make the bar disagree. */
+function chipLabels(groupSel, values){
+  var byVal={};
+  document.querySelectorAll(groupSel+" .cpi-chip").forEach(function(c){
+    byVal[c.getAttribute("data-val")]=(c.textContent||"").trim();
+  });
+  return (values||[]).map(function(v){ return byVal[v]||String(v); });
+}
+
+function qbarValue(key, v){
+  if(key==="days_in_title_min"||key==="days_in_title_max")
+    return Math.round(v/30)+" mo";
+  if(key==="employee_max" && +v>=999999999) return "";
+  if(key==="seniorities") return chipLabels("#fpSeniority", v).join(", ");
+  if(key==="email_status") return chipLabels("#fpEmailStatus", v).join(", ");
+  if(Array.isArray(v)) return v.join(", ");
+  if(v && typeof v==="object") return Object.keys(v).join(", ");
+  return String(v);
+}
+
+/* Is anything actually being asked for? Same reading of gatherFilters() the bar
+   uses, so "the bar is empty" and "there is nothing to count" are one fact. */
+function queryHasFilters(){
+  var f=gatherFilters();
+  return Object.keys(f).some(function(k){
+    if(QBAR_SKIP[k]) return false;
+    var v=f[k];
+    if(v===null||v===undefined||v==="") return false;
+    if(Array.isArray(v)) return v.length>0;
+    return true;
+  });
+}
+
+/* Bands, so "Employees ≥51" and "Employees ≤200" read as one "Employees 51-200"
+   rather than two chips saying half a thing each. Eight of these exist, which
+   would otherwise be sixteen chips for one mental filter. */
+var QBAR_BANDS = [
+  ["employee_min","employee_max","Employees",""],
+  ["revenue_min","revenue_max","Revenue","$"],
+  ["founded_min","founded_max","Founded",""],
+  ["total_funding_min","total_funding_max","Funding","$"],
+  ["latest_funding_min","latest_funding_max","Last round","$"],
+  ["num_jobs_min","num_jobs_max","Open jobs",""],
+  ["headcount_growth_min","headcount_growth_max","Growth","%"],
+  ["yoe_min","yoe_max","Experience"," yrs"],
+  ["days_in_title_min","days_in_title_max","In role"," mo"]
+];
+
+function bandText(lo, hi, unit, key){
+  var f=function(n){
+    if(key==="days_in_title_min") n=Math.round(n/30);
+    if(n>=999999999) return null;
+    var s=(unit==="$") ? "$"+pmNum(n) : pmNum(n)+(unit==="$"?"":unit);
+    return s;
+  };
+  var a=(lo===undefined||lo===null)?null:f(lo);
+  var b=(hi===undefined||hi===null)?null:f(hi);
+  if(a&&b) return a+" to "+b;
+  if(a) return a+"+";
+  if(b) return "up to "+b;
+  return "";
+}
+
+/* The active filters, drawn from the same gatherFilters() the search uses, so
+   the bar cannot describe a different query than the one that would run. */
+function renderQueryBar(){
+  var bar=document.getElementById("cpiQbar");
+  if(!bar) return;
+  var f=gatherFilters();
+  var chips=[], done={};
+  QBAR_BANDS.forEach(function(b){
+    var lo=f[b[0]], hi=f[b[1]];
+    var has=(lo!==undefined&&lo!==null&&lo!=="")||(hi!==undefined&&hi!==null&&hi!=="");
+    if(!has) return;
+    done[b[0]]=1; done[b[1]]=1;
+    var txt=bandText(lo, hi, b[3], b[0]);
+    if(!txt) return;
+    chips.push('<span class="cpi-qchip"><i>'+esc(b[2])+'</i>'+esc(txt)+
+      '<button type="button" onclick="cpiDropFilter(\''+esc(b[0])+'\');cpiDropFilter(\''+esc(b[1])+'\')" '+
+      'aria-label="Remove the '+esc(b[2])+' filter">&times;</button></span>');
+  });
+  Object.keys(f).forEach(function(k){
+    if(QBAR_SKIP[k] || done[k]) return;
+    var v=f[k];
+    if(v===null||v===undefined||v===""||(Array.isArray(v)&&!v.length)) return;
+    var txt=qbarValue(k, v);
+    if(!txt) return;
+    chips.push('<span class="cpi-qchip"><i>'+esc(QBAR_LABELS[k]||k)+'</i>'+esc(txt)+
+      '<button type="button" onclick="cpiDropFilter(\''+esc(k)+'\')" '+
+      'aria-label="Remove '+esc(QBAR_LABELS[k]||k)+' filter">&times;</button></span>');
+  });
+  if(!chips.length){ bar.style.display="none"; bar.innerHTML=""; return; }
+  bar.style.display="";
+  bar.innerHTML='<span class="cpi-qbar-lbl">Searching for</span>'+chips.join("")+
+    '<button type="button" class="cpi-qbar-clear" onclick="cpiClearFilters();cpiFiltersChanged()">Clear all</button>';
+}
+
+/* Remove one filter by its Apollo key, whichever control happens to hold it.
+   Keyed off the same spec tables gatherFilters reads, so a filter added later
+   becomes removable without touching this. */
+window.cpiDropFilter = function(key){
+  var pre = STATE.entity==="people" ? "fp" : "fc";
+  (STATE.entity==="people"?PEOPLE_FIELDS:COMPANY_FIELDS).forEach(function(spec){
+    if(spec[1]===key){ var el=document.getElementById(spec[0]); if(el) el.value=""; }
+  });
+  COMBO_SPECS.forEach(function(spec){
+    if(spec[0].indexOf(pre)===0 && spec[1]===key) setComboValues(spec[0], []);
+  });
+  if(key==="seniorities") document.querySelectorAll("#fpSeniority .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
+  if(key==="email_status") document.querySelectorAll("#fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
+  if(key==="employee_min"||key==="employee_max"){
+    var emp=document.getElementById(pre+"EmpRange"); if(emp) emp.value="";
+  }
+  if(key==="department_counts"){
+    ["DeptName","DeptMin","DeptMax"].forEach(function(s){
+      var el=document.getElementById(pre+s); if(el) el.value="";
+    });
+  }
+  cpiFiltersChanged();
+};
+
+/* ── The free match count ── */
+var COUNT_T=null, COUNT_SEQ=0;
+
+function countEl(){
+  return document.getElementById(STATE.entity==="people" ? "cpiLiveCount" : "cpiLiveCountCo");
+}
+
+/* Debounced, and only for People: the Companies endpoint bills a credit per
+   call, so there is deliberately no live count on that tab (the server refuses
+   it too, rather than trusting this to be the only guard).
+
+   Nothing is counted until at least one real filter is set. Counting an empty
+   filter set means asking Apollo how many people it has, which is a number in
+   the hundreds of millions that describes the database rather than the search:
+   noise on load, and a request nobody asked for. */
+function scheduleCount(){
+  /* Both are cleared first, every time. A count belongs to one filter set on one
+     tab, so leaving the People number in place while the Companies tab is open
+     means switching back shows a figure for filters that have since changed, and
+     a "counting…" that never resolves. Clearing both makes a stale number
+     impossible rather than unlikely. */
+  ["cpiLiveCount","cpiLiveCountCo"].forEach(function(id){
+    var e=document.getElementById(id);
+    if(e){ e.textContent=""; e.title=""; }
+  });
+  if(COUNT_T) clearTimeout(COUNT_T);
+  var el=countEl();
+  if(!el) return;
+  if(STATE.entity!=="people") return;
+  if(!queryHasFilters()) return;
+  el.textContent="counting…";
+  COUNT_T=setTimeout(runCount, 420);
+}
+
+function runCount(){
+  var seq=++COUNT_SEQ;
+  var filters=gatherFilters();
+  fetch(window.__CPI_COUNT_URL__, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({entity: STATE.entity, filters: filters})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    /* A slow answer to an earlier keystroke must not overwrite a later one. */
+    if(seq!==COUNT_SEQ) return;
+    var el=countEl();
+    if(!el) return;
+    if(!d || d.count===null || d.count===undefined){
+      el.textContent = (d && d.reason) ? "" : "";
+      el.title = (d && d.reason) || "";
+      return;
+    }
+    /* "about", because Apollo's total counts what IT matched and the
+       verification pass then drops rows that do not really qualify. The honest
+       number is an upper bound, and saying so is the whole point. */
+    el.innerHTML = (d.approx?"about ":"")+"<b>"+pmNum(d.count)+"</b> "+
+      (d.count===1?"match":"matches");
+    el.title = d.approx
+      ? "Apollo's own count. Some of these are removed when the filters are "+
+        "re-checked against each record, so the page will show this many or fewer."
+      : "Apollo's own count for these filters.";
+  }).catch(function(){
+    var el=countEl(); if(el) el.textContent="";
+  });
+}
+
+/* Anything that changes the query: refresh what the bar says and what the count
+   says, together, so they can never disagree. */
+window.cpiFiltersChanged = function(){
+  renderQueryBar();
+  syncMoreBadge();
+  scheduleCount();
+};
+
+/* How many filters are set inside the collapsed "More filters" panel. Without
+   this the long tail is genuinely invisible: it is collapsed by default, so a
+   revenue floor set last week is still narrowing today's search with nothing on
+   screen to say so. The chip bar shows WHICH; this shows there are some even
+   when the bar is scrolled past. */
+function syncMoreBadge(){
+  ["fp","fc"].forEach(function(pre){
+    var panel=document.getElementById(pre+"Advanced");
+    var btn=document.getElementById(pre+"MoreBtn");
+    if(!panel||!btn) return;
+    var n=0;
+    panel.querySelectorAll("input, select").forEach(function(el){
+      if(el.type==="checkbox"){ if(el.checked && el.id!=="fpCompanyDetail") n++; }
+      else if((el.value||"").trim()) n++;
+    });
+    /* The pickers keep their value in chips, not in the input. */
+    COMBO_SPECS.forEach(function(spec){
+      if(spec[0].indexOf(pre)!==0) return;
+      var el=document.getElementById(spec[0]+"Combo");
+      if(el && panel.contains(el) && comboSel(spec[0]).length) n++;
+    });
+    var base=btn.getAttribute("data-base") || btn.textContent.trim();
+    btn.setAttribute("data-base", base);
+    btn.innerHTML = n ? esc(base)+' <b class="cpi-more-n">'+n+"</b>"
+                      : esc(base);
+  });
+}
+
+/* Apollo can only filter headcount by fixed buckets, and the select offers
+   exactly those. A sentence says "50 to 200 people", which is not one of them,
+   so the requested span is snapped to the bucket it overlaps most. Without this
+   the value matched no option, the select stayed empty, and the size quietly
+   went missing from a search whose note had just claimed to set it.
+
+   Read off the select's own options rather than hardcoded here, so the buckets
+   have one definition. */
+function snapEmployeeBucket(f, selId){
+  var sel=document.getElementById(selId);
+  if(!sel) return;
+  var lo=f.employee_min, hi=f.employee_max;
+  if(lo===undefined && hi===undefined) return;
+  lo=(typeof lo==="number")?lo:0;
+  hi=(typeof hi==="number" && hi<999999999)?hi:Infinity;
+  var best=null, bestOverlap=0;
+  for(var i=0;i<sel.options.length;i++){
+    var v=sel.options[i].value;
+    if(!v) continue;
+    var p=v.split(",");
+    var bl=+p[0], bh=p[1]?+p[1]:Infinity;
+    var ov=Math.min(hi,bh)-Math.max(lo,bl);
+    if(ov>bestOverlap){ bestOverlap=ov; best=v; }
+  }
+  if(best){
+    var q=best.split(",");
+    f.employee_min=+q[0];
+    f.employee_max=q[1]?+q[1]:999999999;
+  } else {
+    /* Nothing Apollo can express: drop it rather than leave a value the form
+       cannot show and the search would not honour. */
+    delete f.employee_min; delete f.employee_max;
+  }
+}
+
+/* ── One sentence to filters ── */
+window.cpiParseQuery = function(){
+  var input=document.getElementById("cpiAskInput");
+  var btn=document.getElementById("cpiAskBtn");
+  var note=document.getElementById("cpiAskNote");
+  if(!input) return;
+  var q=input.value.trim();
+  if(!q){ input.focus(); return; }
+  if(btn){ btn.disabled=true; btn.textContent="Reading…"; }
+  fetch(window.__CPI_PARSE_URL__, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({q:q})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(btn){ btn.disabled=false; btn.textContent="Fill filters"; }
+    if(!d || d.error){ toast((d&&d.error)||"Could not read that query.", "err"); return; }
+    var f=d.filters||{};
+    if(!Object.keys(f).length){
+      toast("Nothing recognisable to filter on in that. Try naming a role, an industry, a place or a size.", "err");
+      return;
+    }
+    if(d.entity && d.entity!==STATE.entity) window.cpiSetEntity(d.entity);
+    snapEmployeeBucket(f, STATE.entity==="people" ? "fpEmpRange" : "fcEmpRange");
+    applyFiltersToForm(f);
+    cpiFiltersChanged();
+    /* Told, not just done. Counted off the chip bar rather than off what the
+       parser returned, because those are not always the same number: a value
+       Apollo cannot express (a headcount span that fits no bucket) is dropped
+       on the way in, and claiming to have set it would be a statement the form
+       does not support. */
+    var landed=document.querySelectorAll("#cpiQbar .cpi-qchip").length;
+    if(note){
+      note.style.display="";
+      note.innerHTML = landed
+        ? ("Filled "+landed+" filter"+(landed===1?"":"s")+
+           " from your description. Check them, then Search.")
+        : "Nothing in that description mapped onto a filter. Try naming a role, an industry, a place or a size.";
+    }
+    if(!landed){ toast("Nothing recognisable to filter on in that.", "err"); return; }
+    toast("Filters filled. Nothing searched or spent yet.", "ok");
+  }).catch(function(){
+    if(btn){ btn.disabled=false; btn.textContent="Fill filters"; }
+    toast("Could not read that query.", "err");
+  });
+};
+
+/* ── The working list ── */
+var LIST_ROWS=null;
+
+function listKeyOf(r){
+  var id=String((r&&(r.id||r.apollo_id))||"").trim();
+  if(id) return id;
+  var parts = STATE.shownEntity==="companies"
+    ? [r&&r.name, r&&r.primary_domain]
+    : [(r&&(r.full_name||r.name)), (r&&(r.organization_name||r.organization_domain))];
+  return parts.map(function(p){ return String(p==null?"":p).trim().toLowerCase(); })
+              .join("|").replace(/^\|+|\|+$/g,"") || "?";
+}
+
+function setListCount(n){
+  var b=document.getElementById("cpiListN");
+  if(!b) return;
+  b.textContent=String(n||0);
+  b.style.display = n ? "" : "none";
+}
+
+window.cpiAddToList = function(){
+  var rows=selectedRows();
+  if(!rows.length) rows=STATE.results.slice();
+  if(!rows.length){ toast("Nothing to add yet.", "err"); return; }
+  fetch(window.__CPI_LIST_URL__, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({entity: STATE.shownEntity||STATE.entity, rows: rows})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(!d || d.available===false){ toast("The list is not available on this environment.", "err"); return; }
+    setListCount(d.count);
+    LIST_ROWS=null;
+    if(d.full){ toast("The list holds "+d.cap+" rows. Download and clear it to add more.", "err"); return; }
+    var dup=rows.length-(d.added||0);
+    toast("Added "+(d.added||0)+" to the list"+
+          (dup>0?" ("+dup+" already there)":"")+".", "ok");
+  }).catch(function(){ toast("Could not add to the list.", "err"); });
+};
+
+function loadList(){
+  return fetch(window.__CPI_LIST_URL__).then(function(r){ return r.json(); })
+    .then(function(d){
+      LIST_ROWS = (d&&d.rows)||[];
+      setListCount((d&&d.count)||0);
+      return d;
+    });
+}
+
+window.cpiOpenList = function(){
+  var dw=document.getElementById("cpiListDrawer"), ov=document.getElementById("cpiListOvl");
+  if(dw) dw.classList.add("on");
+  if(ov) ov.classList.add("on");
+  var body=document.getElementById("cpiListBody");
+  if(body) body.innerHTML='<div class="cpi-empty"><span>Loading…</span></div>';
+  loadList().then(function(){ renderList(); })
+    .catch(function(){
+      if(body) body.innerHTML='<div class="cpi-empty"><span>Could not load the list.</span></div>';
+    });
+};
+
+window.cpiCloseList = function(){
+  var dw=document.getElementById("cpiListDrawer"), ov=document.getElementById("cpiListOvl");
+  if(dw) dw.classList.remove("on");
+  if(ov) ov.classList.remove("on");
+};
+
+function renderList(){
+  var body=document.getElementById("cpiListBody");
+  var clear=document.getElementById("cpiListClearAll");
+  var actions=document.getElementById("cpiListActions");
+  var sub=document.getElementById("cpiListSub");
+  if(!body) return;
+  var rows=LIST_ROWS||[];
+  if(clear) clear.style.display = rows.length ? "" : "none";
+  if(actions) actions.style.display = rows.length ? "" : "none";
+  if(sub){
+    /* How many of these already cost money, so the list says what it is worth
+       rather than only how long it is. */
+    var enriched=rows.filter(function(r){ return r.enriched||r.email; }).length;
+    sub.textContent = rows.length
+      ? rows.length+" row"+(rows.length===1?"":"s")+
+        (enriched?" · "+enriched+" already enriched":"")
+      : "Rows kept across searches and tabs";
+  }
+  if(!rows.length){
+    body.innerHTML='<div class="cpi-empty"><span>Nothing on the list yet. Select rows in the grid and press <b>Add to list</b> to keep them across searches.</span></div>';
+    return;
+  }
+  body.innerHTML=rows.map(function(r){
+    var isCo = r._entity==="companies";
+    var name = esc(isCo ? (r.name||"Unnamed") : (r.full_name||r.name||"Unnamed"));
+    var sub2 = isCo ? [r.primary_domain, r.industry] : [r.title, r.organization_name];
+    var paid = (r.enriched||r.email) ? '<span class="cpi-dw-badge">enriched</span>' : "";
+    return '<div class="cpi-dw-item"><div class="cpi-dw-item-main">'+
+      '<div class="cpi-dw-title">'+name+paid+"</div>"+
+      '<div class="cpi-dw-meta">'+esc(sub2.filter(Boolean).join(" · "))+"</div></div>"+
+      '<button class="cpi-dw-x-sm" onclick="cpiRemoveFromList(\''+esc(r._key)+'\')" '+
+      'aria-label="Remove '+name+' from the list">&times;</button></div>';
+  }).join("");
+}
+
+window.cpiRemoveFromList = function(key){
+  fetch(window.__CPI_LIST_URL__, {
+    method:"DELETE", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({keys:[key]})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    setListCount((d&&d.count)||0);
+    LIST_ROWS=(LIST_ROWS||[]).filter(function(r){ return r._key!==key; });
+    renderList();
+  }).catch(function(){ toast("Could not remove that row.", "err"); });
+};
+
+window.cpiClearList = function(){
+  var n=(LIST_ROWS||[]).length;
+  if(!window.confirm("Clear all "+n+" row"+(n===1?"":"s")+" from the list? Enriched contacts stay in History.")) return;
+  fetch(window.__CPI_LIST_URL__, {
+    method:"DELETE", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({all:true})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    LIST_ROWS=[]; setListCount(0); renderList();
+    toast("List cleared.", "ok");
+  }).catch(function(){ toast("Could not clear the list.", "err"); });
+};
+
+/* The list can hold both kinds of row, and the export columns differ, so each
+   kind is downloaded as its own file rather than forcing one set of headers
+   onto both. */
+window.cpiExportList = function(fmt){
+  var rows=LIST_ROWS||[];
+  if(!rows.length){ toast("The list is empty.", "err"); return; }
+  ["people","companies"].forEach(function(kind){
+    var subset=rows.filter(function(r){ return (r._entity||"people")===kind; });
+    if(!subset.length) return;
+    doCpiDownload(kind, subset, fmt, {}, {});
+  });
+};
+
+/* ── What this tool has spent ── */
+function loadSpend(){
+  var el=document.getElementById("cpiSpend");
+  if(!el) return;
+  fetch(window.__CPI_CREDITS_URL__).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d || !d.available) return;      /* no Postgres: say nothing at all */
+      el.style.display="";
+      el.innerHTML='<b>'+pmNum(d.month)+'</b> credit'+(d.month===1?"":"s")+
+        ' spent here this month'+(d.month_mine?' <s>'+pmNum(d.month_mine)+" by you</s>":"");
+      el.title="What Contact Finder has spent from the shared Apollo pool this "+
+        "month. Not the account balance: the same key also funds visitor "+
+        "de-anonymisation and External Usage enrichment, and no endpoint "+
+        "available here reports the pool's remaining total.";
+    }).catch(function(){ /* the header is decoration; never block the page */ });
+}
+
+/* ── Wiring ── */
 /* The script is deferred, so the DOM is parsed by the time this runs and there is
    no readyState to wait on. */
 COMBO_SPECS.forEach(function(spec){ initCombo(spec[0]); });
 window.cpiSyncCostLabels();
+
+/* Every control that can change the query re-renders the bar and re-counts.
+   Delegated at the document rather than bound per control, so the 60-odd inputs
+   and the ones added later are covered by the same two lines. */
+["input","change"].forEach(function(evt){
+  document.addEventListener(evt, function(e){
+    var t=e.target;
+    if(!t || !t.closest) return;
+    if(t.closest(".cpi-filters") || t.id==="fpCompanyDetail") cpiFiltersChanged();
+  }, true);
+});
+document.addEventListener("click", function(e){
+  var t=e.target;
+  if(t && t.closest && t.closest(".cpi-chip-group")) setTimeout(cpiFiltersChanged, 0);
+}, true);
+/* Picking from a combo commits a chip rather than typing into a field, so it
+   does not raise an input event on anything the listeners above watch. */
+var _addComboValue = addComboValue;
+addComboValue = function(key, value){ _addComboValue(key, value); cpiFiltersChanged(); };
+var _cpiComboRemove = window.cpiComboRemove;
+window.cpiComboRemove = function(key, i){ _cpiComboRemove(key, i); cpiFiltersChanged(); };
+var _cpiSetEntity = window.cpiSetEntity;
+window.cpiSetEntity = function(entity){ _cpiSetEntity(entity); cpiFiltersChanged(); };
+
+renderQueryBar();
+syncMoreBadge();
+loadSpend();
+loadList().catch(function(){ /* the badge is optional */ });
 
 })();

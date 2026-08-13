@@ -9,7 +9,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=21">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/company_people_intelligence.css') }}?v=22">
 <script src="/static/js/theme.js"></script>
 <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 <script src="/static/js/aurora.js?v=1" defer></script>
@@ -69,6 +69,15 @@
        companies first with one paid search. A question about a named company, or
        about people alone, still costs nothing. #}
     <div class="page-hdr-credits"><span class="d"></span>Finding people is free &middot; describing their companies is optional and costs 1 credit per page, cached 30 days &middot; Company search, Enrich, and a chat question filtered by industry, size or HQ each spend 1 credit</div>
+    {# What this tool has spent from the shared pool. Not a balance: no endpoint
+       this app can reach reports the account total, and the same key also funds
+       the de-anon engine and External Usage, so a number called "remaining"
+       would be a guess. Hidden entirely when Postgres is absent. #}
+    <div class="page-hdr-spend" id="cpiSpend" style="display:none"></div>
+    <button class="page-hdr-hist-btn" id="cpiListBtn" onclick="cpiOpenList()">
+      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      List <span class="cpi-list-n" id="cpiListN" style="display:none">0</span>
+    </button>
     <button class="page-hdr-hist-btn" onclick="cpiOpenHistory()">
       <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
       History
@@ -81,6 +90,26 @@
         <button class="on" data-entity="people" onclick="cpiSetEntity('people')">&#128100; People</button>
         <button data-entity="companies" onclick="cpiSetEntity('companies')">&#127970; Companies</button>
       </div>
+
+      {# One sentence in, filters out. This is the same intent parse the chat
+         already runs, pointed at the panel instead of at Apollo: it FILLS the
+         controls and stops, so every value it chose is visible and editable
+         before anything is searched or spent. That is the whole reason it sets
+         filters rather than returning results. #}
+      <div class="cpi-ask" id="cpiAsk">
+        <svg class="cpi-ask-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>
+        <input class="cpi-ask-input" id="cpiAskInput" autocomplete="off"
+               placeholder="Describe who you want, e.g. VPs of Marketing at 50-200 person healthcare companies in Texas"
+               aria-label="Describe the search in your own words"
+               onkeydown="if(event.key==='Enter')cpiParseQuery()">
+        <button class="cpi-ask-btn" id="cpiAskBtn" onclick="cpiParseQuery()">Fill filters</button>
+      </div>
+      <div class="cpi-ask-note" id="cpiAskNote" style="display:none"></div>
+
+      {# The query, said back. Scattered across four fieldsets it could not be
+         read at a glance, which is how a search ran with a filter its owner had
+         forgotten was set. Each chip removes exactly its own filter. #}
+      <div class="cpi-qbar" id="cpiQbar" style="display:none"></div>
 
       <!-- ══════════ People filters ══════════ -->
       <div class="cpi-filters" id="cpiFiltersPeople">
@@ -278,6 +307,12 @@
           <label class="cpi-check cpi-check-cost" title="Adds each person's employer: industry, headcount, HQ, revenue, funding and tech stack. Apollo charges 1 credit per page for this, whatever the number of companies on it, and the answers are cached for 30 days so repeat searches are free.">
             <input type="checkbox" id="fpCompanyDetail" checked onchange="cpiSyncCostLabels()">Company details<s>&middot; up to 1 credit/page</s>
           </label>
+          {# Apollo's people search is free and reports its own total, so the size
+             of the result can be shown while the filters are still being set.
+             Says "about" whenever a filter this app re-checks in code is on,
+             because Apollo's total counts what IT matched and the verification
+             pass then removes rows: the real number can only be lower. #}
+          <span class="cpi-count-live" id="cpiLiveCount" aria-live="polite"></span>
           <button class="cpi-search-btn" id="cpiSearchBtn" onclick="cpiRunSearch(true)"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.3" fill="none" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>Search</button>
         </div>
       </div>
@@ -457,7 +492,11 @@
         <div class="cpi-filter-row">
           <button class="cpi-more-btn" id="fcMoreBtn" onclick="cpiToggleAdvanced('fcAdvanced','fcMoreBtn')">More filters &#9662;</button>
           <button class="cpi-clear-btn" onclick="cpiClearFilters()">Clear</button>
-          <button class="cpi-search-btn" id="cpiSearchBtnCo" onclick="cpiRunSearch(true)"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.3" fill="none" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>Search</button>
+          {# No live count here on purpose: mixed_companies/search bills a credit
+             per call, so a count that updated while you typed would spend one
+             per keystroke. The button says what the run itself costs instead. #}
+          <span class="cpi-count-live" id="cpiLiveCountCo" aria-live="polite"></span>
+          <button class="cpi-search-btn" id="cpiSearchBtnCo" onclick="cpiRunSearch(true)"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.3" fill="none" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>Search <s>&middot; 1 credit</s></button>
         </div>
       </div>
 
@@ -468,6 +507,10 @@
         <button class="cpi-tb-btn" id="cpiSelectAll" onclick="cpiToggleSelectAll()">
           <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           Select all
+        </button>
+        <button class="cpi-tb-btn" id="cpiAddList" onclick="cpiAddToList()">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Add to list
         </button>
         <div class="cpi-menu-wrap">
           <button class="cpi-tb-btn" id="cpiDownloadBtn" onclick="cpiToggleMenu('cpiDownloadMenu')">
@@ -547,6 +590,24 @@
   <div class="cpi-dw-body" id="cpiDrawerBody"></div>
 </aside>
 
+<!-- Working list drawer. Its own drawer rather than a tab inside History,
+     because History is a record of what already happened and the list is the
+     thing being built now. -->
+<div class="cpi-drawer-ovl" id="cpiListOvl" onclick="cpiCloseList()"></div>
+<aside class="cpi-drawer" id="cpiListDrawer" aria-label="Working list">
+  <div class="cpi-dw-hdr">
+    <div class="cpi-dw-hdr-ic"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
+    <div><b>Working list</b><span id="cpiListSub">Rows kept across searches and tabs</span></div>
+    <button class="cpi-dw-clear" id="cpiListClearAll" onclick="cpiClearList()" style="display:none">Clear all</button>
+    <button class="cpi-dw-x" onclick="cpiCloseList()" aria-label="Close">&#10005;</button>
+  </div>
+  <div class="cpi-dw-actions" id="cpiListActions" style="display:none">
+    <button class="cpi-tb-btn" onclick="cpiExportList('xlsx')">Download <em>.xlsx</em></button>
+    <button class="cpi-tb-btn" onclick="cpiExportList('csv')">Download <em>.csv</em></button>
+  </div>
+  <div class="cpi-dw-body" id="cpiListBody"></div>
+</aside>
+
 <div class="cpi-toast" id="cpiToast"></div>
 
 <!-- Enrich modal -->
@@ -571,8 +632,12 @@ window.__CPI_HISTORY_URL__ = "{{ history_url }}";
 window.__CPI_EXPORT_URL__ = "{{ export_url }}";
 window.__CPI_INDUSTRIES_URL__ = "{{ industries_url }}";
 window.__CPI_VOCAB_URL__ = "{{ vocab_url }}";
+window.__CPI_COUNT_URL__ = "{{ count_url }}";
+window.__CPI_CREDITS_URL__ = "{{ credits_url }}";
+window.__CPI_LIST_URL__ = "{{ list_url }}";
+window.__CPI_PARSE_URL__ = "{{ parse_url }}";
 </script>
-<script src="/static/js/company_people_intelligence.js?v=21" defer></script>
+<script src="/static/js/company_people_intelligence.js?v=22" defer></script>
 <script>
 function toggleTbMenu(){
   var pill=document.getElementById('tbUserPill'),dd=document.getElementById('tbDropdown');
