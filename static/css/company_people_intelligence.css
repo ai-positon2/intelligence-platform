@@ -195,6 +195,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
    are the only two filters here whose shape Apollo enforces, so this is the one
    place the picker says no rather than offering to search anyway. */
 .cpi-opt-none.cpi-opt-warn{color:#fca5a5}
+/* Sits under the last option to say the list is one page of a longer vocabulary.
+   Ruled off and sticky so it stays readable at the bottom of a scrolled list,
+   which is exactly where someone who has run out of options is looking. */
+.cpi-opt-none.cpi-opt-more{position:sticky;bottom:-5px;margin-top:4px;
+  border-top:1px solid rgba(255,255,255,.10);background:#0d1220;
+  font-size:11.5px;color:var(--tx3)}
 
 .cpi-check{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx2);
   cursor:pointer;user-select:none;white-space:nowrap}

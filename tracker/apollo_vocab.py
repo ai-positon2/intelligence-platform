@@ -652,7 +652,21 @@ def split_valid(kind: str, values) -> tuple:
     return ok, bad
 
 
-def suggest(kind: str, query: str, learned=None, limit: int = 40) -> list:
+# Deliberately the same number as apollo_taxonomy.PICKER_LIMIT (a test pins them
+# equal) rather than imported from it: these two modules hold different
+# vocabularies and neither depends on the other, and one shared widget renders
+# both, so the two lists must behave identically without being coupled.
+#
+# It used to be 40, which was smaller than every vocabulary here, so the picker
+# was an alphabetical dead end: the location list stopped at "Czech Republic"
+# and 164 of its 204 places could not be browsed to at all. Every seed list
+# below (location 204, technology 168, sic 135, naics 121) now fits, and `meta`
+# reports a cap that is hit anyway, since learned values can push past it.
+PICKER_LIMIT = 300
+
+
+def suggest(kind: str, query: str, learned=None, limit: int = PICKER_LIMIT,
+            meta=None) -> list:
     """Ranked picker entries for a partly-typed query.
 
     Same entry shape as apollo_taxonomy.suggest so one widget renders both:
@@ -665,6 +679,9 @@ def suggest(kind: str, query: str, learned=None, limit: int = 40) -> list:
     A code kind matches on its digits AND on its title, which is the point of
     the picker: nobody knows that computer systems design is 5415, but everybody
     can type "software" or "consulting".
+
+    `meta`, when given a dict, reports {"total", "truncated"} the same way
+    apollo_taxonomy.suggest does. See PICKER_LIMIT for why that matters.
     """
     spec = _KINDS.get(kind)
     if not spec:
@@ -723,4 +740,7 @@ def suggest(kind: str, query: str, learned=None, limit: int = 40) -> list:
     out.sort(key=lambda e: e["_rank"])
     for e in out:
         e.pop("_rank", None)
+    if meta is not None:
+        meta["total"] = len(out)
+        meta["truncated"] = len(out) > limit
     return out[:limit]
