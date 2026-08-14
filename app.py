@@ -1498,8 +1498,15 @@ APP_AGENTS = [
             {"t": "Best for", "d": "SEO leads and growth teams in competitive markets."},
         ],
         "tags": ["Semrush", "Ahrefs", "Sheets"],
+        # no_request removed 2026-08-14: the tool this card describes is now a
+        # real, live SEO Studio agent (see competitor-analysis in
+        # _SEO_TOOLS_FALLBACK), so a member asking for it is a real request
+        # again. Still not connected (no seo_slug/external_url) -- the live
+        # tool's client picker shows every client's data (Tealium, Beta
+        # Bionics, ...) with no per-member scoping, so opening it to any
+        # signed-in Google account without a staff review in between would be
+        # a cross-client data leak, not just an unfinished feature.
         "lock_label": "Need extensive testing",
-        "no_request": True,
     },
     {
         "slug": "search-term-intelligence", "name": "Search Term Intelligence",
