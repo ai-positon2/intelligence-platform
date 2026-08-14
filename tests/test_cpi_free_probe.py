@@ -482,7 +482,7 @@ def _ask_reveal(monkeypatch, people_handler, titles=("CEO",),
     monkeypatch.setattr(ac, "search_companies", lambda *a, **k: [])
     matched = []
 
-    def _bulk(ids, api_key):
+    def _bulk(ids, api_key, **_kw):
         matched.extend(ids)
         return {i: {"id": i, "first_name": "Binal", "last_name": "Shah",
                     "name": "Binal Shah", "title": "CMO"} for i in ids}

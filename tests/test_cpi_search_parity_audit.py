@@ -285,3 +285,116 @@ def test_every_locally_rechecked_filter_is_marked_approximate():
                "company_domains"}
     missing = checked - set(appmod._CPI_COUNT_VERIFIED_FILTERS)
     assert not missing, "these drop rows but do not mark the count approximate: %s" % missing
+
+
+# ── A chunk that never got an answer is not fifty people Apollo lacks ──────
+#
+# The bulk reveal is the biggest purchase this page can make and it runs in
+# chunks of ten, any one of which can fail on its own. A missing id meant two
+# opposite things at once: Apollo has no record of this person, or these ten
+# never got asked. The toast said "Revealed 40 profiles" either way, so the ten
+# worth retrying for free read as ten dead ends.
+
+_BULK_URL = "/p2/b2b-agents/company-people-intelligence/enrich-bulk"
+
+
+def _chunk_failer(fail_on_second=True):
+    """A _post that answers the first chunk of ten and dies on the next."""
+    state = {"n": 0}
+
+    def _post(endpoint, body, api_key, retries=3):
+        state["n"] += 1
+        if fail_on_second and state["n"] > 1:
+            raise RuntimeError("apollo timed out")
+        details = body.get("details") or []
+        return {"matches": [{"id": d["id"], "first_name": "A", "last_name": "B",
+                             "email": "a@b.com"} for d in details]}
+
+    return _post
+
+
+def test_the_ids_from_a_failed_chunk_come_back_named(monkeypatch):
+    monkeypatch.setattr(ac, "_post", _chunk_failer())
+    ids = ["p%02d" % i for i in range(25)]
+    failed = []
+    out = ac.bulk_match_people(ids, "k", failed=failed)
+    assert len(out) == 10, "the chunk that answered should still be kept"
+    assert failed == ids[10:], "the unanswered ids were not reported"
+
+
+def test_an_unreadable_answer_counts_as_unanswered(monkeypatch):
+    """A 200 whose body we cannot parse taught us nothing about those ten."""
+    monkeypatch.setattr(ac, "_post", lambda *a, **k: {"unexpected": "shape"})
+    failed = []
+    assert ac.bulk_match_people(["p1", "p2"], "k", failed=failed) == {}
+    assert failed == ["p1", "p2"]
+
+
+def test_a_clean_run_reports_nothing_unreachable(monkeypatch):
+    monkeypatch.setattr(ac, "_post", _chunk_failer(fail_on_second=False))
+    failed = []
+    out = ac.bulk_match_people(["p1", "p2"], "k", failed=failed)
+    assert len(out) == 2 and failed == []
+
+
+def test_a_person_apollo_simply_has_no_record_of_is_not_called_unreachable(monkeypatch):
+    """The whole point of the distinction: a genuine miss must stay a miss."""
+    monkeypatch.setattr(ac, "_post", lambda *a, **k: {"matches": [None, None]})
+    failed = []
+    assert ac.bulk_match_people(["p1", "p2"], "k", failed=failed) == {}
+    assert failed == [], "a miss was reported as a failure"
+
+
+def test_the_reveal_route_says_how_many_it_could_not_reach(client, monkeypatch):
+    monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {})
+    monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda p: None)
+    monkeypatch.setattr(ac, "_post", _chunk_failer())
+    body = client.post(_BULK_URL,
+                       json={"ids": ["p%02d" % i for i in range(25)]}).get_json()
+    assert body["fetched"] == 10
+    assert body["unreachable"] == 15, (
+        "15 people were neither revealed nor ruled out and the reply did not say so")
+
+
+def test_a_total_failure_is_not_reported_as_nobody_being_found(client, monkeypatch):
+    monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: {})
+
+    def _boom(*a, **k):
+        raise RuntimeError("apollo down")
+
+    monkeypatch.setattr(ac, "bulk_match_people", _boom)
+    body = client.post(_BULK_URL, json={"ids": ["p1", "p2"]}).get_json()
+    assert body["unreachable"] == 2
+    assert "no credits were spent" in body["error"]
+
+
+def test_a_failure_alongside_cached_rows_still_counts_the_unreached(client, monkeypatch):
+    """The path that does NOT return early. With some people already in cache
+    the reveal still succeeds overall, so the ones Apollo never answered for
+    are the only thing standing between the reader and a wrong conclusion."""
+    monkeypatch.setattr(appmod, "_cpi_id_cache_read",
+                        lambda ids: {"p1": {"id": "p1", "first_name": "Cached",
+                                            "last_name": "Person"}})
+    monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda p: None)
+
+    def _boom(*a, **k):
+        raise RuntimeError("apollo down")
+
+    monkeypatch.setattr(ac, "bulk_match_people", _boom)
+    body = client.post(_BULK_URL, json={"ids": ["p1", "p2", "p3"]}).get_json()
+    assert "error" not in body, "the cached rows were a success and should be served"
+    assert body["cached"] == 1
+    assert body["unreachable"] == 2, (
+        "two people were neither revealed nor ruled out and the reply did not say so")
+
+
+def test_the_toast_does_not_call_a_partial_reveal_a_success():
+    js = _js()
+    start = js.index("window.cpiEnrichSelected")
+    body = js[start:js.index("\n};", start)]
+    assert "if(d.unreachable){" in body, (
+        "the reveal toast does not actually branch on unreachable people")
+    assert "neither revealed nor ruled out" in body
+    # Reported inside the one toast: a second call replaces the first before it
+    # has been read, which is why `capped` and this cannot both be extra toasts.
+    assert body.count('"err"') >= 2

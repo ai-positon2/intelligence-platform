@@ -195,7 +195,7 @@ def test_bulk_enrich_is_capped_and_deduped(client, monkeypatch, no_postgres):
     the route must never ask Apollo for more than the cap, even if asked to."""
     seen = {}
 
-    def _fake_bulk(ids, api_key):
+    def _fake_bulk(ids, api_key, **_kw):
         seen["ids"] = ids
         return {i: {"id": i, "first_name": "X", "last_name": "Y"} for i in ids}
 
@@ -223,7 +223,7 @@ def test_bulk_enrich_reports_cache_hits_separately(client, monkeypatch):
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
     import tracker.apollo_client as ac
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: {"p2": {"id": "p2", "first_name": "Fresh"}})
+                        lambda ids, key, **_kw: {"p2": {"id": "p2", "first_name": "Fresh"}})
 
     body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["p1", "p2"]}).get_json()
@@ -236,7 +236,7 @@ def test_bulk_enrich_empty_input_never_calls_apollo(client, monkeypatch):
     called = []
     import tracker.apollo_client as ac
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: called.append(ids) or {})
+                        lambda ids, key, **_kw: called.append(ids) or {})
     body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                        json={"ids": ["", "  ", None]}).get_json()
     assert body == {"profiles": {}, "fetched": 0, "cached": 0}
@@ -571,7 +571,7 @@ def test_reveal_skips_rows_that_already_have_a_full_name(no_postgres, monkeypatc
     import tracker.apollo_client as ac
     calls = []
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: calls.append(list(ids)) or {})
+                        lambda ids, key, **_kw: calls.append(list(ids)) or {})
     people = [{"id": "p%d" % i, "full_name": "Person %d" % i, "last_name": "%d" % i}
               for i in range(10)]
     appmod._cpi_reveal_names(people, "key")
@@ -582,7 +582,7 @@ def test_reveal_is_capped_and_reports_its_cost(no_postgres, monkeypatch):
     import tracker.apollo_client as ac
     seen = []
 
-    def _bulk(ids, key):
+    def _bulk(ids, key, **_kw):
         seen.extend(ids)
         return {i: {"id": i, "first_name": "Real", "last_name": "Name"} for i in ids}
 
@@ -727,7 +727,7 @@ def test_capped_is_only_true_when_rows_were_actually_dropped(client, no_postgres
     50 that "only the first 50 were enriched", when nothing had been left out."""
     import tracker.apollo_client as ac
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: {i: {"id": i} for i in ids})
+                        lambda ids, key, **_kw: {i: {"id": i} for i in ids})
     monkeypatch.setenv("APOLLO_API_KEY", "k")
     cap = appmod._CPI_BULK_ENRICH_CAP
 
@@ -743,7 +743,7 @@ def test_capped_is_only_true_when_rows_were_actually_dropped(client, no_postgres
 def test_duplicate_ids_do_not_count_towards_the_cap(client, no_postgres, monkeypatch):
     import tracker.apollo_client as ac
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: {i: {"id": i} for i in ids})
+                        lambda ids, key, **_kw: {i: {"id": i} for i in ids})
     monkeypatch.setenv("APOLLO_API_KEY", "k")
     ids = ["same"] * (appmod._CPI_BULK_ENRICH_CAP + 20)
     body = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",

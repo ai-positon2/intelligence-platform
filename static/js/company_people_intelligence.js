@@ -1450,7 +1450,20 @@ window.cpiEnrichSelected = function(){
     var bits=[];
     if(d.fetched) bits.push(d.fetched+" fetched from Apollo");
     if(d.cached) bits.push(d.cached+" from cache (free)");
-    toast("Revealed "+n+" "+(n===1?"profile":"profiles")+(bits.length?" · "+bits.join(" · "):""), "ok");
+    var msg="Revealed "+n+" "+(n===1?"profile":"profiles")+(bits.length?" · "+bits.join(" · "):"");
+    /* People Apollo never answered for are not people Apollo has nothing on,
+       and the difference decides what the reader does next. Reported in the
+       same toast rather than a second one, which would replace this before it
+       had been read, and as an error, because "Revealed 40 profiles" on its own
+       reads as the whole job done. They stay unenriched and unbilled, so the
+       same selection can simply be sent again. */
+    if(d.unreachable){
+      toast(msg+" · Apollo did not answer for "+d.unreachable+
+            ", so they were neither revealed nor ruled out. They cost nothing "+
+            "and are still selected: try again in a moment.", "err");
+    } else {
+      toast(msg, "ok");
+    }
     if(d.capped) toast("Only the first 50 were enriched. Select fewer to do the rest.", "err");
   }).catch(function(){
     if(btn) btn.disabled=false;

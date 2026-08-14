@@ -439,7 +439,7 @@ def _ask(monkeypatch, roster, titles=("CFO",), role=None, message="CFO of Lenovo
     monkeypatch.setattr(appmod, "_cpi_research", lambda oai, q, note="": ("", False))
     matched = []
 
-    def _bulk(ids, api_key):
+    def _bulk(ids, api_key, **_kw):
         matched.extend(ids)
         return {}
 
