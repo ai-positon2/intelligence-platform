@@ -8660,7 +8660,17 @@ def _cpi_reveal_names(people: list, api_key: str, cap: int = _CPI_CHAT_REVEAL_CA
     if todo:
         try:
             from tracker.apollo_client import bulk_match_people as _bulk
-            raw = _bulk(todo, api_key)
+            # A chunk that never got an answer leaves those names masked, which
+            # the answer already renders honestly as "Vivek Sh." with the
+            # name_masked flag intact -- so nothing is misstated either way. It
+            # is recorded because a silent partial failure here reads in the log
+            # exactly like Apollo holding no better record, and the next reader
+            # of this code should not have to guess which one happened.
+            unreachable: list = []
+            raw = _bulk(todo, api_key, failed=unreachable)
+            if unreachable:
+                log.info("cpi bulk name reveal: %d of %d ids unanswered, "
+                         "those names stay masked", len(unreachable), len(todo))
         except Exception as e:
             log.warning("cpi bulk name reveal failed: %s", e)
             raw = {}
@@ -11732,7 +11742,7 @@ def _cpi_contact_brief(p: dict) -> dict:
     return brief
 
 
-def _cpi_person_on_file(name: str, domain: str, api_key: str):
+def _cpi_person_on_file(name: str, domain: str, api_key: str, checked=None):
     """The Apollo row for one NAMED person at one employer domain, or None.
 
     Free: mixed_people/api_search costs no credits, and search_people enforces
@@ -11744,6 +11754,13 @@ def _cpi_person_on_file(name: str, domain: str, api_key: str):
     only search that had run was filtered BY TITLE, which says nothing about
     whether that person is on file under a DIFFERENT title -- the common case
     when a company's published CMO sits in Apollo as "SVP, Marketing".
+
+    `checked`, if given a dict, gets "ok" set to True once Apollo has actually
+    answered. Returning None for both "looked, not there" and "could not look"
+    put that same unfounded claim back one layer up: the caller turned a bare
+    None into "we do not hold them", so a timeout re-created word for word the
+    assertion this function was written to stop. None is now only safe to read
+    as an absence when checked["ok"] is set.
     """
     name = str(name or "").strip()
     domain = re.sub(r"^https?://", "", str(domain or "").strip().lower()).rstrip("/")
@@ -11758,6 +11775,9 @@ def _cpi_person_on_file(name: str, domain: str, api_key: str):
         # No personal data in the log line: a domain only.
         log.warning("cpi person-on-file lookup failed domain=%s: %s", domain, e)
         return None
+    if checked is not None:
+        # Apollo answered. Only now does "not in the rows" mean "not on file".
+        checked["ok"] = True
     for r in (rows or []):
         if _cpi_person_name_matches(r.get("full_name"), name):
             return r
@@ -12651,6 +12671,22 @@ def cpi_chat():
                 scope_facts["companies_offered_by_the_search_but_rejected_on_checking"] = \
                     _cpi_reject_note(scope_rejected)
 
+    def _records_unavailable():
+        """The reply for "our records could not be reached for this question".
+
+        Named rather than inlined because the answer prompt has exactly one rule
+        for apollo_lookup_unavailable, and the next path that needs to say "our
+        records could not be reached" should reach for this instead of assembling
+        a second, slightly different version of the same claim.
+        """
+        research, web = _research()
+        facts = {"apollo_lookup_unavailable": True}
+        return _cpi_chat_reply(
+            spend, context=ctx, researched=bool(research), web_search=web,
+            answer=(_cpi_grounded_answer(oai, facts, message, research) if research else
+                    "I couldn't reach our contact records just now, so I don't have an "
+                    "answer for that yet. Try again in a moment."))
+
     people_meta: dict = {}
     try:
         from tracker.apollo_client import search_people as _search_people
@@ -12661,13 +12697,7 @@ def cpi_chat():
         # Apollo being unreachable rules out the people half of the answer, not the
         # whole answer. Say what is missing and give what research can support.
         log.warning("cpi chat people search failed: %s", e)
-        research, web = _research()
-        facts = {"apollo_lookup_unavailable": True}
-        return _cpi_chat_reply(
-            spend, context=ctx, researched=bool(research), web_search=web,
-            answer=(_cpi_grounded_answer(oai, facts, message, research) if research else
-                    "I couldn't reach our contact records just now, so I don't have an "
-                    "answer for that yet. Try again in a moment."))
+        return _records_unavailable()
 
     # Apollo searches titles loosely (include_similar_titles), so a request for a
     # CMO can come back with a Marketing Manager. Verify in code that somebody
@@ -12693,6 +12723,9 @@ def cpi_chat():
     # which company is being asked about. Only ever runs after an org-id-scoped
     # search found nothing, so it can add matches but never replace good ones,
     # and people search is free.
+    # True when a search that would have established an absence did not run.
+    # Everything downstream that asserts "nobody" has to defer to it.
+    records_check_incomplete = False
     _domain_scope = ((resolved_org or {}).get("primary_domain")
                      or (resolved_org or {}).get("domain") or "")
     if not people and titles and _domain_scope and people_filters.get("organization_ids"):
@@ -12703,8 +12736,18 @@ def cpi_chat():
                                     per_page=max_results if kind == "people_list" else 10,
                                     strict=True, meta=people_meta)
         except Exception as e:
+            # Not `people = []`. This retry is not an optional extra: it exists
+            # because one real company often has SEVERAL Apollo organization
+            # records, so the org-id search coming back empty does not establish
+            # that nobody holds the title, only that nobody on THAT record does.
+            # Swallowing the failure sent the answer down the
+            # "no_one_holds_the_requested_title" path, whose whole premise is
+            # that the absence was checked -- and the check is exactly what just
+            # failed. An executive filed under a sibling record would have been
+            # reported as not existing.
             log.warning("cpi chat domain-scoped retry failed: %s", e)
             people = []
+            records_check_incomplete = True
         # The same loose-title check has to apply to the retry, or this becomes a
         # back door that returns a Marketing Manager as the CMO.
         if people and kind == "person_at_company":
@@ -12740,7 +12783,17 @@ def cpi_chat():
     no_title_match = False
     want_functions = _cpi_requested_functions(titles) if titles else frozenset()
     function_label = _cpi_function_label(want_functions)
-    if not people and resolved_org and resolved_org.get("id") and (titles or seniorities):
+    # Not on an incomplete check. This branch reads an empty `people` as "nobody
+    # holds this title here", and everything downstream of it inherits that: it
+    # sets no_title_match, which becomes the consolation list, whose whole offer
+    # is "nobody holds that title, so here are the nearest people we do hold".
+    # When the search that would have established the "nobody" is the one that
+    # failed, `people` has to stay empty so the records-gap branch below answers
+    # instead. Gating the consolation further down would be too late -- `people`
+    # is already the same-function list by then, and a list of near-misses shown
+    # without that framing reads as the answer to the question that was asked.
+    if (not people and not records_check_incomplete
+            and resolved_org and resolved_org.get("id") and (titles or seniorities)):
         no_title_match = True
         people = _cpi_same_function_people(resolved_org["id"], want_functions, api_key)
 
@@ -12785,21 +12838,41 @@ def cpi_chat():
                or (resolved_org or {}).get("domain") or "")
         if not who or not dom:
             return {}, None
-        on_file = _cpi_person_on_file(who, dom, api_key)
+        checked: dict = {}
+        on_file = _cpi_person_on_file(who, dom, api_key, checked=checked)
         if on_file:
             return ({"public_role_holder_is_on_file": _cpi_answer_person(on_file, False)},
                     {"type": "person", "name": on_file.get("full_name") or who,
                      "title": on_file.get("title") or (role or {}).get("title") or "",
                      "domain": dom, "apollo_id": on_file.get("id") or ""})
-        return ({"public_role_holder_not_in_our_records": True},
-                {"type": "person", "name": who,
-                 "title": (role or {}).get("title") or "",
-                 "domain": dom, "apollo_id": ""})
+        enrich = {"type": "person", "name": who,
+                  "title": (role or {}).get("title") or "",
+                  "domain": dom, "apollo_id": ""}
+        if not checked.get("ok"):
+            # Neither key, deliberately. The answer prompt's own rule for that
+            # case is already exactly right: "If NEITHER key is present, nobody
+            # checked: say nothing at all about whether we hold them." Sending
+            # the "not in our records" key here would have the model state an
+            # absence that no request ever established. The Enrich chip still
+            # goes back, since name plus domain is all people/match needs and it
+            # spends nothing until the user clicks it.
+            log.info("cpi chat: on-file check did not complete, claiming nothing")
+            return {}, enrich
+        return ({"public_role_holder_not_in_our_records": True}, enrich)
 
     if not people:
         # No match in our records is not the end of the answer: say so plainly and
         # then answer whatever research can support, rather than dead-ending.
-        facts = {"apollo_found_no_matching_people": True}
+        #
+        # Unless the search that would have found them never ran. "Our records
+        # have nobody matching that" is a claim, and this is the one branch that
+        # cannot tell on its own whether it earned the right to make it: an empty
+        # `people` arrives here identically whether Apollo answered with nothing
+        # or the widening retry failed mid-way. The researched role holder and
+        # everything else still travel with the answer -- only the sentence
+        # asserting an absence is withdrawn.
+        facts = ({"apollo_lookup_unavailable": True} if records_check_incomplete
+                 else {"apollo_found_no_matching_people": True})
         if titles:
             facts["requested_titles"] = titles
         if resolved_org:
