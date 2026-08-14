@@ -7480,6 +7480,23 @@ def cpi_search():
     # accident. Absent means on: the thin card is what this replaced.
     filters = dict(filters)
     company_detail = filters.pop("company_detail", True) is not False
+    # Every numeric range filter, cast the same way the chat's intent parser
+    # already casts a headcount it read out of English. The shipped filter
+    # panel only ever sends real numbers, so this has no effect there -- but
+    # cpi_search has no schema validation of its own, and a non-numeric value
+    # reaching _cpi_num_in_range or _employee_ranges_for raised a bare
+    # TypeError deep enough that the except below reported it as "Apollo did
+    # not answer this search... Try again in a moment" -- a validation bug
+    # dressed up as a transient outage, worst on a request that will fail
+    # identically every time it's retried.
+    for key in ("employee_min", "employee_max", "revenue_min", "revenue_max",
+                "founded_min", "founded_max", "num_jobs_min", "num_jobs_max",
+                "headcount_growth_min", "headcount_growth_max", "headcount_growth_months",
+                "yoe_min", "yoe_max", "days_in_title_min", "days_in_title_max",
+                "total_funding_min", "total_funding_max",
+                "latest_funding_min", "latest_funding_max"):
+        if key in filters and filters[key] is not None:
+            filters[key] = _cpi_int_or_none(filters[key])
     # NAICS and SIC are the two filters on this page with a shape Apollo enforces:
     # 2 to 5 digits and exactly 4. Official NAICS codes are SIX digits, so pasting
     # one from any government source is rejected by Apollo -- previously without a
@@ -7505,8 +7522,8 @@ def cpi_search():
     # AND no company detail is a contradiction, so the filter that was typed wins,
     # the lookup runs, and the response says it was turned back on.
     needs_employer = [k for k in ("industries", "employee_min", "employee_max",
-                                  "revenue_min", "revenue_max",
-                                  "company_locations", "technologies")
+                                  "revenue_min", "revenue_max", "company_locations",
+                                  "technologies", "technologies_all", "exclude_technologies")
                       if filters.get(k) is not None and filters.get(k) != []]
     industry_forced = bool(entity == "people" and needs_employer and not company_detail)
     if industry_forced:
@@ -7523,6 +7540,7 @@ def cpi_search():
     meta: dict = {}
     spend = {"credits": 0}
     resolved_names = None
+    employer_lookup_failed_n = 0
     if entity == "people":
         raw_domains = filters.get("company_domains") or []
         company_query = (raw_domains[0] or "").strip() if len(raw_domains) == 1 else ""
@@ -7572,6 +7590,11 @@ def cpi_search():
             # each person's seniority and function get read off their own title.
             if company_detail:
                 firmo = _cpi_attach_employer_facts(results, api_key, spend)
+                failed_ids = set(firmo.get("fetch_failed_ids") or [])
+                if failed_ids:
+                    for r in results:
+                        if str(r.get("organization_id") or "") in failed_ids:
+                            r["employer_lookup_failed"] = True
             # Outside the toggle on purpose: reading a title costs nothing, so
             # turning off the paid company lookup should not also throw away the
             # free classification that comes with every row.
@@ -7580,7 +7603,8 @@ def cpi_search():
             # Every employer-level check needs the lookup above, which is why
             # requesting one forces it on. With it off, only the title check can
             # run, and the others are simply not requested.
-            results, verify_dropped = _cpi_verify_rows(results, filters, True)
+            results, verify_dropped, employer_lookup_failed_n = _cpi_verify_rows(
+                results, filters, True)
         else:
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
@@ -7591,7 +7615,7 @@ def cpi_search():
             # search_companies already enforced the industry for every caller;
             # this adds the size, HQ and technology checks and reports all of them
             # from one place, so the two tabs cannot disagree.
-            results, verify_dropped = _cpi_verify_rows(results, filters, False)
+            results, verify_dropped, _unused = _cpi_verify_rows(results, filters, False)
     except Exception as e:
         # search_failed, not an empty result set. These are different facts and
         # the page drew them identically: Apollo never answered, so nothing was
@@ -7622,14 +7646,15 @@ def cpi_search():
     # instead of both silently claiming to be free.
     if firmo and firmo.get("orgs"):
         out["companies_described"] = firmo
-    unconfirmed_n = meta.get("company_unconfirmed") or meta.get("domain_unconfirmed")
+    unconfirmed_n = ((meta.get("company_unconfirmed") or 0) + employer_lookup_failed_n
+                    or meta.get("domain_unconfirmed"))
     if unconfirmed_n:
         # Not a rejection -- these rows are IN `results`, each carrying its own
-        # employer_unconfirmed/domain_unconfirmed flag (see search_people /
-        # search_companies) -- but the count still belongs on the response so
-        # the header can say Apollo didn't confirm every row's domain instead
-        # of implying company_detail verified them all, which for a
-        # domain-scoped search it did not.
+        # employer_unconfirmed/domain_unconfirmed/employer_lookup_failed flag
+        # (see search_people / search_companies / _cpi_attach_employer_facts)
+        # -- but the count still belongs on the response so the header can say
+        # Apollo didn't confirm every row's domain or employer data instead of
+        # implying company_detail verified them all, which it did not.
         out["company_unconfirmed"] = unconfirmed_n
     if entity == "people":
         # Echoed back so the results header describes the rows it is actually
@@ -8203,13 +8228,17 @@ def _cpi_tech_uid(name: str) -> str:
 
 
 def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
-    """(kept, {reason: dropped_count}) after enforcing every filter Apollo treats
-    as a hint rather than a rule.
+    """(kept, {reason: dropped_count}, employer_unavailable_count) after
+    enforcing every filter Apollo treats as a hint rather than a rule.
 
     A row missing the field a check needs is dropped by that check, not waved
     through: an unverifiable row is exactly the row that produced "I searched for
-    Healthcare and got a venture firm". The one exception is a check whose filter
-    was not requested, which never runs.
+    Healthcare and got a venture firm". The two exceptions are a check whose
+    filter was not requested, which never runs, and a row flagged
+    `employer_lookup_failed` -- set by _cpi_attach_employer_facts when the paid
+    lookup behind these fields never got an answer -- where "missing" describes
+    an outage, not Apollo's own classification, so the row is kept and counted
+    in the third return value instead of dropped under a reason nothing checked.
     """
     from tracker.apollo_taxonomy import expand as _industry_expand
     from tracker.apollo_client import _industry_matches
@@ -8227,31 +8256,43 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
 
     dropped: dict = {}
     kept = []
+    employer_unavailable = 0
     for r in (rows or []):
         org = _cpi_org_view(r, is_people)
         reason = ""
-        if wanted_industry and not _industry_matches(org, wanted_industry):
+        # Set on a row whose paid employer lookup outright failed (see
+        # _cpi_attach_employer_facts) -- an Apollo outage, not Apollo saying
+        # this row doesn't qualify. Every check below needs data that never
+        # arrived, so none of them run for this row: it is kept and counted
+        # separately rather than rejected under a reason nothing ever checked.
+        employer_ok = not r.get("employer_lookup_failed")
+        has_employer_filter = bool(wanted_industry or emp_min is not None or emp_max is not None
+                                   or rev_min is not None or rev_max is not None
+                                   or places or techs)
+        if employer_ok and wanted_industry and not _industry_matches(org, wanted_industry):
             reason = "industry"
-        elif (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
+        elif employer_ok and (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
                 org.get("employees"), emp_min, emp_max):
             reason = "employees"
-        elif (rev_min is not None or rev_max is not None) and not _cpi_num_in_range(
+        elif employer_ok and (rev_min is not None or rev_max is not None) and not _cpi_num_in_range(
                 org.get("revenue"), rev_min, rev_max):
             reason = "revenue"
-        elif places and not _cpi_place_matches(org, places):
+        elif employer_ok and places and not _cpi_place_matches(org, places):
             reason = "hq"
-        elif techs and not _cpi_tech_matches(org, techs):
+        elif employer_ok and techs and not _cpi_tech_matches(org, techs):
             reason = "technology"
         elif strict_titles and not _cpi_title_matches(r.get("title"), filters["titles"]):
             reason = "title"
         if reason:
             dropped[reason] = dropped.get(reason, 0) + 1
         else:
+            if not employer_ok and has_employer_filter:
+                employer_unavailable += 1
             kept.append(r)
     if dropped:
         log.info("cpi verify: kept %d/%d (%s)", len(kept), len(rows or []),
                  ", ".join("%s=%d" % kv for kv in sorted(dropped.items())))
-    return kept, dropped
+    return kept, dropped, employer_unavailable
 
 
 def _cpi_size_ok(employees, emp_min, emp_max) -> bool:
@@ -8480,11 +8521,20 @@ def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
 
     if missing:
         fresh: dict = {}
+        orgs = None
         try:
             from tracker.apollo_client import search_companies as _search_companies
+            # strict=True: the default swallows a transport failure and
+            # returns [], which read here as "Apollo has nothing on these
+            # companies" -- and every filter that depends on this fetch
+            # (industry, size, HQ, technology) would then reject every row on
+            # the page under a specific, false reason, for a question Apollo
+            # never actually answered. `orgs is None` below is what tells an
+            # outage here apart from a bug in the loop underneath it.
             orgs = _search_companies({"organization_ids": missing,
                                       "max_companies": len(missing)},
-                                     api_key, per_page=min(len(missing), 100)) or []
+                                     api_key, per_page=min(len(missing), 100),
+                                     strict=True) or []
             for o in orgs:
                 org_id = str(o.get("id") or "")
                 if org_id in missing:
@@ -8497,6 +8547,11 @@ def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
                 _cpi_record_vocab(orgs)
         except Exception as e:
             log.warning("cpi employer firmographics lookup failed: %s", e)
+            if orgs is None:
+                # The fetch itself never came back. See _cpi_verify_rows: a
+                # row waiting on this data must not be told its industry,
+                # size, HQ or technology failed a check that was never run.
+                stats["fetch_failed_ids"] = list(missing)
         if fresh:
             for org_id, payload in fresh.items():
                 facts[org_id] = payload
@@ -12207,7 +12262,7 @@ def _cpi_chat_company_scope(employer: dict, api_key: str, spend: dict) -> tuple:
         # genuinely uses.
         _cpi_record_industries(orgs)
         _cpi_record_vocab(orgs)
-    kept, rejected = _cpi_verify_rows(orgs, employer, False)
+    kept, rejected, _unused = _cpi_verify_rows(orgs, employer, False)
     return kept[:_CPI_CHAT_SCOPE_MAX], rejected
 
 

@@ -147,7 +147,7 @@ def test_a_revenue_figure_is_checked_against_the_range(value, lo, hi, ok):
 def test_a_company_outside_the_revenue_range_is_dropped():
     rows = [{"name": "Big", "annual_revenue": 50_000_000},
             {"name": "Small", "annual_revenue": 200_000}]
-    kept, dropped = appmod._cpi_verify_rows(rows, {"revenue_min": 1_000_000}, False)
+    kept, dropped, _unconfirmed = appmod._cpi_verify_rows(rows, {"revenue_min": 1_000_000}, False)
     assert [r["name"] for r in kept] == ["Big"]
     assert dropped == {"revenue": 1}
 
@@ -157,7 +157,7 @@ def test_a_persons_employer_is_checked_against_the_revenue_range_too():
     conclusions about the same employer is the bug _cpi_org_view exists to stop."""
     rows = [{"full_name": "A", "organization_revenue": 50_000_000},
             {"full_name": "B", "organization_revenue": 200_000}]
-    kept, dropped = appmod._cpi_verify_rows(rows, {"revenue_min": 1_000_000}, True)
+    kept, dropped, _unconfirmed = appmod._cpi_verify_rows(rows, {"revenue_min": 1_000_000}, True)
     assert [r["full_name"] for r in kept] == ["A"]
     assert dropped == {"revenue": 1}
 
@@ -165,7 +165,7 @@ def test_a_persons_employer_is_checked_against_the_revenue_range_too():
 def test_a_company_with_no_revenue_on_file_is_not_waved_through():
     """An unverifiable row is exactly the row that produced the original
     complaint. It fails the check rather than passing it."""
-    kept, dropped = appmod._cpi_verify_rows(
+    kept, dropped, _unconfirmed = appmod._cpi_verify_rows(
         [{"name": "Unknown"}], {"revenue_min": 1_000_000}, False)
     assert kept == [] and dropped == {"revenue": 1}
 
@@ -177,7 +177,14 @@ def test_revenue_forces_the_employer_lookup_on_the_results_grid():
     src = open(os.path.join(_ROOT, "app.py"), encoding="utf-8").read()
     block = src.split("needs_employer = [k for k in (")[1].split(")]")[0]
     for key in ("industries", "employee_min", "revenue_min", "revenue_max",
-                "company_locations", "technologies"):
+                "company_locations", "technologies",
+                # technologies_all/exclude_technologies are strict on Apollo's
+                # own side (verified live), so leaving them out never
+                # produced a wrong result -- but without this, the tech-stack
+                # badge on a row matching an ALL-of or NOT-using filter just
+                # never rendered, since it comes from the same paid lookup as
+                # "technologies" and nothing forced that lookup on for them.
+                "technologies_all", "exclude_technologies"):
         assert '"%s"' % key in block, "%s does not force the lookup" % key
 
 
