@@ -7484,7 +7484,7 @@ def cpi_search():
         page = 1
     api_key = os.environ.get("APOLLO_API_KEY", "")
     if not api_key:
-        return jsonify({"results": [], "has_more": False,
+        return jsonify({"results": [], "has_more": False, "search_failed": True,
                         "error": "Apollo is not configured on this environment."})
     per_page = 24
     meta: dict = {}
@@ -7499,7 +7499,9 @@ def cpi_search():
                     company_query, api_key, spend, oai=_cpi_oai())
             except Exception as e:
                 log.warning("cpi company-name resolve failed: %s", e)
-                return jsonify({"results": [], "has_more": False, "error": "Search failed."})
+                return jsonify({"results": [], "has_more": False, "search_failed": True,
+                                "error": 'Apollo did not answer while looking up "%s". '
+                                         "Try again in a moment." % company_query})
             if not found:
                 return jsonify({"results": [], "has_more": False,
                                 "error": 'No company found matching "%s".' % company_query})
@@ -7523,8 +7525,14 @@ def cpi_search():
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
+            # strict, because the default swallows a transport failure and
+            # returns an empty list -- which this route then served as a fact
+            # about the world. A rejected key, a rate limit and a company with
+            # nobody in it all arrived here as [] and all rendered as "No
+            # matches. Try widening the filters." Raising lets the except below
+            # tell the truth: Apollo did not answer.
             results = _search_people(filters, api_key, page=page,
-                                     per_page=per_page, meta=meta)
+                                     per_page=per_page, meta=meta, strict=True)
             # The free people endpoint says almost nothing about where these
             # people work, so the employers get described once for the whole page
             # (see _cpi_attach_employer_facts for the cost and the caching) and
@@ -7543,7 +7551,7 @@ def cpi_search():
         else:
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
-                                    per_page=per_page, meta=meta)
+                                    per_page=per_page, meta=meta, strict=True)
             _cpi_record_industries(raw)
             _cpi_record_vocab(raw)
             results = [_cpi_company_row(o) for o in raw]
@@ -7552,8 +7560,15 @@ def cpi_search():
             # from one place, so the two tabs cannot disagree.
             results, verify_dropped = _cpi_verify_rows(results, filters, False)
     except Exception as e:
+        # search_failed, not an empty result set. These are different facts and
+        # the page drew them identically: Apollo never answered, so nothing was
+        # found AND nothing was ruled out, but the grid said "No matches. Try
+        # widening the filters" -- advice that cannot help, about a search that
+        # never ran.
         log.warning("cpi search failed (entity=%s): %s", entity, e)
-        return jsonify({"results": [], "has_more": False, "error": "Search failed."})
+        return jsonify({"results": [], "has_more": False, "search_failed": True,
+                        "error": "Apollo did not answer this search, so nothing was "
+                                 "found and nothing was ruled out. Try again in a moment."})
     total = meta.get("total_entries")
     total_pages = meta.get("total_pages")
     # Prefer Apollo's own page count for "is there more": len(results) == per_page
@@ -7583,6 +7598,14 @@ def cpi_search():
     if meta.get("industry_dropped"):
         # search_companies removed these before the shared pass ever saw them.
         rejected["industry"] = rejected.get("industry", 0) + meta["industry_dropped"]
+    if meta.get("company_dropped"):
+        # Same story one filter over: Apollo treats its own employer-domain
+        # parameter as a relevance hint rather than a rule, so search_people
+        # enforces it in code -- and those rows were removed before the shared
+        # verify pass could count them. Without this the single most common
+        # search on this page, "everyone at this one company", is the only one
+        # that cannot explain its own empty result.
+        rejected["company"] = rejected.get("company", 0) + meta["company_dropped"]
     if rejected:
         out["rejected"] = rejected
         out["rejected_total"] = sum(rejected.values())
@@ -7965,6 +7988,7 @@ def cpi_vocab():
 #   it is relabelled in the UI as the keyword match it is rather than pretending
 #   to be a segment filter.
 _CPI_VERIFY_LABELS = {
+    "company": "working somewhere else",
     "industry": "outside the industry",
     "employees": "outside the size range",
     "revenue": "outside the revenue range",

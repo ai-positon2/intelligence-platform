@@ -650,7 +650,27 @@ window.cpiRunSearch = function(reset){
     body: JSON.stringify({ entity: STATE.entity, filters: filters, page: STATE.page })
   }).then(function(r){ return r.json(); }).then(function(d){
     if(btn){ btn.disabled=false; btn.textContent="Search"; }
-    if(d && d.error){ toast(d.error, "err"); }
+    /* A search that failed is not a search that found nothing. This used to
+       toast and then fall through, so renderResults() drew the "No matches"
+       empty state over the top -- turning "Apollo never answered" into a claim
+       that nobody matched, and on a reset wiping the rows already on screen to
+       do it. Nothing below this runs: there is no page, no count and no
+       history entry to write for a search that did not happen. */
+    if(d && (d.error || d.search_failed)){
+      toast(d.error || "Search failed.", "err");
+      if(reset){
+        STATE.results=[]; STATE.selected={}; STATE.total=null; STATE.rejected=null;
+        wrap.innerHTML='<div class="cpi-empty"><svg viewBox="0 0 24 24" fill="none" '+
+          'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+
+          '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>'+
+          "</svg><span>"+esc(d.error || "Search failed.")+"</span>"+
+          '<button type="button" class="cpi-relax" onclick="cpiRunSearch(true)">Try again</button></div>';
+        document.getElementById("cpiToolbar").style.display="none";
+        document.getElementById("cpiLoadMore").style.display="none";
+        updateBulk();
+      }
+      return;
+    }
     /* The name matched more than one distinct company: show the list instead
        of guessing one or searching across all of them at once. Nothing below
        this runs -- there is no page to render or "load more" until the user
@@ -820,6 +840,7 @@ function firmoNote(){
    just not clickable: guessing at which control to clear would be worse than
    leaving it to the reader. */
 var REJECT_FILTER = {
+  company:"company_domains",
   industry:"industries", employees:"employee_min", revenue:"revenue_min",
   hq:"company_locations", technology:"technologies", title:"titles"
 };
@@ -2510,6 +2531,7 @@ window.cpiDropFilter = function(key){
   COMBO_SPECS.forEach(function(spec){
     if(spec[0].indexOf(pre)===0 && spec[1]===key) setComboValues(spec[0], []);
   });
+  if(key==="company_domains"){ STATE.pinnedOrgId=null; STATE.pinnedOrgName=null; }
   if(key==="seniorities") document.querySelectorAll("#fpSeniority .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
   if(key==="email_status") document.querySelectorAll("#fpEmailStatus .cpi-chip.on").forEach(function(c){ c.classList.remove("on"); });
   if(key==="employee_min"||key==="employee_max"){

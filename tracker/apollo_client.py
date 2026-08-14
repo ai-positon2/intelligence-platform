@@ -532,7 +532,41 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         meta["total_entries"] = pagination.get("total_entries")
         meta["total_pages"] = pagination.get("total_pages")
 
-    people = data.get("people", [])
+    # Apollo splits a people search across TWO arrays and returns both:
+    # `people` (net new to this team) and `contacts` (people the team has
+    # already saved, which is where every person anyone here has previously
+    # enriched now lives). Reading only `people` meant the better half of the
+    # answer was invisible: searching a client's own domain returned strangers
+    # while the colleagues already sitting in this account -- already paid for,
+    # already carrying a verified email -- were dropped on the floor, and a
+    # narrow enough search dropped every row and reported "no matches".
+    #
+    # This is the same two-bucket split search_companies already merges for
+    # `accounts`, and it carries the same id-namespace trap: a contact row's
+    # `id` is a CONTACT id, and its person id is a separate `person_id` field.
+    # people/bulk_match only understands the person id, so passing the contact
+    # id through would spend a call to match nothing while looking like Apollo
+    # simply had no data. The person id wins here exactly as organization_id
+    # wins over an account id there.
+    people = list(data.get("people") or [])
+    seen_person_ids = {p.get("id") for p in people if p.get("id")}
+    for contact in (data.get("contacts") or []):
+        if not isinstance(contact, dict):
+            continue
+        person_id = contact.get("person_id") or contact.get("id")
+        if not person_id or person_id in seen_person_ids:
+            # A person Apollo listed in both buckets is one person, and the
+            # `people` copy is the one already keyed by person id.
+            continue
+        seen_person_ids.add(person_id)
+        row = dict(contact)
+        row["id"] = person_id
+        row["is_saved_contact"] = True
+        people.append(row)
+    if data.get("contacts"):
+        logger.info("search_people: merged %d saved contacts alongside %d people",
+                    len(data.get("contacts") or []), len(data.get("people") or []))
+
     max_people = filters.get("max_people")
     if max_people is not None:
         people = people[:max_people]
@@ -552,6 +586,13 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
                      if _clean_domain(p.get("organization_domain") or "") in wanted_domains]
         logger.info("search_people: domain filter kept %d/%d", len(normalized), before)
         if meta is not None:
+            # How many rows this filter removed, so the caller can say
+            # "Apollo returned 24 people, none of them at that company"
+            # instead of "no matches" -- which is a claim about the world made
+            # from a fact about the request. Every other filter on this page
+            # already reports itself this way; this one was silent, and it is
+            # the one that fires on the most common search there is.
+            meta["company_dropped"] = before - len(normalized)
             # Apollo's pagination totals describe the unfiltered call and would
             # wildly overstate how many people actually match the domain now
             # that we enforce it ourselves -- an honest caller can't report a
@@ -641,6 +682,10 @@ def _normalize_search_person(p: dict) -> dict:
         "past_companies": [h.get("organization_name") for h in past[:3]],
         "past_roles_count": len(past),
         "last_refreshed_at": p.get("last_refreshed_at"),
+        # True only for a row that came from Apollo's `contacts` bucket: this
+        # person is already saved to this team's account, so their details have
+        # been paid for once already. Set by search_people, never by Apollo.
+        "is_saved_contact": bool(p.get("is_saved_contact")),
         "organization_id": org.get("id") or p.get("organization_id"),
         "organization_name": org.get("name"),
         "organization_domain": (org.get("primary_domain") or org.get("domain")
