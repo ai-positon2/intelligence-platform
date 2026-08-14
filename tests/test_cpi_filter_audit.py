@@ -175,14 +175,32 @@ def test_the_hq_filter_is_enforced_against_the_real_location(client, monkeypatch
 
 @pytest.mark.parametrize("wanted,ok", [
     (["United States"], True), (["united states"], True), (["Texas"], True),
-    (["Austin"], True), (["Austin, Texas"], True), (["Austin, TX"], False),
+    (["Austin"], True), (["Austin, Texas"], True), (["Austin, TX"], True),
+    (["austin, tx"], True), (["New York, NY"], False),
     (["Switzerland"], False), (["Bern, Switzerland"], False),
     (["Switzerland", "United States"], True),
+    # The accidental substring matches are gone: "ca" no longer rides along
+    # inside "Chicago", and a state that simply is not this one still misses.
+    (["Chicago, IL"], False), (["Dallas, TX"], False),
 ])
 def test_the_hq_check_reads_city_state_and_country(wanted, ok):
     """A location can be typed at any level, and "Austin, Texas" spans two fields.
-    "Austin, TX" is honestly a miss: Apollo stored the state unabbreviated, and
-    guessing that TX means Texas is how a filter starts inventing matches."""
+
+    "Austin, TX" was called an honest miss here, on the reasoning that Apollo
+    stores the state unabbreviated and that reading TX as Texas is how a filter
+    starts inventing matches. Measured against this account, that reasoning does
+    not survive: Apollo's OWN matcher accepts "Austin, TX" and returns Austin
+    companies, so refusing the abbreviation did not decline to guess, it threw
+    away rows Apollo had already matched and then told the reader they were
+    "headquartered elsewhere". The two most natural ways to type a US location,
+    "Austin, TX" and "New York, NY", returned nothing at all.
+
+    The state table is a closed, unambiguous list, so expanding it is the same
+    normalization _clean_domain already does for www and protocol rather than a
+    guess. Matching is by whole word now, which also retires the accidents that
+    made this look like it worked: "Boston, MA" and "San Diego, CA" only ever
+    passed because "ma" and "ca" happen to sit inside "Massachusetts" and
+    "California"."""
     org = {"city": "Austin", "state": "Texas", "country": "United States"}
     assert appmod._cpi_place_matches(org, wanted) is ok
 

@@ -703,9 +703,16 @@ def test_people_domain_filter_with_no_real_match_returns_nothing(mock_post):
 
 @patch("tracker.apollo_client.requests.post")
 def test_people_domain_filter_suppresses_apollo_unfiltered_total(mock_post):
-    """Apollo's pagination totals describe the call BEFORE our strict filter --
-    reporting them as-is would show e.g. "24 of 83,435,511 matches" next to a
-    domain-scoped result, which is a far bigger lie than no count at all."""
+    """Apollo's ROW count describes the call BEFORE our strict filter --
+    reporting it as-is would show e.g. "24 of 83,435,511 matches" next to a
+    domain-scoped result, which is a far bigger lie than no count at all.
+
+    Its PAGE count is a different fact and survives: it describes how many pages
+    Apollo will serve, which our own filtering does not change. Discarding it
+    too meant "is there more" fell back to counting the rows that SURVIVED
+    filtering, so removing a single stray row hid "Load more" entirely and
+    stranded the reader on 23 of a company's 355 people, with nothing on screen
+    saying the rest existed."""
     mock_post.return_value = _mock_response({
         "people": [{"id": "p1", "first_name": "Ana", "last_name": "Real",
                     "organization": {"domain": "acme.com"}}],
@@ -713,7 +720,8 @@ def test_people_domain_filter_suppresses_apollo_unfiltered_total(mock_post):
     })
     meta = {}
     apollo_client.search_people({"company_domains": ["acme.com"]}, _FAKE_API_KEY, meta=meta)
-    assert meta["total_entries"] is None and meta["total_pages"] is None
+    assert meta["total_entries"] is None
+    assert meta["total_pages"] == 900000
 
 
 @patch("tracker.apollo_client.requests.post")

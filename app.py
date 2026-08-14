@@ -7572,8 +7572,15 @@ def cpi_search():
     total = meta.get("total_entries")
     total_pages = meta.get("total_pages")
     # Prefer Apollo's own page count for "is there more": len(results) == per_page
-    # is a guess that both over- and under-reports on the last page.
-    has_more = (page < total_pages) if total_pages else (len(results) >= per_page)
+    # is a guess that both over- and under-reports on the last page. Where that
+    # count is unavailable, fall back to how many rows APOLLO served, never to
+    # how many survived our own checks -- reading the filtered count here is
+    # what hid "Load more" the moment any row was removed, stranding a reader on
+    # 23 of a company's 355 people with nothing on screen saying there were more.
+    served = meta.get("returned")
+    if served is None:
+        served = len(results)
+    has_more = (page < total_pages) if total_pages else (served >= per_page)
     out = {"results": results, "has_more": bool(has_more), "total": total, "page": page}
     if resolved_names:
         out["resolved_company"] = resolved_names
@@ -8027,6 +8034,68 @@ def _cpi_org_view(r: dict, is_people: bool) -> dict:
     }
 
 
+# Apollo takes locations as free text and its own matcher understands
+# "Austin, TX". The check below did not: it tested each comma-separated part as
+# a raw substring, and "tx" does not appear in "Texas" any more than "ny"
+# appears in "New York" -- so the two most natural ways to type a US location
+# removed every row Apollo had already matched, and the page reported them as
+# "headquartered elsewhere". ("Boston, MA" and "San Diego, CA" only ever passed
+# by accident, "ma" and "ca" happening to sit inside "Massachusetts" and
+# "California".) Both spellings of every state are accepted now, and matching is
+# by whole word so the accidents stop too.
+_CPI_STATE_ABBR = {
+    "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas",
+    "ca": "california", "co": "colorado", "ct": "connecticut", "de": "delaware",
+    "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
+    "il": "illinois", "in": "indiana", "ia": "iowa", "ks": "kansas",
+    "ky": "kentucky", "la": "louisiana", "me": "maine", "md": "maryland",
+    "ma": "massachusetts", "mi": "michigan", "mn": "minnesota",
+    "ms": "mississippi", "mo": "missouri", "mt": "montana", "ne": "nebraska",
+    "nv": "nevada", "nh": "new hampshire", "nj": "new jersey",
+    "nm": "new mexico", "ny": "new york", "nc": "north carolina",
+    "nd": "north dakota", "oh": "ohio", "ok": "oklahoma", "or": "oregon",
+    "pa": "pennsylvania", "ri": "rhode island", "sc": "south carolina",
+    "sd": "south dakota", "tn": "tennessee", "tx": "texas", "ut": "utah",
+    "vt": "vermont", "va": "virginia", "wa": "washington",
+    "wv": "west virginia", "wi": "wisconsin", "wy": "wyoming",
+    "dc": "district of columbia",
+}
+# Some of these collide with a state code ("CA" is California and Canada, "IN"
+# is Indiana and India, "DE" is Delaware and Germany). Both readings go into the
+# candidate set and any one of them may match: every comma-separated part of the
+# typed location still has to match, so a loose state part cannot carry a row on
+# its own. "Toronto, CA" reaches Canada; it does not reach Toronto, Ohio.
+_CPI_COUNTRY_ABBR = {
+    "us": "united states", "usa": "united states", "u.s.": "united states",
+    "u.s.a.": "united states", "uk": "united kingdom", "gb": "united kingdom",
+    "uae": "united arab emirates", "ca": "canada", "in": "india",
+    "de": "germany", "au": "australia", "fr": "france", "jp": "japan",
+    "sg": "singapore", "nl": "netherlands", "es": "spain", "it": "italy",
+    "br": "brazil", "mx": "mexico", "il": "israel", "ie": "ireland",
+    "se": "sweden", "ch": "switzerland", "nz": "new zealand", "za": "south africa",
+}
+
+
+def _cpi_place_terms(part: str) -> set:
+    """Every spelling of one typed location part worth testing for."""
+    part = str(part or "").strip().lower()
+    if not part:
+        return set()
+    out = {part}
+    for table in (_CPI_STATE_ABBR, _CPI_COUNTRY_ABBR):
+        if part in table:
+            out.add(table[part])
+        for abbr, full in table.items():
+            if part == full:
+                out.add(abbr)
+    return out
+
+
+def _cpi_place_has(have: str, term: str) -> bool:
+    """Whole-word containment, so "CA" matches California and not Chicago."""
+    return re.search(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(term), have) is not None
+
+
 def _cpi_place_matches(org: dict, wanted) -> bool:
     """Whether a company's HQ is in one of the requested places.
 
@@ -8043,7 +8112,8 @@ def _cpi_place_matches(org: dict, wanted) -> bool:
         return False
     for term in (wanted or []):
         parts = [p.strip().lower() for p in str(term or "").split(",") if p.strip()]
-        if parts and all(p in have for p in parts):
+        if parts and all(any(_cpi_place_has(have, t) for t in _cpi_place_terms(p))
+                         for p in parts):
             return True
     return False
 
@@ -8719,7 +8789,7 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
         # No personal data in the log line: an id and a domain only.
         log.warning("cpi person enrich failed apollo_id=%s domain=%s: %s",
                     apollo_id or "(none)", payload.get("domain") or "(none)", e)
-        return {"matched": False}
+        return {"matched": False, "lookup_failed": True}
 
 
 def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
@@ -8759,8 +8829,12 @@ def _cpi_enrich_company(domain: str, apollo_id: str, spend=None) -> dict:
                 profile["leadership"] = []
         return profile
     except Exception as e:
+        # lookup_failed, because "no match" and "no answer" were the same
+        # dict and the modal rendered both as "Apollo has no organization
+        # record for this company" -- a statement about Apollo's database made
+        # from a failed request.
         log.warning("cpi company enrich failed domain=%s apollo_id=%s: %s", domain, apollo_id, e)
-        return {"matched": False}
+        return {"matched": False, "lookup_failed": True}
 
 
 @app.route("/p2/b2b-agents/company-people-intelligence/enrich", methods=["POST"])

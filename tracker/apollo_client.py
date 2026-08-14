@@ -416,13 +416,8 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         orgs = [o for o in orgs if _clean_domain(o.get("primary_domain") or o.get("domain") or "")
                 in wanted_domains]
         logger.info("search_companies: domain filter kept %d/%d", len(orgs), before)
-        if meta is not None:
-            # Apollo's pagination totals describe the unfiltered call and would
-            # wildly overstate how many companies actually match the domain now
-            # that we enforce it ourselves -- an honest caller can't report a
-            # total it doesn't know.
+        if meta is not None and len(orgs) != before:
             meta["total_entries"] = None
-            meta["total_pages"] = None
 
     # q_organization_keyword_tags is a relevance match over name and tags, not an
     # industry filter, so the industry the caller asked for is enforced here
@@ -438,7 +433,6 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
             # this page just dropped. An honest caller cannot report a total it
             # does not know.
             meta["total_entries"] = None
-            meta["total_pages"] = None
             logger.info("search_companies: %d/%d survived the industry check",
                         len(orgs), before)
 
@@ -451,6 +445,50 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
 
     logger.info("search_companies: received %d companies (after filtering)", len(orgs))
     return orgs
+
+
+def _merge_people_buckets(data: dict) -> list[dict]:
+    """Every person in an Apollo people-search response, from BOTH arrays.
+
+    Apollo answers mixed_people/api_search with `people` (net new to this team)
+    and `contacts` (people this team has already saved, which is where everyone
+    anyone here has previously enriched now lives), and returns both. Reading
+    only `people` made the better half of the answer invisible: a search of a
+    client's own domain returned strangers while the colleagues already sitting
+    in this account -- already paid for, already carrying a verified email --
+    were dropped, and a narrow enough search dropped every row and reported
+    that the company had nobody in it.
+
+    This is the same two-bucket split search_companies merges for `accounts`,
+    with the same id-namespace trap: a contact row's `id` is a CONTACT id, and
+    its person id is a separate `person_id` field. people/bulk_match only
+    understands the person id, so passing a contact id on would spend the call
+    to match nothing while looking exactly like Apollo having no such person.
+
+    Shared by search_people and get_leadership rather than written twice: the
+    same defect existed independently in both, which is what a rule living in
+    two places eventually costs.
+    """
+    people = list((data or {}).get("people") or [])
+    seen = {p.get("id") for p in people if p.get("id")}
+    for contact in ((data or {}).get("contacts") or []):
+        if not isinstance(contact, dict):
+            continue
+        person_id = contact.get("person_id") or contact.get("id")
+        if not person_id or person_id in seen:
+            # Listed in both arrays is one person, and the `people` copy is
+            # already keyed by person id.
+            continue
+        seen.add(person_id)
+        row = dict(contact)
+        row["id"] = person_id
+        row["is_saved_contact"] = True
+        people.append(row)
+    if (data or {}).get("contacts"):
+        logger.info("apollo people response: %d net new + %d saved contacts",
+                    len((data or {}).get("people") or []),
+                    len((data or {}).get("contacts") or []))
+    return people
 
 
 def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25,
@@ -532,41 +570,12 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
         meta["total_entries"] = pagination.get("total_entries")
         meta["total_pages"] = pagination.get("total_pages")
 
-    # Apollo splits a people search across TWO arrays and returns both:
-    # `people` (net new to this team) and `contacts` (people the team has
-    # already saved, which is where every person anyone here has previously
-    # enriched now lives). Reading only `people` meant the better half of the
-    # answer was invisible: searching a client's own domain returned strangers
-    # while the colleagues already sitting in this account -- already paid for,
-    # already carrying a verified email -- were dropped on the floor, and a
-    # narrow enough search dropped every row and reported "no matches".
-    #
-    # This is the same two-bucket split search_companies already merges for
-    # `accounts`, and it carries the same id-namespace trap: a contact row's
-    # `id` is a CONTACT id, and its person id is a separate `person_id` field.
-    # people/bulk_match only understands the person id, so passing the contact
-    # id through would spend a call to match nothing while looking like Apollo
-    # simply had no data. The person id wins here exactly as organization_id
-    # wins over an account id there.
-    people = list(data.get("people") or [])
-    seen_person_ids = {p.get("id") for p in people if p.get("id")}
-    for contact in (data.get("contacts") or []):
-        if not isinstance(contact, dict):
-            continue
-        person_id = contact.get("person_id") or contact.get("id")
-        if not person_id or person_id in seen_person_ids:
-            # A person Apollo listed in both buckets is one person, and the
-            # `people` copy is the one already keyed by person id.
-            continue
-        seen_person_ids.add(person_id)
-        row = dict(contact)
-        row["id"] = person_id
-        row["is_saved_contact"] = True
-        people.append(row)
-    if data.get("contacts"):
-        logger.info("search_people: merged %d saved contacts alongside %d people",
-                    len(data.get("contacts") or []), len(data.get("people") or []))
-
+    people = _merge_people_buckets(data)
+    if meta is not None:
+        # Rows Apollo actually served on this page. "Is there another page" is a
+        # question about Apollo, so it has to be answered from this and never
+        # from how many rows survived our own checks -- see cpi_search.
+        meta["returned"] = len(people)
     max_people = filters.get("max_people")
     if max_people is not None:
         people = people[:max_people]
@@ -593,12 +602,30 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
             # already reports itself this way; this one was silent, and it is
             # the one that fires on the most common search there is.
             meta["company_dropped"] = before - len(normalized)
-            # Apollo's pagination totals describe the unfiltered call and would
-            # wildly overstate how many people actually match the domain now
-            # that we enforce it ourselves -- an honest caller can't report a
-            # total it doesn't know.
-            meta["total_entries"] = None
-            meta["total_pages"] = None
+            # Apollo's ROW count is only worth repeating when we can see that it
+            # describes these rows, and a domain-scoped call is where it most
+            # often does not. Two ways to tell that it does not:
+            #
+            #   - we just removed rows, so the total described a looser match
+            #     than the one being shown;
+            #   - or Apollo left the page short while claiming there is more to
+            #     come, which is what an IGNORED filter looks like and is how
+            #     "1 of 83,000,000 matches" once reached the screen beside a
+            #     single-company search. A genuinely short LAST page is not
+            #     that: there, the total is within reach of the pages served.
+            #
+            # Its PAGE count survives both, because that describes Apollo's own
+            # paging and is not ours to invalidate -- reading it as invalid is
+            # what hid "Load more" and stranded a reader on 23 of 355 people.
+            served = meta.get("returned") or 0
+            total = meta.get("total_entries")
+            if before - len(normalized):
+                meta["total_entries"] = None
+            elif total is not None and served < per_page and total > page * per_page:
+                logger.info("search_people: ignoring an inconsistent total "
+                            "(served %d of %d on page %d, total claims %s)",
+                            served, per_page, page, total)
+                meta["total_entries"] = None
 
     logger.info("search_people: received %d people (%s)",
                 len(normalized), _field_coverage(normalized))
@@ -831,7 +858,11 @@ def get_leadership(organization_id: str, api_key: str, max_people: int = 20) -> 
     }
     try:
         data = _post("mixed_people/api_search", payload, api_key)
-        people = data.get("people", [])
+        # Both buckets, for the same reason search_people needs both: a company
+        # whose people this team has already saved would otherwise come back
+        # with no leadership at all, which is the worst case for a lookup whose
+        # entire job is naming the people at the top.
+        people = _merge_people_buckets(data)
         # Deliberately does NOT dump the raw record: it carries personal data
         # (name, email) that must not land in application logs. Count only.
         logger.info("get_leadership: %d people for org_id=%s", len(people), organization_id)
@@ -841,7 +872,10 @@ def get_leadership(organization_id: str, api_key: str, max_people: int = 20) -> 
             last = (p.get("last_name") or "").strip()
             full_name = (f"{first} {last}".strip()) or (p.get("name") or "").strip() or None
             result.append({
+                # Already swapped to the person id by _merge_people_buckets for
+                # a saved contact, so this is safe to enrich with.
                 "id": p.get("id"),
+                "is_saved_contact": bool(p.get("is_saved_contact")),
                 "full_name": full_name,
                 "first_name": first or None,
                 "last_name": last or None,
