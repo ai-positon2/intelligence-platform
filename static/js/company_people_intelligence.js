@@ -1904,7 +1904,12 @@ function personHero(p){
 
 function personBody(p){
   if(!p||!p.matched){
-    return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>No match found</b>Apollo has no full profile for this person beyond what the search already returned.</div></div>';
+    /* A lookup that never reached Apollo says so. Telling a reader "Apollo has
+       no profile for this person" on the strength of a failed request is the
+       one thing this modal must not do: they act on it by giving up. */
+    return p&&p.lookup_failed
+      ? '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>Lookup failed</b>Apollo did not answer, so this person was neither found nor ruled out. Try again in a moment.</div></div>'
+      : '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>No match found</b>Apollo has no full profile for this person beyond what the search already returned.</div></div>';
   }
   var emails=(p.emails&&p.emails.length)?p.emails:[];
   var phones=p.phones||[];
@@ -1959,7 +1964,9 @@ function companyHero(c){
 
 function companyBody(c){
   if(!c||!c.matched){
-    return '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>No match found</b>Apollo has no organization record for this company.</div></div>';
+    return c&&c.lookup_failed
+      ? '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>Lookup failed</b>Apollo did not answer, so this company was neither found nor ruled out. Try again in a moment.</div></div>'
+      : '<div class="pm-sec"><h4 class="pm-h4">Profile<s>apollo</s></h4><div class="pm-empty"><b>No match found</b>Apollo has no organization record for this company.</div></div>';
   }
   var out='<div class="pm-sec"><h4 class="pm-h4">Firmographics<s>apollo</s></h4><div class="pm-kv">'+
     pmKV("Founded",c.founded)+pmKV("Phone",c.phone)+pmKV("HQ",c.hq)+pmKV("Website",c.website,true)+
