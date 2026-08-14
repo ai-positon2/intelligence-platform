@@ -591,9 +591,33 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
     wanted_domains.discard("")
     if wanted_domains:
         before = len(normalized)
-        normalized = [p for p in normalized
-                     if _clean_domain(p.get("organization_domain") or "") in wanted_domains]
-        logger.info("search_people: domain filter kept %d/%d", len(normalized), before)
+        confirmed, unconfirmed, dropped = [], [], 0
+        for p in normalized:
+            have = _clean_domain(p.get("organization_domain") or "")
+            if have in wanted_domains:
+                confirmed.append(p)
+            elif have:
+                # Apollo told us the domain and it is a different one: a real
+                # mismatch, exactly what this filter exists to catch.
+                dropped += 1
+            else:
+                # Apollo returned this row with no employer domain at all --
+                # a plan- or quota-dependent gap (the free tier's own per-row
+                # field coverage varies, same as the last-name masking above),
+                # not evidence the person works elsewhere. Discarding it here
+                # made the single most common search on this page ("everyone
+                # at this one company") return zero for a domain Apollo
+                # actually holds hundreds of people at, because every one of
+                # THOSE rows happened to come back without a domain. Treating
+                # "Apollo didn't say" as "Apollo said no" is the same defect
+                # this filter was written to stop, aimed at a row instead of
+                # the page: kept, but flagged, so the reader is not told a
+                # confirmed fact that was never checked.
+                p["employer_unconfirmed"] = True
+                unconfirmed.append(p)
+        normalized = confirmed + unconfirmed
+        logger.info("search_people: domain filter kept %d/%d (%d unconfirmed)",
+                    len(normalized), before, len(unconfirmed))
         if meta is not None:
             # How many rows this filter removed, so the caller can say
             # "Apollo returned 24 people, none of them at that company"
@@ -601,7 +625,11 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
             # from a fact about the request. Every other filter on this page
             # already reports itself this way; this one was silent, and it is
             # the one that fires on the most common search there is.
-            meta["company_dropped"] = before - len(normalized)
+            meta["company_dropped"] = dropped
+            # A row Apollo simply didn't say, distinct from one it ruled out --
+            # not a rejection (nothing was removed), so callers report it
+            # separately from company_dropped rather than folding it in.
+            meta["company_unconfirmed"] = len(unconfirmed)
             # Apollo's ROW count is only worth repeating when we can see that it
             # describes these rows, and a domain-scoped call is where it most
             # often does not. Two ways to tell that it does not:
@@ -619,7 +647,7 @@ def search_people(filters: dict, api_key: str, page: int = 1, per_page: int = 25
             # what hid "Load more" and stranded a reader on 23 of 355 people.
             served = meta.get("returned") or 0
             total = meta.get("total_entries")
-            if before - len(normalized):
+            if dropped:
                 meta["total_entries"] = None
             elif total is not None and served < per_page and total > page * per_page:
                 logger.info("search_people: ignoring an inconsistent total "

@@ -7614,6 +7614,13 @@ def cpi_search():
     # instead of both silently claiming to be free.
     if firmo and firmo.get("orgs"):
         out["companies_described"] = firmo
+    if meta.get("company_unconfirmed"):
+        # Not a rejection -- these rows are IN `results`, each carrying its own
+        # employer_unconfirmed flag (see search_people) -- but the count still
+        # belongs on the response so the header can say Apollo didn't confirm
+        # every row's employer instead of implying company_detail verified them
+        # all, which for a domain-scoped search it did not.
+        out["company_unconfirmed"] = meta["company_unconfirmed"]
     if entity == "people":
         # Echoed back so the results header describes the rows it is actually
         # showing rather than the state of a checkbox the user may already have

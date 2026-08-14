@@ -660,6 +660,7 @@ window.cpiRunSearch = function(reset){
       toast(d.error || "Search failed.", "err");
       if(reset){
         STATE.results=[]; STATE.selected={}; STATE.total=null; STATE.rejected=null;
+        STATE.companyUnconfirmed=0;
         wrap.innerHTML='<div class="cpi-empty"><svg viewBox="0 0 24 24" fill="none" '+
           'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+
           '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>'+
@@ -705,6 +706,11 @@ window.cpiRunSearch = function(reset){
     STATE.companyDetail=(d&&d.company_detail!==undefined)?!!d.company_detail:undefined;
     STATE.rejected=(d&&d.rejected)||null;
     STATE.rejectedLabels=(d&&d.rejected_labels)||{};
+    /* Rows Apollo returned with no employer domain to check against a
+       company-domain search: kept (see search_people), each flagged on its own
+       row, but the count belongs in the header too so the page does not read
+       as having confirmed every row's employer when it could not. */
+    STATE.companyUnconfirmed=(d&&d.company_unconfirmed)||0;
     /* Apollo has no industry filter, so an industry search needs the company
        lookup to verify what it found. Saying so beats appearing to ignore the
        toggle. */
@@ -896,6 +902,12 @@ function rejectedNote(){
   return ' <s>&middot; '+pmNum(why.total)+" removed: "+esc(why.text)+"</s>";
 }
 
+function unconfirmedNote(){
+  var n=STATE.companyUnconfirmed;
+  if(!n) return "";
+  return ' <s>&middot; '+pmNum(n)+" with employer unconfirmed</s>";
+}
+
 /* "1 companies" is the kind of small wrongness that makes a page feel unfinished,
    and the singular case is common: a scoped search often returns exactly one. */
 function noun(n){
@@ -932,7 +944,7 @@ function renderResults(){
     cnt.innerHTML = (STATE.total && STATE.total>shown
       ? "Showing <b>"+pmNum(shown)+"</b> of <b>"+pmNum(STATE.total)+"</b> <s>matches in Apollo</s>"
       : "<b>"+pmNum(shown)+"</b> <s>"+noun(shown)+"</s>")
-      + firmoNote() + rejectedNote();
+      + firmoNote() + rejectedNote() + unconfirmedNote();
   }
   wrap.innerHTML = STATE.view==="table"
     ? renderTable()
@@ -961,7 +973,12 @@ function coCell(r){
   var lg=safeUrl(r.organization_logo||r.logo_url);
   var dom=r.organization_domain||r.primary_domain;
   var inner=(lg?'<img class="cpi-td-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':"")+
-    '<span class="cpi-td-t">'+esc(name)+'</span>';
+    '<span class="cpi-td-t">'+esc(name)+'</span>'+
+    // Set only when this search was scoped to one employer's domain and Apollo
+    // did not return enough data on THIS row to confirm it against that
+    // domain -- not a claim the person works elsewhere, which is why the row
+    // is on screen at all rather than dropped (see search_people).
+    (r.employer_unconfirmed?'<span class="cpi-masked sm" title="Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"");
   return dom
     ? '<a class="cpi-td-co" href="'+esc(safeUrl("https://"+String(dom).replace(/^https?:\/\//i,"")))+
       '" target="_blank" rel="noopener noreferrer" title="'+esc(name+" · "+dom)+'">'+inner+"</a>"
@@ -1229,7 +1246,8 @@ function personCard(p,i){
        was always going to show if the favicon 404'd anyway. */
     var lg=safeUrl(p.organization_logo);
     var co=(lg?'<img class="cpi-row-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'"> ':"")
-      +'<b>'+esc(p.organization_name)+'</b>';
+      +'<b>'+esc(p.organization_name)+'</b>'
+      +(p.employer_unconfirmed?'<span class="cpi-masked sm" title="Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"");
     var extra=[];
     if(p.organization_industry) extra.push(esc(p.organization_industry));
     if(p.organization_employees) extra.push(pmNum(p.organization_employees)+" emp");
@@ -1766,6 +1784,7 @@ window.cpiRestoreHistory = function(id){
        one's, which is a wrong statement about the file rather than a missing
        one. */
     STATE.rejected = null; STATE.rejectedLabels = {}; STATE.firmo = null;
+    STATE.companyUnconfirmed = 0;
     var revealed = d.entity==="revealed";
     if(revealed){
       /* Not a search: nobody typed filters to get these people, so the panel is
