@@ -65,7 +65,7 @@
     </div>
 
     <div class="dash-grid">
-      {% set _themes = {'seo-geo-audit':'c-seo-geo','article-recommendation':'c-article','content-enhancement':'c-enhancement','content-research':'c-research','keyword-research':'c-keyword','agent-readiness-audit':'c-agent','image-alt-audit':'c-image','knowledge-base':'c-knowledge','team-insights':'c-team','location-page-builder':'c-location'} %}
+      {% set _themes = {'seo-geo-audit':'c-seo-geo','article-recommendation':'c-article','content-enhancement':'c-enhancement','content-research':'c-research','keyword-research':'c-keyword','agent-readiness-audit':'c-agent','image-alt-audit':'c-image','knowledge-base':'c-knowledge','team-insights':'c-team','location-page-builder':'c-location','competitor-analysis':'c-competitor'} %}
       {% set _cycle = ['c-seo-geo','c-article','c-enhancement','c-research','c-keyword','c-agent','c-image','c-knowledge','c-team','c-location'] %}
       {% for t in seo_tools %}
       <a href="/p2/seo/{{ t.slug }}" class="dash-card active {{ _themes.get(t.slug) or _cycle[loop.index0 % (_cycle|length)] }}">
