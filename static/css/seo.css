@@ -236,6 +236,12 @@
       --icon-glow: rgba(236,72,153,0.55); --card-border: rgba(236,72,153,0.4);
       --card-glow: 0 0 40px rgba(236,72,153,0.12); --arrow-color: #f472b6;
     }
+    .c-competitor {
+      --band: linear-gradient(90deg,#d946ef,#e879f9,#f0abfc);
+      --thumb: linear-gradient(135deg,#280a2e 0%,#4a1257 100%);
+      --icon-glow: rgba(217,70,239,0.55); --card-border: rgba(217,70,239,0.4);
+      --card-glow: 0 0 40px rgba(217,70,239,0.12); --arrow-color: #e879f9;
+    }
     .footer-note { margin-top: 52px; font-size: 11.5px; color: #1a1d2e; text-align: center; }
   
 
