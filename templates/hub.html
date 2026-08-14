@@ -78,15 +78,17 @@
           <div class="card-title">B2B Agents</div>
           <div class="card-desc">
             Buyer signals, competitor ad intelligence, anonymous visitor de-anonymisation,
-            LinkedIn engagement and strategy research, and live contact lookup.
+            LinkedIn engagement, and live contact lookup.
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <!-- Counts the cards on /p2/b2b-agents: 6 live plus Job Change Alert,
+              <!-- Counts the cards on /p2/b2b-agents: 5 live plus Job Change Alert,
                    which is still "Coming soon". test_hub_card_counts.py fails if
-                   these drift from the dashboard page again. -->
-              <div class="card-stat"><span>7</span> dashboards</div>
-              <div class="card-stat"><span>6</span> live</div>
+                   these drift from the dashboard page again. Was 7/6 until
+                   LinkedIn Strategy Researcher was hidden on 2026-08-14, which is
+                   also why the description no longer says "and strategy research". -->
+              <div class="card-stat"><span>6</span> dashboards</div>
+              <div class="card-stat"><span>5</span> live</div>
             </div>
             <div class="card-cta">Open <span class="card-arrow">→</span></div>
           </div>
@@ -131,7 +133,9 @@
         <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        <div><b data-lxn="21">0</b><span>dashboards</span></div>
+        {# Live dashboards across both workspaces: 5 on /p2/b2b-agents + 15 SEO tools.
+           Was 21 until LinkedIn Strategy Researcher was hidden on 2026-08-14. #}
+        <div><b data-lxn="20">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>

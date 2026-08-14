@@ -1599,6 +1599,26 @@ APP_AGENTS = [
 ]
 APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 
+# Agents temporarily withdrawn from the listings, without being retired. Their
+# APP_AGENTS entry, routes, templates and run history all stay exactly where they
+# are; only the surfaces that *advertise* an agent skip them, so restoring one is
+# emptying this set (plus un-commenting its hand-written card in
+# templates/b2b_agents.html, which is not driven from here -- see the HIDDEN note
+# in that file). Deliberately NOT applied to APP_AGENTS_BY_SLUG or to
+# /app/<slug>, /<client>/agents/<slug>: a bookmarked link to a hidden agent keeps
+# working, and its past runs keep resolving their name on the history and admin
+# pages. Hidden means unlisted, not gone.
+#   linkedin-strategy-researcher: HIDDEN 2026-08-14 at the owner's request,
+#   expected back in a few days.
+HIDDEN_AGENT_SLUGS = {"linkedin-strategy-researcher"}
+
+def _visible_app_agents():
+    """APP_AGENTS minus anything currently withdrawn from the listings. Every
+    surface that renders an agent *roster* (the /app dashboard, the sidebar in
+    app_base.html, the client portals) reads this; every surface that resolves a
+    single agent someone already asked for by slug reads APP_AGENTS_BY_SLUG."""
+    return [a for a in APP_AGENTS if a["slug"] not in HIDDEN_AGENT_SLUGS]
+
 # Old slugs from before the agents were renamed (Keyword Compass -> Keyword
 # Finder, etc). Kept so links already shared/bookmarked under the old URLs
 # still resolve, via a 301 to the new canonical slug.
@@ -2871,7 +2891,7 @@ def _inject_app_agents():
     can never drift from the server-side admin_required gate."""
     _u = _get_user() or {}
     _is_admin = (_u.get("email", "").lower() in ADMIN_EMAILS)
-    return {"app_agents": APP_AGENTS, "google_client_id": GOOGLE_CLIENT_ID,
+    return {"app_agents": _visible_app_agents(), "google_client_id": GOOGLE_CLIENT_ID,
             "is_admin": _is_admin}
 
 @app.route("/app")
@@ -2882,7 +2902,7 @@ def app_home():
     email = (user or {}).get("email", "")
     run_counts = _agent_run_counts(email)
     requested = _agent_access_requested_slugs(email)
-    return render_template("app.html", user=user, agents=APP_AGENTS,
+    return render_template("app.html", user=user, agents=_visible_app_agents(),
                            run_counts=run_counts, run_cap=AGENT_RUN_CAP,
                            requested_agents=requested)
 
@@ -3204,7 +3224,12 @@ def _client_agent_view(slug, client=None):
                 is_dashboard=has_dash, is_external=is_ext)
 
 def _client_agents(client):
-    return [v for v in (_client_agent_view(s, client) for s in client.get("agents", [])) if v]
+    """The portal's agent roster. Skips HIDDEN_AGENT_SLUGS so a withdrawn agent
+    disappears from the portal home, the sidebar and the "related" strip without
+    the client's own CLIENTS entry being edited -- the ordered "agents" list is
+    the client's curation and stays intact for when the agent comes back."""
+    return [v for v in (_client_agent_view(s, client) for s in client.get("agents", []))
+            if v and v["slug"] not in HIDDEN_AGENT_SLUGS]
 
 def _client_allowed(client, email):
     # Opt-in per client: "open_to_all" drops the domain gate entirely, so any

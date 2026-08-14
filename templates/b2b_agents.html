@@ -167,7 +167,15 @@
         </div>
       </a>
 
-      <!-- 5. LinkedIn Strategy Researcher -->
+      <!-- 5. LinkedIn Strategy Researcher: HIDDEN 2026-08-14 at the owner's request,
+           expected back in a few days. Nothing is retired: the route, the embedded
+           watchtower tool and the APP_AGENTS entry all still work, this card is just
+           pulled from the listing. To restore, un-comment the card below, drop the
+           slug from HIDDEN_AGENT_SLUGS in app.py (that one set covers /app, the /app
+           sidebar and the client portals), put the counts on the hub card in
+           hub.html back to 7 dashboards / 6 live with "and strategy research" in its
+           description, un-comment the command-palette entry further down this file,
+           and restore the four LinkedIn Strategy Researcher mentions in context.html.
       <a href="/p2/b2b-agents/linkedin-strategy-researcher" class="dash-card active c-lir">
         <div class="card-band"></div>
         <div class="card-thumb">
@@ -192,6 +200,7 @@
           </div>
         </div>
       </a>
+      -->
 
       <!-- 6. Contact Finder -->
       <a href="/p2/b2b-agents/company-people-intelligence" class="dash-card active c-cpi">
@@ -313,7 +322,9 @@
     {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
     {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
     {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
-    {t:'LinkedIn Strategy Researcher',d:'Competitive LinkedIn playbook analysis',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'◉'},
+    /* LinkedIn Strategy Researcher: HIDDEN 2026-08-14 with its card above. The page
+       still resolves, but Ctrl+K must not offer an agent the dashboard no longer lists.
+    {t:'LinkedIn Strategy Researcher',d:'Competitive LinkedIn playbook analysis',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'◉'}, */
     {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
     {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
     {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
