@@ -401,7 +401,15 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
                 (org.get("industry") or ""),
             ]).lower()
             return any(kw in text for kw in exclude_kws)
+        before = len(orgs)
         orgs = [o for o in orgs if not _excluded(o)]
+        if meta is not None and len(orgs) != before:
+            # Every other filter on this page says how many rows it removed and
+            # why -- a page short by exactly this many with no reason attached
+            # is the same silent shrink the domain and industry checks exist to
+            # avoid, just for a filter that runs client-side instead of on
+            # Apollo's own results.
+            meta["exclude_keywords_dropped"] = before - len(orgs)
 
     # q_organization_domains_list does not actually restrict Apollo's results to
     # that domain -- a malformed or unindexed domain silently falls back to an
@@ -413,11 +421,43 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
     wanted_domains.discard("")
     if wanted_domains:
         before = len(orgs)
-        orgs = [o for o in orgs if _clean_domain(o.get("primary_domain") or o.get("domain") or "")
-                in wanted_domains]
-        logger.info("search_companies: domain filter kept %d/%d", len(orgs), before)
-        if meta is not None and len(orgs) != before:
-            meta["total_entries"] = None
+        confirmed, unconfirmed, dropped = [], [], 0
+        for o in orgs:
+            have = _clean_domain(o.get("primary_domain") or o.get("domain") or "")
+            if have in wanted_domains:
+                confirmed.append(o)
+            elif have:
+                # Apollo told us the domain and it is a different one: a real
+                # mismatch, exactly what this filter exists to catch.
+                dropped += 1
+            else:
+                # Apollo returned this row with no domain field at all -- the
+                # same plan/quota-dependent gap search_people already accounts
+                # for (see its own domain filter), not evidence this is a
+                # different company. Dropping it unconditionally read "Apollo
+                # didn't say" as "Apollo said no": for a domain-scoped search,
+                # the one company being searched for could vanish outright the
+                # moment its own record came back without a domain, which is
+                # the least rare case since a single-company search is exactly
+                # when the returned row is most likely to be a bare "accounts"
+                # entry Apollo didn't attach a domain to.
+                o["domain_unconfirmed"] = True
+                unconfirmed.append(o)
+        orgs = confirmed + unconfirmed
+        logger.info("search_companies: domain filter kept %d/%d (%d unconfirmed)",
+                    len(orgs), before, len(unconfirmed))
+        if meta is not None:
+            # Named distinctly from search_people's company_dropped/
+            # company_unconfirmed: those describe a PERSON'S employer and
+            # surface in cpi_search under the "working somewhere else" label,
+            # which would misdescribe a company-search row. cpi_search folds
+            # this into the same company_unconfirmed response field (a fact
+            # about the row either way) but reports the drop under its own
+            # "domain" label.
+            meta["domain_dropped"] = dropped
+            meta["domain_unconfirmed"] = len(unconfirmed)
+            if dropped:
+                meta["total_entries"] = None
 
     # q_organization_keyword_tags is a relevance match over name and tags, not an
     # industry filter, so the industry the caller asked for is enforced here

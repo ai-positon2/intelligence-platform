@@ -972,13 +972,19 @@ function coCell(r){
   if(!name) return '<span class="cpi-td-dim">–</span>';
   var lg=safeUrl(r.organization_logo||r.logo_url);
   var dom=r.organization_domain||r.primary_domain;
+  // Set only when this search was scoped to a domain and Apollo did not
+  // return enough data on THIS row to confirm it against that domain -- not
+  // a claim the person works elsewhere or that this is a different company,
+  // which is why the row is on screen at all rather than dropped (see
+  // search_people's employer_unconfirmed and search_companies'
+  // domain_unconfirmed -- same shape, one on a person's employer, one on the
+  // company row itself).
+  var unconfirmedTitle=r.domain_unconfirmed
+    ?"Searched by domain, but Apollo did not return a domain on this company's own record to confirm the match. Not ruled out, just unconfirmed."
+    :"Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.";
   var inner=(lg?'<img class="cpi-td-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':"")+
     '<span class="cpi-td-t">'+esc(name)+'</span>'+
-    // Set only when this search was scoped to one employer's domain and Apollo
-    // did not return enough data on THIS row to confirm it against that
-    // domain -- not a claim the person works elsewhere, which is why the row
-    // is on screen at all rather than dropped (see search_people).
-    (r.employer_unconfirmed?'<span class="cpi-masked sm" title="Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"");
+    ((r.employer_unconfirmed||r.domain_unconfirmed)?'<span class="cpi-masked sm" title="'+esc(unconfirmedTitle)+'">unconfirmed</span>':"");
   return dom
     ? '<a class="cpi-td-co" href="'+esc(safeUrl("https://"+String(dom).replace(/^https?:\/\//i,"")))+
       '" target="_blank" rel="noopener noreferrer" title="'+esc(name+" · "+dom)+'">'+inner+"</a>"
@@ -1353,7 +1359,8 @@ function companyCard(c,i){
     '<button class="cpi-card-check'+(sel?" on":"")+'" onclick="cpiToggleSelect('+i+')" aria-label="Select"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></button>'+
     '<div class="cpi-card-top">'+
       '<div class="cpi-avatar co">'+logo+'</div>'+
-      '<div style="min-width:0"><div class="cpi-card-name">'+esc(c.name||"Unknown")+'</div>'+
+      '<div style="min-width:0"><div class="cpi-card-name">'+esc(c.name||"Unknown")+
+      (c.domain_unconfirmed?'<span class="cpi-masked sm" title="Searched by domain, but Apollo did not return a domain on this company\'s own record to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"")+'</div>'+
       '<div class="cpi-card-sub">'+esc(c.primary_domain||"")+'</div></div>'+
     '</div>'+
     (rows.length?'<div class="cpi-rows">'+rows.join("")+'</div>':'')+
