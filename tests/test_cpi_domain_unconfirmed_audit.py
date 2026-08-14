@@ -1,4 +1,20 @@
-"""The Beta Bionics search came back empty a second time, past the fix in
+"""search_companies had the identical bug this whole file is about, on the
+Companies tab, unfixed: its own domain filter dropped any company Apollo
+returned with no domain field at all, exactly the "Apollo didn't say" read as
+"Apollo said no" defect the people-side fix below exists to describe. Found by
+re-auditing this page end to end rather than by a live report -- the two
+endpoints share the same shape (mixed_companies/search splits into
+organizations/accounts the same way mixed_people/api_search splits into
+people/contacts, and Apollo's per-row field coverage is the same plan/quota
+gap in both), so the same fix applies: split domain_dropped (confirmed
+mismatch, still dropped) from domain_unconfirmed (no domain at all, kept and
+flagged). Named distinctly from the people-side company_dropped/
+company_unconfirmed because a company row dropped for "working somewhere
+else" is nonsense -- cpi_search folds the count into the same
+company_unconfirmed response field but reports the drop under its own
+"domain" label ("a different company at that domain").
+
+The Beta Bionics search came back empty a second time, past the fix in
 test_cpi_search_buckets_audit.py, and this time honestly: "Apollo returned 24
 people, and on checking, none of them matched: 24 working somewhere else."
 
@@ -255,3 +271,183 @@ def test_the_card_company_row_flags_an_unconfirmed_employer():
 def test_the_header_reports_the_unconfirmed_count():
     assert "STATE.companyUnconfirmed" in _js_function("unconfirmedNote")
     assert "unconfirmedNote()" in _js_function("renderResults")
+
+
+# ── search_companies: the same fix, on the Companies tab ────────────────────
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_company_row_with_no_domain_is_kept_not_dropped(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1", "name": "Beta Bionics"}],  # no domain
+    })
+    meta = {}
+    result = ac.search_companies({"domains": ["betabionics.com"]},
+                                 _FAKE_API_KEY, meta=meta)
+    assert [o["name"] for o in result] == ["Beta Bionics"], (
+        "a company Apollo simply didn't give a domain for was treated as a mismatch")
+    assert meta["domain_dropped"] == 0
+    assert meta["domain_unconfirmed"] == 1
+
+
+def test_the_kept_company_row_is_flagged_domain_unconfirmed():
+    with patch("tracker.apollo_client.requests.post") as mock_post:
+        mock_post.return_value = _mock_response({
+            "organizations": [{"id": "o1", "name": "Beta Bionics"}],
+        })
+        result = ac.search_companies({"domains": ["betabionics.com"]}, _FAKE_API_KEY)
+    assert result[0]["domain_unconfirmed"] is True
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_company_row_with_a_different_confirmed_domain_is_still_dropped(mock_post):
+    """The mirror this fix has to preserve: a REAL mismatch must keep being
+    dropped, or fixing the false negative just reopens the false positive the
+    domain filter exists to catch."""
+    mock_post.return_value = _mock_response({
+        "organizations": [
+            {"id": "o1", "name": "Beta Bionics", "primary_domain": "betabionics.com"},
+            {"id": "o2", "name": "Microsoft", "primary_domain": "microsoft.com"},
+        ],
+    })
+    meta = {}
+    result = ac.search_companies({"domains": ["betabionics.com"]},
+                                 _FAKE_API_KEY, meta=meta)
+    assert [o["name"] for o in result] == ["Beta Bionics"]
+    assert meta["domain_dropped"] == 1
+    assert meta["domain_unconfirmed"] == 0
+    assert "domain_unconfirmed" not in result[0]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_confirmed_company_and_an_unconfirmed_one_both_survive_together(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [
+            {"id": "o1", "name": "Beta Bionics", "primary_domain": "betabionics.com"},
+            {"id": "o2", "name": "Beta Bionics Inc"},  # no domain
+            {"id": "o3", "name": "Microsoft", "primary_domain": "microsoft.com"},
+        ],
+    })
+    meta = {}
+    result = ac.search_companies({"domains": ["betabionics.com"]},
+                                 _FAKE_API_KEY, meta=meta)
+    assert sorted(o["name"] for o in result) == ["Beta Bionics", "Beta Bionics Inc"]
+    assert meta["domain_dropped"] == 1
+    assert meta["domain_unconfirmed"] == 1
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_an_all_unconfirmed_company_page_does_not_null_out_apollos_total(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1", "name": "Beta Bionics"}],
+        "pagination": {"total_entries": 1, "total_pages": 1},
+    })
+    meta = {}
+    result = ac.search_companies({"domains": ["betabionics.com"]}, _FAKE_API_KEY, meta=meta)
+    assert len(result) == 1
+    assert meta["domain_unconfirmed"] == 1
+    assert meta["total_entries"] == 1
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_dropped_company_row_nulls_the_total(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1", "name": "Microsoft", "primary_domain": "microsoft.com"}],
+        "pagination": {"total_entries": 1, "total_pages": 1},
+    })
+    meta = {}
+    ac.search_companies({"domains": ["betabionics.com"]}, _FAKE_API_KEY, meta=meta)
+    assert meta["total_entries"] is None
+
+
+# ── The route, companies entity ──────────────────────────────────────────────
+
+def test_the_route_reports_a_company_unconfirmed_domain_not_as_a_rejection(client, monkeypatch):
+    def fake_search_companies(filters, api_key, page=1, per_page=25, meta=None, **kw):
+        if meta is not None:
+            meta["domain_dropped"] = 0
+            meta["domain_unconfirmed"] = 1
+        return [{"id": "o1", "name": "Beta Bionics", "domain_unconfirmed": True}]
+
+    monkeypatch.setattr(ac, "search_companies", fake_search_companies)
+    r = client.post(_SEARCH, json={"entity": "companies",
+                                   "filters": {"domains": ["betabionics.com"]}})
+    d = r.get_json()
+    assert d["company_unconfirmed"] == 1
+    assert "rejected" not in d, "an unconfirmed company row must not read as a rejection"
+    assert d["results"][0]["domain_unconfirmed"] is True
+
+
+def test_the_route_reports_a_dropped_company_domain_under_its_own_label(client, monkeypatch):
+    def fake_search_companies(filters, api_key, page=1, per_page=25, meta=None, **kw):
+        if meta is not None:
+            meta["domain_dropped"] = 2
+            meta["domain_unconfirmed"] = 0
+        return []
+
+    monkeypatch.setattr(ac, "search_companies", fake_search_companies)
+    r = client.post(_SEARCH, json={"entity": "companies",
+                                   "filters": {"domains": ["betabionics.com"]}})
+    d = r.get_json()
+    assert d["rejected"]["domain"] == 2
+    assert d["rejected_labels"]["domain"] == "a different company at that domain", (
+        "a company row must not be told it was 'working somewhere else' -- "
+        "that label describes a PERSON's employer"
+    )
+    assert "company" not in d.get("rejected", {})
+    assert "company_unconfirmed" not in d
+
+
+# ── The JS badge, company grid + card ────────────────────────────────────────
+
+def test_the_table_company_cell_flags_an_unconfirmed_domain_too():
+    body = _js_function("coCell")
+    assert "domain_unconfirmed" in body
+    assert "employer_unconfirmed" in body, "must not have regressed the person-side flag"
+
+
+def test_the_company_card_flags_an_unconfirmed_domain():
+    assert "domain_unconfirmed" in _js_function("companyCard")
+
+
+# ── exclude_keywords: the same "no silent shrink" rule, one filter over ─────
+# Every other post-filter on this page (domain, industry) reports how many
+# rows it removed. exclude_keywords is a client-side post-filter too (Apollo
+# has no native text-exclusion param) and removed rows with no count at all --
+# the one filter on the Companies tab that could narrow a page silently.
+
+@patch("tracker.apollo_client.requests.post")
+def test_exclude_keywords_reports_how_many_it_removed(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [
+            {"id": "o1", "name": "Beta Bionics", "primary_domain": "betabionics.com"},
+            {"id": "o2", "name": "Acme Casino", "primary_domain": "acmecasino.com"},
+        ],
+    })
+    meta = {}
+    result = ac.search_companies({"exclude_keywords": ["casino"]}, _FAKE_API_KEY, meta=meta)
+    assert [o["name"] for o in result] == ["Beta Bionics"]
+    assert meta["exclude_keywords_dropped"] == 1
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_exclude_keywords_reports_nothing_when_nothing_was_removed(mock_post):
+    mock_post.return_value = _mock_response({
+        "organizations": [{"id": "o1", "name": "Beta Bionics"}],
+    })
+    meta = {}
+    ac.search_companies({"exclude_keywords": ["casino"]}, _FAKE_API_KEY, meta=meta)
+    assert "exclude_keywords_dropped" not in meta
+
+
+def test_the_route_reports_excluded_keyword_drops(client, monkeypatch):
+    def fake_search_companies(filters, api_key, page=1, per_page=25, meta=None, **kw):
+        if meta is not None:
+            meta["exclude_keywords_dropped"] = 4
+        return []
+
+    monkeypatch.setattr(ac, "search_companies", fake_search_companies)
+    r = client.post(_SEARCH, json={"entity": "companies",
+                                   "filters": {"exclude_keywords": ["casino"]}})
+    d = r.get_json()
+    assert d["rejected"]["excluded_keyword"] == 4
+    assert d["rejected_labels"]["excluded_keyword"] == "matching an excluded keyword"

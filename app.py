@@ -7622,13 +7622,15 @@ def cpi_search():
     # instead of both silently claiming to be free.
     if firmo and firmo.get("orgs"):
         out["companies_described"] = firmo
-    if meta.get("company_unconfirmed"):
+    unconfirmed_n = meta.get("company_unconfirmed") or meta.get("domain_unconfirmed")
+    if unconfirmed_n:
         # Not a rejection -- these rows are IN `results`, each carrying its own
-        # employer_unconfirmed flag (see search_people) -- but the count still
-        # belongs on the response so the header can say Apollo didn't confirm
-        # every row's employer instead of implying company_detail verified them
-        # all, which for a domain-scoped search it did not.
-        out["company_unconfirmed"] = meta["company_unconfirmed"]
+        # employer_unconfirmed/domain_unconfirmed flag (see search_people /
+        # search_companies) -- but the count still belongs on the response so
+        # the header can say Apollo didn't confirm every row's domain instead
+        # of implying company_detail verified them all, which for a
+        # domain-scoped search it did not.
+        out["company_unconfirmed"] = unconfirmed_n
     if entity == "people":
         # Echoed back so the results header describes the rows it is actually
         # showing rather than the state of a checkbox the user may already have
@@ -7653,6 +7655,19 @@ def cpi_search():
         # search on this page, "everyone at this one company", is the only one
         # that cannot explain its own empty result.
         rejected["company"] = rejected.get("company", 0) + meta["company_dropped"]
+    if meta.get("domain_dropped"):
+        # search_companies' own version of the same fix, on the Companies tab:
+        # a domain-scoped company search that comes back short needs the same
+        # honest count, under its own label since "working somewhere else"
+        # describes a person's employer, not a company matching a domain.
+        rejected["domain"] = rejected.get("domain", 0) + meta["domain_dropped"]
+    if meta.get("exclude_keywords_dropped"):
+        # A client-side exclusion (Apollo has no native text-exclusion param)
+        # shrinks the page exactly like the domain and industry checks above,
+        # so it gets the same honest count instead of being the one filter on
+        # this page that can silently narrow results with no reason shown.
+        rejected["excluded_keyword"] = (rejected.get("excluded_keyword", 0)
+                                        + meta["exclude_keywords_dropped"])
     if rejected:
         out["rejected"] = rejected
         out["rejected_total"] = sum(rejected.values())
@@ -7723,6 +7738,11 @@ def _cpi_company_row(o: dict) -> dict:
         "growth12": _g12,
         "twitter_url": o.get("twitter_url"),
         "facebook_url": o.get("facebook_url"),
+        # Set only for a domain-scoped search where Apollo returned this row
+        # with no domain field to confirm it against the one asked for -- kept
+        # on screen rather than dropped, so this says the match is unconfirmed
+        # rather than implying it was verified. See search_companies.
+        "domain_unconfirmed": bool(o.get("domain_unconfirmed")),
     }
 
 
@@ -8036,12 +8056,14 @@ def cpi_vocab():
 #   to be a segment filter.
 _CPI_VERIFY_LABELS = {
     "company": "working somewhere else",
+    "domain": "a different company at that domain",
     "industry": "outside the industry",
     "employees": "outside the size range",
     "revenue": "outside the revenue range",
     "hq": "headquartered elsewhere",
     "technology": "not using the technology",
     "title": "the wrong title",
+    "excluded_keyword": "matching an excluded keyword",
 }
 
 
