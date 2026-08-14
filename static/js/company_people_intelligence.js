@@ -681,7 +681,7 @@ window.cpiRunSearch = function(reset){
       renderCompanyChoicePicker(typedCompany, d.choices||[]);
       document.getElementById("cpiToolbar").style.display="none";
       document.getElementById("cpiLoadMore").style.display="none";
-      if(d.credits) toast('Looked up "'+typedCompany+'" ('+d.credits+" Apollo credit)", "ok");
+      if(d.credits) toast('Looked up "'+typedCompany+'" ('+d.credits+" Apollo credit"+(d.credits===1?"":"s")+")", "ok");
       return;
     }
     /* The "at company" field also accepts a plain name now (resolved server-side
@@ -694,7 +694,7 @@ window.cpiRunSearch = function(reset){
       var names=d.resolved_company.slice(0,3).join(", ");
       if(d.resolved_company.length>3) names += " +"+(d.resolved_company.length-3)+" more";
       var note='Matched "'+typedCompany+'" to '+names;
-      if(d.credits) note += " ("+d.credits+" Apollo credit)";
+      if(d.credits) note += " ("+d.credits+" Apollo credit"+(d.credits===1?"":"s")+")";
       toast(note, "ok");
     }
     /* How the company detail on these rows was obtained. Kept per page rather
@@ -844,12 +844,29 @@ function firmoNote(){
 /* Which filter each rejection reason came from, so a reason can offer to relax
    the exact thing that caused it. A reason with no entry here is still shown,
    just not clickable: guessing at which control to clear would be worse than
-   leaving it to the reader. */
+   leaving it to the reader. "hq" is resolved separately in cpiRelax rather
+   than listed here, because it is the one reason two different filter keys
+   can produce depending on the tab: company_locations on People, locations
+   on Companies (see _cpi_verify_rows). A fixed entry here was wrong on one
+   tab no matter which key it named. */
 var REJECT_FILTER = {
-  company:"company_domains",
+  company:"company_domains", domain:"domains",
   industry:"industries", employees:"employee_min", revenue:"revenue_min",
-  hq:"company_locations", technology:"technologies", title:"titles"
+  technology:"technologies", title:"titles",
+  excluded_keyword:"exclude_keywords"
 };
+
+/* The one filter key REJECT_FILTER cannot answer with a fixed string:
+   cpiDropFilter clears whichever tab's control STATE.entity currently
+   points at, so "hq" has to resolve against that same state --
+   company_locations is the People-tab field, locations is the Companies-tab
+   field for the identical "hq" rejection reason. Shared by rejectedActions
+   (which decides whether to render a button at all) and cpiRelax (which
+   acts on it), so the two cannot disagree about which reasons are clickable. */
+function rejectFilterKey(reasonKey){
+  if(reasonKey==="hq") return STATE.entity==="companies" ? "locations" : "company_locations";
+  return REJECT_FILTER[reasonKey];
+}
 
 function rejectedReasons(){
   var r=STATE.rejected;
@@ -873,7 +890,7 @@ function rejectedActions(){
   var r=STATE.rejected;
   var parts=why.keys.map(function(k){
     var label=pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
-    var filt=REJECT_FILTER[k];
+    var filt=rejectFilterKey(k);
     if(!filt) return '<span class="cpi-relax-dim">'+esc(label)+"</span>";
     return '<button type="button" class="cpi-relax" onclick="cpiRelax(\''+esc(k)+'\')" '+
       'title="Remove that filter and search again">'+esc(label)+"</button>";
@@ -886,7 +903,7 @@ function rejectedActions(){
    employee or revenue band go together: clearing only the floor and leaving the
    ceiling would re-run a search that still excludes for the same reason. */
 window.cpiRelax = function(reasonKey){
-  var filt=REJECT_FILTER[reasonKey];
+  var filt=rejectFilterKey(reasonKey);
   if(!filt) return;
   window.cpiDropFilter(filt);
   if(filt==="employee_min") window.cpiDropFilter("employee_max");
@@ -981,10 +998,12 @@ function coCell(r){
   // company row itself).
   var unconfirmedTitle=r.domain_unconfirmed
     ?"Searched by domain, but Apollo did not return a domain on this company's own record to confirm the match. Not ruled out, just unconfirmed."
+    :r.employer_lookup_failed
+    ?"The employer lookup for this company did not answer, so its industry, size, HQ and technology could not be checked against your filters. Not ruled out, just unconfirmed."
     :"Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.";
   var inner=(lg?'<img class="cpi-td-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'">':"")+
     '<span class="cpi-td-t">'+esc(name)+'</span>'+
-    ((r.employer_unconfirmed||r.domain_unconfirmed)?'<span class="cpi-masked sm" title="'+esc(unconfirmedTitle)+'">unconfirmed</span>':"");
+    ((r.employer_unconfirmed||r.domain_unconfirmed||r.employer_lookup_failed)?'<span class="cpi-masked sm" title="'+esc(unconfirmedTitle)+'">unconfirmed</span>':"");
   return dom
     ? '<a class="cpi-td-co" href="'+esc(safeUrl("https://"+String(dom).replace(/^https?:\/\//i,"")))+
       '" target="_blank" rel="noopener noreferrer" title="'+esc(name+" · "+dom)+'">'+inner+"</a>"
@@ -1253,7 +1272,8 @@ function personCard(p,i){
     var lg=safeUrl(p.organization_logo);
     var co=(lg?'<img class="cpi-row-logo" src="'+esc(lg)+'" alt="" loading="lazy" onerror="this.style.display=\'none\'"> ':"")
       +'<b>'+esc(p.organization_name)+'</b>'
-      +(p.employer_unconfirmed?'<span class="cpi-masked sm" title="Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"");
+      +(p.employer_unconfirmed?'<span class="cpi-masked sm" title="Searched by company domain, but Apollo did not return an employer domain for this specific person to confirm the match. Not ruled out, just unconfirmed.">unconfirmed</span>':"")
+      +(p.employer_lookup_failed?'<span class="cpi-masked sm" title="The employer lookup for this company did not answer, so its industry, size, HQ and technology could not be checked against your filters. Not ruled out, just unconfirmed.">unconfirmed</span>':"");
     var extra=[];
     if(p.organization_industry) extra.push(esc(p.organization_industry));
     if(p.organization_employees) extra.push(pmNum(p.organization_employees)+" emp");
@@ -2185,7 +2205,10 @@ function companyDetailsBody(r, idx){
 window.cpiOpenDetails = function(idx){
   var r=STATE.results[idx];
   if(!r) return;
-  var isPerson = STATE.entity==="people";
+  // Describes a row already on screen, so it reads shownEntity -- what the
+  // toggle is set to NOW can already be the other tab if the user flipped it
+  // without searching again, and the grid still shows the old rows.
+  var isPerson = STATE.shownEntity==="people";
   pmOpenModal();
   var hero = isPerson
     ? personHero({name:r.full_name, title:r.title, headline:r.headline, photo:r.photo_url,
