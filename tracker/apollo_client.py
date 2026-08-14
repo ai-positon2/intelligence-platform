@@ -732,7 +732,7 @@ def _normalize_search_person(p: dict) -> dict:
     }
 
 
-def bulk_match_people(ids: list, api_key: str) -> dict:
+def bulk_match_people(ids: list, api_key: str, failed: list | None = None) -> dict:
     """Apollo person id -> raw Apollo person record, via people/bulk_match (up to
     10 ids per call, issued in sequential chunks). Costs 1 Apollo credit per id
     that actually matches (0 for a miss).
@@ -740,9 +740,16 @@ def bulk_match_people(ids: list, api_key: str) -> dict:
     This is how search_people's masked/truncated last names get revealed: pass
     the `id` field straight from a search_people row here rather than
     re-searching by name, which could resolve to the wrong same-named person.
-    Returns only ids that Apollo actually matched -- a missing id means either
-    no match or a failed chunk, and callers should keep whatever they already
-    had for that person rather than treating the omission as a fact.
+    Returns only ids that Apollo actually matched. A missing id means one of two
+    very different things -- Apollo has no record of that person, or that chunk
+    of ten never got an answer -- and telling them apart is what `failed` is
+    for: pass a list and the ids from every chunk that errored or came back
+    malformed are appended to it.
+
+    Without that, a fifty-person reveal in which one chunk timed out returned
+    forty profiles and reported success, and the ten missing people read as ten
+    people Apollo has nothing on. They are the opposite: the ones worth asking
+    for again. Nothing was billed for them either, so a retry is free.
     """
     ids = [i for i in dict.fromkeys(ids) if i]
     if not ids:
@@ -754,11 +761,17 @@ def bulk_match_people(ids: list, api_key: str) -> dict:
             data = _post("people/bulk_match", {"details": [{"id": pid} for pid in chunk]}, api_key)
         except Exception:
             logger.error("bulk_match_people failed for a chunk of %d ids", len(chunk))
+            if failed is not None:
+                failed.extend(chunk)
             continue
         matches = data.get("matches")
         if not isinstance(matches, list):
             logger.warning("bulk_match_people: unexpected response shape (keys=%s)",
                            sorted(list(data.keys()))[:8])
+            if failed is not None:
+                # An answer we cannot read is not an answer. Billed or not, we
+                # learned nothing about these ten people.
+                failed.extend(chunk)
             continue
         for j, pid in enumerate(chunk):
             m = matches[j] if j < len(matches) else None

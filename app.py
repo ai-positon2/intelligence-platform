@@ -8956,17 +8956,28 @@ def cpi_enrich_bulk():
     cached = _cpi_id_cache_read(ids)
     missing = [i for i in ids if i not in cached]
     fetched: dict = {}
+    # Ids Apollo never answered for, as opposed to ids Apollo has no record of.
+    # The reveal runs in chunks of ten and one chunk can fail on its own, so
+    # without this a fifty-person reveal that lost a chunk reported "Revealed
+    # 40 profiles" and the other ten read as people Apollo has nothing on --
+    # when they are exactly the ten worth asking for again, at no cost, because
+    # a chunk that failed was never billed.
+    unreachable: list = []
     if missing:
         try:
             from tracker.apollo_client import bulk_match_people
-            fetched = bulk_match_people(missing, api_key) or {}
+            fetched = bulk_match_people(missing, api_key, failed=unreachable) or {}
             if fetched:
                 _cpi_id_cache_write(fetched)
         except Exception as e:
             log.warning("cpi bulk enrich failed for %d ids: %s", len(missing), e)
+            unreachable = list(missing)
             if not cached:
                 return jsonify({"profiles": {}, "fetched": 0, "cached": 0,
-                                "error": "Enrichment failed."})
+                                "unreachable": len(missing),
+                                "error": "Apollo did not answer, so nobody was "
+                                         "revealed and no credits were spent. "
+                                         "Try again in a moment."})
 
     merged = dict(cached)
     merged.update(fetched)
@@ -9010,6 +9021,9 @@ def cpi_enrich_bulk():
         "profiles": rows,
         "fetched": len(fetched), "cached": len(cached),
         "capped": was_capped,
+        # Not folded into any of the counts above: these people were neither
+        # revealed nor ruled out, and nothing was charged for them.
+        "unreachable": len(unreachable),
     })
 
 

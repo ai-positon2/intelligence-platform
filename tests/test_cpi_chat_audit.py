@@ -315,7 +315,7 @@ def _ask(monkeypatch, message, intent, orgs=None, people=None, total=None,
     monkeypatch.setattr(ac, "search_companies", _sc)
     monkeypatch.setattr(ac, "search_people", _sp)
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, api_key: calls["enriched"].extend(ids) or {})
+                        lambda ids, api_key, **_kw: calls["enriched"].extend(ids) or {})
     box: dict = {}
     monkeypatch.setattr(appmod, "_cpi_grounded_answer",
                         lambda oai, facts, q, research="":

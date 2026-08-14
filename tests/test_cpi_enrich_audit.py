@@ -299,7 +299,7 @@ def test_bulk_enrich_is_capped_so_one_click_cannot_drain_the_pool(client, monkey
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
     seen = {}
 
-    def _bulk(ids, api_key):
+    def _bulk(ids, api_key, **_kw):
         seen["n"] = len(ids)
         return {i: dict(_PERSON, id=i) for i in ids}
 
@@ -319,7 +319,7 @@ def test_bulk_enrich_reports_cache_hits_separately_from_purchases(client, monkey
                         lambda ids: {"a": dict(_PERSON, id="a")})
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda profiles: None)
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, api_key: {i: dict(_PERSON, id=i) for i in ids})
+                        lambda ids, api_key, **_kw: {i: dict(_PERSON, id=i) for i in ids})
     r = client.post("/p2/b2b-agents/company-people-intelligence/enrich-bulk",
                     json={"ids": ["a", "b"]})
     body = r.get_json()

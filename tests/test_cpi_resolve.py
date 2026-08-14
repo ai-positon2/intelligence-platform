@@ -273,7 +273,7 @@ def test_reveal_names_merges_real_name_without_leaking_contact_fields(no_postgre
     an email/phone into an answer the user never asked for contact info on."""
     import tracker.apollo_client as ac
 
-    def _fake_bulk(ids, api_key):
+    def _fake_bulk(ids, api_key, **_kw):
         assert ids == ["p1"]
         return {"p1": {"id": "p1", "first_name": "Sanjeev", "last_name": "Dhanaraj",
                        "title": "Vice President Marketing",
@@ -292,7 +292,7 @@ def test_reveal_names_merges_real_name_without_leaking_contact_fields(no_postgre
 
 def test_reveal_names_keeps_original_when_apollo_has_no_match(no_postgres, monkeypatch):
     import tracker.apollo_client as ac
-    monkeypatch.setattr(ac, "bulk_match_people", lambda ids, api_key: {})
+    monkeypatch.setattr(ac, "bulk_match_people", lambda ids, api_key, **_kw: {})
     people = [{"id": "p1", "full_name": "Sanjeev", "title": "VP Marketing"}]
     out = appmod._cpi_reveal_names(people, "key")
     assert out[0]["full_name"] == "Sanjeev"

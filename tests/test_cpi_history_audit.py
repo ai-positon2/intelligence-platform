@@ -85,7 +85,7 @@ def _bulk_stub(monkeypatch, fetched=None, cached=None):
     monkeypatch.setattr(appmod, "_cpi_id_cache_read", lambda ids: dict(cached or {}))
     monkeypatch.setattr(appmod, "_cpi_id_cache_write", lambda p: None)
     monkeypatch.setattr(ac, "bulk_match_people",
-                        lambda ids, key: dict(fetched or {}))
+                        lambda ids, key, **_kw: dict(fetched or {}))
 
 
 # ── The purchase the drawer used to lose ─────────────────────────────────────
@@ -176,7 +176,7 @@ def test_the_reveal_reply_says_nothing_about_having_been_saved(client, saved,
     unchanged by it."""
     _bulk_stub(monkeypatch, fetched={"p1": _person("p1")})
     body = client.post(_BULK, json={"ids": ["p1"]}).get_json()
-    assert set(body) == {"profiles", "fetched", "cached", "capped"}
+    assert set(body) == {"profiles", "fetched", "cached", "capped", "unreachable"}
 
 
 def test_a_history_failure_does_not_lose_the_reveal(client, monkeypatch):
