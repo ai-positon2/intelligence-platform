@@ -660,7 +660,7 @@ window.cpiRunSearch = function(reset){
       toast(d.error || "Search failed.", "err");
       if(reset){
         STATE.results=[]; STATE.selected={}; STATE.total=null; STATE.rejected=null;
-        STATE.companyUnconfirmed=0;
+        STATE.rejectedTotal=0; STATE.companyUnconfirmed=0;
         wrap.innerHTML='<div class="cpi-empty"><svg viewBox="0 0 24 24" fill="none" '+
           'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+
           '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>'+
@@ -706,6 +706,11 @@ window.cpiRunSearch = function(reset){
     STATE.companyDetail=(d&&d.company_detail!==undefined)?!!d.company_detail:undefined;
     STATE.rejected=(d&&d.rejected)||null;
     STATE.rejectedLabels=(d&&d.rejected_labels)||{};
+    /* The server's own count of rows actually removed. Not derivable by
+       summing STATE.rejected's values: a row can be tallied under more than
+       one reason there (both the wrong industry and undersized), so that sum
+       can run higher than the real number of rows that came off the page. */
+    STATE.rejectedTotal=(d&&d.rejected_total)||0;
     /* Rows Apollo returned with no employer domain to check against a
        company-domain search: kept (see search_people), each flagged on its own
        row, but the count belongs in the header too so the page does not read
@@ -873,8 +878,11 @@ function rejectedReasons(){
   if(!r) return null;
   var keys=Object.keys(r).filter(function(k){ return r[k]; });
   if(!keys.length) return null;
-  var total=0;
-  keys.forEach(function(k){ total+=r[k]; });
+  // Not a sum of r's own values: a row can fail more than one check at once
+  // (both the wrong industry and undersized), so it is tallied under both
+  // reasons in `r` -- summing them here would count that one row twice.
+  // STATE.rejectedTotal is the server's actual count of rows removed.
+  var total=STATE.rejectedTotal||0;
   keys.sort(function(a,b){ return r[b]-r[a]; });
   return { total: total, keys: keys, text: keys.map(function(k){
     return pmNum(r[k])+" "+(STATE.rejectedLabels[k]||k);
@@ -1811,7 +1819,7 @@ window.cpiRestoreHistory = function(id){
        one's, which is a wrong statement about the file rather than a missing
        one. */
     STATE.rejected = null; STATE.rejectedLabels = {}; STATE.firmo = null;
-    STATE.companyUnconfirmed = 0;
+    STATE.rejectedTotal = 0; STATE.companyUnconfirmed = 0;
     var revealed = d.entity==="revealed";
     if(revealed){
       /* Not a search: nobody typed filters to get these people, so the panel is

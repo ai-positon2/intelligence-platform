@@ -7573,6 +7573,12 @@ def cpi_search():
             resolved_names = [org_name]
     firmo = None
     verify_dropped: dict = {}
+    # The true count of rows _cpi_verify_rows removed, independent of how its
+    # own `dropped` dict tallies reasons -- see that function's docstring:
+    # a row failing two checks at once is counted under both reasons there,
+    # so only an actual before/after row count (not summing the dict) gives
+    # an accurate rejected_total.
+    verify_dropped_rows = 0
     try:
         if entity == "people":
             from tracker.apollo_client import search_people as _search_people
@@ -7603,8 +7609,10 @@ def cpi_search():
             # Every employer-level check needs the lookup above, which is why
             # requesting one forces it on. With it off, only the title check can
             # run, and the others are simply not requested.
+            before_verify = len(results)
             results, verify_dropped, employer_lookup_failed_n = _cpi_verify_rows(
                 results, filters, True)
+            verify_dropped_rows = before_verify - len(results)
         else:
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
@@ -7615,7 +7623,9 @@ def cpi_search():
             # search_companies already enforced the industry for every caller;
             # this adds the size, HQ and technology checks and reports all of them
             # from one place, so the two tabs cannot disagree.
+            before_verify = len(results)
             results, verify_dropped, _unused = _cpi_verify_rows(results, filters, False)
+            verify_dropped_rows = before_verify - len(results)
     except Exception as e:
         # search_failed, not an empty result set. These are different facts and
         # the page drew them identically: Apollo never answered, so nothing was
@@ -7695,7 +7705,19 @@ def cpi_search():
                                         + meta["exclude_keywords_dropped"])
     if rejected:
         out["rejected"] = rejected
-        out["rejected_total"] = sum(rejected.values())
+        # NOT sum(rejected.values()): _cpi_verify_rows tallies a row under
+        # EVERY reason it fails, so a row that is both the wrong industry and
+        # undersized is counted in both -- summing the dict would count that
+        # one row twice. verify_dropped_rows is the actual row-count drop from
+        # that pass; the meta-sourced counts below are each already exactly
+        # one-to-one with a removed row (search_people/search_companies only
+        # ever attribute one of those reasons per row, since each one removes
+        # a row from contention before the next stage ever sees it).
+        out["rejected_total"] = (verify_dropped_rows
+                                 + (meta.get("industry_dropped") or 0)
+                                 + (meta.get("company_dropped") or 0)
+                                 + (meta.get("domain_dropped") or 0)
+                                 + (meta.get("exclude_keywords_dropped") or 0))
         out["rejected_labels"] = {k: _CPI_VERIFY_LABELS.get(k, k) for k in rejected}
         # Apollo's own total counted its looser match, so it overstates the real
         # number by whatever proportion this page just removed.
@@ -8228,8 +8250,8 @@ def _cpi_tech_uid(name: str) -> str:
 
 
 def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
-    """(kept, {reason: dropped_count}, employer_unavailable_count) after
-    enforcing every filter Apollo treats as a hint rather than a rule.
+    """(kept, {reason: rows_that_failed_this_check}, employer_unavailable_count)
+    after enforcing every filter Apollo treats as a hint rather than a rule.
 
     A row missing the field a check needs is dropped by that check, not waved
     through: an unverifiable row is exactly the row that produced "I searched for
@@ -8239,6 +8261,18 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
     lookup behind these fields never got an answer -- where "missing" describes
     an outage, not Apollo's own classification, so the row is kept and counted
     in the third return value instead of dropped under a reason nothing checked.
+
+    `dropped`'s counts can overlap: a row that is both the wrong industry and
+    undersized is tallied under BOTH "industry" and "employees", because
+    reporting only the first one a fixed check order happened to reach
+    undercounted how many rows a filter further down the list was ALSO
+    responsible for excluding -- the same row, and the same fixed elif chain,
+    that once made "Removed 24: 18 outside the industry" true only if none of
+    those 18 also failed a later check. Row membership in `kept` is still
+    exactly one-to-one with the input, though: `dropped`'s values summing to
+    more than len(rows) - len(kept) is expected, not a bug, and callers must
+    compute a total rejected-row count from actual row counts, never from
+    summing this dict (see cpi_search).
     """
     from tracker.apollo_taxonomy import expand as _industry_expand
     from tracker.apollo_client import _industry_matches
@@ -8259,7 +8293,6 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
     employer_unavailable = 0
     for r in (rows or []):
         org = _cpi_org_view(r, is_people)
-        reason = ""
         # Set on a row whose paid employer lookup outright failed (see
         # _cpi_attach_employer_facts) -- an Apollo outage, not Apollo saying
         # this row doesn't qualify. Every check below needs data that never
@@ -8269,25 +8302,29 @@ def _cpi_verify_rows(rows: list, filters: dict, is_people: bool) -> tuple:
         has_employer_filter = bool(wanted_industry or emp_min is not None or emp_max is not None
                                    or rev_min is not None or rev_max is not None
                                    or places or techs)
-        if employer_ok and wanted_industry and not _industry_matches(org, wanted_industry):
-            reason = "industry"
-        elif employer_ok and (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
+        if not employer_ok and has_employer_filter:
+            employer_unavailable += 1
+            kept.append(r)
+            continue
+        reasons = []
+        if wanted_industry and not _industry_matches(org, wanted_industry):
+            reasons.append("industry")
+        if (emp_min is not None or emp_max is not None) and not _cpi_size_ok(
                 org.get("employees"), emp_min, emp_max):
-            reason = "employees"
-        elif employer_ok and (rev_min is not None or rev_max is not None) and not _cpi_num_in_range(
+            reasons.append("employees")
+        if (rev_min is not None or rev_max is not None) and not _cpi_num_in_range(
                 org.get("revenue"), rev_min, rev_max):
-            reason = "revenue"
-        elif employer_ok and places and not _cpi_place_matches(org, places):
-            reason = "hq"
-        elif employer_ok and techs and not _cpi_tech_matches(org, techs):
-            reason = "technology"
-        elif strict_titles and not _cpi_title_matches(r.get("title"), filters["titles"]):
-            reason = "title"
-        if reason:
-            dropped[reason] = dropped.get(reason, 0) + 1
+            reasons.append("revenue")
+        if places and not _cpi_place_matches(org, places):
+            reasons.append("hq")
+        if techs and not _cpi_tech_matches(org, techs):
+            reasons.append("technology")
+        if strict_titles and not _cpi_title_matches(r.get("title"), filters["titles"]):
+            reasons.append("title")
+        if reasons:
+            for reason in reasons:
+                dropped[reason] = dropped.get(reason, 0) + 1
         else:
-            if not employer_ok and has_employer_filter:
-                employer_unavailable += 1
             kept.append(r)
     if dropped:
         log.info("cpi verify: kept %d/%d (%s)", len(kept), len(rows or []),
@@ -8854,11 +8891,26 @@ def _cpi_enrich_person(name: str, domain: str, apollo_id: str, email: str = "",
     if not key:
         return {"matched": False}
     if email:
+        email_norm = email.strip().lower()
+        # _enrich_people has its own two-tier cache (in-process _PE_MEM, then
+        # Postgres) and returns the identical matched:true shape whether the
+        # profile came from there or from a fresh, billed Apollo call -- so
+        # billing off hit.get("matched") alone charged a credit on every
+        # repeat lookup of the same email, even well inside the cache's
+        # positive TTL, the same defect the apollo_id branch below was
+        # already guarded against via its own _cpi_id_cache_read check.
+        # Checked here against the identical two caches _enrich_people itself
+        # consults, in the same order, so this agrees with what it actually
+        # does rather than duplicating its logic and risking drift.
+        now = time.time()
+        pe_hit = _PE_MEM.get(email_norm)
+        already_cached = bool(pe_hit and pe_hit[0] > now) or bool(_pe_cache_read([email_norm]))
         profiles = _enrich_people([email])
-        hit = profiles.get(email.strip().lower(), {"matched": False})
+        hit = profiles.get(email_norm, {"matched": False})
         # This path bills exactly like the id path and was the only one not saying
         # so, which made an enrich-by-email look free.
-        if spend is not None and isinstance(hit, dict) and hit.get("matched"):
+        if (spend is not None and isinstance(hit, dict) and hit.get("matched")
+                and not already_cached):
             spend["credits"] = spend.get("credits", 0) + 1
         return hit
     # Already bought. Bulk enrich caches the raw record by Apollo id for the

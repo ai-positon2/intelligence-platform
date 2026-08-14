@@ -150,9 +150,17 @@ const PEOPLE = [
   out.export_entity_after_switch = lastExportEntity();
 
   // 2. Apollo matched, and the verification pass removed all of it.
+  // industry (18) and seniority (8) deliberately sum to more than
+  // rejected_total (20): some rows fail both checks, so _cpi_verify_rows
+  // tallies them under both reasons (see app.py) while the row itself is
+  // still only removed once. rejected_total (20), not 26, is what the client
+  // must show -- summing `rejected`'s own values here would both overstate
+  // the real removal count AND exceed the 20 rows Apollo actually returned,
+  // which is the exact regression this fixture exists to catch.
   window.cpiSetEntity("people");
   await search({ results: [], total: 24, has_more: false,
-                 rejected: { industry: 18, seniority: 6, tenure: 0 },
+                 rejected: { industry: 18, seniority: 8, tenure: 0 },
+                 rejected_total: 20,
                  rejected_labels: { industry: "outside the industry",
                                     seniority: "wrong seniority",
                                     tenure: "too new in role" } });
@@ -240,14 +248,19 @@ def test_no_card_reaches_out_to_a_third_party(ran):
 
 def test_an_empty_page_says_apollo_matched_when_it_did(ran):
     html = ran["empty_with_rejections"]
-    assert "Apollo returned 24 people" in html
+    # 20 (rejected_total), not 24 (Apollo's own grand total across all pages)
+    # and not 26 (18+8, what summing the overlapping per-reason counts in
+    # `rejected` would wrongly produce -- see the fixture above).
+    assert "Apollo returned 20 people" in html
+    assert "Apollo returned 24 people" not in html
+    assert "Apollo returned 26 people" not in html
     assert "none of them matched" in html
 
 
 def test_the_empty_page_breaks_the_removals_down_by_reason(ran):
     html = ran["empty_with_rejections"]
     assert "18 outside the industry" in html
-    assert "6 wrong seniority" in html
+    assert "8 wrong seniority" in html
 
 
 def test_a_reason_that_removed_nothing_is_not_listed(ran):
@@ -256,7 +269,7 @@ def test_a_reason_that_removed_nothing_is_not_listed(ran):
 
 def test_the_reasons_are_ordered_worst_first(ran):
     html = ran["empty_with_rejections"]
-    assert html.index("18 outside the industry") < html.index("6 wrong seniority")
+    assert html.index("18 outside the industry") < html.index("8 wrong seniority")
 
 
 def test_a_real_no_match_still_says_no_match(ran):
