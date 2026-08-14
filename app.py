@@ -9924,9 +9924,19 @@ def cpi_parse_query():
 # whenever a verified filter is set the total is an UPPER BOUND, not the answer.
 # Saying "2,400 matches" when the page will show 300 is exactly the kind of claim
 # this app exists not to make.
+# Filters this app re-checks itself after Apollo answers, which makes Apollo's
+# own total an upper bound rather than the number the page will show. Any filter
+# with a row-dropping check behind it belongs here.
+#
+# company_domains is one of them and was missing. It did not show while a domain
+# filter also blanked Apollo's total, because the count then declined to answer
+# at all; the moment that total was allowed through -- it is usually exact, and
+# discarding it left every company-scoped search with no count -- this list was
+# what stood between an upper bound and a number presented as final.
 _CPI_COUNT_VERIFIED_FILTERS = ("industries", "employee_min", "employee_max",
                                "revenue_min", "revenue_max", "company_locations",
-                               "technologies", "technologies_all", "titles")
+                               "technologies", "technologies_all", "titles",
+                               "company_domains")
 
 
 @app.route("/p2/b2b-agents/company-people-intelligence/count", methods=["POST"])

@@ -259,3 +259,29 @@ def test_each_modal_tells_the_two_apart(fn):
     assert "lookup_failed" in body, "%s does not branch on a failed lookup" % fn
     assert "neither found nor ruled out" in body, (
         "%s does not say the lookup failed" % fn)
+
+
+# ── The free count must not overstate what the page will show ──────────────
+
+def test_a_company_scoped_count_is_offered_but_marked_approximate(client, monkeypatch):
+    """Two halves of one change. Apollo's total for a domain-scoped search is
+    usually exact, so refusing to show it left every company search with no
+    count at all. But this app re-checks the domain itself, so the number is an
+    upper bound and has to read as one -- "about 355", not "355"."""
+    _apollo(monkeypatch, {"people": [_person("p1")],
+                          "pagination": {"total_entries": 355, "total_pages": 15}})
+    body = client.post("/p2/b2b-agents/company-people-intelligence/count",
+                       json={"entity": "people",
+                             "filters": {"company_domains": [_DOMAIN]}}).get_json()
+    assert body["count"] == 355
+    assert body["approx"] is True, "an upper bound was presented as a final count"
+
+
+def test_every_locally_rechecked_filter_is_marked_approximate():
+    """The list and the checks have to stay in step: a filter that drops rows
+    but is missing here turns an upper bound into a claim."""
+    checked = {"industries", "employee_min", "employee_max", "revenue_min",
+               "revenue_max", "company_locations", "technologies", "titles",
+               "company_domains"}
+    missing = checked - set(appmod._CPI_COUNT_VERIFIED_FILTERS)
+    assert not missing, "these drop rows but do not mark the count approximate: %s" % missing
