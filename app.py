@@ -10158,6 +10158,80 @@ def _cpi_list_count(cur, email: str) -> int:
     return int((cur.fetchone() or [0])[0])
 
 
+# Phrases that only restate a role/seniority the parser has ALREADY mapped
+# into `seniorities` or `titles`. The intent prompt never explained what
+# `keywords` is for, so it would sometimes also echo the user's own wording in
+# there verbatim ("top executives", "decision makers") -- and Apollo's keyword
+# filter (q_keywords) is a literal text match against free-text fields, not a
+# role match, so nobody's title literally reads "top executives". ANDed
+# against a correct seniority filter, a keyword like that guarantees zero
+# rows instead of narrowing anything. Reported live against "find me top
+# executives in tech industry in san francisco in companies with employees
+# more than 500": seniorities correctly came back [c_suite, vp, director], but
+# keywords also came back "top executives", and that alone was enough to
+# empty the search regardless of what else was set correctly.
+_CPI_GENERIC_KEYWORD_PHRASES = frozenset((
+    "top executives", "executives", "senior executives", "decision makers",
+    "decision-makers", "key decision makers", "leadership", "leadership team",
+    "senior leaders", "senior leadership", "senior management", "management",
+    "managers", "leaders", "key stakeholders", "stakeholders", "c-suite",
+    "c suite", "csuite", "top management", "top brass",
+))
+
+
+def _cpi_filters_from_intent(intent: dict) -> dict:
+    """Narrow a raw _CPI_INTENT_SYSTEM parse down to filter-panel values.
+
+    Split out of cpi_parse_query so it can be exercised directly with a
+    hand-built intent dict, without a live OpenAI call in the loop.
+    """
+    if not isinstance(intent, dict):
+        return {}
+    # Only keys the filter panel actually has a control for. The intent parser
+    # answers a chat question and carries chat-shaped fields too (an intent name,
+    # a person's name, a max_results); passing those through would set filters the
+    # user cannot see, which is the one thing this must not do.
+    allow = ("titles", "seniorities", "industries", "keywords",
+             "person_locations", "company_locations", "locations",
+             "technologies", "naics_codes", "sic_codes", "market_segments",
+             "job_titles", "email_status")
+    out = {}
+    for k in allow:
+        v = intent.get(k)
+        if isinstance(v, list):
+            v = [str(x).strip() for x in v if str(x or "").strip()]
+            if v:
+                out[k] = v
+        elif isinstance(v, str) and v.strip():
+            out[k] = v.strip()
+    kw = out.get("keywords")
+    if isinstance(kw, str) and kw.strip().lower() in _CPI_GENERIC_KEYWORD_PHRASES:
+        del out["keywords"]
+    elif isinstance(kw, list):
+        kept = [x for x in kw if str(x).strip().lower() not in _CPI_GENERIC_KEYWORD_PHRASES]
+        if kept:
+            out["keywords"] = kept
+        else:
+            del out["keywords"]
+    for lo, hi, src in (("employee_min", "employee_max", "employees"),
+                        ("revenue_min", "revenue_max", "revenue")):
+        rng = intent.get(src)
+        if isinstance(rng, dict):
+            if isinstance(rng.get("min"), (int, float)):
+                out[lo] = rng["min"]
+            if isinstance(rng.get("max"), (int, float)):
+                out[hi] = rng["max"]
+    for key in ("employee_min", "employee_max", "revenue_min", "revenue_max",
+                "founded_min", "founded_max"):
+        v = intent.get(key)
+        if isinstance(v, (int, float)):
+            out[key] = v
+    company = str(intent.get("company_name") or "").strip()
+    if company:
+        out["company_domains"] = [company]
+    return out
+
+
 # ── Typed sentence to filter panel ────────────────────────────────────────────
 @app.route("/p2/b2b-agents/company-people-intelligence/parse-query", methods=["POST"])
 @position2_required
@@ -10190,39 +10264,7 @@ def cpi_parse_query():
         return jsonify({"filters": {}, "error": "Could not read that query."})
     if not isinstance(intent, dict):
         return jsonify({"filters": {}})
-    # Only keys the filter panel actually has a control for. The intent parser
-    # answers a chat question and carries chat-shaped fields too (an intent name,
-    # a person's name, a max_results); passing those through would set filters the
-    # user cannot see, which is the one thing this must not do.
-    allow = ("titles", "seniorities", "industries", "keywords",
-             "person_locations", "company_locations", "locations",
-             "technologies", "naics_codes", "sic_codes", "market_segments",
-             "job_titles", "email_status")
-    out = {}
-    for k in allow:
-        v = intent.get(k)
-        if isinstance(v, list):
-            v = [str(x).strip() for x in v if str(x or "").strip()]
-            if v:
-                out[k] = v
-        elif isinstance(v, str) and v.strip():
-            out[k] = v.strip()
-    for lo, hi, src in (("employee_min", "employee_max", "employees"),
-                        ("revenue_min", "revenue_max", "revenue")):
-        rng = intent.get(src)
-        if isinstance(rng, dict):
-            if isinstance(rng.get("min"), (int, float)):
-                out[lo] = rng["min"]
-            if isinstance(rng.get("max"), (int, float)):
-                out[hi] = rng["max"]
-    for key in ("employee_min", "employee_max", "revenue_min", "revenue_max",
-                "founded_min", "founded_max"):
-        v = intent.get(key)
-        if isinstance(v, (int, float)):
-            out[key] = v
-    company = str(intent.get("company_name") or "").strip()
-    if company:
-        out["company_domains"] = [company]
+    out = _cpi_filters_from_intent(intent)
     return jsonify({"filters": out, "entity": (
         "companies" if str(intent.get("intent") or "").startswith("compan") else "people")})
 
@@ -10594,6 +10636,26 @@ _CPI_INTENT_SYSTEM = (
     "a later step maps the plain word onto that vendor's own industry names, and a guessed "
     "spelling defeats it. Only fill this in when the question is about companies in an "
     "industry, never for a question about one named company.\n\n"
+    "person_locations vs company_locations: a place can describe where the PEOPLE are, where "
+    "their EMPLOYER is headquartered, or both, and getting this wrong silently loses the "
+    "filter rather than just misplacing it. Put it in company_locations only when the sentence "
+    "ties the place to the company (\"companies based in Austin\", \"headquartered in the UK\", "
+    "\"Texas-based firms\"). Put it in person_locations when it describes the people themselves "
+    "(\"executives in Austin\", \"who lives in the UK\"). When a request names people or a role "
+    "and a place with nothing that ties the place to the company specifically, default to "
+    "person_locations: \"top executives in tech in San Francisco\" is asking for people located "
+    "in San Francisco, not for San Francisco headquarters, so it takes person_locations, not "
+    "company_locations. Expand a well-known abbreviation to the full place name (\"SF\" -> "
+    "\"San Francisco\", \"NYC\" -> \"New York\").\n\n"
+    "keywords: a single free-text phrase Apollo will match literally against a record, for "
+    "something concrete that titles/seniorities/industries/technologies cannot express -- a "
+    "named product line, a niche specialty, a specific term straight from the question "
+    "(\"keto\", \"ex-Google\", \"Series B\"). Leave it EMPTY far more often than not, and never "
+    "use it to restate a role or seniority you already captured elsewhere: \"top executives\", "
+    "\"decision makers\", \"leadership\", \"senior leaders\" and similar are seniority words, "
+    "not keywords, and belong ONLY in seniorities. No real person's title or bio literally "
+    "contains the phrase \"top executives\", so putting it in keywords too does not narrow the "
+    "search, it empties it.\n\n"
     "technologies: named software the companies should be using (\"Salesforce\", "
     "\"HubSpot\", \"Shopify\"), only when the question actually asks for it.\n"
     "naics_codes / sic_codes: only when the question itself quotes a classification "

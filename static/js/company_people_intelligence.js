@@ -2736,14 +2736,24 @@ function snapEmployeeBucket(f, selId){
   var lo=f.employee_min, hi=f.employee_max;
   if(lo===undefined && hi===undefined) return;
   lo=(typeof lo==="number")?lo:0;
-  hi=(typeof hi==="number" && hi<999999999)?hi:Infinity;
+  /* "500+ employees" (a min with no max) overlaps every bucket up to the
+     open-ended top one to infinity, and Math.min(Infinity,Infinity) is still
+     Infinity -- so maximizing raw overlap width always handed the win to the
+     5,001+ bucket, no matter how small the actual number asked for was. A
+     query like "employees more than 50" was landing on 5,001+ instead of
+     51-200, which is what sent this whole search off after the wrong
+     companies. For an open-ended query, what the sentence actually wants is
+     the bucket lo itself falls in, not the widest one on offer. */
+  var open = !(typeof hi==="number") || hi>=999999999;
+  hi = open ? Infinity : hi;
   var best=null, bestOverlap=0;
   for(var i=0;i<sel.options.length;i++){
     var v=sel.options[i].value;
     if(!v) continue;
     var p=v.split(",");
     var bl=+p[0], bh=p[1]?+p[1]:Infinity;
-    var ov=Math.min(hi,bh)-Math.max(lo,bl);
+    var ov = open ? ((lo>=bl && lo<=bh) ? 1 : 0)
+                  : Math.min(hi,bh)-Math.max(lo,bl);
     if(ov>bestOverlap){ bestOverlap=ov; best=v; }
   }
   if(best){
