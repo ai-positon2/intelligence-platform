@@ -31,6 +31,17 @@ IST = timezone(timedelta(hours=5, minutes=30))
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
 app.permanent_session_lifetime = timedelta(days=7)
+# Flask's own default (no max_age configured) sends every static file with an
+# explicit "Cache-Control: no-cache" -- not merely no header -- so browsers were
+# re-validating JS/CSS/images/fonts on every navigation instead of serving them
+# from cache. An hour, not "immutable" + a year: these assets aren't
+# fingerprinted/consistently version-stamped (a couple of templates hand-bump a
+# `?v=N` query string; most don't), so a year-long cache would risk a browser
+# silently running a stale bundle for a long time after a deploy. This applies
+# to send_file()/send_from_directory() and the built-in /static/<path> route
+# alike; the few per-request generated downloads (Vimi Insights export, further
+# down) opt back out with an explicit max_age=0 since those must never be cached.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 3600
 
 @app.errorhandler(403)
 def forbidden(e):
@@ -1672,6 +1683,11 @@ def _log_agent_run(user: dict, agent: dict) -> None:
                 range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AR_HEADER]}).execute()
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+        # Keep the read-side cache (below) consistent immediately, so the run this
+        # very request just logged shows up on the page it redirects to instead of
+        # waiting out the TTL.
+        if _AGENT_RUN_ROWS_CACHE["rows"] is not None:
+            _AGENT_RUN_ROWS_CACHE["rows"].append(row)
     except Exception as e:
         log.warning("agent run log failed: %s", e)
 
@@ -1683,18 +1699,46 @@ def _canonical_agent_slug(slug: str) -> str:
     and letting a renamed agent's cap be bypassed)."""
     return _LEGACY_AGENT_SLUGS.get(slug, slug)
 
+_AGENT_RUN_ROWS_CACHE = {"rows": None, "ts": 0.0}
+_AGENT_RUN_ROWS_CACHE_TTL = 30  # seconds -- _agent_run_counts is read on nearly every
+                                # /app and agent-detail page render (for every user),
+                                # so re-fetching the whole 'Agent Runs' tab on each one
+                                # was a network round-trip on almost every navigation.
+                                # 30s keeps the soft run-cap responsive (it was never
+                                # atomic/race-proof to begin with -- see app_use_log_run)
+                                # while cutting that cost to once per half-minute; a
+                                # run logged in this process is also appended straight
+                                # into the cache (see _log_agent_run) so it's never stale
+                                # for the request that just made it.
+
+def _agent_run_rows(force: bool = False) -> list:
+    """Raw 'Agent Runs' sheet values (header included), TTL-cached."""
+    now = time.time()
+    if not force and _AGENT_RUN_ROWS_CACHE["rows"] is not None and \
+            (now - _AGENT_RUN_ROWS_CACHE["ts"]) < _AGENT_RUN_ROWS_CACHE_TTL:
+        return _AGENT_RUN_ROWS_CACHE["rows"]
+    rows = []
+    if LOGIN_LOG_SHEET_ID:
+        try:
+            svc = _va_sheets_service_st()
+            if svc:
+                rows = svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AR_TAB).execute().get("values", [])
+        except Exception as ex:
+            log.warning("agent run rows read failed: %s", ex)
+            return _AGENT_RUN_ROWS_CACHE["rows"] or []
+    _AGENT_RUN_ROWS_CACHE["rows"] = rows
+    _AGENT_RUN_ROWS_CACHE["ts"] = now
+    return rows
+
 def _agent_run_counts(email: str) -> dict:
-    """Return {agent_slug: run_count} for one user, read fresh from 'Agent Runs'.
-    Used both to enforce the cap and to show 'runs left' on the dashboard."""
+    """Return {agent_slug: run_count} for one user, from the (TTL-cached) 'Agent
+    Runs' tab. Used both to enforce the cap and to show 'runs left' on the dashboard."""
     counts = {}
     if not LOGIN_LOG_SHEET_ID or not email:
         return counts
     try:
-        svc = _va_sheets_service()
-        if not svc:
-            return counts
-        rows = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:F" % _AR_TAB).execute().get("values", [])
+        rows = _agent_run_rows()
         rows = rows[1:] if len(rows) > 1 else []
         AR = {n: i for i, n in enumerate(_AR_HEADER)}
         def ac(r, n, d=""):
@@ -1714,17 +1758,7 @@ def _fetch_agent_run_stats() -> dict:
     """Per-user, per-agent run counts for the admin 'Public Agent Usage' dashboard."""
     from collections import defaultdict
     svc = _va_sheets_service()
-    def read(rng):
-        if not svc:
-            return []
-        try:
-            return svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
-        except Exception as e:
-            log.warning("agent run stats read failed (%s): %s", rng, e)
-            return []
-
-    rows = read("%s!A:F" % _AR_TAB)
+    rows = _agent_run_rows()
     rows = rows[1:] if len(rows) > 1 else []
     AR = {n: i for i, n in enumerate(_AR_HEADER)}
     def ac(r, n, d=""):
@@ -1828,21 +1862,49 @@ def _log_agent_access_request(user: dict, agent: dict, message: str = "") -> boo
                 range="%s!A1" % tab, valueInputOption="RAW", body={"values": [_AAR_HEADER]}).execute()
         svc.spreadsheets().values().append(spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A1" % tab,
             valueInputOption="RAW", insertDataOption="INSERT_ROWS", body={"values": [row]}).execute()
+        # Same immediate-consistency fix as _log_agent_run: update the cache in
+        # place so this request's own "Request sent" state doesn't have to wait
+        # out the TTL below.
+        if _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"] is not None:
+            _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"].append(row)
         return True
     except Exception as e:
         log.warning("agent access request log failed: %s", e)
         return False
 
+_AGENT_ACCESS_REQUEST_ROWS_CACHE = {"rows": None, "ts": 0.0}
+_AGENT_ACCESS_REQUEST_ROWS_CACHE_TTL = 30  # seconds -- same fix as _AGENT_RUN_ROWS_CACHE:
+                                            # read on nearly every /app, agent-detail, and
+                                            # client-portal page render (dedupe check +
+                                            # "Request sent" state), so it was a Sheets
+                                            # round-trip on almost every navigation.
+
+def _agent_access_request_rows(force: bool = False) -> list:
+    """Raw 'Agent Access Requests' sheet values (header included), TTL-cached."""
+    now = time.time()
+    if not force and _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"] is not None and \
+            (now - _AGENT_ACCESS_REQUEST_ROWS_CACHE["ts"]) < _AGENT_ACCESS_REQUEST_ROWS_CACHE_TTL:
+        return _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"]
+    rows = []
+    if LOGIN_LOG_SHEET_ID:
+        try:
+            svc = _va_sheets_service_st()
+            if svc:
+                rows = svc.spreadsheets().values().get(
+                    spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:G" % _AAR_TAB).execute().get("values", [])
+        except Exception as ex:
+            log.warning("agent access request rows read failed: %s", ex)
+            return _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"] or []
+    _AGENT_ACCESS_REQUEST_ROWS_CACHE["rows"] = rows
+    _AGENT_ACCESS_REQUEST_ROWS_CACHE["ts"] = now
+    return rows
+
 def _agent_access_requests_raw(limit=2000):
-    """Read every row from 'Agent Access Requests', newest first. Fails to []."""
+    """Read every row from 'Agent Access Requests' (TTL-cached), newest first. Fails to []."""
     if not LOGIN_LOG_SHEET_ID:
         return []
     try:
-        svc = _va_sheets_service()
-        if not svc:
-            return []
-        rows = svc.spreadsheets().values().get(
-            spreadsheetId=LOGIN_LOG_SHEET_ID, range="%s!A:G" % _AAR_TAB).execute().get("values", [])
+        rows = _agent_access_request_rows()
         rows = rows[1:] if len(rows) > 1 else []
         AH = {n: i for i, n in enumerate(_AAR_HEADER)}
         def ac(r, n, d=""):
@@ -3848,6 +3910,48 @@ def _no_html_cache(resp):
     return resp
 
 
+# (Static JS/CSS/image/font caching is set at the top of this file via
+# app.config["SEND_FILE_MAX_AGE_DEFAULT"] -- every static asset in this repo is
+# served through send_file()/send_from_directory()/the built-in /static route,
+# so that one config line covers all of them; an after_request hook here would
+# be redundant and, worse, is what Flask's own default Cache-Control header
+# would silently defeat, since it sets "no-cache" explicitly rather than
+# leaving the header unset.)
+
+# Nothing in front of gunicorn here compresses responses, so HTML/JSON/CSS/JS
+# went over the wire uncompressed except on the two endpoints that already
+# gzip by hand (see _ANON_GZ / the LinkedIn Intelligence data endpoint below).
+# This generalizes that same stdlib-gzip approach to every response, skipping
+# file-serving routes (send_file/send_from_directory set direct_passthrough,
+# and often serve conditional/range requests that byte-for-byte compression
+# would break) and anything already encoded.
+_COMPRESSIBLE_MIMES = {
+    "text/html", "text/css", "text/javascript", "application/javascript",
+    "application/json", "image/svg+xml", "text/plain", "text/xml", "application/xml",
+}
+_COMPRESS_MIN_BYTES = 800  # gzip's own overhead isn't worth it below this
+
+@app.after_request
+def _compress_response(resp):
+    try:
+        if (resp.direct_passthrough or resp.mimetype not in _COMPRESSIBLE_MIMES
+                or "Content-Encoding" in resp.headers
+                or "gzip" not in request.headers.get("Accept-Encoding", "").lower()):
+            return resp
+        data = resp.get_data()
+        if len(data) < _COMPRESS_MIN_BYTES:
+            return resp
+        resp.set_data(gzip.compress(data, 6))
+        resp.headers["Content-Encoding"] = "gzip"
+        resp.headers["Content-Length"] = str(len(resp.get_data()))
+        vary = resp.headers.get("Vary", "")
+        if "Accept-Encoding" not in vary:
+            resp.headers["Vary"] = (vary + ", " if vary else "") + "Accept-Encoding"
+    except Exception:
+        pass
+    return resp
+
+
 @app.route("/dashboard/<account_id>")
 @app.route("/dashboard/<account_id>/<section>")
 @position2_required
@@ -4219,15 +4323,16 @@ def _graph_resolve_person(vid) -> dict:
         return {}
 
 
-def _va_identity_map(vi_rows=None) -> dict:
+def _va_identity_map(vi_rows=None, access_requests=None) -> dict:
     """visitor_id -> {name,email,company,source}. Merges access-form conversions + provider identifies.
 
-    Pass vi_rows (the raw 'Visitor Identities' sheet values, header included) to
-    reuse an already-fetched read instead of issuing another Sheets round-trip --
-    the member analytics page batch-fetches that tab alongside its others."""
+    Pass vi_rows (the raw 'Visitor Identities' sheet values, header included) and/or
+    access_requests (an already-fetched _read_access_requests() list) to reuse reads
+    the caller already did instead of issuing another Sheets round-trip each -- both
+    the member and visitor analytics pages batch-fetch these tabs alongside others."""
     m = {}
     try:
-        for req in _read_access_requests(limit=2000):
+        for req in (access_requests if access_requests is not None else _read_access_requests(limit=2000)):
             v = (req.get("vid") or "").strip()
             if v:
                 m[v] = {"name": req.get("name", ""), "email": req.get("email", ""),
@@ -4251,18 +4356,22 @@ def _va_identity_map(vi_rows=None) -> dict:
     return m
 
 
-def _login_events_by_vid() -> dict:
+def _login_events_by_vid(ms_rows=None, login_rows=None) -> dict:
     """p2_vid -> {type, email, name, picture, events:[...]} across every Google
     sign-in this platform has ever recorded -- 'Member Signins' (public /app
     sign-ups) plus the internal login log (default tab, @position2.com staff).
     This is the join that lets Anonymous Traffic show what an anonymous
-    visitor went on to do AFTER they signed in, not just before."""
-    svc = _va_sheets_service()
+    visitor went on to do AFTER they signed in, not just before.
+
+    Pass ms_rows/login_rows (the raw sheet values, header included) to reuse
+    reads the caller already did instead of issuing two more Sheets round-trips --
+    the visitor analytics page batch-fetches these tabs alongside its others."""
     out: dict = {}
-    if not svc:
-        return out
 
     def read(rng):
+        svc = _va_sheets_service()
+        if not svc:
+            return []
         try:
             return svc.spreadsheets().values().get(
                 spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
@@ -4280,12 +4389,14 @@ def _login_events_by_vid() -> dict:
         if name: entry["name"] = name
         if picture: entry["picture"] = picture
 
-    ms_rows = read("%s!A:T" % _MEMBER_TAB)
+    if ms_rows is None:
+        ms_rows = read("%s!A:T" % _MEMBER_TAB)
     for r in (ms_rows[1:] if len(ms_rows) > 1 else []):
         def mc(i, d=""): return r[i] if i < len(r) else d
         add(mc(9), mc(5), mc(6), mc(8), mc(0), "member")
 
-    login_rows = read("A1:U5000")
+    if login_rows is None:
+        login_rows = read("A1:U5000")
     for r in (login_rows[1:] if len(login_rows) > 1 else []):
         def lc(i, d=""): return r[i] if i < len(r) else d
         add(lc(20), lc(5), lc(6), lc(8), lc(0), "staff")
@@ -4472,15 +4583,39 @@ def _fetch_visitor_analytics(force: bool = False) -> dict:
 def _fetch_visitor_analytics_uncached() -> dict:
     """Aggregate the 'Visitor Analytics' tab for the admin dashboard."""
     from collections import Counter, defaultdict
-    rows = []
-    svc = _va_sheets_service()
-    if svc:
+    from concurrent.futures import ThreadPoolExecutor
+    svc = _va_sheets_service()   # also the "is Sheets configured?" probe
+
+    # These are the exact same reads this function has always done -- Visitor
+    # Analytics, Member Signins, the internal login log, Visitor Identities, and
+    # Page Views -- issued CONCURRENTLY instead of one-after-another, the same
+    # fix already applied to the sibling _fetch_member_analytics_uncached (see
+    # its comment: five serial round-trips was most of a 10-15s load). Access
+    # requests live on a different spreadsheet/credentials (_read_access_requests)
+    # so it's fetched in the same pool rather than via _read; it used to be
+    # fetched TWICE per call here (once for `conversions`, again inside
+    # _va_identity_map) -- fetched once now and passed to both.
+    def _read(rng):
+        s = _va_sheets_service_st()
+        if not s:
+            return []
         try:
-            r = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Visitor Analytics!A:AM").execute()
-            rows = r.get("values", [])
+            return s.spreadsheets().values().get(
+                spreadsheetId=LOGIN_LOG_SHEET_ID, range=rng).execute().get("values", [])
         except Exception as e:
-            log.warning("visitor analytics read failed: %s", e)
+            log.warning("visitor analytics read failed (%s): %s", rng, e)
+            return []
+
+    _RANGES = ["Visitor Analytics!A:AM", "%s!A:T" % _MEMBER_TAB, "A1:U5000",
+               "Visitor Identities!A1:G5000", "Page Views!A:N"]
+    if svc:
+        with ThreadPoolExecutor(max_workers=len(_RANGES) + 1) as _ex:
+            _access_future = _ex.submit(_read_access_requests, 2000)
+            rows, ms_rows, login_rows, vi_rows, pv_rows = list(_ex.map(_read, _RANGES))
+            access_requests = _access_future.result()
+    else:
+        rows = ms_rows = login_rows = vi_rows = pv_rows = []
+        access_requests = []
     idx = {name:i for i,name in enumerate(_VA_HEADER)}
     def c(row,name,d=""):
         i = idx.get(name, -1)
@@ -4620,13 +4755,15 @@ def _fetch_visitor_analytics_uncached() -> dict:
     cwv = {"lcp": avg_nonzero("LCP (ms)"), "cls": avg_nonzero("CLS",True), "inp": avg_nonzero("INP (ms)")}
 
     try:
-        conversions = len(_read_access_requests())
+        # [:300] preserves _read_access_requests()'s own default limit -- access_requests
+        # above was fetched with limit=2000 to also serve _va_identity_map below.
+        conversions = len(access_requests[:300])
     except Exception:
         conversions = 0
     conv_rate = round(conversions/unique_visitors*100,1) if unique_visitors else 0
 
     # ---- identity + reverse-IP company enrichment ----
-    idmap = _va_identity_map()
+    idmap = _va_identity_map(vi_rows=vi_rows, access_requests=access_requests)
     vid_ip = {}
     for r in human:
         v = c(r,"Visitor ID"); ipv = c(r,"IP")
@@ -4660,7 +4797,7 @@ def _fetch_visitor_analytics_uncached() -> dict:
     top_companies = companies.most_common(15)
 
     # ---- did this anonymous visitor go on to sign in? (member or staff) ----
-    login_map = _login_events_by_vid()
+    login_map = _login_events_by_vid(ms_rows=ms_rows, login_rows=login_rows)
     signed_in = sum(1 for v in visitors if v in login_map)
     signed_in_rate = round(signed_in/unique_visitors*100, 1) if unique_visitors else 0
 
@@ -4669,13 +4806,7 @@ def _fetch_visitor_analytics_uncached() -> dict:
     signup_funnel = {"clicked": signup_clicks, "signed_in": signed_in}
     signup_cvr = round(signed_in/signup_clicks*100, 1) if signup_clicks else 0
 
-    pv_rows = []
-    if svc:
-        try:
-            pv_rows = svc.spreadsheets().values().get(
-                spreadsheetId=LOGIN_LOG_SHEET_ID, range="Page Views!A:N").execute().get("values", [])
-        except Exception as e:
-            log.warning("visitor analytics: page views read failed: %s", e)
+    # pv_rows was already fetched concurrently with the other reads above.
     pv_by_vid = defaultdict(list)
     for r in (pv_rows[1:] if len(pv_rows) > 1 else []):
         pvid = r[13] if len(r) > 13 else ""
@@ -15495,7 +15626,7 @@ def vimi_export():
                 for kind, val in _md_blocks(content):
                     w.writerow([_strip_md(val if isinstance(val, str) else " | ".join(val))])
             data = io.BytesIO(buf.getvalue().encode("utf-8-sig"))
-            return send_file(data, mimetype="text/csv", as_attachment=True, download_name=fname)
+            return send_file(data, mimetype="text/csv", as_attachment=True, download_name=fname, max_age=0)
 
         if fmt == "xlsx":
             import openpyxl
@@ -15520,7 +15651,7 @@ def vimi_export():
                 mx = max((len(str(c.value or "")) for c in col), default=10)
                 ws.column_dimensions[col[0].column_letter].width = min(60, max(12, mx + 2))
             data = io.BytesIO(); wb.save(data); data.seek(0)
-            return send_file(data, as_attachment=True, download_name=fname,
+            return send_file(data, as_attachment=True, download_name=fname, max_age=0,
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         if fmt == "docx":
@@ -15551,7 +15682,7 @@ def vimi_export():
                 else: doc.add_paragraph(_strip_md(val))
             _flush()
             data = io.BytesIO(); doc.save(data); data.seek(0)
-            return send_file(data, as_attachment=True, download_name=fname,
+            return send_file(data, as_attachment=True, download_name=fname, max_age=0,
                 mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
         if fmt == "pptx":
@@ -15577,7 +15708,7 @@ def vimi_export():
                     p = tf.paragraphs[0] if i2 == 0 else tf.add_paragraph()
                     p.text = ln[:180]
             data = io.BytesIO(); prs.save(data); data.seek(0)
-            return send_file(data, as_attachment=True, download_name=fname,
+            return send_file(data, as_attachment=True, download_name=fname, max_age=0,
                 mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
         # ── pdf ──
@@ -15617,7 +15748,7 @@ def vimi_export():
         _flush_pdf()
         docp.build(story)
         data.seek(0)
-        return send_file(data, mimetype="application/pdf", as_attachment=True, download_name=fname)
+        return send_file(data, mimetype="application/pdf", as_attachment=True, download_name=fname, max_age=0)
     except Exception as e:
         import traceback; log.error("vimi_export: %s", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
