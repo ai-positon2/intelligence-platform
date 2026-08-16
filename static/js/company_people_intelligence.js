@@ -862,14 +862,22 @@ var REJECT_FILTER = {
 };
 
 /* The one filter key REJECT_FILTER cannot answer with a fixed string:
-   cpiDropFilter clears whichever tab's control STATE.entity currently
-   points at, so "hq" has to resolve against that same state --
+   cpiDropFilter clears whichever tab's control this resolves to, so "hq" has
+   to resolve against the entity that actually produced the rejection --
    company_locations is the People-tab field, locations is the Companies-tab
    field for the identical "hq" rejection reason. Shared by rejectedActions
    (which decides whether to render a button at all) and cpiRelax (which
-   acts on it), so the two cannot disagree about which reasons are clickable. */
+   acts on it), so the two cannot disagree about which reasons are clickable.
+
+   Reads STATE.shownEntity, not STATE.entity: the banner describes the rows
+   currently ON SCREEN, and switching tabs deliberately leaves those rows
+   alone (see cpiSetEntity), so a still-visible banner from a People search
+   must keep resolving "hq" to company_locations even after the Companies tab
+   is selected -- the same STATE.entity/STATE.shownEntity mixup already fixed
+   once for cpiOpenDetails. */
 function rejectFilterKey(reasonKey){
-  if(reasonKey==="hq") return STATE.entity==="companies" ? "locations" : "company_locations";
+  var entity = STATE.shownEntity || STATE.entity;
+  if(reasonKey==="hq") return entity==="companies" ? "locations" : "company_locations";
   return REJECT_FILTER[reasonKey];
 }
 
@@ -911,6 +919,14 @@ function rejectedActions(){
    employee or revenue band go together: clearing only the floor and leaving the
    ceiling would re-run a search that still excludes for the same reason. */
 window.cpiRelax = function(reasonKey){
+  // The rejection banner belongs to STATE.shownEntity's search, which can
+  // differ from STATE.entity (the currently selected tab) after a tab switch
+  // that left the old results on screen. Acting here has to mean "fix and
+  // re-run the search that produced this banner" -- not "clear a filter on
+  // whichever panel happens to be open and search that instead", which
+  // silently cleared a People-tab filter in the background while actually
+  // launching an unrelated, credit-costing Companies search.
+  if(STATE.shownEntity && STATE.shownEntity!==STATE.entity) window.cpiSetEntity(STATE.shownEntity);
   var filt=rejectFilterKey(reasonKey);
   if(!filt) return;
   window.cpiDropFilter(filt);
@@ -1637,10 +1653,15 @@ function applyFiltersToForm(f){
     var lo=document.getElementById(pre+"DeptMin"); if(lo) lo.value=(dc[dcName].min!==undefined?dc[dcName].min:"");
     var hi=document.getElementById(pre+"DeptMax"); if(hi) hi.value=(dc[dcName].max!==undefined?dc[dcName].max:"");
   }
-  /* Stored in Apollo's days, shown in the months the UI collects. */
+  /* Stored in Apollo's days, shown in the months the UI collects. A real
+     value of 0 (a saved/reopened search for "just started, 0 months in role")
+     must still restore -- checking truthiness like every other numeric field
+     here silently drops it, since 0 is falsy but not absent. */
   var tMin=document.getElementById("fpTenureMin"), tMax=document.getElementById("fpTenureMax");
-  if(tMin && f.days_in_title_min) tMin.value=Math.round(f.days_in_title_min/30);
-  if(tMax && f.days_in_title_max) tMax.value=Math.round(f.days_in_title_max/30);
+  if(tMin && f.days_in_title_min!==undefined && f.days_in_title_min!==null)
+    tMin.value=Math.round(f.days_in_title_min/30);
+  if(tMax && f.days_in_title_max!==undefined && f.days_in_title_max!==null)
+    tMax.value=Math.round(f.days_in_title_max/30);
   var sim=document.getElementById("fpSimilarTitles");
   if(sim && f.include_similar_titles!==undefined) sim.checked=!!f.include_similar_titles;
   var unk=document.getElementById("fcUnknownFounded");
@@ -2778,7 +2799,13 @@ window.cpiParseQuery = function(){
   if(btn){ btn.disabled=true; btn.textContent="Reading…"; }
   fetch(window.__CPI_PARSE_URL__, {
     method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({q:q})
+    /* The currently active tab, as a prior for the ambiguous case: the
+       parser's own intent taxonomy has no "a list of companies matching
+       criteria" bucket (only one named company, or a person-shaped ask), so
+       a Companies-tab question like "software companies in Texas" reads as
+       "people_list" and would otherwise default to People every time,
+       switching the user off the tab they were deliberately using. */
+    body: JSON.stringify({q:q, entity: STATE.entity})
   }).then(function(r){ return r.json(); }).then(function(d){
     if(btn){ btn.disabled=false; btn.textContent="Fill filters"; }
     if(!d || d.error){ toast((d&&d.error)||"Could not read that query.", "err"); return; }

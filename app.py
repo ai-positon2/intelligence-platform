@@ -29,7 +29,24 @@ log = logging.getLogger(__name__)
 IST = timezone(timedelta(hours=5, minutes=30))
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "cst-dev-secret-do-not-use-in-prod-abc123xyz")
+_SECRET_KEY_ENV = os.environ.get("SECRET_KEY", "")
+app.secret_key = _SECRET_KEY_ENV or "cst-dev-secret-do-not-use-in-prod-abc123xyz"
+if not _SECRET_KEY_ENV:
+    # This fallback signs every session cookie on the platform -- every
+    # position2_required / admin_required check and every per-email database
+    # scope (Contact Finder's history/list, saved searches, ...) ultimately
+    # trusts session["google_user"]["email"], which is only as trustworthy as
+    # the key that signed it. If this is ever what's actually running in
+    # production, ANYONE can mint a cookie for any email, including another
+    # user's, with a value that is checked into this very repo. Loud rather
+    # than silent on purpose: previously nothing here would have told anyone
+    # this was happening. Set SECRET_KEY in the real environment (Railway ->
+    # Variables) to a long random value and this stops firing.
+    log.error("SECURITY: SECRET_KEY is not set -- falling back to a hardcoded, "
+              "publicly-known dev secret. Every signed-in session on this "
+              "deployment can be forged by anyone who has read this source file. "
+              "Set SECRET_KEY in the environment before this is reachable by "
+              "anyone outside the team that already has this code.")
 app.permanent_session_lifetime = timedelta(days=7)
 # Flask's own default (no max_age configured) sends every static file with an
 # explicit "Cache-Control: no-cache" -- not merely no header -- so browsers were
@@ -42,6 +59,13 @@ app.permanent_session_lifetime = timedelta(days=7)
 # alike; the few per-request generated downloads (Vimi Insights export, further
 # down) opt back out with an explicit max_age=0 since those must never be cached.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 3600
+# No route on this platform legitimately needs more than this in one request
+# body -- the largest known upload (ppc_upload, further down, caps a raw file
+# at 20MB) still fits comfortably with room for multipart/base64 overhead.
+# Without this, nothing stopped a client from sending an arbitrarily large
+# body to any endpoint (a giant `rows` array, an oversized JSON blob) and
+# having it fully buffered and parsed before any route-level check ran.
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
 
 @app.errorhandler(403)
 def forbidden(e):
@@ -1272,7 +1296,19 @@ def auth_google():
         return jsonify({"success": False, "error": "No credential"}), 400
 
     if not GOOGLE_CLIENT_ID:
-        # Dev mode: decode without verification (localhost only)
+        # Dev mode: decode without verification (localhost only). This is only
+        # safe because it requires GOOGLE_CLIENT_ID to be unset, which it must
+        # never be once this is reachable by anyone outside local development --
+        # unverified means the "credential" is trusted as-is, so any caller can
+        # log in as any email (including a real @position2.com address) just by
+        # POSTing a self-made, unsigned JWT-shaped payload. Loud rather than
+        # silent: a redeploy or a dropped environment variable that lands here
+        # in production would otherwise degrade authentication with nothing in
+        # the logs saying so.
+        log.error("SECURITY: GOOGLE_CLIENT_ID is not set -- /auth/google is accepting "
+                  "UNVERIFIED sign-ins. Anyone can log in as any email this way. Set "
+                  "GOOGLE_CLIENT_ID in the environment before this is reachable by "
+                  "anyone outside local development.")
         import base64, json as _j
         try:
             pad = credential.split(".")[1]
@@ -7748,6 +7784,16 @@ def cpi_search():
             from tracker.apollo_client import search_companies as _search_companies
             raw = _search_companies(filters, api_key, page=page,
                                     per_page=per_page, meta=meta, strict=True)
+            # mixed_companies/search bills 1 credit per call that returns at
+            # least one row (0 for an empty result) -- unlike search_people,
+            # this is NOT free. Every other caller of search_companies in this
+            # file (_cpi_resolve_company_direct, _cpi_chat_company_scope) bills
+            # it into `spend` at the call site; this, the Companies tab's own
+            # search, was the one caller that never did, so a real per-page
+            # Apollo charge was never recorded to the ledger and never shown
+            # to the user as a cost.
+            if raw:
+                spend["credits"] = spend.get("credits", 0) + 1
             _cpi_record_industries(raw)
             _cpi_record_vocab(raw)
             results = [_cpi_company_row(o) for o in raw]
@@ -7764,9 +7810,21 @@ def cpi_search():
         # widening the filters" -- advice that cannot help, about a search that
         # never ran.
         log.warning("cpi search failed (entity=%s): %s", entity, e)
-        return jsonify({"results": [], "has_more": False, "search_failed": True,
-                        "error": "Apollo did not answer this search, so nothing was "
-                                 "found and nothing was ruled out. Try again in a moment."})
+        out = {"results": [], "has_more": False, "search_failed": True,
+               "error": "Apollo did not answer this search, so nothing was "
+                        "found and nothing was ruled out. Try again in a moment."}
+        # A typed company NAME (as opposed to a domain) can already have spent
+        # a real credit resolving it to an org id (the mixed_companies/search
+        # call a few lines up) before the people search that follows it fails.
+        # That spend already happened and cannot be undone by this request
+        # failing -- reporting nothing here left it permanently missing from
+        # both the response and the ledger, breaking the one guarantee this
+        # ledger makes: the number in the header and the number actually spent
+        # never drift apart.
+        if spend["credits"]:
+            out["credits"] = spend["credits"]
+            _cpi_credit_record("search-" + entity, spend["credits"])
+        return jsonify(out)
     total = meta.get("total_entries")
     total_pages = meta.get("total_pages")
     # Prefer Apollo's own page count for "is there more": len(results) == per_page
@@ -8611,6 +8669,12 @@ def _cpi_firmo_db_write(facts: dict) -> None:
             pass
 
 
+# The two facts merged by _cpi_attach_employer_facts below where a bare 0 is
+# a real, meaningful value (flat headcount growth) rather than Apollo simply
+# not having the number -- see the merge loop for why that distinction matters.
+_CPI_GROWTH_KEYS = ("organization_growth6", "organization_growth12")
+
+
 def _cpi_employer_facts(o: dict) -> dict:
     """One Apollo org -> the organization_* fields a person row carries.
 
@@ -8732,6 +8796,18 @@ def _cpi_attach_employer_facts(rows: list, api_key: str, spend: dict) -> dict:
         if not payload:
             continue
         for key, val in payload.items():
+            # Headcount growth is a fraction that is routinely and
+            # legitimately exactly 0 (flat headcount over the period) --
+            # unlike every other fact merged here, where an Apollo record
+            # reporting a bare 0 (employees, revenue, founded year) is Apollo
+            # not actually having that number rather than a true zero. Treating
+            # growth the same way as those silently discarded a real "0%"
+            # fetched from Apollo, leaving the field blank instead.
+            if key in _CPI_GROWTH_KEYS:
+                if val is None or r.get(key) is not None:
+                    continue
+                r[key] = val
+                continue
             if val in (None, "", [], 0):
                 continue
             if r.get(key) in (None, "", [], 0):
@@ -10023,6 +10099,25 @@ _CPI_LIST_MAX = 500             # rows per user; a list past this is an export
 _CPI_LIST_TTL_DAYS = 90         # matches history: these rows can hold contacts
 
 
+def _cpi_list_prune(cur, email: str) -> None:
+    """Keep the per-user working list bounded at _CPI_LIST_MAX, no matter how
+    it got past that -- mirrors _cpi_history_prune's self-healing trim.
+
+    The insert path below only checks room = _CPI_LIST_MAX - COUNT(*) before
+    inserting, which is a plain check-then-act: two concurrent POSTs from the
+    same user, each carrying up to _CPI_LIST_MAX new rows, can each read the
+    same pre-insert count and each insert up to their own `room`, landing the
+    table well past the cap. This runs inside the same transaction right after
+    the insert, so the cap holds regardless of how many concurrent writers got
+    there first -- it is what actually enforces the limit; the pre-check above
+    only exists to answer "full" honestly in the common, non-racing case."""
+    cur.execute(
+        "DELETE FROM cpi_list_rows WHERE email = %s AND (entity, dedupe_key) NOT IN "
+        "(SELECT entity, dedupe_key FROM cpi_list_rows WHERE email = %s "
+        " ORDER BY added_at DESC LIMIT %s)",
+        (email, email, _CPI_LIST_MAX))
+
+
 def _ensure_cpi_list_table(conn) -> None:
     global _CPI_LIST_TABLE_READY
     if _CPI_LIST_TABLE_READY:
@@ -10109,6 +10204,7 @@ def cpi_list():
                         "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
                         (email, entity, _cpi_list_key(r, entity), Json(r)))
                     added += cur.rowcount
+                _cpi_list_prune(cur, email)
                 conn.commit()
                 out = {"added": added, "available": True,
                        "count": _cpi_list_count(cur, email)}
@@ -10193,7 +10289,8 @@ def _cpi_filters_from_intent(intent: dict) -> dict:
     # user cannot see, which is the one thing this must not do.
     allow = ("titles", "seniorities", "industries", "keywords",
              "person_locations", "company_locations", "locations",
-             "technologies", "naics_codes", "sic_codes", "market_segments",
+             "technologies", "technologies_all", "exclude_technologies",
+             "naics_codes", "sic_codes", "market_segments",
              "job_titles", "email_status")
     out = {}
     for k in allow:
@@ -10232,6 +10329,45 @@ def _cpi_filters_from_intent(intent: dict) -> dict:
     return out
 
 
+# ── Per-user rate limiting on the endpoints that cost real money per call ────
+# Nothing on this page's parse-query/count/chat routes was ever rate limited --
+# fine while every caller was internal staff on the honor system, but each of
+# these bills a real, per-request OpenAI and/or Apollo call, and this is meant
+# to open up to external clients who are not on that honor system. A script
+# (malicious, or just a client's own buggy integration) looping any of these
+# has nothing here to slow it down.
+#
+# Per-process, in-memory, keyed on the session's own email -- not a shared
+# store (no Redis in this app), so with gunicorn's 2 workers the true ceiling
+# per user is roughly double the configured number. That is a real, honest
+# limitation, not a subtle bug: it is still a large improvement over no limit
+# at all, and the fix if it ever proves too loose is a shared backing store,
+# not a different algorithm.
+_CPI_RATE_LIMITS = {
+    # route key -> (max requests, window in seconds)
+    "count": (40, 60),          # debounced client-side at 420ms while typing
+    "parse-query": (12, 60),    # a deliberate button click, not per-keystroke
+    "chat": (20, 60),           # a conversation, several messages a minute
+}
+_CPI_RATE_STATE: dict = {}
+_CPI_RATE_LOCK = threading.Lock()
+
+
+def _cpi_rate_limited(route_key: str, email: str) -> bool:
+    """True if `email` is over budget for `route_key` in the current window."""
+    limit, window = _CPI_RATE_LIMITS[route_key]
+    now = time.time()
+    with _CPI_RATE_LOCK:
+        bucket = _CPI_RATE_STATE.setdefault(route_key, {})
+        hits = [t for t in bucket.get(email, ()) if now - t < window]
+        if len(hits) >= limit:
+            bucket[email] = hits
+            return True
+        hits.append(now)
+        bucket[email] = hits
+        return False
+
+
 # ── Typed sentence to filter panel ────────────────────────────────────────────
 @app.route("/p2/b2b-agents/company-people-intelligence/parse-query", methods=["POST"])
 @position2_required
@@ -10247,10 +10383,16 @@ def cpi_parse_query():
 
     Costs an OpenAI call and 0 Apollo credits.
     """
+    email = ((_get_user() or {}).get("email") or "").lower()
+    if _cpi_rate_limited("parse-query", email):
+        return jsonify({"filters": {}, "error": "Too many requests -- wait a moment and try again."}), 429
     body = request.get_json(silent=True) or {}
     text = str(body.get("q") or "").strip()[:400]
     if not text:
         return jsonify({"filters": {}})
+    # The tab the user was already on when they asked -- used below as the
+    # default for whichever the parse doesn't unambiguously call for.
+    requested_entity = "companies" if body.get("entity") == "companies" else "people"
     oai = _cpi_oai()
     if oai is None:
         return jsonify({"filters": {}, "error": "The assistant is not configured here."})
@@ -10265,8 +10407,32 @@ def cpi_parse_query():
     if not isinstance(intent, dict):
         return jsonify({"filters": {}})
     out = _cpi_filters_from_intent(intent)
-    return jsonify({"filters": out, "entity": (
-        "companies" if str(intent.get("intent") or "").startswith("compan") else "people")})
+    kind = str(intent.get("intent") or "")
+    # _CPI_INTENT_SYSTEM's taxonomy is shared with the chat feature and has no
+    # "a list of companies matching criteria" bucket of its own (only one named
+    # company, or a person-shaped ask) -- so "software companies in Texas" on
+    # the Companies tab comes back "people_list" or "unclear" for lack of a
+    # better fit, and defaulting that straight to "people" would silently flip
+    # the user off the tab they were deliberately using. Only switch tabs when
+    # the parse is UNAMBIGUOUS about which one it means; otherwise keep
+    # whichever tab was already open.
+    if kind == "company_info":
+        entity = "companies"
+    elif kind == "person_at_company":
+        entity = "people"
+    else:
+        entity = requested_entity
+    if entity == "companies" and "locations" not in out and "company_locations" in out:
+        # The Companies tab's own HQ-location combo reads the bare `locations`
+        # key (COMBO_SPECS: ["fcLocation","locations",...]); `company_locations`
+        # is what the PEOPLE tab's "at a company headquartered in X" combo
+        # reads instead. The intent schema only ever produces company_locations
+        # (it has no reason to know which tab is asking), so a Companies-tab
+        # request ("software companies in Texas") would otherwise paint a value
+        # into a field the visible tab has no control for -- landing exactly
+        # like a dropped filter, just one level less obvious than an empty key.
+        out["locations"] = out.pop("company_locations")
+    return jsonify({"filters": out, "entity": entity})
 
 
 # ── The free match count ──────────────────────────────────────────────────────
@@ -10309,6 +10475,9 @@ _CPI_COUNT_VERIFIED_FILTERS = ("industries", "employee_min", "employee_max",
 @position2_required
 def cpi_count():
     """How many people Apollo says match, for 0 credits. See the note above."""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    if _cpi_rate_limited("count", email):
+        return jsonify({"count": None, "reason": "Too many requests -- wait a moment and try again."}), 429
     body = request.get_json(silent=True) or {}
     if body.get("entity") == "companies":
         return jsonify({"count": None,
@@ -10366,9 +10535,12 @@ def cpi_count():
 # cannot stand behind, the ledger records what THIS TOOL spent, which it knows
 # exactly, and the header says precisely that.
 #
-# Written at the five places a spend is reported to the user, never anywhere
+# Written at the six places a spend is reported to the user, never anywhere
 # else, so the number in the header and the number on the screen come from the
-# same event and cannot drift apart.
+# same event and cannot drift apart. The sixth is cpi_search's own
+# search_failed branch: a credit can already have been spent resolving a typed
+# company name before the people search that follows it fails, and that spend
+# already happened whether or not the rest of the request succeeded.
 _CPI_LEDGER_TABLE_READY = False
 _CPI_LEDGER_TTL_DAYS = 400      # a little over a year, so "last 12 months" is whole
 
@@ -10497,7 +10669,13 @@ def cpi_export():
     table rather than growing a mismatched header block.
     """
     body = request.get_json(silent=True) or {}
-    rows = [r for r in (body.get("rows") or []) if isinstance(r, dict)]
+    # Every other client-supplied row collection on this page has an explicit
+    # cap (_CPI_LIST_MAX=500, history's _CPI_HISTORY_KEEP=60) -- this was the
+    # one left unbounded, so a client could POST an arbitrarily large `rows`
+    # array and have the server build the entire file in memory with no limit
+    # at all. 5,000 comfortably covers a full working-list export (500) or a
+    # many-page "load more" session with room to spare.
+    rows = [r for r in (body.get("rows") or [])[:5000] if isinstance(r, dict)]
     if not rows:
         return jsonify({"error": "Nothing selected to export."}), 400
     entity = "companies" if body.get("entity") == "companies" else "people"
@@ -10591,6 +10769,7 @@ _CPI_INTENT_SYSTEM = (
     "Return one JSON object with these keys:\n"
     '{"intent": "person_at_company" | "people_list" | "company_info" | "unclear",\n'
     ' "titles": ["..."],\n'
+    ' "job_titles": ["..."],\n'
     ' "seniorities": ["..."],\n'
     ' "company_name": "...",\n'
     ' "company_name_typed": "...",\n'
@@ -10598,6 +10777,9 @@ _CPI_INTENT_SYSTEM = (
     ' "company_locations": ["..."],\n'
     ' "industries": ["..."],\n'
     ' "technologies": ["..."],\n'
+    ' "technologies_all": ["..."],\n'
+    ' "exclude_technologies": ["..."],\n'
+    ' "market_segments": ["..."],\n'
     ' "naics_codes": ["..."],\n'
     ' "sic_codes": ["..."],\n'
     ' "employee_min": null,\n'
@@ -10605,11 +10787,19 @@ _CPI_INTENT_SYSTEM = (
     ' "revenue_min": null,\n'
     ' "revenue_max": null,\n'
     ' "keywords": "...",\n'
+    ' "email_status": "...",\n'
     ' "wants_contact_info": false,\n'
     ' "wants_count": false,\n'
     ' "max_results": 10}\n\n'
     "titles: job titles/roles asked about, e.g. [\"CMO\",\"Chief Marketing Officer\"] -- expand "
-    "common abbreviations to their full title too. seniorities: only from owner, founder, "
+    "common abbreviations to their full title too. This is what a PERSON currently holds. Do "
+    "NOT confuse it with job_titles below, a completely different signal about the COMPANY: "
+    "\"list VPs of Sales\" is titles; \"companies hiring a VP of Sales\" is job_titles. When in "
+    "doubt (the sentence names a role but does not say \"hiring\"/\"open role\"/\"job posting\"), "
+    "use titles, since that is what almost every request means. job_titles: ONLY when the "
+    "question is explicitly about a company's OPEN JOB POSTINGS, not about who already holds a "
+    "role (\"companies currently hiring a VP of Sales\", \"who has an open req for a "
+    "recruiter\") -> job_titles: [\"VP of Sales\"], titles left empty. seniorities: only from owner, founder, "
     "c_suite, vp, director, manager, senior, entry, intern -- infer these even when the user "
     "does not use those exact words: \"leadership\", \"leadership team\", \"executives\", "
     "\"decision makers\", \"senior leaders\" -> [\"c_suite\",\"vp\",\"director\"]; \"founders\" -> "
@@ -10656,8 +10846,24 @@ _CPI_INTENT_SYSTEM = (
     "not keywords, and belong ONLY in seniorities. No real person's title or bio literally "
     "contains the phrase \"top executives\", so putting it in keywords too does not narrow the "
     "search, it empties it.\n\n"
-    "technologies: named software the companies should be using (\"Salesforce\", "
-    "\"HubSpot\", \"Shopify\"), only when the question actually asks for it.\n"
+    "technologies: named software the companies should be using ANY of (\"Salesforce\", "
+    "\"HubSpot\", \"Shopify\"), only when the question actually asks for it. technologies_all: "
+    "same, but only when the question requires ALL of several named ones together (\"using "
+    "both Salesforce and Marketo\") -- rare, leave empty unless the word \"both\"/\"and\" ties "
+    "multiple named technologies together as a single joint requirement. exclude_technologies: "
+    "named software the companies should NOT be using (\"not using Salesforce\", \"companies "
+    "that don't run on HubSpot\", \"without Shopify\"). This is the opposite of technologies, "
+    "and mixing them up inverts the search: never put an excluded technology into `technologies` "
+    "-- a \"NOT using X\" question with X placed in `technologies` asks for exactly the "
+    "companies the user wants excluded.\n"
+    "market_segments: a company-level tag or descriptor Apollo has recorded about it, in plain "
+    "words, one entry per segment (\"mid-market\", \"enterprise\", \"SaaS\"), only when the "
+    "question names one explicitly. This is an approximate, loosely-matched field, unlike "
+    "industries -- leave it empty rather than guessing a segment from context.\n"
+    "email_status: only \"verified\" or \"unavailable\" (Apollo's other documented values are "
+    "not usable here, so never emit anything else), and only when the question explicitly asks "
+    "about email availability or verification (\"only people with a verified email\", \"emails "
+    "we can actually reach\" -> \"verified\"). Leave it empty otherwise.\n"
     "naics_codes / sic_codes: only when the question itself quotes a classification "
     "code (\"companies in NAICS 5415\", \"SIC 7372 companies\"). Copy the digits "
     "across and nothing else. Never derive a code from an industry name: the industry "
@@ -12684,6 +12890,10 @@ def cpi_chat():
     the user want) is one JSON-mode OpenAI call; which Apollo calls to make and
     whether a company name is ambiguous is decided in plain Python, never left
     to the model -- see _cpi_resolve_company."""
+    email = ((_get_user() or {}).get("email") or "").lower()
+    if _cpi_rate_limited("chat", email):
+        return jsonify({"answer": "You're sending messages faster than I can "
+                                   "process them. Wait a moment and try again."}), 429
     body = request.get_json(silent=True) or {}
     message = str(body.get("message") or "").strip()[:600]
     history = body.get("history") or []
