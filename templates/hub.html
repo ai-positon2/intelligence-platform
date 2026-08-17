@@ -77,18 +77,19 @@
           <div class="card-category">Go-To-Market</div>
           <div class="card-title">B2B Agents</div>
           <div class="card-desc">
-            Buyer signals, competitor ad intelligence, anonymous visitor de-anonymisation,
-            LinkedIn engagement, and live contact lookup.
+            Buyer signals, job-change alerts, competitor ad intelligence, anonymous visitor
+            de-anonymisation, LinkedIn engagement, and live contact lookup.
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <!-- Counts the cards on /p2/b2b-agents: 5 live plus Job Change Alert,
-                   which is still "Coming soon". test_hub_card_counts.py fails if
-                   these drift from the dashboard page again. Was 7/6 until
-                   LinkedIn Strategy Researcher was hidden on 2026-08-14, which is
-                   also why the description no longer says "and strategy research". -->
+              <!-- Counts the cards on /p2/b2b-agents: all 6 are live as of
+                   2026-08-17 (Job Change Alert shipped, no more "Coming soon"
+                   cards left). test_hub_card_counts.py fails if these drift from
+                   the dashboard page again. Was 7/6 until LinkedIn Strategy
+                   Researcher was hidden on 2026-08-14, which is also why the
+                   description no longer says "and strategy research". -->
               <div class="card-stat"><span>6</span> dashboards</div>
-              <div class="card-stat"><span>5</span> live</div>
+              <div class="card-stat"><span>6</span> live</div>
             </div>
             <div class="card-cta">Open <span class="card-arrow">→</span></div>
           </div>
@@ -133,10 +134,10 @@
         <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        {# Live dashboards across both workspaces: 5 on /p2/b2b-agents + 16 SEO tools
-           (Competitor Analysis added 2026-08-14). Was 20 before that, 21 before
-           LinkedIn Strategy Researcher was hidden the same day. #}
-        <div><b data-lxn="21">0</b><span>dashboards</span></div>
+        {# Live dashboards across both workspaces: 6 on /p2/b2b-agents (Job Change
+           Alert shipped 2026-08-17, the last "Coming soon" card there) + 16 SEO
+           tools. Was 21 before Job Change Alert shipped. #}
+        <div><b data-lxn="22">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>
@@ -193,6 +194,7 @@
     {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
     {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
     {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

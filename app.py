@@ -3854,6 +3854,51 @@ def ad_intelligence_favicon():
 def ad_intelligence_icons():
     return send_from_directory("ad_intelligence", "icons.svg")
 
+# ── Job Change Alert ──────────────────────────────────────────────────────────
+# Sourced from Apollo's own "Job_change_alert_apollo_database" workflow, which
+# posts one Slack message per detected job change into #job_change_alert_apollo.
+# tracker/job_change_parser.py + tracker/job_change_store.py + scripts/sync_job_change_alerts.py
+# own the parsing/storage; this app only ever reads the resulting SQLite db.
+JOB_CHANGE_DB_PATH = Path(__file__).parent / "data" / "job_change_alerts.db"
+
+@app.route("/p2/b2b-agents/job-change-alert")
+@position2_required
+def job_change_alert():
+    return render_template("job_change_alert.html", user=_get_user())
+
+@app.route("/p2/b2b-agents/job-change-alert/data")
+@position2_required
+def job_change_alert_data():
+    from tracker.job_change_store import JobChangeStore
+    store = JobChangeStore(JOB_CHANGE_DB_PATH)
+    events = store.get_all_events()
+    return jsonify({"events": events, "total": len(events),
+                     "last_synced": store.get_latest_detected_at()})
+
+@app.route("/p2/b2b-agents/job-change-alert/sync", methods=["POST"])
+@admin_required
+def job_change_alert_sync():
+    """Runs the sync script as a subprocess (never imported into this process --
+    the script does an os.chdir()/sys.path mutation on import that is only safe
+    isolated in its own process, same reason scripts/refresh-dashboards.py is
+    always invoked, never imported)."""
+    import subprocess
+    import sys as _sys
+    script = str(Path(__file__).parent / "scripts" / "sync_job_change_alerts.py")
+    try:
+        proc = subprocess.run([_sys.executable, script], capture_output=True, text=True, timeout=60)
+    except Exception as e:
+        log.warning("Job Change Alert manual sync failed to launch: %s", e)
+        return jsonify({"ok": False, "error": "sync failed to start"}), 500
+    if proc.returncode != 0:
+        log.warning("Job Change Alert manual sync exited %s: %s", proc.returncode, proc.stderr[-500:])
+        return jsonify({"ok": False, "error": "sync script failed, check server logs"}), 500
+    try:
+        result = json.loads(proc.stdout.strip().splitlines()[-1])
+    except Exception:
+        result = {}
+    return jsonify({"ok": True, **result})
+
 _SEO_TOOLS_FALLBACK = [
     {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",         "desc": "AI-powered keyword shortlisting",              "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
     {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",         "desc": "Competitor-based content briefs",              "icon": "🔎", "tags": ["Content", "SERP"]},
