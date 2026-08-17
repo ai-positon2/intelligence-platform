@@ -13882,7 +13882,8 @@ def _build_account_card(account_id, cfg):
     accent = cfg["accent"]
     # derive thumb gradient from accent colour
     thumb_map = {"#3b82f6": "linear-gradient(135deg,#172554,#1e3a8a)",
-                 "#8b5cf6": "linear-gradient(135deg,#2e1065,#1e1b4b)"}
+                 "#8b5cf6": "linear-gradient(135deg,#2e1065,#1e1b4b)",
+                 "#5b9dff": "linear-gradient(135deg,#0c2a4a,#134e6f)"}
     thumb = thumb_map.get(accent, f"linear-gradient(135deg,#0d0f17,#1a1d27)")
     if path.exists():
         count = _read_company_count(path)
