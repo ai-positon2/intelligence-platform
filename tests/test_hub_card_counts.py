@@ -12,8 +12,10 @@ hub advertises. Adding a dashboard now fails this test until the card is updated
 which is the only way a hand-maintained number stays honest.
 
 Also checked: every capability the card's prose claims corresponds to a card that
-is actually live, so the description cannot promise something unbuilt (it used to
-advertise job-change alerts, which is still "Coming soon").
+is actually live, so the description cannot promise something unbuilt. Job Change
+Alert was the last "Coming soon" card and shipped 2026-08-17 -- there are no soon
+cards left on this page now, which is itself worth pinning (the next unbuilt card
+added here should make that state visible again, not silently).
 """
 
 import os
@@ -87,9 +89,17 @@ def test_contact_finder_is_one_of_the_live_dashboards(dashboard_cards):
     assert "Contact Finder" in dashboard_cards["live"]
 
 
-def test_a_coming_soon_card_is_counted_as_a_dashboard_but_not_as_live(dashboard_cards):
-    assert dashboard_cards["soon"], "expected at least one Coming soon card"
+def test_soon_cards_would_be_counted_as_dashboards_but_not_as_live(dashboard_cards):
+    """No "Coming soon" card exists on this page right now (Job Change Alert,
+    the last one, shipped 2026-08-17) -- this just pins that the total/live
+    split still adds up correctly, so it keeps holding whenever a soon card is
+    reintroduced rather than only being checked incidentally."""
     assert dashboard_cards["total"] == len(dashboard_cards["live"]) + len(dashboard_cards["soon"])
+
+
+def test_job_change_alert_is_one_of_the_live_dashboards(dashboard_cards):
+    """The dashboard whose shipping retired the last "Coming soon" card."""
+    assert "Job Change Alert" in dashboard_cards["live"]
 
 
 # ── The prose ───────────────────────────────────────────────────────────────
@@ -103,13 +113,12 @@ def test_the_description_mentions_contact_lookup(hub_card):
     assert "contact lookup" in hub_card["desc"].lower()
 
 
-def test_the_description_does_not_promise_the_unbuilt_dashboard(hub_card, dashboard_cards):
-    """Job Change Alert is still "Coming soon", so listing it alongside shipped
-    capabilities oversells the card."""
-    assert "job-change" not in hub_card["desc"].lower()
-    assert "job change" not in hub_card["desc"].lower()
-    assert "Job Change Alert" in dashboard_cards["soon"], \
-        "if this shipped, the description should say so and this test should change"
+def test_the_description_mentions_job_change_alerts_now_that_it_shipped(hub_card, dashboard_cards):
+    """Job Change Alert shipped 2026-08-17 -- the description saying so is no
+    longer overselling an unbuilt card, it's the same "every live capability is
+    named" rule test_the_description_mentions_contact_lookup pins above."""
+    assert "job change" in hub_card["desc"].lower() or "job-change" in hub_card["desc"].lower()
+    assert "Job Change Alert" in dashboard_cards["live"]
 
 
 def test_the_description_does_not_call_it_scraping(hub_card):

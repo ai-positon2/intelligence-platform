@@ -1,0 +1,49 @@
+name: Sync Job Change Alerts
+
+# Pulls new job-change events from #job_change_alert_apollo (Slack) into
+# data/job_change_alerts.db + data/job_change_alerts_manual.json. Best-effort:
+# the sync script never fails the job even if SLACK_BOT_TOKEN is missing or
+# under-scoped for reading channel history -- it just logs and changes nothing,
+# so the Job Change Alert page keeps serving the last-known-good data either way.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 13 * * *'   # daily, 13:00 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-job-change-alerts
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Sync new events from Slack
+        run: python scripts/sync_job_change_alerts.py
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Commit & publish
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/job_change_alerts.db data/job_change_alerts_manual.json
+          if git diff --cached --quiet; then
+            echo "No new job-change events."
+          else
+            git commit -m "data: sync Job Change Alert events [skip ci]"
+            git push
+          fi
