@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=3">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -61,6 +61,13 @@
       {% if is_admin %}
       <button class="sync-btn" id="syncBtn" onclick="runSync()"><span class="sync-icon">↻</span> Sync now</button>
       {% endif %}
+    </div>
+
+    <div class="jc-ticker" id="jcTicker">
+      <span class="jc-ticker-dot"></span>
+      <span class="jc-ticker-tag">Latest signal</span>
+      <span class="jc-ticker-sep">·</span>
+      <span class="jc-ticker-text" id="jcTickerText"></span>
     </div>
 
     <div class="stats-row">
@@ -132,6 +139,8 @@
         <span class="sync-msg" id="syncMsg"></span>
       </div>
 
+      <div class="jc-chip-row" id="chipRow"></div>
+
       <div id="pane-events" class="tab-pane active">
         <div class="tbl-wrap"><div id="tableWrap-events"><div class="jc-loading">Loading…</div></div></div>
       </div>
@@ -142,6 +151,12 @@
         <div class="tbl-wrap"><div id="tableWrap-companies"><div class="jc-loading">Loading the tracked-companies roster…</div></div></div>
       </div>
     </div>
+  </div>
+
+  <div class="jc-drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="jc-drawer" id="drawer">
+    <button class="jc-drawer-close" onclick="closeDrawer()" aria-label="Close">✕</button>
+    <div id="drawerBody"></div>
   </div>
 
   {% include 'ppc_chat_widget.html' %}
@@ -162,6 +177,7 @@
     var TRACKED_LOADING = false;
     var SORT = { events: {key:'detected_at', dir:-1}, people: {key:'name', dir:1}, companies: {key:'name', dir:1} };
     var FILTERS = { events: {}, people: {}, companies: {} };
+    var LAST_ROWS = { events: [], people: [], companies: [] };
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function initials(name){
@@ -224,6 +240,178 @@
       (arr||[]).forEach(function(o){String((o&&o[key])||'').split(',').forEach(function(s){s=s.trim();if(s)set[s]=1;});});
       return Object.keys(set).sort();
     }
+    function domainFromUrl(u){
+      if(!u)return '';
+      var h=String(u).trim().replace(/^https?:\/\//i,'').replace(/^www\./i,'').split(/[\/?#]/)[0];
+      return h||'';
+    }
+    function logoAvatar(website, letter, extraClass){
+      var d=domainFromUrl(website);
+      return '<div class="jc-avatar-sq'+(extraClass?' '+extraClass:'')+'">'+esc(letter)
+        +(d?'<img class="jc-logo-img" src="https://logo.clearbit.com/'+esc(d)+'?size=64" loading="lazy" onerror="this.remove()">':'')
+        +'</div>';
+    }
+
+    /* ── Detail drawer ───────────────────────────────────────────────────── */
+    function drw(label,val){
+      if(val==null||val==='')return '';
+      return '<div class="drw-row"><span class="drw-label">'+esc(label)+'</span><span class="drw-value">'+val+'</span></div>';
+    }
+    function drwSection(label,rowsHtml){
+      return rowsHtml?'<div class="drw-section-label">'+esc(label)+'</div>'+rowsHtml:'';
+    }
+    function drwLinks(links){
+      var html=(links||[]).filter(function(l){return l&&l.href;}).map(function(l){
+        return '<a class="drw-link-btn" href="'+esc(l.href)+'" target="_blank" rel="noopener">'+esc(l.label)+' ↗</a>';
+      }).join('');
+      return html?'<div class="drw-links">'+html+'</div>':'';
+    }
+    function drwHead(avatarHtml,name,subtitleHtml,extraHtml){
+      return '<div class="drw-head">'+avatarHtml
+        +'<div class="drw-head-txt"><h3>'+esc(name||'Unknown')+'</h3>'
+        +(subtitleHtml?'<div class="drw-sub">'+subtitleHtml+'</div>':'')
+        +(extraHtml||'')+'</div></div>';
+    }
+    function drawerEvent(e){
+      var avatar='<div class="jc-avatar ev drw-avatar">'+esc(initials(e.person_name))+'</div>';
+      var sub=esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+esc(e.new_company_name)+'</span>':'');
+      var detected=e.detected_at?relTime(e.detected_at)+' · '+new Date(e.detected_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      return drwHead(avatar,e.person_name,sub)
+        +'<div class="drw-body">'
+        +'<div class="drw-section-label">Job change</div>'
+        +drw('Started',esc(e.job_start_date))
+        +drw('Detected',esc(detected))
+        +'<div class="drw-section-label">Company</div>'
+        +drw('Industry',esc(e.company_industry))
+        +drw('Employees',fmtNum(e.employees))
+        +drw('Revenue',esc(e.revenue))
+        +drw('Location',esc(e.city))
+        +(e.company_description?'<div class="drw-section-label">About</div><p class="drw-desc">'+esc(e.company_description)+'</p>':'')
+        +drwLinks([{href:e.linkedin_url,label:'LinkedIn profile'},{href:e.slack_permalink,label:'Original alert'}])
+        +'</div>';
+    }
+    function drawerPerson(c){
+      var avatar='<div class="jc-avatar roster drw-avatar">'+esc(initials(c.name))+'</div>';
+      var badge=c.seniority?'<div style="margin-top:8px"><span class="jc-badge '+seniorityClass(c.seniority)+'">'+esc(c.seniority)+'</span></div>':'';
+      return drwHead(avatar,c.name,esc(c.title||'—'),badge)
+        +'<div class="drw-body">'
+        +'<div class="drw-section-label">Role</div>'
+        +drw('Company',esc(c.company))
+        +drw('Department',esc(c.department))
+        +'<div class="drw-section-label">Company</div>'
+        +drw('Industry',esc(c.industry))
+        +drw('Employees',fmtNum(c.employees))
+        +drw('Location',esc([c.city,c.state].filter(Boolean).join(', ')))
+        +drwLinks([{href:c.linkedin_url,label:'LinkedIn profile'},{href:c.company_linkedin_url,label:'Company LinkedIn'},{href:c.website,label:'Website'}])
+        +'</div>';
+    }
+    function drawerCompany(c){
+      var avatar=logoAvatar(c.website,(c.name||'?')[0].toUpperCase(),'drw-avatar');
+      return drwHead(avatar,c.name,esc(c.industry||'—'))
+        +'<div class="drw-body">'
+        +'<div class="drw-section-label">Company</div>'
+        +drw('Employees',fmtNum(c.employees))
+        +drw('Location',esc([c.city,c.state,c.country].filter(Boolean).join(', ')))
+        +drwSection('Financials',
+            drw('Annual revenue',c.annual_revenue?fmtMoney(c.annual_revenue):'')
+            +drw('Total funding',c.total_funding?fmtMoney(c.total_funding):'')
+            +drw('Latest round',esc(c.latest_funding)))
+        +drwLinks([{href:c.website,label:'Website'},{href:c.linkedin_url,label:'LinkedIn'}])
+        +'</div>';
+    }
+    function openDrawer(tab,idx){
+      var item=LAST_ROWS[tab]&&LAST_ROWS[tab][idx];
+      if(!item)return;
+      var html=tab==='events'?drawerEvent(item):tab==='people'?drawerPerson(item):drawerCompany(item);
+      document.getElementById('drawerBody').innerHTML=html;
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerOverlay').classList.add('open');
+      document.body.style.overflow='hidden';
+    }
+    function closeDrawer(){
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.body.style.overflow='';
+    }
+
+    /* ── Active filter chips ─────────────────────────────────────────────── */
+    function filterValueLabel(tab,key,value){
+      var f=(getFilterConfig(tab)||[]).filter(function(c){return c.key===key;})[0];
+      if(!f)return value;
+      if(f.raw){
+        var opt=(f.options||[]).filter(function(o){return o[0]===value;})[0];
+        return opt?opt[1]:value;
+      }
+      return value;
+    }
+    function renderChips(){
+      var row=document.getElementById('chipRow');
+      var chips=[];
+      var q=(document.getElementById('searchInput').value||'').trim();
+      if(q)chips.push({label:'"'+q+'"',onclick:'clearSearchChip()'});
+      Object.keys(FILTERS[TAB]||{}).forEach(function(k){
+        var v=FILTERS[TAB][k];
+        if(!v)return;
+        chips.push({label:filterValueLabel(TAB,k,v),onclick:'removeChipFilter(\''+k+'\')'});
+      });
+      if(!chips.length){row.innerHTML='';row.classList.remove('has-chips');return;}
+      row.classList.add('has-chips');
+      row.innerHTML=chips.map(function(c){
+        return '<span class="jc-chip">'+esc(c.label)+'<button type="button" onclick="'+c.onclick+'" aria-label="Remove filter">✕</button></span>';
+      }).join('');
+    }
+    function removeChipFilter(key){
+      delete FILTERS[TAB][key];
+      populateFilters();
+      render();
+    }
+    function clearSearchChip(){
+      document.getElementById('searchInput').value='';
+      render();
+    }
+
+    /* ── Latest-signal ticker ────────────────────────────────────────────── */
+    var TICKER_ITEMS=[], TICKER_IDX=0, TICKER_TIMER=null;
+    function showTickerItem(){
+      var e=TICKER_ITEMS[TICKER_IDX];
+      if(!e)return;
+      var txt=document.getElementById('jcTickerText');
+      txt.classList.remove('in'); void txt.offsetWidth;
+      txt.innerHTML=esc(e.person_name||'Someone')+' just started as <b>'+esc(e.new_title||'a new role')+'</b>'
+        +(e.new_company_name?' at <b>'+esc(e.new_company_name)+'</b>':'')
+        +' <span class="jc-ticker-time">· '+esc(relTime(e.detected_at))+'</span>';
+      txt.classList.add('in');
+    }
+    function renderTicker(){
+      var el=document.getElementById('jcTicker');
+      if(TICKER_TIMER){clearInterval(TICKER_TIMER);TICKER_TIMER=null;}
+      if(!EVENTS.length){el.style.display='none';return;}
+      TICKER_ITEMS=EVENTS.slice().sort(function(a,b){return new Date(b.detected_at||0)-new Date(a.detected_at||0);}).slice(0,5);
+      TICKER_IDX=0;
+      el.style.display='flex';
+      showTickerItem();
+      if(TICKER_ITEMS.length>1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+        TICKER_TIMER=setInterval(function(){
+          TICKER_IDX=(TICKER_IDX+1)%TICKER_ITEMS.length;
+          showTickerItem();
+        },4500);
+      }
+    }
+    document.getElementById('jcTicker').addEventListener('click',function(){
+      var current=TICKER_ITEMS[TICKER_IDX];
+      switchTab('events');
+      var idx=LAST_ROWS.events.indexOf(current);
+      if(idx>=0)openDrawer('events',idx);
+    });
+    document.getElementById('mainCard').addEventListener('click',function(e){
+      if(e.target.closest('a'))return;
+      var tr=e.target.closest('tr[data-idx]');
+      if(!tr)return;
+      var pane=tr.closest('.tab-pane');
+      if(!pane)return;
+      openDrawer(pane.id.replace('pane-',''), parseInt(tr.getAttribute('data-idx'),10));
+    });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeDrawer(); });
 
     function loadEvents(){
       fetch('/p2/b2b-agents/job-change-alert/data').then(function(r){return r.json();}).then(function(data){
@@ -233,6 +421,7 @@
         var recent=EVENTS.filter(function(e){return e.detected_at&&new Date(e.detected_at).getTime()>=cutoff;});
         countUp(document.getElementById('statWeek'),recent.length);
         renderMomentum();
+        renderTicker();
         populateFilters();
         render();
       }).catch(function(){
@@ -477,6 +666,7 @@
     }
 
     function render(){
+      renderChips();
       if(TAB==='events')return renderEvents();
       if(TAB==='people')return renderPeople();
       return renderCompanies();
@@ -501,6 +691,7 @@
         return av<bv?-1*s.dir:av>bv?1*s.dir:0;
       });
       document.getElementById('resultCount').textContent=EVENTS.length?rows.length+' of '+EVENTS.length:'';
+      LAST_ROWS.events=rows;
       if(!rows.length){
         document.getElementById('tableWrap-events').innerHTML='<div class="jc-empty">'+(EVENTS.length?'No matches.':'No job changes tracked yet.')+'</div>';
         return;
@@ -514,9 +705,11 @@
         +'<th onclick="sortBy(\'detected_at\')">Detected</th>'
         +'</tr></thead>';
       var cutoff=Date.now()-7*86400000;
+      var freshCutoff=Date.now()-48*3600000;
       var body='<tbody>'+rows.map(function(e,i){
         var hot=e.detected_at&&new Date(e.detected_at).getTime()>=cutoff;
-        return '<tr class="jc-row-in" style="animation-delay:'+Math.min(i*25,400)+'ms">'
+        var fresh=e.detected_at&&new Date(e.detected_at).getTime()>=freshCutoff;
+        return '<tr class="jc-row-in'+(fresh?' jc-fresh':'')+'" data-idx="'+i+'" style="animation-delay:'+Math.min(i*25,400)+'ms">'
           +'<td><div class="jc-person"><div class="jc-avatar ev">'+esc(initials(e.person_name))+'</div>'
           +'<span class="jc-name">'+esc(e.person_name||'Unknown')+'</span>'
           +(e.linkedin_url?'<a class="jc-li" href="'+esc(e.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
@@ -551,6 +744,7 @@
         return av<bv?-1*s.dir:av>bv?1*s.dir:0;
       });
       document.getElementById('resultCount').textContent=TRACKED.contacts.length?rows.length+' of '+TRACKED.contacts.length:'';
+      LAST_ROWS.people=rows;
       if(!rows.length){
         document.getElementById('tableWrap-people').innerHTML='<div class="jc-empty">'+(TRACKED.contacts.length?'No matches.':'No tracked contacts found — check that the roster sheet is shared with the platform.')+'</div>';
         return;
@@ -563,7 +757,7 @@
         +'<th onclick="sortBy(\'city\')">Location</th>'
         +'</tr></thead>';
       var body='<tbody>'+rows.map(function(c,i){
-        return '<tr class="jc-row-in" style="animation-delay:'+Math.min(i*12,400)+'ms">'
+        return '<tr class="jc-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*12,400)+'ms">'
           +'<td><div class="jc-person"><div class="jc-avatar roster">'+esc(initials(c.name))+'</div>'
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
           +'<div class="jc-muted" style="font-size:11px">'+esc(c.title||'')+'</div></div>'
@@ -600,6 +794,7 @@
         return av<bv?-1*s.dir:av>bv?1*s.dir:0;
       });
       document.getElementById('resultCount').textContent=TRACKED.companies.length?rows.length+' of '+TRACKED.companies.length:'';
+      LAST_ROWS.companies=rows;
       if(!rows.length){
         document.getElementById('tableWrap-companies').innerHTML='<div class="jc-empty">'+(TRACKED.companies.length?'No matches.':'No tracked companies found — check that the roster sheet is shared with the platform.')+'</div>';
         return;
@@ -612,8 +807,8 @@
         +'<th onclick="sortBy(\'total_funding\')">Funding</th>'
         +'</tr></thead>';
       var body='<tbody>'+rows.map(function(c,i){
-        return '<tr class="jc-row-in" style="animation-delay:'+Math.min(i*12,400)+'ms">'
-          +'<td><div class="jc-person"><div class="jc-avatar-sq">'+esc((c.name||'?')[0].toUpperCase())+'</div>'
+        return '<tr class="jc-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*12,400)+'ms">'
+          +'<td><div class="jc-person">'+logoAvatar(c.website,(c.name||'?')[0].toUpperCase())
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
           +(c.website?'<div class="jc-muted" style="font-size:11px">'+esc(c.website.replace(/^https?:\/\//,''))+'</div>':'')+'</div>'
           +(c.linkedin_url?'<a class="jc-li" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
