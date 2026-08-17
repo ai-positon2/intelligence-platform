@@ -68,11 +68,6 @@ body {
 .sync-btn.spinning .sync-icon { animation: spin 1s linear infinite; }
 @keyframes spin { to{transform:rotate(360deg)} }
 
-.context-banner { display: flex; align-items: center; gap: 10px; background: rgba(245,166,35,.06); border: 1px solid rgba(245,166,35,.16); border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 26px; font-size: 13px; color: #d8c9a8; flex-wrap: wrap; }
-.context-banner strong { color: #ffce7a; }
-.cb-pills { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
-.cb-pill { padding: 2px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; background: rgba(245,166,35,.12); border: 1px solid rgba(245,166,35,.25); color: #f5a623; }
-
 /* Stats */
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gutter); margin-bottom: 24px; }
 .stat-card { background: rgba(16,13,11,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); padding: 20px 22px; position: relative; overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease, border-color .2s, box-shadow .2s; cursor: pointer; will-change: transform; }
@@ -103,6 +98,23 @@ body {
 .sc-events .stat-hint    { color: #fcd34d; }
 .sc-week .stat-hint      { color: #fda4af; }
 
+/* Momentum + Top Industries charts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gutter); margin-bottom: 24px; }
+.card-head { padding: 16px 22px 14px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.card-title { font-size: 13px; font-weight: 700; color: #f1eee8; display: flex; align-items: center; gap: 8px; }
+.card-meta { font-size: 11px; color: #6b6680; }
+.card-body { padding: 18px 22px; }
+.bar-list { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { display: flex; align-items: center; gap: 10px; }
+.bar-name { font-size: 11.5px; color: #c9c4d6; width: 132px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 6px; background: rgba(255,255,255,.06); border-radius: var(--radius-pill); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: var(--radius-pill); width: 0%; transition: width .8s cubic-bezier(.34,.6,.6,1); }
+.bar-fill.ev-fill { background: linear-gradient(90deg,#f5a623,#fb7185); }
+.bar-fill.roster-fill { background: linear-gradient(90deg,#7c83f5,#9b87fd); }
+.bar-num { font-size: 11.5px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
+.bar-num.ev-num { color: #fcd34d; }
+.bar-num.roster-num { color: #b9bdff; }
+
 /* Tabs + toolbar */
 .card { background: rgba(16,13,11,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; }
 .card.visible { opacity: 1; transform: translateY(0); }
@@ -120,6 +132,13 @@ body {
 .search-box:focus-within { border-color: rgba(245,166,35,.4); }
 .search-box input { flex: 1; background: none; border: none; outline: none; color: #e2e8f0; font-family: inherit; font-size: 13.5px; }
 .search-box input::placeholder { color: #55506a; }
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-select { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; color: #c9c4d6; font-family: inherit; outline: none; cursor: pointer; transition: border-color .15s, background .15s; max-width: 170px; }
+.filter-select:hover { background: rgba(255,255,255,.08); }
+.filter-select:focus { border-color: rgba(245,166,35,.4); }
+.filter-select option { background: #17130f; color: #e2e8f0; }
+.clear-btn { padding: 7px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,.1); background: transparent; color: #6b6680; font-size: 11.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.clear-btn:hover { border-color: rgba(239,68,68,.4); color: #f87171; }
 .result-count { font-size: 11.5px; color: #6b6680; white-space: nowrap; }
 .sync-msg { font-size: 12px; color: #6b6680; white-space: nowrap; }
 .sync-msg.err { color: #f87171; }
@@ -185,12 +204,18 @@ html,body{scrollbar-width:thin}
 [data-theme="light"] .ph h1 { color: #241c15 !important; }
 [data-theme="light"] .ph p { color: #6b6252 !important; }
 [data-theme="light"] .eyebrow { color: #b5560a !important; }
-[data-theme="light"] .context-banner { color: #6b4a1e !important; background: rgba(245,166,35,.09) !important; }
-[data-theme="light"] .context-banner strong { color: #b5560a !important; }
 [data-theme="light"] .stat-card,[data-theme="light"] .card { background: #fff !important; border-color: rgba(36,28,21,.1) !important; }
 [data-theme="light"] .stat-label { color: #8a8070 !important; }
 [data-theme="light"] .search-box { background: #fff !important; border-color: rgba(36,28,21,.12) !important; }
 [data-theme="light"] .search-box input { color: #241c15 !important; }
+[data-theme="light"] .filter-select { background: #fff !important; border-color: rgba(36,28,21,.12) !important; color: #4a4436 !important; }
+[data-theme="light"] .filter-select option { background: #fff !important; color: #241c15 !important; }
+[data-theme="light"] .clear-btn { border-color: rgba(36,28,21,.12) !important; color: #8a8070 !important; }
+[data-theme="light"] .card-title { color: #241c15 !important; }
+[data-theme="light"] .card-meta { color: #8a8070 !important; }
+[data-theme="light"] .card-head { border-bottom-color: rgba(36,28,21,.08) !important; }
+[data-theme="light"] .bar-name { color: #5c5344 !important; }
+[data-theme="light"] .bar-track { background: rgba(36,28,21,.08) !important; }
 [data-theme="light"] table.jc-table thead th { background: #fff !important; color: #8a8070 !important; }
 [data-theme="light"] table.jc-table tbody tr:hover { background: rgba(245,166,35,.06) !important; }
 [data-theme="light"] .jc-name,[data-theme="light"] .jc-role { color: #241c15 !important; }
