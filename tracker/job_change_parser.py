@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 _HEADER_RE = re.compile(r"^We found \*someone\* who recently changed their job", re.I)
 _FIELD_LINE_RE = re.compile(r"^>\s*\*([^*]+?)\*:?\s*(.*)$")
 _LINK_RE = re.compile(r"<([^|>]*)(?:\|([^>]*))?>")
+_EMOJI_SHORTCODE_RE = re.compile(r":[a-z0-9_+\-]+:")
 _CONTACT_ID_RE = re.compile(r"/contacts/([a-f0-9]+)", re.I)
 _ACCOUNT_ID_RE = re.compile(r"/accounts/([a-f0-9]+)", re.I)
 _TRAILING_NOISE = {"see contact button"}
@@ -41,6 +42,21 @@ _MULTILINE_FIELDS = {"company description"}
 def _links(value: str) -> list[tuple[str, str | None]]:
     return [(url.strip(), (label.strip() if label is not None else None))
             for url, label in _LINK_RE.findall(value)]
+
+
+def _clean_slack_text(value: str) -> str:
+    """Strips Slack mrkdwn from free-text fields (only "company description"
+    today): "<url|label>" -> "label" (or the bare url if there's no label),
+    ":emoji_shortcode:" -> removed, then whitespace is collapsed. Apollo's
+    own company-description text sometimes embeds these verbatim -- e.g.
+    ":globe_with_meridians: <http://x.com|x.com>" -- and without this the
+    raw mrkdwn leaked straight into the UI."""
+    value = _LINK_RE.sub(lambda m: m.group(2) if m.group(2) else m.group(1), value)
+    value = _EMOJI_SHORTCODE_RE.sub("", value)
+    value = re.sub(r"[ \t]+", " ", value)
+    value = re.sub(r" *\n *", "\n", value)
+    value = re.sub(r"\n{3,}", "\n\n", value)
+    return value.strip()
 
 
 def _clean_plain(value: str) -> str | None:
@@ -104,7 +120,7 @@ def parse_job_change_message(text: str, message_ts: str, permalink: str = "") ->
         "new_company_name": company_name,
         "apollo_account_id": account_id,
         "company_industry": _clean_plain(fields.get("company industry", "")),
-        "company_description": _clean_plain(fields.get("company description", "")),
+        "company_description": _clean_plain(_clean_slack_text(fields.get("company description", ""))),
         "city": _clean_plain(fields.get("city", "")),
         "employees": _clean_plain(fields.get("# employees", "")),
         "revenue": _clean_plain(fields.get("revenue", "")),

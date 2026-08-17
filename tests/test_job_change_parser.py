@@ -124,6 +124,23 @@ def test_trailing_see_contact_button_footer_is_not_folded_into_the_description()
     assert "see contact button" not in event["company_description"].lower()
 
 
+def test_slack_mrkdwn_is_stripped_from_the_company_description():
+    text = _message([
+        ">*Name:* <https://x/#/contacts/hhh888|Priya> <https://x/#/contacts/hhh888|Rao>",
+        ">*Title:* VP Partnerships",
+        ">*Company:* <https://x/#/accounts/iii999|Gamma Health>",
+        ">*Company industry:* hospital & health care",
+        ">*Company description: *Think Growth :globe_with_meridians: <http://gamma.com|gamma.com> | <http://gamma.ai|gamma.ai>",
+        ">*City:* Boston",
+        ">*# Employees:* 300",
+        ">*Revenue:* $40M",
+        ">*LinkedIn*: <http://www.linkedin.com/in/priyarao>",
+        ">*Current job start date:* May 01, 2026",
+    ])
+    event = parse_job_change_message(text, _TS)
+    assert event["company_description"] == "Think Growth gamma.com | gamma.ai"
+
+
 def test_a_non_job_change_message_returns_none():
     assert parse_job_change_message("Just a regular reply from a teammate.", _TS) is None
     assert parse_job_change_message("<@U123|Ebin V Edison> has joined the channel", _TS) is None

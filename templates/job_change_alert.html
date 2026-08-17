@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=3">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=4">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -248,17 +248,27 @@
     function logoAvatar(website, letter, extraClass){
       var d=domainFromUrl(website);
       return '<div class="jc-avatar-sq'+(extraClass?' '+extraClass:'')+'">'+esc(letter)
-        +(d?'<img class="jc-logo-img" src="https://logo.clearbit.com/'+esc(d)+'?size=64" loading="lazy" onerror="this.remove()">':'')
+        +(d?'<img class="jc-logo-img" src="https://logo.clearbit.com/'+esc(d)+'?size=128" loading="lazy" onerror="this.remove()">':'')
         +'</div>';
     }
+    function logoIcon(website){
+      var d=domainFromUrl(website);
+      return d?'<img class="jc-logo-inline" src="https://logo.clearbit.com/'+esc(d)+'?size=32" loading="lazy" onerror="this.remove()">':'';
+    }
+    function trackedCompanyWebsite(name){
+      if(!name||!TRACKED||!TRACKED.companies)return '';
+      var n=String(name).trim().toLowerCase();
+      var hit=TRACKED.companies.filter(function(c){return (c.name||'').trim().toLowerCase()===n;})[0];
+      return hit?hit.website:'';
+    }
 
-    /* ── Detail drawer ───────────────────────────────────────────────────── */
+    /* ── Detail modal ────────────────────────────────────────────────────── */
     function drw(label,val){
       if(val==null||val==='')return '';
-      return '<div class="drw-row"><span class="drw-label">'+esc(label)+'</span><span class="drw-value">'+val+'</span></div>';
+      return '<div class="drw-cell"><span class="drw-label">'+esc(label)+'</span><span class="drw-value">'+val+'</span></div>';
     }
-    function drwSection(label,rowsHtml){
-      return rowsHtml?'<div class="drw-section-label">'+esc(label)+'</div>'+rowsHtml:'';
+    function drwSection(label,cellsHtml){
+      return cellsHtml?'<div class="drw-section-label">'+esc(label)+'</div><div class="drw-grid">'+cellsHtml+'</div>':'';
     }
     function drwLinks(links){
       var html=(links||[]).filter(function(l){return l&&l.href;}).map(function(l){
@@ -274,18 +284,13 @@
     }
     function drawerEvent(e){
       var avatar='<div class="jc-avatar ev drw-avatar">'+esc(initials(e.person_name))+'</div>';
-      var sub=esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+esc(e.new_company_name)+'</span>':'');
+      var companyWebsite=trackedCompanyWebsite(e.new_company_name);
+      var sub=esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+logoIcon(companyWebsite)+esc(e.new_company_name)+'</span>':'');
       var detected=e.detected_at?relTime(e.detected_at)+' · '+new Date(e.detected_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
       return drwHead(avatar,e.person_name,sub)
         +'<div class="drw-body">'
-        +'<div class="drw-section-label">Job change</div>'
-        +drw('Started',esc(e.job_start_date))
-        +drw('Detected',esc(detected))
-        +'<div class="drw-section-label">Company</div>'
-        +drw('Industry',esc(e.company_industry))
-        +drw('Employees',fmtNum(e.employees))
-        +drw('Revenue',esc(e.revenue))
-        +drw('Location',esc(e.city))
+        +drwSection('Job change', drw('Started',esc(e.job_start_date))+drw('Detected',esc(detected)))
+        +drwSection('Company', drw('Industry',esc(e.company_industry))+drw('Employees',fmtNum(e.employees))+drw('Revenue',esc(e.revenue))+drw('Location',esc(e.city)))
         +(e.company_description?'<div class="drw-section-label">About</div><p class="drw-desc">'+esc(e.company_description)+'</p>':'')
         +drwLinks([{href:e.linkedin_url,label:'LinkedIn profile'},{href:e.slack_permalink,label:'Original alert'}])
         +'</div>';
@@ -295,13 +300,8 @@
       var badge=c.seniority?'<div style="margin-top:8px"><span class="jc-badge '+seniorityClass(c.seniority)+'">'+esc(c.seniority)+'</span></div>':'';
       return drwHead(avatar,c.name,esc(c.title||'—'),badge)
         +'<div class="drw-body">'
-        +'<div class="drw-section-label">Role</div>'
-        +drw('Company',esc(c.company))
-        +drw('Department',esc(c.department))
-        +'<div class="drw-section-label">Company</div>'
-        +drw('Industry',esc(c.industry))
-        +drw('Employees',fmtNum(c.employees))
-        +drw('Location',esc([c.city,c.state].filter(Boolean).join(', ')))
+        +drwSection('Role', drw('Company',logoIcon(c.website)+esc(c.company))+drw('Department',esc(c.department)))
+        +drwSection('Company', drw('Industry',esc(c.industry))+drw('Employees',fmtNum(c.employees))+drw('Location',esc([c.city,c.state].filter(Boolean).join(', '))))
         +drwLinks([{href:c.linkedin_url,label:'LinkedIn profile'},{href:c.company_linkedin_url,label:'Company LinkedIn'},{href:c.website,label:'Website'}])
         +'</div>';
     }
@@ -309,9 +309,7 @@
       var avatar=logoAvatar(c.website,(c.name||'?')[0].toUpperCase(),'drw-avatar');
       return drwHead(avatar,c.name,esc(c.industry||'—'))
         +'<div class="drw-body">'
-        +'<div class="drw-section-label">Company</div>'
-        +drw('Employees',fmtNum(c.employees))
-        +drw('Location',esc([c.city,c.state,c.country].filter(Boolean).join(', ')))
+        +drwSection('Company', drw('Employees',fmtNum(c.employees))+drw('Location',esc([c.city,c.state,c.country].filter(Boolean).join(', '))))
         +drwSection('Financials',
             drw('Annual revenue',c.annual_revenue?fmtMoney(c.annual_revenue):'')
             +drw('Total funding',c.total_funding?fmtMoney(c.total_funding):'')
@@ -323,9 +321,12 @@
       var item=LAST_ROWS[tab]&&LAST_ROWS[tab][idx];
       if(!item)return;
       var html=tab==='events'?drawerEvent(item):tab==='people'?drawerPerson(item):drawerCompany(item);
+      var d=document.getElementById('drawer');
       document.getElementById('drawerBody').innerHTML=html;
-      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerBody').scrollTop=0;
+      d.className='jc-drawer type-'+tab;
       document.getElementById('drawerOverlay').classList.add('open');
+      requestAnimationFrame(function(){ d.classList.add('open'); });
       document.body.style.overflow='hidden';
     }
     function closeDrawer(){
@@ -714,7 +715,7 @@
           +'<span class="jc-name">'+esc(e.person_name||'Unknown')+'</span>'
           +(e.linkedin_url?'<a class="jc-li" href="'+esc(e.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
           +'</div></td>'
-          +'<td class="jc-role">'+esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+esc(e.new_company_name)+'</span>':'')+'</td>'
+          +'<td class="jc-role">'+esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+logoIcon(trackedCompanyWebsite(e.new_company_name))+esc(e.new_company_name)+'</span>':'')+'</td>'
           +'<td class="jc-muted">'+esc(e.company_industry||'—')+'</td>'
           +'<td class="jc-muted">'+esc(e.city||'—')+'</td>'
           +'<td class="jc-muted">'+esc(e.job_start_date||'—')+'</td>'
@@ -763,7 +764,7 @@
           +'<div class="jc-muted" style="font-size:11px">'+esc(c.title||'')+'</div></div>'
           +(c.linkedin_url?'<a class="jc-li" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
           +'</div></td>'
-          +'<td class="jc-role">'+esc(c.company||'—')+'</td>'
+          +'<td class="jc-role">'+logoIcon(c.website)+esc(c.company||'—')+'</td>'
           +'<td>'+(c.seniority?'<span class="jc-badge '+seniorityClass(c.seniority)+'">'+esc(c.seniority)+'</span>':'<span class="jc-muted">—</span>')+'</td>'
           +'<td class="jc-muted">'+esc(c.department||'—')+'</td>'
           +'<td class="jc-muted">'+esc([c.city,c.state].filter(Boolean).join(', ')||'—')+'</td>'
