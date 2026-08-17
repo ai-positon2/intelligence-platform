@@ -298,7 +298,7 @@ intelligence-platform/
 - **`p2_vid` stitching:** Page Views and both login tabs carry a visitor-id column.
 - **Surface 2, `/app`:** shell `app_base.html`, `APP_AGENTS` cards (minus `HIDDEN_AGENT_SLUGS`), 3 wired to live seo-apps tools plus LSR (currently hidden), the rest request-access-only. Per-agent `lock_label` and `no_request` keys control the locked-card CTA, enforced server-side too.
 - **Surface 1, public site:** one template `agents.html`, `{% if page %}` chain.
-- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (+ Contact Finder, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-strategy-researcher), `/p2/seo` + tools (16 now), `/p2/accounts` + signal trackers, `/p2/playbook`, admin dashboards.
+- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (+ Contact Finder, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-strategy-researcher), `/p2/seo` + tools (16 now), `/p2/abm-signal-tracker/accounts` + signal trackers, `/p2/playbook`, admin dashboards.
 
 **Agent roster hazard, still live, and this cycle proved it again:** the roster exists in **three independent lists** (`AGENTS`, `APP_AGENTS`, and a JS array in `templates/context.html`), plus the internal SEO Suite tools list, plus now `HIDDEN_AGENT_SLUGS` as a fourth cross-cutting mechanism. **Nothing derives one from another.** The LSR hide this cycle needed edits in the set AND two hand-written HTML spots precisely because of this; expect the same friction on the next roster change.
 
