@@ -170,6 +170,29 @@ def test_a_companies_search_that_returns_nothing_bills_zero(client, monkeypatch,
     assert "credits" not in d
 
 
+# ── 1c. A clamped funding bound (real Apollo ceiling, confirmed live against a
+# real account with a real key) is reported to the user, not answered silently
+
+def test_a_clamped_funding_bound_is_reported_in_the_search_response(client, monkeypatch, apollo_key):
+    def fake_search_companies(filters, api_key, page=1, per_page=25, meta=None, **kw):
+        if meta is not None:
+            meta["funding_value_clamped"] = ["total_funding_range"]
+        return [{"id": "o1", "name": "Acme"}]
+    monkeypatch.setattr(ac, "search_companies", fake_search_companies)
+    r = client.post(_SEARCH, json={"entity": "companies",
+                                   "filters": {"total_funding_min": 5_000_000_000}})
+    d = r.get_json()
+    assert d["funding_value_clamped"] is True
+
+
+def test_no_clamp_flag_when_nothing_was_clamped(client, monkeypatch, apollo_key):
+    monkeypatch.setattr(ac, "search_companies", lambda *a, **kw: [{"id": "o1", "name": "Acme"}])
+    r = client.post(_SEARCH, json={"entity": "companies",
+                                   "filters": {"total_funding_min": 1_000_000}})
+    d = r.get_json()
+    assert "funding_value_clamped" not in d
+
+
 # ── 1b. A credit already spent survives a later failure in the same request ─
 
 def test_a_credit_spent_resolving_a_company_name_is_reported_even_if_the_search_then_fails(

@@ -735,6 +735,9 @@ window.cpiRunSearch = function(reset){
       });
       toast(parts.join(" "), "err");
     }
+    if(d && d.funding_value_clamped){
+      toast("A funding amount was larger than Apollo can filter on, so it was capped at the largest figure Apollo supports.", "err");
+    }
     var items=(d&&d.results)||[];
     /* Advance only when a page actually came back, so Load more fetches the NEXT
        page instead of re-fetching page 1 and appending duplicate cards (which on
