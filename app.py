@@ -538,7 +538,7 @@ AGENTS = [
         "slug": "signal-tracker", "name": "ABM Signal Tracker", "role": "Account Intent Monitoring",
         "badge": "CORE", "cat": "Signals", "accent": "#a78bfa", "metric": "26 signal types \u00b7 scored weekly",
         "icon": _svg('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>'),
-        "summary": "Always-on monitoring for your target-account universe. Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week.",
+        "summary": "Always-on monitoring for your target-account universe. ABM Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week.",
         "benefit": "You never miss the moment an account becomes ready. The most urgent opportunities rise to the top automatically - no manual list-scrubbing.",
         "how": "It ingests curated, authenticated high-tier sources plus open-web news, scores each event as type_weight x severity x recency (with a bonus when signals stack), keeps a rolling 90-day window, and ships a weekly digest.",
         "who": "Demand-gen and sales teams running account-based programs.",
@@ -1484,7 +1484,7 @@ APP_AGENTS = [
         "tagline": "Account Intent Monitoring",
         "ac": "#a78bfa", "ac2": "#818cf8", "icon": _asvg("<path d=\"M3 3v18h18\"/><path d=\"M7 14l4-4 3 3 5-6\"/>"),
         "pill1": "Account Intent Monitoring", "pill2": "26 signal types \u00b7 scored weekly",
-        "lead": ("Always-on monitoring for your target-account universe. Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week."),
+        "lead": ("Always-on monitoring for your target-account universe. ABM Signal Tracker watches for every buying signal, scores each one, and resurfaces the highest-intent companies every week."),
         "trips": [
             {"t": "What it does", "d": "You never miss the moment an account becomes ready. The most urgent opportunities rise to the top automatically \u2014 no manual list-scrubbing."},
             {"t": "How it works", "d": "It ingests curated, authenticated high-tier sources plus open-web news, scores each event as type_weight \u00d7 severity \u00d7 recency (with a bonus when signals stack), keeps a rolling 90-day window, and ships a weekly digest."},
@@ -3911,7 +3911,7 @@ def seo_tool(tool_slug: str):
         accent="#34d399",
     )
 
-# ── Company Signal Tracker ───────────────────────────────────────────────────────
+# ── ABM Signal Tracker ────────────────────────────────────────────────────────
 @app.route("/p2/accounts")
 @position2_required
 def accounts():
@@ -13927,7 +13927,7 @@ def _read_last_refreshed(path: Path) -> str:
         return "unknown"
 
 
-# Every Signal Tracker dashboard is a self-contained HTML file whose build script
+# Every ABM Signal Tracker dashboard is a self-contained HTML file whose build script
 # stamps meta.total_companies into the embedded payload, so the file itself knows
 # how many companies it tracks. Reading that back is how any surface can quote a
 # company count without hardcoding one that goes stale the next time a dashboard
@@ -14193,7 +14193,7 @@ CHATBOT_FUNCTIONS = [
     {
         "name": "get_signal_tracker",
         "description": (
-            "Get buying signals from the Signal Tracker — companies showing funding rounds, "
+            "Get buying signals from the ABM Signal Tracker — companies showing funding rounds, "
             "C-suite changes, M&A, news mentions, or IPO signals. "
             "Use for: prospect intelligence, hot accounts, recent high signals, outbound prioritization."
         ),
@@ -14281,7 +14281,7 @@ tracks competitor ads and AI-answer-engine brand visibility, and runs a suite of
 
 THREE SURFACES: (1) public marketing site, logged out; (2) /app member workspace, any signed-in Google
 account, curated SEO/GEO agents + saved run history; (3) /p2/* internal staff app, @position2.com only
-(this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/Signal Tracker, Admin dashboards.
+(this chat lives here) — Hub, GTM tools, SEO Studio, Accounts/ABM Signal Tracker, Admin dashboards.
 
 ANONYMOUS VISITORS (de-anonymisation engine, /p2/admin/anonymous-traffic, /p2/b2b-agents/anonymous-visitors):
 Identifies which COMPANIES (not usually individual people) visit the Position2 site, by fusing three
@@ -14295,7 +14295,7 @@ co-op — anonymous browsing is never matched to a named person. Company firmogr
 sources (the company's own homepage schema.org/meta data, tech-stack fingerprinting, SEC EDGAR for public
 filers); a paid Apollo.io lookup only runs on explicit request (the "Enrich further" button) to control cost.
 
-SIGNAL TRACKER (Accounts / Signal Tracker dashboards, /p2/accounts, /p2/signal-tracker/<account>):
+ABM SIGNAL TRACKER (Accounts / ABM Signal Tracker dashboards, /p2/accounts, /p2/signal-tracker/<account>):
 Monitors named company lists per client account (Healthcare and CSG) for buying signals: funding rounds,
 leadership changes, M&A, IPO activity, product launches, partnerships, hiring surges, and general news.
 Each signal has a severity (HIGH/MEDIUM/LOW) and an importance score = signal type weight x severity x
@@ -14451,13 +14451,13 @@ def _build_ppc_context() -> str:
     except Exception as e:
         parts.append(f"=== ANONYMOUS VISITORS ===\n⚠ Could not fetch: {e}")
 
-    # ── 2. Signal Tracker — ALL signals, no limit, BOTH accounts ──────────
+    # ── 2. ABM Signal Tracker — ALL signals, no limit, BOTH accounts ──────
     import sqlite3 as _sql
     for _acct_label, _db_name in (("Healthcare", "tracker.db"), ("CSG", "tracker_csg_v2.db")):
         try:
             db_path = Path(__file__).parent / "data" / _db_name
             if not db_path.exists():
-                parts.append(f"=== SIGNAL TRACKER ({_acct_label}) ===\n⚠ Database not on Railway — commit data/{_db_name} to git")
+                parts.append(f"=== ABM SIGNAL TRACKER ({_acct_label}) ===\n⚠ Database not on Railway — commit data/{_db_name} to git")
                 continue
 
             conn = _sql.connect(str(db_path))
@@ -14493,7 +14493,7 @@ def _build_ppc_context() -> str:
             sig_note = f" — showing newest {len(sig_lines)} of {sig_total}" if len(sig_lines) < sig_total else ""
 
             parts.append(
-                f"=== SIGNAL TRACKER ({_acct_label} — {comp_count} companies with signals) ===\n"
+                f"=== ABM SIGNAL TRACKER ({_acct_label} — {comp_count} companies with signals) ===\n"
                 f"Total signals: {len(all_sigs)}\n"
                 f"By type: {sig_counts}\n\n"
                 f"--- ALL SIGNALS (newest first{sig_note}) ---\n"
@@ -14501,7 +14501,7 @@ def _build_ppc_context() -> str:
             )
 
         except Exception as e:
-            parts.append(f"=== SIGNAL TRACKER ({_acct_label}) ===\n⚠ Could not fetch: {e}")
+            parts.append(f"=== ABM SIGNAL TRACKER ({_acct_label}) ===\n⚠ Could not fetch: {e}")
 
     # ── 3. Ad Intelligence — ALL ads ─────────────────────────────────────
     try:
@@ -14667,7 +14667,7 @@ DATA SECTION RULES — NEVER MIX THESE:
 - Asked about COMPANIES → use SECTION A only. Columns: Company Name, Website, Industry, Location, Employees, Revenue. Never include individual people names.
 - Asked about VISITORS/PEOPLE → use SECTION B only. Columns: Name, Title, Company Website, Industry, Location, Date Visited.
 - "last 10 companies" = first 10 rows of SECTION A. "last 10 visitors" = first 10 rows of SECTION B.
-- Signal Tracker data is per client account (Healthcare, CSG) — never mix companies from one account into the other.
+- ABM Signal Tracker data is per client account (Healthcare, CSG) — never mix companies from one account into the other.
 
 CSV/EXCEL EXPORT RULES:
 - Output ONLY the CSV rows. No intro text, no explanation, no markdown fences, no code blocks.
@@ -14871,7 +14871,7 @@ def ppc_upload():
 
 
 
-# ── Signal Tracker Insights API ──────────────────────────────────────────────
+# ── ABM Signal Tracker Insights API ──────────────────────────────────────────
 
 _REVENUE_KEYS = {"est_value", "opportunity", "revenue_impact", "pipeline_estimate",
                  "estimated_value", "pipeline_value", "deal_size", "contract_value"}

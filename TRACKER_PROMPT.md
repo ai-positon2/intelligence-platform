@@ -1,4 +1,4 @@
-# Claude Code Prompt — Company Signal Tracker (CSV-Based)
+# Claude Code Prompt — ABM Signal Tracker (CSV-Based)
 
 Paste everything below this line into Claude Code:
 
@@ -6,7 +6,7 @@ Paste everything below this line into Claude Code:
 
 ## TASK
 
-Rebuild the company signal tracker from scratch using a provided CSV file as the company source instead of Apollo search. The CSV file is called `apollo-accounts-export.csv` and is already in the project folder.
+Rebuild the ABM signal tracker from scratch using a provided CSV file as the company source instead of Apollo search. The CSV file is called `apollo-accounts-export.csv` and is already in the project folder.
 
 ---
 
@@ -141,7 +141,7 @@ Build `reports/dashboard.html` as a **single self-contained HTML file** with an 
 **Layout:** Full-width, responsive, sidebar + main content
 
 ### SECTION 1 — TOP NAVIGATION BAR
-- Logo/title: "Signal Tracker" with a pulse animation dot
+- Logo/title: "ABM Signal Tracker" with a pulse animation dot
 - Last updated timestamp
 - Total companies tracked count
 - "Run Now" button (triggers `python main.py` via a note that this is manual)

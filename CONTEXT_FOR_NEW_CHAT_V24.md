@@ -214,7 +214,7 @@ An agent whose entire backend lives on a third-party AI app-builder platform we 
 Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scraper.html`; all content drawn client-side by `static/js/linkedin.js`. One row per person x post engagement, header-mapped.
 
 - `_fetch_linkedin_intel_data(force, sheet_id)` with **per-sheet caches** so internal and each client portal read independent sheets.
-- **Do not confuse** LinkedIn Intelligence (your own engagement data from a Sheet) with LinkedIn Strategy Researcher (external competitive analysis, currently hidden from listings) or with the Signal Tracker's own News Mention/Partnership categories.
+- **Do not confuse** LinkedIn Intelligence (your own engagement data from a Sheet) with LinkedIn Strategy Researcher (external competitive analysis, currently hidden from listings) or with the ABM Signal Tracker's own News Mention/Partnership categories.
 
 ---
 
@@ -243,7 +243,7 @@ intelligence-platform/
 │                            routes and _cpi_* helpers, marketing routes, /api/demo-request,
 │                            /api/track|atrack|identify|whoami, /app/* + run history,
 │                            /p2/* + admin analytics, client-portal routes, LinkedIn Intelligence
-│                            (per-sheet), Postgres history. Does NOT build Signal Tracker
+│                            (per-sheet), Postgres history. Does NOT build ABM Signal Tracker
 │                            dashboards, just serves the pre-built HTML.
 ├── tracker/apollo_client.py ← Apollo API client, 971 lines: search_people, search_companies,
 │                            all filter-building + domain/industry enforcement logic (see
@@ -367,7 +367,7 @@ intelligence-platform/
 13. **`data/identity_graph.db` is on Railway's ephemeral disk.** Move to a persistent volume or Postgres.
 14. **Cold-visitor identification** needs a licensed identity feed. Plug point ready.
 15. **Light-theme polish** on heavy custom inline pages.
-16. **Signal Tracker maintenance mode:** periodically prune `data/northstar_signals_manual.json` by `signal_date` and re-run `seed_northstar_signals.py --prune`.
+16. **ABM Signal Tracker maintenance mode:** periodically prune `data/northstar_signals_manual.json` by `signal_date` and re-run `seed_northstar_signals.py --prune`.
 17. **Advisory security/design audit (do not start without an explicit ask):** fail-closed `SECRET_KEY`/`GOOGLE_CLIENT_ID`, cookie flags, HSTS/security headers, CSRF, rate limiting, SSRF/`X-Forwarded-For` hardening; CSS token convergence, accessibility.
 
 ---

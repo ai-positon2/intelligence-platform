@@ -1,4 +1,4 @@
-name: Weekly Company Signal Tracker
+name: Weekly ABM Signal Tracker
 
 on:
   schedule:

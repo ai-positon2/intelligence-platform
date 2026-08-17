@@ -1,4 +1,4 @@
-# Company Signal Tracker
+# ABM Signal Tracker
 
 Automated weekly tracker that monitors healthcare company signals from Apollo.io and fires structured alerts to Slack and Google Sheets.
 
@@ -69,7 +69,7 @@ This repo is the single source for the Position² Intelligence Platform.
 .                      Flask backend (app.py), serves everything
 ad_intelligence/       Built Ad Intelligence app (served at /ppc/ad-intelligence) — committed
 apps/ad-intelligence/  Ad Intelligence React/Vite SOURCE (build target of the above)
-reports/               Prebuilt Signal Tracker dashboards
+reports/               Prebuilt ABM Signal Tracker dashboards
 data/                  SQLite signal databases
 tracker/               Signal ingestion pipeline
 scripts/build-frontend.sh   Builds apps/ad-intelligence -> ad_intelligence/ (+ re-injects Vimi chat widget)

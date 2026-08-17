@@ -1,4 +1,4 @@
-"""Company Signal Tracker's account picker (/p2/accounts, templates/accounts.html).
+"""ABM Signal Tracker's account picker (/p2/accounts, templates/accounts.html).
 
 Reported live via screenshot: with exactly three accounts (Healthcare, CSG,
 NorthStar Anesthesia), the card grid showed two cards on the first row and the

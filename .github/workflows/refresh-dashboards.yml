@@ -1,4 +1,4 @@
-name: Refresh Signal Tracker dashboards
+name: Refresh ABM Signal Tracker dashboards
 
 # One-click refresh of BOTH accounts: fetch latest signals, rebuild the
 # dashboards while preserving every Vimi customization, prune irrelevant news,
@@ -73,6 +73,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to publish."
           else
-            git commit -m "data: refresh Signal Tracker dashboards [skip ci]"
+            git commit -m "data: refresh ABM Signal Tracker dashboards [skip ci]"
             git push
           fi
