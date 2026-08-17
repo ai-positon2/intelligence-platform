@@ -3899,6 +3899,133 @@ def job_change_alert_sync():
         result = {}
     return jsonify({"ok": True, **result})
 
+
+# ── Job Change Alert: tracked contacts/companies watchlist ───────────────────
+# The roster of who Apollo's job-change workflow is watching (not the events
+# themselves) -- a manually-maintained Google Sheet: "Contact List (Being
+# Monitored)" (header on row 5) + "Tracked Companies" (header on row 1).
+# Header-name-driven column mapping since teammates reorder/add columns here
+# routinely (same convention as _chatbot_get_anonymous_visitors).
+JOB_CHANGE_TRACKED_SHEET_ID = "1PNacfeTu86QAc3ukje9yGUBYoxKxNCcx0b6odUq8SP4"
+_JOB_CHANGE_TRACKED_CACHE = {"data": None, "ts": 0.0}
+_JOB_CHANGE_TRACKED_GZ = {"ts": None, "raw": b"", "gz": b""}
+_JOB_CHANGE_TRACKED_CACHE_TTL = 300  # seconds
+
+
+def _jc_header_map(header_row):
+    """{lowercased header name: column index}, skipping blank headers."""
+    return {str(h).strip().lower(): i for i, h in enumerate(header_row) if str(h).strip()}
+
+
+def _jc_col(row, idx, default=""):
+    if idx is None or len(row) <= idx or row[idx] in (None, ""):
+        return default
+    return row[idx]
+
+
+def _fetch_job_change_tracked_data(force: bool = False) -> dict:
+    """Fetch the tracked-contacts/tracked-companies watchlist (TTL-cached).
+
+    Best-effort: any failure (missing GOOGLE_SA_JSON, sheet not shared with
+    the service account, network error) returns empty lists rather than
+    raising -- this is a "who's tracked" panel, not the primary Job Change
+    Alert feed, so it must never break the page."""
+    now = time.time()
+    cache = _JOB_CHANGE_TRACKED_CACHE
+    if not force and cache["data"] is not None and (now - cache["ts"]) < _JOB_CHANGE_TRACKED_CACHE_TTL:
+        return cache["data"]
+
+    def _fetch(tab_range):
+        try:
+            svc = _sheets_service()
+            r = svc.spreadsheets().values().get(
+                spreadsheetId=JOB_CHANGE_TRACKED_SHEET_ID, range=tab_range).execute()
+            return r.get("values", [])
+        except Exception as e:
+            log.warning("job_change tracked-sheet read failed (%s): %s", tab_range, e)
+            return []
+
+    contact_rows = _fetch("'Contact List (Being Monitored)'!A5:BZ2000")
+    company_rows = _fetch("'Tracked Companies'!A1:BZ2000")
+
+    contacts = []
+    if len(contact_rows) > 1:
+        hdr = _jc_header_map(contact_rows[0])
+        for row in contact_rows[1:]:
+            name = (_jc_col(row, hdr.get("first name")) + " " + _jc_col(row, hdr.get("last name"))).strip()
+            if not name:
+                continue
+            contacts.append({
+                "name": name,
+                "title": _jc_col(row, hdr.get("title")),
+                "company": _jc_col(row, hdr.get("company name")),
+                "seniority": _jc_col(row, hdr.get("seniority")),
+                "department": _jc_col(row, hdr.get("departments")),
+                "industry": _jc_col(row, hdr.get("industry")),
+                "employees": _jc_col(row, hdr.get("# employees")),
+                "city": _jc_col(row, hdr.get("city")),
+                "state": _jc_col(row, hdr.get("state")),
+                "linkedin_url": _jc_col(row, hdr.get("person linkedin url")),
+                "company_linkedin_url": _jc_col(row, hdr.get("company linkedin url")),
+                "website": _jc_col(row, hdr.get("website")),
+            })
+
+    companies = []
+    if len(company_rows) > 1:
+        hdr = _jc_header_map(company_rows[0])
+        for row in company_rows[1:]:
+            name = _jc_col(row, hdr.get("company name"))
+            if not name:
+                continue
+            companies.append({
+                "name": name,
+                "industry": _jc_col(row, hdr.get("industry")),
+                "employees": _jc_col(row, hdr.get("# employees")),
+                "website": _jc_col(row, hdr.get("website")),
+                "linkedin_url": _jc_col(row, hdr.get("company linkedin url")),
+                "city": _jc_col(row, hdr.get("city")),
+                "state": _jc_col(row, hdr.get("state")),
+                "country": _jc_col(row, hdr.get("country")),
+                "annual_revenue": _jc_col(row, hdr.get("annual revenue")),
+                "total_funding": _jc_col(row, hdr.get("total funding")),
+                "latest_funding": _jc_col(row, hdr.get("latest funding")),
+            })
+
+    contacts.sort(key=lambda c: c["name"])
+    companies.sort(key=lambda c: c["name"])
+
+    result = {
+        "contacts": contacts,
+        "companies": companies,
+        "totals": {"contacts": len(contacts), "companies": len(companies)},
+        "fetched_at": datetime.now(timezone.utc).isoformat() if (contacts or companies) else None,
+    }
+    cache["data"] = result
+    cache["ts"] = now
+    return result
+
+
+@app.route("/p2/b2b-agents/job-change-alert/tracked")
+@position2_required
+def job_change_alert_tracked():
+    """JSON data endpoint for the "who's tracked" roster (gzipped, cached)."""
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    data = _fetch_job_change_tracked_data(force=force)
+    gz = _JOB_CHANGE_TRACKED_GZ
+    if gz["ts"] != _JOB_CHANGE_TRACKED_CACHE["ts"]:
+        gz["raw"] = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        gz["gz"] = gzip.compress(gz["raw"], 6)
+        gz["ts"] = _JOB_CHANGE_TRACKED_CACHE["ts"]
+    use_gz = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    resp = make_response(gz["gz"] if use_gz else gz["raw"])
+    resp.headers["Content-Type"] = "application/json"
+    resp.headers["Cache-Control"] = "private, max-age=60"
+    resp.headers["Vary"] = "Accept-Encoding"
+    if use_gz:
+        resp.headers["Content-Encoding"] = "gzip"
+    return resp
+
+
 _SEO_TOOLS_FALLBACK = [
     {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",         "desc": "AI-powered keyword shortlisting",              "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
     {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",         "desc": "Competitor-based content briefs",              "icon": "🔎", "tags": ["Content", "SERP"]},
