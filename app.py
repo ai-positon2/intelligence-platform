@@ -7584,6 +7584,21 @@ def _cpi_oai():
     return OpenAI(api_key=key, timeout=45.0, max_retries=1)
 
 
+def _cpi_anthropic():
+    """A configured Anthropic client, or None when this environment has no key.
+
+    Purely an optional second opinion on the OpenAI intent parse (see
+    _cpi_verify_intent_with_claude below) -- every caller must degrade to the
+    original, unverified intent when this is absent, exactly like the rest of
+    Contact Finder degrades when OPENAI_API_KEY is missing.
+    """
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        return None
+    from anthropic import Anthropic
+    return Anthropic(api_key=key, timeout=45.0, max_retries=1)
+
+
 def _cpi_search_no_match_note(filters: dict, resolved_names, api_key: str, spend: dict):
     """When a people search scoped to ONE company and a specific title comes
     back with nothing, "no matches" is not the most honest available answer:
@@ -10389,7 +10404,8 @@ def cpi_parse_query():
     keeps it an accelerator rather than a black box, and it is why this returns
     filters rather than results.
 
-    Costs an OpenAI call and 0 Apollo credits.
+    Costs an OpenAI call and 0 Apollo credits (plus an optional Claude call, see
+    _cpi_verify_intent_with_claude, when ANTHROPIC_API_KEY is configured).
     """
     email = ((_get_user() or {}).get("email") or "").lower()
     if _cpi_rate_limited("parse-query", email):
@@ -10414,6 +10430,7 @@ def cpi_parse_query():
         return jsonify({"filters": {}, "error": "Could not read that query."})
     if not isinstance(intent, dict):
         return jsonify({"filters": {}})
+    intent = _cpi_verify_intent_with_claude(text, intent)
     out = _cpi_filters_from_intent(intent)
     kind = str(intent.get("intent") or "")
     # _CPI_INTENT_SYSTEM's taxonomy is shared with the chat feature and has no
@@ -10905,6 +10922,81 @@ _CPI_INTENT_SYSTEM = (
     "healthcare\") or any count question, \"company_info\" for questions about a company itself "
     "(\"tell me about Acme\", \"how big is Acme\"), and \"unclear\" if there isn't enough to act on."
 )
+
+# ── A second model checking the first one's homework ─────────────────────────
+# _CPI_INTENT_SYSTEM above already spells out, in prose, the exact three mistakes
+# a live user hit in one afternoon: a numeric bucket that didn't actually satisfy
+# the stated cutoff, a seniority word ("top executives") echoed back into
+# keywords as though it were a literal phrase to match, and a person_locations
+# value silently dropped. That prompt fix closes each case IT NAMES, but a
+# single model call can still mis-follow instructions on a case it doesn't -- the
+# next bug in this family will not be one this prompt already describes, or it
+# would already be fixed. A second, independently-trained model reading the same
+# request and the first model's answer catches slips the first model's own
+# re-reading of its own prompt cannot: it has no stake in having been right the
+# first time.
+_CPI_INTENT_VERIFY_SYSTEM = (
+    _CPI_INTENT_SYSTEM +
+    "\n\n---\n\nYou are not extracting from scratch. Another model already read the "
+    "schema above and produced a JSON extraction for the same request; you are "
+    "reviewing ITS answer, not writing your own from nothing. You will be given "
+    "the request (and, if this is one turn of a longer conversation, the turns "
+    "before it) plus the extracted JSON.\n\n"
+    "Check specifically for the mistakes this pipeline has actually shipped with: "
+    "a keyword or filter value that is not really in the request (most often a "
+    "seniority/role word like \"executives\" or \"leadership\" echoed into "
+    "keywords, which belongs only in seniorities), a location or other criterion "
+    "the request stated but the extraction dropped, or a numeric bound "
+    "(employee_min/max, revenue_min/max) that does not match what the request "
+    "actually said (\"more than 500\" must produce employee_min 500, not some "
+    "other cutoff).\n\n"
+    "A field left blank is not automatically wrong: the request may simply not "
+    "mention it, or an earlier conversation turn may already supply it. Only "
+    "change a field when the request (read together with the conversation so "
+    "far) clearly supports a different value -- when unsure, leave the "
+    "extraction as it is rather than guessing your own answer over it.\n\n"
+    "Return the corrected JSON object in the exact same schema, with every key "
+    "the original had. If the extraction was already correct, return it "
+    "unchanged."
+)
+
+
+def _cpi_verify_intent_with_claude(text: str, intent: dict, context: str = "") -> dict:
+    """A second opinion on an already-extracted _CPI_INTENT_SYSTEM JSON, from a
+    different model family, checking specifically for the failure modes real
+    users have already hit (see _CPI_INTENT_VERIFY_SYSTEM above).
+
+    `context` is the conversation so far, for chat's multi-turn callsite --
+    without it, a field correctly left blank because an earlier turn already
+    supplied it (a pinned company, a carried-over title) reads to Claude as a
+    dropped field and gets "corrected" into something wrong. Fill-filters has
+    no conversation, so it passes none.
+
+    Best-effort only, by design: no ANTHROPIC_API_KEY configured, a network
+    failure, a non-JSON or non-object reply all just return the ORIGINAL intent
+    untouched. A second opinion this function cannot trust is exactly the same
+    as not having one -- never a reason to break the first model's working
+    answer or to surface a new failure mode of its own.
+    """
+    client = _cpi_anthropic()
+    if client is None:
+        return intent
+    payload = {"request": text, "extracted": intent}
+    if context:
+        payload["conversation_so_far"] = context
+    try:
+        resp = client.messages.create(
+            model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+            max_tokens=700,
+            system=_CPI_INTENT_VERIFY_SYSTEM,
+            messages=[{"role": "user", "content": json.dumps(payload)}])
+        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        fixed = json.loads(raw)
+    except Exception as e:
+        log.warning("cpi intent cross-check failed, keeping the original: %s", e)
+        return intent
+    return fixed if isinstance(fixed, dict) else intent
+
 
 _CPI_RESEARCH_SYSTEM = (
     "You are a B2B research analyst with live web search. ANSWER THE EXACT QUESTION "
@@ -12953,6 +13045,12 @@ def cpi_chat():
     except Exception as e:
         log.warning("cpi chat intent parse failed: %s", e)
         return jsonify({"answer": "I couldn't understand that, try rephrasing."})
+    if not isinstance(intent, dict):
+        return jsonify({"answer": "I couldn't understand that, try rephrasing."})
+    history_text = "\n".join(
+        f"{h.get('role')}: {h.get('content')}" for h in history[-12:]
+        if h.get("role") in ("user", "assistant") and h.get("content"))
+    intent = _cpi_verify_intent_with_claude(message, intent, context=history_text)
 
     kind = str(intent.get("intent") or "unclear")
     company_name = str(intent.get("company_name") or "").strip()
