@@ -91,9 +91,9 @@ def test_the_client_only_dashboard_is_not_double_counted():
 # ── The accounts page still reads its own per-universe count ────────────────
 
 def test_each_account_card_still_shows_that_universes_own_count(client):
-    """/p2/accounts prints a count per card, and it shares the reading code with the
-    new total. The refactor must not have turned those into dashes."""
-    body = client.get("/p2/accounts").get_data(as_text=True)
+    """/p2/abm-signal-tracker/accounts prints a count per card, and it shares the reading
+    code with the new total. The refactor must not have turned those into dashes."""
+    body = client.get("/p2/abm-signal-tracker/accounts").get_data(as_text=True)
     for cfg in appmod.ACCOUNTS.values():
         n = appmod._company_count(cfg["dashboard"])
         assert "<span>%d</span> companies" % n in body

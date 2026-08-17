@@ -2016,7 +2016,7 @@ document.addEventListener("click",function(e){if(!e.target.closest||!e.target.cl
     </button>
   </div>
   <div class="sidebar-footer" style="margin-top:0">
-    <a href="/accounts" class="sidebar-switch-btn">
+    <a href="/p2/abm-signal-tracker/accounts" class="sidebar-switch-btn">
       <span style="font-size:14px">⇄</span> Switch Account
     </a>
     <div class="sidebar-user">
@@ -4760,7 +4760,7 @@ var STEPS=['Vimi is reading the signals…','Cross-referencing companies and pat
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ini(n){return (n||'?').split(/\s+/).map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
-function acct(){var m=window.location.pathname.match(/\/(?:dashboard|signal-tracker)\/([^\/]+)/);return m?m[1]:'healthcare';}
+function acct(){var m=window.location.pathname.match(/\/(?:dashboard|abm-signal-tracker|signal-tracker)\/([^\/]+)/);return m?m[1]:'healthcare';}
 function liCo(co){return 'https://www.linkedin.com/search/results/companies/?keywords='+encodeURIComponent(co);}
 function liPpl(co){return 'https://www.linkedin.com/search/results/people/?company='+encodeURIComponent(co)+'&keywords=CMO+CEO+VP+Marketing+CTO';}
 function tCls(t){t=(t||'').toLowerCase();return t.indexOf('today')>-1?'ir9-t-now':t.indexOf('week')>-1?'ir9-t-week':'ir9-t-email';}
@@ -6171,13 +6171,13 @@ window.irCopy=function(btn,text){
     setTimeout(function(){el.querySelectorAll('.sgx-bar-fill[data-w]').forEach(function(b){b.style.width=b.getAttribute('data-w')+'%';});},90);
   }
   /* URL routing */
-  function curAcct(){var m=location.pathname.match(/\/(?:dashboard|signal-tracker)\/([^\/]+)/);return m?m[1]:'';}
+  function curAcct(){var m=location.pathname.match(/\/(?:dashboard|abm-signal-tracker|signal-tracker)\/([^\/]+)/);return m?m[1]:'';}
   function sectionFromPath(){var m=location.pathname.match(/\/(?:dashboard|signal-tracker)\/[^\/]+\/([^\/?#]+)/);return m?m[1]:'';}
   var _origSS=window.showSection;
   if(typeof _origSS==='function'){
     window.showSection=function(name,btn){
       _origSS(name,btn);
-      if(VALID[name]){var base='/signal-tracker/'+curAcct();var url=(name==='overview')?base:base+'/'+name;try{history.replaceState(null,'',url);}catch(e){}}
+      if(VALID[name]){var base='/p2/abm-signal-tracker/'+curAcct();var url=(name==='overview')?base:base+'/'+name;try{history.replaceState(null,'',url);}catch(e){}}
       if(name==='signals')renderSig();
     };
   }

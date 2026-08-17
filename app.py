@@ -3631,9 +3631,6 @@ _P2_LEGACY_RULES = [
     ("/gtm/linkedin-scraper",                         "p2legacy_linkedin"),
     ("/seo",                                          "p2legacy_seo"),
     ("/seo/<tool_slug>",                              "p2legacy_seo_tool"),
-    ("/accounts",                                     "p2legacy_accounts"),
-    ("/signal-tracker/<account_id>",                  "p2legacy_st"),
-    ("/signal-tracker/<account_id>/<section>",        "p2legacy_st_section"),
     ("/admin/usage",                                  "p2legacy_admin_usage"),
     ("/admin/usage/data",                             "p2legacy_admin_usage_data"),
     ("/admin/visitors",                               "p2legacy_admin_visitors"),
@@ -3643,6 +3640,20 @@ _P2_LEGACY_RULES = [
 ]
 for _rule, _endpoint in _P2_LEGACY_RULES:
     app.add_url_rule(_rule, _endpoint, _p2_relocate_redirect)
+
+# These two moved a second time (/p2/accounts -> /p2/abm-signal-tracker/accounts, same for
+# /p2/signal-tracker/*) after already being relocated once above, so a generic "/p2" + path
+# rewrite would bounce through the now-old /p2 path as an extra redirect hop. Point them
+# straight at the current canonical URL instead.
+@app.route("/accounts")
+def p2legacy_accounts():
+    return redirect("/p2/abm-signal-tracker/accounts", code=301)
+
+@app.route("/signal-tracker/<account_id>")
+@app.route("/signal-tracker/<account_id>/<section>")
+def p2legacy_st(account_id: str, section: str = None):
+    target = "/p2/abm-signal-tracker/" + account_id + (("/" + section) if section else "")
+    return redirect(target, code=301)
 
 @app.route("/p2")
 @app.route("/p2/")
@@ -3912,14 +3923,20 @@ def seo_tool(tool_slug: str):
     )
 
 # ── ABM Signal Tracker ────────────────────────────────────────────────────────
-@app.route("/p2/accounts")
+@app.route("/p2/abm-signal-tracker/accounts")
 @position2_required
 def accounts():
     cards_html = "".join(_build_account_card(aid, cfg) for aid, cfg in ACCOUNTS.items())
     return render_template("accounts.html", user=_get_user(), account_cards=cards_html)
 
-@app.route("/p2/signal-tracker/<account_id>")
-@app.route("/p2/signal-tracker/<account_id>/<section>")
+@app.route("/p2/accounts")
+@position2_required
+def accounts_legacy():
+    """Back-compat: old /p2/accounts URL redirects to canonical /p2/abm-signal-tracker/accounts."""
+    return redirect("/p2/abm-signal-tracker/accounts", code=301)
+
+@app.route("/p2/abm-signal-tracker/<account_id>")
+@app.route("/p2/abm-signal-tracker/<account_id>/<section>")
 @position2_required
 def dashboard(account_id: str, section: str = None):
     cfg = ACCOUNTS.get(account_id)
@@ -3932,6 +3949,14 @@ def dashboard(account_id: str, section: str = None):
     resp.headers.update({"Cache-Control": "no-cache, no-store, must-revalidate",
                          "Pragma": "no-cache", "Expires": "0"})
     return resp
+
+@app.route("/p2/signal-tracker/<account_id>")
+@app.route("/p2/signal-tracker/<account_id>/<section>")
+@position2_required
+def dashboard_legacy_p2(account_id: str, section: str = None):
+    """Back-compat: old /p2/signal-tracker/* URLs redirect to canonical /p2/abm-signal-tracker/*."""
+    target = "/p2/abm-signal-tracker/" + account_id + (("/" + section) if section else "")
+    return redirect(target, code=301)
 
 @app.after_request
 def _no_html_cache(resp):
@@ -3992,8 +4017,8 @@ def _compress_response(resp):
 @app.route("/dashboard/<account_id>/<section>")
 @position2_required
 def dashboard_legacy(account_id: str, section: str = None):
-    """Back-compat: old /dashboard/* URLs redirect to canonical /signal-tracker/*."""
-    target = "/p2/signal-tracker/" + account_id + (("/" + section) if section else "")
+    """Back-compat: old /dashboard/* URLs redirect to canonical /abm-signal-tracker/*."""
+    target = "/p2/abm-signal-tracker/" + account_id + (("/" + section) if section else "")
     return redirect(target, code=301)
 
 @app.route("/api/whoami")
@@ -13889,7 +13914,7 @@ def _build_account_card(account_id, cfg):
         count = _read_company_count(path)
         refreshed = _read_last_refreshed(path)
         return (
-            f'<a class="card" href="/signal-tracker/{account_id}" '
+            f'<a class="card" href="/p2/abm-signal-tracker/{account_id}" '
             f'style="--accent:{accent};--glow:rgba(99,102,241,.25);'
             f'--thumb:{thumb};--accent-text:{accent}">'
             f'<div class="card-band"></div>'
@@ -14295,7 +14320,7 @@ co-op — anonymous browsing is never matched to a named person. Company firmogr
 sources (the company's own homepage schema.org/meta data, tech-stack fingerprinting, SEC EDGAR for public
 filers); a paid Apollo.io lookup only runs on explicit request (the "Enrich further" button) to control cost.
 
-ABM SIGNAL TRACKER (Accounts / ABM Signal Tracker dashboards, /p2/accounts, /p2/signal-tracker/<account>):
+ABM SIGNAL TRACKER (Accounts / ABM Signal Tracker dashboards, /p2/abm-signal-tracker/accounts, /p2/abm-signal-tracker/<account>):
 Monitors named company lists per client account (Healthcare and CSG) for buying signals: funding rounds,
 leadership changes, M&A, IPO activity, product launches, partnerships, hiring surges, and general news.
 Each signal has a severity (HIGH/MEDIUM/LOW) and an importance score = signal type weight x severity x
