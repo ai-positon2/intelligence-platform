@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=2">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -62,12 +62,6 @@
       {% endif %}
     </div>
 
-    <div class="context-banner">
-      <span>🚀</span>
-      <span><strong>Apollo</strong> detects the move, <strong>Slack</strong> delivers the alert, this page keeps the history.</span>
-      <div class="cb-pills"><span class="cb-pill">Apollo</span><span class="cb-pill">Slack</span><span class="cb-pill">Sheets</span></div>
-    </div>
-
     <div class="stats-row">
       <div class="stat-card sc-events" id="scEvents" onclick="switchTab('events')">
         <div class="sc-glow"></div>
@@ -95,6 +89,23 @@
       </div>
     </div>
 
+    <div class="grid-2">
+      <div class="card" id="momentumCard">
+        <div class="card-head">
+          <span class="card-title">📈 Weekly Momentum</span>
+          <span class="card-meta">job changes detected, last 8 weeks</span>
+        </div>
+        <div class="card-body" id="momentumBody"><div class="skel" style="height:150px"></div></div>
+      </div>
+      <div class="card" id="industriesCard">
+        <div class="card-head">
+          <span class="card-title">🏭 Top Industries Tracked</span>
+          <span class="card-meta">by tracked-contact count</span>
+        </div>
+        <div class="card-body" id="industriesBody"><div class="skel" style="height:150px"></div></div>
+      </div>
+    </div>
+
     <div class="card" id="mainCard">
       <div class="tabs">
         <button class="tab-btn active" id="btn-events"    onclick="switchTab('events')">🚀 Recent Job Changes</button>
@@ -106,6 +117,12 @@
         <div class="search-box">
           <span>⌕</span>
           <input id="searchInput" placeholder="Search…" oninput="onSearch()">
+        </div>
+        <div class="filter-row" id="filterRow">
+          <select class="filter-select" id="filter1" onchange="onFilterChange()"></select>
+          <select class="filter-select" id="filter2" onchange="onFilterChange()"></select>
+          <select class="filter-select" id="filter3" onchange="onFilterChange()"></select>
+          <button class="clear-btn" onclick="clearFilters()">✕ Clear</button>
         </div>
         <span class="result-count" id="resultCount"></span>
         <span class="sync-msg" id="syncMsg"></span>
@@ -137,9 +154,10 @@
   <script>
     var TAB = 'events';
     var EVENTS = [];
-    var TRACKED = null;           /* {contacts, companies, totals, fetched_at} — lazy-loaded */
+    var TRACKED = null;           /* {contacts, companies, totals, fetched_at} */
     var TRACKED_LOADING = false;
     var SORT = { events: {key:'detected_at', dir:-1}, people: {key:'name', dir:1}, companies: {key:'name', dir:1} };
+    var FILTERS = { events: {}, people: {}, companies: {} };
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function initials(name){
@@ -192,6 +210,17 @@
       });
     }
 
+    function distinct(arr,key){
+      var set={};
+      (arr||[]).forEach(function(o){var v=String((o&&o[key])||'').trim(); if(v)set[v]=1;});
+      return Object.keys(set).sort();
+    }
+    function distinctSplit(arr,key){
+      var set={};
+      (arr||[]).forEach(function(o){String((o&&o[key])||'').split(',').forEach(function(s){s=s.trim();if(s)set[s]=1;});});
+      return Object.keys(set).sort();
+    }
+
     function loadEvents(){
       fetch('/p2/b2b-agents/job-change-alert/data').then(function(r){return r.json();}).then(function(data){
         EVENTS=data.events||[];
@@ -199,6 +228,8 @@
         var cutoff=Date.now()-7*86400000;
         var recent=EVENTS.filter(function(e){return e.detected_at&&new Date(e.detected_at).getTime()>=cutoff;});
         countUp(document.getElementById('statWeek'),recent.length);
+        renderMomentum();
+        populateFilters();
         render();
       }).catch(function(){
         document.getElementById('tableWrap-events').innerHTML='<div class="jc-empty">Couldn\'t load the job-change feed — try refreshing the page.</div>';
@@ -213,14 +244,105 @@
         TRACKED_LOADING=false;
         countUp(document.getElementById('statPeople'),(data.totals&&data.totals.contacts)||0);
         countUp(document.getElementById('statCompanies'),(data.totals&&data.totals.companies)||0);
+        renderTopIndustries();
+        populateFilters();
         render();
       }).catch(function(){
         TRACKED_LOADING=false;
         TRACKED={contacts:[],companies:[],totals:{contacts:0,companies:0},fetched_at:null};
+        renderTopIndustries();
         ['people','companies'].forEach(function(t){
           document.getElementById('tableWrap-'+t).innerHTML='<div class="jc-empty">Couldn\'t load the tracked roster — check that the sheet is shared with the platform.</div>';
         });
       });
+    }
+
+    function renderMomentum(){
+      var body=document.getElementById('momentumBody');
+      if(!EVENTS.length){body.innerHTML='<div class="jc-empty" style="padding:24px">No job changes tracked yet.</div>';return;}
+      var now=Date.now(), counts=new Array(8).fill(0), labels=[];
+      for(var i=7;i>=0;i--){
+        var start=new Date(now-i*7*86400000);
+        labels.push((start.getMonth()+1)+'/'+start.getDate());
+      }
+      EVENTS.forEach(function(e){
+        if(!e.detected_at)return;
+        var days=Math.floor((now-new Date(e.detected_at).getTime())/86400000);
+        var idx=7-Math.floor(days/7);
+        if(idx>=0&&idx<8)counts[idx]++;
+      });
+      var max=Math.max.apply(null,counts.concat([1]));
+      body.innerHTML='<div class="bar-list">'+labels.map(function(lbl,i){
+        var pct=Math.round(counts[i]/max*100);
+        return '<div class="bar-row"><span class="bar-name">Week of '+esc(lbl)+'</span><div class="bar-track"><div class="bar-fill ev-fill" style="width:'+pct+'%"></div></div><span class="bar-num ev-num">'+counts[i]+'</span></div>';
+      }).join('')+'</div>';
+    }
+
+    function renderTopIndustries(){
+      var body=document.getElementById('industriesBody');
+      var contacts=(TRACKED&&TRACKED.contacts)||[];
+      if(!contacts.length){body.innerHTML='<div class="jc-empty" style="padding:24px">No roster data yet.</div>';return;}
+      var counts={};
+      contacts.forEach(function(c){var v=(c.industry||'').trim(); if(v)counts[v]=(counts[v]||0)+1;});
+      var top=Object.keys(counts).map(function(k){return [k,counts[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+      if(!top.length){body.innerHTML='<div class="jc-empty" style="padding:24px">No industry data.</div>';return;}
+      var max=top[0][1];
+      body.innerHTML='<div class="bar-list">'+top.map(function(t){
+        var pct=Math.round(t[1]/max*100);
+        return '<div class="bar-row"><span class="bar-name">'+esc(t[0])+'</span><div class="bar-track"><div class="bar-fill roster-fill" style="width:'+pct+'%"></div></div><span class="bar-num roster-num">'+t[1]+'</span></div>';
+      }).join('')+'</div>';
+    }
+
+    function getFilterConfig(tab){
+      if(tab==='events'){
+        return [
+          {key:'industry',   label:'All Industries', options:distinct(EVENTS,'company_industry')},
+          {key:'timeframe',  label:'All Time', raw:true, options:[['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days']]}
+        ];
+      }
+      var t=TRACKED||{contacts:[],companies:[]};
+      if(tab==='people'){
+        return [
+          {key:'seniority',  label:'All Seniority',   options:distinct(t.contacts,'seniority')},
+          {key:'department', label:'All Departments', options:distinctSplit(t.contacts,'department')},
+          {key:'state',      label:'All Locations',   options:distinct(t.contacts,'state')}
+        ];
+      }
+      return [
+        {key:'industry', label:'All Industries', options:distinct(t.companies,'industry')},
+        {key:'size',     label:'All Sizes', raw:true, options:[['<200','<200 employees'],['200-999','200–999 employees'],['1000+','1000+ employees']]},
+        {key:'state',    label:'All Locations', options:distinct(t.companies,'state')}
+      ];
+    }
+
+    function populateFilters(){
+      var cfg=getFilterConfig(TAB);
+      ['filter1','filter2','filter3'].forEach(function(id,i){
+        var sel=document.getElementById(id), f=cfg[i];
+        if(!f){sel.style.display='none';sel.removeAttribute('data-key');sel.innerHTML='';return;}
+        sel.style.display='';
+        sel.setAttribute('data-key',f.key);
+        var cur=FILTERS[TAB][f.key]||'';
+        var opts='<option value="">'+esc(f.label)+'</option>';
+        (f.options||[]).forEach(function(o){
+          var val=f.raw?o[0]:o, lbl=f.raw?o[1]:o;
+          opts+='<option value="'+esc(val)+'"'+(cur===val?' selected':'')+'>'+esc(lbl)+'</option>';
+        });
+        sel.innerHTML=opts;
+      });
+    }
+    function onFilterChange(){
+      ['filter1','filter2','filter3'].forEach(function(id){
+        var sel=document.getElementById(id), key=sel.getAttribute('data-key');
+        if(key)FILTERS[TAB][key]=sel.value;
+      });
+      render();
+    }
+    function clearFilters(){
+      FILTERS[TAB]={};
+      document.getElementById('searchInput').value='';
+      populateFilters();
+      render();
     }
 
     function switchTab(tab){
@@ -234,7 +356,8 @@
         tab==='events' ? 'Search by name, title, or company…' :
         tab==='people' ? 'Search tracked people by name, title, or company…' :
                           'Search tracked companies by name or industry…';
-      if(tab!=='events')loadTracked();
+      loadTracked();
+      populateFilters();
       render();
     }
     function onSearch(){ render(); }
@@ -252,9 +375,16 @@
 
     function renderEvents(){
       var q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+      var f=FILTERS.events;
       var rows=EVENTS.filter(function(e){
-        if(!q)return true;
-        return [e.person_name,e.new_title,e.new_company_name,e.city].join(' ').toLowerCase().indexOf(q)>=0;
+        if(q&&[e.person_name,e.new_title,e.new_company_name,e.city].join(' ').toLowerCase().indexOf(q)<0)return false;
+        if(f.industry&&e.company_industry!==f.industry)return false;
+        if(f.timeframe){
+          if(!e.detected_at)return false;
+          var days=(Date.now()-new Date(e.detected_at).getTime())/86400000;
+          if(days>parseInt(f.timeframe,10))return false;
+        }
+        return true;
       });
       var s=SORT.events;
       rows.sort(function(a,b){
@@ -295,9 +425,16 @@
     function renderPeople(){
       if(!TRACKED){document.getElementById('tableWrap-people').innerHTML='<div class="jc-loading">Loading the tracked-contacts roster…</div>';return;}
       var q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+      var f=FILTERS.people;
       var rows=TRACKED.contacts.filter(function(c){
-        if(!q)return true;
-        return [c.name,c.title,c.company,c.industry].join(' ').toLowerCase().indexOf(q)>=0;
+        if(q&&[c.name,c.title,c.company,c.industry].join(' ').toLowerCase().indexOf(q)<0)return false;
+        if(f.seniority&&c.seniority!==f.seniority)return false;
+        if(f.department){
+          var depts=String(c.department||'').split(',').map(function(s){return s.trim();});
+          if(depts.indexOf(f.department)<0)return false;
+        }
+        if(f.state&&c.state!==f.state)return false;
+        return true;
       });
       var s=SORT.people;
       rows.sort(function(a,b){
@@ -335,9 +472,18 @@
     function renderCompanies(){
       if(!TRACKED){document.getElementById('tableWrap-companies').innerHTML='<div class="jc-loading">Loading the tracked-companies roster…</div>';return;}
       var q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+      var f=FILTERS.companies;
       var rows=TRACKED.companies.filter(function(c){
-        if(!q)return true;
-        return [c.name,c.industry,c.city].join(' ').toLowerCase().indexOf(q)>=0;
+        if(q&&[c.name,c.industry,c.city].join(' ').toLowerCase().indexOf(q)<0)return false;
+        if(f.industry&&c.industry!==f.industry)return false;
+        if(f.size){
+          var n=parseFloat(String(c.employees||'').replace(/[^0-9.]/g,''));
+          if(f.size==='<200'&&!(n<200))return false;
+          if(f.size==='200-999'&&!(n>=200&&n<1000))return false;
+          if(f.size==='1000+'&&!(n>=1000))return false;
+        }
+        if(f.state&&c.state!==f.state)return false;
+        return true;
       });
       var s=SORT.companies;
       rows.sort(function(a,b){
@@ -390,7 +536,9 @@
     }
 
     revealCards();
+    populateFilters();
     loadEvents();
+    loadTracked();
   </script>
 
 <script>
