@@ -130,10 +130,27 @@ def test_rows_with_no_name_are_dropped(monkeypatch):
     assert len(data["companies"]) == 1
 
 
-def test_degrades_to_empty_lists_when_sheets_service_fails(monkeypatch):
+def test_falls_back_to_committed_snapshot_when_sheets_service_fails(monkeypatch):
+    """The live sheet is currently unreachable (blocked by a Workspace
+    external-sharing policy -- see the project_job_change_alert memory), so
+    this is the realistic production path, not just a theoretical one."""
     def boom():
         raise RuntimeError("GOOGLE_SA_JSON env var not set")
     monkeypatch.setattr(appmod, "_sheets_service", boom)
+
+    data = appmod._fetch_job_change_tracked_data(force=True)
+
+    assert data["totals"] == {"contacts": 673, "companies": 274}
+    assert data["fetched_at"] is not None
+    assert any(c["name"] == "Aaron Roose" for c in data["contacts"])
+    assert any(c["name"] == "314e Corporation" for c in data["companies"])
+
+
+def test_degrades_to_empty_lists_when_sheets_and_snapshot_both_fail(monkeypatch, tmp_path):
+    def boom():
+        raise RuntimeError("GOOGLE_SA_JSON env var not set")
+    monkeypatch.setattr(appmod, "_sheets_service", boom)
+    monkeypatch.setattr(appmod, "JOB_CHANGE_TRACKED_SNAPSHOT_PATH", tmp_path / "does-not-exist.json")
 
     data = appmod._fetch_job_change_tracked_data(force=True)
 
@@ -141,6 +158,19 @@ def test_degrades_to_empty_lists_when_sheets_service_fails(monkeypatch):
         "contacts": [], "companies": [],
         "totals": {"contacts": 0, "companies": 0}, "fetched_at": None,
     }
+
+
+def test_snapshot_fallback_is_independent_per_list(monkeypatch):
+    """If contacts come back live but companies don't (or vice versa), only
+    the empty side should fall back -- the two lists shouldn't be coupled."""
+    fake = FakeSheetsService({CONTACT_RANGE: CONTACT_ROWS, COMPANY_RANGE: []})
+    monkeypatch.setattr(appmod, "_sheets_service", lambda: fake)
+
+    data = appmod._fetch_job_change_tracked_data(force=True)
+
+    assert data["totals"]["contacts"] == 1  # from the live (mocked) sheet, not the snapshot
+    assert data["contacts"][0]["name"] == "Dillon Mullaney"
+    assert data["totals"]["companies"] == 274  # fell back to the snapshot
 
 
 def test_second_call_within_ttl_is_served_from_cache(monkeypatch):

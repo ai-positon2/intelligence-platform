@@ -3907,9 +3907,27 @@ def job_change_alert_sync():
 # Header-name-driven column mapping since teammates reorder/add columns here
 # routinely (same convention as _chatbot_get_anonymous_visitors).
 JOB_CHANGE_TRACKED_SHEET_ID = "1PNacfeTu86QAc3ukje9yGUBYoxKxNCcx0b6odUq8SP4"
+# Fallback snapshot: a Position2 Workspace external-sharing policy currently blocks
+# sharing the sheet above with the platform's service account (confirmed 2026-08-17),
+# so the live read below comes back empty. Until that's fixed, fall back to this
+# committed .xlsx-derived snapshot -- see scripts/import_job_change_tracked_snapshot.py.
+JOB_CHANGE_TRACKED_SNAPSHOT_PATH = Path(__file__).parent / "data" / "job_change_tracked_snapshot.json"
 _JOB_CHANGE_TRACKED_CACHE = {"data": None, "ts": 0.0}
 _JOB_CHANGE_TRACKED_GZ = {"ts": None, "raw": b"", "gz": b""}
 _JOB_CHANGE_TRACKED_CACHE_TTL = 300  # seconds
+
+
+def _load_job_change_tracked_snapshot():
+    """Best-effort load of the committed .xlsx-derived snapshot. Returns
+    (contacts, companies), both empty on any failure -- this is a fallback
+    for a fallback, so it must never raise."""
+    try:
+        with open(JOB_CHANGE_TRACKED_SNAPSHOT_PATH) as f:
+            data = json.load(f)
+        return data.get("contacts", []), data.get("companies", [])
+    except Exception as e:
+        log.warning("job_change tracked-snapshot load failed: %s", e)
+        return [], []
 
 
 def _jc_header_map(header_row):
@@ -3990,6 +4008,13 @@ def _fetch_job_change_tracked_data(force: bool = False) -> dict:
                 "total_funding": _jc_col(row, hdr.get("total funding")),
                 "latest_funding": _jc_col(row, hdr.get("latest funding")),
             })
+
+    if not contacts or not companies:
+        snap_contacts, snap_companies = _load_job_change_tracked_snapshot()
+        if not contacts:
+            contacts = snap_contacts
+        if not companies:
+            companies = snap_companies
 
     contacts.sort(key=lambda c: c["name"])
     companies.sort(key=lambda c: c["name"])
