@@ -666,8 +666,16 @@ start();
 })();</script>
 
 <style>
-/* account cards — larger sizing */
-.grid{grid-template-columns:repeat(auto-fit,minmax(380px,460px));gap:var(--gutter);max-width:1000px}
+/* account cards — larger sizing.
+   minmax(380,460) + max-width:1000 only ever fits 2 columns, so a 3rd (or 5th,
+   7th...) card wraps alone onto its own row, left-anchored with the rest of
+   that row empty -- exactly the "orphan card" look reported live. minmax(*,1fr)
+   lets auto-fit settle on however many columns actually fit the row and then
+   stretch them to share it evenly, so a full last row is either genuinely full
+   or doesn't happen; 320-1fr keeps 3 columns together from ~1000px of
+   available width upward (today's exact card count) while still folding to 2
+   then 1 as the viewport narrows. */
+.grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--gutter);max-width:1240px}
 .card-thumb{height:148px}
 .card-thumb-icon{font-size:56px}
 .card-body{padding:26px 30px 28px}
@@ -684,7 +692,20 @@ start();
 .ac-hero{min-height:0 !important;padding:0}
 .hb-cue,.ac-pintag{display:none !important}
 .ac-motif{display:none !important}           /* remove the trapezoid constellation behind the title */
-.main{padding:56px var(--margin) 44px;max-width:var(--maxw);margin:0 auto}                 /* top-aligned, comfortable spacing */
+.main{padding:56px var(--margin) 44px;max-width:var(--maxw);width:100%;margin:0 auto}      /* top-aligned, comfortable spacing */
+/* width:100% is load-bearing, not decorative: .main is a column-flex item of
+   body with no width of its own, so its box normally takes the auto-min-width
+   fallback -- and the LUX kit's marquee band (a non-wrapping, width:max-content
+   track meant to scroll infinitely) contributes ITS full un-clipped text width
+   to that fallback despite living inside an overflow:hidden wrapper. The result
+   was .main silently rendering ~40% wider than the viewport, invisible only
+   because body{overflow-x:hidden} clips the overflow rather than showing a
+   scrollbar -- until any child sized as a percentage of .main (the card grid
+   below included) inherited that inflated width and pushed its own content
+   past the visible edge. An explicit width pins .main to its real containing
+   block instead of a content-derived fallback, which is the fix and also
+   closes the door on the same silent inflation happening again from any
+   future .main child. */
 .sub{margin-bottom:0}
 .foot{margin-top:34px}
 </style>
