@@ -78,7 +78,7 @@ def send_weekly_summary(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f":bar_chart: *Weekly Signal Tracker Update*\n\n{summary_line}",
+                "text": f":bar_chart: *Weekly ABM Signal Tracker Update*\n\n{summary_line}",
             },
         },
     ]

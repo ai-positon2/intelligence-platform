@@ -4,7 +4,7 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Company Signal Tracker</title>
+  <title>ABM Signal Tracker</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -157,7 +157,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
       <div class="bc">
         <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
         <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
-        <span class="bc-cur">Signal Tracker</span>
+        <span class="bc-cur">ABM Signal Tracker</span>
       </div>
     </div>
     <div class="user-menu" id="userMenu">
@@ -182,7 +182,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     <div class="pinwrap ac-pin">
     <section class="ac-hero">
     <div class="label">Company Intelligence</div>
-    <h1 class="heading">Company Signal <em>Tracker.</em></h1>
+    <h1 class="heading">ABM Signal <em>Tracker.</em></h1>
     <p class="sub">Choose a company list to open the dashboard</p>
     <div class="hb-cue"><span></span></div>
     </section>
@@ -206,8 +206,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
     {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
     {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
     {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
-    {t:'Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
-    {t:'Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
+    {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/signal-tracker/healthcare',i:'☆'},
+    {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/signal-tracker/csg',i:'☆'},
     {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
     {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
     {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
@@ -606,7 +606,7 @@ d.innerHTML='<svg viewBox="0 0 400 400" aria-hidden="true">'
 +'<g><line class="ac-link" x1="200" y1="200" x2="90" y2="96"/><line class="ac-link" x1="200" y1="200" x2="318" y2="120"/><line class="ac-link" x1="200" y1="200" x2="320" y2="280"/><line class="ac-link" x1="200" y1="200" x2="110" y2="300"/><line class="ac-link" x1="90" y1="96" x2="318" y2="120"/><line class="ac-link" x1="318" y1="120" x2="320" y2="280"/><line class="ac-link" x1="320" y1="280" x2="110" y2="300"/><line class="ac-link" x1="110" y1="300" x2="90" y2="96"/></g>'
 +'<circle class="ac-node" cx="200" cy="200" r="6"/><circle class="ac-node b" cx="90" cy="96" r="4.5"/><circle class="ac-node c" cx="318" cy="120" r="4.5"/><circle class="ac-node" cx="320" cy="280" r="4.5"/><circle class="ac-node b" cx="110" cy="300" r="4.5"/><circle class="ac-node c" cx="250" cy="60" r="3.5"/><circle class="ac-node" cx="60" cy="210" r="3.5"/><circle class="ac-node b" cx="340" cy="200" r="3.5"/></svg>';
 h.insertBefore(d,h.firstChild);}b();})();</script>
-<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Signal Tracker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'ABM Signal Tracker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 
 <style>
 /* accounts scroll-pinned hero */

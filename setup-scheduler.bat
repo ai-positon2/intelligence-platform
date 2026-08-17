@@ -1,6 +1,6 @@
 @echo off
 :: ─────────────────────────────────────────────────────────────────────────────
-::  Signal Tracker — Windows Task Scheduler setup
+::  ABM Signal Tracker — Windows Task Scheduler setup
 ::  Registers a task that runs main.py every Monday at 08:00 AM
 ::  Run this file ONCE as Administrator to register the task.
 :: ─────────────────────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ SET PYTHON=python
 SET SCRIPT=%PROJECT_DIR%\main.py
 
 echo.
-echo Setting up Windows Task Scheduler for Signal Tracker...
+echo Setting up Windows Task Scheduler for ABM Signal Tracker...
 echo Task:    %TASK_NAME%
 echo Runs:    Every Monday at 05:00 PM
 echo Script:  %SCRIPT%

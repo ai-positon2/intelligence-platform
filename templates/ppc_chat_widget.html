@@ -993,7 +993,7 @@ table.k-table{ border-collapse:collapse; width:100%; font-size:11.5px; }
   function stripHtml(el){ return (el.innerText||el.textContent||'').trim(); }
   function stripText(t){ return (''+t).replace(/```vimi-card[\s\S]*?```/g,'').replace(/[*_`#>]/g,'').trim(); }
   function detectExport(m){ m=(m||'').toLowerCase(); if(/excel|xlsx/.test(m)){return 'excel';} if(/\bcsv\b/.test(m)){return 'csv';} if(/\bjson\b/.test(m)){return 'json';} if(/\btable\b|spreadsheet/.test(m)){return 'table';} return null; }
-  function citeify(t){ return t.replace(/\[(Signal Tracker|Visitors|Ad Intelligence|HubSpot|Apollo|Insights|Funding|Search Console)\]/g, function(_,s){ return '<span class="k-cite" title="Source: '+s+'">◆ '+s+'</span>'; }); }
+  function citeify(t){ return t.replace(/\[(ABM Signal Tracker|Signal Tracker|Visitors|Ad Intelligence|HubSpot|Apollo|Insights|Funding|Search Console)\]/g, function(_,s){ return '<span class="k-cite" title="Source: '+s+'">◆ '+s+'</span>'; }); }
   function fmt(t){ if(/```vimi-card/.test(t)){ /* handled after insert */ }
     t=t.replace(/```vimi-card[\s\S]*?```/g,'');
     t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
