@@ -104,6 +104,29 @@ body {
 .card-title { font-size: 13px; font-weight: 700; color: #f1eee8; display: flex; align-items: center; gap: 8px; }
 .card-meta { font-size: 11px; color: #6b6680; }
 .card-body { padding: 18px 22px; }
+
+.delta-badge { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); white-space: nowrap; }
+.delta-badge.up { background: rgba(74,222,128,.13); color: #86efac; }
+.delta-badge.down { background: rgba(239,68,68,.13); color: #fca5a5; }
+.delta-badge.flat { background: rgba(255,255,255,.06); color: #9a94ab; }
+
+.momentum-chart-wrap { position: relative; }
+.momentum-svg { width: 100%; height: 168px; display: block; overflow: visible; }
+.mm-grid-line { stroke: rgba(255,255,255,.06); stroke-width: 1; }
+.mm-area { fill: url(#jcMomentumArea); }
+.mm-line { fill: none; stroke: url(#jcMomentumLine); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 8px rgba(245,166,35,.35)); }
+.mm-dot { fill: #14100c; stroke: url(#jcMomentumLine); stroke-width: 2; transition: r .15s ease; }
+.mm-dot.mm-dot-last { fill: #fb7185; stroke: #fff2ee; }
+.mm-dot.mm-dot-hover { r: 6.5; }
+.mm-dot-glow { fill: #fb7185; opacity: .35; animation: mmPulse 2.4s ease-in-out infinite; }
+@keyframes mmPulse { 0%,100%{ opacity:.22; transform:scale(1); } 50%{ opacity:.42; transform:scale(1.25); } }
+.mm-x-label { font-size: 9.5px; font-family: 'Space Grotesk', sans-serif; fill: #6b6680; }
+.mm-hit { fill: transparent; cursor: pointer; }
+.mm-tooltip { position: absolute; pointer-events: none; background: rgba(20,16,12,.96); border: 1px solid rgba(245,166,35,.3); border-radius: 8px; padding: 7px 11px; font-size: 11px; line-height: 1.5; color: #c9c4d6; white-space: nowrap; transform: translate(-50%,calc(-100% - 12px)); opacity: 0; transition: opacity .12s ease, transform .12s ease; z-index: 5; box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+.mm-tooltip.show { opacity: 1; transform: translate(-50%,calc(-100% - 16px)); }
+.mm-tooltip .mm-tt-count { font-weight: 700; color: #fcd34d; font-size: 13px; }
+@media (prefers-reduced-motion:reduce) { .mm-dot-glow { animation: none; } }
+
 .bar-list { display: flex; flex-direction: column; gap: 12px; }
 .bar-row { display: flex; align-items: center; gap: 10px; }
 .bar-name { font-size: 11.5px; color: #c9c4d6; width: 132px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -216,6 +239,11 @@ html,body{scrollbar-width:thin}
 [data-theme="light"] .card-head { border-bottom-color: rgba(36,28,21,.08) !important; }
 [data-theme="light"] .bar-name { color: #5c5344 !important; }
 [data-theme="light"] .bar-track { background: rgba(36,28,21,.08) !important; }
+[data-theme="light"] .mm-grid-line { stroke: rgba(36,28,21,.08) !important; }
+[data-theme="light"] .mm-x-label { fill: #8a8070 !important; }
+[data-theme="light"] .mm-dot { fill: #fff !important; }
+[data-theme="light"] .mm-tooltip { background: #fff !important; border-color: rgba(36,28,21,.12) !important; color: #4a4436 !important; box-shadow: 0 10px 28px rgba(36,28,21,.18) !important; }
+[data-theme="light"] .delta-badge.flat { background: rgba(36,28,21,.06) !important; color: #6b6252 !important; }
 [data-theme="light"] table.jc-table thead th { background: #fff !important; color: #8a8070 !important; }
 [data-theme="light"] table.jc-table tbody tr:hover { background: rgba(245,166,35,.06) !important; }
 [data-theme="light"] .jc-name,[data-theme="light"] .jc-role { color: #241c15 !important; }
