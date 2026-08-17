@@ -7930,6 +7930,14 @@ def cpi_search():
     # search that was asked for.
     if bad_codes:
         out["invalid_codes"] = bad_codes
+    if meta.get("funding_value_clamped"):
+        # Apollo itself rejects a funding-amount bound above 2**31-1 with a
+        # hard error rather than clamping or ignoring it -- search_companies
+        # clamps it here instead of letting the whole search crash, but that
+        # still means the search that ran was not the exact search that was
+        # asked for, and this page says so rather than silently answering a
+        # smaller question than "over $5 billion" without a word about it.
+        out["funding_value_clamped"] = True
     if spend["credits"]:
         out["credits"] = spend["credits"]
         _cpi_credit_record("search-" + entity, spend["credits"])

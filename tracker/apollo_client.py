@@ -87,6 +87,11 @@ _ORG_LIST_FILTERS = (
     ("exclude_technologies",       "currently_not_using_any_of_technology_uids"),
 )
 
+# Apollo's own ceiling for a funding-amount range bound, confirmed live: a
+# number above this gets a 422 rather than being clamped Apollo-side. See
+# search_companies' total_funding_min/max handling.
+_APOLLO_MAX_RANGE_VALUE = 2_147_483_647
+
 _ORG_RANGE_FILTERS = (
     ("revenue_min",       "revenue_max",       "revenue_range"),
     ("founded_min",       "founded_max",       "organization_founded_year_range"),
@@ -342,14 +347,34 @@ def search_companies(filters: dict, api_key: str, page: int = 1, per_page: int =
         payload["account_label_ids"] = list(filters["label_ids"])
     _apply_org_filters(payload, filters)
     # Funding filters exist only on the company endpoint, not on people search.
+    # The two AMOUNT ranges have a ceiling Apollo enforces server-side and does
+    # not document: a bound above 2**31-1 gets a hard 422 ("The number ... is
+    # too big for our system to handle"), confirmed live against this account,
+    # rather than being clamped or ignored. "Companies that raised over $5
+    # billion" is an entirely reasonable ask, and without this it crashed the
+    # WHOLE search -- which the caller then reported as a transient "Apollo
+    # did not answer, try again in a moment", a claim that is never true here
+    # since an oversized number fails identically on every retry. Clamped
+    # instead, with the clamp recorded in `meta` so a caller can say the
+    # search ran against the largest figure Apollo can represent rather than
+    # silently answering a smaller question than the one that was asked.
+    # funded_after/funded_before (a date range) has no such ceiling.
     for min_key, max_key, param in (
         ("total_funding_min",   "total_funding_max",   "total_funding_range"),
         ("latest_funding_min",  "latest_funding_max",  "latest_funding_amount_range"),
-        ("funded_after",        "funded_before",       "latest_funding_date_range"),
     ):
         rng = _range(filters, min_key, max_key)
         if rng is not None:
+            for bound in ("min", "max"):
+                if bound in rng and isinstance(rng[bound], (int, float)) \
+                        and rng[bound] > _APOLLO_MAX_RANGE_VALUE:
+                    rng[bound] = _APOLLO_MAX_RANGE_VALUE
+                    if meta is not None:
+                        meta.setdefault("funding_value_clamped", []).append(param)
             payload[param] = rng
+    rng = _range(filters, "funded_after", "funded_before")
+    if rng is not None:
+        payload["latest_funding_date_range"] = rng
 
     try:
         data = _post("mixed_companies/search", payload, api_key)

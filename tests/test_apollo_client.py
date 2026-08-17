@@ -187,6 +187,55 @@ def test_search_companies_builds_real_payload(mock_post):
 
 
 @patch("tracker.apollo_client.requests.post")
+def test_a_funding_bound_over_apollos_ceiling_is_clamped_not_sent_raw(mock_post):
+    """Live-confirmed against a real Apollo account: a total_funding_min/max or
+    latest_funding_min/max bound above 2**31-1 gets a hard 422 from Apollo
+    ("The number ... is too big for our system to handle"), not a silent
+    ignore or an Apollo-side clamp. "Companies that raised over $5 billion" is
+    an entirely ordinary ask and would otherwise crash the whole search. Also
+    confirmed live: funded_after/funded_before (a date range) and revenue_min
+    have no such ceiling, so only the two funding-amount fields need this."""
+    mock_post.return_value = _mock_response({"organizations": []})
+    meta = {}
+    apollo_client.search_companies(
+        {"total_funding_min": 5_000_000_000, "latest_funding_max": 9_999_999_999},
+        _FAKE_API_KEY, meta=meta)
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["total_funding_range"]["min"] == apollo_client._APOLLO_MAX_RANGE_VALUE
+    assert sent["latest_funding_amount_range"]["max"] == apollo_client._APOLLO_MAX_RANGE_VALUE
+    assert sorted(meta["funding_value_clamped"]) == [
+        "latest_funding_amount_range", "total_funding_range"]
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_funding_bound_under_the_ceiling_is_sent_unchanged(mock_post):
+    mock_post.return_value = _mock_response({"organizations": []})
+    meta = {}
+    apollo_client.search_companies(
+        {"total_funding_min": 1_000_000, "latest_funding_max": 2_000_000},
+        _FAKE_API_KEY, meta=meta)
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["total_funding_range"]["min"] == 1_000_000
+    assert sent["latest_funding_amount_range"]["max"] == 2_000_000
+    assert "funding_value_clamped" not in meta
+
+
+@patch("tracker.apollo_client.requests.post")
+def test_a_funding_date_range_has_no_ceiling_to_clamp(mock_post):
+    """funded_after/funded_before is a date, not an amount -- confirmed live
+    that Apollo has no numeric ceiling issue with it, so it must not be
+    touched by the amount-clamping logic above it."""
+    mock_post.return_value = _mock_response({"organizations": []})
+    meta = {}
+    apollo_client.search_companies(
+        {"funded_after": "1900-01-01", "funded_before": "2099-01-01"},
+        _FAKE_API_KEY, meta=meta)
+    sent = mock_post.call_args.kwargs["json"]
+    assert sent["latest_funding_date_range"] == {"min": "1900-01-01", "max": "2099-01-01"}
+    assert "funding_value_clamped" not in meta
+
+
+@patch("tracker.apollo_client.requests.post")
 def test_search_people_scopes_to_an_organization_id(mock_post):
     """Every company-scoped lookup in the app ends up here: the chat resolves a
     company name to an org id and then asks for people at that id. Nothing was
