@@ -699,7 +699,9 @@
       }
       var head='<thead><tr>'
         +'<th onclick="sortBy(\'person_name\')">Person</th>'
-        +'<th onclick="sortBy(\'new_title\')">New role</th>'
+        +'<th onclick="sortBy(\'new_title\')">New Role</th>'
+        +'<th onclick="sortBy(\'new_company_name\')">New Company</th>'
+        +'<th>LinkedIn</th>'
         +'<th onclick="sortBy(\'company_industry\')">Industry</th>'
         +'<th onclick="sortBy(\'city\')">Location</th>'
         +'<th onclick="sortBy(\'job_start_date\')">Started</th>'
@@ -713,9 +715,10 @@
         return '<tr class="jc-row-in'+(fresh?' jc-fresh':'')+'" data-idx="'+i+'" style="animation-delay:'+Math.min(i*25,400)+'ms">'
           +'<td><div class="jc-person"><div class="jc-avatar ev">'+esc(initials(e.person_name))+'</div>'
           +'<span class="jc-name">'+esc(e.person_name||'Unknown')+'</span>'
-          +(e.linkedin_url?'<a class="jc-li" href="'+esc(e.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
           +'</div></td>'
-          +'<td class="jc-role">'+esc(e.new_title||'—')+(e.new_company_name?' <span class="co">@ '+logoIcon(trackedCompanyWebsite(e.new_company_name))+esc(e.new_company_name)+'</span>':'')+'</td>'
+          +'<td class="jc-role">'+esc(e.new_title||'—')+'</td>'
+          +'<td class="jc-role">'+(e.new_company_name?logoIcon(trackedCompanyWebsite(e.new_company_name))+esc(e.new_company_name):'<span class="jc-muted">—</span>')+'</td>'
+          +'<td>'+(e.linkedin_url?'<a class="jc-li-badge" href="'+esc(e.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn profile">in</a>':'<span class="jc-muted">—</span>')+'</td>'
           +'<td class="jc-muted">'+esc(e.company_industry||'—')+'</td>'
           +'<td class="jc-muted">'+esc(e.city||'—')+'</td>'
           +'<td class="jc-muted">'+esc(e.job_start_date||'—')+'</td>'
