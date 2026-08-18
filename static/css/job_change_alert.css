@@ -141,12 +141,38 @@ body {
 /* Tabs + toolbar */
 .card { background: rgba(16,13,11,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; }
 .card.visible { opacity: 1; transform: translateY(0); }
-.tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,.07); }
-.tab-btn { padding: 14px 22px; font-size: 13px; font-weight: 600; color: #74708a; background: none; border: none; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; display: flex; align-items: center; gap: 7px; }
-.tab-btn:hover { color: #b8b3c9; }
-.tab-btn.active { color: #f5a623; border-bottom-color: #f5a623; }
+.tabs { display: flex; position: relative; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.07); padding: 7px; }
+.tab-indicator {
+  position: absolute; top: 7px; bottom: 7px; left: 7px;
+  width: calc((100% - 14px) / 3);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(245,166,35,.18), rgba(251,113,133,.10));
+  border: 1px solid rgba(245,166,35,.34);
+  box-shadow: 0 10px 28px rgba(245,166,35,.16), inset 0 1px 0 rgba(255,255,255,.07);
+  transition: transform .4s cubic-bezier(.65,0,.35,1), background .35s ease, border-color .35s ease, box-shadow .35s ease;
+  z-index: 0; pointer-events: none;
+}
+.tabs.at-people .tab-indicator {
+  transform: translateX(100%);
+  background: linear-gradient(135deg, rgba(124,131,245,.18), rgba(155,135,253,.10));
+  border-color: rgba(124,131,245,.36);
+  box-shadow: 0 10px 28px rgba(124,131,245,.18), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.tabs.at-companies .tab-indicator {
+  transform: translateX(200%);
+  background: linear-gradient(135deg, rgba(99,102,241,.18), rgba(56,189,248,.11));
+  border-color: rgba(99,102,241,.36);
+  box-shadow: 0 10px 28px rgba(56,189,248,.18), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.tab-btn { position: relative; z-index: 1; flex: 1; padding: 20px 22px; font-size: 15px; font-weight: 700; letter-spacing: .003em; color: #6b6680; background: none; border: none; cursor: pointer; font-family: inherit; transition: color .3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.tab-btn:not(:last-child) { border-right: 1px solid rgba(255,255,255,.05); }
+.tab-btn:hover { color: #c9c4d6; }
+#btn-events.active    { color: #ffce7a; }
+#btn-people.active    { color: #b9bdff; }
+#btn-companies.active { color: #7dd3fc; }
 .tab-btn .tct { font-size: 10.5px; font-weight: 700; background: rgba(255,255,255,.07); color: #9a94ab; border-radius: var(--radius-pill); padding: 1px 7px; }
 .tab-btn.active .tct { background: rgba(245,166,35,.18); color: #ffce7a; }
+@media (prefers-reduced-motion: reduce) { .tab-indicator { transition: none; } }
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
 
@@ -353,7 +379,14 @@ html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner,
 [data-theme="light"] .drw-value { color: #241c15 !important; }
 [data-theme="light"] .drw-desc { color: #6b6252 !important; }
 [data-theme="light"] .drw-link-btn { background: rgba(181,86,10,.08) !important; border-color: rgba(181,86,10,.25) !important; color: #8a4508 !important; }
-[data-theme="light"] .tab-btn.active { color: #b5560a !important; border-bottom-color: #b5560a !important; }
+[data-theme="light"] .tabs { background: rgba(36,28,21,.02) !important; border-bottom-color: rgba(36,28,21,.08) !important; }
+[data-theme="light"] .tab-btn:not(:last-child) { border-right-color: rgba(36,28,21,.07) !important; }
+[data-theme="light"] .tab-indicator { background: linear-gradient(135deg, rgba(181,86,10,.11), rgba(225,29,72,.06)) !important; border-color: rgba(181,86,10,.3) !important; box-shadow: 0 10px 28px rgba(181,86,10,.12), inset 0 1px 0 rgba(255,255,255,.5) !important; }
+[data-theme="light"] .tabs.at-people .tab-indicator { background: linear-gradient(135deg, rgba(67,56,202,.11), rgba(99,102,241,.06)) !important; border-color: rgba(67,56,202,.3) !important; box-shadow: 0 10px 28px rgba(67,56,202,.12), inset 0 1px 0 rgba(255,255,255,.5) !important; }
+[data-theme="light"] .tabs.at-companies .tab-indicator { background: linear-gradient(135deg, rgba(3,105,161,.11), rgba(56,189,248,.07)) !important; border-color: rgba(3,105,161,.3) !important; box-shadow: 0 10px 28px rgba(3,105,161,.12), inset 0 1px 0 rgba(255,255,255,.5) !important; }
+[data-theme="light"] #btn-events.active    { color: #b5560a !important; }
+[data-theme="light"] #btn-people.active    { color: #4338ca !important; }
+[data-theme="light"] #btn-companies.active { color: #0369a1 !important; }
 [data-theme="light"] html, [data-theme="light"] body, [data-theme="light"] .main,
 [data-theme="light"] .tbl-wrap, [data-theme="light"] #drawerBody { scrollbar-color: rgba(181,86,10,.35) transparent !important; }
 [data-theme="light"] html::-webkit-scrollbar-thumb, [data-theme="light"] body::-webkit-scrollbar-thumb,
