@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=5">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -248,12 +248,12 @@
     function logoAvatar(website, letter, extraClass){
       var d=domainFromUrl(website);
       return '<div class="jc-avatar-sq'+(extraClass?' '+extraClass:'')+'">'+esc(letter)
-        +(d?'<img class="jc-logo-img" src="https://logo.clearbit.com/'+esc(d)+'?size=128" loading="lazy" onerror="this.remove()">':'')
+        +(d?'<img class="jc-logo-img" src="https://icons.duckduckgo.com/ip3/'+esc(d)+'.ico" loading="lazy" onerror="this.remove()">':'')
         +'</div>';
     }
     function logoIcon(website){
       var d=domainFromUrl(website);
-      return d?'<img class="jc-logo-inline" src="https://logo.clearbit.com/'+esc(d)+'?size=32" loading="lazy" onerror="this.remove()">':'';
+      return d?'<img class="jc-logo-inline" src="https://icons.duckduckgo.com/ip3/'+esc(d)+'.ico" loading="lazy" onerror="this.remove()">':'';
     }
     function trackedCompanyWebsite(name){
       if(!name||!TRACKED||!TRACKED.companies)return '';
@@ -292,7 +292,7 @@
         +drwSection('Job change', drw('Started',esc(e.job_start_date))+drw('Detected',esc(detected)))
         +drwSection('Company', drw('Industry',esc(e.company_industry))+drw('Employees',fmtNum(e.employees))+drw('Revenue',esc(e.revenue))+drw('Location',esc(e.city)))
         +(e.company_description?'<div class="drw-section-label">About</div><p class="drw-desc">'+esc(e.company_description)+'</p>':'')
-        +drwLinks([{href:e.linkedin_url,label:'LinkedIn profile'},{href:e.slack_permalink,label:'Original alert'}])
+        +drwLinks([{href:e.linkedin_url,label:'LinkedIn profile'}])
         +'</div>';
     }
     function drawerPerson(c){

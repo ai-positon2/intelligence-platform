@@ -169,8 +169,6 @@ body {
 
 /* Table */
 .tbl-wrap { overflow-x: auto; max-height: 560px; overflow-y: auto; }
-.tbl-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
-.tbl-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: var(--radius-pill); }
 table.jc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.jc-table thead { position: sticky; top: 0; z-index: 2; }
 table.jc-table thead th { padding: 11px 16px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #6b6680; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(16,13,11,.98); white-space: nowrap; cursor: pointer; user-select: none; }
@@ -187,7 +185,7 @@ tr.jc-fresh:hover { background: rgba(245,166,35,.08); }
 .jc-avatar.ev { background: linear-gradient(135deg,#f5a623,#fb7185); }
 .jc-avatar.roster { background: linear-gradient(135deg,#7c83f5,#9b87fd); }
 .jc-avatar-sq { width: 30px; height: 30px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #dde0ff; flex-shrink: 0; background: linear-gradient(135deg,#1f2247,#38408c); position: relative; overflow: hidden; }
-.jc-logo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.jc-logo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 5px; background: #fff; }
 .jc-name { font-weight: 600; color: #f1eee8; }
 .jc-li { color: #55506a; text-decoration: none; font-size: 14px; margin-left: 2px; flex-shrink: 0; transition: color .12s; }
 .jc-li:hover { color: #0a66c2; }
@@ -215,7 +213,34 @@ tr.jc-fresh:hover { background: rgba(245,166,35,.08); }
 @keyframes jcRowIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 @media (prefers-reduced-motion:reduce) { .jc-row-in { animation: none; } }
 
-html,body{scrollbar-width:thin}
+/* Sleek scrollbars everywhere on this page — overrides aurora-app.css's
+   thicker 10px global bar so html/body, the table and the modal all match. */
+html, body, .main, .tbl-wrap, #drawerBody {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245,166,35,.4) transparent;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar,
+.main::-webkit-scrollbar, .tbl-wrap::-webkit-scrollbar, #drawerBody::-webkit-scrollbar {
+  width: 6px !important; height: 6px !important;
+}
+html::-webkit-scrollbar-track, body::-webkit-scrollbar-track,
+.main::-webkit-scrollbar-track, .tbl-wrap::-webkit-scrollbar-track, #drawerBody::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb,
+.main::-webkit-scrollbar-thumb, .tbl-wrap::-webkit-scrollbar-thumb, #drawerBody::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(245,166,35,.5), rgba(251,113,133,.4)) !important;
+  border-radius: var(--radius-pill) !important;
+  border: none !important;
+}
+html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
+.main::-webkit-scrollbar-thumb:hover, .tbl-wrap::-webkit-scrollbar-thumb:hover, #drawerBody::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(245,166,35,.7), rgba(251,113,133,.6)) !important;
+}
+html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner,
+.main::-webkit-scrollbar-corner, .tbl-wrap::-webkit-scrollbar-corner, #drawerBody::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
 
 /* Latest-signal ticker */
 .jc-ticker { display: none; flex-wrap: nowrap; align-items: center; gap: 10px; background: linear-gradient(90deg,rgba(245,166,35,.1),rgba(251,113,133,.05)); border: 1px solid rgba(245,166,35,.25); border-radius: var(--radius-pill); padding: 9px 18px; margin-bottom: 20px; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; }
@@ -250,7 +275,7 @@ html,body{scrollbar-width:thin}
 .jc-drawer-close:hover { background: rgba(255,255,255,.1); color: #f1eee8; }
 #drawerBody { overflow-y: auto; }
 .drw-head { padding: 32px 30px 22px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; gap: 16px; align-items: flex-start; }
-.drw-avatar { width: 56px; height: 56px; font-size: 18px; flex-shrink: 0; }
+.drw-avatar { width: 56px; height: 56px; font-size: 18px; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 8px 24px rgba(0,0,0,.35); }
 .drw-head-txt h3 { font-size: 20px; font-weight: 700; color: #f7f2ec; line-height: 1.25; }
 .drw-sub { font-size: 13px; color: #c9c4d6; margin-top: 5px; }
 .drw-sub .co { color: #ffce7a; display: inline-flex; align-items: center; }
@@ -265,7 +290,7 @@ html,body{scrollbar-width:thin}
 .drw-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .drw-link-btn { font-size: 11.5px; font-weight: 600; color: #ffce7a; background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.28); border-radius: var(--radius-pill); padding: 8px 16px; text-decoration: none; transition: background .15s; }
 .drw-link-btn:hover { background: rgba(245,166,35,.2); }
-.jc-logo-inline { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; vertical-align: -3px; margin-right: 6px; background: #fff; flex-shrink: 0; }
+.jc-logo-inline { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; padding: 2px; vertical-align: -3px; margin-right: 6px; background: #fff; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
 @media (max-width: 560px) { .drw-grid { grid-template-columns: 1fr; } }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
@@ -325,3 +350,11 @@ html,body{scrollbar-width:thin}
 [data-theme="light"] .drw-desc { color: #6b6252 !important; }
 [data-theme="light"] .drw-link-btn { background: rgba(181,86,10,.08) !important; border-color: rgba(181,86,10,.25) !important; color: #8a4508 !important; }
 [data-theme="light"] .tab-btn.active { color: #b5560a !important; border-bottom-color: #b5560a !important; }
+[data-theme="light"] html, [data-theme="light"] body, [data-theme="light"] .main,
+[data-theme="light"] .tbl-wrap, [data-theme="light"] #drawerBody { scrollbar-color: rgba(181,86,10,.35) transparent !important; }
+[data-theme="light"] html::-webkit-scrollbar-thumb, [data-theme="light"] body::-webkit-scrollbar-thumb,
+[data-theme="light"] .main::-webkit-scrollbar-thumb, [data-theme="light"] .tbl-wrap::-webkit-scrollbar-thumb,
+[data-theme="light"] #drawerBody::-webkit-scrollbar-thumb { background: rgba(181,86,10,.3) !important; }
+[data-theme="light"] html::-webkit-scrollbar-thumb:hover, [data-theme="light"] body::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .main::-webkit-scrollbar-thumb:hover, [data-theme="light"] .tbl-wrap::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] #drawerBody::-webkit-scrollbar-thumb:hover { background: rgba(181,86,10,.45) !important; }
