@@ -105,11 +105,6 @@ body {
 .card-meta { font-size: 11px; color: #6b6680; }
 .card-body { padding: 18px 22px; }
 
-.delta-badge { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); white-space: nowrap; }
-.delta-badge.up { background: rgba(74,222,128,.13); color: #86efac; }
-.delta-badge.down { background: rgba(239,68,68,.13); color: #fca5a5; }
-.delta-badge.flat { background: rgba(255,255,255,.06); color: #9a94ab; }
-
 .momentum-chart-wrap { position: relative; }
 .momentum-svg { width: 100%; height: 168px; display: block; overflow: visible; }
 .mm-grid-line { stroke: rgba(255,255,255,.06); stroke-width: 1; }
@@ -352,7 +347,6 @@ html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner,
 [data-theme="light"] .mm-x-label { fill: #8a8070 !important; }
 [data-theme="light"] .mm-dot { fill: #fff !important; }
 [data-theme="light"] .mm-tooltip { background: #fff !important; border-color: rgba(36,28,21,.12) !important; color: #4a4436 !important; box-shadow: 0 10px 28px rgba(36,28,21,.18) !important; }
-[data-theme="light"] .delta-badge.flat { background: rgba(36,28,21,.06) !important; color: #6b6252 !important; }
 [data-theme="light"] table.jc-table thead th { background: #fff !important; color: #8a8070 !important; }
 [data-theme="light"] table.jc-table tbody tr:hover { background: rgba(245,166,35,.06) !important; }
 [data-theme="light"] .jc-name,[data-theme="light"] .jc-role { color: #241c15 !important; }

@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=8">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -104,7 +104,6 @@
             <span class="card-title">📈 Weekly Momentum</span>
             <span class="card-meta">job changes detected, last 8 weeks</span>
           </div>
-          <span class="delta-badge" id="momentumDelta"></span>
         </div>
         <div class="card-body" id="momentumBody"><div class="skel" style="height:150px"></div></div>
       </div>
@@ -465,8 +464,6 @@
 
     function renderMomentum(){
       var body=document.getElementById('momentumBody');
-      var deltaEl=document.getElementById('momentumDelta');
-      if(deltaEl)deltaEl.textContent='';
       if(!EVENTS.length){body.innerHTML='<div class="jc-empty" style="padding:24px">No job changes tracked yet.</div>';return;}
 
       var now=Date.now(), counts=new Array(8).fill(0), labels=[];
