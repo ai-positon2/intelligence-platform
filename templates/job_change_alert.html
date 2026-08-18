@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=6">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -753,6 +753,7 @@
       var head='<thead><tr>'
         +'<th onclick="sortBy(\'name\')">Person</th>'
         +'<th onclick="sortBy(\'company\')">Company</th>'
+        +'<th>LinkedIn</th>'
         +'<th onclick="sortBy(\'seniority\')">Seniority</th>'
         +'<th onclick="sortBy(\'department\')">Department</th>'
         +'<th onclick="sortBy(\'city\')">Location</th>'
@@ -762,9 +763,9 @@
           +'<td><div class="jc-person"><div class="jc-avatar roster">'+esc(initials(c.name))+'</div>'
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
           +'<div class="jc-muted" style="font-size:11px">'+esc(c.title||'')+'</div></div>'
-          +(c.linkedin_url?'<a class="jc-li" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
           +'</div></td>'
           +'<td class="jc-role">'+logoIcon(c.website)+esc(c.company||'—')+'</td>'
+          +'<td>'+(c.linkedin_url?'<a class="jc-li-badge" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn profile">in</a>':'<span class="jc-muted">—</span>')+'</td>'
           +'<td>'+(c.seniority?'<span class="jc-badge '+seniorityClass(c.seniority)+'">'+esc(c.seniority)+'</span>':'<span class="jc-muted">—</span>')+'</td>'
           +'<td class="jc-muted">'+esc(c.department||'—')+'</td>'
           +'<td class="jc-muted">'+esc([c.city,c.state].filter(Boolean).join(', ')||'—')+'</td>'
@@ -802,6 +803,7 @@
       }
       var head='<thead><tr>'
         +'<th onclick="sortBy(\'name\')">Company</th>'
+        +'<th>LinkedIn</th>'
         +'<th onclick="sortBy(\'industry\')">Industry</th>'
         +'<th onclick="sortBy(\'employees\')">Employees</th>'
         +'<th onclick="sortBy(\'city\')">Location</th>'
@@ -812,8 +814,8 @@
           +'<td><div class="jc-person">'+logoAvatar(c.website,(c.name||'?')[0].toUpperCase())
           +'<div><div class="jc-name">'+esc(c.name||'Unknown')+'</div>'
           +(c.website?'<div class="jc-muted" style="font-size:11px">'+esc(c.website.replace(/^https?:\/\//,''))+'</div>':'')+'</div>'
-          +(c.linkedin_url?'<a class="jc-li" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'')
           +'</div></td>'
+          +'<td>'+(c.linkedin_url?'<a class="jc-li-badge" href="'+esc(c.linkedin_url)+'" target="_blank" rel="noopener" title="LinkedIn">in</a>':'<span class="jc-muted">—</span>')+'</td>'
           +'<td class="jc-muted">'+esc(c.industry||'—')+'</td>'
           +'<td class="jc-muted">'+fmtNum(c.employees)+'</td>'
           +'<td class="jc-muted">'+esc([c.city,c.state].filter(Boolean).join(', ')||'—')+'</td>'

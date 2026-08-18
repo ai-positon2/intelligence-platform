@@ -189,6 +189,8 @@ tr.jc-fresh:hover { background: rgba(245,166,35,.08); }
 .jc-name { font-weight: 600; color: #f1eee8; }
 .jc-li { color: #55506a; text-decoration: none; font-size: 14px; margin-left: 2px; flex-shrink: 0; transition: color .12s; }
 .jc-li:hover { color: #0a66c2; }
+.jc-li-badge { display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; border-radius: var(--radius-sm); background: rgba(10,102,194,.14); color: #5aa3ee; font-size: 11px; font-weight: 800; text-decoration: none; transition: background .15s, color .15s, transform .15s; }
+.jc-li-badge:hover { background: #0a66c2; color: #fff; transform: translateY(-1px); }
 .jc-role { color: #e5e1d8; }
 .jc-role .co { color: #ffce7a; }
 .jc-muted { color: #6b6680; }
@@ -328,6 +330,8 @@ html::-webkit-scrollbar-corner, body::-webkit-scrollbar-corner,
 [data-theme="light"] table.jc-table thead th { background: #fff !important; color: #8a8070 !important; }
 [data-theme="light"] table.jc-table tbody tr:hover { background: rgba(245,166,35,.06) !important; }
 [data-theme="light"] .jc-name,[data-theme="light"] .jc-role { color: #241c15 !important; }
+[data-theme="light"] .jc-li-badge { background: rgba(10,102,194,.1) !important; color: #0a66c2 !important; }
+[data-theme="light"] .jc-li-badge:hover { background: #0a66c2 !important; color: #fff !important; }
 [data-theme="light"] .tab-btn { color: #8a8070 !important; }
 [data-theme="light"] .jc-ticker { background: linear-gradient(90deg,rgba(181,86,10,.08),rgba(225,29,72,.05)) !important; border-color: rgba(181,86,10,.22) !important; }
 [data-theme="light"] .jc-ticker-tag { color: #be123c !important; }
