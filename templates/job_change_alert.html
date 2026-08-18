@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/job_change_alert.css') }}?v=7">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -118,7 +118,8 @@
     </div>
 
     <div class="card" id="mainCard">
-      <div class="tabs">
+      <div class="tabs at-events" id="tabs">
+        <div class="tab-indicator" aria-hidden="true"></div>
         <button class="tab-btn active" id="btn-events"    onclick="switchTab('events')">Recent Job Changes</button>
         <button class="tab-btn"        id="btn-people"    onclick="switchTab('people')">People We Track</button>
         <button class="tab-btn"        id="btn-companies" onclick="switchTab('companies')">Companies We Track</button>
@@ -646,6 +647,7 @@
 
     function switchTab(tab){
       TAB=tab;
+      document.getElementById('tabs').className='tabs at-'+tab;
       ['events','people','companies'].forEach(function(t){
         document.getElementById('btn-'+t).classList.toggle('active',t===tab);
         document.getElementById('pane-'+t).classList.toggle('active',t===tab);
