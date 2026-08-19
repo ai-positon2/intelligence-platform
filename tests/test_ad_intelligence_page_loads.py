@@ -121,3 +121,56 @@ def test_the_app_no_longer_bundles_its_own_favicon():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     assert not os.path.exists(os.path.join(root, "apps", "ad-intelligence", "public", "favicon.svg"))
     assert not os.path.exists(os.path.join(root, "ad_intelligence", "favicon.svg"))
+
+
+# ── Header must use the Arena logo (not a lightning-bolt icon) and the
+#    current "B2B Agents" naming (not the stale "PPC" name it shipped with) ──
+#
+# App.tsx's PlatformBar (its site-wide nav strip), sidebar logo, and page
+# header all used a lucide-react `Zap` (lightning bolt) icon as a stand-in
+# brand mark, and PlatformBar's breadcrumb hardcoded "Hub › PPC › Ad
+# Intelligence" from when this section was still called PPC. Both went stale:
+# every other page uses the real static/logo-lockup.svg ("arena by
+# Position2") / static/logo-mark.svg, and the section has been "B2B Agents"
+# since #22-26 above. Checked at both the TSX source (authoritative, survives
+# a rebuild) and the compiled bundle actually being served (catches a source
+# edit that was never rebuilt into ad_intelligence/) -- string literals like
+# these survive minification intact, unlike logic/structure, so grepping the
+# bundle for them is reliable here.
+
+def _read(*parts):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return open(os.path.join(root, *parts), encoding="utf-8").read()
+
+
+def test_source_has_no_lightning_bolt_icon():
+    src = _read("apps", "ad-intelligence", "src", "App.tsx")
+    assert "Zap" not in src, "App.tsx should no longer import or render the lucide 'Zap' (lightning bolt) icon"
+
+
+def test_source_uses_the_arena_logo_files():
+    src = _read("apps", "ad-intelligence", "src", "App.tsx")
+    assert "/static/logo-lockup.svg" in src, "top brand slot should render the arena wordmark, like every other page"
+    assert "/static/logo-mark.svg" in src, "the sidebar/header icon badges should render the arena mark"
+
+
+def test_source_breadcrumb_says_b2b_agents_not_ppc():
+    src = _read("apps", "ad-intelligence", "src", "App.tsx")
+    assert 'href="/p2/b2b-agents"' in src
+    assert '>B2B Agents<' in src
+    assert '>PPC<' not in src, "breadcrumb still shows the pre-rename section label"
+    assert 'href="/ppc"' not in src, "breadcrumb link should point straight at the canonical path, not the legacy alias"
+
+
+def test_compiled_bundle_matches_the_source_fix():
+    """Guards against editing App.tsx without rebuilding+copying the output
+    into ad_intelligence/ -- the exact gap that caused the original asset-path
+    bug this test file is named after."""
+    assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ad_intelligence", "assets")
+    js_files = [f for f in os.listdir(assets_dir) if f.endswith(".js")]
+    assert js_files, "expected a built JS bundle in ad_intelligence/assets/"
+    bundle = open(os.path.join(assets_dir, js_files[0]), encoding="utf-8").read()
+    assert "/static/logo-lockup.svg" in bundle
+    assert "/static/logo-mark.svg" in bundle
+    assert "B2B Agents" in bundle
+    assert ">PPC<" not in bundle
