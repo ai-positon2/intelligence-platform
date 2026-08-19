@@ -82,3 +82,42 @@ def test_vite_base_matches_the_flask_mount_path():
     cfg = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "apps", "ad-intelligence", "vite.config.ts"), encoding="utf-8").read()
     assert "base: '/p2/b2b-agents/ad-intelligence/'" in cfg
+
+
+# ── Favicon must match every other page, not this app's own bundled icon ────
+#
+# This app used to ship its own favicon.svg (apps/ad-intelligence/public/) and
+# reference it as href="/favicon.svg", which vite's `base` then rewrote to
+# /p2/b2b-agents/ad-intelligence/favicon.svg at build time. That routed to a
+# different icon than every other page's plain /favicon.svg, so the browser
+# tab looked wrong specifically on this page. Fixed by dropping the app's own
+# public/favicon.svg entirely, so nothing in apps/ad-intelligence/public/
+# collides with the href and vite has nothing local to rewrite it against,
+# leaving the reference as the site-wide root path.
+
+def test_the_favicon_reference_is_the_plain_site_root_path(client):
+    body = client.get(PAGE_PATH).get_data(as_text=True)
+    m = re.search(r'<link[^>]+rel="icon"[^>]+href="([^"]+)"', body)
+    assert m, "expected an <link rel=\"icon\"> tag in index.html"
+    href = m.group(1)
+    assert href == "/favicon.svg?v=4", (
+        f"favicon href is {href!r}; every other page on the site uses "
+        "/favicon.svg?v=4 (see templates/*.html) -- this one has drifted "
+        "and will show a different browser-tab icon"
+    )
+
+
+def test_the_favicon_byte_matches_the_site_wide_static_file(client):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    served = client.get("/favicon.svg?v=4").get_data()
+    on_disk = open(os.path.join(root, "static", "favicon.svg"), "rb").read()
+    assert served == on_disk
+
+
+def test_the_app_no_longer_bundles_its_own_favicon():
+    """Guards against a future edit re-adding apps/ad-intelligence/public/
+    favicon.svg, which would make vite base-prefix the href again and bring
+    back the mismatched icon."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assert not os.path.exists(os.path.join(root, "apps", "ad-intelligence", "public", "favicon.svg"))
+    assert not os.path.exists(os.path.join(root, "ad_intelligence", "favicon.svg"))
