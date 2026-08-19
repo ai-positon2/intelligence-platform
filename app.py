@@ -3836,18 +3836,21 @@ AD_INTEL_SHEET_ID = "16U5_QSxMmrAGKvK5dHScBu1Et4BJ1p8Q1ns5LycRA0s"
 def ad_intelligence():
     return send_from_directory("ad_intelligence", "index.html")
 
+@app.route("/p2/b2b-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/b2b-agents/ad-intelligence/assets/<path:filename>")
 @app.route("/gtm/ad-intelligence/assets/<path:filename>")
 @app.route("/ppc/ad-intelligence/assets/<path:filename>")
 def ad_intelligence_assets(filename):
     return send_from_directory("ad_intelligence/assets", filename)
 
+@app.route("/p2/b2b-agents/ad-intelligence/favicon.svg")
 @app.route("/b2b-agents/ad-intelligence/favicon.svg")
 @app.route("/gtm/ad-intelligence/favicon.svg")
 @app.route("/ppc/ad-intelligence/favicon.svg")
 def ad_intelligence_favicon():
     return send_from_directory("ad_intelligence", "favicon.svg")
 
+@app.route("/p2/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/gtm/ad-intelligence/icons.svg")
 @app.route("/ppc/ad-intelligence/icons.svg")
