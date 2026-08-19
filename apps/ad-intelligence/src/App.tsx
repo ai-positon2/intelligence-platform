@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import {
   LayoutDashboard, Image, Users, Sparkles, Brain,
   RefreshCw, ExternalLink, CheckCircle2,
-  Menu, X, TrendingUp, Zap, ArrowRight
+  Menu, X, TrendingUp, ArrowRight
 } from 'lucide-react';
 import type { Ad, TabId, NavParams } from './lib/types';
 import { COMPETITORS } from './lib/types';
@@ -151,16 +151,17 @@ function PlatformBar() {
   const isAdmin = u?.email === 'krishna.ladha@position2.com' || u?.email === 'sudheer.d@position2.com';
   return (
     <div style={{ height: 46, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px', background: 'rgba(6,9,20,.96)', borderBottom: '1px solid rgba(129,140,248,.16)', position: 'relative', zIndex: 60 }}>
-      <a href="/hub" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
-        <span style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(99,102,241,.45)' }}><Zap size={16} className="text-white" /></span>
-        <span style={{ fontSize: 15, fontWeight: 800, color: '#eef2ff', letterSpacing: '-.01em' }}>Platform</span>
+      <a href="/p2/hub" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 8px', borderRadius: 8, background: '#151b2e' }}>
+          <img src="/static/logo-lockup.svg?v=4" alt="arena by Position2" style={{ height: 26, width: 'auto', display: 'block' }} />
+        </span>
       </a>
-      <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, fontSize: 12.5, minWidth: 0 }}>
-        <a href="/hub" style={{ color: '#64748b', textDecoration: 'none' }}>Hub</a>
+      <div className="hidden sm:flex" style={{ alignItems: 'center', gap: 8, fontSize: 12.5, minWidth: 0, marginLeft: 2, paddingLeft: 14, borderLeft: '1px solid rgba(255,255,255,.1)' }}>
+        <a href="/p2/hub" style={{ color: '#64748b', textDecoration: 'none' }}>Hub</a>
         <span style={{ color: '#334155' }}>›</span>
-        <a href="/ppc" style={{ color: '#64748b', textDecoration: 'none' }}>PPC</a>
+        <a href="/p2/b2b-agents" style={{ color: '#64748b', textDecoration: 'none' }}>B2B Agents</a>
         <span style={{ color: '#334155' }}>›</span>
-        <span style={{ color: '#c7d2fe', fontWeight: 600 }}>Ad Intelligence</span>
+        <span style={{ color: '#818cf8', fontWeight: 600 }}>Ad Intelligence</span>
       </div>
       <div id="kp-right" style={{ marginLeft: 'auto', position: 'relative', flexShrink: 0 }}>
         <div onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 999, padding: '4px 13px 4px 4px', cursor: 'pointer' }}>
@@ -176,8 +177,8 @@ function PlatformBar() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#e6edf6' }}>{full}</div>
               <div style={{ fontSize: 11, color: '#55617a', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u?.email || ''}</div>
             </div>
-            <a href="/hub" style={kpDdItem}>⌂&nbsp; Hub</a>
-            {isAdmin && <a href="/admin/usage" style={kpDdItem}>⚙&nbsp; Usage Dashboard</a>}
+            <a href="/p2/hub" style={kpDdItem}>⌂&nbsp; Hub</a>
+            {isAdmin && <a href="/p2/admin/usage" style={kpDdItem}>⚙&nbsp; Usage Dashboard</a>}
             <a href="/logout" style={{ ...kpDdItem, color: '#fb7185' }}>→&nbsp; Sign out</a>
           </div>
         )}
@@ -258,8 +259,8 @@ export default function App() {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl animated-gradient flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30 logo-glow icon-spin-hover">
-              <Zap size={18} className="text-white" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#151b2e' }}>
+              <img src="/static/logo-mark.svg?v=4" alt="Arena mark" style={{ width: 20, height: 20, display: 'block' }} />
             </div>
             <div>
               <p className="gradient-text-anim font-bold text-sm leading-none">Ad Intelligence</p>
@@ -330,8 +331,8 @@ export default function App() {
 
           {/* Left: breadcrumb-style title */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg animated-gradient flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
-              <Zap size={13} className="text-white"/>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: '#151b2e' }}>
+              <img src="/static/logo-mark.svg?v=4" alt="Arena mark" style={{ width: 15, height: 15, display: 'block' }} />
             </div>
             <div className="hidden sm:flex items-center gap-1.5 font-medium">
               <span className="text-[13px] text-white/70">Ad Intelligence</span>
