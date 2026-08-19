@@ -3848,7 +3848,10 @@ def ad_intelligence_assets(filename):
 @app.route("/gtm/ad-intelligence/favicon.svg")
 @app.route("/ppc/ad-intelligence/favicon.svg")
 def ad_intelligence_favicon():
-    return send_from_directory("ad_intelligence", "favicon.svg")
+    # index.html requests this exact path (see vite.config.ts's `base`), but
+    # it should show the same browser-tab icon as every other page on the
+    # site, not the app's own bundled ad_intelligence/favicon.svg.
+    return send_from_directory("static", "favicon.svg", mimetype="image/svg+xml")
 
 @app.route("/p2/b2b-agents/ad-intelligence/icons.svg")
 @app.route("/b2b-agents/ad-intelligence/icons.svg")
