@@ -132,6 +132,10 @@ def _parse_sse_text(trimmed: str) -> dict:
     output: dict = {}
     final_output: dict = {}
     chunks_by_block: dict[str, str] = {}
+    # Diagnostic only (see _sseDebug below) -- never affects parsing behavior.
+    event_type_counts: dict[str, int] = {}
+    final_event_output_keys: set[str] = set()
+    unparsed_line_count = 0
 
     for line in trimmed.split("\n"):
         l = line.strip()
@@ -143,9 +147,13 @@ def _parse_sse_text(trimmed: str) -> dict:
         try:
             evt = json.loads(body)
         except (ValueError, json.JSONDecodeError):
+            unparsed_line_count += 1
             continue
         if not _is_dict(evt):
             continue
+        evt_type = evt.get("event")
+        if isinstance(evt_type, str):
+            event_type_counts[evt_type] = event_type_counts.get(evt_type, 0) + 1
         # The streaming API's final event carries the complete, structured
         # output: {event: 'final', data: {output: {<blockId>: {...}}}}. This
         # multi-agent workflow can emit more than one "final" event -- one per
@@ -155,6 +163,7 @@ def _parse_sse_text(trimmed: str) -> dict:
         # except whichever agent's final event happened to arrive last).
         if evt.get("event") == "final" and _is_dict(evt.get("data")) and _is_dict(evt["data"].get("output")):
             final_output.update(evt["data"]["output"])
+            final_event_output_keys.update(evt["data"]["output"].keys())
             continue
         # Intermediate streamed text chunks per block; accumulated as a
         # fallback in case no final event is present in the stream.
@@ -178,7 +187,21 @@ def _parse_sse_text(trimmed: str) -> dict:
     # accumulated from chunk/intermediate events, since either source alone
     # might be incomplete.
     output.update(final_output)
-    return {"output": output}
+    # A namespace missing from `output` after all of the above means the
+    # vendor's stream never carried it -- these three numbers are what
+    # distinguish "the wire never had it" (all zero/absent here) from a future
+    # parsing regression, without needing production log access to tell them
+    # apart. Stored alongside the run so the existing admin raw-data view
+    # surfaces it for free on the next real run.
+    return {
+        "output": output,
+        "_sseDebug": {
+            "eventTypeCounts": event_type_counts,
+            "finalEventOutputKeys": sorted(final_event_output_keys),
+            "chunkBlockIds": sorted(chunks_by_block.keys()),
+            "unparsedLineCount": unparsed_line_count,
+        },
+    }
 
 
 def _parse_chunk_records(chunk_text: str) -> dict:
@@ -370,6 +393,8 @@ def run_analysis(company_name: str, company_id: str, email: str, run_type: str,
         return None
     output = normalize_analysis_output(extract_output(parsed))
     _log_missing_namespaces(output)
+    if _is_dict(parsed.get("_sseDebug")):
+        output["_sseDebug"] = parsed["_sseDebug"]
     return output
 
 
