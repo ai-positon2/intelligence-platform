@@ -32,7 +32,7 @@ sys.path.insert(0, _ROOT)
 
 import app as appmod  # noqa: E402
 
-_SLUG = "linkedin-strategy-researcher"
+_SLUG = "linkedin-social-researcher"
 _NAME = "LinkedIn Social Researcher"
 _CLIENT = "northstaranesthesia"
 
