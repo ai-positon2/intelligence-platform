@@ -1,4 +1,4 @@
-"""Postgres-backed storage for LinkedIn Playbook Studio runs and playbooks.
+"""Postgres-backed storage for LinkedIn Strategy Researcher runs and playbooks.
 
 Deliberately NOT sqlite3, unlike most tracker/*_store.py modules in this repo:
 this Flask app runs on Railway with no persistent disk, and the sqlite pattern

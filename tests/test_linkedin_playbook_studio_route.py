@@ -67,7 +67,7 @@ def _owner_scoped_get_run(monkeypatch, run=None):
 def test_page_renders_for_any_position2_staff():
     resp = _client("someone@position2.com").get("/p2/b2b-agents/linkedin-playbook-studio")
     assert resp.status_code == 200
-    assert b"LinkedIn Playbook Studio" in resp.data
+    assert b"LinkedIn Strategy Researcher" in resp.data
 
 
 def test_page_requires_login():

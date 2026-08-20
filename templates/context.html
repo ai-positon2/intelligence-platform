@@ -551,11 +551,11 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
           <span class="p-eyebrow" style="color:#a78bfa">Go-to-market team</span>
         </div>
         <h3>Sales · AM · BD</h3>
-        <p>Before you dial, know the account's story. <b>ABM Signal Tracker</b> flags funding, leadership and hiring moves the moment they land. <b>LinkedIn Intelligence</b> shows which buying-committee members are already engaging. <b>LinkedIn Strategy Researcher</b> decodes what a competitor is posting and how it lands. <b>Competitor Ad Intelligence</b> reveals what rivals are pitching the same account. Walk into every call already ahead of it.</p>
+        <p>Before you dial, know the account's story. <b>ABM Signal Tracker</b> flags funding, leadership and hiring moves the moment they land. <b>LinkedIn Intelligence</b> shows which buying-committee members are already engaging. <b>LinkedIn Social Researcher</b> decodes what a competitor is posting and how it lands. <b>Competitor Ad Intelligence</b> reveals what rivals are pitching the same account. Walk into every call already ahead of it.</p>
         <div class="p-chips">
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>ABM Signal Tracker</span>
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>LinkedIn Intelligence</span>
-          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>LinkedIn Strategy</span>
+          <span class="chip"><span class="cdot" style="background:#a78bfa"></span>LinkedIn Social</span>
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Competitor Ad Intel</span>
           <span class="chip"><span class="cdot" style="background:#a78bfa"></span>Anonymous Visitors</span>
         </div>
@@ -654,8 +654,8 @@ html[data-theme="light"] .layer .ldot{border-color:#eef1f8}
         <div class="u"><code>/app</code>Member workspace</div>
         <p>The client-facing side. Prospects and clients sign in here to run the public SEO tools themselves, no /p2 access required.</p>
         <div class="surf-list">
-          {# Was "4 live agents ... LinkedIn Strategy Researcher" and "(unlimited on
-             LinkedIn Strategy Researcher)" until that agent was hidden on 2026-08-14
+          {# Was "4 live agents ... LinkedIn Social Researcher" and "(unlimited on
+             LinkedIn Social Researcher)" until that agent was hidden on 2026-08-14
              (HIDDEN_AGENT_SLUGS in app.py). This describes what /app actually lists,
              so it has to move with it; restore both when the agent comes back. #}
           <div class="srow"><span class="sck">✓</span>3 live agents: Keyword Finder, Content Brief Generator, Content Enhancer</div>
@@ -956,7 +956,7 @@ var CX_AGENTS = [
    d:'Tracks any person, company or page and maps engagement to accounts.',
    more:'Point it at a LinkedIn target and it captures the engagement around them via Unipile, showing which buying-committee members are already paying attention.',
    src:['Arena','Unipile'], needs:'LinkedIn target'},
-  {name:'LinkedIn Strategy Researcher', bucket:'gtm', ac:'#a78bfa',
+  {name:'LinkedIn Social Researcher', bucket:'gtm', ac:'#a78bfa',
    d:'Decodes a competitor’s LinkedIn strategy from a year of their posts.',
    more:'Point it at a company page and it pulls the last 12 months of organic posts, analyzes the messaging, creative and engagement, and writes a prioritized 30/60/90 playbook.',
    src:['Unipile','ChatGPT API'], needs:'Company page'},

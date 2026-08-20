@@ -625,7 +625,7 @@ AGENTS = [
         "connects": ["LinkedIn", "GTM", "CRM"],
     },
     {
-        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher", "role": "Competitive LinkedIn Analysis",
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Social Researcher", "role": "Competitive LinkedIn Analysis",
         "badge": "NEW", "cat": "Social", "accent": "#3b82f6", "metric": "12 months of posts, scored in minutes",
         "icon": _svg('<path d="M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z"/><path d="M12 7v12.8"/>'),
         "summary": "Decode any company's organic LinkedIn strategy in one report. Point it at a company page and it reads a year of their posts, then breaks down messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run.",
@@ -635,7 +635,7 @@ AGENTS = [
         "connects": ["LinkedIn", "Competitive", "AI"],
     },
     {
-        "slug": "linkedin-playbook-studio", "name": "LinkedIn Playbook Studio", "role": "Competitive Strategy Playbooks",
+        "slug": "linkedin-playbook-studio", "name": "LinkedIn Strategy Researcher", "role": "Competitive Strategy Playbooks",
         "badge": "NEW", "cat": "Social", "accent": "#f472b6", "metric": "5-agent analysis → prioritized playbook",
         "icon": _svg('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
         "summary": "Search any company, run a multi-agent LinkedIn strategy analysis of its own brand or a competitor, and generate a prioritized strategic playbook of what to run next.",
@@ -1468,7 +1468,7 @@ APP_AGENTS = [
         # means it's exempt from AGENT_RUN_CAP everywhere that cap is enforced
         # (app_use, app_use_log_run, app.html, app_detail.html, app_embed.html):
         # free for every signed-in user, no run limit, no metering.
-        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher",
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Social Researcher",
         "tagline": "Competitive LinkedIn content analysis",
         "external_url": "https://watchtower-by-position2.vercel.app/linkedin.html",
         "uncapped": True,
@@ -1592,7 +1592,7 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "GTM", "CRM"],
     },
     {
-        "slug": "linkedin-playbook-studio", "name": "LinkedIn Playbook Studio",
+        "slug": "linkedin-playbook-studio", "name": "LinkedIn Strategy Researcher",
         "tagline": "Competitive Strategy Playbooks",
         "ac": "#f472b6", "ac2": "#fb7185", "icon": _asvg("<path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
         "pill1": "Competitive Strategy Playbooks", "pill2": "5-agent analysis → prioritized playbook",
@@ -2984,7 +2984,7 @@ def _fmt_run_ts(iso_str: str) -> str:
 
 def _app_embed_url(agent):
     """Build the live tool URL for an agent: either a hardcoded external tool
-    (via "external_url", e.g. the watchtower-hosted LinkedIn Strategy Researcher)
+    (via "external_url", e.g. the watchtower-hosted LinkedIn Social Researcher)
     or the SERP tool (via "seo_slug", same as the internal /p2/seo embed)."""
     if agent.get("external_url"):
         return agent["external_url"]
@@ -3536,7 +3536,7 @@ def _client_agent_log_run(client_slug, agent_slug):
     if agent_slug not in client.get("agents", []):
         return jsonify({"logged": False, "error": "unknown agent"}), 404
     # client=client matters here: an external-tool-only agent (no seo_slug, e.g.
-    # LinkedIn Strategy Researcher) only shows connected=True when _client_agent_view
+    # LinkedIn Social Researcher) only shows connected=True when _client_agent_view
     # knows the client, since that's what resolves is_external. Omitting it silently
     # marks the agent "not connected" and 400s every log-run call.
     agent = _client_agent_view(agent_slug, client)
@@ -3781,7 +3781,7 @@ def b2b_agents_gtm_legacy_redirect(rest=""):
     return redirect(target, code=308)
 
 
-# LinkedIn Strategy Researcher — external Position2-hosted tool (watchtower), embedded
+# LinkedIn Social Researcher — external Position2-hosted tool (watchtower), embedded
 # behind this internal path so the .vercel.app host stays masked in the address bar.
 # Internal GTM tool: @position2 staff only, no run cap and no metering (unlike the
 # co-branded client-portal copy of this agent, which is capped).
@@ -3794,10 +3794,10 @@ def linkedin_strategy_researcher():
     """Competitive LinkedIn analysis tool, embedded from watchtower. Uncapped."""
     return render_template("embed.html",
         user=_get_user(),
-        title="LinkedIn Strategy Researcher",
+        title="LinkedIn Social Researcher",
         embed_url=LINKEDIN_RESEARCHER_URL,
         breadcrumb=[("Hub", "/p2/hub"), ("B2B Agents", "/p2/b2b-agents")],
-        current="LinkedIn Strategy Researcher",
+        current="LinkedIn Social Researcher",
         accent="#a855f7",
     )
 
@@ -7651,7 +7651,7 @@ def linkedin_scraper_data():
     return _linkedin_data_response(LINKEDIN_INTEL_SHEET_ID, force)
 
 
-# ── LinkedIn Playbook Studio ──────────────────────────────────────────────────
+# ── LinkedIn Strategy Researcher ──────────────────────────────────────────────
 # Search a company, run a multi-agent LinkedIn competitive-strategy analysis
 # (own-brand or vs. a competitor) via the Arena workflow platform
 # (agent.thearena.ai), and generate a strategic playbook from a saved run.
@@ -7681,7 +7681,7 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
         lps_store.update_run_status(run_id, "complete", output=output, summary=summary,
                                     scorecard_score=score)
     except Exception as e:
-        log.warning("LinkedIn Playbook Studio: analysis job failed for run %s: %s", run_id, e)
+        log.warning("LinkedIn Strategy Researcher: analysis job failed for run %s: %s", run_id, e)
         lps_store.update_run_status(run_id, "error", error="Analysis could not be completed.")
 
 
@@ -7691,11 +7691,11 @@ def _lps_run_playbook_job(run_id: int, email: str, mode: str) -> None:
     try:
         content = arena_client.run_playbook(email, str(run_id), mode)
         if content is None:
-            log.warning("LinkedIn Playbook Studio: playbook generation returned nothing for run %s", run_id)
+            log.warning("LinkedIn Strategy Researcher: playbook generation returned nothing for run %s", run_id)
             return
         lps_store.save_playbook(run_id, email, mode, content)
     except Exception as e:
-        log.warning("LinkedIn Playbook Studio: playbook job failed for run %s: %s", run_id, e)
+        log.warning("LinkedIn Strategy Researcher: playbook job failed for run %s: %s", run_id, e)
 
 
 @app.route("/p2/b2b-agents/linkedin-playbook-studio")
