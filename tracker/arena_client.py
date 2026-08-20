@@ -57,8 +57,12 @@ ANALYSIS_OUTPUTS = [
 # namespace -> the field names that, together, identify a nested output block
 # as belonging to that agent. Used to place an already-flat (non-dotted)
 # response onto the right namespace -- the same disambiguation the vendor's
-# own streaming shape sometimes requires. Ported verbatim from the prior
-# tool's AGENT_KEY_GROUPS table.
+# own streaming shape sometimes requires. The five *agent groups are ported
+# verbatim from the prior tool's AGENT_KEY_GROUPS table; getcompanyprofile and
+# getcompanypost are added here since this app also requests those two
+# namespaces (the prior tool never had to place them, since it only ever read
+# a single already-namespaced field: history/single-run lookups it made
+# unscoped by id -- see the module docstring).
 _AGENT_KEY_GROUPS: list[tuple[str, set[str]]] = [
     ("strategyagent", {"strategy", "personas", "hookLibrary", "ctaLibrary", "audienceDetail"}),
     ("contentcreativeagent", {"content", "creative", "engagement", "topicClusters"}),
@@ -66,7 +70,14 @@ _AGENT_KEY_GROUPS: list[tuple[str, set[str]]] = [
     ("creativeinsightagent", {"imageryTypes", "recommendations", "observations", "textStyle"}),
     ("competitiveagent", {"campaigns", "competitive", "launches", "messagingEvolution",
                           "recommendations", "scorecard", "scorecardOverall"}),
+    ("getcompanyprofile", {"id", "name", "description", "public_identifier", "profile_url",
+                          "followers_count", "employee_count", "website", "logo", "profile"}),
+    ("getcompanypost", {"items"}),
 ]
+
+# The full set of namespaces ANALYSIS_OUTPUTS asks for, used only to log when
+# one goes missing from a response -- see _log_missing_namespaces below.
+_EXPECTED_NAMESPACES = sorted({k.split(".", 1)[0] for k in ANALYSIS_OUTPUTS})
 
 _TIMEOUT_SEARCH = 30
 _TIMEOUT_LONG = 300  # own-brand/competitor analysis and playbook generation
@@ -119,7 +130,7 @@ def _parse_response_text(text: str) -> dict:
 
 def _parse_sse_text(trimmed: str) -> dict:
     output: dict = {}
-    final_output: dict | None = None
+    final_output: dict = {}
     chunks_by_block: dict[str, str] = {}
 
     for line in trimmed.split("\n"):
@@ -136,10 +147,14 @@ def _parse_sse_text(trimmed: str) -> dict:
         if not _is_dict(evt):
             continue
         # The streaming API's final event carries the complete, structured
-        # output: {event: 'final', data: {output: {<blockId>: {...}}}}. Always
-        # prefer this over intermediate chunk events.
+        # output: {event: 'final', data: {output: {<blockId>: {...}}}}. This
+        # multi-agent workflow can emit more than one "final" event -- one per
+        # agent/node as it finishes, not one for the whole run -- so this
+        # merges every final event's output rather than letting the last one
+        # overwrite the others (which previously discarded every namespace
+        # except whichever agent's final event happened to arrive last).
         if evt.get("event") == "final" and _is_dict(evt.get("data")) and _is_dict(evt["data"].get("output")):
-            final_output = evt["data"]["output"]
+            final_output.update(evt["data"]["output"])
             continue
         # Intermediate streamed text chunks per block; accumulated as a
         # fallback in case no final event is present in the stream.
@@ -149,12 +164,6 @@ def _parse_sse_text(trimmed: str) -> dict:
             continue
         _merge_event_output(evt, output)
 
-    # Some workflows (e.g. the playbook) stream the whole content as chunks
-    # and then emit a final event with an EMPTY output. Only prefer the final
-    # event when it actually carries data; otherwise fall back to the chunks.
-    if final_output:
-        return {"output": final_output}
-
     if not output:
         for block_id, chunk_text in chunks_by_block.items():
             merged = _parse_chunk_records(chunk_text)
@@ -162,6 +171,13 @@ def _parse_sse_text(trimmed: str) -> dict:
                 output[block_id] = merged
             elif chunk_text.strip():
                 output[block_id] = chunk_text.strip()
+
+    # Some workflows (e.g. the playbook) stream the whole content as chunks
+    # and then emit a final event with an EMPTY output -- so the final events'
+    # data (if any) is layered on top of, not instead of, whatever was
+    # accumulated from chunk/intermediate events, since either source alone
+    # might be incomplete.
+    output.update(final_output)
     return {"output": output}
 
 
@@ -215,12 +231,18 @@ def extract_output(parsed: dict) -> dict:
 
 def normalize_analysis_output(output: dict) -> dict:
     """Namespace a flat (non-dotted) analysis output onto 'strategyagent.strategy'-
-    style keys by scoring each nested object's field names against the five
-    agents' known key sets. Already-namespaced output is returned as-is."""
-    if any("." in k for k in output):
-        return output
+    style keys by scoring each nested object's field names against the known
+    agent/namespace key sets. Handles a MIXED response -- some keys already
+    dotted, others not -- by deciding per key, not for the response as a
+    whole: a response where most agents stream back already-namespaced keys
+    but one or two land as a flat nested block (e.g. under an opaque block id)
+    must still get that block namespaced, not skipped just because its
+    siblings were already dotted."""
     normalized: dict = {}
     for key, value in output.items():
+        if "." in key:
+            normalized[key] = value
+            continue
         if not _is_dict(value):
             normalized[key] = value
             continue
@@ -236,6 +258,25 @@ def normalize_analysis_output(output: dict) -> dict:
         else:
             normalized[key] = value
     return normalized
+
+
+def _log_missing_namespaces(output: dict) -> None:
+    """Best-effort diagnostic: if a namespace we explicitly requested via
+    ANALYSIS_OUTPUTS never shows up (dotted or otherwise) in the parsed
+    result, log the namespaces that are missing and the top-level keys that
+    ARE present. Never raises. Purely observational -- this exists so a
+    report showing empty sections for specific namespaces can be diagnosed
+    from Railway logs next time, instead of guessed at from screenshots."""
+    try:
+        present = {k.split(".", 1)[0] for k in output}
+        missing = [ns for ns in _EXPECTED_NAMESPACES if ns not in present]
+        if missing:
+            logger.warning(
+                "arena_client: analysis output missing namespace(s) %s -- "
+                "top-level keys present were: %s", missing, sorted(output.keys()),
+            )
+    except Exception:
+        pass
 
 
 def _to_company(r: dict) -> dict | None:
@@ -327,7 +368,9 @@ def run_analysis(company_name: str, company_id: str, email: str, run_type: str,
     }, _TIMEOUT_LONG)
     if parsed is None:
         return None
-    return normalize_analysis_output(extract_output(parsed))
+    output = normalize_analysis_output(extract_output(parsed))
+    _log_missing_namespaces(output)
+    return output
 
 
 _CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*([\s\S]*?)\s*```$")

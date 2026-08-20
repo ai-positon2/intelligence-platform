@@ -21,13 +21,31 @@ def test_a_plain_json_object_body_parses_directly():
     assert parsed == {"output": {"companies": []}}
 
 
-def test_sse_final_event_wins_over_intermediate_chunks():
+def test_sse_final_event_output_is_layered_over_accumulated_chunks():
+    # The final event's own keys win, but data accumulated from other blocks
+    # along the way isn't discarded just because a final event also arrived --
+    # a real multi-agent run's final event for one agent must not erase
+    # another agent's already-streamed data (see the merge test below).
     body = "\n".join([
         'data: {"blockId":"b1","chunk":"partial"}',
         'data: {"event":"final","data":{"output":{"strategy":"the real answer"}}}',
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"strategy": "the real answer"}}
+    assert parsed == {"output": {"b1": "partial", "strategy": "the real answer"}}
+
+
+def test_multiple_final_events_are_merged_not_overwritten():
+    # This multi-agent workflow emits one "final" event per agent as it
+    # completes, not a single final event for the whole run. Overwriting
+    # (instead of merging) meant only the LAST agent to finish survived --
+    # every earlier agent's namespace silently vanished from the response,
+    # which is exactly the "some report tabs are empty" symptom this fixes.
+    body = "\n".join([
+        'data: {"event":"final","data":{"output":{"strategyagent.strategy":"x"}}}',
+        'data: {"event":"final","data":{"output":{"getcompanyprofile.name":"Acme"}}}',
+    ])
+    parsed = ac._parse_response_text(body)
+    assert parsed == {"output": {"strategyagent.strategy": "x", "getcompanyprofile.name": "Acme"}}
 
 
 def test_sse_empty_final_event_falls_back_to_accumulated_chunks():
@@ -91,10 +109,21 @@ def test_a_flat_block_is_namespaced_by_its_field_names():
     assert normalized == {"strategyagent.strategy": "x", "strategyagent.personas": ["a"]}
 
 
-def test_a_block_matching_no_known_namespace_is_left_as_is():
+def test_a_getcompanyprofile_block_is_namespaced():
+    # getcompanyprofile and getcompanypost are this app's own two extra
+    # namespaces beyond the five analysis agents ported from a prior tool --
+    # they used to be absent from the scored groups entirely, so a flat
+    # response for either one passed through unmatched and never reached the
+    # UI as `getcompanyprofile.name` etc., reading as "no data returned" even
+    # when the vendor's profile fetch actually succeeded.
     flat = {"getcompanyprofile": {"name": "Acme", "website": "acme.com"}}
-    # getcompanyprofile isn't one of the scored namespaces (it never collides
-    # with the five agents' field names), so it passes through untouched.
+    assert ac.normalize_analysis_output(flat) == {
+        "getcompanyprofile.name": "Acme", "getcompanyprofile.website": "acme.com",
+    }
+
+
+def test_a_block_matching_no_known_namespace_is_left_as_is():
+    flat = {"block-1": {"totally": "unrecognized", "fields": "here"}}
     assert ac.normalize_analysis_output(flat) == flat
 
 
@@ -103,6 +132,43 @@ def test_ties_are_broken_by_which_namespace_scores_first():
     # unambiguously belongs there even though it's the only shared field.
     flat = {"block-1": {"summary": "text"}}
     assert ac.normalize_analysis_output(flat) == {"messagingagent.summary": "text"}
+
+
+def test_normalize_handles_a_mixed_response_of_dotted_and_flat_keys():
+    # A response where most agents already stream back namespaced keys but
+    # one lands as a flat nested block (e.g. under an opaque block id) used
+    # to skip normalization ENTIRELY the moment any key had a dot -- so that
+    # one flat block's data was silently dropped instead of namespaced. Each
+    # key must be judged on its own, not the response as a whole.
+    mixed = {
+        "strategyagent.strategy": "already dotted",
+        "block-uuid-9": {"imageryTypes": ["carousel"], "textStyle": "bold"},
+    }
+    normalized = ac.normalize_analysis_output(mixed)
+    assert normalized == {
+        "strategyagent.strategy": "already dotted",
+        "creativeinsightagent.imageryTypes": ["carousel"],
+        "creativeinsightagent.textStyle": "bold",
+    }
+
+
+# ── Missing-namespace diagnostics ────────────────────────────────────────
+
+def test_log_missing_namespaces_warns_when_one_is_absent(caplog):
+    with caplog.at_level("WARNING"):
+        ac._log_missing_namespaces({"strategyagent.strategy": "x"})
+    assert any("missing namespace" in r.message for r in caplog.records)
+
+
+def test_log_missing_namespaces_silent_when_everything_present(caplog):
+    output = {f"{ns}.x": 1 for ns in ac._EXPECTED_NAMESPACES}
+    with caplog.at_level("WARNING"):
+        ac._log_missing_namespaces(output)
+    assert not any("missing namespace" in r.message for r in caplog.records)
+
+
+def test_log_missing_namespaces_never_raises_on_bad_input():
+    ac._log_missing_namespaces(None)  # type: ignore[arg-type]
 
 
 # ── extract_companies ────────────────────────────────────────────────────
