@@ -524,13 +524,18 @@
     }
 
     /* Company Profile: a purpose-built profile card instead of a generic
-       key/value dump, since this namespace's shape is fully known. */
-    function companyProfileContent(output){
+       key/value dump, since this namespace's shape is fully known. Falls
+       back to the company name/logo captured at search time (run.company_name/
+       company_logo, always present) when the vendor's own profile fields
+       come back empty for this run -- so the tab never shows a bare "no
+       data" message for a company whose name and logo we already know. */
+    function companyProfileContent(output,run){
       var get=function(f){return output['getcompanyprofile.'+f];};
-      var name=get('name'), desc=get('description'), logo=get('logo'),
+      var name=get('name')||(run&&run.company_name), desc=get('description'),
+          logo=get('logo')||(run&&run.company_logo),
           website=get('website'), profileUrl=get('profile_url'), handle=get('public_identifier'),
           followers=get('followers_count'), employees=get('employee_count');
-      if([name,desc,website,profileUrl,followers,employees].every(isEmptyValue))
+      if([name,desc,logo,website,profileUrl,followers,employees].every(isEmptyValue))
         return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanyprofile+'</div>';
       var stats=[];
       if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
@@ -606,8 +611,8 @@
       return top+(restIsEmpty?'':rest);
     }
 
-    function tabPaneContent(output,ns){
-      if(ns==='getcompanyprofile')return companyProfileContent(output);
+    function tabPaneContent(output,ns,run){
+      if(ns==='getcompanyprofile')return companyProfileContent(output,run);
       if(ns==='getcompanypost')return postsContent(output);
       if(ns==='competitiveagent')return competitiveContent(output);
       return agentTabContent(output,ns);
@@ -701,7 +706,7 @@
           return '<button class="lps-drw-tab'+(i===0?' active':'')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'+esc(t.label)+'</button>';
         }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">Playbook</button>';
         var panesHtml=AGENT_TABS.map(function(t,i){
-          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+tabPaneContent(output,t.ns)+'</div>';
+          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+tabPaneContent(output,t.ns,run)+'</div>';
         }).join('')+'<div class="lps-drw-pane" data-ns="playbook"><div id="lpsPlaybookBody"></div></div>';
         document.getElementById('drawerBody').innerHTML=drawerHeader(run)
           +'<div class="lps-drw-tabs">'+tabsHtml+'</div>'
