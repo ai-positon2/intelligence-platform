@@ -220,7 +220,7 @@ Per-client co-branded front door at `/<client-slug>`. Currently one client: `nor
 
 ## LINKEDIN STRATEGY RESEARCHER - STILL HIDDEN, NOT DELETED (unchanged this cycle, carried over from v24)
 
-**Pulled from every listing on 2026-08-14; the owner expected to ask for it back "in a few days" - still hidden as of this cycle, with no restore request received yet.** Nothing underneath was deleted or disabled: `/p2/b2b-agents/linkedin-strategy-researcher` still resolves, the watchtower tool it embeds still loads, `APP_AGENTS_BY_SLUG` still holds the full entry, and NorthStar's own ordered `agents` list in `CLIENTS` is untouched.
+**Pulled from every listing on 2026-08-14; the owner expected to ask for it back "in a few days" - still hidden as of this cycle, with no restore request received yet.** Renamed 2026-08-20 to LinkedIn Social Researcher (slug also moved, to `linkedin-social-researcher`) when the old name/slug moved to a new, unrelated agent. Nothing underneath was deleted or disabled: `/p2/b2b-agents/linkedin-social-researcher` still resolves, the watchtower tool it embeds still loads, `APP_AGENTS_BY_SLUG` still holds the full entry, and NorthStar's own ordered `agents` list in `CLIENTS` is untouched.
 
 **To restore, in this exact order:**
 1. Empty `HIDDEN_AGENT_SLUGS` in `app.py` (drives `/app`'s main grid, the `/app` sidebar, and every client portal - three consuming surfaces from one flag).
@@ -356,7 +356,7 @@ intelligence-platform/
 - **`p2_vid` stitching:** Page Views and both login tabs carry a visitor-id column.
 - **Surface 2, `/app`:** shell `app_base.html`, `APP_AGENTS` cards (minus `HIDDEN_AGENT_SLUGS`), 3 wired to live seo-apps tools plus LSR (currently hidden), the rest request-access-only. Per-agent `lock_label` and `no_request` keys control the locked-card CTA, enforced server-side too.
 - **Surface 1, public site:** one template `agents.html`, `{% if page %}` chain.
-- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (+ Contact Finder, Job Change Alert, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-strategy-researcher), `/p2/seo` + tools (16), `/p2/abm-signal-tracker/accounts` + signal trackers (renamed URL this cycle), `/p2/playbook`, admin dashboards.
+- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (+ Contact Finder, Job Change Alert, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-social-researcher, linkedin-strategy-researcher [new agent, this cycle]), `/p2/seo` + tools (16), `/p2/abm-signal-tracker/accounts` + signal trackers (renamed URL this cycle), `/p2/playbook`, admin dashboards.
 
 **Agent roster hazard, still live:** the roster exists in **three independent lists** (`AGENTS`, `APP_AGENTS`, and a JS array in `templates/context.html`), plus the internal SEO Suite tools list, plus `HIDDEN_AGENT_SLUGS` as a fourth cross-cutting mechanism, plus now Job Change Alert's own card is hand-written in `b2b_agents.html` like every other B2B agent card. **Nothing derives one from another.**
 

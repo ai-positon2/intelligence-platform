@@ -625,7 +625,7 @@ AGENTS = [
         "connects": ["LinkedIn", "GTM", "CRM"],
     },
     {
-        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Social Researcher", "role": "Competitive LinkedIn Analysis",
+        "slug": "linkedin-social-researcher", "name": "LinkedIn Social Researcher", "role": "Competitive LinkedIn Analysis",
         "badge": "NEW", "cat": "Social", "accent": "#3b82f6", "metric": "12 months of posts, scored in minutes",
         "icon": _svg('<path d="M12 7c-2-1.2-4.7-1.8-8-1.8V18c3.3 0 6 .6 8 1.8 2-1.2 4.7-1.8 8-1.8V5.2c-3.3 0-6 .6-8 1.8z"/><path d="M12 7v12.8"/>'),
         "summary": "Decode any company's organic LinkedIn strategy in one report. Point it at a company page and it reads a year of their posts, then breaks down messaging, content mix, creative formats, engagement and posting cadence, and hands you an AI playbook of moves to run.",
@@ -635,7 +635,7 @@ AGENTS = [
         "connects": ["LinkedIn", "Competitive", "AI"],
     },
     {
-        "slug": "linkedin-playbook-studio", "name": "LinkedIn Strategy Researcher", "role": "Competitive Strategy Playbooks",
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher", "role": "Competitive Strategy Playbooks",
         "badge": "NEW", "cat": "Social", "accent": "#f472b6", "metric": "5-agent analysis → prioritized playbook",
         "icon": _svg('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
         "summary": "Search any company, run a multi-agent LinkedIn strategy analysis of its own brand or a competitor, and generate a prioritized strategic playbook of what to run next.",
@@ -1468,7 +1468,7 @@ APP_AGENTS = [
         # means it's exempt from AGENT_RUN_CAP everywhere that cap is enforced
         # (app_use, app_use_log_run, app.html, app_detail.html, app_embed.html):
         # free for every signed-in user, no run limit, no metering.
-        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Social Researcher",
+        "slug": "linkedin-social-researcher", "name": "LinkedIn Social Researcher",
         "tagline": "Competitive LinkedIn content analysis",
         "external_url": "https://watchtower-by-position2.vercel.app/linkedin.html",
         "uncapped": True,
@@ -1592,7 +1592,7 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "GTM", "CRM"],
     },
     {
-        "slug": "linkedin-playbook-studio", "name": "LinkedIn Strategy Researcher",
+        "slug": "linkedin-strategy-researcher", "name": "LinkedIn Strategy Researcher",
         "tagline": "Competitive Strategy Playbooks",
         "ac": "#f472b6", "ac2": "#fb7185", "icon": _asvg("<path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
         "pill1": "Competitive Strategy Playbooks", "pill2": "5-agent analysis → prioritized playbook",
@@ -1685,9 +1685,10 @@ APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 # /app/<slug>, /<client>/agents/<slug>: a bookmarked link to a hidden agent keeps
 # working, and its past runs keep resolving their name on the history and admin
 # pages. Hidden means unlisted, not gone.
-#   linkedin-strategy-researcher: HIDDEN 2026-08-14 at the owner's request,
-#   expected back in a few days.
-HIDDEN_AGENT_SLUGS = {"linkedin-strategy-researcher"}
+#   linkedin-social-researcher: HIDDEN 2026-08-14 at the owner's request,
+#   expected back in a few days. (Renamed from linkedin-strategy-researcher
+#   on 2026-08-20 when that slug moved to a new, unrelated agent.)
+HIDDEN_AGENT_SLUGS = {"linkedin-social-researcher"}
 
 def _visible_app_agents():
     """APP_AGENTS minus anything currently withdrawn from the listings. Every
@@ -3274,7 +3275,7 @@ CLIENTS = {
         "tagline":  "Your agents, all in one place.",
         "blurb":    "",
         # Ordered exactly as the portal should list them (slugs index APP_AGENTS_BY_SLUG).
-        "agents":   ["signal-tracker", "linkedin-intelligence", "linkedin-strategy-researcher",
+        "agents":   ["signal-tracker", "linkedin-intelligence", "linkedin-social-researcher",
                      "keyword-finder", "content-brief-generator",
                      "content-enhancer"],
         # Per-agent live dashboards wired to this client's data. An agent listed
@@ -3293,7 +3294,7 @@ CLIENTS = {
         # intelligence.position2.com/<slug>/agents/<agent>/use — the external host is
         # never shown. Treated like a live dashboard (shows Live, not run-metered).
         "external_tools": {
-            "linkedin-strategy-researcher": "https://watchtower-by-position2.vercel.app/linkedin.html",
+            "linkedin-social-researcher": "https://watchtower-by-position2.vercel.app/linkedin.html",
         },
     },
 }
@@ -3787,10 +3788,10 @@ def b2b_agents_gtm_legacy_redirect(rest=""):
 # co-branded client-portal copy of this agent, which is capped).
 LINKEDIN_RESEARCHER_URL = "https://watchtower-by-position2.vercel.app/linkedin.html"
 
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher")
-@app.route("/p2/b2b-agents/linkedin-strategy-researcher/")
+@app.route("/p2/b2b-agents/linkedin-social-researcher")
+@app.route("/p2/b2b-agents/linkedin-social-researcher/")
 @position2_required
-def linkedin_strategy_researcher():
+def linkedin_social_researcher():
     """Competitive LinkedIn analysis tool, embedded from watchtower. Uncapped."""
     return render_template("embed.html",
         user=_get_user(),
@@ -3800,6 +3801,11 @@ def linkedin_strategy_researcher():
         current="LinkedIn Social Researcher",
         accent="#a855f7",
     )
+
+# NOTE: no legacy redirect from the old slug /linkedin-strategy-researcher --
+# that exact path is being reassigned to a different, unrelated agent below,
+# not deprecated. A bookmark to the old URL now lands on the new agent by
+# design (see the route registered further down in this file).
 
 
 @app.route("/p2/b2b-agents/sentiment-pulse")
@@ -4838,6 +4844,20 @@ def atrack():
 _PAGE_LABEL_ALIASES = (
     ("GTM Dashboards", "B2B Agents Dashboards"),   # renamed 2026-08-11
     ("/p2/gtm", "/p2/b2b-agents"),
+    # linkedin-playbook-studio -> linkedin-strategy-researcher, 2026-08-20. Safe
+    # to fold forward: "linkedin-playbook-studio"/"LinkedIn Playbook Studio"
+    # unambiguously meant this one agent for its few hours of existence, and the
+    # slug/title are both retired, not reused.
+    ("/p2/b2b-agents/linkedin-playbook-studio", "/p2/b2b-agents/linkedin-strategy-researcher"),
+    ("LinkedIn Playbook Studio", "LinkedIn Strategy Researcher"),
+    # NOT aliased, deliberately: the old hidden agent's slug/title
+    # ("linkedin-strategy-researcher" / "LinkedIn Strategy Researcher") were
+    # reassigned the same day to the new agent above, rather than retired. That
+    # exact string is now the CURRENT, correct label for the new agent going
+    # forward, so folding it would mis-attribute every future page view here to
+    # the old agent instead. The old agent's pre-2026-08-20 history under that
+    # label is a small, permanent, unfixable-by-substring ambiguity -- the
+    # one-time cost of reusing a name rather than a reason to add an alias.
 )
 
 
@@ -7698,13 +7718,13 @@ def _lps_run_playbook_job(run_id: int, email: str, mode: str) -> None:
         log.warning("LinkedIn Strategy Researcher: playbook job failed for run %s: %s", run_id, e)
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher")
 @position2_required
 def linkedin_playbook_studio():
     return render_template("linkedin_playbook_studio.html", user=_get_user())
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/search")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/search")
 @position2_required
 def linkedin_playbook_studio_search():
     from tracker import arena_client
@@ -7714,7 +7734,7 @@ def linkedin_playbook_studio_search():
     return jsonify({"companies": arena_client.search_companies(q)})
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/analyze", methods=["POST"])
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/analyze", methods=["POST"])
 @position2_required
 def linkedin_playbook_studio_analyze():
     from tracker import linkedin_playbook_store as lps_store
@@ -7753,7 +7773,7 @@ def linkedin_playbook_studio_analyze():
     return jsonify({"run_id": run_id, "status": "running"})
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>/status")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/status")
 @position2_required
 def linkedin_playbook_studio_run_status(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -7764,7 +7784,7 @@ def linkedin_playbook_studio_run_status(run_id):
     return jsonify({"id": run["id"], "status": run["status"], "error": run.get("error")})
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/history")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/history")
 @position2_required
 def linkedin_playbook_studio_history():
     from tracker import linkedin_playbook_store as lps_store
@@ -7772,7 +7792,7 @@ def linkedin_playbook_studio_history():
     return jsonify({"runs": lps_store.list_runs(email)})
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>")
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>")
 @position2_required
 def linkedin_playbook_studio_run(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -7784,7 +7804,7 @@ def linkedin_playbook_studio_run(run_id):
     return jsonify(run)
 
 
-@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>/playbook", methods=["GET", "POST"])
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/playbook", methods=["GET", "POST"])
 @position2_required
 def linkedin_playbook_studio_playbook(run_id):
     from tracker import linkedin_playbook_store as lps_store
@@ -7802,6 +7822,22 @@ def linkedin_playbook_studio_playbook(run_id):
     mode = "COMPETITOR" if payload.get("mode") == "COMPETITOR" else "OWN"
     threading.Thread(target=_lps_run_playbook_job, args=(run_id, email, mode), daemon=True).start()
     return jsonify({"status": "running"})
+
+
+# Old slug, kept resolving: this agent shipped hours earlier the same day as
+# "LinkedIn Playbook Studio" before being renamed to "LinkedIn Strategy
+# Researcher". One catch-all covers the whole subtree (page, search, analyze,
+# status, history, runs, playbook) the same way the /p2/gtm legacy redirect
+# does; 308 preserves method/body for the POST-based /analyze and /playbook
+# endpoints a still-open tab might call.
+@app.route("/p2/b2b-agents/linkedin-playbook-studio", methods=["GET", "POST"])
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/", methods=["GET", "POST"])
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/<path:rest>", methods=["GET", "POST"])
+def linkedin_playbook_studio_legacy_redirect(rest=""):
+    target = "/p2/b2b-agents/linkedin-strategy-researcher" + (("/" + rest) if rest else "")
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8", "ignore")
+    return redirect(target, code=308)
 
 
 # ── Contact Finder ────────────────────────────────────────────────────────────
