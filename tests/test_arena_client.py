@@ -31,7 +31,7 @@ def test_sse_final_event_output_is_layered_over_accumulated_chunks():
         'data: {"event":"final","data":{"output":{"strategy":"the real answer"}}}',
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"b1": "partial", "strategy": "the real answer"}}
+    assert parsed["output"] == {"b1": "partial", "strategy": "the real answer"}
 
 
 def test_multiple_final_events_are_merged_not_overwritten():
@@ -45,7 +45,7 @@ def test_multiple_final_events_are_merged_not_overwritten():
         'data: {"event":"final","data":{"output":{"getcompanyprofile.name":"Acme"}}}',
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"strategyagent.strategy": "x", "getcompanyprofile.name": "Acme"}}
+    assert parsed["output"] == {"strategyagent.strategy": "x", "getcompanyprofile.name": "Acme"}
 
 
 def test_sse_empty_final_event_falls_back_to_accumulated_chunks():
@@ -55,13 +55,13 @@ def test_sse_empty_final_event_falls_back_to_accumulated_chunks():
         'data: {"event":"final","data":{"output":{}}}',
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"b1": {"headline": "hello"}}}
+    assert parsed["output"] == {"b1": {"headline": "hello"}}
 
 
 def test_sse_chunk_that_never_parses_as_json_is_kept_as_raw_text():
     body = 'data: {"blockId":"b1","chunk":"just some prose, not JSON"}'
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"b1": "just some prose, not JSON"}}
+    assert parsed["output"] == {"b1": "just some prose, not JSON"}
 
 
 def test_sse_done_marker_lines_are_ignored():
@@ -70,7 +70,7 @@ def test_sse_done_marker_lines_are_ignored():
         "data: [DONE]",
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"x": 1}}
+    assert parsed["output"] == {"x": 1}
 
 
 def test_malformed_sse_lines_are_skipped_not_raised():
@@ -79,7 +79,47 @@ def test_malformed_sse_lines_are_skipped_not_raised():
         'data: {"event":"final","data":{"output":{"x":1}}}',
     ])
     parsed = ac._parse_response_text(body)
-    assert parsed == {"output": {"x": 1}}
+    assert parsed["output"] == {"x": 1}
+    assert parsed["_sseDebug"]["unparsedLineCount"] == 1
+
+
+# ── SSE diagnostics (_sseDebug) ──────────────────────────────────────────
+
+def test_sse_debug_reports_zero_events_for_a_namespace_that_never_arrived():
+    # This is the concrete tool for telling "the vendor's stream never sent
+    # this agent's data" apart from "our merge dropped it" without needing
+    # production log access -- see run_analysis, which carries this into the
+    # stored output under output["_sseDebug"] for the existing admin raw-data
+    # view to surface on the next real run.
+    body = 'data: {"event":"final","data":{"output":{"strategyagent.strategy":"x"}}}'
+    parsed = ac._parse_response_text(body)
+    debug = parsed["_sseDebug"]
+    assert debug["eventTypeCounts"] == {"final": 1}
+    assert debug["finalEventOutputKeys"] == ["strategyagent.strategy"]
+    assert debug["chunkBlockIds"] == []
+    assert "creativeinsightagent.imageryTypes" not in debug["finalEventOutputKeys"]
+
+
+def test_run_analysis_attaches_sse_debug_to_the_stored_output(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+
+    class _Resp:
+        text = 'data: {"event":"final","data":{"output":{"strategyagent.strategy":"x"}}}'
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(ac.requests, "post", lambda *a, **kw: _Resp())
+    output = ac.run_analysis("Acme", "1", "a@position2.com", "OWN")
+    assert output["strategyagent.strategy"] == "x"
+    assert output["_sseDebug"]["eventTypeCounts"] == {"final": 1}
+
+
+def test_a_whole_body_json_response_has_no_sse_debug():
+    # Only the SSE code path can say anything about what arrived on the wire;
+    # a plain JSON body has no such distinction to report.
+    parsed = ac._parse_response_text('{"output": {"a": 1}}')
+    assert "_sseDebug" not in parsed
 
 
 # ── extract_output ────────────────────────────────────────────────────────
