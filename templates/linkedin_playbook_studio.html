@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>LinkedIn Playbook Studio — Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin_playbook_studio.css') }}?v=1">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="lps-aurora"><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
+  <div class="lps-grain"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">LinkedIn Playbook Studio</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div>
+        <div class="eyebrow">B2B Agents · Competitive LinkedIn strategy</div>
+        <h1>LinkedIn Playbook Studio</h1>
+        <p>Search any company, run a five-agent LinkedIn strategy analysis of its own brand or against a competitor, and generate a prioritized strategic playbook of what to run next.</p>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card sc-total" id="scTotal" onclick="switchMainTab('history')">
+        <div class="sc-glow"></div>
+        <div class="stat-label">Analyses Run</div>
+        <div class="stat-value" id="statTotal"><span class="skel" style="width:56px;height:34px;display:inline-block"></span></div>
+        <div class="stat-hint">View history →</div>
+      </div>
+      <div class="stat-card sc-own" id="scOwn" onclick="switchMainTab('history')">
+        <div class="sc-glow"></div>
+        <div class="stat-label">Own-Brand Runs</div>
+        <div class="stat-value" id="statOwn"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
+        <div class="stat-hint">View history →</div>
+      </div>
+      <div class="stat-card sc-comp" id="scComp" onclick="switchMainTab('history')">
+        <div class="sc-glow"></div>
+        <div class="stat-label">Competitor Runs</div>
+        <div class="stat-value" id="statComp"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
+        <div class="stat-hint">View history →</div>
+      </div>
+      <div class="stat-card sc-playbooks" id="scPlaybooks" onclick="switchMainTab('history')">
+        <div class="sc-glow"></div>
+        <div class="stat-label">Playbooks Generated</div>
+        <div class="stat-value" id="statPlaybooks"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
+        <div class="stat-hint">View history →</div>
+      </div>
+    </div>
+
+    <div class="card" id="mainCard">
+      <div class="tabs at-search" id="mainTabs">
+        <div class="tab-indicator" aria-hidden="true"></div>
+        <button class="tab-btn active" id="btn-search"  onclick="switchMainTab('search')">New Analysis</button>
+        <button class="tab-btn"        id="btn-history" onclick="switchMainTab('history')">History</button>
+      </div>
+
+      <div id="pane-search" class="tab-pane active">
+        <div class="toolbar">
+          <div class="search-box">
+            <span>⌕</span>
+            <input id="companySearchInput" placeholder="Search for a company by name…" oninput="onCompanySearchInput()">
+          </div>
+        </div>
+        <div id="searchResultsWrap"><div class="lps-empty">Search for a company to get started.</div></div>
+
+        <div id="modeSelectWrap" class="lps-mode-wrap" style="display:none">
+          <div class="lps-mode-company" id="modeCompanyRow"></div>
+          <div class="lps-mode-actions">
+            <button class="lps-mode-btn own" onclick="startAnalysis('OWN')">Analyze my brand</button>
+            <button class="lps-mode-btn comp" onclick="showCompetitorPicker()">Compare against a competitor</button>
+          </div>
+          <div id="competitorPickerWrap" style="display:none">
+            <label class="lps-picker-label">Compare against which own-brand run?</label>
+            <select id="parentRunSelect" class="filter-select" style="max-width:none;width:100%"></select>
+            <button class="lps-mode-btn comp" style="margin-top:10px" onclick="startAnalysis('COMPETITOR')">Run comparison</button>
+          </div>
+          <button class="lps-mode-cancel" onclick="cancelModeSelect()">✕ Cancel</button>
+        </div>
+
+        <div id="runningWrap" style="display:none">
+          <div class="lps-running">
+            <div class="lps-spinner"></div>
+            <div class="lps-running-text">Running the five-agent analysis — this can take a few minutes. You can leave this page; it'll keep running and show up in History.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-history" class="tab-pane">
+        <div class="toolbar">
+          <div class="search-box">
+            <span>⌕</span>
+            <input id="historySearchInput" placeholder="Search by company…" oninput="renderHistory()">
+          </div>
+          <div class="filter-row">
+            <select class="filter-select" id="historyTypeFilter" onchange="renderHistory()">
+              <option value="">All Types</option>
+              <option value="OWN">Own-Brand</option>
+              <option value="COMPETITOR">Competitor</option>
+            </select>
+          </div>
+          <span class="result-count" id="historyResultCount"></span>
+        </div>
+        <div class="tbl-wrap"><div id="historyTableWrap"><div class="lps-loading">Loading…</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lps-drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="lps-drawer" id="drawer">
+    <button class="lps-drawer-close" onclick="closeDrawer()" aria-label="Close">✕</button>
+    <div id="drawerBody"></div>
+  </div>
+
+  {% include 'ppc_chat_widget.html' %}
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+  </script>
+
+  <script>
+    var MAIN_TAB = 'search';
+    var RUNS = [];
+    var SELECTED_COMPANY = null;
+    var POLL_TIMER = null;
+    var HISTORY_SORT = { key: 'created_at', dir: -1 };
+
+    var AGENT_TABS = [
+      {ns: 'strategyagent',        label: 'Strategy'},
+      {ns: 'contentcreativeagent', label: 'Content'},
+      {ns: 'messagingagent',       label: 'Messaging'},
+      {ns: 'creativeinsightagent', label: 'Creative Insight'},
+      {ns: 'competitiveagent',     label: 'Competitive'},
+      {ns: 'getcompanyprofile',    label: 'Company Profile'},
+      {ns: 'getcompanypost',       label: 'Posts'},
+    ];
+
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function initials(name){
+      var parts=(name||'').trim().split(/\s+/);
+      return ((parts[0]||'')[0]||'?').toUpperCase()+((parts[1]||'')[0]||'').toUpperCase();
+    }
+    function relTime(iso){
+      if(!iso)return '—';
+      var d=new Date(iso), s=Math.floor((Date.now()-d.getTime())/1000);
+      if(s<0)s=0;
+      var units=[[31536000,'y'],[2592000,'mo'],[86400,'d'],[3600,'h'],[60,'m']];
+      for(var i=0;i<units.length;i++){var v=Math.floor(s/units[i][0]);if(v>=1)return v+units[i][1]+' ago';}
+      return 'just now';
+    }
+    function countUp(el,target){
+      var t0=null;
+      function step(ts){
+        if(!t0)t0=ts;
+        var p=Math.min(1,(ts-t0)/900);p=1-Math.pow(1-p,3);
+        el.textContent=Math.round(target*p).toLocaleString('en-US');
+        if(p<1)requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    function revealCards(){
+      document.querySelectorAll('.stat-card,.card').forEach(function(el,i){
+        setTimeout(function(){el.classList.add('visible');},i*55);
+      });
+    }
+    function debounce(fn,ms){
+      var t=null;
+      return function(){var a=arguments;clearTimeout(t);t=setTimeout(function(){fn.apply(null,a);},ms);};
+    }
+
+    function switchMainTab(tab){
+      MAIN_TAB=tab;
+      document.getElementById('mainTabs').className='tabs at-'+tab;
+      ['search','history'].forEach(function(t){
+        document.getElementById('btn-'+t).classList.toggle('active',t===tab);
+        document.getElementById('pane-'+t).classList.toggle('active',t===tab);
+      });
+      if(tab==='history')renderHistory();
+    }
+
+    /* ── Search & Analyze ────────────────────────────────────────────────── */
+    var onCompanySearchInput = debounce(function(){
+      var q=(document.getElementById('companySearchInput').value||'').trim();
+      var wrap=document.getElementById('searchResultsWrap');
+      if(!q){wrap.innerHTML='<div class="lps-empty">Search for a company to get started.</div>';return;}
+      wrap.innerHTML='<div class="lps-loading">Searching…</div>';
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/search?q='+encodeURIComponent(q))
+        .then(function(r){return r.json();}).then(function(data){
+          renderCompanyResults(data.companies||[]);
+        }).catch(function(){
+          wrap.innerHTML='<div class="lps-empty">Couldn\'t reach the search — try again in a moment.</div>';
+        });
+    },350);
+
+    function renderCompanyResults(companies){
+      var wrap=document.getElementById('searchResultsWrap');
+      if(!companies.length){wrap.innerHTML='<div class="lps-empty">No companies found.</div>';return;}
+      wrap.innerHTML='<div class="lps-company-grid">'+companies.map(function(c,i){
+        return '<div class="lps-company-card" data-idx="'+i+'" onclick="pickCompany('+i+')">'
+          +(c.logo?'<img class="lps-company-logo" src="'+esc(c.logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-company-logo lps-company-logo-fallback">'+esc((c.name||'?')[0].toUpperCase())+'</div>')
+          +'<div class="lps-company-info"><div class="lps-company-name">'+esc(c.name)+'</div>'
+          +'<div class="lps-company-meta">'+esc(c.industry||'')+(c.location?' · '+esc(c.location):'')+'</div>'
+          +(c.followers_count?'<div class="lps-company-followers">'+Math.round(c.followers_count).toLocaleString('en-US')+' followers</div>':'')
+          +'</div></div>';
+      }).join('')+'</div>';
+      window.__lpsCompanies=companies;
+    }
+
+    function pickCompany(idx){
+      SELECTED_COMPANY=(window.__lpsCompanies||[])[idx];
+      if(!SELECTED_COMPANY)return;
+      document.getElementById('modeCompanyRow').innerHTML=
+        (SELECTED_COMPANY.logo?'<img class="lps-company-logo" src="'+esc(SELECTED_COMPANY.logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-company-logo lps-company-logo-fallback">'+esc((SELECTED_COMPANY.name||'?')[0].toUpperCase())+'</div>')
+        +'<div class="lps-company-info"><div class="lps-company-name">'+esc(SELECTED_COMPANY.name)+'</div>'
+        +'<div class="lps-company-meta">'+esc(SELECTED_COMPANY.industry||'')+'</div></div>';
+      document.getElementById('competitorPickerWrap').style.display='none';
+      document.getElementById('modeSelectWrap').style.display='block';
+    }
+
+    function showCompetitorPicker(){
+      var sel=document.getElementById('parentRunSelect');
+      var ownRuns=RUNS.filter(function(r){return r.run_type==='OWN'&&r.status==='complete';});
+      if(!ownRuns.length){
+        sel.innerHTML='<option value="">No completed own-brand runs yet — analyze your own brand first</option>';
+      } else {
+        sel.innerHTML=ownRuns.map(function(r){
+          return '<option value="'+r.id+'">'+esc(r.company_name)+' · '+relTime(r.created_at)+'</option>';
+        }).join('');
+      }
+      document.getElementById('competitorPickerWrap').style.display='block';
+    }
+
+    function cancelModeSelect(){
+      SELECTED_COMPANY=null;
+      document.getElementById('modeSelectWrap').style.display='none';
+      document.getElementById('competitorPickerWrap').style.display='none';
+    }
+
+    function startAnalysis(mode){
+      if(!SELECTED_COMPANY)return;
+      var body={company_id: SELECTED_COMPANY.id, company_name: SELECTED_COMPANY.name,
+                company_logo: SELECTED_COMPANY.logo, mode: mode};
+      if(mode==='COMPETITOR'){
+        var parentId=document.getElementById('parentRunSelect').value;
+        if(!parentId)return;
+        body.parent_run_id=parentId;
+      }
+      document.getElementById('modeSelectWrap').style.display='none';
+      document.getElementById('runningWrap').style.display='block';
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/analyze',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+      }).then(function(r){return r.json();}).then(function(data){
+        if(data.error){
+          document.getElementById('runningWrap').style.display='none';
+          document.getElementById('searchResultsWrap').innerHTML='<div class="lps-empty">'+esc(data.error)+'</div>';
+          return;
+        }
+        pollRun(data.run_id);
+      }).catch(function(){
+        document.getElementById('runningWrap').style.display='none';
+      });
+    }
+
+    function pollRun(runId){
+      if(POLL_TIMER)clearTimeout(POLL_TIMER);
+      function check(){
+        fetch('/p2/b2b-agents/linkedin-playbook-studio/runs/'+runId+'/status')
+          .then(function(r){return r.json();}).then(function(data){
+            if(data.status==='running'){ POLL_TIMER=setTimeout(check,4000); return; }
+            document.getElementById('runningWrap').style.display='none';
+            document.getElementById('companySearchInput').value='';
+            document.getElementById('searchResultsWrap').innerHTML='<div class="lps-empty">Search for a company to get started.</div>';
+            loadStatsAndHistory();
+            switchMainTab('history');
+            if(data.status==='complete')openRunDrawer(runId);
+          }).catch(function(){ POLL_TIMER=setTimeout(check,6000); });
+      }
+      check();
+    }
+
+    /* ── History ─────────────────────────────────────────────────────────── */
+    function loadStatsAndHistory(){
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/history').then(function(r){return r.json();}).then(function(data){
+        RUNS=data.runs||[];
+        countUp(document.getElementById('statTotal'),RUNS.length);
+        countUp(document.getElementById('statOwn'),RUNS.filter(function(r){return r.run_type==='OWN';}).length);
+        countUp(document.getElementById('statComp'),RUNS.filter(function(r){return r.run_type==='COMPETITOR';}).length);
+        countUp(document.getElementById('statPlaybooks'),0);
+        if(MAIN_TAB==='history')renderHistory();
+      }).catch(function(){
+        document.getElementById('historyTableWrap').innerHTML='<div class="lps-empty">Couldn\'t load history — try refreshing the page.</div>';
+      });
+    }
+
+    function sortHistory(key){
+      if(HISTORY_SORT.key===key){HISTORY_SORT.dir=-HISTORY_SORT.dir;}else{HISTORY_SORT.key=key;HISTORY_SORT.dir=1;}
+      renderHistory();
+    }
+
+    function renderHistory(){
+      var q=(document.getElementById('historySearchInput').value||'').toLowerCase().trim();
+      var typeFilter=document.getElementById('historyTypeFilter').value;
+      var rows=RUNS.filter(function(r){
+        if(q&&(r.company_name||'').toLowerCase().indexOf(q)<0)return false;
+        if(typeFilter&&r.run_type!==typeFilter)return false;
+        return true;
+      });
+      var s=HISTORY_SORT;
+      rows.sort(function(a,b){
+        var av=a[s.key]||'', bv=b[s.key]||'';
+        return av<bv?-1*s.dir:av>bv?1*s.dir:0;
+      });
+      document.getElementById('historyResultCount').textContent=RUNS.length?rows.length+' of '+RUNS.length:'';
+      window.__lpsHistoryRows=rows;
+      if(!rows.length){
+        document.getElementById('historyTableWrap').innerHTML='<div class="lps-empty">'+(RUNS.length?'No matches.':'No analyses run yet — start one from the New Analysis tab.')+'</div>';
+        return;
+      }
+      var head='<thead><tr>'
+        +'<th onclick="sortHistory(\'company_name\')">Company</th>'
+        +'<th onclick="sortHistory(\'run_type\')">Type</th>'
+        +'<th onclick="sortHistory(\'status\')">Status</th>'
+        +'<th>Summary</th>'
+        +'<th onclick="sortHistory(\'created_at\')">Run</th>'
+        +'</tr></thead>';
+      var body='<tbody>'+rows.map(function(r,i){
+        var statusCls=r.status==='complete'?'lps-status-complete':r.status==='error'?'lps-status-error':'lps-status-running';
+        return '<tr class="lps-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*25,400)+'ms">'
+          +'<td><div class="lps-person">'
+          +(r.company_logo?'<img class="lps-row-logo" src="'+esc(r.company_logo)+'" loading="lazy" onerror="this.outerHTML=\'<div class=&quot;lps-avatar-sq&quot;&gt;'+esc(initials(r.company_name))+'&lt;/div&gt;\'">':'<div class="lps-avatar-sq">'+esc(initials(r.company_name))+'</div>')
+          +'<span class="lps-name">'+esc(r.company_name||'Unknown')+'</span></div></td>'
+          +'<td>'+(r.run_type==='COMPETITOR'?'<span class="lps-badge comp">Competitor</span>':'<span class="lps-badge own">Own-Brand</span>')+'</td>'
+          +'<td><span class="lps-badge '+statusCls+'">'+esc(r.status)+'</span></td>'
+          +'<td class="lps-muted">'+esc(r.summary||'—')+'</td>'
+          +'<td class="lps-muted">'+esc(relTime(r.created_at))+'</td>'
+          +'</tr>';
+      }).join('')+'</tbody>';
+      document.getElementById('historyTableWrap').innerHTML='<table class="lps-table">'+head+body+'</table>';
+    }
+
+    document.getElementById('historyTableWrap').addEventListener('click',function(e){
+      var tr=e.target.closest('tr[data-idx]');
+      if(!tr)return;
+      var row=(window.__lpsHistoryRows||[])[parseInt(tr.getAttribute('data-idx'),10)];
+      if(!row)return;
+      if(row.status==='complete')openRunDrawer(row.id);
+    });
+
+    /* ── Report drawer ───────────────────────────────────────────────────── */
+    function renderValue(v){
+      if(v==null||v==='')return '<span class="lps-muted">—</span>';
+      if(Array.isArray(v)){
+        if(!v.length)return '<span class="lps-muted">—</span>';
+        return '<ul class="lps-list">'+v.map(function(x){return '<li>'+renderValue(x)+'</li>';}).join('')+'</ul>';
+      }
+      if(typeof v==='object'){
+        var keys=Object.keys(v);
+        if(!keys.length)return '<span class="lps-muted">—</span>';
+        return '<div class="lps-kv-grid">'+keys.map(function(k){
+          return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(k)+'</span><div class="lps-kv-value">'+renderValue(v[k])+'</div></div>';
+        }).join('')+'</div>';
+      }
+      return '<span>'+esc(String(v))+'</span>';
+    }
+
+    function agentTabContent(output,ns){
+      var prefix=ns+'.';
+      var keys=Object.keys(output||{}).filter(function(k){return k.indexOf(prefix)===0;});
+      if(!keys.length)return '<div class="lps-empty">No data returned for this section.</div>';
+      return keys.map(function(k){
+        var field=k.slice(prefix.length);
+        return '<div class="lps-section-label">'+esc(field)+'</div><div class="lps-section-body">'+renderValue(output[k])+'</div>';
+      }).join('');
+    }
+
+    var DRAWER_RUN = null;
+
+    function drawerHeader(run){
+      var typeLabel=run.run_type==='COMPETITOR'?'Competitor analysis':'Own-brand analysis';
+      return '<div class="drw-head">'
+        +(run.company_logo?'<img class="lps-drw-logo" src="'+esc(run.company_logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-avatar-sq drw-avatar">'+esc(initials(run.company_name))+'</div>')
+        +'<div class="drw-head-txt"><h3>'+esc(run.company_name||'Unknown company')+'</h3>'
+        +'<div class="drw-sub">'+esc(typeLabel)+' · '+esc(relTime(run.created_at))+'</div></div></div>';
+    }
+
+    function switchDrawerTab(ns){
+      document.querySelectorAll('.lps-drw-tab').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-ns')===ns);});
+      document.querySelectorAll('.lps-drw-pane').forEach(function(p){p.classList.toggle('active',p.getAttribute('data-ns')===ns);});
+      if(ns==='playbook')loadPlaybook();
+    }
+
+    function loadPlaybook(){
+      var wrap=document.getElementById('lpsPlaybookBody');
+      if(!DRAWER_RUN)return;
+      var mode=DRAWER_RUN.run_type==='COMPETITOR'?'COMPETITOR':'OWN';
+      wrap.innerHTML='<div class="lps-loading">Loading…</div>';
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/runs/'+DRAWER_RUN.id+'/playbook?mode='+mode)
+        .then(function(r){return r.json();}).then(function(data){
+          if(data.playbook&&data.playbook.content){
+            wrap.innerHTML='<button class="lps-mode-btn own" style="margin-bottom:16px" onclick="generatePlaybook()">↻ Regenerate playbook</button>'
+              +renderValue(data.playbook.content);
+          } else {
+            wrap.innerHTML='<div class="lps-empty">No playbook generated yet.</div>'
+              +'<button class="lps-mode-btn own" style="margin-top:16px" onclick="generatePlaybook()">Generate playbook</button>';
+          }
+        }).catch(function(){
+          wrap.innerHTML='<div class="lps-empty">Couldn\'t load the playbook — try again.</div>';
+        });
+    }
+
+    function generatePlaybook(){
+      if(!DRAWER_RUN)return;
+      var mode=DRAWER_RUN.run_type==='COMPETITOR'?'COMPETITOR':'OWN';
+      var wrap=document.getElementById('lpsPlaybookBody');
+      wrap.innerHTML='<div class="lps-running"><div class="lps-spinner"></div><div class="lps-running-text">Generating the strategic playbook — this can take a few minutes.</div></div>';
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/runs/'+DRAWER_RUN.id+'/playbook',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode:mode})
+      }).then(function(){ pollPlaybook(); }).catch(function(){
+        wrap.innerHTML='<div class="lps-empty">Couldn\'t start playbook generation.</div>';
+      });
+    }
+
+    function pollPlaybook(){
+      var mode=DRAWER_RUN.run_type==='COMPETITOR'?'COMPETITOR':'OWN';
+      function check(){
+        fetch('/p2/b2b-agents/linkedin-playbook-studio/runs/'+DRAWER_RUN.id+'/playbook?mode='+mode)
+          .then(function(r){return r.json();}).then(function(data){
+            if(data.playbook&&data.playbook.content){ loadPlaybook(); return; }
+            setTimeout(check,5000);
+          }).catch(function(){ setTimeout(check,7000); });
+      }
+      setTimeout(check,5000);
+    }
+
+    function openRunDrawer(runId){
+      var d=document.getElementById('drawer');
+      document.getElementById('drawerBody').innerHTML='<div class="lps-loading" style="padding:60px">Loading report…</div>';
+      d.classList.add('open');
+      document.getElementById('drawerOverlay').classList.add('open');
+      requestAnimationFrame(function(){});
+      document.body.style.overflow='hidden';
+      fetch('/p2/b2b-agents/linkedin-playbook-studio/runs/'+runId).then(function(r){
+        if(!r.ok)throw new Error('not found');
+        return r.json();
+      }).then(function(run){
+        DRAWER_RUN=run;
+        var output=run.output||{};
+        var tabsHtml=AGENT_TABS.map(function(t,i){
+          return '<button class="lps-drw-tab'+(i===0?' active':'')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'+esc(t.label)+'</button>';
+        }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">Playbook</button>';
+        var panesHtml=AGENT_TABS.map(function(t,i){
+          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+agentTabContent(output,t.ns)+'</div>';
+        }).join('')+'<div class="lps-drw-pane" data-ns="playbook"><div id="lpsPlaybookBody"></div></div>';
+        document.getElementById('drawerBody').innerHTML=drawerHeader(run)
+          +'<div class="lps-drw-tabs">'+tabsHtml+'</div>'
+          +'<div class="drw-body lps-drw-body">'+panesHtml+'</div>';
+      }).catch(function(){
+        document.getElementById('drawerBody').innerHTML='<div class="lps-empty" style="padding:60px">Couldn\'t load this report.</div>';
+      });
+    }
+
+    function closeDrawer(){
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.body.style.overflow='';
+      DRAWER_RUN=null;
+    }
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeDrawer(); });
+
+    revealCards();
+    loadStatsAndHistory();
+  </script>
+
+<script>
+/* ════ Platform command palette — Ctrl/Cmd+K ════ */
+(function(){
+  if(window.__kpal)return;window.__kpal=1;
+  var BASE=[
+    {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+    {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+    {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+    {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+    {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
+    {t:'LinkedIn Playbook Studio',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-playbook-studio',i:'▤'},
+    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
+  ];
+  var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
+  var css=document.createElement('style');
+  css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+    +'#kpal.on{display:block;animation:kpalF .14s ease}'
+    +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+    +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(11,14,28,.96);border:1px solid rgba(129,140,248,.3);border-radius:var(--radius-lg);box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(99,102,241,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+    +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+    +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+    +'.kpal-iw .ic{color:#7c83f5;font-size:15px}'
+    +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+    +'#kpal-in::placeholder{color:#4b5572}'
+    +'.kpal-iw kbd{font-family:inherit;font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xs);padding:3px 7px}'
+    +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+    +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:var(--radius-md);cursor:pointer;border:1px solid transparent}'
+    +'.kpal-it .ki{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(99,102,241,.12);border:1px solid rgba(129,140,248,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#a5b4fc;flex-shrink:0}'
+    +'.kpal-it .kt{font-size:13px;font-weight:600;color:#dbe2f1}'
+    +'.kpal-it .kd{font-size:11.5px;color:#55617a;margin-top:1px}'
+    +'.kpal-it.sel{background:linear-gradient(95deg,rgba(79,70,229,.22),rgba(124,58,237,.12));border-color:rgba(129,140,248,.35)}'
+    +'.kpal-it.sel .kt{color:#fff}'
+    +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:13px}'
+    +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4763;display:flex;gap:14px}'
+    +'#kpal-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99998;background:rgba(11,14,28,.95);border:1px solid rgba(129,140,248,.35);color:#a9b4d8;border-radius:var(--radius-pill);font-size:11.5px;padding:9px 18px;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:kpalF .3s ease}'
+    +'#kpal-toast b{color:#c7d2fe}';
+  document.head.appendChild(css);
+  var ov=document.createElement('div');ov.id='kpal';
+  ov.innerHTML='<div class="kpal-box">'
+    +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+    +'<div id="kpal-list"></div>'
+    +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+  document.body.appendChild(ov);
+  var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+  var cur=[],sel=0;
+  function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function render(){
+    if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+    list.innerHTML=cur.map(function(x,i){
+      return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc2(x.t)+'</div><div class="kd">'+esc2(x.d||'')+'</div></span></div>';
+    }).join('');
+    var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+  }
+  function filter(q){
+    q=(q||'').toLowerCase().trim();
+    cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+    sel=0;render();
+  }
+  function go(x){
+    if(!x)return;
+    close();
+    if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
+    if(x.u.charAt(0)==='#'){location.hash=x.u;return;}
+    if(location.pathname===x.u)return;
+    window.location.href=x.u;
+  }
+  function open(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+  function close(){ov.classList.remove('on');}
+  inp.addEventListener('input',function(){filter(inp.value);});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+    else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+  });
+  list.addEventListener('click',function(e){
+    var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+  });
+  ov.addEventListener('mousedown',function(e){if(e.target===ov)close();});
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?close():open();}
+    else if(e.key==='Escape'&&ov.classList.contains('on')){close();}
+  });
+})();
+</script>
+<script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'LinkedIn Playbook Studio',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

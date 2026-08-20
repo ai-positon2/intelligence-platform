@@ -248,6 +248,14 @@
       --card-glow: 0 0 40px rgba(236,72,153,0.10);
       --arrow-color: #f472b6;
     }
+    .c-lps {
+      --band: linear-gradient(90deg,#14b8a6,#22d3ee,#818cf8);
+      --thumb: linear-gradient(135deg,#001a1a 0%,#0a1730 100%);
+      --icon-glow: rgba(34,211,238,0.5);
+      --card-border: rgba(34,211,238,0.35);
+      --card-glow: 0 0 40px rgba(34,211,238,0.10);
+      --arrow-color: #67e8f9;
+    }
     .c-visitors {
       --band: linear-gradient(90deg,#10b981,#06b6d4,#0ea5e9);
       --thumb: linear-gradient(135deg,#001a12 0%,#001e28 100%);

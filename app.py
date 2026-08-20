@@ -635,6 +635,16 @@ AGENTS = [
         "connects": ["LinkedIn", "Competitive", "AI"],
     },
     {
+        "slug": "linkedin-playbook-studio", "name": "LinkedIn Playbook Studio", "role": "Competitive Strategy Playbooks",
+        "badge": "NEW", "cat": "Social", "accent": "#f472b6", "metric": "5-agent analysis → prioritized playbook",
+        "icon": _svg('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+        "summary": "Search any company, run a multi-agent LinkedIn strategy analysis of its own brand or a competitor, and generate a prioritized strategic playbook of what to run next.",
+        "benefit": "Skip the manual teardown - get a scored breakdown of messaging, content, creative and competitive positioning, then a ready-to-run playbook in minutes.",
+        "how": "It searches for a company on LinkedIn, runs five specialized agents against its recent activity and positioning, saves the analysis, and can generate a strategic playbook from any saved run.",
+        "who": "Marketing and demand-gen teams planning their own LinkedIn strategy or benchmarking a competitor.",
+        "connects": ["LinkedIn", "Competitive", "AI"],
+    },
+    {
         "slug": "ad-intelligence", "name": "Competitor Ad Intelligence", "role": "Competitive Creative",
         "badge": "NEW", "cat": "Paid", "accent": "#a855f7", "metric": "Live competitor creative tracking",
         "icon": _svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
@@ -1580,6 +1590,19 @@ APP_AGENTS = [
             {"t": "Best for", "d": "ABM and social-selling teams."},
         ],
         "tags": ["LinkedIn", "GTM", "CRM"],
+    },
+    {
+        "slug": "linkedin-playbook-studio", "name": "LinkedIn Playbook Studio",
+        "tagline": "Competitive Strategy Playbooks",
+        "ac": "#f472b6", "ac2": "#fb7185", "icon": _asvg("<path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/>"),
+        "pill1": "Competitive Strategy Playbooks", "pill2": "5-agent analysis → prioritized playbook",
+        "lead": ("Search any company, run a multi-agent LinkedIn strategy analysis of its own brand or a competitor, and generate a prioritized strategic playbook of what to run next."),
+        "trips": [
+            {"t": "What it does", "d": "Skip the manual teardown — get a scored breakdown of messaging, content, creative and competitive positioning, then a ready-to-run playbook in minutes."},
+            {"t": "How it works", "d": "It searches for a company on LinkedIn, runs five specialized agents against its recent activity and positioning, saves the analysis, and can generate a strategic playbook from any saved run."},
+            {"t": "Best for", "d": "Marketing and demand-gen teams planning their own LinkedIn strategy or benchmarking a competitor."},
+        ],
+        "tags": ["LinkedIn", "Competitive", "AI"],
     },
     {
         "slug": "company-people-intelligence", "name": "Contact Finder",
@@ -7626,6 +7649,159 @@ def linkedin_scraper_data():
     dashboard's Refresh button calls."""
     force = request.args.get("fresh") in ("1", "true", "yes")
     return _linkedin_data_response(LINKEDIN_INTEL_SHEET_ID, force)
+
+
+# ── LinkedIn Playbook Studio ──────────────────────────────────────────────────
+# Search a company, run a multi-agent LinkedIn competitive-strategy analysis
+# (own-brand or vs. a competitor) via the Arena workflow platform
+# (agent.thearena.ai), and generate a strategic playbook from a saved run.
+# tracker/arena_client.py owns the vendor API contract; tracker/linkedin_
+# playbook_store.py owns storage (Postgres -- this app has no persistent disk,
+# so a live per-click write target can't be a committed sqlite file the way
+# most other agents here work). The analysis/playbook calls take minutes,
+# longer than gunicorn's own worker timeout, so both run in a background
+# thread and the client polls for completion.
+
+def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email: str,
+                          run_type: str, parent_arena_id: str) -> None:
+    """Background worker: never touches Flask's request/session context --
+    everything it needs is passed in explicitly, since those aren't available
+    once the request that started this thread has returned."""
+    from tracker import arena_client
+    from tracker import linkedin_playbook_store as lps_store
+    try:
+        output = arena_client.run_analysis(company_name, company_id, email, run_type, parent_arena_id)
+        if output is None:
+            lps_store.update_run_status(run_id, "error", error="Analysis could not be completed.")
+            return
+        summary = output.get("messagingagent.summary")
+        summary = summary if isinstance(summary, str) else None
+        score = output.get("competitiveagent.scorecardOverall")
+        score = score if isinstance(score, (int, float)) else None
+        lps_store.update_run_status(run_id, "complete", output=output, summary=summary,
+                                    scorecard_score=score)
+    except Exception as e:
+        log.warning("LinkedIn Playbook Studio: analysis job failed for run %s: %s", run_id, e)
+        lps_store.update_run_status(run_id, "error", error="Analysis could not be completed.")
+
+
+def _lps_run_playbook_job(run_id: int, email: str, mode: str) -> None:
+    from tracker import arena_client
+    from tracker import linkedin_playbook_store as lps_store
+    try:
+        content = arena_client.run_playbook(email, str(run_id), mode)
+        if content is None:
+            log.warning("LinkedIn Playbook Studio: playbook generation returned nothing for run %s", run_id)
+            return
+        lps_store.save_playbook(run_id, email, mode, content)
+    except Exception as e:
+        log.warning("LinkedIn Playbook Studio: playbook job failed for run %s: %s", run_id, e)
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio")
+@position2_required
+def linkedin_playbook_studio():
+    return render_template("linkedin_playbook_studio.html", user=_get_user())
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/search")
+@position2_required
+def linkedin_playbook_studio_search():
+    from tracker import arena_client
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"companies": []})
+    return jsonify({"companies": arena_client.search_companies(q)})
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/analyze", methods=["POST"])
+@position2_required
+def linkedin_playbook_studio_analyze():
+    from tracker import linkedin_playbook_store as lps_store
+    payload = request.get_json(silent=True) or {}
+    company_id = str(payload.get("company_id") or "").strip()
+    company_name = str(payload.get("company_name") or "").strip()
+    company_logo = payload.get("company_logo") or None
+    run_type = "COMPETITOR" if payload.get("mode") == "COMPETITOR" else "OWN"
+
+    if not company_id or not company_name:
+        return jsonify({"error": "Company name and company ID are required."}), 400
+
+    email = (_get_user() or {}).get("email", "").lower()
+
+    parent_run_id = None
+    parent_arena_id = ""
+    if run_type == "COMPETITOR":
+        try:
+            parent_run_id = int(payload.get("parent_run_id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "A completed own-brand run is required to compare against a competitor."}), 400
+        parent = lps_store.get_run(parent_run_id, email)
+        if not parent or parent.get("status") != "complete":
+            return jsonify({"error": "That own-brand run isn't available to compare against."}), 404
+        parent_arena_id = str(parent_run_id)
+
+    run_id = lps_store.save_run(email, run_type, company_id, company_name, company_logo, parent_run_id)
+    if run_id is None:
+        return jsonify({"error": "Could not start the analysis."}), 500
+
+    threading.Thread(
+        target=_lps_run_analysis_job,
+        args=(run_id, company_name, company_id, email, run_type, parent_arena_id),
+        daemon=True,
+    ).start()
+    return jsonify({"run_id": run_id, "status": "running"})
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>/status")
+@position2_required
+def linkedin_playbook_studio_run_status(run_id):
+    from tracker import linkedin_playbook_store as lps_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = lps_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    return jsonify({"id": run["id"], "status": run["status"], "error": run.get("error")})
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/history")
+@position2_required
+def linkedin_playbook_studio_history():
+    from tracker import linkedin_playbook_store as lps_store
+    email = (_get_user() or {}).get("email", "").lower()
+    return jsonify({"runs": lps_store.list_runs(email)})
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>")
+@position2_required
+def linkedin_playbook_studio_run(run_id):
+    from tracker import linkedin_playbook_store as lps_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = lps_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    run["children"] = lps_store.get_children(run_id, email)
+    return jsonify(run)
+
+
+@app.route("/p2/b2b-agents/linkedin-playbook-studio/runs/<int:run_id>/playbook", methods=["GET", "POST"])
+@position2_required
+def linkedin_playbook_studio_playbook(run_id):
+    from tracker import linkedin_playbook_store as lps_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = lps_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+
+    if request.method == "GET":
+        mode = (request.args.get("mode") or run.get("run_type") or "OWN").upper()
+        playbook = lps_store.get_playbook(run_id, email, mode)
+        return jsonify({"playbook": playbook})
+
+    payload = request.get_json(silent=True) or {}
+    mode = "COMPETITOR" if payload.get("mode") == "COMPETITOR" else "OWN"
+    threading.Thread(target=_lps_run_playbook_job, args=(run_id, email, mode), daemon=True).start()
+    return jsonify({"status": "running"})
 
 
 # ── Contact Finder ────────────────────────────────────────────────────────────

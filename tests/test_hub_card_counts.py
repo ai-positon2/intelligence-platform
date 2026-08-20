@@ -102,6 +102,11 @@ def test_job_change_alert_is_one_of_the_live_dashboards(dashboard_cards):
     assert "Job Change Alert" in dashboard_cards["live"]
 
 
+def test_linkedin_playbook_studio_is_one_of_the_live_dashboards(dashboard_cards):
+    """The dashboard that bumped the count from 6/6 to 7/7 on 2026-08-20."""
+    assert "LinkedIn Playbook Studio" in dashboard_cards["live"]
+
+
 # ── The prose ───────────────────────────────────────────────────────────────
 
 def test_the_card_is_named_b2b_agents(hub_card):
