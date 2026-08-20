@@ -211,7 +211,7 @@ Two hard-won points that generalise: **validate response shape, not just HTTP st
 Per-client co-branded front door at `/<client-slug>`. Currently one client: `northstaranesthesia`. Unchanged this cycle.
 
 - **`CLIENTS` registry** entry fields: `slug`, `name`, `short`, `website`, `logo`, `domains`, `accent`/`accent2`, `tagline`, `blurb`, `agents` (ordered APP_AGENTS slugs), `dashboards` (agent-slug -> pre-built static HTML), `linkedin_sheet`, `external_tools` (agent-slug -> full external URL to iframe).
-- NorthStar: `domains=["northstaranesthesia.com"]`, `accent="#5b9dff"`, agents list currently shows 5 live (LinkedIn Strategy Researcher remains hidden platform-wide, see below - it returns to 6 whenever LSR is restored, no code change needed there).
+- NorthStar: `domains=["northstaranesthesia.com"]`, `accent="#5b9dff"`, agents list currently shows 5 live (LinkedIn Social Researcher, renamed from LinkedIn Strategy Researcher on 2026-08-20 when that name moved to a new, unrelated agent, remains hidden platform-wide, see below - it returns to 6 whenever LSR is restored, no code change needed there).
 - Sign-in to the portal is open to any Google account.
 - **Three agent types, all keyed off the same `agents` list:** SERP-connected (`seo_slug`, run-metered via postMessage), dashboard-backed (`is_dashboard`, shown Live, never metered), external-tool (`is_external`, iframed, run-metered on a real postMessage signal).
 - `_client_agent_view(slug, client)`: **always pass `client`**. Omitting it silently resolves `connected=False` for an external-tool-only agent and 400s the log-run endpoints.
@@ -247,7 +247,7 @@ An agent whose entire backend lives on a third-party AI app-builder platform we 
 2. Add it to `APP_AGENTS` with no `seo_slug`.
 3. Add its slug to the client's `agents` list and its URL to `external_tools` (client portal), or add a small route rendering `templates/embed.html` (internal).
 4. `client_embed.html` / `embed.html` iframe it; the address bar shows OUR path.
-5. **Metering requires the external tool's cooperation.** It must call `window.parent.postMessage({source:'p2-agent', type:'agent-run-started'|'agent-run-finished'}, 'https://intelligence.position2.com')`, guarded by `if (window.parent !== window)`. Deployed and working for LinkedIn Strategy Researcher (currently hidden from listings, but the mechanism itself is untouched).
+5. **Metering requires the external tool's cooperation.** It must call `window.parent.postMessage({source:'p2-agent', type:'agent-run-started'|'agent-run-finished'}, 'https://intelligence.position2.com')`, guarded by `if (window.parent !== window)`. Deployed and working for LinkedIn Social Researcher (renamed from LinkedIn Strategy Researcher on 2026-08-20, currently hidden from listings, but the mechanism itself is untouched).
 6. **Any prompt written to be pasted into that other platform must be self-contained** and describe only that tool's own observable behaviour, never our internal routes, slugs, or architecture.
 
 ---
@@ -257,7 +257,7 @@ An agent whose entire backend lives on a third-party AI app-builder platform we 
 Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scraper.html`; all content drawn client-side by `static/js/linkedin.js`. One row per person x post engagement, header-mapped.
 
 - `_fetch_linkedin_intel_data(force, sheet_id)` with **per-sheet caches** so internal and each client portal read independent sheets.
-- **Do not confuse** LinkedIn Intelligence (your own engagement data from a Sheet) with LinkedIn Strategy Researcher (external competitive analysis, currently hidden from listings), the ABM Signal Tracker's own News Mention/Partnership categories, or Job Change Alert (a completely separate feature, sourced from Slack, tracking new-role detections rather than engagement).
+- **Do not confuse** LinkedIn Intelligence (your own engagement data from a Sheet) with LinkedIn Social Researcher (external competitive analysis, renamed from LinkedIn Strategy Researcher on 2026-08-20 when that name moved to a new, unrelated agent, currently hidden from listings), the ABM Signal Tracker's own News Mention/Partnership categories, or Job Change Alert (a completely separate feature, sourced from Slack, tracking new-role detections rather than engagement).
 
 ---
 
@@ -414,7 +414,7 @@ intelligence-platform/
 ## OPEN ITEMS / TODO
 
 1. **Rotate the GitHub token.** Used for many consecutive pushes across many sessions now, pasted into chat each time. This is the one piece of cleanup the assistant cannot do itself; flag it every session.
-2. **Restore LinkedIn Strategy Researcher to the listings** when the owner asks - full itemized checklist above and in `[[project-lsr-hidden]]`.
+2. **Restore LinkedIn Social Researcher (formerly named LinkedIn Strategy Researcher, renamed 2026-08-20) to the listings** when the owner asks - full itemized checklist above and in `[[project-lsr-hidden]]`.
 3. **Set `ANTHROPIC_API_KEY` on Railway** to activate Contact Finder's Claude cross-check - a pure accuracy upgrade sitting inert.
 4. **Fix `SLACK_BOT_TOKEN`'s scope/membership for `#job_change_alert_apollo`**, and **add `SLACK_BOT_TOKEN` as a GitHub Actions repo secret**, so Job Change Alert's daily sync actually pulls new events instead of relying entirely on the backfill.
 5. **Fix the Job Change Alert tracked-roster Google Sheet's sharing policy block** (Workspace admin allowlist, or re-share from a personal account) - currently running off a manual `.xlsx` snapshot stopgap that needs periodic re-export.

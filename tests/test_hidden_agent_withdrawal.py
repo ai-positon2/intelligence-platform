@@ -1,6 +1,6 @@
 """An agent can be pulled from the listings without being retired.
 
-LinkedIn Strategy Researcher was withdrawn on 2026-08-14 and is expected back in
+LinkedIn Social Researcher was withdrawn on 2026-08-14 and is expected back in
 a few days, so nothing about it was deleted: the route, the embedded tool, the
 APP_AGENTS entry, the client's own curated agent order and every past run all
 stay exactly as they were. Only the surfaces that *advertise* an agent skip it.
@@ -33,7 +33,7 @@ sys.path.insert(0, _ROOT)
 import app as appmod  # noqa: E402
 
 _SLUG = "linkedin-strategy-researcher"
-_NAME = "LinkedIn Strategy Researcher"
+_NAME = "LinkedIn Social Researcher"
 _CLIENT = "northstaranesthesia"
 
 
