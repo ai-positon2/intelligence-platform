@@ -171,6 +171,7 @@
 
     var AGENT_TABS = [
       {ns: 'overview',             label: 'Overview',         icon: '✦'},
+      {ns: 'aienrichment',         label: 'AI Insights',      icon: '✨'},
       {ns: 'strategyagent',        label: 'Strategy',         icon: '◈'},
       {ns: 'contentcreativeagent', label: 'Content',          icon: '✎'},
       {ns: 'messagingagent',       label: 'Messaging',        icon: '✉'},
@@ -753,6 +754,7 @@
     }
 
     var NS_EMPTY_MESSAGE={
+      aienrichment:'AI insights aren\'t available for this run.',
       strategyagent:'No strategy data was returned for this company.',
       contentcreativeagent:'No content or creative data was returned for this company.',
       messagingagent:'No messaging data was returned for this company.',
@@ -892,8 +894,39 @@
       return top+(restIsEmpty?'':rest);
     }
 
+    /* AI Insights: a single Claude call (tracker/lps_enrichment.py), run once
+       per completed analysis, that reads everything the vendor's five agents
+       returned and writes ONE point of view across all of it -- unlike every
+       other tab here, this section is never vendor data on its own, so it
+       carries a visible badge saying so and is held to a stricter rule than
+       the rest of this page: it must never state a fact that isn't traceable
+       to a real field in this run (see the system prompt), so a company with
+       little real signal gets an honest "no organic content was found"
+       synthesis, not a fabricated one. Absent entirely (no ANTHROPIC_API_KEY,
+       or the call failed) just falls through to the normal empty state. */
+    function aiInsightsContent(output){
+      var headline=output['aienrichment.headline'];
+      var synthesis=output['aienrichment.synthesis'];
+      var actions=output['aienrichment.topActions'];
+      var coverage=output['aienrichment.coverage'];
+      if(isEmptyValue(headline)&&isEmptyValue(synthesis))
+        return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.aienrichment+'</div>';
+      var html='<div class="lps-ai-badge">✨ AI-synthesized — combines signal across every section on this report, not vendor data on its own</div>';
+      if(!isEmptyValue(headline))html+='<div class="lps-ai-headline">'+esc(headline)+'</div>';
+      if(!isEmptyValue(synthesis)){
+        var paras=String(synthesis).split(/\n\s*\n/).map(function(p){return p.trim();}).filter(Boolean);
+        html+='<div class="lps-section"><div class="lps-section-label">Synthesis</div><div class="lps-section-body">'
+          +paras.map(function(p){return '<p class="lps-prose">'+esc(p)+'</p>';}).join('')+'</div></div>';
+      }
+      if(Array.isArray(actions)&&actions.length)
+        html+='<div class="lps-section"><div class="lps-section-label">Top Actions</div><div class="lps-section-body">'+renderStringList(actions)+'</div></div>';
+      if(!isEmptyValue(coverage))html+='<div class="lps-ai-coverage">'+esc(coverage)+'</div>';
+      return html;
+    }
+
     function tabPaneContent(output,ns,run){
       if(ns==='overview')return overviewContent(output,run);
+      if(ns==='aienrichment')return aiInsightsContent(output);
       if(ns==='getcompanyprofile')return companyProfileContent(output,run);
       if(ns==='getcompanypost')return postsContent(output);
       if(ns==='competitiveagent')return competitiveContent(output);
@@ -951,6 +984,16 @@
           +'</div>'
           +(!isEmptyValue(overall)?'<div class="lps-ov-hero-score">'+renderScoreGauge(overall,maxScoreVal)+'<div class="lps-ov-stat-label">Competitive Score</div></div>':'')
           +'</div>';
+      }
+
+      /* A one-line teaser for the AI Insights tab -- the full synthesis lives
+         in its own tab (aiInsightsContent), this is just enough to make its
+         existence and headline visible without leaving Overview. */
+      var aiHeadline=output['aienrichment.headline'];
+      if(!isEmptyValue(aiHeadline)){
+        html+='<button class="lps-ov-ai-teaser" onclick="switchDrawerTab(\'aienrichment\')">'
+          +'<span class="lps-ov-ai-icon">✨</span><span class="lps-ov-ai-text">'+esc(aiHeadline)+'</span>'
+          +'<span class="lps-ov-ai-link">Full AI insights →</span></button>';
       }
 
       /* messagingagent.summary is commonly an object ({text, moves, stats, …}),

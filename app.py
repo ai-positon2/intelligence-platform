@@ -7688,12 +7688,30 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
     everything it needs is passed in explicitly, since those aren't available
     once the request that started this thread has returned."""
     from tracker import arena_client
+    from tracker import lps_enrichment
     from tracker import linkedin_playbook_store as lps_store
     try:
         output = arena_client.run_analysis(company_name, company_id, email, run_type, parent_arena_id)
         if output is None:
             lps_store.update_run_status(run_id, "error", error="Analysis could not be completed.")
             return
+        # Best-effort: an extra Claude pass that synthesizes a single point of
+        # view across every namespace the vendor's agents returned (see
+        # tracker/lps_enrichment.py). Runs on every completed analysis, not
+        # only thin ones -- absence of ANTHROPIC_API_KEY, or any failure here,
+        # must never stop a run from completing and saving without it.
+        try:
+            enrichment = lps_enrichment.enrich_run(output, company_name, run_type)
+        except Exception as e:
+            log.warning("LinkedIn Strategy Researcher: enrichment failed for run %s: %s", run_id, e)
+            enrichment = None
+        if enrichment:
+            output["aienrichment.headline"] = enrichment["headline"]
+            output["aienrichment.synthesis"] = enrichment["synthesis"]
+            if enrichment.get("topActions"):
+                output["aienrichment.topActions"] = enrichment["topActions"]
+            if enrichment.get("coverage"):
+                output["aienrichment.coverage"] = enrichment["coverage"]
         summary = output.get("messagingagent.summary")
         summary = summary if isinstance(summary, str) else None
         score = output.get("competitiveagent.scorecardOverall")

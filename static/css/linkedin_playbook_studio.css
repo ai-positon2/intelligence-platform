@@ -456,6 +456,18 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 .lps-gauge-num { font-size: 30px; font-weight: 800; color: #fbb6d9; line-height: 1; font-variant-numeric: tabular-nums; }
 .lps-gauge-label { font-size: 10.5px; color: #6b6680; margin-top: 2px; }
 
+/* AI Insights tab (aienrichment) + its Overview teaser -- the one section on
+   this page that is Claude's synthesis rather than vendor data, so it always
+   carries a visible badge saying so. */
+.lps-ai-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; color: #a8a2b3; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-pill); padding: 6px 14px; margin-bottom: 18px; }
+.lps-ai-headline { font-size: 17px; font-weight: 700; line-height: 1.4; color: #f1eef2; margin-bottom: 18px; }
+.lps-ai-coverage { font-size: 12px; font-style: italic; line-height: 1.6; color: #8b86a0; margin-top: 4px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.06); }
+.lps-ov-ai-teaser { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: rgba(244,114,182,.07); border: 1px solid rgba(244,114,182,.2); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 24px; font-family: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+.lps-ov-ai-teaser:hover { background: rgba(244,114,182,.12); border-color: rgba(244,114,182,.32); }
+.lps-ov-ai-icon { font-size: 15px; flex-shrink: 0; }
+.lps-ov-ai-text { flex: 1; font-size: 13px; font-weight: 600; color: #f1eef2; line-height: 1.4; }
+.lps-ov-ai-link { font-size: 11px; font-weight: 700; color: #fbb6d9; white-space: nowrap; flex-shrink: 0; }
+
 /* Overview hero: description/stats alongside a competitive-score gauge */
 .lps-ov-hero { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .lps-ov-hero-main { flex: 1; min-width: 240px; }
@@ -523,6 +535,13 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 [data-theme="light"] .lps-ov-cov-row.empty { color: #8a7a83 !important; }
 [data-theme="light"] .lps-ov-cov-row.empty .lps-ov-cov-dot { background: rgba(36,24,32,.16) !important; }
 [data-theme="light"] .lps-ov-cov-state { color: #8a7a83 !important; }
+[data-theme="light"] .lps-ai-badge { background: #fff !important; border-color: rgba(36,24,32,.1) !important; color: #6b5c64 !important; }
+[data-theme="light"] .lps-ai-headline { color: #241820 !important; }
+[data-theme="light"] .lps-ai-coverage { color: #7a6a73 !important; border-top-color: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-ov-ai-teaser { background: rgba(190,24,116,.06) !important; border-color: rgba(190,24,116,.22) !important; }
+[data-theme="light"] .lps-ov-ai-teaser:hover { background: rgba(190,24,116,.1) !important; }
+[data-theme="light"] .lps-ov-ai-text { color: #241820 !important; }
+[data-theme="light"] .lps-ov-ai-link { color: #be1874 !important; }
 [data-theme="light"] .lps-section-label { color: #8a7a83 !important; }
 [data-theme="light"] .lps-section-body { color: #4a3d44 !important; }
 [data-theme="light"] .lps-kv-cell { border-bottom-color: rgba(36,24,32,.06) !important; }

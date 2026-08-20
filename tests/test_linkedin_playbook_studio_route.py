@@ -153,6 +153,93 @@ def test_analyze_starts_running_even_without_a_configured_key(monkeypatch):
     assert resp.status_code == 200
 
 
+# ── Background analysis job: AI enrichment is additive, never blocking ─────
+# _lps_run_analysis_job runs off-thread in production, but it's a plain
+# function -- called directly here (bypassing threading.Thread) so these
+# tests are synchronous and deterministic. The one thing under test: an
+# extra Claude synthesis pass (tracker/lps_enrichment.py) must never be able
+# to stop a run that the vendor's own analysis already completed
+# successfully, whether enrichment is unavailable, returns nothing, or
+# outright raises.
+
+from tracker import lps_enrichment  # noqa: E402
+
+
+def _fake_vendor_output():
+    return {
+        "getcompanyprofile.name": "Acme",
+        "messagingagent.summary": "A summary.",
+        "competitiveagent.scorecardOverall": 5,
+    }
+
+
+def test_analysis_job_merges_enrichment_fields_into_the_saved_output(monkeypatch):
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda output, name, run_type: {
+        "headline": "H", "synthesis": "S", "topActions": ["do this"], "coverage": "C",
+    })
+    saved = {}
+
+    def _capture_update(run_id, status, **kwargs):
+        saved["status"] = status
+        saved.update(kwargs)
+
+    monkeypatch.setattr(lps_store, "update_run_status", _capture_update)
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert saved["status"] == "complete"
+    assert saved["output"]["aienrichment.headline"] == "H"
+    assert saved["output"]["aienrichment.synthesis"] == "S"
+    assert saved["output"]["aienrichment.topActions"] == ["do this"]
+    assert saved["output"]["aienrichment.coverage"] == "C"
+    # the vendor's own fields are untouched
+    assert saved["output"]["getcompanyprofile.name"] == "Acme"
+
+
+def test_analysis_job_completes_normally_when_enrichment_returns_none(monkeypatch):
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert saved["status"] == "complete"
+    assert "aienrichment.headline" not in saved["output"]
+
+
+def test_analysis_job_completes_normally_when_enrichment_raises(monkeypatch):
+    """The one case this feature exists to guard against: a bug in the new
+    enrichment call must not turn a perfectly good vendor analysis into a
+    failed run."""
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+
+    def _boom(*a, **k):
+        raise RuntimeError("enrichment blew up")
+
+    monkeypatch.setattr(lps_enrichment, "enrich_run", _boom)
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert saved["status"] == "complete"
+    assert saved["output"]["getcompanyprofile.name"] == "Acme"
+
+
+def test_analysis_job_never_calls_enrichment_when_the_vendor_analysis_itself_fails(monkeypatch):
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: None)
+    called = []
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: called.append(1))
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert not called
+    assert saved["status"] == "error"
+
+
 # ── Run status / detail / history ────────────────────────────────────────
 
 def test_run_status_404s_for_a_run_that_belongs_to_someone_else(monkeypatch):
