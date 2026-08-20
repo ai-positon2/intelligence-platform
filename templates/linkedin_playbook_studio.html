@@ -390,31 +390,227 @@
       if(row.status==='complete')openRunDrawer(row.id);
     });
 
-    /* ── Report drawer ───────────────────────────────────────────────────── */
-    function renderValue(v){
-      if(v==null||v==='')return '<span class="lps-muted">—</span>';
-      if(Array.isArray(v)){
-        if(!v.length)return '<span class="lps-muted">—</span>';
-        return '<ul class="lps-list">'+v.map(function(x){return '<li>'+renderValue(x)+'</li>';}).join('')+'</ul>';
-      }
-      if(typeof v==='object'){
-        var keys=Object.keys(v);
-        if(!keys.length)return '<span class="lps-muted">—</span>';
-        return '<div class="lps-kv-grid">'+keys.map(function(k){
-          return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(k)+'</span><div class="lps-kv-value">'+renderValue(v[k])+'</div></div>';
-        }).join('')+'</div>';
-      }
-      return '<span>'+esc(String(v))+'</span>';
+    /* ── Report drawer: field-shape-aware rendering ──────────────────────────
+       The Arena API returns ~30 dotted-key fields per run, each shaped
+       differently (prose, string lists, {l,v} distributions, richer objects,
+       or nested groups of any of the above) and frequently PARTIALLY empty --
+       a real company might have data for Strategy but nothing for Content.
+       renderSmart() returns null for "nothing worth showing" rather than a
+       placeholder, so callers can omit the field/section entirely instead of
+       rendering a wall of "—" dashes; humanizeKey() turns raw camelCase keys
+       ("audienceDetail") into real headings ("Audience Detail"). */
+
+    function humanizeKey(k){
+      var s=String(k||'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_\-]+/g,' ').trim();
+      return s.replace(/\S+/g,function(w){return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();});
     }
 
-    function agentTabContent(output,ns){
-      var prefix=ns+'.';
-      var keys=Object.keys(output||{}).filter(function(k){return k.indexOf(prefix)===0;});
-      if(!keys.length)return '<div class="lps-empty">No data returned for this section.</div>';
-      return keys.map(function(k){
-        var field=k.slice(prefix.length);
-        return '<div class="lps-section-label">'+esc(field)+'</div><div class="lps-section-body">'+renderValue(output[k])+'</div>';
+    var FIELD_TITLES={
+      strategy:'Overall Strategy', hookLibrary:'Hook Library', ctaLibrary:'CTA Library',
+      audienceDetail:'Audience Breakdown', topicClusters:'Topic Clusters',
+      imageryTypes:'Imagery Types', textStyle:'Text Style',
+      public_identifier:'LinkedIn Handle', profile_url:'Profile URL',
+      followers_count:'Followers', employee_count:'Employees'
+    };
+    function fieldTitle(field){ return FIELD_TITLES[field]||humanizeKey(field); }
+
+    function isEmptyValue(v){
+      if(v==null)return true;
+      if(typeof v==='string')return v.trim()==='';
+      if(Array.isArray(v))return v.length===0||v.every(isEmptyValue);
+      if(typeof v==='object')return Object.keys(v).every(function(k){return isEmptyValue(v[k]);});
+      return false;
+    }
+    function isLVPair(o){
+      return !!o&&typeof o==='object'&&!Array.isArray(o)&&typeof o.l==='string'&&(typeof o.v==='number'||typeof o.v==='string');
+    }
+    function isLVArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(isLVPair); }
+    function isStringArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(function(x){return typeof x==='string'||typeof x==='number';}); }
+    /* Short tag-like strings (hooks, CTAs, imagery types) read well as pill
+       chips; full sentences (recommendations, observations) look wrong
+       wrapped inside a pill, so those get a plain bulleted list instead. */
+    function isShortStringArray(arr){ return isStringArray(arr)&&arr.every(function(x){return String(x).length<=50;}); }
+
+    /* A label+percentage breakdown (LinkedIn audience/experience/industry
+       splits) as horizontal bars scaled to the largest value, sorted so the
+       biggest segment reads first. */
+    function renderDistribution(arr){
+      var nums=arr.map(function(x){return Number(x.v)||0;});
+      var max=Math.max.apply(null,nums), allPct=nums.every(function(n){return n>=0&&n<=100;});
+      var sorted=arr.slice().sort(function(a,b){return (Number(b.v)||0)-(Number(a.v)||0);});
+      return '<div class="lps-dist">'+sorted.map(function(x){
+        var val=Number(x.v)||0, pct=max>0?Math.max(4,Math.round(val/max*100)):0;
+        var display=allPct?(val+'%'):String(x.v);
+        return '<div class="lps-dist-row"><div class="lps-dist-label">'+esc(x.l)+'</div>'
+          +'<div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%"></div></div>'
+          +'<div class="lps-dist-val">'+esc(display)+'</div></div>';
+      }).join('')+'</div>';
+    }
+    function renderChips(arr){
+      return '<div class="lps-chips">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
+        return '<span class="lps-chip">'+esc(String(s))+'</span>';
+      }).join('')+'</div>';
+    }
+    function renderStringList(arr){
+      return '<ul class="lps-str-list">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
+        return '<li>'+esc(String(s))+'</li>';
+      }).join('')+'</ul>';
+    }
+    var _TITLE_KEYS=['title','name','headline','label','hook','cta','type','category','theme'];
+    function renderCardArray(arr){
+      var cards=arr.filter(function(o){return !isEmptyValue(o);}).map(function(o){
+        if(typeof o!=='object'||o==null)return '<div class="lps-mini-card">'+(renderSmart(o)||'')+'</div>';
+        var keys=Object.keys(o).filter(function(k){return !isEmptyValue(o[k]);});
+        var titleKey=null;
+        for(var i=0;i<_TITLE_KEYS.length;i++){ if(keys.indexOf(_TITLE_KEYS[i])>=0){titleKey=_TITLE_KEYS[i];break;} }
+        var bodyKeys=keys.filter(function(k){return k!==titleKey;});
+        return '<div class="lps-mini-card">'
+          +(titleKey?'<div class="lps-mini-card-title">'+esc(String(o[titleKey]))+'</div>':'')
+          +bodyKeys.map(function(k){
+            var inner=renderSmart(o[k]); if(inner==null)return '';
+            return '<div class="lps-mini-field"><span class="lps-mini-label">'+esc(humanizeKey(k))+'</span>'+inner+'</div>';
+          }).join('')
+          +'</div>';
       }).join('');
+      return cards?'<div class="lps-card-grid">'+cards+'</div>':null;
+    }
+
+    function renderSmart(v){
+      if(isEmptyValue(v))return null;
+      if(Array.isArray(v)){
+        if(isLVArray(v))return renderDistribution(v);
+        if(isShortStringArray(v))return renderChips(v);
+        if(isStringArray(v))return renderStringList(v);
+        return renderCardArray(v);
+      }
+      if(typeof v==='object'){
+        var keys=Object.keys(v).filter(function(k){return !isEmptyValue(v[k]);});
+        if(!keys.length)return null;
+        var cells=keys.map(function(k){
+          var inner=renderSmart(v[k]); if(inner==null)return '';
+          return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(humanizeKey(k))+'</span><div class="lps-kv-value">'+inner+'</div></div>';
+        }).join('');
+        return cells?'<div class="lps-kv-grid">'+cells+'</div>':null;
+      }
+      if(typeof v==='number')return '<span class="lps-stat-inline">'+esc(String(v))+'</span>';
+      var s=String(v).trim();
+      if(!s)return null;
+      return s.length>140?'<p class="lps-prose">'+esc(s)+'</p>':'<span>'+esc(s)+'</span>';
+    }
+
+    var NS_EMPTY_MESSAGE={
+      strategyagent:'No strategy data was returned for this company.',
+      contentcreativeagent:'No content or creative data was returned for this company.',
+      messagingagent:'No messaging data was returned for this company.',
+      creativeinsightagent:'No creative-insight data was returned for this company.',
+      competitiveagent:'No competitive data was returned for this company.',
+      getcompanyprofile:'No company profile data was returned.',
+      getcompanypost:'No recent posts could be pulled for this company.'
+    };
+
+    /* Skips fields with nothing to show instead of rendering them dash-filled
+       -- a real run commonly has data for some agents and none for others. */
+    function agentTabContent(output,ns,excludeFields){
+      var prefix=ns+'.', exclude=excludeFields||[];
+      var keys=Object.keys(output||{}).filter(function(k){
+        return k.indexOf(prefix)===0 && exclude.indexOf(k.slice(prefix.length))<0;
+      });
+      var sections=keys.map(function(k){
+        var body=renderSmart(output[k]);
+        if(body==null)return '';
+        return '<div class="lps-section"><div class="lps-section-label">'+esc(fieldTitle(k.slice(prefix.length)))+'</div><div class="lps-section-body">'+body+'</div></div>';
+      }).filter(Boolean);
+      return sections.length?sections.join(''):'<div class="lps-empty">'+(NS_EMPTY_MESSAGE[ns]||'No data returned for this section.')+'</div>';
+    }
+
+    /* Company Profile: a purpose-built profile card instead of a generic
+       key/value dump, since this namespace's shape is fully known. */
+    function companyProfileContent(output){
+      var get=function(f){return output['getcompanyprofile.'+f];};
+      var name=get('name'), desc=get('description'), logo=get('logo'),
+          website=get('website'), profileUrl=get('profile_url'), handle=get('public_identifier'),
+          followers=get('followers_count'), employees=get('employee_count');
+      if([name,desc,website,profileUrl,followers,employees].every(isEmptyValue))
+        return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanyprofile+'</div>';
+      var stats=[];
+      if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
+      if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
+      if(!isEmptyValue(handle))stats.push({l:'Handle',v:'@'+handle});
+      return '<div class="lps-profile-card">'
+        +(logo?'<img class="lps-profile-logo" src="'+esc(logo)+'" loading="lazy" onerror="this.remove()">':'')
+        +'<div class="lps-profile-main">'
+        +(name?'<div class="lps-profile-name">'+esc(name)+'</div>':'')
+        +(desc?'<p class="lps-profile-desc">'+esc(desc)+'</p>':'')
+        +((website||profileUrl)?'<div class="lps-profile-links">'
+          +(website?'<a href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
+          +(profileUrl?'<a href="'+esc(profileUrl)+'" target="_blank" rel="noopener">LinkedIn profile ↗</a>':'')
+          +'</div>':'')+'</div>'
+        +(stats.length?'<div class="lps-profile-stats">'+stats.map(function(s){
+            return '<div class="lps-profile-stat"><div class="lps-profile-stat-val">'+esc(String(s.v))+'</div><div class="lps-profile-stat-label">'+esc(s.l)+'</div></div>';
+          }).join('')+'</div>':'')
+        +'</div>';
+    }
+
+    /* Posts: cards with whatever fields a post actually carries -- the
+       vendor's exact post shape isn't pinned down, so this reads generously
+       from several plausible key names rather than assuming one. */
+    function postsContent(output){
+      var items=output['getcompanypost.items'];
+      if(!Array.isArray(items)||!items.length)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
+      var cards=items.filter(function(p){return !isEmptyValue(p);}).map(function(p){
+        if(typeof p!=='object')return '<div class="lps-post-card"><p class="lps-post-text">'+esc(String(p))+'</p></div>';
+        var text=p.text||p.content||p.body||p.caption||'';
+        var likes=p.likes!=null?p.likes:(p.reactions!=null?p.reactions:p.likeCount);
+        var comments=p.comments!=null?p.comments:p.commentCount;
+        var date=p.date||p.postedAt||p.created_at||p.publishedAt;
+        var url=p.url||p.postUrl||p.link;
+        var meta=[];
+        if(!isEmptyValue(date))meta.push('<span>'+esc(String(date))+'</span>');
+        if(!isEmptyValue(likes))meta.push('<span>'+esc(String(likes))+' likes</span>');
+        if(!isEmptyValue(comments))meta.push('<span>'+esc(String(comments))+' comments</span>');
+        if(!isEmptyValue(url))meta.push('<a href="'+esc(url)+'" target="_blank" rel="noopener">View ↗</a>');
+        return '<div class="lps-post-card">'
+          +(text?'<p class="lps-post-text">'+esc(String(text))+'</p>':'<p class="lps-post-text lps-muted">No text captured for this post.</p>')
+          +(meta.length?'<div class="lps-post-meta">'+meta.join('')+'</div>':'')
+          +'</div>';
+      }).join('');
+      return cards?'<div class="lps-post-grid">'+cards+'</div>':'<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
+    }
+
+    /* Competitive: the scorecard (an overall number plus a category
+       breakdown) gets its own visual treatment up top; everything else in
+       this namespace renders through the generic path below it. */
+    function competitiveContent(output){
+      var overall=output['competitiveagent.scorecardOverall'];
+      var breakdown=output['competitiveagent.scorecard'];
+      var top='';
+      if(!isEmptyValue(overall)||!isEmptyValue(breakdown)){
+        top+='<div class="lps-section"><div class="lps-section-label">Scorecard</div><div class="lps-section-body"><div class="lps-scorecard">';
+        if(!isEmptyValue(overall))top+='<div class="lps-score-gauge"><div class="lps-score-num">'+esc(String(overall))+'</div><div class="lps-score-label">Overall Score</div></div>';
+        if(!isEmptyValue(breakdown)&&typeof breakdown==='object'&&!Array.isArray(breakdown)){
+          var keys=Object.keys(breakdown).filter(function(k){return !isEmptyValue(breakdown[k]);});
+          if(keys.length){
+            top+='<div class="lps-score-bars">'+keys.map(function(k){
+              var val=Number(breakdown[k])||0, pct=Math.max(4,Math.min(100,val<=10?val*10:val));
+              return '<div class="lps-dist-row"><div class="lps-dist-label">'+esc(humanizeKey(k))+'</div>'
+                +'<div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%"></div></div>'
+                +'<div class="lps-dist-val">'+esc(String(breakdown[k]))+'</div></div>';
+            }).join('')+'</div>';
+          }
+        }
+        top+='</div></div></div>';
+      }
+      var rest=agentTabContent(output,'competitiveagent',['scorecard','scorecardOverall']);
+      var restIsEmpty=rest.indexOf('lps-empty')>=0;
+      if(!top&&restIsEmpty)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.competitiveagent+'</div>';
+      return top+(restIsEmpty?'':rest);
+    }
+
+    function tabPaneContent(output,ns){
+      if(ns==='getcompanyprofile')return companyProfileContent(output);
+      if(ns==='getcompanypost')return postsContent(output);
+      if(ns==='competitiveagent')return competitiveContent(output);
+      return agentTabContent(output,ns);
     }
 
     var DRAWER_RUN = null;
@@ -433,6 +629,18 @@
       if(ns==='playbook')loadPlaybook();
     }
 
+    /* The vendor's playbook content is either a structured dict of
+       recommendations (rendered through the same shape-aware path as every
+       other field) or a plain-text fallback nested under a lone "raw" key
+       when the model didn't return structured JSON. */
+    function renderPlaybookContent(content){
+      if(content&&typeof content==='object'&&!Array.isArray(content)
+         &&typeof content.raw==='string'&&Object.keys(content).length===1){
+        return '<p class="lps-prose">'+esc(content.raw)+'</p>';
+      }
+      return renderSmart(content)||'<div class="lps-empty">The playbook came back empty.</div>';
+    }
+
     function loadPlaybook(){
       var wrap=document.getElementById('lpsPlaybookBody');
       if(!DRAWER_RUN)return;
@@ -442,7 +650,7 @@
         .then(function(r){return r.json();}).then(function(data){
           if(data.playbook&&data.playbook.content){
             wrap.innerHTML='<button class="lps-mode-btn own" style="margin-bottom:16px" onclick="generatePlaybook()">↻ Regenerate playbook</button>'
-              +renderValue(data.playbook.content);
+              +renderPlaybookContent(data.playbook.content);
           } else {
             wrap.innerHTML='<div class="lps-empty">No playbook generated yet.</div>'
               +'<button class="lps-mode-btn own" style="margin-top:16px" onclick="generatePlaybook()">Generate playbook</button>';
@@ -493,7 +701,7 @@
           return '<button class="lps-drw-tab'+(i===0?' active':'')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'+esc(t.label)+'</button>';
         }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">Playbook</button>';
         var panesHtml=AGENT_TABS.map(function(t,i){
-          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+agentTabContent(output,t.ns)+'</div>';
+          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+tabPaneContent(output,t.ns)+'</div>';
         }).join('')+'<div class="lps-drw-pane" data-ns="playbook"><div id="lpsPlaybookBody"></div></div>';
         document.getElementById('drawerBody').innerHTML=drawerHeader(run)
           +'<div class="lps-drw-tabs">'+tabsHtml+'</div>'
