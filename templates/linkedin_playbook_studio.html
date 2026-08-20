@@ -427,26 +427,98 @@
       return !!o&&typeof o==='object'&&!Array.isArray(o)&&typeof o.l==='string'&&(typeof o.v==='number'||typeof o.v==='string');
     }
     function isLVArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(isLVPair); }
+    function isHVPair(o){
+      return !!o&&typeof o==='object'&&!Array.isArray(o)&&typeof o.h==='string'&&(typeof o.v==='number'||typeof o.v==='string');
+    }
+    function isHVArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(isHVPair); }
     function isStringArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(function(x){return typeof x==='string'||typeof x==='number';}); }
     /* Short tag-like strings (hooks, CTAs, imagery types) read well as pill
        chips; full sentences (recommendations, observations) look wrong
        wrapped inside a pill, so those get a plain bulleted list instead. */
     function isShortStringArray(arr){ return isStringArray(arr)&&arr.every(function(x){return String(x).length<=50;}); }
+    /* A {l,v} pair only reads as a chartable number when v itself IS a
+       number -- real responses mix this shape with v holding a full
+       sentence (ctas/features/hooks/trust all use {l,v} with a description
+       in v). Coercing a sentence with Number()||0 used to silently render
+       every bar at zero width while cramming the sentence into a
+       nowrap right-aligned value cell -- exactly the kind of broken-looking
+       output a real run's "ctas"/"features"/"trust" fields produced. */
+    function numericLVValue(v){
+      if(typeof v==='number')return v;
+      var s=String(v).trim();
+      return /^-?\d+(\.\d+)?%?$/.test(s)?parseFloat(s):null;
+    }
+    function isNumericLVArray(arr){ return arr.every(function(x){return numericLVValue(x.v)!=null;}); }
+    function isTupleArray(arr){ return Array.isArray(arr)&&arr.length>0&&arr.every(function(x){return Array.isArray(x)&&x.length===2;}); }
+    function isSwatchArray(arr){
+      return isTupleArray(arr)&&arr.every(function(x){return typeof x[0]==='string'&&/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(x[0].trim())&&typeof x[1]==='string';});
+    }
+    function isKeywordArray(arr){
+      return isTupleArray(arr)&&arr.every(function(x){return typeof x[0]==='string'&&typeof x[1]==='number';});
+    }
+    function arrayOfObjectsWithKeys(arr,keys){
+      return Array.isArray(arr)&&arr.length>0&&arr.every(function(o){
+        return !!o&&typeof o==='object'&&!Array.isArray(o)&&keys.every(function(k){return k in o;});
+      });
+    }
+    function isPersonaArray(arr){ return arrayOfObjectsWithKeys(arr,['confidence','persona']); }
+    function isTimelineArray(arr){ return arrayOfObjectsWithKeys(arr,['date','title'])||arrayOfObjectsWithKeys(arr,['period','theme']); }
+    function isCampaignArray(arr){ return arrayOfObjectsWithKeys(arr,['name','durationDays']); }
+    function isObsRecArray(arr){ return arrayOfObjectsWithKeys(arr,['observation','recommendation']); }
+    function isCountThemeArray(arr){ return arrayOfObjectsWithKeys(arr,['postCount','theme']); }
+    function looksLikeUrl(s){ return typeof s==='string'&&/^https?:\/\//i.test(s.trim()); }
+    function looksLikeImageUrl(s){ return looksLikeUrl(s)&&/\.(png|jpe?g|svg|webp|gif)(\?|$)/i.test(s); }
 
-    /* A label+percentage breakdown (LinkedIn audience/experience/industry
-       splits) as horizontal bars scaled to the largest value, sorted so the
-       biggest segment reads first. */
+    /* Fixed-order categorical palette -- validated with the dataviz skill's
+       accessibility checker (lightness band + CVD separation + contrast) at
+       both dark and light chart surfaces, so chart identity never relies on
+       hue alone at a hue pair the palette itself can't tell apart. Always
+       paired with a direct text label wherever it's used below. */
+    var CHART_PALETTE=['#db2777','#4f46e5','#0891b2','#d97706','#059669','#ea580c'];
+    var TIMELINE_TYPE_COLOR={
+      feature_release:'#4f46e5', event:'#0891b2', partnership:'#059669',
+      hiring:'#d97706', product_launch:'#db2777'
+    };
+
+    /* A label+percentage breakdown as horizontal bars scaled to the largest
+       value -- used once a distribution has too many categories (>6) for a
+       donut to stay legible, sorted so the biggest segment reads first. */
     function renderDistribution(arr){
-      var nums=arr.map(function(x){return Number(x.v)||0;});
+      var nums=arr.map(function(x){return numericLVValue(x.v)||0;});
       var max=Math.max.apply(null,nums), allPct=nums.every(function(n){return n>=0&&n<=100;});
-      var sorted=arr.slice().sort(function(a,b){return (Number(b.v)||0)-(Number(a.v)||0);});
-      return '<div class="lps-dist">'+sorted.map(function(x){
-        var val=Number(x.v)||0, pct=max>0?Math.max(4,Math.round(val/max*100)):0;
+      var sorted=arr.slice().sort(function(a,b){return (numericLVValue(b.v)||0)-(numericLVValue(a.v)||0);});
+      return '<div class="lps-dist">'+sorted.map(function(x,i){
+        var val=numericLVValue(x.v)||0, pct=max>0?Math.max(4,Math.round(val/max*100)):0;
         var display=allPct?(val+'%'):String(x.v);
+        var color=CHART_PALETTE[i%CHART_PALETTE.length];
         return '<div class="lps-dist-row"><div class="lps-dist-label">'+esc(x.l)+'</div>'
-          +'<div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%"></div></div>'
+          +'<div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%;background:'+color+'"></div></div>'
           +'<div class="lps-dist-val">'+esc(display)+'</div></div>';
       }).join('')+'</div>';
+    }
+    /* Share-of-whole for <=6 categories reads far better as a ring than as
+       stacked bars -- an SVG donut built from stroke-dasharray segments (no
+       chart library), a small surface gap between segments, and a legend
+       that always carries a text label so color is never the only signal. */
+    function renderDonut(arr){
+      var vals=arr.map(function(x){return Math.max(0,numericLVValue(x.v)||0);});
+      var total=vals.reduce(function(a,b){return a+b;},0)||1;
+      var r=40,cx=50,cy=50,circ=2*Math.PI*r, offset=0, gap=arr.length>1?1.6:0;
+      var segs=arr.map(function(x,i){
+        var len=vals[i]/total*circ, dashLen=Math.max(0,len-gap);
+        var rot=(offset/circ)*360-90;
+        offset+=len;
+        return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+CHART_PALETTE[i%CHART_PALETTE.length]+'" '
+          +'stroke-width="16" stroke-dasharray="'+dashLen+' '+(circ-dashLen)+'" transform="rotate('+rot+' '+cx+' '+cy+')" class="lps-donut-seg"></circle>';
+      }).join('');
+      var legend=arr.map(function(x,i){
+        var pct=Math.round(vals[i]/total*100);
+        return '<div class="lps-donut-leg-row"><span class="lps-donut-dot" style="background:'+CHART_PALETTE[i%CHART_PALETTE.length]+'"></span>'
+          +'<span class="lps-donut-leg-label">'+esc(x.l)+'</span>'
+          +'<span class="lps-donut-leg-val">'+esc(String(x.v))+'</span><span class="lps-donut-leg-pct">'+pct+'%</span></div>';
+      }).join('');
+      return '<div class="lps-donut-wrap"><svg viewBox="0 0 100 100" class="lps-donut-svg">'+segs+'</svg>'
+        +'<div class="lps-donut-legend">'+legend+'</div></div>';
     }
     function renderChips(arr){
       return '<div class="lps-chips">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
@@ -457,6 +529,103 @@
       return '<ul class="lps-str-list">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
         return '<li>'+esc(String(s))+'</li>';
       }).join('')+'</ul>';
+    }
+    /* {l,v} pairs where v is a description, not a number (ctas/features/
+       hooks/trust) -- an accent-edged card per entry instead of a broken
+       zero-width bar with the sentence crammed into a nowrap value cell. */
+    function renderDefinitionCards(arr){
+      var cards=arr.map(function(x,i){
+        return '<div class="lps-def-card" style="--accent:'+CHART_PALETTE[i%CHART_PALETTE.length]+'">'
+          +'<div class="lps-def-label">'+esc(String(x.l))+'</div>'
+          +'<p class="lps-def-body">'+esc(String(x.v))+'</p></div>';
+      }).join('');
+      return '<div class="lps-def-grid">'+cards+'</div>';
+    }
+    function renderStatTiles(arr){
+      return '<div class="lps-stat-tiles">'+arr.map(function(x,i){
+        return '<div class="lps-stat-tile" style="--accent:'+CHART_PALETTE[i%CHART_PALETTE.length]+'">'
+          +'<div class="lps-stat-tile-val">'+esc(String(x.v))+'</div><div class="lps-stat-tile-label">'+esc(String(x.h))+'</div></div>';
+      }).join('')+'</div>';
+    }
+    function renderSwatches(arr){
+      return '<div class="lps-swatch-row">'+arr.map(function(x){
+        return '<div class="lps-swatch"><span class="lps-swatch-chip" style="background:'+esc(x[0])+'"></span>'
+          +'<span class="lps-swatch-name">'+esc(x[1])+'</span><span class="lps-swatch-hex">'+esc(String(x[0]).toUpperCase())+'</span></div>';
+      }).join('')+'</div>';
+    }
+    /* Keyword frequency as a sized cloud -- font-size and accent scale with
+       count relative to the top keyword, count itself always shown as a
+       direct label so size isn't the only signal. */
+    function renderKeywordCloud(arr){
+      var max=Math.max.apply(null,arr.map(function(x){return x[1];}))||1;
+      var sorted=arr.slice().sort(function(a,b){return b[1]-a[1];});
+      return '<div class="lps-kw-cloud">'+sorted.map(function(x,i){
+        var scale=(0.88+(x[1]/max)*0.6).toFixed(2);
+        return '<span class="lps-kw" style="font-size:'+scale+'em;--accent:'+CHART_PALETTE[i%CHART_PALETTE.length]+'">'
+          +esc(String(x[0]))+'<b>'+esc(String(x[1]))+'</b></span>';
+      }).join('')+'</div>';
+    }
+    function confidenceRing(pct,color){
+      var r=26,circ=2*Math.PI*r, off=circ*(1-Math.max(0,Math.min(100,pct))/100);
+      return '<svg viewBox="0 0 64 64" class="lps-ring-svg">'
+        +'<circle cx="32" cy="32" r="'+r+'" class="lps-ring-track"></circle>'
+        +'<circle cx="32" cy="32" r="'+r+'" class="lps-ring-fill" style="stroke:'+color+';stroke-dasharray:'+circ+';stroke-dashoffset:'+off+'"></circle>'
+        +'</svg><div class="lps-ring-label">'+Math.round(pct)+'%</div>';
+    }
+    function renderPersonaCards(arr){
+      var cards=arr.map(function(p,i){
+        var color=CHART_PALETTE[i%CHART_PALETTE.length], conf=numericLVValue(p.confidence)||0;
+        return '<div class="lps-persona-card">'
+          +'<div class="lps-persona-ring">'+confidenceRing(conf,color)+'</div>'
+          +'<div class="lps-persona-body">'
+          +'<div class="lps-persona-name">'+esc(p.persona||'')+'</div>'
+          +'<div class="lps-persona-tags">'
+            +(p.seniority?'<span class="lps-chip lps-chip-sm">'+esc(p.seniority)+'</span>':'')
+            +(p.industry?'<span class="lps-chip lps-chip-sm">'+esc(p.industry)+'</span>':'')
+          +'</div>'
+          +(p.rationale?'<p class="lps-persona-rationale">'+esc(p.rationale)+'</p>':'')
+          +'</div></div>';
+      }).join('');
+      return '<div class="lps-persona-grid">'+cards+'</div>';
+    }
+    function renderTimeline(arr){
+      var isDated=arrayOfObjectsWithKeys(arr,['date','title']);
+      var sorted=arr.slice();
+      if(isDated)sorted.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+      return '<div class="lps-timeline">'+sorted.map(function(x){
+        if(isDated){
+          var color=TIMELINE_TYPE_COLOR[x.type]||CHART_PALETTE[0];
+          return '<div class="lps-tl-item"><div class="lps-tl-dot" style="background:'+color+'"></div>'
+            +'<div class="lps-tl-body"><div class="lps-tl-date">'+esc(x.date||'')+'</div>'
+            +'<div class="lps-tl-title">'+esc(x.title||'')+'</div>'
+            +(x.type?'<span class="lps-chip lps-chip-sm" style="--accent:'+color+'">'+esc(humanizeKey(x.type))+'</span>':'')
+            +'</div></div>';
+        }
+        return '<div class="lps-tl-item"><div class="lps-tl-dot" style="background:'+CHART_PALETTE[1]+'"></div>'
+          +'<div class="lps-tl-body"><div class="lps-tl-date">'+esc(x.period||'')+'</div>'
+          +'<p class="lps-tl-theme">'+esc(x.theme||'')+'</p></div></div>';
+      }).join('')+'</div>';
+    }
+    function renderCampaignCards(arr){
+      var maxDur=Math.max.apply(null,arr.map(function(x){return Number(x.durationDays)||0;}))||1;
+      return '<div class="lps-campaign-grid">'+arr.map(function(x,i){
+        var pct=Math.max(6,Math.round((Number(x.durationDays)||0)/maxDur*100));
+        var color=CHART_PALETTE[i%CHART_PALETTE.length];
+        return '<div class="lps-campaign-card">'
+          +'<div class="lps-campaign-name">'+esc(x.name||'')+'</div>'
+          +(x.cta?'<p class="lps-campaign-cta">'+esc(x.cta)+'</p>':'')
+          +'<div class="lps-campaign-dur"><div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%;background:'+color+'"></div></div>'
+          +'<span>'+esc(String(x.durationDays))+' days</span>'+(x.posts!=null?'<span class="lps-badge own">'+esc(String(x.posts))+' posts</span>':'')+'</div>'
+          +'</div>';
+      }).join('')+'</div>';
+    }
+    function renderObsRecCards(arr){
+      return '<div class="lps-obsrec-grid">'+arr.map(function(x){
+        return '<div class="lps-obsrec-card">'
+          +'<div class="lps-obsrec-row"><span class="lps-obsrec-tag obs">Observation</span><p>'+esc(x.observation)+'</p></div>'
+          +'<div class="lps-obsrec-row"><span class="lps-obsrec-tag rec">Do this</span><p>'+esc(x.recommendation)+'</p></div>'
+          +'</div>';
+      }).join('')+'</div>';
     }
     var _TITLE_KEYS=['title','name','headline','label','hook','cta','type','category','theme'];
     function renderCardArray(arr){
@@ -477,17 +646,98 @@
       return cards?'<div class="lps-card-grid">'+cards+'</div>':null;
     }
 
+    /* Radar + arc-gauge for the competitive scorecard. The vendor's real
+       shape is an ARRAY of {metric,score} -- not an object keyed by
+       category -- so anything checking `!Array.isArray(breakdown)` before
+       treating it as a category map (as this file's first version did)
+       silently skips it for every real run; see competitiveContent below. */
+    function renderRadar(items){
+      var n=items.length, cx=155,cy=125,rMax=72;
+      var scoreVals=items.map(function(x){return Number(x.score)||0;});
+      var maxScore=Math.max(10,Math.max.apply(null,scoreVals))<=10?10:100;
+      var angleFor=function(i){return -Math.PI/2+i*(2*Math.PI/n);};
+      var pointAt=function(i,frac){ var a=angleFor(i),r=rMax*frac; return [cx+r*Math.cos(a),cy+r*Math.sin(a)]; };
+      var rings=[0.2,0.4,0.6,0.8,1].map(function(f){
+        var pts=items.map(function(_,i){return pointAt(i,f).join(',');}).join(' ');
+        return '<polygon points="'+pts+'" class="lps-radar-ring"></polygon>';
+      }).join('');
+      var axes=items.map(function(_,i){
+        var p=pointAt(i,1);
+        return '<line x1="'+cx+'" y1="'+cy+'" x2="'+p[0]+'" y2="'+p[1]+'" class="lps-radar-axis"></line>';
+      }).join('');
+      var dataPts=items.map(function(x,i){ return pointAt(i,Math.max(0,Math.min(1,(Number(x.score)||0)/maxScore))); });
+      var poly=dataPts.map(function(p){return p.join(',');}).join(' ');
+      var dots=dataPts.map(function(p){return '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.5" class="lps-radar-dot"></circle>';}).join('');
+      /* Long metric names ("CTA Effectiveness") clipped past the SVG edge
+         when rendered as one line at the label radius -- wrapped onto up to
+         two tspans instead of just widening the canvas further, which still
+         wouldn't have been enough room for anchor="end" labels on the axes
+         pointing furthest left. */
+      var wrapLabel=function(s){
+        var words=s.split(' ');
+        if(words.length<2)return [s];
+        var mid=Math.ceil(words.length/2);
+        return [words.slice(0,mid).join(' '), words.slice(mid).join(' ')];
+      };
+      var labels=items.map(function(x,i){
+        var p=pointAt(i,1.34);
+        var anchor=Math.abs(p[0]-cx)<4?'middle':(p[0]>cx?'start':'end');
+        var lines=wrapLabel(humanizeKey(x.metric));
+        var lineTspans=lines.map(function(line,li){return '<tspan x="'+p[0]+'" dy="'+(li===0?0:11)+'">'+esc(line)+'</tspan>';}).join('');
+        return '<text y="'+p[1]+'" text-anchor="'+anchor+'" class="lps-radar-label">'+lineTspans+'</text>'
+          +'<text x="'+p[0]+'" y="'+(p[1]+11*lines.length+11)+'" text-anchor="'+anchor+'" class="lps-radar-score">'+esc(String(x.score))+'</text>';
+      }).join('');
+      return '<svg viewBox="0 0 310 280" class="lps-radar-svg">'+rings+axes
+        +'<polygon points="'+poly+'" class="lps-radar-fill"></polygon>'+dots+labels+'</svg>';
+    }
+    function renderScoreGauge(overall,maxVal){
+      maxVal=maxVal||10;
+      var pct=Math.max(0,Math.min(1,Number(overall)/maxVal));
+      var r=52,circ=2*Math.PI*r, off=circ*(1-pct);
+      return '<div class="lps-gauge-wrap"><svg viewBox="0 0 128 128" class="lps-gauge-svg">'
+        +'<circle cx="64" cy="64" r="'+r+'" class="lps-gauge-track"></circle>'
+        +'<circle cx="64" cy="64" r="'+r+'" class="lps-gauge-fill" style="stroke-dasharray:'+circ+';stroke-dashoffset:'+off+'"></circle>'
+        +'</svg><div class="lps-gauge-center"><div class="lps-gauge-num">'+esc(String(overall))+'</div><div class="lps-gauge-label">/ '+maxVal+'</div></div></div>';
+    }
+
     function renderSmart(v){
       if(isEmptyValue(v))return null;
       if(Array.isArray(v)){
-        if(isLVArray(v))return renderDistribution(v);
+        if(isSwatchArray(v))return renderSwatches(v);
+        if(isKeywordArray(v))return renderKeywordCloud(v);
+        if(isLVArray(v)){
+          if(isNumericLVArray(v))return v.length<=6?renderDonut(v):renderDistribution(v);
+          return renderDefinitionCards(v);
+        }
+        if(isHVArray(v))return renderStatTiles(v);
         if(isShortStringArray(v))return renderChips(v);
         if(isStringArray(v))return renderStringList(v);
+        if(isPersonaArray(v))return renderPersonaCards(v);
+        if(isTimelineArray(v))return renderTimeline(v);
+        if(isCampaignArray(v))return renderCampaignCards(v);
+        if(isObsRecArray(v))return renderObsRecCards(v);
+        if(isCountThemeArray(v)){
+          var asLV=v.map(function(x){return {l:x.theme,v:x.postCount};});
+          return asLV.length<=6?renderDonut(asLV):renderDistribution(asLV);
+        }
         return renderCardArray(v);
       }
       if(typeof v==='object'){
         var keys=Object.keys(v).filter(function(k){return !isEmptyValue(v[k]);});
         if(!keys.length)return null;
+        /* An object whose children are themselves arrays/objects (strategy,
+           audienceDetail, summary, messaging, competitive, …) reads far
+           better as full-width stacked sub-sections than crammed into a
+           2-column key/value grid -- that layout is reserved for genuinely
+           flat objects (a handful of short scalar fields, e.g. `company`). */
+        var hasComplexChild=keys.some(function(k){return typeof v[k]==='object';});
+        if(hasComplexChild){
+          var blocks=keys.map(function(k){
+            var inner=renderSmart(v[k]); if(inner==null)return '';
+            return '<div class="lps-subfield"><div class="lps-subfield-label">'+esc(humanizeKey(k))+'</div>'+inner+'</div>';
+          }).join('');
+          return blocks?'<div class="lps-subfield-stack">'+blocks+'</div>':null;
+        }
         var cells=keys.map(function(k){
           var inner=renderSmart(v[k]); if(inner==null)return '';
           return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(humanizeKey(k))+'</span><div class="lps-kv-value">'+inner+'</div></div>';
@@ -497,6 +747,8 @@
       if(typeof v==='number')return '<span class="lps-stat-inline">'+esc(String(v))+'</span>';
       var s=String(v).trim();
       if(!s)return null;
+      if(looksLikeImageUrl(s))return '<img class="lps-inline-logo" src="'+esc(s)+'" loading="lazy" onerror="this.remove()">';
+      if(looksLikeUrl(s))return '<a class="lps-inline-link" href="'+esc(s)+'" target="_blank" rel="noopener">Open link ↗</a>';
       return s.length>140?'<p class="lps-prose">'+esc(s)+'</p>':'<span>'+esc(s)+'</span>';
     }
 
@@ -531,23 +783,41 @@
        company_logo, always present) when the vendor's own profile fields
        come back empty for this run -- so the tab never shows a bare "no
        data" message for a company whose name and logo we already know. */
+    /* The vendor's raw `profile` blob carries a lot more than the flat
+       fields this page requests individually (tagline, founding date,
+       office locations, an activities/hashtags list, viewer-permission
+       flags nobody needs) -- pulling a handful of the genuinely useful
+       extras out of it turns this tab from "name + description" into an
+       actual company snapshot, without rendering the whole 40-field object. */
     function companyProfileContent(output,run){
       var get=function(f){return output['getcompanyprofile.'+f];};
+      var profile=get('profile'); if(!profile||typeof profile!=='object')profile={};
       var name=get('name')||(run&&run.company_name), desc=get('description'),
           logo=get('logo')||(run&&run.company_logo),
           website=get('website'), profileUrl=get('profile_url'), handle=get('public_identifier'),
           followers=get('followers_count'), employees=get('employee_count');
       if([name,desc,logo,website,profileUrl,followers,employees].every(isEmptyValue))
         return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanyprofile+'</div>';
+      var industry=Array.isArray(profile.industry)?profile.industry[0]:profile.industry;
       var stats=[];
       if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
       if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
       if(!isEmptyValue(handle))stats.push({l:'Handle',v:'@'+handle});
+      if(!isEmptyValue(profile.foundation_date))stats.push({l:'Founded',v:String(profile.foundation_date).split('/').pop()});
+      var locations=Array.isArray(profile.locations)?profile.locations:[];
+      var hq=locations.filter(function(l){return l&&l.is_headquarter;})[0];
+      if(hq)stats.push({l:'HQ',v:[hq.city,hq.country].filter(Boolean).join(', ')});
+      if(locations.length>1)stats.push({l:'Offices',v:locations.length+' worldwide'});
+      var tags=[].concat(Array.isArray(profile.activities)?profile.activities.slice(0,12):[])
+        .concat(Array.isArray(profile.hashtags)?profile.hashtags.map(function(h){return typeof h==='object'?h.title:h;}):[])
+        .filter(function(t){return !isEmptyValue(t);});
       return '<div class="lps-profile-card">'
         +(logo?'<img class="lps-profile-logo" src="'+esc(logo)+'" loading="lazy" onerror="this.remove()">':'')
         +'<div class="lps-profile-main">'
-        +(name?'<div class="lps-profile-name">'+esc(name)+'</div>':'')
+        +(name?'<div class="lps-profile-name">'+esc(name)+(industry?'<span class="lps-profile-industry">'+esc(industry)+'</span>':'')+'</div>':'')
+        +(profile.tagline?'<div class="lps-profile-tagline">'+esc(profile.tagline)+'</div>':'')
         +(desc?'<p class="lps-profile-desc">'+esc(desc)+'</p>':'')
+        +(tags.length?'<div class="lps-chips" style="margin-top:12px">'+tags.slice(0,14).map(function(t){return '<span class="lps-chip lps-chip-sm">'+esc(String(t))+'</span>';}).join('')+'</div>':'')
         +((website||profileUrl)?'<div class="lps-profile-links">'
           +(website?'<a href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
           +(profileUrl?'<a href="'+esc(profileUrl)+'" target="_blank" rel="noopener">LinkedIn profile ↗</a>':'')
@@ -558,53 +828,62 @@
         +'</div>';
     }
 
-    /* Posts: cards with whatever fields a post actually carries -- the
-       vendor's exact post shape isn't pinned down, so this reads generously
-       from several plausible key names rather than assuming one. */
+    /* Posts: the vendor's actual field names (reaction_counter/comment_counter/
+       repost_counter/share_url) confirmed from a real production run --
+       earlier guesses at likely key names (likes/comments/url, ported from a
+       different tool's assumed shape) never matched, so engagement numbers
+       and the "View" link silently never appeared. Sorted by reactions so
+       the best-performing posts surface first (a genuinely useful ranking,
+       not just recency), with the first image/video attachment as a
+       thumbnail and reposts flagged distinctly from original posts. */
     function postsContent(output){
       var items=output['getcompanypost.items'];
-      if(!Array.isArray(items)||!items.length)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
-      var cards=items.filter(function(p){return !isEmptyValue(p);}).map(function(p){
-        if(typeof p!=='object')return '<div class="lps-post-card"><p class="lps-post-text">'+esc(String(p))+'</p></div>';
-        var text=p.text||p.content||p.body||p.caption||'';
-        var likes=p.likes!=null?p.likes:(p.reactions!=null?p.reactions:p.likeCount);
-        var comments=p.comments!=null?p.comments:p.commentCount;
-        var date=p.date||p.postedAt||p.created_at||p.publishedAt;
-        var url=p.url||p.postUrl||p.link;
+      var real=Array.isArray(items)?items.filter(function(p){return p&&typeof p==='object';}):[];
+      if(!real.length)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
+      var sorted=real.slice().sort(function(a,b){return (Number(b.reaction_counter)||0)-(Number(a.reaction_counter)||0);});
+      var cards=sorted.slice(0,24).map(function(p){
+        var text=p.text||(p.repost_content&&p.repost_content.text)||'';
+        var thumb=null;
+        if(Array.isArray(p.attachments)){
+          var media=p.attachments.filter(function(a){return a&&(a.type==='img'||a.type==='video')&&a.url;})[0];
+          if(media)thumb=media.url;
+        }
         var meta=[];
-        if(!isEmptyValue(date))meta.push('<span>'+esc(String(date))+'</span>');
-        if(!isEmptyValue(likes))meta.push('<span>'+esc(String(likes))+' likes</span>');
-        if(!isEmptyValue(comments))meta.push('<span>'+esc(String(comments))+' comments</span>');
-        if(!isEmptyValue(url))meta.push('<a href="'+esc(url)+'" target="_blank" rel="noopener">View ↗</a>');
+        if(!isEmptyValue(p.date))meta.push('<span>'+esc(String(p.date))+'</span>');
+        if(!isEmptyValue(p.reaction_counter))meta.push('<span>❤ '+Number(p.reaction_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.comment_counter))meta.push('<span>💬 '+Number(p.comment_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.repost_counter))meta.push('<span>↻ '+Number(p.repost_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.share_url))meta.push('<a href="'+esc(p.share_url)+'" target="_blank" rel="noopener">View ↗</a>');
         return '<div class="lps-post-card">'
+          +(thumb?'<img class="lps-post-thumb" src="'+esc(thumb)+'" loading="lazy" onerror="this.remove()">':'')
+          +(p.is_repost?'<span class="lps-badge comp lps-post-repost">Repost</span>':'')
           +(text?'<p class="lps-post-text">'+esc(String(text))+'</p>':'<p class="lps-post-text lps-muted">No text captured for this post.</p>')
           +(meta.length?'<div class="lps-post-meta">'+meta.join('')+'</div>':'')
           +'</div>';
       }).join('');
-      return cards?'<div class="lps-post-grid">'+cards+'</div>':'<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
+      return '<div class="lps-post-grid">'+cards+'</div>';
     }
 
-    /* Competitive: the scorecard (an overall number plus a category
-       breakdown) gets its own visual treatment up top; everything else in
-       this namespace renders through the generic path below it. */
+    /* Competitive: the scorecard (an overall number plus a per-metric
+       breakdown) gets its own visual treatment up top -- a real run's
+       `scorecard` is an ARRAY of {metric,score} objects, not an object keyed
+       by category name, which this file's first version didn't account for
+       (`typeof x==='object' && !Array.isArray(x)` is false for an array, so
+       the whole breakdown branch was silently skipped on every real run --
+       the category bars simply never rendered). Now rendered as a radar
+       chart (reads a multi-metric shape better than 7 stacked bars) next to
+       the overall score as a proper arc gauge. Everything else in this
+       namespace renders through the generic path below it. */
     function competitiveContent(output){
       var overall=output['competitiveagent.scorecardOverall'];
       var breakdown=output['competitiveagent.scorecard'];
+      var validBreakdown=arrayOfObjectsWithKeys(breakdown,['metric','score']);
       var top='';
-      if(!isEmptyValue(overall)||!isEmptyValue(breakdown)){
-        top+='<div class="lps-section"><div class="lps-section-label">Scorecard</div><div class="lps-section-body"><div class="lps-scorecard">';
-        if(!isEmptyValue(overall))top+='<div class="lps-score-gauge"><div class="lps-score-num">'+esc(String(overall))+'</div><div class="lps-score-label">Overall Score</div></div>';
-        if(!isEmptyValue(breakdown)&&typeof breakdown==='object'&&!Array.isArray(breakdown)){
-          var keys=Object.keys(breakdown).filter(function(k){return !isEmptyValue(breakdown[k]);});
-          if(keys.length){
-            top+='<div class="lps-score-bars">'+keys.map(function(k){
-              var val=Number(breakdown[k])||0, pct=Math.max(4,Math.min(100,val<=10?val*10:val));
-              return '<div class="lps-dist-row"><div class="lps-dist-label">'+esc(humanizeKey(k))+'</div>'
-                +'<div class="lps-dist-bar-wrap"><div class="lps-dist-bar" style="width:'+pct+'%"></div></div>'
-                +'<div class="lps-dist-val">'+esc(String(breakdown[k]))+'</div></div>';
-            }).join('')+'</div>';
-          }
-        }
+      if(!isEmptyValue(overall)||validBreakdown){
+        var maxVal=validBreakdown&&breakdown.some(function(x){return Number(x.score)>10;})?100:10;
+        top+='<div class="lps-section"><div class="lps-section-label">Scorecard</div><div class="lps-section-body"><div class="lps-scorecard-viz">';
+        if(!isEmptyValue(overall))top+=renderScoreGauge(overall,maxVal);
+        if(validBreakdown)top+='<div class="lps-radar-block">'+renderRadar(breakdown)+'</div>';
         top+='</div></div></div>';
       }
       var rest=agentTabContent(output,'competitiveagent',['scorecard','scorecardOverall']);
@@ -640,29 +919,50 @@
       var desc=get('description'), website=get('website'),
           followers=get('followers_count'), employees=get('employee_count');
       var overall=output['competitiveagent.scorecardOverall'];
+      var scoreBreakdown=output['competitiveagent.scorecard'];
+      var maxScoreVal=arrayOfObjectsWithKeys(scoreBreakdown,['metric','score'])&&scoreBreakdown.some(function(x){return Number(x.score)>10;})?100:10;
       var summary=output['messagingagent.summary'];
       var strategy=output['strategyagent.strategy'];
       var hooks=output['strategyagent.hookLibrary'];
       var ctas=output['strategyagent.ctaLibrary'];
+      /* hookLibrary is an array of {example,type} objects, not plain
+         strings -- isStringArray(hooks) is false for the real shape, so
+         "Top Hooks" never rendered on Overview at all until this pulled
+         .example out explicitly. Truncated here since Overview is a taste,
+         not the full detail (that lives in the Strategy tab). */
+      var hookExamples=Array.isArray(hooks)?hooks.map(function(h){
+        var s=String((h&&typeof h==='object')?h.example:h||'');
+        return s.length>70?s.slice(0,70).trim()+'…':s;
+      }).filter(function(s){return s;}):[];
 
       var stats=[];
       if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
       if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
-      if(!isEmptyValue(overall))stats.push({l:'Competitive Score',v:String(overall)});
 
       var html='';
-      if(!isEmptyValue(desc)||stats.length){
+      if(!isEmptyValue(desc)||stats.length||!isEmptyValue(overall)){
         html+='<div class="lps-ov-hero">'
+          +'<div class="lps-ov-hero-main">'
           +(desc?'<p class="lps-ov-desc">'+esc(desc)+'</p>':'')
           +(website?'<a class="lps-ov-website" href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
           +(stats.length?'<div class="lps-ov-stats">'+stats.map(function(s){
               return '<div class="lps-ov-stat"><div class="lps-ov-stat-val">'+esc(String(s.v))+'</div><div class="lps-ov-stat-label">'+esc(s.l)+'</div></div>';
             }).join('')+'</div>':'')
+          +'</div>'
+          +(!isEmptyValue(overall)?'<div class="lps-ov-hero-score">'+renderScoreGauge(overall,maxScoreVal)+'<div class="lps-ov-stat-label">Competitive Score</div></div>':'')
           +'</div>';
       }
 
-      if(!isEmptyValue(summary)){
-        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body"><p class="lps-prose">'+esc(summary)+'</p></div></div>';
+      /* messagingagent.summary is commonly an object ({text, moves, stats, …}),
+         not a plain string -- stringifying it directly used to print the
+         literal text "[object Object]" into the Executive Summary section.
+         Pull .text out when present; otherwise fall back to the shape-aware
+         renderer instead of assuming a string. */
+      var summaryText=(summary&&typeof summary==='object'&&!Array.isArray(summary))?summary.text:summary;
+      if(!isEmptyValue(summaryText)&&typeof summaryText==='string'){
+        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body"><p class="lps-prose">'+esc(summaryText)+'</p></div></div>';
+      } else if(!isEmptyValue(summary)){
+        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body">'+renderSmart(summary)+'</div></div>';
       } else if(!isEmptyValue(strategy)){
         var s=String(strategy), long=s.length>320, excerpt=long?s.slice(0,320).trim()+'…':s;
         html+='<div class="lps-section"><div class="lps-section-label">Strategy Snapshot</div><div class="lps-section-body"><p class="lps-prose">'+esc(excerpt)+'</p>'
@@ -670,8 +970,8 @@
           +'</div></div>';
       }
 
-      if(isStringArray(hooks))
-        html+='<div class="lps-section"><div class="lps-section-label">Top Hooks</div><div class="lps-section-body">'+renderChips(hooks.slice(0,6))+'</div></div>';
+      if(hookExamples.length)
+        html+='<div class="lps-section"><div class="lps-section-label">Top Hooks</div><div class="lps-section-body">'+renderChips(hookExamples.slice(0,6))+'</div></div>';
       if(isStringArray(ctas))
         html+='<div class="lps-section"><div class="lps-section-label">Top CTAs</div><div class="lps-section-body">'+renderChips(ctas.slice(0,6))+'</div></div>';
 

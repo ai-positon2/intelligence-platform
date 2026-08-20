@@ -341,12 +341,133 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 .lps-post-meta a { color: #7dd3fc; text-decoration: none; }
 .lps-post-meta a:hover { text-decoration: underline; }
 
-/* Competitive tab scorecard */
-.lps-scorecard { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
-.lps-score-gauge { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 108px; height: 108px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(244,114,182,.22), rgba(124,131,245,.14) 60%, rgba(255,255,255,.03) 100%); border: 1px solid rgba(244,114,182,.3); flex-shrink: 0; }
-.lps-score-num { font-size: 32px; font-weight: 800; color: #fbb6d9; line-height: 1; font-variant-numeric: tabular-nums; }
-.lps-score-label { font-size: 9.5px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #8b86a0; }
-.lps-score-bars { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 9px; }
+/* Competitive tab scorecard: arc gauge + radar, replacing the old flat
+   category bars (which never actually rendered against the real
+   {metric,score} array shape -- see competitiveContent). */
+.lps-scorecard-viz { display: flex; gap: 32px; align-items: center; flex-wrap: wrap; }
+
+/* Stacked sub-sections for objects whose children are themselves arrays/
+   objects (strategy, audienceDetail, summary, messaging, competitive) --
+   each gets its own label and full page width instead of a cramped 2-col
+   key/value grid. */
+.lps-subfield-stack { display: flex; flex-direction: column; gap: 22px; }
+.lps-subfield-label { font-size: 10px; font-weight: 800; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #a78bd4; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed rgba(167,139,212,.25); }
+
+.lps-inline-link { color: #7dd3fc; text-decoration: none; font-size: 12.5px; }
+.lps-inline-link:hover { text-decoration: underline; }
+.lps-inline-logo { max-width: 120px; max-height: 40px; object-fit: contain; background: #fff; border-radius: var(--radius-xs); padding: 4px; }
+
+/* Donut chart -- SVG ring built from stroke-dasharray segments, legend
+   always carries the label + raw value + share%, so color never has to
+   carry identity alone. */
+.lps-donut-wrap { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+.lps-donut-svg { width: 132px; height: 132px; flex-shrink: 0; filter: drop-shadow(0 6px 18px rgba(0,0,0,.35)); }
+.lps-donut-seg { transition: stroke-width .2s ease; }
+.lps-donut-legend { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.lps-donut-leg-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+.lps-donut-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.lps-donut-leg-label { flex: 1; color: #cfc9d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lps-donut-leg-val { color: #f1eef2; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lps-donut-leg-pct { color: #6b6680; font-size: 10.5px; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+/* {l,v} pairs where v is a sentence (ctas, features, hooks, trust) -- an
+   accent-edged definition card per entry instead of a broken zero-width bar
+   with the sentence overflowing a nowrap value cell. */
+.lps-def-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 12px; }
+.lps-def-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-left: 3px solid var(--accent, #f472b6); border-radius: var(--radius-md); padding: 13px 15px; }
+.lps-def-label { font-size: 12.5px; font-weight: 700; color: #f1eef2; margin-bottom: 6px; }
+.lps-def-body { font-size: 12px; line-height: 1.55; color: #a8a2b3; }
+
+/* {h,v} stat tiles (messagingagent stats) */
+.lps-stat-tiles { display: flex; gap: 16px; flex-wrap: wrap; }
+.lps-stat-tile { flex: 1; min-width: 150px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-top: 2px solid var(--accent, #f472b6); border-radius: var(--radius-md); padding: 14px 16px; }
+.lps-stat-tile-val { font-size: 19px; font-weight: 800; color: #f1eef2; line-height: 1.2; }
+.lps-stat-tile-label { font-size: 10.5px; color: #8b86a0; margin-top: 6px; line-height: 1.4; }
+
+/* Color swatches (contentcreativeagent.creative.swatches) -- actual chips */
+.lps-swatch-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.lps-swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.lps-swatch-chip { width: 44px; height: 44px; border-radius: var(--radius-sm); box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 6px 16px rgba(0,0,0,.35); }
+.lps-swatch-name { font-size: 10.5px; color: #cfc9d6; text-align: center; max-width: 80px; }
+.lps-swatch-hex { font-size: 9.5px; color: #6b6680; font-variant-numeric: tabular-nums; }
+
+/* Keyword frequency cloud */
+.lps-kw-cloud { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+.lps-kw { color: var(--accent, #f472b6); font-weight: 700; white-space: nowrap; }
+.lps-kw b { font-weight: 700; font-size: .6em; color: #6b6680; margin-left: 3px; vertical-align: super; }
+
+/* Persona cards with a circular confidence ring */
+.lps-persona-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 14px; }
+.lps-persona-card { display: flex; gap: 14px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 16px; }
+.lps-persona-ring { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.lps-ring-svg { width: 64px; height: 64px; transform: rotate(-90deg); }
+.lps-ring-track { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 5; }
+.lps-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.22,1,.36,1); }
+.lps-ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #f1eef2; font-variant-numeric: tabular-nums; }
+.lps-persona-body { flex: 1; min-width: 0; }
+.lps-persona-name { font-size: 13.5px; font-weight: 700; color: #f1eef2; margin-bottom: 6px; }
+.lps-persona-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.lps-chip-sm { padding: 3px 9px; font-size: 10.5px; }
+.lps-persona-rationale { font-size: 11.5px; line-height: 1.5; color: #8b86a0; }
+
+/* Timeline (launches, messagingEvolution) */
+.lps-timeline { position: relative; display: flex; flex-direction: column; gap: 18px; padding-left: 20px; }
+.lps-timeline::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 1.5px; background: linear-gradient(180deg, rgba(244,114,182,.4), rgba(124,131,245,.15)); }
+.lps-tl-item { position: relative; }
+.lps-tl-dot { position: absolute; left: -20px; top: 4px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(15,10,13,.98); }
+.lps-tl-date { font-size: 10.5px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #8b86a0; margin-bottom: 3px; }
+.lps-tl-title { font-size: 13px; font-weight: 600; color: #e2dde8; margin-bottom: 6px; }
+.lps-tl-theme { font-size: 12px; line-height: 1.5; color: #a8a2b3; }
+
+/* Campaign cards (competitiveagent.campaigns) */
+.lps-campaign-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 12px; }
+.lps-campaign-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.lps-campaign-name { font-size: 13px; font-weight: 700; color: #f1eef2; }
+.lps-campaign-cta { font-size: 11.5px; line-height: 1.5; color: #a8a2b3; }
+.lps-campaign-dur { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.lps-campaign-dur .lps-dist-bar-wrap { flex: 1; }
+.lps-campaign-dur span { font-size: 10.5px; color: #8b86a0; white-space: nowrap; }
+
+/* Observation/recommendation pair cards */
+.lps-obsrec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 12px; }
+.lps-obsrec-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.lps-obsrec-row { display: flex; flex-direction: column; gap: 5px; }
+.lps-obsrec-row p { font-size: 12px; line-height: 1.55; color: #cfc9d6; }
+.lps-obsrec-tag { display: inline-block; width: fit-content; font-size: 9.5px; font-weight: 800; letter-spacing: var(--ls-caps); text-transform: uppercase; padding: 2px 8px; border-radius: var(--radius-xs); }
+.lps-obsrec-tag.obs { background: rgba(255,255,255,.06); color: #8b86a0; }
+.lps-obsrec-tag.rec { background: rgba(52,211,153,.13); color: #6ee7b7; }
+
+/* Radar chart (competitiveagent.scorecard) */
+.lps-radar-block { flex: 1; min-width: 240px; display: flex; justify-content: center; }
+.lps-radar-svg { width: 100%; max-width: 320px; height: auto; }
+.lps-radar-ring { fill: none; stroke: rgba(255,255,255,.08); stroke-width: 1; }
+.lps-radar-axis { stroke: rgba(255,255,255,.08); stroke-width: 1; }
+.lps-radar-fill { fill: rgba(244,114,182,.22); stroke: #f472b6; stroke-width: 1.5; stroke-linejoin: round; }
+.lps-radar-dot { fill: #f472b6; stroke: rgba(15,10,13,.98); stroke-width: 1.5; }
+.lps-radar-label { fill: #a8a2b3; font-size: 8.5px; font-weight: 700; font-family: inherit; }
+.lps-radar-score { fill: #fbb6d9; font-size: 9px; font-weight: 800; font-family: inherit; font-variant-numeric: tabular-nums; }
+
+/* Arc gauge (scorecardOverall, Overview competitive score) */
+.lps-gauge-wrap { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
+.lps-gauge-svg { width: 128px; height: 128px; transform: rotate(-90deg); }
+.lps-gauge-track { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 10; }
+.lps-gauge-fill { fill: none; stroke: #f472b6; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1); }
+.lps-gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.lps-gauge-num { font-size: 30px; font-weight: 800; color: #fbb6d9; line-height: 1; font-variant-numeric: tabular-nums; }
+.lps-gauge-label { font-size: 10.5px; color: #6b6680; margin-top: 2px; }
+
+/* Overview hero: description/stats alongside a competitive-score gauge */
+.lps-ov-hero { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.lps-ov-hero-main { flex: 1; min-width: 240px; }
+.lps-ov-hero-score { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Posts tab extras */
+.lps-post-thumb { width: 100%; height: 130px; object-fit: cover; border-radius: var(--radius-sm); background: rgba(255,255,255,.04); }
+.lps-post-repost { align-self: flex-start; }
+
+/* Profile tab extras */
+.lps-profile-industry { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #7dd3fc; background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.28); border-radius: var(--radius-pill); padding: 3px 9px; margin-left: 10px; vertical-align: middle; }
+.lps-profile-tagline { font-size: 12.5px; font-style: italic; color: #8b86a0; margin-bottom: 8px; }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
 [data-theme="light"] body { background: #f8f2f6 !important; color: #241820 !important; }
@@ -438,3 +559,49 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 [data-theme="light"] .lps-score-gauge { background: radial-gradient(circle at 30% 30%, rgba(190,24,116,.12), rgba(67,56,202,.08) 60%, rgba(36,24,32,.02) 100%) !important; border-color: rgba(190,24,116,.25) !important; }
 [data-theme="light"] .lps-score-num { color: #be1874 !important; }
 [data-theme="light"] .lps-score-label { color: #8a7a83 !important; }
+
+[data-theme="light"] .lps-subfield-label { color: #8b3fae !important; border-bottom-color: rgba(139,63,174,.22) !important; }
+[data-theme="light"] .lps-inline-link { color: #0891b2 !important; }
+[data-theme="light"] .lps-donut-leg-label { color: #4a3d44 !important; }
+[data-theme="light"] .lps-donut-leg-val { color: #241820 !important; }
+[data-theme="light"] .lps-donut-leg-pct { color: #8a7a83 !important; }
+[data-theme="light"] .lps-def-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-def-label { color: #241820 !important; }
+[data-theme="light"] .lps-def-body { color: #6b5c64 !important; }
+[data-theme="light"] .lps-stat-tile { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-stat-tile-val { color: #241820 !important; }
+[data-theme="light"] .lps-stat-tile-label { color: #8a7a83 !important; }
+[data-theme="light"] .lps-swatch-name { color: #4a3d44 !important; }
+[data-theme="light"] .lps-swatch-hex { color: #8a7a83 !important; }
+[data-theme="light"] .lps-kw b { color: #8a7a83 !important; }
+[data-theme="light"] .lps-persona-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-ring-track { stroke: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-ring-label { color: #241820 !important; }
+[data-theme="light"] .lps-persona-name { color: #241820 !important; }
+[data-theme="light"] .lps-persona-rationale { color: #8a7a83 !important; }
+[data-theme="light"] .lps-timeline::before { background: linear-gradient(180deg, rgba(190,24,116,.4), rgba(67,56,202,.15)) !important; }
+[data-theme="light"] .lps-tl-dot { box-shadow: 0 0 0 3px #fff !important; }
+[data-theme="light"] .lps-tl-date { color: #8a7a83 !important; }
+[data-theme="light"] .lps-tl-title { color: #241820 !important; }
+[data-theme="light"] .lps-tl-theme { color: #6b5c64 !important; }
+[data-theme="light"] .lps-campaign-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-campaign-name { color: #241820 !important; }
+[data-theme="light"] .lps-campaign-cta { color: #6b5c64 !important; }
+[data-theme="light"] .lps-campaign-dur span { color: #8a7a83 !important; }
+[data-theme="light"] .lps-obsrec-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-obsrec-row p { color: #4a3d44 !important; }
+[data-theme="light"] .lps-obsrec-tag.obs { background: rgba(36,24,32,.05) !important; color: #8a7a83 !important; }
+[data-theme="light"] .lps-obsrec-tag.rec { background: rgba(5,150,105,.12) !important; color: #047857 !important; }
+[data-theme="light"] .lps-radar-ring { stroke: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-radar-axis { stroke: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-radar-fill { fill: rgba(190,24,116,.14) !important; stroke: #be1874 !important; }
+[data-theme="light"] .lps-radar-dot { fill: #be1874 !important; stroke: #fff !important; }
+[data-theme="light"] .lps-radar-label { fill: #6b5c64 !important; }
+[data-theme="light"] .lps-radar-score { fill: #be1874 !important; }
+[data-theme="light"] .lps-gauge-track { stroke: rgba(36,24,32,.07) !important; }
+[data-theme="light"] .lps-gauge-fill { stroke: #be1874 !important; }
+[data-theme="light"] .lps-gauge-num { color: #be1874 !important; }
+[data-theme="light"] .lps-gauge-label { color: #8a7a83 !important; }
+[data-theme="light"] .lps-post-thumb { background: rgba(36,24,32,.04) !important; }
+[data-theme="light"] .lps-profile-industry { color: #0e7490 !important; background: rgba(8,145,178,.08) !important; border-color: rgba(8,145,178,.24) !important; }
+[data-theme="light"] .lps-profile-tagline { color: #8a7a83 !important; }
