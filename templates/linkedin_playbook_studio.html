@@ -170,14 +170,16 @@
     var HISTORY_SORT = { key: 'created_at', dir: -1 };
 
     var AGENT_TABS = [
-      {ns: 'strategyagent',        label: 'Strategy'},
-      {ns: 'contentcreativeagent', label: 'Content'},
-      {ns: 'messagingagent',       label: 'Messaging'},
-      {ns: 'creativeinsightagent', label: 'Creative Insight'},
-      {ns: 'competitiveagent',     label: 'Competitive'},
-      {ns: 'getcompanyprofile',    label: 'Company Profile'},
-      {ns: 'getcompanypost',       label: 'Posts'},
+      {ns: 'overview',             label: 'Overview',         icon: '✦'},
+      {ns: 'strategyagent',        label: 'Strategy',         icon: '◈'},
+      {ns: 'contentcreativeagent', label: 'Content',          icon: '✎'},
+      {ns: 'messagingagent',       label: 'Messaging',        icon: '✉'},
+      {ns: 'creativeinsightagent', label: 'Creative Insight', icon: '◐'},
+      {ns: 'competitiveagent',     label: 'Competitive',      icon: '⚔'},
+      {ns: 'getcompanyprofile',    label: 'Company Profile',  icon: '⬡'},
+      {ns: 'getcompanypost',       label: 'Posts',            icon: '▤'},
     ];
+    var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function initials(name){
@@ -612,20 +614,95 @@
     }
 
     function tabPaneContent(output,ns,run){
+      if(ns==='overview')return overviewContent(output,run);
       if(ns==='getcompanyprofile')return companyProfileContent(output,run);
       if(ns==='getcompanypost')return postsContent(output);
       if(ns==='competitiveagent')return competitiveContent(output);
       return agentTabContent(output,ns);
     }
 
+    /* Whether a tab has anything to show, without duplicating each pane's own
+       empty-state logic -- reuses the same render path the pane itself uses
+       and checks for its own empty-state marker. Powers the nav dots and the
+       Overview tab's coverage list, so a user can see what's missing before
+       clicking into it instead of discovering empty tabs one at a time. */
+    function tabHasData(output,ns,run){
+      return tabPaneContent(output,ns,run).indexOf('class="lps-empty"')===-1;
+    }
+
+    /* Overview: a synthesized first-look instead of making the reader click
+       through every tab to get oriented -- company snapshot, competitive
+       score, a strategy/summary excerpt with a jump link to the full tab, top
+       hooks/CTAs, and an honest coverage list of which sections this run
+       actually has data for. */
+    function overviewContent(output,run){
+      var get=function(f){return output['getcompanyprofile.'+f];};
+      var desc=get('description'), website=get('website'),
+          followers=get('followers_count'), employees=get('employee_count');
+      var overall=output['competitiveagent.scorecardOverall'];
+      var summary=output['messagingagent.summary'];
+      var strategy=output['strategyagent.strategy'];
+      var hooks=output['strategyagent.hookLibrary'];
+      var ctas=output['strategyagent.ctaLibrary'];
+
+      var stats=[];
+      if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
+      if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
+      if(!isEmptyValue(overall))stats.push({l:'Competitive Score',v:String(overall)});
+
+      var html='';
+      if(!isEmptyValue(desc)||stats.length){
+        html+='<div class="lps-ov-hero">'
+          +(desc?'<p class="lps-ov-desc">'+esc(desc)+'</p>':'')
+          +(website?'<a class="lps-ov-website" href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
+          +(stats.length?'<div class="lps-ov-stats">'+stats.map(function(s){
+              return '<div class="lps-ov-stat"><div class="lps-ov-stat-val">'+esc(String(s.v))+'</div><div class="lps-ov-stat-label">'+esc(s.l)+'</div></div>';
+            }).join('')+'</div>':'')
+          +'</div>';
+      }
+
+      if(!isEmptyValue(summary)){
+        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body"><p class="lps-prose">'+esc(summary)+'</p></div></div>';
+      } else if(!isEmptyValue(strategy)){
+        var s=String(strategy), long=s.length>320, excerpt=long?s.slice(0,320).trim()+'…':s;
+        html+='<div class="lps-section"><div class="lps-section-label">Strategy Snapshot</div><div class="lps-section-body"><p class="lps-prose">'+esc(excerpt)+'</p>'
+          +(long?'<button class="lps-ov-more" onclick="switchDrawerTab(\'strategyagent\')">Read full strategy →</button>':'')
+          +'</div></div>';
+      }
+
+      if(isStringArray(hooks))
+        html+='<div class="lps-section"><div class="lps-section-label">Top Hooks</div><div class="lps-section-body">'+renderChips(hooks.slice(0,6))+'</div></div>';
+      if(isStringArray(ctas))
+        html+='<div class="lps-section"><div class="lps-section-label">Top CTAs</div><div class="lps-section-body">'+renderChips(ctas.slice(0,6))+'</div></div>';
+
+      var coverage=AGENT_TABS.filter(function(t){return t.ns!=='overview';}).map(function(t){
+        var has=tabHasData(output,t.ns,run);
+        return '<button class="lps-ov-cov-row'+(has?'':' empty')+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
+          +'<span class="lps-ov-cov-dot"></span><span class="lps-ov-cov-label">'+esc(t.label)+'</span>'
+          +'<span class="lps-ov-cov-state">'+(has?'Available':'No data')+'</span></button>';
+      }).join('');
+      html+='<div class="lps-section"><div class="lps-section-label">Report Coverage</div><div class="lps-section-body"><div class="lps-ov-coverage">'+coverage+'</div></div></div>';
+
+      return html||'<div class="lps-empty">No overview data available yet — check the individual tabs.</div>';
+    }
+
     var DRAWER_RUN = null;
 
     function drawerHeader(run){
       var typeLabel=run.run_type==='COMPETITOR'?'Competitor analysis':'Own-brand analysis';
-      return '<div class="drw-head">'
+      var html='<div class="drw-head">'
         +(run.company_logo?'<img class="lps-drw-logo" src="'+esc(run.company_logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-avatar-sq drw-avatar">'+esc(initials(run.company_name))+'</div>')
         +'<div class="drw-head-txt"><h3>'+esc(run.company_name||'Unknown company')+'</h3>'
-        +'<div class="drw-sub">'+esc(typeLabel)+' · '+esc(relTime(run.created_at))+'</div></div></div>';
+        +'<div class="drw-sub">'+esc(typeLabel)+' · '+esc(relTime(run.created_at))+'</div></div>';
+      if(IS_ADMIN)html+='<button class="lps-raw-toggle" onclick="toggleRawJson()" title="Admin only — the exact data this run has to work with, for diagnosing missing or wrong data">{ } Raw data</button>';
+      html+='</div>';
+      if(IS_ADMIN)html+='<div class="lps-raw-panel" id="lpsRawPanel"><pre>'+esc(JSON.stringify(run,null,2))+'</pre></div>';
+      return html;
+    }
+
+    function toggleRawJson(){
+      var p=document.getElementById('lpsRawPanel');
+      if(p)p.classList.toggle('open');
     }
 
     function switchDrawerTab(ns){
@@ -703,14 +780,20 @@
         DRAWER_RUN=run;
         var output=run.output||{};
         var tabsHtml=AGENT_TABS.map(function(t,i){
-          return '<button class="lps-drw-tab'+(i===0?' active':'')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'+esc(t.label)+'</button>';
-        }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">Playbook</button>';
+          var has=t.ns==='overview'||tabHasData(output,t.ns,run);
+          return '<button class="lps-drw-tab'+(i===0?' active':'')+(has?'':' lps-drw-tab-empty')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
+            +'<span class="lps-drw-tab-ic">'+t.icon+'</span><span class="lps-drw-tab-label">'+esc(t.label)+'</span>'
+            +'<span class="lps-drw-tab-dot" aria-hidden="true"></span></button>';
+        }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">'
+          +'<span class="lps-drw-tab-ic">⎘</span><span class="lps-drw-tab-label">Playbook</span></button>';
         var panesHtml=AGENT_TABS.map(function(t,i){
           return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+tabPaneContent(output,t.ns,run)+'</div>';
         }).join('')+'<div class="lps-drw-pane" data-ns="playbook"><div id="lpsPlaybookBody"></div></div>';
         document.getElementById('drawerBody').innerHTML=drawerHeader(run)
-          +'<div class="lps-drw-tabs">'+tabsHtml+'</div>'
-          +'<div class="drw-body lps-drw-body">'+panesHtml+'</div>';
+          +'<div class="lps-drw-shell">'
+          +'<div class="lps-drw-nav">'+tabsHtml+'</div>'
+          +'<div class="drw-body lps-drw-body">'+panesHtml+'</div>'
+          +'</div>';
       }).catch(function(){
         document.getElementById('drawerBody').innerHTML='<div class="lps-empty" style="padding:60px">Couldn\'t load this report.</div>';
       });
