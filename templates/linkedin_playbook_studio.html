@@ -180,7 +180,6 @@
       {ns: 'getcompanyprofile',    label: 'Company Profile',  icon: '⬡'},
       {ns: 'getcompanypost',       label: 'Posts',            icon: '▤'},
     ];
-    var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function initials(name){
@@ -1037,15 +1036,8 @@
         +(run.company_logo?'<img class="lps-drw-logo" src="'+esc(run.company_logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-avatar-sq drw-avatar">'+esc(initials(run.company_name))+'</div>')
         +'<div class="drw-head-txt"><h3>'+esc(run.company_name||'Unknown company')+'</h3>'
         +'<div class="drw-sub">'+esc(typeLabel)+' · '+esc(relTime(run.created_at))+'</div></div>';
-      if(IS_ADMIN)html+='<button class="lps-raw-toggle" onclick="toggleRawJson()" title="Admin only — the exact data this run has to work with, for diagnosing missing or wrong data">{ } Raw data</button>';
       html+='</div>';
-      if(IS_ADMIN)html+='<div class="lps-raw-panel" id="lpsRawPanel"><pre>'+esc(JSON.stringify(run,null,2))+'</pre></div>';
       return html;
-    }
-
-    function toggleRawJson(){
-      var p=document.getElementById('lpsRawPanel');
-      if(p)p.classList.toggle('open');
     }
 
     function switchDrawerTab(ns){
