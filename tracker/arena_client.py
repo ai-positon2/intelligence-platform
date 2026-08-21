@@ -118,11 +118,23 @@ def _is_dict(v: Any) -> bool:
     return isinstance(v, dict)
 
 
+# The vendor answers 500 with a body like
+#   {"success":false,"error":"LinkedIn Company Search is missing required
+#    fields: LinkedIn Account"}
+# when its own workspace is missing a connected account, which is what the
+# LinkedIn account connection lapsing looks like from here. It is a 500, but
+# retrying it is pointless: nothing changes until somebody reconnects the
+# account on their side, so it is classified apart from a real server blip.
+_VENDOR_CONFIG_RE = re.compile(r"missing required field", re.I)
+_MISSING_FIELDS_RE = re.compile(r"missing required fields?:\s*([^\"}\n]+)", re.I)
+
+
 def _err(kind: str, detail: str = "", status: int | None = None) -> dict:
     """One failure, described. `detail` is for operators (logs, the admin
     self-test) and may quote the vendor's own words; it never carries the API
     key, which only ever lives in a request header."""
-    return {"kind": kind, "status": status, "detail": detail[:500], "attempts": 1}
+    return {"kind": kind, "status": status, "detail": detail[:500], "attempts": 1,
+            "config": bool(detail and _VENDOR_CONFIG_RE.search(detail))}
 
 
 def describe_error(err: dict | None) -> str:
@@ -132,6 +144,13 @@ def describe_error(err: dict | None) -> str:
     if not _is_dict(err):
         return ""
     kind, status = err.get("kind"), err.get("status")
+    if err.get("config"):
+        m = _MISSING_FIELDS_RE.search(err.get("detail") or "")
+        missing = m.group(1).strip().rstrip('".,') if m else "a connected account"
+        return ("The provider's own workflow is not fully set up: it reports "
+                "missing %s. That is a connection inside the Arena workspace "
+                "which has to be reconnected there, and nothing on this side "
+                "can retry around it." % missing)
     if kind == ERR_NOT_CONFIGURED:
         return ("Company search is not configured on this deployment: "
                 "ARENA_API_KEY is missing.")
@@ -167,6 +186,8 @@ def is_retryable(err: dict | None) -> bool:
     this module's own retries and whether the page offers a Retry button --
     offering one for a revoked key would just teach people to click it."""
     if not _is_dict(err):
+        return False
+    if err.get("config"):
         return False
     if err.get("kind") in (ERR_TIMEOUT, ERR_NETWORK):
         return True
