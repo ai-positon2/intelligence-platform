@@ -73,8 +73,10 @@ _SYSTEM = (
     '  "coverage": one short sentence naming which sections had real data and '
     "which came back empty, so a reader can gauge how much of this is founded "
     "on real signal\n\n"
-    "No markdown, no code fences, no commentary outside the JSON object. Never "
-    "use an em dash; use commas or periods instead."
+    "No markdown, no code fences, no commentary outside the JSON object. Output "
+    "compact, single-line JSON with no indentation and no extra whitespace "
+    "between keys -- every token spent on formatting is a token not spent on "
+    "the analysis. Never use an em dash; use commas or periods instead."
 )
 
 # Every list-shaped key in the schema above, with the cap applied to each.
@@ -85,16 +87,78 @@ _LIST_FIELDS = {
     "contentAngles": 5,
 }
 
+# A completed run's output easily has enough real content (100 posts' worth
+# of derived metrics, five agents' sections) that a compact-JSON reply for
+# this schema can still run to several thousand tokens. The original 2000
+# cap was hit routinely -- even a tiny synthetic probe payload truncated mid
+# response -- which produces invalid JSON that silently became None. If the
+# first attempt still gets cut off, one retry with double the budget is
+# cheap insurance against a repeat: the JSON-invalidity failure mode was
+# deterministic, not flaky, so a bigger budget fixes it for good rather than
+# masking it.
+_MAX_TOKENS = 4096
+_RETRY_MAX_TOKENS = 8192
+
+ERR_EMPTY_SOURCE = "empty_source"
+ERR_API = "api_error"
+ERR_TRUNCATED = "truncated"
+ERR_UNPARSABLE = "unparsable"
+ERR_SHAPE = "shape"
+
 
 def _anthropic():
     """A configured Anthropic client, or None when this environment has no
     key. Mirrors app.py's _cpi_anthropic -- every caller degrades to "no
-    enrichment" exactly like Contact Finder degrades to "no second opinion"."""
+    enrichment" exactly like Contact Finder degrades to "no second opinion".
+    A generous timeout: the retry attempt below asks for up to 8192 tokens,
+    which can take well over the default for a slow generation."""
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not key:
         return None
     from anthropic import Anthropic
-    return Anthropic(api_key=key, timeout=60.0, max_retries=1)
+    return Anthropic(api_key=key, timeout=120.0, max_retries=1)
+
+
+def _err(kind: str, detail: str = "", status: int | None = None) -> dict:
+    return {"kind": kind, "status": status, "detail": (detail or "")[:500]}
+
+
+def describe_error(err: dict | None) -> str:
+    """Human-facing text for an enrich_run_result() error. Never includes the
+    raw exception text -- callers that want that detail for admins should
+    read err['detail'] directly, gated the same way arena_client's callers
+    gate vendor response bodies."""
+    if not isinstance(err, dict):
+        return "AI Insights could not be generated."
+    kind = err.get("kind")
+    status = err.get("status")
+    if kind == ERR_EMPTY_SOURCE:
+        return "There is no analysis data yet to synthesize a point of view from."
+    if kind == ERR_API:
+        if status in (401, 403):
+            return "The AI Insights service rejected our API key. It needs to be renewed before this will work."
+        if status == 429:
+            return "The AI Insights service is rate-limiting us right now. Try again in a moment."
+        if status:
+            return "The AI Insights service returned an error (HTTP %s)." % status
+        return "The AI Insights service could not be reached."
+    if kind == ERR_TRUNCATED:
+        return ("The AI's reply was cut off before it finished, even after retrying with more "
+                "room. This is usually a one-off; try again.")
+    if kind == ERR_UNPARSABLE:
+        return "The AI's reply couldn't be understood. Try again."
+    if kind == ERR_SHAPE:
+        return "The AI's reply was missing required fields. Try again."
+    return "AI Insights could not be generated."
+
+
+def is_retryable(err: dict | None) -> bool:
+    if not isinstance(err, dict):
+        return False
+    kind = err.get("kind")
+    if kind == ERR_API:
+        return err.get("status") not in (401, 403)
+    return kind in (ERR_TRUNCATED, ERR_UNPARSABLE, ERR_SHAPE)
 
 
 def _is_dict(v: Any) -> bool:
@@ -115,22 +179,32 @@ def _string_list(value: Any, limit: int) -> list[str]:
     return out[:limit]
 
 
-def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
-    """One Claude call synthesizing a completed run.
+def _call(client, payload: dict, max_tokens: int) -> tuple[str, str | None]:
+    resp = client.messages.create(
+        model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+        max_tokens=max_tokens,
+        system=_SYSTEM,
+        messages=[{"role": "user", "content": json.dumps(payload, default=str)}])
+    raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+    return raw, getattr(resp, "stop_reason", None)
+
+
+def enrich_run_result(output: dict, company_name: str, run_type: str) -> tuple[dict | None, dict | None]:
+    """One Claude call synthesizing a completed run, returning (result, error).
 
     Callers pass the AUGMENTED output (tracker/lps_analytics.augment), so the
     prose here is repaired rather than mojibake and the derived.* metrics are
-    already computed. Returns the synthesis dict, or None when
-    ANTHROPIC_API_KEY isn't configured, the source output is empty, or the
-    call/parse fails -- never raises. app.py's background analysis job treats
-    this as strictly best-effort: a run still completes and saves without it.
+    already computed. `result` is None whenever `error` is set, and vice
+    versa; both are None only when ANTHROPIC_API_KEY isn't configured at all
+    (the caller is expected to have already checked for that, since it isn't
+    a per-run failure worth recording). Never raises.
     """
     client = _anthropic()
     if client is None:
-        return None
+        return None, None
     source = {k: v for k, v in (output or {}).items() if k not in _NON_CONTENT_KEYS}
     if not source:
-        return None
+        return None, _err(ERR_EMPTY_SOURCE)
     # Send the compacted view, not the whole run. The raw output carries up to
     # 100 full post bodies with attachment URLs and ~72 viewer-permission
     # booleans (roughly 320KB on the real Google run, most of it noise the
@@ -143,25 +217,36 @@ def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
     except Exception as e:  # pragma: no cover - defensive
         logger.warning("lps_enrichment: compaction failed, sending full output: %s", e)
     payload = {"company_name": company_name, "run_type": run_type, "agent_output": source}
+
+    raw = None
+    stop_reason = None
+    for max_tokens in (_MAX_TOKENS, _RETRY_MAX_TOKENS):
+        try:
+            raw, stop_reason = _call(client, payload, max_tokens)
+        except Exception as e:
+            status = getattr(e, "status_code", None)
+            logger.warning("lps_enrichment: call failed for %r: %s", company_name, e)
+            return None, _err(ERR_API, "%s: %s" % (type(e).__name__, e), status)
+        if stop_reason != "max_tokens":
+            break
+    if stop_reason == "max_tokens":
+        logger.warning("lps_enrichment: reply truncated for %r even at %d tokens",
+                        company_name, _RETRY_MAX_TOKENS)
+        return None, _err(ERR_TRUNCATED, "Response still hit the token limit after retrying with more room.")
+
     try:
-        resp = client.messages.create(
-            model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=2000,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": json.dumps(payload, default=str)}])
-        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
         parsed = json.loads(raw)
     except Exception as e:
-        logger.warning("lps_enrichment: synthesis failed for %r: %s", company_name, e)
-        return None
+        logger.warning("lps_enrichment: unparsable reply for %r: %s", company_name, e)
+        return None, _err(ERR_UNPARSABLE, "%s: %s" % (type(e).__name__, e))
     if not _is_dict(parsed):
-        return None
+        return None, _err(ERR_SHAPE, "Reply was valid JSON but not an object.")
 
     headline = parsed.get("headline")
     synthesis = parsed.get("synthesis")
     if (not isinstance(headline, str) or not headline.strip()
             or not isinstance(synthesis, str) or not synthesis.strip()):
-        return None
+        return None, _err(ERR_SHAPE, "Reply was missing a usable headline/synthesis.")
 
     coverage = parsed.get("coverage")
     coverage = coverage.strip() if isinstance(coverage, str) and coverage.strip() else None
@@ -181,6 +266,15 @@ def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
             result[field] = items
     if coverage:
         result["coverage"] = coverage
+    return result, None
+
+
+def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
+    """Back-compat wrapper for callers that only want the best-effort result
+    and don't need the reason it failed (the analysis-time caller in app.py:
+    a run still completes and saves without its synthesis, so there is
+    nothing actionable to do with the error there)."""
+    result, _error = enrich_run_result(output, company_name, run_type)
     return result
 
 
@@ -192,14 +286,11 @@ _SAMPLE_SOURCE = {
 
 
 def probe(company_name: str = "Acme Corp") -> dict:
-    """Admin self-test: makes the exact call enrich_run makes, against a tiny
-    synthetic payload, and reports what actually happened instead of
-    collapsing every outcome to None. Mirrors arena_client.probe() and
-    app.py's _apollo_selftest -- this exists because enrich_run's own
-    broad-except is correct for its caller (a completed run must never fail
-    just because the synthesis pass did), but that same broad-except leaves
-    NOTHING for a human to look at when insights stop generating. Never
-    raises, so it is safe to expose on an admin-only route."""
+    """Admin self-test: runs enrich_run_result against a tiny synthetic
+    payload -- the exact code path a real run takes -- and reports what
+    actually happened instead of collapsing every outcome to None. Mirrors
+    arena_client.probe() and app.py's _apollo_selftest. Never raises, so it
+    is safe to expose on an admin-only route."""
     import time
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
@@ -207,27 +298,15 @@ def probe(company_name: str = "Acme Corp") -> dict:
     if not key:
         result["error"] = "ANTHROPIC_API_KEY is not set on this deployment."
         return result
-    payload = {"company_name": company_name, "run_type": "OWN", "agent_output": _SAMPLE_SOURCE}
     t0 = time.time()
-    try:
-        from anthropic import Anthropic
-        client = Anthropic(api_key=key, timeout=60.0, max_retries=1)
-        resp = client.messages.create(
-            model=model, max_tokens=2000, system=_SYSTEM,
-            messages=[{"role": "user", "content": json.dumps(payload, default=str)}])
-        result["elapsed_ms"] = int((time.time() - t0) * 1000)
-        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
-        result["raw_len"] = len(raw)
-        result["raw_sample"] = raw[:400]
-        try:
-            parsed = json.loads(raw)
-            result["parsed_ok"] = _is_dict(parsed)
-            result["has_headline"] = _is_dict(parsed) and isinstance(parsed.get("headline"), str) \
-                and bool(parsed.get("headline", "").strip())
-        except Exception as e:
-            result["parsed_ok"] = False
-            result["parse_error"] = "%s: %s" % (type(e).__name__, e)
-    except Exception as e:
-        result["elapsed_ms"] = int((time.time() - t0) * 1000)
-        result["error"] = "%s: %s" % (type(e).__name__, e)
+    enrichment, err = enrich_run_result(_SAMPLE_SOURCE, company_name, "OWN")
+    result["elapsed_ms"] = int((time.time() - t0) * 1000)
+    if enrichment:
+        result["ok"] = True
+        result["headline"] = enrichment["headline"]
+    else:
+        result["ok"] = False
+        result["error_kind"] = (err or {}).get("kind")
+        result["error"] = describe_error(err)
+        result["detail"] = (err or {}).get("detail")
     return result

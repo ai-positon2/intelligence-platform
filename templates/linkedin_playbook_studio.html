@@ -274,13 +274,17 @@
         });
     }
 
-    function searchErrorBanner(err){
+    function searchErrorBanner(err,opts){
+      opts=opts||{};
+      var head=opts.head||'Company search is unavailable';
+      var retryFn=opts.retryFn||'runCompanySearch';
+      var adminControl=opts.adminControl!==undefined?opts.adminControl:adminCheckControl();
       return '<div class="lps-search-error">'
-        +'<div class="lps-search-error-head">Company search is unavailable</div>'
-        +'<div class="lps-search-error-msg">'+esc(err.message||'Company search is unavailable right now.')+'</div>'
+        +'<div class="lps-search-error-head">'+esc(head)+'</div>'
+        +'<div class="lps-search-error-msg">'+esc(err.message||'This is unavailable right now.')+'</div>'
         +(err.detail?'<pre class="lps-search-error-detail">'+esc(err.detail)+'</pre>':'')
-        +(err.retryable===false?'':'<button class="lps-retry-btn" onclick="runCompanySearch()">Try again</button>')
-        +adminCheckControl()
+        +(err.retryable===false?'':'<button class="lps-retry-btn" onclick="'+retryFn+'()">Try again</button>')
+        +adminControl
         +'</div>';
     }
 
@@ -308,6 +312,37 @@
             +'Attempts: '+(d.attempts||0)+' · '+(d.elapsed_ms||0)+'ms'
             +(d.http_status?' · HTTP '+d.http_status:'')+'\n'
             +(d.source?'Rows found under: '+d.source+'\n':'')
+            +(d.error?'\n'+d.error:'')
+            +(d.detail?'\n'+d.detail:'');
+        }).catch(function(e){
+          b.disabled=false; b.textContent='Run provider check';
+          out.style.display='block'; out.textContent='Could not run the check: '+e;
+        });
+    }
+
+    function lpsInsightsCheckControl(){
+      if(!IS_ADMIN)return '';
+      return '<button class="lps-retry-btn" style="margin-left:8px" id="lpsInsightsCheckBtn" onclick="runLpsInsightsCheck()">Run provider check</button>'
+        +'<pre class="lps-search-error-detail" id="lpsInsightsCheckOut" style="display:none"></pre>';
+    }
+
+    /* Same idea as runArenaCheck, against the Claude synthesis call instead
+       of the vendor search -- a tiny synthetic payload through the exact
+       enrich_run_result() path so a stuck "Generate AI insights" button can
+       be read as a real failure rather than guessed at. */
+    function runLpsInsightsCheck(){
+      var b=document.getElementById('lpsInsightsCheckBtn'), out=document.getElementById('lpsInsightsCheckOut');
+      if(!b||!out)return;
+      b.disabled=true; b.textContent='Checking…';
+      fetch('/p2/admin/external-usage/lps-insights-check',{method:'POST'})
+        .then(function(r){return r.json();}).then(function(d){
+          b.disabled=false; b.textContent='Run provider check';
+          out.style.display='block';
+          out.textContent=
+            'Key configured: '+(d.configured?'yes ('+d.key_len+' chars)':'NO')+' · model: '+(d.model||'?')+'\n'
+            +'Probe: '+(d.ok?'ok':'failed')+' · '+(d.elapsed_ms||0)+'ms'
+            +(d.headline?'\nHeadline: '+d.headline:'')
+            +(d.error_kind?'\nKind: '+d.error_kind:'')
             +(d.error?'\n'+d.error:'')
             +(d.detail?'\n'+d.detail:'');
         }).catch(function(e){
@@ -1442,17 +1477,26 @@
     function aiInsightsContent(output){
       var headline=output['aienrichment.headline'];
       var synthesis=output['aienrichment.synthesis'];
+      var aiError=output['aienrichment.error'];
       /* The synthesis is produced at analysis time and stored, so a run that
          completed before this feature shipped has no aienrichment.* keys and
          cannot grow them on a read (unlike derived.*, which is recomputed
          every time). Rather than a dead end telling the reader to re-run the
          whole multi-minute vendor analysis, offer the one Claude call against
-         the vendor output that is already saved. */
-      if(isEmptyValue(headline)&&isEmptyValue(synthesis))
+         the vendor output that is already saved. A run where that call was
+         already tried and failed carries aienrichment.error instead -- shown
+         distinctly from "never tried yet" so a retry isn't a shot in the dark. */
+      if(isEmptyValue(headline)&&isEmptyValue(synthesis)){
+        if(!isEmptyValue(aiError))
+          return '<div id="lpsInsightsBody">'+searchErrorBanner(
+            {message:aiError.message,detail:aiError.detail,retryable:aiError.retryable},
+            {head:'AI Insights could not be generated',retryFn:'generateInsights',
+             adminControl:lpsInsightsCheckControl()})+'</div>';
         return '<div id="lpsInsightsBody">'
           +'<div class="lps-empty">This run was analyzed before AI Insights existed, so no synthesis was saved for it.'
           +'<div class="lps-empty-note">Generating reads the analysis already stored for this run, so it takes seconds and does not re-run the five-agent workflow.</div></div>'
           +'<div style="text-align:center"><button class="lps-act primary" style="margin-top:18px" onclick="generateInsights()">✨ Generate AI insights</button></div></div>';
+      }
       var html='<div class="lps-ai-badge">✨ AI-synthesized — combines signal across every section on this report, not vendor data on its own</div>';
       if(!isEmptyValue(headline))html+='<div class="lps-ai-headline">'+esc(headline)+'</div>';
       if(!isEmptyValue(synthesis)){
@@ -1495,12 +1539,21 @@
           if(!res.ok){ fail(res.data.error||'Couldn\'t start generating insights.'); return; }
           var tries=0;
           (function poll(){
-            if(++tries>40){ fail('Insights are taking longer than expected. Try again in a moment.'); return; }
+            // 60 tries * 3s = 180s: one attempt can retry once server-side
+            // with a larger token budget if the first reply gets cut off, so
+            // this needs more headroom than a single quick call would.
+            if(++tries>60){ fail('Insights are taking longer than expected. Try again in a moment.'); return; }
             setTimeout(function(){
               fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+runId)
                 .then(function(r){return r.json();}).then(function(run){
                   var out=run.output||{};
-                  if(!isEmptyValue(out['aienrichment.headline'])){ openRunDrawer(runId,'aienrichment'); return; }
+                  // A real failure (bad key, truncated reply, malformed JSON)
+                  // is recorded on the run rather than left to poll to the
+                  // generic timeout above, which looks identical whether the
+                  // call failed in two seconds or is genuinely still running.
+                  if(!isEmptyValue(out['aienrichment.headline'])||!isEmptyValue(out['aienrichment.error'])){
+                    openRunDrawer(runId,'aienrichment'); return;
+                  }
                   poll();
                 }).catch(poll);
             },3000);
