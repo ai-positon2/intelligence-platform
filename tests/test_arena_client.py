@@ -536,3 +536,47 @@ def test_probe_never_raises(monkeypatch):
     monkeypatch.setattr(ac, "search_companies_result", lambda q: (_ for _ in ()).throw(RuntimeError("boom")))
     out = ac.probe()
     assert out["error_kind"] == "exception" and "boom" in out["error"]
+
+
+# ── The vendor's own workspace being unconfigured ─────────────────────────
+# Observed in production: the search workflow answers HTTP 500 with
+# {"success":false,"error":"LinkedIn Company Search is missing required
+# fields: LinkedIn Account"} once the Arena workspace's LinkedIn connection
+# lapses. A 500 would normally be retried, but this one cannot succeed until
+# somebody reconnects that account, and it is the actual reason this agent has
+# twice looked broken.
+
+_VENDOR_UNCONFIGURED = ('{"success":false,"error":"LinkedIn Company Search is '
+                        'missing required fields: LinkedIn Account"}')
+
+
+def test_a_vendor_workspace_gap_is_named_not_called_a_server_error(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(500, _VENDOR_UNCONFIGURED)))
+    result = ac.search_companies_result("Microsoft")
+    message = ac.describe_error(result["error"])
+    assert result["error"]["config"] is True
+    assert "LinkedIn Account" in message
+    assert "Arena workspace" in message
+
+
+def test_a_vendor_workspace_gap_is_not_retried_despite_being_a_500(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    post = _post_returning(_FakeResp(500, _VENDOR_UNCONFIGURED))
+    monkeypatch.setattr(ac.requests, "post", post)
+    result = ac.search_companies_result("Microsoft")
+    assert len(post.calls) == 1
+    assert ac.is_retryable(result["error"]) is False
+
+
+def test_a_plain_500_is_still_treated_as_a_retryable_blip(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    post = _post_returning(_FakeResp(500, "internal error"))
+    monkeypatch.setattr(ac.requests, "post", post)
+    result = ac.search_companies_result("Microsoft")
+    assert len(post.calls) == ac._SEARCH_ATTEMPTS
+    assert result["error"]["config"] is False
+    assert ac.is_retryable(result["error"]) is True
