@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin_playbook_studio.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/linkedin_playbook_studio.css') }}?v=2">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
@@ -164,6 +164,9 @@
 
   <script>
     var MAIN_TAB = 'search';
+    /* Admins are the only people who can act on a dead key or a changed
+       workflow ID, so they are the only ones offered the provider check. */
+    var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
     var RUNS = [];
     var SELECTED_COMPANY = null;
     var POLL_TIMER = null;
@@ -251,30 +254,89 @@
     }
 
     /* ── Search & Analyze ────────────────────────────────────────────────── */
-    var onCompanySearchInput = debounce(function(){
+    /* An empty result and a failed call are different things and now look
+       different: the page only claims "nothing matched" when the provider
+       actually answered that, and otherwise names the failure. */
+    var LAST_SEARCH_Q='';
+    var onCompanySearchInput = debounce(function(){runCompanySearch();},350);
+
+    function runCompanySearch(){
       var q=(document.getElementById('companySearchInput').value||'').trim();
       var wrap=document.getElementById('searchResultsWrap');
+      LAST_SEARCH_Q=q;
       if(!q){wrap.innerHTML='<div class="lps-empty">Search for a company to get started.</div>';return;}
       wrap.innerHTML='<div class="lps-loading">Searching…</div>';
       fetch('/p2/b2b-agents/linkedin-strategy-researcher/search?q='+encodeURIComponent(q))
         .then(function(r){return r.json();}).then(function(data){
-          renderCompanyResults(data.companies||[]);
+          renderCompanyResults(data.companies||[],data.error||null,q);
         }).catch(function(){
-          wrap.innerHTML='<div class="lps-empty">Couldn\'t reach the search — try again in a moment.</div>';
+          renderCompanyResults([],{message:'The search request itself failed to complete.',retryable:true},q);
         });
-    },350);
+    }
 
-    function renderCompanyResults(companies){
+    function searchErrorBanner(err){
+      return '<div class="lps-search-error">'
+        +'<div class="lps-search-error-head">Company search is unavailable</div>'
+        +'<div class="lps-search-error-msg">'+esc(err.message||'Company search is unavailable right now.')+'</div>'
+        +(err.detail?'<pre class="lps-search-error-detail">'+esc(err.detail)+'</pre>':'')
+        +(err.retryable===false?'':'<button class="lps-retry-btn" onclick="runCompanySearch()">Try again</button>')
+        +adminCheckControl()
+        +'</div>';
+    }
+
+    function adminCheckControl(){
+      if(!IS_ADMIN)return '';
+      return '<button class="lps-retry-btn" style="margin-left:8px" id="arenaCheckBtn" onclick="runArenaCheck()">Run provider check</button>'
+        +'<pre class="lps-search-error-detail" id="arenaCheckOut" style="display:none"></pre>';
+    }
+
+    /* Probes the provider from the server with a company every LinkedIn
+       dataset contains, so an empty search can be read as a real absence of
+       data rather than a silent misconfiguration. */
+    function runArenaCheck(){
+      var b=document.getElementById('arenaCheckBtn'), out=document.getElementById('arenaCheckOut');
+      if(!b||!out)return;
+      b.disabled=true; b.textContent='Checking…';
+      fetch('/p2/admin/external-usage/arena-check',{method:'POST'})
+        .then(function(r){return r.json();}).then(function(d){
+          b.disabled=false; b.textContent='Run provider check';
+          out.style.display='block';
+          out.textContent=
+            'Key configured: '+(d.configured?'yes ('+d.key_len+' chars)':'NO')+'\n'
+            +'Probe: '+(d.probe||'?')+' → '+(d.companies||0)+' companies'
+            +(d.sample&&d.sample.length?' ('+d.sample.join(', ')+')':'')+'\n'
+            +'Attempts: '+(d.attempts||0)+' · '+(d.elapsed_ms||0)+'ms'
+            +(d.http_status?' · HTTP '+d.http_status:'')+'\n'
+            +(d.source?'Rows found under: '+d.source+'\n':'')
+            +(d.error?'\n'+d.error:'')
+            +(d.detail?'\n'+d.detail:'');
+        }).catch(function(e){
+          b.disabled=false; b.textContent='Run provider check';
+          out.style.display='block'; out.textContent='Could not run the check: '+e;
+        });
+    }
+
+    function companyCard(c,i){
+      return '<div class="lps-company-card" data-idx="'+i+'" onclick="pickCompany('+i+')">'
+        +(c.logo?'<img class="lps-company-logo" src="'+esc(c.logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-company-logo lps-company-logo-fallback">'+esc((c.name||'?')[0].toUpperCase())+'</div>')
+        +'<div class="lps-company-info"><div class="lps-company-name">'+esc(c.name)+'</div>'
+        +'<div class="lps-company-meta">'+(c.from_history?'Analyzed before':esc(c.industry||''))+(c.location?' · '+esc(c.location):'')+'</div>'
+        +(c.followers_count?'<div class="lps-company-followers">'+Math.round(c.followers_count).toLocaleString('en-US')+' followers</div>':'')
+        +'</div></div>';
+    }
+
+    function renderCompanyResults(companies,error,q){
       var wrap=document.getElementById('searchResultsWrap');
-      if(!companies.length){wrap.innerHTML='<div class="lps-empty">No companies found.</div>';return;}
-      wrap.innerHTML='<div class="lps-company-grid">'+companies.map(function(c,i){
-        return '<div class="lps-company-card" data-idx="'+i+'" onclick="pickCompany('+i+')">'
-          +(c.logo?'<img class="lps-company-logo" src="'+esc(c.logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-company-logo lps-company-logo-fallback">'+esc((c.name||'?')[0].toUpperCase())+'</div>')
-          +'<div class="lps-company-info"><div class="lps-company-name">'+esc(c.name)+'</div>'
-          +'<div class="lps-company-meta">'+esc(c.industry||'')+(c.location?' · '+esc(c.location):'')+'</div>'
-          +(c.followers_count?'<div class="lps-company-followers">'+Math.round(c.followers_count).toLocaleString('en-US')+' followers</div>':'')
-          +'</div></div>';
-      }).join('')+'</div>';
+      var html=error?searchErrorBanner(error):'';
+      if(companies.length){
+        if(error)html+='<div class="lps-fallback-note">Companies you have analyzed before are still available to re-run.</div>';
+        html+='<div class="lps-company-grid">'+companies.map(companyCard).join('')+'</div>';
+      } else if(!error){
+        html='<div class="lps-empty">Nothing matched “'+esc(q||'')+'”.'
+          +'<div class="lps-empty-note">Try the name exactly as it reads on the company\'s LinkedIn page.</div>'
+          +adminCheckControl()+'</div>';
+      }
+      wrap.innerHTML=html;
       window.__lpsCompanies=companies;
     }
 

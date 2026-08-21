@@ -136,6 +136,16 @@ body {
 
 /* Search & Analyze */
 .lps-empty, .lps-loading { text-align: center; padding: 60px 20px; color: #55506a; }
+/* Search failure, stated. Amber rather than red: nothing the user did is
+   wrong, and the provider being down is a wait-or-tell-an-admin situation. */
+.lps-search-error { margin: 18px 22px 0; padding: 16px 18px; border-radius: var(--radius-md); background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.28); }
+.lps-search-error-head { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #fbbf24; }
+.lps-search-error-msg { font-size: 13px; color: #d6cfd8; margin-top: 6px; line-height: 1.5; }
+.lps-search-error-detail { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: #8b86a0; background: rgba(0,0,0,.25); border-radius: var(--radius-sm); padding: 8px 10px; margin: 10px 0 0; white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow: auto; }
+.lps-retry-btn { margin-top: 12px; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm); padding: 7px 14px; font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.lps-retry-btn:hover { background: rgba(251,191,36,.24); }
+.lps-fallback-note { padding: 14px 22px 0; font-size: 11.5px; color: #8b86a0; }
+
 .lps-company-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 18px 22px; }
 .lps-company-card { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md); padding: 14px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
 .lps-company-card:hover { background: rgba(244,114,182,.06); border-color: rgba(244,114,182,.3); transform: translateY(-2px); }
@@ -713,6 +723,12 @@ body.lps-printing .lps-drw-pane { display: block !important; }
 [data-theme="light"] table.lps-table tbody tr:hover { background: rgba(244,114,182,.06) !important; }
 [data-theme="light"] .lps-name { color: #241820 !important; }
 [data-theme="light"] .lps-empty,[data-theme="light"] .lps-loading { color: #8a7a83 !important; }
+[data-theme="light"] .lps-search-error { background: #fffbeb !important; border-color: rgba(180,120,10,.35) !important; }
+[data-theme="light"] .lps-search-error-head { color: #a1660a !important; }
+[data-theme="light"] .lps-search-error-msg { color: #4a3c44 !important; }
+[data-theme="light"] .lps-search-error-detail { color: #6f6068 !important; background: rgba(36,24,32,.06) !important; }
+[data-theme="light"] .lps-retry-btn { background: rgba(180,120,10,.1) !important; border-color: rgba(180,120,10,.35) !important; color: #8a5806 !important; }
+[data-theme="light"] .lps-fallback-note { color: #8a7a83 !important; }
 [data-theme="light"] .lps-company-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
 [data-theme="light"] .lps-company-name { color: #241820 !important; }
 [data-theme="light"] .lps-company-meta { color: #8a7a83 !important; }

@@ -79,15 +79,21 @@ def test_page_requires_login():
 # ── Search ────────────────────────────────────────────────────────────────
 
 def test_search_returns_companies_from_the_arena_client(monkeypatch):
-    monkeypatch.setattr(arena_client, "search_companies", lambda q: [{"id": "1", "name": "Acme"}])
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [{"id": "1", "name": "Acme"}], "error": None})
     resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme")
     assert resp.status_code == 200
-    assert resp.get_json()["companies"] == [{"id": "1", "name": "Acme"}]
+    body = resp.get_json()
+    assert body["companies"] == [{"id": "1", "name": "Acme"}]
+    # A successful search carries no error key at all, so the page can treat
+    # its presence as "the provider failed" without inspecting anything else.
+    assert "error" not in body
 
 
 def test_search_with_no_query_returns_an_empty_list_without_calling_arena(monkeypatch):
     called = []
-    monkeypatch.setattr(arena_client, "search_companies", lambda q: called.append(q) or [])
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: called.append(q) or {"companies": [], "error": None})
     resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search")
     assert resp.get_json()["companies"] == []
     assert called == []
@@ -174,7 +180,8 @@ def _fake_vendor_output():
 
 
 def test_analysis_job_merges_enrichment_fields_into_the_saved_output(monkeypatch):
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": _fake_vendor_output(), "error": None})
     monkeypatch.setattr(lps_enrichment, "enrich_run", lambda output, name, run_type: {
         "headline": "H", "synthesis": "S", "topActions": ["do this"], "coverage": "C",
     })
@@ -197,7 +204,8 @@ def test_analysis_job_merges_enrichment_fields_into_the_saved_output(monkeypatch
 
 
 def test_analysis_job_completes_normally_when_enrichment_returns_none(monkeypatch):
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": _fake_vendor_output(), "error": None})
     monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
     saved = {}
     monkeypatch.setattr(lps_store, "update_run_status",
@@ -212,7 +220,8 @@ def test_analysis_job_completes_normally_when_enrichment_raises(monkeypatch):
     """The one case this feature exists to guard against: a bug in the new
     enrichment call must not turn a perfectly good vendor analysis into a
     failed run."""
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": _fake_vendor_output(), "error": None})
 
     def _boom(*a, **k):
         raise RuntimeError("enrichment blew up")
@@ -228,7 +237,10 @@ def test_analysis_job_completes_normally_when_enrichment_raises(monkeypatch):
 
 
 def test_analysis_job_never_calls_enrichment_when_the_vendor_analysis_itself_fails(monkeypatch):
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: None)
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": None,
+                                         "error": {"kind": "http_status", "status": 401,
+                                                   "detail": "HTTP 401. Body: bad key"}})
     called = []
     monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: called.append(1))
     saved = {}
@@ -441,8 +453,9 @@ def test_analysis_job_derives_the_summary_column_from_the_summary_object(monkeyp
     """Every real run returns messagingagent.summary as an OBJECT, never a
     bare string, so an isinstance(str) check discarded it every time and the
     history table's Summary column showed a dash for every row."""
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: {
-        "messagingagent.summary": {"text": "The real summary.", "moves": ["m"]},
+    monkeypatch.setattr(arena_client, "run_analysis_result", lambda *a, **k: {
+        "output": {"messagingagent.summary": {"text": "The real summary.", "moves": ["m"]}},
+        "error": None,
     })
     monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
     saved = {}
@@ -456,8 +469,8 @@ def test_analysis_job_derives_the_summary_column_from_the_summary_object(monkeyp
 def test_analysis_job_hands_enrichment_the_computed_metrics(monkeypatch):
     """Claude is given the augmented view so cadence and format performance
     arrive as finished numbers rather than 100 raw posts to do arithmetic on."""
-    monkeypatch.setattr(arena_client, "run_analysis",
-                        lambda *a, **k: _run_with_posts()["output"])
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": _run_with_posts()["output"], "error": None})
     seen = {}
 
     def _capture(output, name, run_type):
@@ -472,7 +485,8 @@ def test_analysis_job_hands_enrichment_the_computed_metrics(monkeypatch):
 
 
 def test_analysis_job_merges_the_newer_enrichment_list_fields(monkeypatch):
-    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(arena_client, "run_analysis_result",
+                        lambda *a, **k: {"output": _fake_vendor_output(), "error": None})
     monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: {
         "headline": "H", "synthesis": "S", "topActions": ["a"],
         "strengths": ["s"], "risks": ["r"], "contentAngles": ["c"],
@@ -623,3 +637,144 @@ def test_insights_job_refuses_a_run_that_is_not_the_callers(monkeypatch):
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda *a, **k: pytest.fail("must not write"))
     appmod._lps_run_insights_job(1, _OWNER)
+
+
+# ── A failed search must not masquerade as an empty one ───────────────────
+# The whole point of this section: the page said "No companies found." for a
+# revoked key, a rate limit, a timeout and a genuinely unknown company alike,
+# so the same message meant four different actions (rotate a key, wait a
+# minute, retry, retype the name). The route now carries the reason.
+
+def _failing_search(monkeypatch, kind="http_status", status=401, detail="HTTP 401. Body: bad key"):
+    monkeypatch.setattr(arena_client, "search_companies_result", lambda q: {
+        "companies": [], "error": {"kind": kind, "status": status,
+                                   "detail": detail, "attempts": 1},
+        "elapsed_ms": 12, "source": "",
+    })
+
+
+def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    assert body["companies"] == []
+    assert body["error"]["code"] == "http_status"
+    assert "rejected our API key" in body["error"]["message"]
+
+
+def test_a_dead_key_is_not_offered_as_retryable(monkeypatch):
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    assert body["error"]["retryable"] is False
+
+
+def test_a_rate_limit_is_offered_as_retryable(monkeypatch):
+    _failing_search(monkeypatch, status=429, detail="HTTP 429")
+    monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    assert body["error"]["retryable"] is True
+
+
+def test_the_vendors_own_words_go_only_to_admins(monkeypatch):
+    """The raw body can name internal endpoints and account state, and only an
+    admin can act on it, so a non-admin gets the plain-English message alone."""
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(lps_store, "search_known_companies", lambda *a, **k: [])
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    admin_body = _client(admin).get(
+        "/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    plain_body = _client("nobody@position2.com").get(
+        "/p2/b2b-agents/linkedin-strategy-researcher/search?q=apple").get_json()
+    assert admin_body["error"]["detail"] == "HTTP 401. Body: bad key"
+    assert admin_body["error"]["status"] == 401
+    assert "detail" not in plain_body["error"]
+    assert "status" not in plain_body["error"]
+
+
+def test_a_failed_search_falls_back_to_the_users_own_analyzed_companies(monkeypatch):
+    _failing_search(monkeypatch)
+    seen = {}
+
+    def _known(email, q, *a, **k):
+        seen["args"] = (email, q)
+        return [{"id": "1441", "name": "Google", "logo": None, "from_history": True}]
+
+    monkeypatch.setattr(lps_store, "search_known_companies", _known)
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=goo").get_json()
+    assert [c["name"] for c in body["companies"]] == ["Google"]
+    assert body["companies"][0]["from_history"] is True
+    # Scoped to the session's own email, never a client-supplied one.
+    assert seen["args"] == (_OWNER, "goo")
+    # The banner still shows: these are past runs, not live search results.
+    assert body["error"]["code"] == "http_status"
+
+
+def test_a_successful_search_never_consults_history(monkeypatch):
+    called = []
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [{"id": "1", "name": "Acme"}], "error": None})
+    monkeypatch.setattr(lps_store, "search_known_companies",
+                        lambda *a, **k: called.append(1) or [])
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=Acme").get_json()
+    assert not called
+    assert body["companies"][0]["name"] == "Acme"
+
+
+def test_a_genuine_zero_result_carries_no_error_at_all(monkeypatch):
+    """The vendor looked and found nothing: the page may say "nothing matched"
+    only in this case."""
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [], "error": None})
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/search?q=zzz").get_json()
+    assert body == {"companies": []}
+
+
+def test_the_page_tells_admins_they_can_run_the_provider_check():
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    admin_page = _client(admin).get("/p2/b2b-agents/linkedin-strategy-researcher").data
+    plain_page = _client("nobody@position2.com").get(
+        "/p2/b2b-agents/linkedin-strategy-researcher").data
+    assert b"IS_ADMIN = true" in admin_page
+    assert b"IS_ADMIN = false" in plain_page
+
+
+# ── The Arena self-test route ────────────────────────────────────────────
+
+def test_arena_check_requires_an_admin():
+    resp = _client("nobody@position2.com").post("/p2/admin/external-usage/arena-check")
+    assert resp.status_code in (302, 401, 403, 404)
+
+
+def test_arena_check_returns_the_probe_for_an_admin(monkeypatch):
+    monkeypatch.setattr(arena_client, "probe", lambda *a, **k: {"configured": True, "companies": 3})
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    resp = _client(admin).post("/p2/admin/external-usage/arena-check")
+    assert resp.status_code == 200
+    assert resp.get_json()["companies"] == 3
+
+
+def test_arena_check_never_500s_when_the_probe_explodes(monkeypatch):
+    monkeypatch.setattr(arena_client, "probe",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    resp = _client(admin).post("/p2/admin/external-usage/arena-check")
+    assert resp.status_code == 200
+    assert "boom" in resp.get_json()["error"]
+
+
+# ── The analysis job stores WHY a run failed ─────────────────────────────
+
+def test_a_failed_run_stores_the_reason_it_failed(monkeypatch):
+    monkeypatch.setattr(arena_client, "run_analysis_result", lambda *a, **k: {
+        "output": None,
+        "error": {"kind": "http_status", "status": 401, "detail": "HTTP 401. Body: bad key"},
+    })
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+    assert saved["status"] == "error"
+    assert "rejected our API key" in saved["error"]
+    # The vendor's raw body is logged, never stored on a row users can read.
+    assert "bad key" not in saved["error"]

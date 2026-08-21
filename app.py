@@ -7746,9 +7746,18 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
     from tracker import lps_enrichment
     from tracker import linkedin_playbook_store as lps_store
     try:
-        output = arena_client.run_analysis(company_name, company_id, email, run_type, parent_arena_id)
+        attempt = arena_client.run_analysis_result(company_name, company_id, email,
+                                                   run_type, parent_arena_id)
+        output = attempt.get("output")
         if output is None:
-            lps_store.update_run_status(run_id, "error", error="Analysis could not be completed.")
+            # The stored error is what the history row shows days later, so it
+            # says which side failed and whether retrying is worth anything,
+            # instead of the old uniform "could not be completed".
+            reason = arena_client.describe_error(attempt.get("error")) or \
+                "Analysis could not be completed."
+            log.warning("LinkedIn Strategy Researcher: analysis failed for run %s: %s",
+                        run_id, (attempt.get("error") or {}).get("detail"))
+            lps_store.update_run_status(run_id, "error", error=reason)
             return
         # Best-effort: an extra Claude pass that synthesizes a single point of
         # view across every namespace the vendor's agents returned (see
@@ -7803,17 +7812,68 @@ def _lps_run_playbook_job(run_id: int, email: str, mode: str) -> None:
 @app.route("/p2/b2b-agents/linkedin-strategy-researcher")
 @position2_required
 def linkedin_playbook_studio():
-    return render_template("linkedin_playbook_studio.html", user=_get_user())
+    user = _get_user() or {}
+    return render_template("linkedin_playbook_studio.html", user=user,
+                           is_admin=(user.get("email") or "").lower() in ADMIN_EMAILS)
 
 
 @app.route("/p2/b2b-agents/linkedin-strategy-researcher/search")
 @position2_required
 def linkedin_playbook_studio_search():
+    """Company search, which reports WHY it came back empty.
+
+    This route used to return a bare list, so the page said "No companies
+    found." whether the vendor had answered "no such company", rejected our
+    key, rate-limited us or never answered at all. Those need different
+    responses from a human, so the reason now travels with the result: a
+    `message` for anyone, plus the vendor's own words in `detail` for admins,
+    who are the only people who can act on a key or a workflow ID."""
     from tracker import arena_client
+    from tracker import linkedin_playbook_store as lps_store
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify({"companies": []})
-    return jsonify({"companies": arena_client.search_companies(q)})
+    email = (_get_user() or {}).get("email") or ""
+    result = arena_client.search_companies_result(q)
+    companies = result.get("companies") or []
+    err = result.get("error")
+    payload = {"companies": companies}
+    if err:
+        # Falling back to companies this user has already analyzed keeps the
+        # page actionable while the provider is down: everything needed to
+        # start a run is already stored on those rows.
+        fallback = lps_store.search_known_companies(email, q)
+        payload["companies"] = fallback
+        payload["error"] = {
+            "code": err.get("kind") or "unavailable",
+            "message": arena_client.describe_error(err),
+            "retryable": arena_client.is_retryable(err),
+        }
+        if email.lower() in ADMIN_EMAILS:
+            payload["error"]["detail"] = err.get("detail") or ""
+            payload["error"]["status"] = err.get("status")
+            payload["error"]["attempts"] = err.get("attempts")
+        app.logger.warning("lps search failed for %r: %s (%s)", q,
+                           err.get("kind"), err.get("detail"))
+    return jsonify(payload)
+
+
+def _arena_selftest() -> dict:
+    """Prove the Arena integration end to end (see arena_client.probe). Free:
+    the company-search workflow is not one of the billed multi-agent runs."""
+    from tracker import arena_client
+    try:
+        return arena_client.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/arena-check", methods=["POST"])
+@admin_required
+def admin_external_usage_arena_check():
+    """Run the Arena self-test. POST so no crawler or prefetch can trigger it,
+    matching the Apollo check next to it."""
+    return jsonify(_arena_selftest())
 
 
 @app.route("/p2/b2b-agents/linkedin-strategy-researcher/analyze", methods=["POST"])

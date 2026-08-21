@@ -31,14 +31,29 @@ _FIXED_TS = datetime(2026, 8, 20, 12, 0, 0, tzinfo=timezone.utc)
 
 def _select_columns(sql):
     m = re.search(r"SELECT (.+?) FROM lps_(runs|playbooks)", sql)
-    return [c.strip() for c in m.group(1).split(",")]
+    # A DISTINCT ON (col) prefix is not part of the column list.
+    cols = re.sub(r"^DISTINCT ON \(\w+\)\s*", "", m.group(1))
+    return [c.strip() for c in cols.split(",")]
 
 
-def _where_columns(sql):
+def _where_conditions(sql):
+    """(column, operator) pairs in the order their placeholders appear, so the
+    fake binds params positionally the way psycopg2 does."""
     m = re.search(r"WHERE (.+?)(?: ORDER BY| LIMIT|$)", sql)
     if not m:
         return []
-    return re.findall(r"(\w+)\s*=\s*%s", m.group(1))
+    return [(c, op.upper()) for c, op in re.findall(r"(\w+)\s*(=|ILIKE)\s*%s", m.group(1))]
+
+
+def _row_matches(row, conds, params):
+    for (col, op), val in zip(conds, params):
+        actual = row.get(col)
+        if op == "ILIKE":
+            if str(val).strip("%").lower() not in str(actual or "").lower():
+                return False
+        elif actual != val:
+            return False
+    return True
 
 
 def _unwrap(v):
@@ -92,12 +107,22 @@ class _FakeCursor:
 
         if sql.startswith("SELECT") and "FROM lps_runs" in sql:
             cols = _select_columns(sql)
-            where_cols = _where_columns(sql)
-            order_desc = "ORDER BY created_at DESC" in sql
-            matches = [r for r in self.db.runs
-                      if all(r.get(c) == v for c, v in zip(where_cols, params))]
-            if order_desc:
+            conds = _where_conditions(sql)
+            matches = [r for r in self.db.runs if _row_matches(r, conds, params)]
+            if "created_at DESC" in sql:
                 matches = sorted(matches, key=lambda r: r["id"], reverse=True)
+            distinct_on = re.search(r"DISTINCT ON \((\w+)\)", sql)
+            if distinct_on:
+                seen, deduped = set(), []
+                for r in matches:
+                    marker = r.get(distinct_on.group(1))
+                    if marker in seen:
+                        continue
+                    seen.add(marker)
+                    deduped.append(r)
+                matches = deduped
+            if "LIMIT %s" in sql:
+                matches = matches[:params[len(conds)]]
             self._result = [tuple(r.get(c) for c in cols) for r in matches]
             return
 
@@ -120,9 +145,8 @@ class _FakeCursor:
             return
 
         if sql.startswith("SELECT") and "FROM lps_playbooks" in sql:
-            where_cols = _where_columns(sql)
-            matches = [p for p in self.db.playbooks
-                      if all(p.get(c) == v for c, v in zip(where_cols, params))]
+            conds = _where_conditions(sql)
+            matches = [p for p in self.db.playbooks if _row_matches(p, conds, params)]
             self._result = [(p["id"], p["run_id"], p["mode"], p["content"], p["created_at"])
                             for p in matches]
             return
@@ -261,3 +285,50 @@ def test_everything_degrades_to_none_or_empty_without_a_database(monkeypatch):
     assert store.save_playbook(1, "alice@position2.com", "OWN", {}) is None
     assert store.get_playbook(1, "alice@position2.com", "OWN") is None
     assert store.update_run_status(1, "error") is False
+
+
+# ── search_known_companies: the fallback when the vendor's search is down ──
+
+def test_known_companies_match_by_partial_name(fake_db):
+    store.save_run("alice@position2.com", "OWN", "1441", "Google")
+    store.save_run("alice@position2.com", "OWN", "361348", "Myntra")
+    found = store.search_known_companies("alice@position2.com", "goo")
+    assert [c["name"] for c in found] == ["Google"]
+    # Everything needed to start a fresh run comes back with it.
+    assert found[0]["id"] == "1441"
+    assert found[0]["from_history"] is True
+
+
+def test_known_companies_are_scoped_to_the_asking_user(fake_db):
+    """One user's analyzed-company list must never leak into another's search,
+    the same ownership property every single-row read here guarantees."""
+    store.save_run("alice@position2.com", "OWN", "1441", "Google")
+    assert store.search_known_companies("bob@position2.com", "goo") == []
+
+
+def test_known_companies_collapse_repeat_analyses_of_one_company(fake_db):
+    for _ in range(3):
+        store.save_run("alice@position2.com", "OWN", "1441", "Google")
+    found = store.search_known_companies("alice@position2.com", "google")
+    assert len(found) == 1
+
+
+def test_known_companies_is_case_insensitive(fake_db):
+    store.save_run("alice@position2.com", "OWN", "1441", "Google")
+    assert len(store.search_known_companies("alice@position2.com", "GOOGLE")) == 1
+
+
+def test_known_companies_needs_a_query(fake_db):
+    store.save_run("alice@position2.com", "OWN", "1441", "Google")
+    assert store.search_known_companies("alice@position2.com", "  ") == []
+
+
+def test_known_companies_honours_the_limit(fake_db):
+    for i in range(5):
+        store.save_run("alice@position2.com", "OWN", str(i), "Acme %d" % i)
+    assert len(store.search_known_companies("alice@position2.com", "acme", limit=2)) == 2
+
+
+def test_known_companies_returns_empty_without_postgres(monkeypatch):
+    monkeypatch.setattr(store, "_pg_conn", lambda: None)
+    assert store.search_known_companies("alice@position2.com", "goo") == []
