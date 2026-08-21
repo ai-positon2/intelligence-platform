@@ -33,18 +33,29 @@ logger = logging.getLogger(__name__)
 _NON_CONTENT_KEYS = {"_sseDebug"}
 
 _SYSTEM = (
-    "You are a B2B LinkedIn competitive-strategy analyst. You are given the full "
+    "You are a B2B LinkedIn competitive-strategy analyst. You are given the "
     "JSON output of a five-agent LinkedIn analysis workflow for one company -- "
     "namespaced fields such as strategyagent.*, contentcreativeagent.*, "
-    "messagingagent.*, creativeinsightagent.*, competitiveagent.*, "
-    "getcompanyprofile.*, and getcompanypost.*. Synthesize ONE point of view "
-    "across all of it. Do not just restate a single section.\n\n"
+    "messagingagent.*, creativeinsightagent.*, competitiveagent.*, and "
+    "getcompanyprofile.* -- plus a derived.* block of metrics computed "
+    "directly from that company's real post feed (posting cadence, engagement "
+    "averages and rate, which post format actually earns engagement, content "
+    "signals, voice mix) and a postFeedSummary with its best posts. "
+    "Synthesize ONE point of view across all of it. Do not just restate a "
+    "single section.\n\n"
+    "The derived.* numbers are arithmetic over real posts, so quote them "
+    "specifically: a named format with its multiple, the posts-per-week "
+    "figure, the engagement rate. Concrete numbers are what makes this useful. "
+    "Prefer the finding a reader could act on over a description of what the "
+    "company does.\n\n"
     "HARD RULE: never state a fact that is not traceable to a field in the JSON "
     "you were given. If a namespace is missing, or its arrays/objects are empty, "
     "say so plainly (for example: \"no organic posts were available to "
     "analyze\") instead of guessing or inventing plausible-sounding detail. "
-    "Ground every conclusion in the specific field it comes from. It is always "
-    "better to say less than to invent.\n\n"
+    "Ground every conclusion in the specific field it comes from. Never "
+    "estimate, benchmark against an industry average, or compare to a "
+    "competitor that is not named in the data. It is always better to say less "
+    "than to invent.\n\n"
     "Return ONLY a JSON object with these keys, nothing else:\n"
     '  "headline": one sentence, the single most useful thing to know about '
     "this company's LinkedIn presence (140 characters or fewer)\n"
@@ -52,12 +63,27 @@ _SYSTEM = (
     "separated by blank lines\n"
     '  "topActions": an array of up to 5 short (140 characters or fewer) '
     "prioritized action strings, each grounded in something in the source data\n"
-    '  "coverage": one short sentence naming which agent sections had real '
-    "data and which came back empty, so a reader can gauge how much of this "
-    "is founded on real signal\n\n"
+    '  "strengths": an array of up to 4 short strings, what is demonstrably '
+    "working, each citing the field or number that shows it\n"
+    '  "risks": an array of up to 4 short strings, the gaps or exposures '
+    "visible in this data. Omit the key entirely rather than inventing one.\n"
+    '  "contentAngles": an array of up to 5 short, specific post or campaign '
+    "angles this company could run next, each derived from a theme, hook, "
+    "persona or gap present in the data\n"
+    '  "coverage": one short sentence naming which sections had real data and '
+    "which came back empty, so a reader can gauge how much of this is founded "
+    "on real signal\n\n"
     "No markdown, no code fences, no commentary outside the JSON object. Never "
     "use an em dash; use commas or periods instead."
 )
+
+# Every list-shaped key in the schema above, with the cap applied to each.
+_LIST_FIELDS = {
+    "topActions": 5,
+    "strengths": 4,
+    "risks": 4,
+    "contentAngles": 5,
+}
 
 
 def _anthropic():
@@ -75,10 +101,26 @@ def _is_dict(v: Any) -> bool:
     return isinstance(v, dict)
 
 
-def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
-    """One Claude call synthesizing a completed run's full vendor output.
+def _string_list(value: Any, limit: int) -> list[str]:
+    """A model-returned array coerced to clean strings, capped. A non-list, or
+    a list of objects, yields [] rather than str()-ing dicts into the report."""
+    if not isinstance(value, list):
+        return []
+    out: list[str] = []
+    for item in value:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, (str, int, float)) and str(item).strip():
+            out.append(str(item).strip())
+    return out[:limit]
 
-    Returns {"headline", "synthesis", "topActions", "coverage"}, or None when
+
+def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
+    """One Claude call synthesizing a completed run.
+
+    Callers pass the AUGMENTED output (tracker/lps_analytics.augment), so the
+    prose here is repaired rather than mojibake and the derived.* metrics are
+    already computed. Returns the synthesis dict, or None when
     ANTHROPIC_API_KEY isn't configured, the source output is empty, or the
     call/parse fails -- never raises. app.py's background analysis job treats
     this as strictly best-effort: a run still completes and saves without it.
@@ -89,11 +131,22 @@ def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
     source = {k: v for k, v in (output or {}).items() if k not in _NON_CONTENT_KEYS}
     if not source:
         return None
+    # Send the compacted view, not the whole run. The raw output carries up to
+    # 100 full post bodies with attachment URLs and ~72 viewer-permission
+    # booleans (roughly 320KB on the real Google run, most of it noise the
+    # model has to read past); compact_for_llm swaps that for the computed
+    # metrics plus the top posts, which is both far cheaper and strictly more
+    # useful signal.
+    try:
+        from tracker import lps_analytics
+        source = lps_analytics.compact_for_llm(source)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning("lps_enrichment: compaction failed, sending full output: %s", e)
     payload = {"company_name": company_name, "run_type": run_type, "agent_output": source}
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=1200,
+            max_tokens=2000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload, default=str)}])
         raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
@@ -110,16 +163,22 @@ def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
             or not isinstance(synthesis, str) or not synthesis.strip()):
         return None
 
-    top_actions = []
-    if isinstance(parsed.get("topActions"), list):
-        for a in parsed["topActions"]:
-            if isinstance(a, (str, int, float)) and str(a).strip():
-                top_actions.append(str(a).strip())
-
     coverage = parsed.get("coverage")
     coverage = coverage.strip() if isinstance(coverage, str) and coverage.strip() else None
 
-    result = {"headline": headline.strip(), "synthesis": synthesis.strip(), "topActions": top_actions[:5]}
+    result: dict[str, Any] = {
+        "headline": headline.strip(),
+        "synthesis": synthesis.strip(),
+        # topActions stays present-but-possibly-empty for backward
+        # compatibility with the existing contract; the newer list fields are
+        # omitted entirely when the model returns nothing usable, so the
+        # report can skip their sections rather than render empty headings.
+        "topActions": _string_list(parsed.get("topActions"), _LIST_FIELDS["topActions"]),
+    }
+    for field in ("strengths", "risks", "contentAngles"):
+        items = _string_list(parsed.get(field), _LIST_FIELDS[field])
+        if items:
+            result[field] = items
     if coverage:
         result["coverage"] = coverage
     return result

@@ -220,7 +220,7 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
    layout: nav stays put, only the content pane scrolls) */
 .lps-drawer-overlay { position: fixed; inset: 0; background: rgba(4,3,5,.66); backdrop-filter: blur(5px); z-index: 200; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
 .lps-drawer-overlay.open { opacity: 1; pointer-events: auto; }
-.lps-drawer { position: fixed; top: 50%; left: 50%; width: min(1080px,96vw); max-height: 90vh; background: rgba(15,10,13,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg); z-index: 201; transform: translate(-50%,-50%) scale(.93) translateY(8px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.22,1.3,.36,1), opacity .22s ease; display: flex; flex-direction: column; box-shadow: 0 50px 140px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02); overflow: hidden; }
+.lps-drawer { position: fixed; top: 50%; left: 50%; width: min(1180px,96vw); max-height: 92vh; background: rgba(15,10,13,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg); z-index: 201; transform: translate(-50%,-50%) scale(.93) translateY(8px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.22,1.3,.36,1), opacity .22s ease; display: flex; flex-direction: column; box-shadow: 0 50px 140px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02); overflow: hidden; }
 .lps-drawer.open { transform: translate(-50%,-50%) scale(1) translateY(0); opacity: 1; pointer-events: auto; }
 .lps-drawer::before { content: ''; height: 4px; flex-shrink: 0; background: linear-gradient(90deg,#f472b6,#7c83f5,#22d3ee); }
 .lps-drawer-close { position: absolute; top: 18px; right: 18px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #9a94ab; font-size: 14px; cursor: pointer; transition: background .15s, color .15s; z-index: 2; }
@@ -232,7 +232,7 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 .drw-head-txt h3 { font-size: 19px; font-weight: 700; color: #f7f2f5; line-height: 1.25; }
 .drw-sub { font-size: 13px; color: #c9c4d6; margin-top: 5px; }
 
-.lps-drw-shell { display: grid; grid-template-columns: 200px 1fr; flex: 1; min-height: 0; }
+.lps-drw-shell { display: grid; grid-template-columns: 208px 1fr; flex: 1; min-height: 0; }
 .lps-drw-nav { display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; border-right: 1px solid rgba(255,255,255,.07); overflow-y: auto; min-height: 0; }
 .lps-drw-tab { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid transparent; background: transparent; color: #8b86a0; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .15s, color .15s; position: relative; }
 .lps-drw-tab:hover { background: rgba(255,255,255,.045); color: #c9c4d6; }
@@ -475,6 +475,219 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 .lps-profile-industry { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #7dd3fc; background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.28); border-radius: var(--radius-pill); padding: 3px 9px; margin-left: 10px; vertical-align: middle; }
 .lps-profile-tagline { font-size: 12.5px; font-style: italic; color: #8b86a0; margin-bottom: 8px; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Report surface v2: identity band, computed-metric components, charts.
+   Dark is the base here (this app is dark-first); the [data-theme="light"]
+   block at the end of this file overrides tokens for light mode.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Fourth stat card: average competitive score (was a hardcoded zero labelled
+   "Playbooks Generated" -- the history endpoint returns no playbook counts). */
+.sc-score::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+.sc-score .sc-glow { background: #fbbf24; }
+.sc-score .stat-value { color: #fcd34d; }
+.sc-score .stat-hint { color: #fcd34d; }
+
+/* History table: score column + a summary cell that can't push the row tall */
+.lps-score-pill { display: inline-block; min-width: 30px; text-align: center; padding: 3px 9px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; background: rgba(251,191,36,.13); color: #fcd34d; }
+.lps-cell-clamp { max-width: 420px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Report identity band ─────────────────────────────────────────────────
+   Stays above the tab shell, so who/what/when and the headline numbers are
+   on screen no matter which section is open. */
+.lps-rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 30px 16px; flex-wrap: wrap; }
+.lps-rep-id { display: flex; gap: 16px; align-items: flex-start; min-width: 0; flex: 1; }
+.lps-rep-txt { min-width: 0; }
+.lps-rep-txt h3 { font-size: 21px; font-weight: 700; color: #f7f2f5; line-height: 1.22; letter-spacing: var(--ls-tight); }
+.lps-rep-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.lps-rep-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-right: 44px; }
+.lps-act { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.045); color: #c9c4d6; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s, color .15s, transform .15s; }
+.lps-act:hover { background: rgba(255,255,255,.09); color: #f1eef2; border-color: rgba(255,255,255,.2); transform: translateY(-1px); }
+.lps-act.primary { background: linear-gradient(135deg, rgba(244,114,182,.2), rgba(124,131,245,.14)); border-color: rgba(244,114,182,.4); color: #fbb6d9; }
+.lps-act.primary:hover { background: linear-gradient(135deg, rgba(244,114,182,.3), rgba(124,131,245,.2)); }
+.lps-rep-band { padding: 0 30px 18px; border-bottom: 1px solid rgba(255,255,255,.07); }
+/* Narrow viewports: the close button is absolutely positioned top-right, so
+   the action row moves below the identity block rather than wrapping up
+   underneath it, and the title gets room to keep its own line. */
+@media (max-width: 760px) {
+  .lps-rep-head { flex-direction: column; padding: 20px 18px 14px; }
+  .lps-rep-actions { padding-right: 0; width: 100%; }
+  .lps-act { flex: 1; justify-content: center; }
+  .lps-rep-txt h3 { font-size: 18px; padding-right: 38px; }
+  .lps-rep-band { padding: 0 18px 16px; }
+  .lps-metric-val { font-size: 19px; }
+}
+
+/* Metric strip. Reused inside panes, so it carries no outer padding. */
+.lps-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(124px, 1fr)); gap: 1px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); overflow: hidden; }
+.lps-metric { background: rgba(17,13,18,.96); padding: 13px 15px; }
+.lps-metric-val { font-size: 22px; font-weight: 800; color: #fbb6d9; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: var(--ls-tight); }
+.lps-metric-unit { font-size: 12px; font-weight: 700; color: #8b86a0; margin-left: 2px; }
+.lps-metric-label { font-size: 9.5px; font-weight: 800; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #7b7590; margin-top: 7px; }
+.lps-metric-note { font-size: 10px; color: #5d5872; margin-top: 3px; line-height: 1.35; }
+
+/* Sections gain a note slot for "what this number means" without turning
+   into a paragraph of chrome. */
+.lps-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.lps-section-head .lps-section-label { margin-bottom: 0; }
+.lps-section-note { font-size: 10.5px; color: #5d5872; }
+.lps-pane-title { display: none; }
+
+/* Marks a section as computed here rather than reported by the vendor -- the
+   same honesty rule the AI Insights badge follows. */
+.lps-derived-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; color: #a5b4fc; background: rgba(79,70,229,.1); border: 1px solid rgba(124,131,245,.26); border-radius: var(--radius-pill); padding: 6px 14px; margin-bottom: 18px; }
+.lps-empty-note { font-size: 11.5px; color: #4b4760; margin-top: 8px; }
+.lps-drw-nav-sep { height: 1px; background: rgba(255,255,255,.07); margin: 8px 4px; }
+.lps-stat-tile-desc { font-size: 10.5px; color: #6b6680; margin-top: 6px; line-height: 1.45; }
+
+/* ── Line/area chart (posting cadence) ─────────────────────────────────────
+   preserveAspectRatio="none" lets one SVG stretch to any pane width; every
+   text size below is therefore set in CSS px on the element, not scaled with
+   the viewBox, and the sparse labels avoid collisions at 15+ buckets. */
+.lps-chart-block { width: 100%; }
+.lps-ch-svg { width: 100%; height: 190px; display: block; overflow: visible; }
+.lps-ch-grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.lps-ch-axis { fill: #6b6680; font-size: 9px; font-family: inherit; font-variant-numeric: tabular-nums; }
+.lps-ch-line { fill: none; stroke: #db2777; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.lps-ch-dot { fill: #db2777; stroke: rgba(15,10,13,.98); stroke-width: 1.5; }
+.lps-ch-dot.peak { fill: #fbb6d9; }
+.lps-ch-peak { fill: #fbb6d9; font-size: 10px; font-weight: 800; font-family: inherit; font-variant-numeric: tabular-nums; }
+.lps-ch-caption { font-size: 11px; color: #6b6680; margin-top: 10px; line-height: 1.5; }
+
+/* ── Column chart (weekday, hour of day) ───────────────────────────────────
+   A zero bucket keeps a 1px stub so "nothing published on Sunday" reads as a
+   measured zero rather than a rendering gap. */
+.lps-cols { display: flex; align-items: flex-end; gap: 8px; height: 168px; }
+.lps-cols.dense { gap: 3px; height: 132px; }
+.lps-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.lps-col-val { font-size: 10px; font-weight: 700; color: #8b86a0; font-variant-numeric: tabular-nums; margin-bottom: 5px; height: 13px; }
+.lps-col.peak .lps-col-val { color: #fbb6d9; }
+.lps-col-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.lps-col-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, rgba(219,39,119,.85), rgba(79,70,229,.5)); transition: height .6s cubic-bezier(.22,1,.36,1); }
+.lps-col.peak .lps-col-bar { background: linear-gradient(180deg,#f472b6,#7c83f5); box-shadow: 0 0 18px rgba(244,114,182,.3); }
+.lps-col.zero .lps-col-bar { background: rgba(255,255,255,.12); }
+.lps-col-label { font-size: 9.5px; color: #6b6680; margin-top: 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lps-cols.dense .lps-col-val { display: none; }
+.lps-cols.dense .lps-col-label { font-size: 8px; }
+
+/* ── Performance comparison rows ───────────────────────────────────────────
+   The sample size sits next to every bar on purpose: "Text + link averages
+   727 engagements" off two posts is not the same claim as off thirty. */
+.lps-perf { display: flex; flex-direction: column; gap: 9px; }
+.lps-perf-row { display: grid; grid-template-columns: minmax(96px,168px) 1fr 62px 64px 74px; align-items: center; gap: 12px; }
+.lps-perf-label { font-size: 12px; color: #cfc9d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lps-perf-track { height: 9px; border-radius: var(--radius-pill); background: rgba(255,255,255,.06); overflow: hidden; }
+.lps-perf-bar { height: 100%; border-radius: var(--radius-pill); transition: width .7s cubic-bezier(.22,1,.36,1); }
+.lps-perf-val { font-size: 12.5px; font-weight: 800; color: #f1eef2; text-align: right; font-variant-numeric: tabular-nums; }
+.lps-perf-n { font-size: 10.5px; color: #6b6680; text-align: right; white-space: nowrap; }
+.lps-perf-flag { font-size: 9.5px; font-weight: 800; letter-spacing: var(--ls-caps); text-transform: uppercase; text-align: right; }
+.lps-up { color: #6ee7b7; }
+.lps-down { color: #fca5a5; }
+@media (max-width: 700px) {
+  .lps-perf-row { grid-template-columns: 1fr 54px; grid-template-areas: "label val" "track track" "n flag"; }
+  .lps-perf-label { grid-area: label; } .lps-perf-val { grid-area: val; }
+  .lps-perf-track { grid-area: track; } .lps-perf-n { grid-area: n; text-align: left; }
+  .lps-perf-flag { grid-area: flag; }
+}
+
+/* ── Ranked posts ─────────────────────────────────────────────────────────── */
+.lps-ranked { display: flex; flex-direction: column; gap: 10px; }
+.lps-ranked-row { display: flex; gap: 14px; align-items: flex-start; background: rgba(255,255,255,.028); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 14px 16px; }
+.lps-ranked-rank { width: 24px; height: 24px; border-radius: var(--radius-sm); background: rgba(244,114,182,.13); color: #fbb6d9; font-size: 11.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.lps-ranked-main { flex: 1; min-width: 0; }
+.lps-ranked-text { font-size: 12.5px; line-height: 1.55; color: #cfc9d6; }
+.lps-ranked-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 10.5px; color: #6b6680; margin-top: 8px; }
+.lps-ranked-meta a { color: #7dd3fc; text-decoration: none; }
+.lps-ranked-meta a:hover { text-decoration: underline; }
+.lps-ranked-track { height: 4px; border-radius: var(--radius-pill); background: rgba(255,255,255,.06); overflow: hidden; margin-top: 10px; }
+.lps-ranked-bar { height: 100%; border-radius: var(--radius-pill); background: linear-gradient(90deg,#f472b6,#7c83f5); transition: width .7s cubic-bezier(.22,1,.36,1); }
+.lps-ranked-total { font-size: 15px; font-weight: 800; color: #fbb6d9; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lps-tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-xs); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09); color: #a8a2b3; font-size: 9.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+
+/* ── Polls ────────────────────────────────────────────────────────────────── */
+.lps-poll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 14px; }
+.lps-poll-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 16px; }
+.lps-poll-q { font-size: 13px; font-weight: 700; color: #f1eef2; margin-bottom: 12px; line-height: 1.45; }
+.lps-poll-opt { position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); background: rgba(255,255,255,.03); margin-bottom: 6px; }
+.lps-poll-opt-fill { position: absolute; inset: 0 auto 0 0; background: rgba(79,70,229,.22); }
+.lps-poll-opt.win .lps-poll-opt-fill { background: rgba(219,39,119,.28); }
+.lps-poll-opt-txt { position: relative; flex: 1; font-size: 12px; color: #cfc9d6; }
+.lps-poll-opt-pct { position: relative; font-size: 11.5px; font-weight: 800; color: #f1eef2; font-variant-numeric: tabular-nums; }
+.lps-poll-total { font-size: 10.5px; color: #6b6680; margin-top: 10px; }
+
+/* Two charts side by side (voice mix, format mix + signals) */
+.lps-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 26px; }
+.lps-split-col { min-width: 0; }
+
+/* Strengths / risks columns */
+.lps-sr { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 18px; }
+.lps-sr-col { border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,.07); padding: 14px 16px; }
+.lps-sr-col.good { background: rgba(5,150,105,.06); border-color: rgba(52,211,153,.2); }
+.lps-sr-col.bad { background: rgba(239,68,68,.05); border-color: rgba(248,113,113,.2); }
+.lps-sr-head { font-size: 10px; font-weight: 800; letter-spacing: var(--ls-caps); text-transform: uppercase; margin-bottom: 10px; }
+.lps-sr-col.good .lps-sr-head { color: #6ee7b7; }
+.lps-sr-col.bad .lps-sr-head { color: #fca5a5; }
+
+/* Numbered priority list (AI top actions) */
+.lps-num-list { list-style: none; counter-reset: lpsn; display: flex; flex-direction: column; gap: 8px; }
+.lps-num-list li { counter-increment: lpsn; position: relative; padding: 11px 14px 11px 42px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.55; color: #cfc9d6; }
+.lps-num-list li::before { content: counter(lpsn); position: absolute; left: 12px; top: 10px; width: 20px; height: 20px; border-radius: var(--radius-xs); background: linear-gradient(135deg,#f472b6,#7c83f5); color: #fff; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+/* Weakest scorecard metrics -- where the gains are */
+.lps-weak-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; }
+.lps-weak { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-left: 3px solid #ea580c; border-radius: var(--radius-md); padding: 14px 16px; }
+.lps-weak-score { font-size: 24px; font-weight: 800; color: #fdba74; line-height: 1; font-variant-numeric: tabular-nums; }
+.lps-weak-score span { font-size: 12px; font-weight: 700; color: #6b6680; }
+.lps-weak-label { font-size: 11px; color: #a8a2b3; margin-top: 7px; line-height: 1.4; }
+
+/* Posts pane controls */
+.lps-posts-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+.lps-seg { display: inline-flex; padding: 3px; border-radius: var(--radius-sm); background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.08); }
+.lps-seg-btn { padding: 6px 14px; border: none; background: none; border-radius: var(--radius-xs); color: #8b86a0; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+.lps-seg-btn.active { background: rgba(244,114,182,.16); color: #fbb6d9; }
+.lps-posts-count { font-size: 11px; color: #6b6680; }
+.lps-post-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.lps-more-btn { display: block; width: 100%; margin-top: 14px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.02); color: #8b86a0; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+.lps-more-btn:hover { background: rgba(255,255,255,.05); color: #cfc9d6; }
+
+/* ── Print: flatten the report ─────────────────────────────────────────────
+   The on-screen report is a modal with a sidebar and one visible pane; a
+   printed report has to be the whole thing, top to bottom, on white. So the
+   drawer becomes static full-width flow content, every pane is revealed, and
+   all page chrome (topbar, aurora, overlay, nav, buttons) is removed. Panes
+   get their own heading back here, since the sidebar that labelled them is
+   gone, and each starts on a fresh page. */
+@media print {
+  @page { margin: 14mm 12mm; }
+  html, body { background: #fff !important; color: #16121a !important; }
+  .bg-grid, .lps-aurora, .lps-grain, .topbar, .main, .lps-drawer-overlay,
+  .lps-drawer-close, .lps-drw-nav, .lps-rep-actions, .lps-ov-ai-link,
+  .lps-more-btn, .lps-seg, #kpal, #kpal-toast, .ppc-chat-launcher,
+  .lps-ov-more, .lps-posts-bar { display: none !important; }
+  .lps-drawer { position: static !important; transform: none !important; opacity: 1 !important; max-height: none !important; width: 100% !important; border: none !important; box-shadow: none !important; background: #fff !important; overflow: visible !important; pointer-events: auto !important; }
+  .lps-drawer::before { display: none !important; }
+  #drawerBody { overflow: visible !important; display: block !important; }
+  .lps-drw-shell { display: block !important; }
+  .drw-body.lps-drw-body { overflow: visible !important; padding: 0 !important; }
+  .lps-drw-pane { display: block !important; break-inside: auto; }
+  .lps-drw-pane + .lps-drw-pane { break-before: page; padding-top: 6mm; }
+  .lps-pane-title { display: block !important; font-size: 17px; font-weight: 700; color: #16121a !important; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid #db2777; }
+  .lps-rep-head, .lps-rep-band { padding-left: 0 !important; padding-right: 0 !important; }
+  .lps-rep-txt h3 { color: #16121a !important; }
+  .lps-section { break-inside: avoid; }
+  .lps-metric { background: #fff !important; }
+  .lps-metric-val, .lps-metric-label, .lps-section-label, .lps-prose,
+  .lps-ranked-text, .lps-dist-label, .lps-perf-label, .lps-post-text,
+  .lps-str-list li, .lps-num-list li, .lps-def-body, .lps-ov-desc { color: #16121a !important; }
+  .lps-post-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .lps-post-thumb, .lps-post-card img { display: none !important; }
+  a[href]::after { content: ""; }
+}
+/* While the print dialog is open the on-screen copy is irrelevant, but
+   Safari renders the pre-print reflow briefly, so the same flattening is
+   applied via a body class rather than only inside @media print. */
+body.lps-printing .lps-drw-pane { display: block !important; }
+
 /* ── Light theme ─────────────────────────────────────────────────────────── */
 [data-theme="light"] body { background: #f8f2f6 !important; color: #241820 !important; }
 [data-theme="light"] .lps-aurora,[data-theme="light"] .lps-grain,[data-theme="light"] .bg-grid { opacity: .5; }
@@ -614,3 +827,78 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 [data-theme="light"] .lps-post-thumb { background: rgba(36,24,32,.04) !important; }
 [data-theme="light"] .lps-profile-industry { color: #0e7490 !important; background: rgba(8,145,178,.08) !important; border-color: rgba(8,145,178,.24) !important; }
 [data-theme="light"] .lps-profile-tagline { color: #8a7a83 !important; }
+
+/* ── Light theme for the v2 report components ─────────────────────────────── */
+[data-theme="light"] .sc-score .stat-value { color: #b45309 !important; }
+[data-theme="light"] .sc-score .stat-hint { color: #b45309 !important; }
+[data-theme="light"] .lps-score-pill { background: rgba(180,83,9,.1) !important; color: #b45309 !important; }
+[data-theme="light"] .lps-rep-txt h3 { color: #241820 !important; }
+[data-theme="light"] .lps-rep-band { border-bottom-color: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-act { background: #fff !important; border-color: rgba(36,24,32,.12) !important; color: #4a3d44 !important; }
+[data-theme="light"] .lps-act:hover { background: rgba(36,24,32,.04) !important; color: #241820 !important; border-color: rgba(36,24,32,.2) !important; }
+[data-theme="light"] .lps-act.primary { background: rgba(190,24,116,.08) !important; border-color: rgba(190,24,116,.3) !important; color: #be1874 !important; }
+[data-theme="light"] .lps-act.primary:hover { background: rgba(190,24,116,.14) !important; }
+[data-theme="light"] .lps-metrics { background: rgba(36,24,32,.1) !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-metric { background: #fff !important; }
+[data-theme="light"] .lps-metric-val { color: #be1874 !important; }
+[data-theme="light"] .lps-metric-unit { color: #8a7a83 !important; }
+[data-theme="light"] .lps-metric-label { color: #8a7a83 !important; }
+[data-theme="light"] .lps-metric-note { color: #a2949b !important; }
+[data-theme="light"] .lps-section-note { color: #a2949b !important; }
+[data-theme="light"] .lps-derived-badge { background: rgba(67,56,202,.07) !important; border-color: rgba(67,56,202,.22) !important; color: #4338ca !important; }
+[data-theme="light"] .lps-empty-note { color: #a2949b !important; }
+[data-theme="light"] .lps-drw-nav-sep { background: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-stat-tile-desc { color: #8a7a83 !important; }
+[data-theme="light"] .lps-ch-grid { stroke: rgba(36,24,32,.09) !important; }
+[data-theme="light"] .lps-ch-axis { fill: #8a7a83 !important; }
+[data-theme="light"] .lps-ch-line { stroke: #be1874 !important; }
+[data-theme="light"] .lps-ch-dot { fill: #be1874 !important; stroke: #fff !important; }
+[data-theme="light"] .lps-ch-dot.peak { fill: #86155c !important; }
+[data-theme="light"] .lps-ch-peak { fill: #86155c !important; }
+[data-theme="light"] .lps-ch-caption { color: #8a7a83 !important; }
+[data-theme="light"] .lps-col-val { color: #8a7a83 !important; }
+[data-theme="light"] .lps-col.peak .lps-col-val { color: #be1874 !important; }
+[data-theme="light"] .lps-col-bar { background: linear-gradient(180deg, rgba(190,24,116,.75), rgba(67,56,202,.45)) !important; }
+[data-theme="light"] .lps-col.peak .lps-col-bar { background: linear-gradient(180deg,#be1874,#4338ca) !important; box-shadow: none !important; }
+[data-theme="light"] .lps-col.zero .lps-col-bar { background: rgba(36,24,32,.14) !important; }
+[data-theme="light"] .lps-col-label { color: #8a7a83 !important; }
+[data-theme="light"] .lps-perf-label { color: #4a3d44 !important; }
+[data-theme="light"] .lps-perf-track { background: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-perf-val { color: #241820 !important; }
+[data-theme="light"] .lps-perf-n { color: #8a7a83 !important; }
+[data-theme="light"] .lps-up { color: #047857 !important; }
+[data-theme="light"] .lps-down { color: #b91c1c !important; }
+[data-theme="light"] .lps-ranked-row { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-ranked-rank { background: rgba(190,24,116,.1) !important; color: #be1874 !important; }
+[data-theme="light"] .lps-ranked-text { color: #4a3d44 !important; }
+[data-theme="light"] .lps-ranked-meta { color: #8a7a83 !important; }
+[data-theme="light"] .lps-ranked-meta a { color: #0891b2 !important; }
+[data-theme="light"] .lps-ranked-track { background: rgba(36,24,32,.08) !important; }
+[data-theme="light"] .lps-ranked-bar { background: linear-gradient(90deg,#be1874,#4338ca) !important; }
+[data-theme="light"] .lps-ranked-total { color: #be1874 !important; }
+[data-theme="light"] .lps-tag { background: rgba(36,24,32,.05) !important; border-color: rgba(36,24,32,.1) !important; color: #6b5c64 !important; }
+[data-theme="light"] .lps-poll-card { background: #fff !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-poll-q { color: #241820 !important; }
+[data-theme="light"] .lps-poll-opt { background: rgba(36,24,32,.03) !important; }
+[data-theme="light"] .lps-poll-opt-fill { background: rgba(67,56,202,.14) !important; }
+[data-theme="light"] .lps-poll-opt.win .lps-poll-opt-fill { background: rgba(190,24,116,.16) !important; }
+[data-theme="light"] .lps-poll-opt-txt { color: #4a3d44 !important; }
+[data-theme="light"] .lps-poll-opt-pct { color: #241820 !important; }
+[data-theme="light"] .lps-poll-total { color: #8a7a83 !important; }
+[data-theme="light"] .lps-sr-col { border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-sr-col.good { background: rgba(5,150,105,.05) !important; border-color: rgba(5,150,105,.22) !important; }
+[data-theme="light"] .lps-sr-col.bad { background: rgba(185,28,28,.04) !important; border-color: rgba(185,28,28,.2) !important; }
+[data-theme="light"] .lps-sr-col.good .lps-sr-head { color: #047857 !important; }
+[data-theme="light"] .lps-sr-col.bad .lps-sr-head { color: #b91c1c !important; }
+[data-theme="light"] .lps-num-list li { background: #fff !important; border-color: rgba(36,24,32,.1) !important; color: #4a3d44 !important; }
+[data-theme="light"] .lps-num-list li::before { background: linear-gradient(135deg,#be1874,#4338ca) !important; }
+[data-theme="light"] .lps-weak { background: #fff !important; border-color: rgba(36,24,32,.1) !important; border-left-color: #c2410c !important; }
+[data-theme="light"] .lps-weak-score { color: #c2410c !important; }
+[data-theme="light"] .lps-weak-score span { color: #8a7a83 !important; }
+[data-theme="light"] .lps-weak-label { color: #6b5c64 !important; }
+[data-theme="light"] .lps-seg { background: rgba(36,24,32,.04) !important; border-color: rgba(36,24,32,.1) !important; }
+[data-theme="light"] .lps-seg-btn { color: #8a7a83 !important; }
+[data-theme="light"] .lps-seg-btn.active { background: rgba(190,24,116,.1) !important; color: #be1874 !important; }
+[data-theme="light"] .lps-posts-count { color: #8a7a83 !important; }
+[data-theme="light"] .lps-more-btn { background: rgba(36,24,32,.02) !important; border-color: rgba(36,24,32,.16) !important; color: #6b5c64 !important; }
+[data-theme="light"] .lps-more-btn:hover { background: rgba(36,24,32,.05) !important; color: #241820 !important; }

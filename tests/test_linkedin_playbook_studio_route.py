@@ -354,3 +354,135 @@ def test_the_old_slug_redirects_deep_sub_paths_too(monkeypatch):
     assert resp.status_code == 308
     assert resp.headers["Location"].endswith(
         "/p2/b2b-agents/linkedin-strategy-researcher/runs/1/playbook")
+
+
+# ── Read-time augmentation: derived analytics + text repair ────────────────
+# tracker/lps_analytics.py is applied when a run is READ, not frozen into the
+# stored blob at analysis time, so every run already in the database gains the
+# computed sections without re-running a multi-minute vendor workflow. These
+# tests pin that placement: the route's response must carry derived.* keys and
+# repaired text even though the stored output has neither.
+
+_MOJI_QUOTE = "’".encode("utf-8").decode("latin-1")
+
+
+def _run_with_posts(run_id=1, email=_OWNER):
+    run = _run(run_id=run_id, email=email)
+    run["output"] = {
+        "getcompanyprofile.followers_count": 1000,
+        "getcompanyprofile.employee_count": 100,
+        "getcompanypost.items": [
+            {"parsed_datetime": "2026-08-10T09:00:00.000Z",
+             "text": "we" + _MOJI_QUOTE + "re shipping",
+             "reaction_counter": 40, "comment_counter": 8, "repost_counter": 2,
+             "attachments": [{"type": "video", "url": "https://x/v"}],
+             "author": {"name": "Acme", "is_company": True}},
+            {"parsed_datetime": "2026-08-17T09:00:00.000Z", "text": "second post",
+             "reaction_counter": 10, "comment_counter": 0, "repost_counter": 0,
+             "attachments": [], "author": {"name": "Acme", "is_company": True}},
+        ],
+    }
+    return run
+
+
+def test_run_detail_adds_computed_analytics_that_the_stored_output_lacks(monkeypatch):
+    run = _run_with_posts()
+    stored_keys = sorted(run["output"])
+    _owner_scoped_get_run(monkeypatch, run)
+    monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
+    # Nothing is written back: the computed view is per-request, so an
+    # improvement to lps_analytics applies to the whole history on next read.
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda *a, **k: pytest.fail("read path must not persist"))
+
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+
+    assert not [k for k in stored_keys if k.startswith("derived.")], \
+        "the stored blob is vendor-only before the request"
+    assert body["output"]["derived.activity"]["postsAnalyzed"] == 2
+    assert body["output"]["derived.engagement"]["avgTotal"] == 30
+    assert body["output"]["derived.insights"]
+
+
+def test_run_detail_repairs_mojibake_in_post_text(monkeypatch):
+    """The vendor double-decodes text before sending it, so post bodies arrive
+    as "we<a-hat-euro-TM>re". The report was rendering that verbatim."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+    monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
+
+    body = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+    assert body["output"]["getcompanypost.items"][0]["text"] == "we’re shipping"
+
+
+def test_run_detail_survives_an_output_that_is_not_a_dict(monkeypatch):
+    run = _run()
+    run["output"] = None
+    _owner_scoped_get_run(monkeypatch, run)
+    monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
+
+    resp = _client().get("/p2/b2b-agents/linkedin-strategy-researcher/runs/1")
+    assert resp.status_code == 200
+    assert resp.get_json()["output"] is None
+
+
+def test_run_detail_still_scopes_by_owner_after_augmentation(monkeypatch):
+    """Augmentation runs after the ownership-scoped lookup, so it must not
+    become a way to read someone else's run."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts(email=_OTHER))
+    monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
+
+    assert _client().get(
+        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").status_code == 404
+
+
+# ── The analysis job's own two contracts ───────────────────────────────────
+
+def test_analysis_job_derives_the_summary_column_from_the_summary_object(monkeypatch):
+    """Every real run returns messagingagent.summary as an OBJECT, never a
+    bare string, so an isinstance(str) check discarded it every time and the
+    history table's Summary column showed a dash for every row."""
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: {
+        "messagingagent.summary": {"text": "The real summary.", "moves": ["m"]},
+    })
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert saved["summary"] == "The real summary."
+
+
+def test_analysis_job_hands_enrichment_the_computed_metrics(monkeypatch):
+    """Claude is given the augmented view so cadence and format performance
+    arrive as finished numbers rather than 100 raw posts to do arithmetic on."""
+    monkeypatch.setattr(arena_client, "run_analysis",
+                        lambda *a, **k: _run_with_posts()["output"])
+    seen = {}
+
+    def _capture(output, name, run_type):
+        seen["keys"] = [k for k in output if k.startswith("derived.")]
+        return None
+
+    monkeypatch.setattr(lps_enrichment, "enrich_run", _capture)
+    monkeypatch.setattr(lps_store, "update_run_status", lambda *a, **k: None)
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert "derived.engagement" in seen["keys"]
+
+
+def test_analysis_job_merges_the_newer_enrichment_list_fields(monkeypatch):
+    monkeypatch.setattr(arena_client, "run_analysis", lambda *a, **k: _fake_vendor_output())
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: {
+        "headline": "H", "synthesis": "S", "topActions": ["a"],
+        "strengths": ["s"], "risks": ["r"], "contentAngles": ["c"],
+    })
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_analysis_job(1, "Acme", "c1", _OWNER, "OWN", "")
+
+    assert saved["output"]["aienrichment.strengths"] == ["s"]
+    assert saved["output"]["aienrichment.risks"] == ["r"]
+    assert saved["output"]["aienrichment.contentAngles"] == ["c"]
+    assert "aienrichment.coverage" not in saved["output"]
