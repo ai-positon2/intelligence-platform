@@ -182,3 +182,52 @@ def enrich_run(output: dict, company_name: str, run_type: str) -> dict | None:
     if coverage:
         result["coverage"] = coverage
     return result
+
+
+_SAMPLE_SOURCE = {
+    "strategyagent.summary": "Acme posts about product launches and hiring.",
+    "derived.postingCadence": {"postsPerWeek": 3.0, "longestGapDays": 6},
+    "derived.engagement": {"average": 40, "rate": 0.4},
+}
+
+
+def probe(company_name: str = "Acme Corp") -> dict:
+    """Admin self-test: makes the exact call enrich_run makes, against a tiny
+    synthetic payload, and reports what actually happened instead of
+    collapsing every outcome to None. Mirrors arena_client.probe() and
+    app.py's _apollo_selftest -- this exists because enrich_run's own
+    broad-except is correct for its caller (a completed run must never fail
+    just because the synthesis pass did), but that same broad-except leaves
+    NOTHING for a human to look at when insights stop generating. Never
+    raises, so it is safe to expose on an admin-only route."""
+    import time
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+    result: dict[str, Any] = {"configured": bool(key), "key_len": len(key), "model": model}
+    if not key:
+        result["error"] = "ANTHROPIC_API_KEY is not set on this deployment."
+        return result
+    payload = {"company_name": company_name, "run_type": "OWN", "agent_output": _SAMPLE_SOURCE}
+    t0 = time.time()
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=key, timeout=60.0, max_retries=1)
+        resp = client.messages.create(
+            model=model, max_tokens=2000, system=_SYSTEM,
+            messages=[{"role": "user", "content": json.dumps(payload, default=str)}])
+        result["elapsed_ms"] = int((time.time() - t0) * 1000)
+        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        result["raw_len"] = len(raw)
+        result["raw_sample"] = raw[:400]
+        try:
+            parsed = json.loads(raw)
+            result["parsed_ok"] = _is_dict(parsed)
+            result["has_headline"] = _is_dict(parsed) and isinstance(parsed.get("headline"), str) \
+                and bool(parsed.get("headline", "").strip())
+        except Exception as e:
+            result["parsed_ok"] = False
+            result["parse_error"] = "%s: %s" % (type(e).__name__, e)
+    except Exception as e:
+        result["elapsed_ms"] = int((time.time() - t0) * 1000)
+        result["error"] = "%s: %s" % (type(e).__name__, e)
+    return result

@@ -7876,6 +7876,25 @@ def admin_external_usage_arena_check():
     return jsonify(_arena_selftest())
 
 
+def _lps_insights_selftest() -> dict:
+    """Prove the AI Insights synthesis call end to end (see
+    lps_enrichment.probe). Costs one small Claude call against a synthetic
+    payload -- never a real run's data."""
+    from tracker import lps_enrichment
+    try:
+        return lps_enrichment.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/lps-insights-check", methods=["POST"])
+@admin_required
+def admin_external_usage_lps_insights_check():
+    """Run the AI Insights self-test. POST so no crawler or prefetch can
+    trigger it, matching the Arena/Apollo checks next to it."""
+    return jsonify(_lps_insights_selftest())
+
+
 @app.route("/p2/b2b-agents/linkedin-strategy-researcher/analyze", methods=["POST"])
 @position2_required
 def linkedin_playbook_studio_analyze():
