@@ -305,3 +305,234 @@ def test_execute_never_raises_on_a_network_failure(monkeypatch):
 
     monkeypatch.setattr(ac.requests, "post", _boom)
     assert ac.search_companies("Acme") == []
+
+
+# ── Failure kinds: every one of these used to look like "no results" ──────
+
+class _FakeResp:
+    def __init__(self, status=200, text="{}"):
+        self.status_code = status
+        self.text = text
+
+
+def _post_returning(*responses):
+    """A requests.post stand-in that yields the given responses/exceptions in
+    order, so retry behavior is observable."""
+    calls = []
+
+    def _post(*a, **kw):
+        calls.append(kw.get("json"))
+        item = responses[min(len(calls) - 1, len(responses) - 1)]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    _post.calls = calls
+    return _post
+
+
+def test_a_missing_key_is_reported_as_not_configured(monkeypatch):
+    monkeypatch.delenv("ARENA_API_KEY", raising=False)
+    result = ac.search_companies_result("Acme")
+    assert result["companies"] == []
+    assert result["error"]["kind"] == ac.ERR_NOT_CONFIGURED
+    assert "ARENA_API_KEY" in ac.describe_error(result["error"])
+
+
+def test_a_rejected_key_is_reported_as_an_http_error_with_its_status(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(401, '{"message":"invalid api key"}')))
+    result = ac.search_companies_result("Acme")
+    assert result["error"]["kind"] == ac.ERR_HTTP
+    assert result["error"]["status"] == 401
+    # The vendor's own words survive into the operator-facing detail.
+    assert "invalid api key" in result["error"]["detail"]
+    assert "rejected our API key" in ac.describe_error(result["error"])
+
+
+def test_a_rejected_key_is_not_retried(monkeypatch):
+    """Retrying a 401 only delays telling the operator the key is dead."""
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    post = _post_returning(_FakeResp(401, "nope"))
+    monkeypatch.setattr(ac.requests, "post", post)
+    ac.search_companies_result("Acme")
+    assert len(post.calls) == 1
+
+
+def test_a_deleted_workflow_reports_the_id_changed(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post", _post_returning(_FakeResp(404, "not found")))
+    result = ac.search_companies_result("Acme")
+    assert result["error"]["status"] == 404
+    assert "no longer recognises this workflow" in ac.describe_error(result["error"])
+
+
+def test_a_transient_server_error_is_retried_and_can_then_succeed(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    post = _post_returning(
+        _FakeResp(503, "unavailable"),
+        _FakeResp(200, '{"output":{"companies":[{"id":"1","name":"Acme"}]}}'),
+    )
+    monkeypatch.setattr(ac.requests, "post", post)
+    result = ac.search_companies_result("Acme")
+    assert len(post.calls) == 2
+    assert result["error"] is None
+    assert [c["name"] for c in result["companies"]] == ["Acme"]
+
+
+def test_a_rate_limit_is_retried_up_to_the_attempt_cap(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    post = _post_returning(_FakeResp(429, "slow down"))
+    monkeypatch.setattr(ac.requests, "post", post)
+    result = ac.search_companies_result("Acme")
+    assert len(post.calls) == ac._SEARCH_ATTEMPTS
+    assert result["error"]["attempts"] == ac._SEARCH_ATTEMPTS
+    assert "rate-limiting" in ac.describe_error(result["error"])
+
+
+def test_a_timeout_is_reported_as_a_timeout_not_as_zero_results(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(ac.requests.Timeout("too slow")))
+    result = ac.search_companies_result("Acme")
+    assert result["error"]["kind"] == ac.ERR_TIMEOUT
+    assert ac.is_retryable(result["error"])
+
+
+def test_the_retry_budget_stops_attempts_that_cannot_finish(monkeypatch):
+    """A retry that would run past the budget (and so past gunicorn's worker
+    timeout) is skipped rather than started."""
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.time, "sleep", lambda s: None)
+    post = _post_returning(ac.requests.Timeout("too slow"))
+    monkeypatch.setattr(ac.requests, "post", post)
+    parsed, err = ac._execute("wf", {}, timeout=100, attempts=3, budget=60.0)
+    assert parsed is None
+    assert len(post.calls) == 1
+    assert err["kind"] == ac.ERR_TIMEOUT
+
+
+def test_a_200_with_no_company_list_is_a_shape_error_not_an_empty_search(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(200, '{"output":{"somethingElse":42}}')))
+    result = ac.search_companies_result("Acme")
+    assert result["companies"] == []
+    assert result["error"]["kind"] == ac.ERR_SHAPE
+    assert "somethingElse" in result["error"]["detail"]
+
+
+def test_a_200_with_an_empty_company_list_is_a_genuine_zero_result(monkeypatch):
+    """The one case where the page may say "nothing matched": the vendor
+    itself looked and returned an empty list."""
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(200, '{"output":{"companies":[]}}')))
+    result = ac.search_companies_result("Nonexistent Ltd")
+    assert result["companies"] == []
+    assert result["error"] is None
+
+
+def test_find_company_rows_separates_missing_from_empty():
+    assert ac.find_company_rows({"companies": []}) == ([], "companies")
+    assert ac.find_company_rows({"nothing": 1}) == (None, "")
+
+
+def test_an_unreadable_body_never_escapes_as_an_exception(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+
+    class _Exploding:
+        status_code = 200
+
+        @property
+        def text(self):
+            raise ValueError("stream closed")
+
+    monkeypatch.setattr(ac.requests, "post", _post_returning(_Exploding()))
+    result = ac.search_companies_result("Acme")
+    assert result["error"]["kind"] == ac.ERR_UNPARSABLE
+
+
+def test_is_retryable_says_no_to_a_dead_key_and_yes_to_a_blip():
+    assert not ac.is_retryable({"kind": ac.ERR_HTTP, "status": 401})
+    assert not ac.is_retryable({"kind": ac.ERR_NOT_CONFIGURED})
+    assert not ac.is_retryable(None)
+    assert ac.is_retryable({"kind": ac.ERR_HTTP, "status": 502})
+    assert ac.is_retryable({"kind": ac.ERR_NETWORK})
+
+
+def test_search_companies_still_returns_a_bare_list(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(200, '{"output":{"companies":[{"id":"1","name":"Acme"}]}}')))
+    assert [c["name"] for c in ac.search_companies("Acme")] == ["Acme"]
+
+
+def test_run_analysis_result_carries_the_failure_reason(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post", _post_returning(_FakeResp(402, "no credit")))
+    attempt = ac.run_analysis_result("Acme", "1", "a@position2.com", "OWN")
+    assert attempt["output"] is None
+    assert attempt["error"]["status"] == 402
+    assert "out of credit" in ac.describe_error(attempt["error"])
+
+
+def test_a_billed_analysis_run_is_never_retried(monkeypatch):
+    """A multi-minute billed run gets one attempt: a retry would double the
+    vendor spend on a failure a second attempt does not fix."""
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    post = _post_returning(_FakeResp(503, "unavailable"))
+    monkeypatch.setattr(ac.requests, "post", post)
+    ac.run_analysis_result("Acme", "1", "a@position2.com", "OWN")
+    assert len(post.calls) == 1
+
+
+# ── probe (the admin self-test) ───────────────────────────────────────────
+
+def test_probe_reports_a_working_integration(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(200, '{"output":{"companies":[{"id":"1","name":"Microsoft"}]}}')))
+    out = ac.probe()
+    assert out["configured"] and out["companies"] == 1
+    assert out["sample"] == ["Microsoft"]
+    assert out["error"] == ""
+
+
+def test_probe_names_the_http_status_when_the_key_is_rejected(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post", _post_returning(_FakeResp(403, "forbidden")))
+    out = ac.probe()
+    assert out["http_status"] == 403
+    assert out["error_kind"] == ac.ERR_HTTP
+    assert "forbidden" in out["detail"]
+
+
+def test_probe_without_a_key_says_so_without_calling_out(monkeypatch):
+    monkeypatch.delenv("ARENA_API_KEY", raising=False)
+    called = []
+    monkeypatch.setattr(ac.requests, "post", lambda *a, **k: called.append(1))
+    out = ac.probe()
+    assert out["configured"] is False and not called
+
+
+def test_probe_flags_a_successful_call_that_found_nothing(monkeypatch):
+    """If even the probe company comes back empty, the provider's data or plan
+    is the suspect, not this platform."""
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac.requests, "post",
+                        _post_returning(_FakeResp(200, '{"output":{"companies":[]}}')))
+    out = ac.probe()
+    assert out["companies"] == 0
+    assert "no companies" in out["error"]
+
+
+def test_probe_never_raises(monkeypatch):
+    monkeypatch.setenv("ARENA_API_KEY", "test-key")
+    monkeypatch.setattr(ac, "search_companies_result", lambda q: (_ for _ in ()).throw(RuntimeError("boom")))
+    out = ac.probe()
+    assert out["error_kind"] == "exception" and "boom" in out["error"]

@@ -234,6 +234,53 @@ def get_run(run_id: int, email: str) -> dict | None:
             pass
 
 
+def search_known_companies(email: str, query: str, limit: int = 8) -> list[dict]:
+    """Companies this user has already analyzed, matching `query` by name.
+
+    The fallback for when the vendor's own company search is unavailable: the
+    company identity needed to start a run (LinkedIn numeric id, name, logo) is
+    already sitting in this user's run history, so a name match there keeps the
+    page usable instead of dead. Ownership-scoped in the query itself, like
+    every other single-row read here -- one user's history never surfaces in
+    another's search. [] on any failure."""
+    conn = _pg_conn()
+    q = (query or "").strip()
+    if not conn or not email or not q:
+        return []
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            # DISTINCT ON collapses repeat analyses of the same company to its
+            # most recent row, so re-analyzing Google five times still offers
+            # one Google card.
+            cur.execute(
+                "SELECT DISTINCT ON (company_id) company_id, company_name, company_logo "
+                "FROM lps_runs WHERE email = %s AND company_name ILIKE %s "
+                "ORDER BY company_id, created_at DESC LIMIT %s",
+                (email.lower(), "%" + q + "%", limit),
+            )
+            rows = cur.fetchall()
+        out = []
+        for row in rows:
+            company_id, name, logo = row[0], row[1], row[2]
+            if not name:
+                continue
+            out.append({"id": company_id or "", "name": name, "logo": logo,
+                        "industry": None, "location": None, "description": None,
+                        "summary": None, "followers_count": None,
+                        "profile_url": None, "website": None,
+                        "from_history": True})
+        return out
+    except Exception as e:
+        logger.warning("linkedin_playbook_store: search_known_companies failed: %s", e)
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_children(parent_run_id: int, email: str) -> list[dict]:
     """Competitor runs linked to one own-brand run, ownership-scoped the same
     way as get_run. [] on any failure."""
