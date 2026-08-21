@@ -7712,6 +7712,13 @@ def _lps_run_insights_job(run_id: int, email: str) -> None:
     Only the vendor output plus `aienrichment.*` is persisted: the augmented
     view handed to Claude carries derived.* too, but those stay recomputed on
     read so improvements to them keep applying retroactively.
+
+    Unlike the analysis-time enrichment pass (best-effort, silent -- a run
+    still completes and saves without it), this one was explicitly requested
+    by someone watching a spinner, so a failure here is recorded onto
+    `aienrichment.error` rather than swallowed: the report drawer reads that
+    key to show why, instead of polling to a generic timeout that looks
+    identical whether the call failed in two seconds or is genuinely slow.
     """
     from tracker import lps_analytics
     from tracker import lps_enrichment
@@ -7721,17 +7728,28 @@ def _lps_run_insights_job(run_id: int, email: str) -> None:
         if not run or run.get("status") != "complete" or not isinstance(run.get("output"), dict):
             return
         stored = run["output"]
-        enrichment = lps_enrichment.enrich_run(
+        enrichment, err = lps_enrichment.enrich_run_result(
             lps_analytics.augment(stored),
             run.get("company_name") or "",
             run.get("run_type") or "OWN",
         )
-        if not enrichment:
-            log.info("LinkedIn Strategy Researcher: no insights produced for run %s", run_id)
-            return
         merged = dict(stored)
-        _lps_merge_enrichment(merged, enrichment)
-        lps_store.update_run_status(run_id, "complete", output=merged)
+        merged.pop("aienrichment.error", None)
+        if enrichment:
+            _lps_merge_enrichment(merged, enrichment)
+            lps_store.update_run_status(run_id, "complete", output=merged)
+        elif err:
+            merged["aienrichment.error"] = {
+                "message": lps_enrichment.describe_error(err),
+                "detail": err.get("detail", ""),
+                "retryable": lps_enrichment.is_retryable(err),
+            }
+            lps_store.update_run_status(run_id, "complete", output=merged)
+            log.warning("LinkedIn Strategy Researcher: insights failed for run %s: %s (%s)",
+                        run_id, err.get("kind"), err.get("detail"))
+        else:
+            log.info("LinkedIn Strategy Researcher: no insights produced for run %s "
+                      "(ANTHROPIC_API_KEY not configured)", run_id)
     except Exception as e:
         log.warning("LinkedIn Strategy Researcher: insights job failed for run %s: %s", run_id, e)
 
@@ -7971,6 +7989,14 @@ def linkedin_playbook_studio_run(run_id):
     # cost is a few milliseconds of pure arithmetic over at most 100 posts.
     if isinstance(run.get("output"), dict):
         run["output"] = lps_analytics.augment(run["output"])
+        # The AI Insights error carries the raw exception text for admins to
+        # act on (same boundary as the search route's vendor-body gating) --
+        # strip it for everyone else rather than relying on the client to
+        # not render a field it was handed.
+        ai_error = run["output"].get("aienrichment.error")
+        if isinstance(ai_error, dict) and email not in ADMIN_EMAILS:
+            run["output"] = dict(run["output"])
+            run["output"]["aienrichment.error"] = {k: v for k, v in ai_error.items() if k != "detail"}
     run["children"] = lps_store.get_children(run_id, email)
     return jsonify(run)
 

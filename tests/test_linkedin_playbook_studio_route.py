@@ -426,6 +426,44 @@ def test_run_detail_repairs_mojibake_in_post_text(monkeypatch):
     assert body["output"]["getcompanypost.items"][0]["text"] == "we’re shipping"
 
 
+def _insights_error():
+    # A fresh dict per call: the fake get_run() below hands back the very
+    # object the route operates on (unlike the real Postgres-backed store,
+    # which reconstructs a dict per call), so the route's own
+    # `run["output"] = dict(run["output"])` copy-on-strip would otherwise
+    # leak a mutation from the first request into the second here.
+    return {
+        "message": "The AI's reply couldn't be understood. Try again.",
+        "detail": "JSONDecodeError: Unterminated string at line 28",
+        "retryable": True,
+    }
+
+
+def test_run_detail_hides_the_insights_error_detail_from_non_admins(monkeypatch):
+    """Same boundary as the search route's vendor-body gating: the raw
+    exception text can name internals, so only an admin gets it."""
+    run = _run_with_posts()
+    run["output"]["aienrichment.error"] = _insights_error()
+    _owner_scoped_get_run(monkeypatch, run)
+    monkeypatch.setattr(lps_store, "get_children", lambda *a, **k: [])
+
+    plain_body = _client(_OWNER).get(
+        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+    assert "detail" not in plain_body["output"]["aienrichment.error"]
+    assert plain_body["output"]["aienrichment.error"]["message"] == \
+        "The AI's reply couldn't be understood. Try again."
+    assert plain_body["output"]["aienrichment.error"]["retryable"] is True
+
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    admin_run = _run_with_posts(email=admin)
+    admin_run["output"]["aienrichment.error"] = _insights_error()
+    _owner_scoped_get_run(monkeypatch, admin_run)
+    admin_body = _client(admin).get(
+        "/p2/b2b-agents/linkedin-strategy-researcher/runs/1").get_json()
+    assert admin_body["output"]["aienrichment.error"]["detail"] == \
+        "JSONDecodeError: Unterminated string at line 28"
+
+
 def test_run_detail_survives_an_output_that_is_not_a_dict(monkeypatch):
     run = _run()
     run["output"] = None
@@ -562,7 +600,7 @@ def test_insights_job_merges_the_synthesis_into_the_stored_output(monkeypatch):
     run = _run_with_posts()
     run["output"]["strategyagent.strategy"] = "vendor text"
     _owner_scoped_get_run(monkeypatch, run)
-    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: _enrichment())
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", lambda *a, **k: (_enrichment(), None))
     saved = {}
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
@@ -579,7 +617,7 @@ def test_insights_job_does_not_persist_the_recomputed_metrics(monkeypatch):
     later improvements to lps_analytics keep applying retroactively instead of
     being frozen into whichever runs happened to be enriched."""
     _owner_scoped_get_run(monkeypatch, _run_with_posts())
-    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: _enrichment())
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", lambda *a, **k: (_enrichment(), None))
     saved = {}
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
@@ -595,9 +633,9 @@ def test_insights_job_hands_claude_the_computed_metrics(monkeypatch):
     def _capture(output, name, run_type):
         seen["derived"] = [k for k in output if k.startswith("derived.")]
         seen["name"] = name
-        return None
+        return None, None
 
-    monkeypatch.setattr(lps_enrichment, "enrich_run", _capture)
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", _capture)
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda *a, **k: pytest.fail("nothing to save"))
     appmod._lps_run_insights_job(1, _OWNER)
@@ -606,12 +644,52 @@ def test_insights_job_hands_claude_the_computed_metrics(monkeypatch):
     assert seen["name"] == "Acme"
 
 
-def test_insights_job_saves_nothing_when_the_synthesis_comes_back_empty(monkeypatch):
+def test_insights_job_saves_nothing_when_the_key_is_not_configured(monkeypatch):
+    """enrich_run_result returns (None, None) specifically when there is no
+    ANTHROPIC_API_KEY -- nothing was attempted, so nothing is recorded (the
+    route itself already 503s before ever starting the job in that case)."""
     _owner_scoped_get_run(monkeypatch, _run_with_posts())
-    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", lambda *a, **k: (None, None))
     monkeypatch.setattr(lps_store, "update_run_status",
-                        lambda *a, **k: pytest.fail("must not write an empty synthesis"))
+                        lambda *a, **k: pytest.fail("nothing to write when not configured"))
     appmod._lps_run_insights_job(1, _OWNER)
+
+
+def test_insights_job_records_a_real_failure_instead_of_staying_silent(monkeypatch):
+    """This is the bug this rewrite exists to fix: a truncated/unparsable/
+    rejected-key failure used to collapse to nothing being written at all,
+    leaving the UI to poll to a generic timeout indistinguishable from the
+    call just being slow. Now the reason is recorded on the run."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+    err = {"kind": lps_enrichment.ERR_TRUNCATED, "detail": "raw exception text", "status": None}
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", lambda *a, **k: (None, err))
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+    assert saved["status"] == "complete"
+    ai_error = saved["output"]["aienrichment.error"]
+    assert "try again" in ai_error["message"].lower() or "cut off" in ai_error["message"].lower()
+    assert ai_error["detail"] == "raw exception text"
+    assert ai_error["retryable"] is True
+    assert "aienrichment.headline" not in saved["output"]
+
+
+def test_insights_job_clears_a_prior_error_on_a_successful_retry(monkeypatch):
+    """A run that failed once and is retried through the same button must not
+    keep showing the old error once the retry actually succeeds."""
+    run = _run_with_posts()
+    run["output"]["aienrichment.error"] = {"message": "old failure", "detail": "d", "retryable": True}
+    _owner_scoped_get_run(monkeypatch, run)
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", lambda *a, **k: (_enrichment(), None))
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+    assert "aienrichment.error" not in saved["output"]
+    assert saved["output"]["aienrichment.headline"] == "H"
 
 
 def test_insights_job_never_raises_when_the_claude_call_blows_up(monkeypatch):
@@ -622,7 +700,7 @@ def test_insights_job_never_raises_when_the_claude_call_blows_up(monkeypatch):
     def _boom(*a, **k):
         raise RuntimeError("nope")
 
-    monkeypatch.setattr(lps_enrichment, "enrich_run", _boom)
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result", _boom)
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda *a, **k: pytest.fail("nothing should be written"))
     appmod._lps_run_insights_job(1, _OWNER)
@@ -632,7 +710,7 @@ def test_insights_job_refuses_a_run_that_is_not_the_callers(monkeypatch):
     """The job re-reads through the ownership-scoped get_run rather than
     trusting the run_id it was handed."""
     _owner_scoped_get_run(monkeypatch, _run_with_posts(email=_OTHER))
-    monkeypatch.setattr(lps_enrichment, "enrich_run",
+    monkeypatch.setattr(lps_enrichment, "enrich_run_result",
                         lambda *a, **k: pytest.fail("must not enrich another user's run"))
     monkeypatch.setattr(lps_store, "update_run_status",
                         lambda *a, **k: pytest.fail("must not write"))
@@ -759,6 +837,30 @@ def test_arena_check_never_500s_when_the_probe_explodes(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
     admin = sorted(appmod.ADMIN_EMAILS)[0]
     resp = _client(admin).post("/p2/admin/external-usage/arena-check")
+    assert resp.status_code == 200
+    assert "boom" in resp.get_json()["error"]
+
+
+# ── The AI Insights self-test route ──────────────────────────────────────
+
+def test_lps_insights_check_requires_an_admin():
+    resp = _client("nobody@position2.com").post("/p2/admin/external-usage/lps-insights-check")
+    assert resp.status_code in (302, 401, 403, 404)
+
+
+def test_lps_insights_check_returns_the_probe_for_an_admin(monkeypatch):
+    monkeypatch.setattr(lps_enrichment, "probe", lambda *a, **k: {"configured": True, "ok": True})
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    resp = _client(admin).post("/p2/admin/external-usage/lps-insights-check")
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+
+
+def test_lps_insights_check_never_500s_when_the_probe_explodes(monkeypatch):
+    monkeypatch.setattr(lps_enrichment, "probe",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    resp = _client(admin).post("/p2/admin/external-usage/lps-insights-check")
     assert resp.status_code == 200
     assert "boom" in resp.get_json()["error"]
 
