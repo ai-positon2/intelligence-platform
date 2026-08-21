@@ -1722,7 +1722,13 @@
         {label:'Engagement rate', value:isEmptyValue(eng.engagementRatePct)?null:eng.engagementRatePct, unit:'%'},
         {label:'Posts analyzed', value:isEmptyValue(act.postsAnalyzed)?null:act.postsAnalyzed}
       ]);
-      return html+(band?'<div class="lps-rep-band">'+band+'</div>':'');
+      /* Only ever shown by @media print (see lps-print-foot in the CSS) --
+         a repeating per-page footer so a printed report still identifies
+         itself on page 4 without the on-screen chrome around it. Filled in
+         by printReport() right before printing so the date is always the
+         day it was actually printed, not the day the drawer was opened. */
+      return html+(band?'<div class="lps-rep-band">'+band+'</div>':'')
+        +'<div class="lps-print-foot" id="lpsPrintFoot"></div>';
     }
 
     /* Plain-text findings for pasting into Slack or an email. Built from the
@@ -1778,18 +1784,53 @@
     /* Printing flattens the report: the print stylesheet reveals every pane
        at once and drops the nav, overlay and page chrome, so the browser's
        own "Save as PDF" produces the whole report rather than one tab of it.
-       The body class is what the stylesheet keys off, and is removed again
-       after the dialog closes so the on-screen layout is untouched. */
+       Two things happen only here, not on screen:
+       - The page is forced into the light theme regardless of what the
+         reader has selected. Every chart/badge color in this report already
+         has a light-theme value designed to sit on white; the dark-theme
+         values (pale text meant for a near-black background) are what a
+         printed page would otherwise inherit, which is unreadable on paper.
+       - The Playbook pane is lazy-loaded on tab click, so a reader who never
+         opened that tab would otherwise print a blank "Playbook" page; this
+         loads it first (or marks it empty, which @media print hides) so
+         Save as PDF never ships a page with nothing on it.
+       Both are undone after the dialog closes so the on-screen view the
+       reader was looking at is untouched. */
     function printReport(){
-      document.body.classList.add('lps-printing');
-      var cleanup=function(){ document.body.classList.remove('lps-printing'); };
-      if(window.matchMedia){
-        var mq=window.matchMedia('print');
-        var onChange=function(e){ if(!e.matches){cleanup(); if(mq.removeEventListener)mq.removeEventListener('change',onChange);} };
-        if(mq.addEventListener)mq.addEventListener('change',onChange);
+      var prevTheme=document.documentElement.getAttribute('data-theme');
+      var restoreTheme=function(){
+        if(prevTheme===null)document.documentElement.removeAttribute('data-theme');
+        else document.documentElement.setAttribute('data-theme',prevTheme);
+      };
+      var cleanup=function(){ document.body.classList.remove('lps-printing'); restoreTheme(); };
+      var doPrint=function(){
+        document.documentElement.setAttribute('data-theme','light');
+        document.body.classList.add('lps-printing');
+        var foot=document.getElementById('lpsPrintFoot');
+        if(foot&&DRAWER_RUN){
+          var kind=DRAWER_RUN.run_type==='COMPETITOR'?'Competitor analysis':'Own-brand analysis';
+          foot.textContent=(DRAWER_RUN.company_name||'Report')+' — '+kind+' — Prepared via the Intelligence Platform — Printed '
+            +new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+        }
+        if(window.matchMedia){
+          var mq=window.matchMedia('print');
+          var onChange=function(e){ if(!e.matches){cleanup(); if(mq.removeEventListener)mq.removeEventListener('change',onChange);} };
+          if(mq.addEventListener)mq.addEventListener('change',onChange);
+        }
+        window.addEventListener('afterprint',cleanup,{once:true});
+        setTimeout(function(){ window.print(); setTimeout(cleanup,1200); },60);
+      };
+      /* An empty #lpsPlaybookBody means loadPlaybook() has never run for this
+         drawer session (it starts empty and is only ever filled in, never
+         cleared back out) -- that, not the pane's data-empty flag, is the
+         signal for "never attempted" vs. "attempted and confirmed empty". */
+      var playbookBody=document.getElementById('lpsPlaybookBody');
+      var needsPlaybook=playbookBody&&!playbookBody.innerHTML.trim();
+      if(needsPlaybook){
+        loadPlaybook().then(doPrint).catch(doPrint);
+      } else {
+        doPrint();
       }
-      window.addEventListener('afterprint',cleanup,{once:true});
-      setTimeout(function(){ window.print(); setTimeout(cleanup,1200); },60);
     }
 
     function switchDrawerTab(ns){
@@ -1832,23 +1873,30 @@
       return renderSmart(content)||'<div class="lps-empty">The playbook came back empty.</div>';
     }
 
+    /* Returns a promise so a caller that needs the outcome (printReport,
+       ensuring the section isn't blank) can wait on it -- ordinary callers
+       (switchDrawerTab, openRunDrawer) just fire it and ignore the return. */
     function loadPlaybook(){
       var wrap=document.getElementById('lpsPlaybookBody');
-      if(!DRAWER_RUN||!wrap)return;
+      var pane=document.querySelector('.lps-drw-pane[data-ns="playbook"]');
+      if(!DRAWER_RUN||!wrap)return Promise.resolve();
       var mode=DRAWER_RUN.run_type==='COMPETITOR'?'COMPETITOR':'OWN';
       wrap.innerHTML='<div class="lps-loading">Loading…</div>';
-      fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+DRAWER_RUN.id+'/playbook?mode='+mode)
+      return fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+DRAWER_RUN.id+'/playbook?mode='+mode)
         .then(function(r){return r.json();}).then(function(data){
           if(data.playbook&&data.playbook.content){
             wrap.innerHTML='<button class="lps-act" style="margin-bottom:16px" onclick="generatePlaybook()">↻ Regenerate playbook</button>'
               +renderPlaybookContent(data.playbook.content);
+            if(pane)pane.setAttribute('data-empty','0');
           } else {
             wrap.innerHTML='<div class="lps-empty">No playbook generated yet.'
               +'<div class="lps-empty-note">A playbook turns this analysis into a sequenced plan of what to publish next.</div></div>'
               +'<div style="text-align:center"><button class="lps-mode-btn own" style="margin-top:16px;max-width:280px" onclick="generatePlaybook()">Generate playbook</button></div>';
+            if(pane)pane.setAttribute('data-empty','1');
           }
         }).catch(function(){
           wrap.innerHTML='<div class="lps-empty">Couldn\'t load the playbook — try again.</div>';
+          if(pane)pane.setAttribute('data-empty','1');
         });
     }
 
@@ -1891,21 +1939,31 @@
         var output=run.output||{};
         var wanted=AGENT_TABS.some(function(t){return t.ns===initialTab;})||initialTab==='playbook'
           ? initialTab : 'overview';
-        var tabsHtml=AGENT_TABS.map(function(t){
-          var has=t.ns==='overview'||tabHasData(output,t.ns,run);
-          return '<button class="lps-drw-tab'+(t.ns===wanted?' active':'')+(has?'':' lps-drw-tab-empty')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
+        /* Computed once per tab and shared by the nav button and its pane --
+           `has` is also how print decides which sections are worth a page:
+           a pane with nothing to show is hidden there rather than printed as
+           a blank titled page (see the data-empty rule in @media print). */
+        var tabRender=AGENT_TABS.map(function(t){
+          var content=tabPaneContent(output,t.ns,run);
+          var has=t.ns==='overview'||content.indexOf('class="lps-empty"')===-1;
+          return {t:t,has:has,content:content};
+        });
+        var tabsHtml=tabRender.map(function(r){
+          var t=r.t;
+          return '<button class="lps-drw-tab'+(t.ns===wanted?' active':'')+(r.has?'':' lps-drw-tab-empty')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
             +'<span class="lps-drw-tab-ic">'+t.icon+'</span><span class="lps-drw-tab-label">'+esc(t.label)+'</span>'
             +'<span class="lps-drw-tab-dot" aria-hidden="true"></span></button>';
         }).join('')
           +'<div class="lps-drw-nav-sep"></div>'
           +'<button class="lps-drw-tab'+(wanted==='playbook'?' active':'')+'" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">'
           +'<span class="lps-drw-tab-ic">⎘</span><span class="lps-drw-tab-label">Playbook</span></button>';
-        var panesHtml=AGENT_TABS.map(function(t){
-          return '<section class="lps-drw-pane'+(t.ns===wanted?' active':'')+'" data-ns="'+t.ns+'">'
+        var panesHtml=tabRender.map(function(r){
+          var t=r.t;
+          return '<section class="lps-drw-pane'+(t.ns===wanted?' active':'')+'" data-ns="'+t.ns+'" data-empty="'+(r.has?'0':'1')+'">'
             +'<h4 class="lps-pane-title">'+esc(t.label)+'</h4>'
-            +tabPaneContent(output,t.ns,run)+'</section>';
+            +r.content+'</section>';
         }).join('')
-          +'<section class="lps-drw-pane'+(wanted==='playbook'?' active':'')+'" data-ns="playbook">'
+          +'<section class="lps-drw-pane'+(wanted==='playbook'?' active':'')+'" data-ns="playbook" data-empty="1">'
           +'<h4 class="lps-pane-title">Playbook</h4><div id="lpsPlaybookBody"></div></section>';
         document.getElementById('drawerBody').innerHTML=reportHeader(run,output)
           +'<div class="lps-drw-shell">'

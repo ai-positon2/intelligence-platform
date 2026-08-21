@@ -660,13 +660,28 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
 .lps-more-btn { display: block; width: 100%; margin-top: 14px; padding: 12px; border-radius: var(--radius-md); border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.02); color: #8b86a0; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
 .lps-more-btn:hover { background: rgba(255,255,255,.05); color: #cfc9d6; }
 
+/* Hidden on screen; @media print turns this into a repeating per-page
+   footer (see below). Filled in by printReport() right before printing. */
+.lps-print-foot { display: none; }
+
 /* ── Print: flatten the report ─────────────────────────────────────────────
    The on-screen report is a modal with a sidebar and one visible pane; a
    printed report has to be the whole thing, top to bottom, on white. So the
    drawer becomes static full-width flow content, every pane is revealed, and
    all page chrome (topbar, aurora, overlay, nav, buttons) is removed. Panes
    get their own heading back here, since the sidebar that labelled them is
-   gone, and each starts on a fresh page. */
+   gone, and each starts on a fresh page.
+
+   printReport() forces data-theme="light" before calling window.print(), so
+   the ~200 [data-theme="light"] rules throughout this file (written for the
+   light theme, never for print specifically) already give every chart,
+   badge and label here a color designed to sit on white -- the alternative
+   would be maintaining a second, parallel palette by hand. The handful of
+   plain color overrides below are a defensive fallback for the rare case a
+   browser prints without running that script (e.g. a right-click "Print"
+   before the page's JS has attached); [data-theme="light"] selectors win
+   the cascade whenever both apply, since an attribute selector outranks a
+   bare class of the same otherwise-equal specificity. */
 @media print {
   @page { margin: 14mm 12mm; }
   html, body { background: #fff !important; color: #16121a !important; }
@@ -675,11 +690,18 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
   .lps-more-btn, .lps-seg, #kpal, #kpal-toast, .ppc-chat-launcher,
   .lps-ov-more, .lps-posts-bar { display: none !important; }
   .lps-drawer { position: static !important; transform: none !important; opacity: 1 !important; max-height: none !important; width: 100% !important; border: none !important; box-shadow: none !important; background: #fff !important; overflow: visible !important; pointer-events: auto !important; }
-  .lps-drawer::before { display: none !important; }
+  /* The on-screen drawer's top accent bar, restyled rather than hidden --
+     the printed report keeps a small mark of brand identity on its cover. */
+  .lps-drawer::before { display: block !important; height: 5px !important; background: linear-gradient(90deg,#db2777,#7c83f5,#0891b2) !important; }
   #drawerBody { overflow: visible !important; display: block !important; }
   .lps-drw-shell { display: block !important; }
   .drw-body.lps-drw-body { overflow: visible !important; padding: 0 !important; }
   .lps-drw-pane { display: block !important; break-inside: auto; }
+  /* A pane with nothing to show (data-empty, stamped when the drawer opens
+     from the exact same check that grays out its nav tab) never becomes a
+     blank titled page in the export -- includes the Playbook pane, which
+     printReport() populates or marks empty before this runs. */
+  .lps-drw-pane[data-empty="1"] { display: none !important; }
   .lps-drw-pane + .lps-drw-pane { break-before: page; padding-top: 6mm; }
   .lps-pane-title { display: block !important; font-size: 17px; font-weight: 700; color: #16121a !important; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid #db2777; }
   .lps-rep-head, .lps-rep-band { padding-left: 0 !important; padding-right: 0 !important; }
@@ -692,11 +714,16 @@ html::-webkit-scrollbar-thumb:hover, body::-webkit-scrollbar-thumb:hover,
   .lps-post-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .lps-post-thumb, .lps-post-card img { display: none !important; }
   a[href]::after { content: ""; }
+  /* A repeating footer so a report identifies itself on page 4 without the
+     on-screen chrome around it. Sits inside the @page margin (6mm from the
+     physical edge, against a 14mm-margin page), never over page content. */
+  .lps-print-foot { display: block !important; position: fixed; left: 0; right: 0; bottom: 6mm; text-align: center; font-size: 9px; letter-spacing: .02em; color: #8a7a83 !important; border-top: 1px solid rgba(36,24,32,.12); padding-top: 5px; }
 }
 /* While the print dialog is open the on-screen copy is irrelevant, but
    Safari renders the pre-print reflow briefly, so the same flattening is
    applied via a body class rather than only inside @media print. */
 body.lps-printing .lps-drw-pane { display: block !important; }
+body.lps-printing .lps-drw-pane[data-empty="1"] { display: none !important; }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
 [data-theme="light"] body { background: #f8f2f6 !important; color: #241820 !important; }
@@ -918,3 +945,12 @@ body.lps-printing .lps-drw-pane { display: block !important; }
 [data-theme="light"] .lps-posts-count { color: #8a7a83 !important; }
 [data-theme="light"] .lps-more-btn { background: rgba(36,24,32,.02) !important; border-color: rgba(36,24,32,.16) !important; color: #6b5c64 !important; }
 [data-theme="light"] .lps-more-btn:hover { background: rgba(36,24,32,.05) !important; color: #241820 !important; }
+
+/* Missed the first pass: pale-on-dark colors with no light-theme value at
+   all, so they stayed illegible both in actual light mode and (since print
+   forces this same theme) in every exported PDF. */
+[data-theme="light"] .lps-muted { color: #6b5c64 !important; }
+[data-theme="light"] .lps-badge.own { background: rgba(67,56,202,.1) !important; color: #4338ca !important; }
+[data-theme="light"] .lps-badge.comp { background: rgba(8,145,178,.1) !important; color: #0891b2 !important; }
+[data-theme="light"] .lps-ov-website { color: #0891b2 !important; }
+[data-theme="light"] .lps-ov-stat-val { color: #be1874 !important; }
