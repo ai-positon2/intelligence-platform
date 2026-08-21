@@ -126,8 +126,14 @@ body {
 .s-avg .gd-stat-hint       { color: #67e8f9; }
 
 /* Cards */
-.gd-grid-3 { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: var(--gutter); margin-bottom: 24px; }
+.gd-grid-3 { display: grid; grid-template-columns: 1.24fr 1fr; gap: var(--gutter); margin-bottom: 24px; }
+/* Two cards on row one, brand mix spanning row two. This was a 3-column grid
+   holding 2 cards, so above 1360px the third column rendered as dead space and
+   squeezed the state rows until their flex:1 bar track collapsed to 0px wide —
+   which is what "this place is empty" actually was. */
 .gd-grid-3 > :nth-child(3) { grid-column: 1 / -1; }
+.gd-grid-3 > .card { display: flex; flex-direction: column; }
+.gd-grid-3 > .card > .card-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
 .card { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; position: relative; }
 .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,rgba(163,230,53,.55),rgba(20,184,166,.55)); opacity: .7; }
 .card.visible { opacity: 1; transform: translateY(0); }
@@ -136,40 +142,110 @@ body {
 .card-meta { font-size: 11.5px; color: #6c7f78; }
 .card-body { padding: 16px 20px 20px; position: relative; }
 
-/* 14-day column chart */
-.gd-cols { display: flex; align-items: flex-end; gap: 6px; height: 168px; }
-.gd-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; cursor: pointer; border-radius: 4px; transition: background .15s; }
-.gd-col:hover { background: rgba(74,222,128,.06); }
+/* 14-day column chart.
+   The geometry lives in these four variables and nowhere else. The gridlines,
+   the y-axis ticks and the average line all measure up from the bottom of
+   .gd-cols with the same origin — `lbl-h + lbl-gap` — so they land exactly on
+   the bars' baseline instead of being nudged into place by eye. bar-head is
+   headroom the peak badge lives in: without it the tallest column overflowed
+   its fixed-height container and printed the badge over the card header. */
+:root {
+  --gd-bar-max: 150px;
+  --gd-bar-head: 26px;
+  --gd-lbl-h: 22px;
+  --gd-lbl-gap: 8px;
+  --gd-yaxis-w: 40px;
+}
+.gd-plot { position: relative; padding-left: var(--gd-yaxis-w); }
+.gd-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--gd-yaxis-w) - 8px); }
+.gd-ytick { position: absolute; right: 0; transform: translateY(50%); font-size: 9px; font-weight: 600; color: #56675f; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gd-gls { position: absolute; left: var(--gd-yaxis-w); right: 0; top: 0; bottom: 0; pointer-events: none; }
+.gd-gl { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,.05); }
+.gd-gl.base { background: rgba(255,255,255,.13); }
+.gd-avg { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed rgba(94,234,212,.5); }
+
+.gd-cols { display: flex; align-items: flex-end; gap: 6px; position: relative; z-index: 1;
+  height: calc(var(--gd-bar-head) + var(--gd-bar-max) + var(--gd-lbl-gap) + var(--gd-lbl-h)); }
+.gd-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; cursor: pointer; border-radius: 5px 5px 4px 4px; transition: background .15s; }
+.gd-col:hover { background: rgba(74,222,128,.07); }
 .gd-col.active { background: rgba(74,222,128,.13); }
-.gd-col.active .gd-col-lbl b { color: #bef264; }
-.gd-col-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg,#4ade80,#14b8a6); transition: height .7s cubic-bezier(.34,.6,.6,1), filter .15s; min-height: 2px; }
+.gd-col.active .gd-col-lbl b, .gd-col.active .gd-col-lbl i { color: #bef264; }
+.gd-col-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg,#4ade80,#14b8a6); transition: height .8s cubic-bezier(.34,.6,.6,1), filter .15s; min-height: 2px; }
 .gd-col.weekend .gd-col-bar { background: linear-gradient(180deg,#5eead4,#0f766e); opacity: .62; }
-.gd-col:hover .gd-col-bar { filter: brightness(1.18); }
+.gd-col:hover .gd-col-bar { filter: brightness(1.2); }
+.gd-col.is-peak .gd-col-bar { background: linear-gradient(180deg,#d9f99d,#22c55e); box-shadow: 0 0 18px -2px rgba(190,242,100,.45); }
 /* A day with genuinely nothing open keeps a 1px stub rather than vanishing:
    an absent bar reads as "no data for that day", which is a different claim. */
 .gd-col-bar.zero { height: 1px !important; background: rgba(251,113,133,.6); border-radius: 1px; }
-.gd-col-lbl { font-size: 9.5px; color: #6c7f78; text-align: center; line-height: 1.25; white-space: nowrap; }
-.gd-col-lbl b { display: block; font-size: 10px; font-weight: 700; color: #8fa39c; }
-.gd-col-lbl i { font-style: normal; }
-.gd-col-peak { font-size: 9.5px; font-weight: 700; color: #bef264; margin-bottom: 5px; background: rgba(190,242,100,.14); border: 1px solid rgba(190,242,100,.3); border-radius: var(--radius-pill); padding: 2px 7px; white-space: nowrap; }
+.gd-col-lbl { height: var(--gd-lbl-h); margin-top: var(--gd-lbl-gap); font-size: 9px; text-align: center; line-height: 1.2; white-space: nowrap; }
+.gd-col-lbl b { display: block; font-size: 9px; font-weight: 700; color: #7f938c; letter-spacing: .01em; }
+.gd-col-lbl i { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: #c2d4cc; font-variant-numeric: tabular-nums; }
 .gd-col.weekend .gd-col-lbl b { color: #5eead4; }
+.gd-col.weekend .gd-col-lbl i { color: #8fa39c; }
+.gd-col-peak { font-size: 9.5px; font-weight: 700; color: #06231c; margin-bottom: 6px; background: linear-gradient(135deg,#d9f99d,#a3e635); border-radius: var(--radius-pill); padding: 2px 7px; white-space: nowrap; box-shadow: 0 3px 10px -2px rgba(163,230,53,.5); }
+
+/* Month band: its own row, so the month never has to share a column's width
+   with the day number. Left-aligned and printed only where the month turns
+   over, which is why fourteen labels no longer collide. */
+.gd-months { display: flex; gap: 6px; padding-left: var(--gd-yaxis-w); margin-top: 3px; }
+.gd-mo { flex: 1; min-width: 0; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps); color: #56675f; white-space: nowrap; }
+
+.gd-chart-key { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.06); font-size: 10px; color: #6c7f78; }
+.gd-chart-key span { display: inline-flex; align-items: center; gap: 6px; }
+.gd-chart-key i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.gd-chart-key i.k-wd { background: linear-gradient(180deg,#4ade80,#14b8a6); }
+.gd-chart-key i.k-we { background: linear-gradient(180deg,#5eead4,#0f766e); opacity: .62; }
+.gd-chart-key i.k-avg { height: 0; border-radius: 0; border-top: 1px dashed rgba(94,234,212,.8); }
+.gd-chart-key b { color: #bef264; font-variant-numeric: tabular-nums; }
 
 /* Bar lists */
+/* Composition ribbon: the one-glance answer to "where is the capacity", with
+   the ranked list underneath as the breakdown. Top three plus a neutral
+   "Other" — beyond four segments the widths stop being readable, and Other is
+   deliberately grey rather than a fifth hue. Palette checked with the
+   dataviz validator: worst all-pairs CVD ΔE 13.7, normal-vision 15.8, every
+   step over 3:1 on this surface. */
+.gd-ribbon { display: flex; gap: 2px; height: 11px; margin-bottom: 9px; }
+.gd-ribbon-seg { display: block; border-radius: 2px; min-width: 3px; transition: width .9s cubic-bezier(.34,.6,.6,1), filter .15s; }
+.gd-ribbon-seg:first-child { border-radius: var(--radius-pill) 2px 2px var(--radius-pill); }
+.gd-ribbon-seg:last-child { border-radius: 2px var(--radius-pill) var(--radius-pill) 2px; }
+.gd-ribbon-seg.r1, .gd-ribbon-key i.r1 { background: #bef264; }
+.gd-ribbon-seg.r2, .gd-ribbon-key i.r2 { background: #2dd4bf; }
+.gd-ribbon-seg.r3, .gd-ribbon-key i.r3 { background: #60a5fa; }
+.gd-ribbon-seg.r0, .gd-ribbon-key i.r0 { background: #7f938c; }
+.gd-ribbon-key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 16px; font-size: 10px; color: #7f938c; }
+.gd-ribbon-key span { display: inline-flex; align-items: center; gap: 5px; }
+.gd-ribbon-key i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.gd-ribbon-key b { color: #d9f5e4; font-variant-numeric: tabular-nums; }
+
+.gd-bars-head { padding-bottom: 9px; margin-bottom: 3px; border-bottom: 1px solid rgba(255,255,255,.06);
+  font-size: 8.5px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #56675f; }
+.gd-bars-head .gd-bar-track { background: none; }
+.gd-bars-head .gd-bar-name, .gd-bars-head .gd-bar-num, .gd-bars-head .gd-bar-sub {
+  font-size: 8.5px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #56675f; }
 .gd-bars { display: flex; flex-direction: column; gap: 11px; }
 .gd-bar-row.clickable { cursor: pointer; padding: 5px 8px; margin: -5px -8px; border-radius: var(--radius-sm); transition: background .15s; }
 .gd-bar-row.clickable:hover { background: rgba(74,222,128,.07); }
 .gd-bar-row.clickable.active { background: rgba(74,222,128,.14); }
 .gd-bar-row.clickable.active .gd-bar-name { color: #d9f5e4; font-weight: 600; }
-.gd-bar-row { display: flex; align-items: center; gap: 10px; }
-.gd-bar-rank { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; flex-shrink: 0; background: rgba(255,255,255,.07); color: #6c7f78; }
+.gd-bar-row { display: flex; align-items: center; gap: 9px; }
+.gd-bar-rank { width: 19px; height: 19px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; flex-shrink: 0; background: rgba(255,255,255,.07); color: #6c7f78; }
 .gd-bar-rank.top { background: linear-gradient(135deg,#a3e635,#14b8a6); color: #06231c; box-shadow: 0 0 10px rgba(74,222,128,.35); }
-.gd-bar-name { font-size: 11.5px; color: #c2d4cc; width: 128px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gd-bar-track { flex: 1; height: 9px; background: rgba(255,255,255,.10); border-radius: var(--radius-pill); overflow: hidden; }
+/* The name shrinks and ellipsises; the track does not. Fixed widths on every
+   sibling used to overflow the row in the narrow card, and a flex:1 track with
+   no floor is the first thing to give — it went to 0px and the bars vanished
+   while still being in the DOM. min-width here is what makes that impossible. */
+.gd-bar-name { font-size: 11.5px; color: #c2d4cc; flex: 0 1 118px; min-width: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gd-bar-track { flex: 1 1 auto; min-width: 56px; height: 9px; background: rgba(255,255,255,.10); border-radius: var(--radius-pill); overflow: hidden; }
 /* display:block matters: this is a <span>, and width/height do not apply to
    a non-replaced inline box, so without it every bar renders 0px wide. */
 .gd-bar-fill { display: block; height: 100%; border-radius: var(--radius-pill); width: 0%; background: linear-gradient(90deg,#a3e635,#14b8a6); transition: width .8s cubic-bezier(.34,.6,.6,1); }
-.gd-bar-num { font-size: 11.5px; font-weight: 700; color: #bef264; width: 52px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.gd-bar-sub { font-size: 10px; color: #6c7f78; width: 62px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+/* ME's 4 slots against MA's 4,804 round to 0.08% of the track. Same rule as the
+   day chart's zero stub: "almost nothing" has to look different from "nothing",
+   so a non-zero row always keeps a visible nub. */
+.gd-bar-fill[data-w]:not([data-w="0"]) { min-width: 4px; }
+.gd-bar-num { font-size: 11.5px; font-weight: 700; color: #bef264; width: 46px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.gd-bar-sub { font-size: 10px; color: #6c7f78; width: 46px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
 /* Tabs + toolbar */
 .gd-tabs { display: flex; position: relative; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.07); padding: 7px; }
@@ -467,10 +543,35 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 :root[data-theme="light"] .gd-bar-name { color: #3c4a44; }
 :root[data-theme="light"] .gd-bar-track { background: rgba(18,26,54,.07); }
 :root[data-theme="light"] .gd-bar-fill { background: linear-gradient(90deg,#65a30d,#047857); }
+:root[data-theme="light"] .gd-ytick,
+:root[data-theme="light"] .gd-mo,
+:root[data-theme="light"] .gd-bars-head,
+:root[data-theme="light"] .gd-bars-head .gd-bar-name,
+:root[data-theme="light"] .gd-bars-head .gd-bar-num,
+:root[data-theme="light"] .gd-bars-head .gd-bar-sub { color: #6b7a73; }
+:root[data-theme="light"] .gd-gl { background: rgba(18,26,54,.07); }
+:root[data-theme="light"] .gd-gl.base { background: rgba(18,26,54,.20); }
+:root[data-theme="light"] .gd-avg { border-top-color: rgba(13,148,136,.6); }
+:root[data-theme="light"] .gd-col-lbl i { color: #33403a; }
+:root[data-theme="light"] .gd-col.is-peak .gd-col-bar { background: linear-gradient(180deg,#65a30d,#047857); box-shadow: 0 0 16px -2px rgba(101,163,13,.4); }
+:root[data-theme="light"] .gd-col-peak { color: #f7fdf9; background: linear-gradient(135deg,#65a30d,#15803d); box-shadow: 0 3px 10px -2px rgba(101,163,13,.45); }
+:root[data-theme="light"] .gd-bars-head { border-bottom-color: rgba(18,26,54,.1); }
+:root[data-theme="light"] .gd-chart-key { color: #6b7a73; border-top-color: rgba(18,26,54,.09); }
+:root[data-theme="light"] .gd-chart-key i.k-wd { background: linear-gradient(180deg,#10b981,#047857); }
+:root[data-theme="light"] .gd-chart-key i.k-avg { border-top-color: rgba(13,148,136,.9); }
+:root[data-theme="light"] .gd-chart-key b { color: #3f6212; }
+:root[data-theme="light"] .gd-ribbon-key { color: #55635d; }
+:root[data-theme="light"] .gd-ribbon-key b { color: #1d2a24; }
+/* Light mode gets its own steps, not a dimmed copy: the dark ramp tops out at
+   2:1 on a white card. Validated on #ffffff — worst all-pairs CVD ΔE 14.2,
+   normal-vision 16.2, every step over 3:1. */
+:root[data-theme="light"] .gd-ribbon-seg.r1, :root[data-theme="light"] .gd-ribbon-key i.r1 { background: #65a30d; }
+:root[data-theme="light"] .gd-ribbon-seg.r2, :root[data-theme="light"] .gd-ribbon-key i.r2 { background: #0f766e; }
+:root[data-theme="light"] .gd-ribbon-seg.r3, :root[data-theme="light"] .gd-ribbon-key i.r3 { background: #2563eb; }
+:root[data-theme="light"] .gd-ribbon-seg.r0, :root[data-theme="light"] .gd-ribbon-key i.r0 { background: #334155; }
 :root[data-theme="light"] .gd-bar-num { color: #3f6212; }
 :root[data-theme="light"] .gd-bar-rank { background: rgba(18,26,54,.06); color: #5f6a65; }
 :root[data-theme="light"] .gd-bar-rank.top { background: linear-gradient(135deg,#65a30d,#047857); color: #eafff0; }
-:root[data-theme="light"] .gd-col-peak { color: #4d7c0f; background: rgba(77,124,15,.12); border-color: rgba(77,124,15,.3); }
 :root[data-theme="light"] .gd-stat-ico.gd-stat-ico { filter: saturate(1.15); }
 :root[data-theme="light"] .gd-ai-teaser { color: #3c4a44; }
 :root[data-theme="light"] .gd-ai-chip { color: #55635d; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
@@ -572,11 +673,13 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 :root[data-theme="light"] .gd-bar-row.clickable.active .gd-bar-name { color: #12251d; }
 
 /* Responsive */
-@media (max-width: 1360px) { .gd-grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1240px) { .gd-grid-3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px)  { .gd-grid-3 { grid-template-columns: 1fr; } .gd-grid-3 > :nth-child(3) { grid-column: auto; } }
-/* Fourteen "12 Aug" labels stop fitting well before the page does, and an
-   overlapping axis is worse than a terser one, so the month goes first. */
-@media (max-width: 1080px) { .gd-col-lbl i { display: none; } }
+/* Fourteen ticks stop fitting well before the page does, and an overlapping
+   axis is worse than a terser one. The day number is the axis value, so the
+   weekday abbreviation is what gives way, then the y-axis gutter narrows. */
+@media (max-width: 1080px) { .gd-col-lbl b { display: none; } :root { --gd-lbl-h: 11px; } }
+@media (max-width: 820px)  { :root { --gd-yaxis-w: 30px; --gd-bar-max: 130px; } .gd-cols { gap: 4px; } .gd-months { gap: 4px; } }
 @media (max-width: 980px)  { .gd-stats { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 720px) {
   .gd-stats { grid-template-columns: 1fr; }
@@ -584,6 +687,11 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
   .user-name { display: none; }
   .ph { flex-direction: column; align-items: flex-start; }
   .gd-ph-side { align-items: flex-start; }
-  .gd-bar-name { width: 90px; }
+  /* Name, bar and total all have to survive; avg/ea is slots divided by
+     practices and both are already on the row, so it is the one column that
+     can go rather than truncating "48 practices" to "48 practi…". */
+  .gd-bar-sub { display: none; }
+  .gd-bar-name { flex-basis: 140px; }
+  .gd-ribbon-key { gap: 5px 10px; }
   .gd-tab { font-size: 11px; padding: 9px 4px; }
 }
