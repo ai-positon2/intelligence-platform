@@ -256,6 +256,16 @@
       --card-glow: 0 0 40px rgba(34,211,238,0.10);
       --arrow-color: #67e8f9;
     }
+    /* Lime -> emerald -> teal: the one hue family none of the cards above
+       claim, and it reads as "capacity" for an availability dashboard. */
+    .c-gdsc {
+      --band: linear-gradient(90deg,#a3e635,#4ade80,#14b8a6);
+      --thumb: linear-gradient(135deg,#04160f 0%,#06231c 100%);
+      --icon-glow: rgba(74,222,128,0.5);
+      --card-border: rgba(74,222,128,0.35);
+      --card-glow: 0 0 40px rgba(74,222,128,0.10);
+      --arrow-color: #bef264;
+    }
     .c-visitors {
       --band: linear-gradient(90deg,#10b981,#06b6d4,#0ea5e9);
       --thumb: linear-gradient(135deg,#001a12 0%,#001e28 100%);

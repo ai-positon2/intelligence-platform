@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Gentle Dental Slot Checker — Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gentle_dental_slot_checker.css') }}?v=6">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="gd-aurora"><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
+  <div class="gd-grain"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Gentle Dental Slot Checker</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div>
+        <div class="eyebrow">B2B Agents · Appointment availability</div>
+        <h1>Gentle Dental Slot Checker</h1>
+        <p>What a new patient would actually be offered if they tried to book right now, across every practice the agent checks: which services are open, on which days, and where the calendar is full.</p>
+      </div>
+      <div class="gd-ph-side">
+        <span class="gd-pill" id="windowPill"><span class="gd-pill-dot"></span><span id="windowText">Loading…</span></span>
+        <span class="gd-pill muted" id="freshPill">&nbsp;</span>
+      </div>
+    </div>
+
+    <div class="gd-stats" id="statsRow">
+      <div class="gd-stat s-slots" onclick="switchTab('heat')">
+        <div class="gd-stat-label">Open Slots</div>
+        <div class="gd-stat-val" id="kSlots"><span class="skel" style="width:86px;height:34px"></span></div>
+        <div class="gd-stat-hint">See the calendar →</div>
+      </div>
+      <div class="gd-stat s-practices" onclick="switchTab('practices')">
+        <div class="gd-stat-label">Practices Checked</div>
+        <div class="gd-stat-val" id="kPractices"><span class="skel" style="width:70px;height:34px"></span></div>
+        <div class="gd-stat-hint">Browse practices →</div>
+      </div>
+      <div class="gd-stat s-attention" onclick="switchTab('alerts')">
+        <div class="gd-stat-label">Needs Attention</div>
+        <div class="gd-stat-val" id="kAttention"><span class="skel" style="width:56px;height:34px"></span></div>
+        <div class="gd-stat-hint">Review problems →</div>
+      </div>
+      <div class="gd-stat s-avg" onclick="switchTab('services')">
+        <div class="gd-stat-label">Avg per Practice</div>
+        <div class="gd-stat-val" id="kAvg"><span class="skel" style="width:64px;height:34px"></span></div>
+        <div class="gd-stat-hint">Service mix →</div>
+      </div>
+    </div>
+
+    <div class="gd-grid-2">
+      <div class="card" id="cardDays">
+        <div class="card-head">
+          <span class="card-title">Availability by day</span>
+          <span class="card-meta" id="daysMeta">open slots across all practices</span>
+        </div>
+        <div class="card-body"><div id="daysBody"><div class="skel" style="height:168px"></div></div></div>
+      </div>
+      <div class="card" id="cardStates">
+        <div class="card-head">
+          <span class="card-title">Where the capacity is</span>
+          <span class="card-meta">slots · practices</span>
+        </div>
+        <div class="card-body"><div id="statesBody"><div class="skel" style="height:168px"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card" id="mainCard">
+      <div class="gd-tabs at-practices" id="gdTabs">
+        <div class="gd-tab-ind" aria-hidden="true"></div>
+        <button class="gd-tab active" id="tab-practices" onclick="switchTab('practices')">Practices<span class="gd-tab-count" id="cntPractices"></span></button>
+        <button class="gd-tab" id="tab-heat" onclick="switchTab('heat')">Calendar</button>
+        <button class="gd-tab" id="tab-alerts" onclick="switchTab('alerts')">Needs Attention<span class="gd-tab-count" id="cntAlerts"></span></button>
+        <button class="gd-tab" id="tab-services" onclick="switchTab('services')">Services<span class="gd-tab-count" id="cntServices"></span></button>
+      </div>
+
+      <div class="gd-toolbar" id="toolbar">
+        <div class="gd-search">
+          <span class="gd-search-ico" aria-hidden="true">⌕</span>
+          <input id="q" type="text" placeholder="Search practice, brand, city or office number…" oninput="onFilter()" autocomplete="off">
+        </div>
+        <select class="gd-select" id="fState" onchange="onFilter()"></select>
+        <select class="gd-select" id="fService" onchange="onFilter()"></select>
+        <select class="gd-select" id="fStatus" onchange="onFilter()"></select>
+        <button class="gd-clear" onclick="clearFilters()">✕ Clear</button>
+        <span class="gd-count" id="resultCount"></span>
+      </div>
+
+      <div id="pane-practices" class="gd-pane active">
+        <div class="gd-tbl-wrap"><div id="practicesBody"><div class="gd-loading">Loading availability…</div></div></div>
+      </div>
+      <div id="pane-heat" class="gd-pane">
+        <div class="gd-legend">
+          <span>Open slots that day:</span>
+          <span class="gd-legend-steps"><i class="l0" title="none"></i><i class="l1" title="1 to 2"></i><i class="l2" title="3 to 5"></i><i class="l3" title="6 to 10"></i><i class="l4" title="11 to 20"></i><i class="l5" title="21 or more"></i></span>
+          <span>none · 1–2 · 3–5 · 6–10 · 11–20 · 21+</span>
+        </div>
+        <div class="gd-heat-wrap"><div id="heatBody"><div class="gd-loading">Loading calendar…</div></div></div>
+      </div>
+      <div id="pane-alerts" class="gd-pane">
+        <div id="alertsBody"><div class="gd-loading">Loading…</div></div>
+      </div>
+      <div id="pane-services" class="gd-pane">
+        <div id="servicesBody"><div class="gd-loading">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gd-tip" id="tip"></div>
+  <div class="gd-drawer-ov" id="drawerOv" onclick="closeDrawer()"></div>
+  <div class="gd-drawer" id="drawer">
+    <button class="gd-drawer-close" onclick="closeDrawer()" aria-label="Close">✕</button>
+    <div id="drawerContent"></div>
+  </div>
+
+  {% include 'ppc_chat_widget.html' %}
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');closeDrawer();} });
+  </script>
+
+  <script>
+    var DATA = null;
+    var TAB = 'practices';
+    var SORT = { key:'total', dir:-1 };
+    var VIEW = [];
+
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function n(v){return (v==null?0:v).toLocaleString('en-US');}
+
+    /* ── boot ────────────────────────────────────────────────────────────── */
+    function boot(){
+      fetch('/p2/b2b-agents/gentle-dental-slot-checker/data')
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(d){
+          DATA = d;
+          if(!d.practices || !d.practices.length){ renderNoData(d); return; }
+          renderHeader(); renderStats(); renderDays(); renderStates();
+          buildFilters(); onFilter(); renderAlerts(); renderServices();
+          reveal();
+        })
+        .catch(function(e){
+          document.getElementById('windowText').textContent = 'Unavailable';
+          ['practicesBody','heatBody','alertsBody','servicesBody'].forEach(function(id){
+            document.getElementById(id).innerHTML='<div class="gd-empty"><b>Couldn\'t load availability</b>'+
+              'The dashboard reads a committed snapshot of the Slot Checker sheet. '+
+              'If this persists the snapshot is missing from the deploy.</div>';
+          });
+          ['daysBody','statesBody'].forEach(function(id){ document.getElementById(id).innerHTML=''; });
+          reveal();
+        });
+    }
+
+    function renderNoData(d){
+      document.getElementById('windowText').textContent='No data';
+      var msg='<div class="gd-empty"><b>No availability data in this snapshot</b>'+
+        'The snapshot parsed cleanly but contained no practices. Re-run '+
+        'scripts/import_slot_checker_snapshot.py against a fresh export.</div>';
+      ['practicesBody','heatBody','alertsBody','servicesBody'].forEach(function(id){
+        document.getElementById(id).innerHTML=msg; });
+      ['daysBody','statesBody'].forEach(function(id){ document.getElementById(id).innerHTML=''; });
+      reveal();
+    }
+
+    function reveal(){
+      var els=[].concat([].slice.call(document.querySelectorAll('.gd-stat')),
+                        [].slice.call(document.querySelectorAll('.card')));
+      els.forEach(function(el,i){ setTimeout(function(){ el.classList.add('visible'); }, i*55); });
+    }
+
+    function renderHeader(){
+      var t=DATA.totals, w=t.window||[];
+      document.getElementById('windowText').textContent =
+        w.length===2 ? (t.window_days+' days · '+fmtDay(w[0])+' to '+fmtDay(w[1])) : 'No window';
+      var f=DATA.freshness||{};
+      var pill=document.getElementById('freshPill');
+      if(f.newest){
+        var txt='Checked '+fmtStamp(f.newest);
+        /* The agent does not sweep the portfolio in one pass, so a single
+           "last updated" would be a fiction for most rows. Say the spread. */
+        if(f.oldest && f.oldest.slice(0,10)!==f.newest.slice(0,10)){
+          txt='Checked '+fmtDay(f.oldest.slice(0,10))+' to '+fmtDay(f.newest.slice(0,10));
+        }
+        pill.textContent=txt;
+      } else { pill.textContent='No run recorded'; }
+    }
+
+    function fmtDay(iso){
+      if(!iso) return '';
+      var p=String(iso).slice(0,10).split('-');
+      if(p.length!==3) return iso;
+      var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return parseInt(p[2],10)+' '+M[parseInt(p[1],10)-1];
+    }
+    function fmtStamp(iso){ return fmtDay(iso)+(String(iso).length>10?', '+String(iso).slice(11,16):''); }
+
+    function renderStats(){
+      var t=DATA.totals, a=DATA.alerts;
+      document.getElementById('kSlots').innerHTML=n(t.slots);
+      document.getElementById('kPractices').innerHTML=n(t.practices_with_data)+
+        '<small>of '+n(t.practices)+'</small>';
+      var attention=a.no_data.length + a.zero.length + a.thin.length;
+      document.getElementById('kAttention').innerHTML=n(attention);
+      document.querySelector('.s-attention .gd-stat-hint').textContent =
+        a.zero.length+' full · '+a.thin.length+' thin · '+a.no_data.length+' silent →';
+      document.getElementById('kAvg').innerHTML=n(Math.round(t.avg_per_practice));
+      document.querySelector('.s-avg .gd-stat-hint').textContent =
+        t.services+' services tracked →';
+      document.querySelector('.s-slots .gd-stat-hint').textContent =
+        'across '+t.window_days+' days →';
+    }
+
+    /* ── day chart ───────────────────────────────────────────────────────── */
+    function renderDays(){
+      var d=DATA.by_date||[];
+      if(!d.length){ document.getElementById('daysBody').innerHTML=''; return; }
+      var max=Math.max.apply(null,d.map(function(x){return x.slots;}))||1;
+      var wk=d.filter(function(x){return x.weekend;}), wd=d.filter(function(x){return !x.weekend;});
+      var avgWk=wk.length?wk.reduce(function(s,x){return s+x.slots;},0)/wk.length:0;
+      var avgWd=wd.length?wd.reduce(function(s,x){return s+x.slots;},0)/wd.length:0;
+      if(avgWk&&avgWd){
+        document.getElementById('daysMeta').textContent =
+          'weekends run '+Math.round((1-avgWk/avgWd)*100)+'% thinner';
+      }
+      var html='<div class="gd-cols">';
+      d.forEach(function(x,i){
+        var h=x.slots>0?Math.max(4,Math.round(x.slots/max*140)):1;
+        html+='<div class="gd-col'+(x.weekend?' weekend':'')+'" data-i="'+i+'">'+
+          '<div class="gd-col-bar'+(x.slots>0?'':' zero')+'" style="height:'+h+'px"></div>'+
+          '<div class="gd-col-lbl"><b>'+esc(x.weekday)+'</b>'+esc(x.label.split(' ')[0])+'<i> '+esc(x.label.split(' ')[1]||'')+'</i></div></div>';
+      });
+      html+='</div>';
+      document.getElementById('daysBody').innerHTML=html;
+      [].slice.call(document.querySelectorAll('#daysBody .gd-col')).forEach(function(el){
+        var x=d[parseInt(el.getAttribute('data-i'),10)];
+        el.addEventListener('mousemove',function(ev){
+          showTip(ev,'<span class="t-name">'+esc(x.weekday)+' '+esc(x.label)+'</span><b>'+
+            n(x.slots)+'</b> open slots · '+n(x.practices_open)+' practices open');
+        });
+        el.addEventListener('mouseleave',hideTip);
+      });
+    }
+
+    /* ── state bars ──────────────────────────────────────────────────────── */
+    function renderStates(){
+      var s=DATA.by_state||[];
+      if(!s.length){ document.getElementById('statesBody').innerHTML=''; return; }
+      var max=Math.max.apply(null,s.map(function(x){return x.slots;}))||1;
+      var html='<div class="gd-bars">';
+      s.forEach(function(x){
+        html+='<div class="gd-bar-row">'+
+          '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' practice'+(x.practices===1?'':'s')+'</span></span>'+
+          '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
+          '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
+          '<span class="gd-bar-sub">'+n(Math.round(x.avg))+'/ea</span></div>';
+      });
+      html+='</div>';
+      document.getElementById('statesBody').innerHTML=html;
+      requestAnimationFrame(function(){
+        [].slice.call(document.querySelectorAll('#statesBody .gd-bar-fill')).forEach(function(f){
+          f.style.width=f.getAttribute('data-w')+'%';
+        });
+      });
+    }
+
+    /* ── filters ─────────────────────────────────────────────────────────── */
+    function buildFilters(){
+      var states={}, services={};
+      DATA.practices.forEach(function(p){
+        if(p.state) states[p.state]=(states[p.state]||0)+1;
+        p.services.forEach(function(s){ services[s.name]=(services[s.name]||0)+1; });
+      });
+      fill('fState','All states',Object.keys(states).sort().map(function(k){return [k,k+' ('+states[k]+')'];}));
+      fill('fService','All services',Object.keys(services).sort().map(function(k){return [k,k];}));
+      fill('fStatus','Any status',[['open','Bookable'],['thin','Thin'],['none','Fully booked'],['no-data','No data']]);
+    }
+    function fill(id,blank,pairs){
+      var el=document.getElementById(id);
+      el.innerHTML='<option value="">'+esc(blank)+'</option>'+pairs.map(function(p){
+        return '<option value="'+esc(p[0])+'">'+esc(p[1])+'</option>'; }).join('');
+    }
+    function clearFilters(){
+      document.getElementById('q').value='';
+      ['fState','fService','fStatus'].forEach(function(id){ document.getElementById(id).value=''; });
+      onFilter();
+    }
+    function onFilter(){
+      var q=(document.getElementById('q').value||'').toLowerCase().trim();
+      var st=document.getElementById('fState').value;
+      var sv=document.getElementById('fService').value;
+      var stat=document.getElementById('fStatus').value;
+      VIEW=DATA.practices.filter(function(p){
+        if(st && p.state!==st) return false;
+        if(stat && p.status!==stat) return false;
+        if(sv && !p.services.some(function(s){return s.name===sv;})) return false;
+        if(q){
+          var hay=(p.name+' '+p.brand+' '+p.account+' '+p.city+' '+p.state+' '+p.office).toLowerCase();
+          if(hay.indexOf(q)<0) return false;
+        }
+        return true;
+      });
+      var shown=VIEW.reduce(function(s,p){return s+p.total;},0);
+      document.getElementById('resultCount').textContent=
+        VIEW.length+' of '+DATA.practices.length+' practices · '+n(shown)+' slots';
+      document.getElementById('cntPractices').textContent=' '+VIEW.length;
+      renderPractices(); renderHeat();
+    }
+
+    /* ── practices table ─────────────────────────────────────────────────── */
+    var COLS=[
+      ['office','#',''],['name','Practice',''],['brand','Brand',''],['state','State',''],
+      ['service_count','Services','num'],['total','Open slots','num'],
+      ['days_open','Days open','num'],['lead_days','First open','num'],
+      ['spark','Pattern',''],['status','Status','']
+    ];
+    function sortBy(k){
+      if(SORT.key===k) SORT.dir=-SORT.dir;
+      else { SORT.key=k; SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office'||k==='status')?1:-1; }
+      renderPractices();
+    }
+    function renderPractices(){
+      var body=document.getElementById('practicesBody');
+      if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No practices match</b>Try clearing a filter.</div>'; return; }
+      var rows=VIEW.slice().sort(function(a,b){
+        var k=SORT.key;
+        if(k==='spark') k='total';
+        var x=a[k], y=b[k];
+        /* Never-open practices sort last on "first open" whichever way the
+           column is pointed: null is the absence of a lead time, not a small one. */
+        if(k==='lead_days'){
+          if(x==null&&y==null) return 0;
+          if(x==null) return 1;
+          if(y==null) return -1;
+        }
+        if(typeof x==='string'||typeof y==='string'){
+          return String(x||'').localeCompare(String(y||''))*SORT.dir;
+        }
+        return ((x||0)-(y||0))*SORT.dir;
+      });
+      var max=Math.max.apply(null,DATA.practices.map(function(p){return p.peak;}))||1;
+      var h='<table class="gd-tbl"><thead><tr>';
+      COLS.forEach(function(c){
+        var arrow=SORT.key===c[0]?(SORT.dir>0?' ↑':' ↓'):'';
+        h+='<th class="'+c[2]+'" onclick="sortBy(\''+c[0]+'\')">'+esc(c[1])+arrow+'</th>';
+      });
+      h+='</tr></thead><tbody>';
+      rows.forEach(function(p,i){
+        h+='<tr class="gd-row-in" style="animation-delay:'+Math.min(i*11,420)+'ms" onclick="openDrawer(\''+esc(p.office)+'\')">'+
+          '<td><span class="gd-office">'+esc(p.office||'—')+'</span></td>'+
+          '<td><div class="gd-name">'+esc(p.name)+'</div>'+
+            (p.account&&p.account!==p.name?'<div class="gd-sub">'+esc(p.account)+'</div>':'')+'</td>'+
+          '<td>'+esc(p.brand||'—')+'</td>'+
+          '<td><span class="gd-state">'+esc(p.state||'—')+'</span></td>'+
+          '<td class="num">'+p.service_count+(p.zero_services?' <span class="gd-full-note">('+p.zero_services+' full)</span>':'')+'</td>'+
+          '<td class="num"><b>'+n(p.total)+'</b></td>'+
+          '<td class="num">'+p.days_open+'</td>'+
+          '<td class="num">'+leadLabel(p.lead_days)+'</td>'+
+          '<td>'+spark(p.counts,max)+'</td>'+
+          '<td>'+badge(p.status)+'</td></tr>';
+      });
+      body.innerHTML=h+'</tbody></table>';
+    }
+    function leadLabel(v){
+      if(v==null) return '<span class="gd-full-note">never</span>';
+      if(v===0) return 'day 1';
+      return 'day '+(v+1);
+    }
+    function badge(s){
+      var L={open:'Bookable',thin:'Thin',none:'Fully booked','no-data':'No data'};
+      return '<span class="gd-badge '+s+'">'+esc(L[s]||s)+'</span>';
+    }
+    function spark(counts,max){
+      return '<span class="gd-spark">'+counts.map(function(c){
+        var hh=c>0?Math.max(2,Math.round(c/max*22)):1;
+        return '<i class="'+(c>0?'':'z')+'" style="height:'+hh+'px"></i>';
+      }).join('')+'</span>';
+    }
+
+    /* ── calendar heatmap ────────────────────────────────────────────────── */
+    /* Absolute breaks, not a fraction of the busiest cell, for two reasons.
+       The distribution is skewed (median 10, max 51), so scaling to the max put
+       0.4% of cells in the top step and left the ramp unreadable. And a relative
+       scale makes the same colour mean different things under different filters,
+       so filtering to one state would silently repaint every surviving cell.
+       These breaks are also legible: "3 to 5 slots" is something a person can
+       read off the legend, "under a quarter of the busiest day" is not. */
+    var RAMP_BREAKS=[2,5,10,20];
+    function ramp(v){
+      if(v<=0) return 'r0';
+      for(var i=0;i<RAMP_BREAKS.length;i++){ if(v<=RAMP_BREAKS[i]) return 'r'+(i+1); }
+      return 'r5';
+    }
+    function renderHeat(){
+      var body=document.getElementById('heatBody');
+      var dates=DATA.dates||[];
+      if(!VIEW.length||!dates.length){
+        body.innerHTML='<div class="gd-empty"><b>Nothing to chart</b>No practices match the current filters.</div>'; return; }
+      var rows=VIEW.slice().sort(function(a,b){return b.total-a.total;});
+      var h='<table class="gd-heat"><thead><tr><th class="rowhead">Practice</th>';
+      dates.forEach(function(d){
+        var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
+        h+='<th class="'+(wknd?'wk':'')+'">'+esc(d.weekday)+'<br>'+esc(d.label.split(' ')[0])+'</th>';
+      });
+      h+='<th style="padding-left:10px">Total</th></tr></thead><tbody>';
+      rows.forEach(function(p){
+        h+='<tr><th class="rowhead" onclick="openDrawer(\''+esc(p.office)+'\')">'+esc(p.name)+
+           '<span>'+esc(p.state)+'</span></th>';
+        p.counts.forEach(function(c,i){
+          h+='<td><div class="gd-cell '+ramp(c)+'" data-o="'+esc(p.office)+'" data-i="'+i+'"></div></td>';
+        });
+        h+='<td class="num" class="gd-heat-total">'+n(p.total)+'</td></tr>';
+      });
+      body.innerHTML=h+'</tbody></table>';
+      var byOffice={};
+      VIEW.forEach(function(p){ byOffice[p.office]=p; });
+      [].slice.call(body.querySelectorAll('.gd-cell')).forEach(function(el){
+        el.addEventListener('mousemove',function(ev){
+          var p=byOffice[el.getAttribute('data-o')], i=parseInt(el.getAttribute('data-i'),10);
+          if(!p) return;
+          var c=p.counts[i], d=dates[i];
+          var lines=p.services.filter(function(s){return s.counts[i]>0;})
+            .map(function(s){return esc(s.name)+' · '+s.counts[i];});
+          showTip(ev,'<span class="t-name">'+esc(p.name)+' — '+esc(d.weekday)+' '+esc(d.label)+'</span>'+
+            (c>0?('<b>'+n(c)+'</b> open'+(lines.length?'<br>'+lines.join('<br>'):'')):'Nothing open'));
+        });
+        el.addEventListener('mouseleave',hideTip);
+      });
+    }
+
+    /* ── alerts ──────────────────────────────────────────────────────────── */
+    function renderAlerts(){
+      var a=DATA.alerts, h='<div class="gd-alerts">';
+      /* Count PRACTICES, not practices plus flagged services, so this badge and
+         the Needs Attention tile are the same number. They were 42 and 19 for a
+         while, which reads as one of them being wrong. Each section still shows
+         its own count, so the 23 unbookable services are not hidden. */
+      var practices=a.no_data.length+a.zero.length+a.thin.length;
+      var total=practices+a.unbookable_services.length;
+      document.getElementById('cntAlerts').textContent=' '+practices;
+      document.getElementById('cntServices').textContent=' '+(DATA.by_service||[]).length;
+      if(!total){
+        document.getElementById('alertsBody').innerHTML=
+          '<div class="gd-empty"><b>Nothing needs attention</b>Every practice returned data and has bookable availability.</div>';
+        return;
+      }
+      h+=sec('sev-none','Fully booked', a.zero,
+        'Checked successfully, and every service came back with zero openings for the whole window. '+
+        'A patient calling these would be turned away.',
+        function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+'</span>'; });
+      h+=sec('sev-none','No data returned', a.no_data,
+        'The agent never returned a row for these. That is a gap in the crawl, not a finding about '+
+        'the practice, so it is kept separate from fully booked above.',
+        function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+'</span>'; });
+      h+=sec('sev-thin','Thin availability', a.thin,
+        'Bookable, but under 20 slots across the whole window, so most specific days a patient asks for will be a no.',
+        function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+' · '+x.total+' slots</span>'; });
+      h+=sec('','Unbookable services', a.unbookable_services,
+        'These practices are healthy overall, but this one service has no openings at all, which the '+
+        'practice-level total hides.',
+        function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.service)+'</span>'; });
+      document.getElementById('alertsBody').innerHTML=h+'</div>';
+      [].slice.call(document.querySelectorAll('#alertsBody .gd-alert-item[data-o]')).forEach(function(el){
+        el.addEventListener('click',function(){ openDrawer(el.getAttribute('data-o')); });
+      });
+    }
+    function sec(cls,title,items,note,fmt){
+      if(!items.length) return '';
+      return '<div class="gd-alert-sec '+cls+'"><div class="gd-alert-head">'+
+        '<span class="gd-alert-title">'+esc(title)+'</span>'+
+        '<span class="card-meta">'+items.length+'</span></div>'+
+        '<div class="gd-alert-note">'+note+'</div><div class="gd-alert-items">'+
+        items.map(function(x){
+          return '<span class="gd-alert-item"'+(x.office?' data-o="'+esc(x.office)+'"':'')+'>'+fmt(x)+'</span>';
+        }).join('')+'</div></div>';
+    }
+
+    /* ── services ────────────────────────────────────────────────────────── */
+    function renderServices(){
+      var s=DATA.by_service||[];
+      if(!s.length){ document.getElementById('servicesBody').innerHTML='<div class="gd-empty"><b>No services</b></div>'; return; }
+      var max=Math.max.apply(null,s.map(function(x){return x.slots;}))||1;
+      var pmax=Math.max.apply(null,s.map(function(x){
+        return Math.max.apply(null,x.counts); }))||1;
+      var h='<div style="padding:18px 20px 22px"><div class="gd-bars">';
+      s.forEach(function(x){
+        h+='<div class="gd-bar-row">'+
+          '<span class="gd-bar-name" title="'+esc(x.name)+'">'+esc(x.name)+'</span>'+
+          '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
+          '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
+          '<span class="gd-bar-sub">'+x.practices+' loc'+(x.zero?' · '+x.zero+' full':'')+'</span></div>';
+      });
+      h+='</div><div style="margin-top:22px">';
+      s.forEach(function(x){
+        h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(x.name)+
+           '<em>offered at '+x.practices+' practice'+(x.practices===1?'':'s')+
+           (x.zero?', unbookable at '+x.zero:'')+'</em></span>'+
+           spark(x.counts,pmax)+
+           '<span class="gd-drw-svc-v" style="margin-left:12px">'+n(x.slots)+'</span></div>';
+      });
+      document.getElementById('servicesBody').innerHTML=h+'</div></div>';
+      requestAnimationFrame(function(){
+        [].slice.call(document.querySelectorAll('#servicesBody .gd-bar-fill')).forEach(function(f){
+          f.style.width=f.getAttribute('data-w')+'%'; });
+      });
+    }
+
+    /* ── drawer ──────────────────────────────────────────────────────────── */
+    function openDrawer(office){
+      var p=null;
+      DATA.practices.forEach(function(x){ if(x.office===office) p=x; });
+      if(!p) return;
+      var dates=DATA.dates||[];
+      var pmax=Math.max.apply(null,p.services.map(function(s){
+        return Math.max.apply(null,s.counts.concat([0])); }).concat([1]))||1;
+      var h='<div class="gd-drw-head"><div class="gd-drw-name">'+esc(p.name)+'</div>'+
+        '<div class="gd-drw-sub">'+badge(p.status)+
+        '<span>Office '+esc(p.office||'—')+'</span><span>·</span><span>'+esc(p.state||'—')+'</span>'+
+        (p.brand?'<span>·</span><span>'+esc(p.brand)+'</span>':'')+'</div>';
+      if(p.account&&p.account!==p.name) h+='<div class="gd-drw-sub" style="margin-top:6px">'+esc(p.account)+'</div>';
+      h+='</div><div class="gd-drw-body">';
+      h+='<div class="gd-drw-sec"><div class="gd-drw-kpis">'+
+        kpi('Open slots',n(p.total))+kpi('Days open',p.days_open+' of '+dates.length)+
+        kpi('First open',leadLabel(p.lead_days))+'</div></div>';
+      h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">By service</div>';
+      if(!p.services.length){
+        h+='<div class="gd-empty" style="padding:18px 0;text-align:left">The agent returned no rows for this practice, so there is nothing to break down. Its booking page may be failing to load for the crawler.</div>';
+      } else {
+        p.services.forEach(function(s){
+          h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(s.name)+
+             '<em>'+(s.bookable?(s.days_open+' of '+dates.length+' days'):'nothing open')+
+             (s.runs>1?' · checked '+s.runs+'×':'')+'</em></span>'+
+             spark(s.counts,pmax)+
+             '<span class="gd-drw-svc-v" style="margin-left:12px">'+n(s.total)+'</span></div>';
+        });
+      }
+      h+='</div>';
+      h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Day by day</div>'+
+        '<table class="gd-heat" style="border-spacing:3px"><tbody><tr>';
+      dates.forEach(function(d){ h+='<th class="'+((d.weekday==='Sat'||d.weekday==='Sun')?'wk':'')+
+        '" style="position:static;background:none;padding:0 0 5px">'+esc(d.weekday.slice(0,1))+'</th>'; });
+      h+='</tr><tr>';
+      p.counts.forEach(function(c,i){
+        h+='<td title="'+esc(dates[i].weekday+' '+dates[i].label)+' · '+c+' open">'+
+           '<div class="gd-cell '+ramp(c)+'"></div></td>';
+      });
+      h+='</tr></tbody></table></div>';
+      h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Provenance</div>'+
+        '<div class="gd-drw-svc"><span class="gd-drw-svc-n">Last checked<em>'+
+        (p.checked_at?esc(fmtStamp(p.checked_at)):'never')+'</em></span></div>'+
+        '<div class="gd-drw-svc"><span class="gd-drw-svc-n">Booking view<em>'+
+        esc(p.booking||'unknown')+' · '+esc(p.system==='jarvis'?'Jarvis scheduler':'gentledental.com')+
+        '</em></span></div></div>';
+      if(p.url){
+        h+='<a class="gd-drw-link" href="'+esc(p.url)+'" target="_blank" rel="noopener">Open booking page ↗</a>';
+      }
+      h+='</div>';
+      document.getElementById('drawerContent').innerHTML=h;
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerOv').classList.add('open');
+    }
+    function kpi(l,v){ return '<div class="gd-drw-kpi"><div class="gd-drw-kpi-l">'+esc(l)+
+      '</div><div class="gd-drw-kpi-v">'+v+'</div></div>'; }
+    function closeDrawer(){
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerOv').classList.remove('open');
+    }
+
+    /* ── tabs + tooltip ──────────────────────────────────────────────────── */
+    function switchTab(t){
+      TAB=t;
+      document.getElementById('gdTabs').className='gd-tabs at-'+t;
+      ['practices','heat','alerts','services'].forEach(function(k){
+        document.getElementById('tab-'+k).classList.toggle('active',k===t);
+        document.getElementById('pane-'+k).classList.toggle('active',k===t);
+      });
+      /* The toolbar only drives the two panes that read VIEW. Leaving it visible
+         over Needs Attention / Services would imply it filters those too. */
+      document.getElementById('toolbar').style.display=(t==='practices'||t==='heat')?'':'none';
+      document.getElementById('mainCard').scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    function showTip(ev,html){
+      var t=document.getElementById('tip');
+      t.innerHTML=html; t.classList.add('show');
+      var r=t.getBoundingClientRect();
+      var x=Math.min(Math.max(ev.clientX-r.width/2,8),window.innerWidth-r.width-8);
+      var y=ev.clientY-r.height-14;
+      if(y<8) y=ev.clientY+18;
+      t.style.left=x+'px'; t.style.top=y+'px';
+    }
+    function hideTip(){ document.getElementById('tip').classList.remove('show'); }
+
+    boot();
+  </script>
+
+  <script>
+  window.__KP_ITEMS=[
+    {t:'Practices',d:'Availability by practice',u:'#practices',i:'▤'},
+    {t:'Calendar',d:'Practice by day heatmap',u:'#heat',i:'◷'},
+    {t:'Needs Attention',d:'Fully booked and silent practices',u:'#alerts',i:'⚠'}
+  ];
+  </script>
+  <script>
+  (function(){
+    if(window.__kpal)return;window.__kpal=1;
+    var BASE=[
+      {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+      {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+      {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+      {t:'ABM Signal Tracker — Healthcare',d:'Company signals &amp; insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+      {t:'ABM Signal Tracker — CSG',d:'Company signals &amp; insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+      {t:'LinkedIn Intelligence',d:'People, companies &amp; posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
+      {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
+      {t:'Contact Finder',d:'Apollo-powered search &amp; chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
+      {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+      {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
+      {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
+      {t:'Gentle Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/gentle-dental-slot-checker',i:'◷'},
+      {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
+    ];
+    var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
+    var css=document.createElement('style');
+    css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+      +'#kpal.on{display:block;animation:kpalF .14s ease}'
+      +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+      +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(9,16,14,.96);border:1px solid rgba(74,222,128,.3);border-radius:var(--radius-lg);box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(45,212,170,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+      +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+      +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+      +'.kpal-iw .ic{color:#4ade80;font-size:15px}'
+      +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+      +'#kpal-in::placeholder{color:#4b5c56}'
+      +'.kpal-iw kbd{font-family:inherit;font-size:10px;font-weight:700;color:#55746a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xs);padding:3px 7px}'
+      +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+      +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:var(--radius-md);cursor:pointer;border:1px solid transparent}'
+      +'.kpal-it .ki{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(45,212,170,.12);border:1px solid rgba(74,222,128,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#6ee7b7;flex-shrink:0}'
+      +'.kpal-it .kt{font-size:13px;font-weight:600;color:#dbe2f1}'
+      +'.kpal-it .kd{font-size:11.5px;color:#55746a;margin-top:1px}'
+      +'.kpal-it.sel{background:linear-gradient(95deg,rgba(20,184,166,.22),rgba(74,222,128,.12));border-color:rgba(74,222,128,.35)}'
+      +'.kpal-it.sel .kt{color:#fff}'
+      +'.kpal-empty{padding:26px;text-align:center;color:#55746a;font-size:13px}'
+      +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b5349;display:flex;gap:14px}';
+    document.head.appendChild(css);
+    var ov=document.createElement('div');ov.id='kpal';
+    ov.innerHTML='<div class="kpal-box">'
+      +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+      +'<div id="kpal-list"></div>'
+      +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+    document.body.appendChild(ov);
+    var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+    var cur=[],sel=0;
+    function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function render(){
+      if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+      list.innerHTML=cur.map(function(x,i){
+        return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc2(x.t)+'</div><div class="kd">'+esc2(x.d||'')+'</div></span></div>';
+      }).join('');
+      var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+    }
+    function filter(q){
+      q=(q||'').toLowerCase().trim();
+      cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+      sel=0;render();
+    }
+    function go(x){
+      if(!x)return;
+      close();
+      if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
+      if(x.u.charAt(0)==='#'){ if(typeof switchTab==='function') switchTab(x.u.slice(1)); return; }
+      if(location.pathname===x.u)return;
+      window.location.href=x.u;
+    }
+    function open(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+    function close(){ov.classList.remove('on');}
+    inp.addEventListener('input',function(){filter(inp.value);});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+      else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+      else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+    });
+    list.addEventListener('click',function(e){
+      var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+    });
+    ov.addEventListener('mousedown',function(e){if(e.target===ov)close();});
+    document.addEventListener('keydown',function(e){
+      if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?close():open();}
+      else if(e.key==='Escape'&&ov.classList.contains('on')){close();}
+    });
+  })();
+  </script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Gentle Dental Slot Checker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>
