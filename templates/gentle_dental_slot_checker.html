@@ -86,20 +86,40 @@
       </div>
     </div>
 
-    <div class="gd-grid-2">
+    <div class="card gd-ai" id="cardAI">
+      <div class="gd-ai-top">
+        <div class="gd-ai-badge"><span class="gd-ai-dot"></span>AI Insights</div>
+        <div class="gd-ai-actions">
+          <span class="gd-ai-meta" id="aiMeta"></span>
+          <button class="gd-ai-refresh" id="aiRefresh" onclick="loadInsights(true)" title="Regenerate" aria-label="Regenerate this week's briefing">⟳</button>
+        </div>
+      </div>
+      <div id="aiBody" class="gd-ai-body">
+        <div class="gd-ai-loading"><div class="gd-ai-pulse"></div>Reading this week's numbers…</div>
+      </div>
+    </div>
+
+    <div class="gd-grid-3">
       <div class="card" id="cardDays">
         <div class="card-head">
           <span class="card-title">Availability by day</span>
-          <span class="card-meta" id="daysMeta">open slots across all practices</span>
+          <span class="card-meta" id="daysMeta">click a day to filter →</span>
         </div>
         <div class="card-body"><div id="daysBody"><div class="skel" style="height:168px"></div></div></div>
       </div>
       <div class="card" id="cardStates">
         <div class="card-head">
           <span class="card-title">Where the capacity is</span>
-          <span class="card-meta">slots · practices</span>
+          <span class="card-meta">click a state to filter →</span>
         </div>
         <div class="card-body"><div id="statesBody"><div class="skel" style="height:168px"></div></div></div>
+      </div>
+      <div class="card" id="cardBrands">
+        <div class="card-head">
+          <span class="card-title">Brand mix</span>
+          <span class="card-meta">click a brand to filter →</span>
+        </div>
+        <div class="card-body"><div id="brandsBody"><div class="skel" style="height:120px"></div></div></div>
       </div>
     </div>
 
@@ -117,9 +137,11 @@
           <span class="gd-search-ico" aria-hidden="true">⌕</span>
           <input id="q" type="text" placeholder="Search practice, brand, city or office number…" oninput="onFilter()" autocomplete="off">
         </div>
-        <select class="gd-select" id="fState" onchange="onFilter()"></select>
-        <select class="gd-select" id="fService" onchange="onFilter()"></select>
+        <select class="gd-select" id="fState" onchange="syncBarHighlights();onFilter()"></select>
+        <select class="gd-select" id="fBrand" onchange="syncBarHighlights();onFilter()"></select>
+        <select class="gd-select" id="fService" onchange="syncBarHighlights();onFilter()"></select>
         <select class="gd-select" id="fStatus" onchange="onFilter()"></select>
+        <span class="gd-filter-chip" id="dateChip" style="display:none" onclick="clearDateFilter()"><span>📅</span><span id="dateChipLabel"></span><span class="x">✕</span></span>
         <button class="gd-clear" onclick="clearFilters()">✕ Clear</button>
         <span class="gd-count" id="resultCount"></span>
       </div>
@@ -167,18 +189,20 @@
     var TAB = 'practices';
     var SORT = { key:'total', dir:-1 };
     var VIEW = [];
+    var DATE_FILTER = null;
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function n(v){return (v==null?0:v).toLocaleString('en-US');}
 
     /* ── boot ────────────────────────────────────────────────────────────── */
     function boot(){
+      loadInsights();
       fetch('/p2/b2b-agents/gentle-dental-slot-checker/data')
         .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
         .then(function(d){
           DATA = d;
           if(!d.practices || !d.practices.length){ renderNoData(d); return; }
-          renderHeader(); renderStats(); renderDays(); renderStates();
+          renderHeader(); renderStats(); renderDays(); renderStates(); renderBrands();
           buildFilters(); onFilter(); renderAlerts(); renderServices();
           reveal();
         })
@@ -237,16 +261,79 @@
     }
     function fmtStamp(iso){ return fmtDay(iso)+(String(iso).length>10?', '+String(iso).slice(11,16):''); }
 
+    /* ── AI Insights ─────────────────────────────────────────────────────── */
+    function loadInsights(force){
+      var body=document.getElementById('aiBody'), btn=document.getElementById('aiRefresh');
+      btn.classList.add('spin');
+      if(body.getAttribute('data-state')!=='ok'){
+        body.setAttribute('data-state','loading');
+        body.innerHTML='<div class="gd-ai-loading"><div class="gd-ai-pulse"></div>Reading this week\'s numbers…</div>';
+      }
+      fetch('/p2/b2b-agents/gentle-dental-slot-checker/insights'+(force?'?fresh=1':''))
+        .then(function(r){ return r.json(); })
+        .then(renderInsights)
+        .catch(function(){
+          renderInsights({configured:true,ok:false,error:'Could not reach the AI Insights service.',retryable:true});
+        });
+    }
+    function renderInsights(d){
+      document.getElementById('aiRefresh').classList.remove('spin');
+      var card=document.getElementById('cardAI'), body=document.getElementById('aiBody');
+      if(!d || !d.configured){
+        card.classList.add('quiet');
+        body.setAttribute('data-state','off');
+        body.innerHTML='<div class="gd-ai-empty">AI Insights aren\'t configured on this deployment yet.</div>';
+        return;
+      }
+      card.classList.remove('quiet');
+      if(!d.ok){
+        body.setAttribute('data-state','err');
+        body.innerHTML='<div class="gd-ai-empty"><b>Couldn\'t generate this week\'s briefing</b>'+esc(d.error||'')+'</div>'+
+          (d.retryable?'<button class="gd-ai-retry" onclick="loadInsights(true)">Try again</button>':'');
+        return;
+      }
+      body.setAttribute('data-state','ok');
+      var ins=d.insights, h='';
+      h+='<div class="gd-ai-headline">'+esc(ins.headline)+'</div>';
+      h+='<div class="gd-ai-syn">'+String(ins.synthesis||'').split('\n\n').map(function(p){
+        return p.trim()?'<p>'+esc(p)+'</p>':''; }).join('')+'</div>';
+      var cols='';
+      if(ins.topActions && ins.topActions.length) cols+=aiList('Priority actions','act',ins.topActions);
+      if(ins.opportunities && ins.opportunities.length) cols+=aiList('Opportunities','opp',ins.opportunities);
+      if(ins.risks && ins.risks.length) cols+=aiList('Risks','risk',ins.risks);
+      if(cols) h+='<div class="gd-ai-cols">'+cols+'</div>';
+      if(ins.coverage) h+='<div class="gd-ai-coverage">'+esc(ins.coverage)+'</div>';
+      body.innerHTML=h;
+      document.getElementById('aiMeta').textContent="This week's snapshot";
+    }
+    function aiList(title,cls,items){
+      return '<div class="gd-ai-col ai-'+cls+'"><div class="gd-ai-col-t">'+esc(title)+'</div><ul>'+
+        items.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ul></div>';
+    }
+
+    var REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function countUp(id,target,suffix){
+      var el=document.getElementById(id);
+      if(REDUCE_MOTION || !target){ el.innerHTML=n(target)+(suffix||''); return; }
+      var t0=null, dur=650;
+      function step(ts){
+        if(!t0) t0=ts;
+        var p=Math.min(1,(ts-t0)/dur);
+        var eased=1-Math.pow(1-p,3);
+        el.innerHTML=n(Math.round(target*eased))+(suffix||'');
+        if(p<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
     function renderStats(){
       var t=DATA.totals, a=DATA.alerts;
-      document.getElementById('kSlots').innerHTML=n(t.slots);
-      document.getElementById('kPractices').innerHTML=n(t.practices_with_data)+
-        '<small>of '+n(t.practices)+'</small>';
+      countUp('kSlots', t.slots);
+      countUp('kPractices', t.practices_with_data, '<small>of '+n(t.practices)+'</small>');
       var attention=a.no_data.length + a.zero.length + a.thin.length;
-      document.getElementById('kAttention').innerHTML=n(attention);
+      countUp('kAttention', attention);
       document.querySelector('.s-attention .gd-stat-hint').textContent =
         a.zero.length+' full · '+a.thin.length+' thin · '+a.no_data.length+' silent →';
-      document.getElementById('kAvg').innerHTML=n(Math.round(t.avg_per_practice));
+      countUp('kAvg', Math.round(t.avg_per_practice));
       document.querySelector('.s-avg .gd-stat-hint').textContent =
         t.services+' services tracked →';
       document.querySelector('.s-slots .gd-stat-hint').textContent =
@@ -281,7 +368,9 @@
             n(x.slots)+'</b> open slots · '+n(x.practices_open)+' practices open');
         });
         el.addEventListener('mouseleave',hideTip);
+        el.addEventListener('click',function(){ setDateFilter(parseInt(el.getAttribute('data-i'),10)); });
       });
+      applyDateFilter();
     }
 
     /* ── state bars ──────────────────────────────────────────────────────── */
@@ -291,7 +380,7 @@
       var max=Math.max.apply(null,s.map(function(x){return x.slots;}))||1;
       var html='<div class="gd-bars">';
       s.forEach(function(x){
-        html+='<div class="gd-bar-row">'+
+        html+='<div class="gd-bar-row clickable" data-state="'+esc(x.state)+'">'+
           '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' practice'+(x.practices===1?'':'s')+'</span></span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
@@ -304,16 +393,56 @@
           f.style.width=f.getAttribute('data-w')+'%';
         });
       });
+      [].slice.call(document.querySelectorAll('#statesBody .gd-bar-row')).forEach(function(el){
+        el.addEventListener('click',function(){
+          var st=el.getAttribute('data-state'), sel=document.getElementById('fState');
+          sel.value=(sel.value===st)?'':st;
+          syncBarHighlights(); switchTab('practices'); onFilter();
+        });
+      });
+    }
+
+    /* ── brand mix ───────────────────────────────────────────────────────── */
+    function renderBrands(){
+      var b=DATA.by_brand||[];
+      var el=document.getElementById('brandsBody');
+      if(!b.length){ el.innerHTML=''; return; }
+      var top=b.slice(0,8);
+      var max=Math.max.apply(null,top.map(function(x){return x.slots;}))||1;
+      var html='<div class="gd-bars">';
+      top.forEach(function(x){
+        html+='<div class="gd-bar-row clickable" data-brand="'+esc(x.brand)+'">'+
+          '<span class="gd-bar-name">'+esc(x.brand)+'</span>'+
+          '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
+          '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
+          '<span class="gd-bar-sub">'+x.practices+' loc</span></div>';
+      });
+      html+='</div>';
+      el.innerHTML=html;
+      requestAnimationFrame(function(){
+        [].slice.call(el.querySelectorAll('.gd-bar-fill')).forEach(function(f){
+          f.style.width=f.getAttribute('data-w')+'%';
+        });
+      });
+      [].slice.call(el.querySelectorAll('.gd-bar-row')).forEach(function(row){
+        row.addEventListener('click',function(){
+          var br=row.getAttribute('data-brand'), sel=document.getElementById('fBrand');
+          sel.value=(sel.value===br)?'':br;
+          syncBarHighlights(); switchTab('practices'); onFilter();
+        });
+      });
     }
 
     /* ── filters ─────────────────────────────────────────────────────────── */
     function buildFilters(){
-      var states={}, services={};
+      var states={}, services={}, brands={};
       DATA.practices.forEach(function(p){
         if(p.state) states[p.state]=(states[p.state]||0)+1;
+        if(p.brand) brands[p.brand]=(brands[p.brand]||0)+1;
         p.services.forEach(function(s){ services[s.name]=(services[s.name]||0)+1; });
       });
       fill('fState','All states',Object.keys(states).sort().map(function(k){return [k,k+' ('+states[k]+')'];}));
+      fill('fBrand','All brands',Object.keys(brands).sort().map(function(k){return [k,k+' ('+brands[k]+')'];}));
       fill('fService','All services',Object.keys(services).sort().map(function(k){return [k,k];}));
       fill('fStatus','Any status',[['open','Bookable'],['thin','Thin'],['none','Fully booked'],['no-data','No data']]);
     }
@@ -324,18 +453,23 @@
     }
     function clearFilters(){
       document.getElementById('q').value='';
-      ['fState','fService','fStatus'].forEach(function(id){ document.getElementById(id).value=''; });
-      onFilter();
+      ['fState','fBrand','fService','fStatus'].forEach(function(id){ document.getElementById(id).value=''; });
+      DATE_FILTER=null;
+      syncBarHighlights();
+      applyDateFilter();
     }
     function onFilter(){
       var q=(document.getElementById('q').value||'').toLowerCase().trim();
       var st=document.getElementById('fState').value;
+      var br=document.getElementById('fBrand').value;
       var sv=document.getElementById('fService').value;
       var stat=document.getElementById('fStatus').value;
       VIEW=DATA.practices.filter(function(p){
         if(st && p.state!==st) return false;
+        if(br && p.brand!==br) return false;
         if(stat && p.status!==stat) return false;
         if(sv && !p.services.some(function(s){return s.name===sv;})) return false;
+        if(DATE_FILTER!=null && !(p.counts[DATE_FILTER]>0)) return false;
         if(q){
           var hay=(p.name+' '+p.brand+' '+p.account+' '+p.city+' '+p.state+' '+p.office).toLowerCase();
           if(hay.indexOf(q)<0) return false;
@@ -347,6 +481,49 @@
         VIEW.length+' of '+DATA.practices.length+' practices · '+n(shown)+' slots';
       document.getElementById('cntPractices').textContent=' '+VIEW.length;
       renderPractices(); renderHeat();
+    }
+
+    /* ── click-to-filter: day columns ────────────────────────────────────── */
+    function setDateFilter(i){
+      DATE_FILTER=(DATE_FILTER===i)?null:i;
+      applyDateFilter();
+      switchTab('practices');
+    }
+    function clearDateFilter(){
+      if(DATE_FILTER==null) return;
+      DATE_FILTER=null;
+      applyDateFilter();
+    }
+    function applyDateFilter(){
+      [].slice.call(document.querySelectorAll('#daysBody .gd-col')).forEach(function(el){
+        el.classList.toggle('active', parseInt(el.getAttribute('data-i'),10)===DATE_FILTER);
+      });
+      var chip=document.getElementById('dateChip');
+      if(DATE_FILTER!=null && DATA && DATA.by_date && DATA.by_date[DATE_FILTER]){
+        var x=DATA.by_date[DATE_FILTER];
+        document.getElementById('dateChipLabel').textContent='Open '+x.weekday+' '+x.label;
+        chip.style.display='inline-flex';
+      } else {
+        chip.style.display='none';
+      }
+      onFilter();
+    }
+
+    /* ── click-to-filter: keep the bar lists' highlight in sync with the
+       dropdowns, whichever one changed it ─────────────────────────────────── */
+    function syncBarHighlights(){
+      var st=document.getElementById('fState').value;
+      var br=document.getElementById('fBrand').value;
+      var sv=document.getElementById('fService').value;
+      [].slice.call(document.querySelectorAll('#statesBody [data-state]')).forEach(function(el){
+        el.classList.toggle('active', !!st && el.getAttribute('data-state')===st);
+      });
+      [].slice.call(document.querySelectorAll('#brandsBody [data-brand]')).forEach(function(el){
+        el.classList.toggle('active', !!br && el.getAttribute('data-brand')===br);
+      });
+      [].slice.call(document.querySelectorAll('#servicesBody [data-service]')).forEach(function(el){
+        el.classList.toggle('active', !!sv && el.getAttribute('data-service')===sv);
+      });
     }
 
     /* ── practices table ─────────────────────────────────────────────────── */
@@ -467,6 +644,7 @@
             (c>0?('<b>'+n(c)+'</b> open'+(lines.length?'<br>'+lines.join('<br>'):'')):'Nothing open'));
         });
         el.addEventListener('mouseleave',hideTip);
+        el.addEventListener('click',function(){ openDrawer(el.getAttribute('data-o')); });
       });
     }
 
@@ -526,7 +704,7 @@
         return Math.max.apply(null,x.counts); }))||1;
       var h='<div style="padding:18px 20px 22px"><div class="gd-bars">';
       s.forEach(function(x){
-        h+='<div class="gd-bar-row">'+
+        h+='<div class="gd-bar-row clickable" data-service="'+esc(x.name)+'">'+
           '<span class="gd-bar-name" title="'+esc(x.name)+'">'+esc(x.name)+'</span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
@@ -545,6 +723,14 @@
         [].slice.call(document.querySelectorAll('#servicesBody .gd-bar-fill')).forEach(function(f){
           f.style.width=f.getAttribute('data-w')+'%'; });
       });
+      [].slice.call(document.querySelectorAll('#servicesBody .gd-bar-row[data-service]')).forEach(function(el){
+        el.addEventListener('click',function(){
+          var sv=el.getAttribute('data-service'), sel=document.getElementById('fService');
+          sel.value=(sel.value===sv)?'':sv;
+          syncBarHighlights(); switchTab('practices'); onFilter();
+        });
+      });
+      syncBarHighlights();
     }
 
     /* ── drawer ──────────────────────────────────────────────────────────── */
