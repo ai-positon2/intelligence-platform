@@ -486,3 +486,140 @@ def test_analysis_job_merges_the_newer_enrichment_list_fields(monkeypatch):
     assert saved["output"]["aienrichment.risks"] == ["r"]
     assert saved["output"]["aienrichment.contentAngles"] == ["c"]
     assert "aienrichment.coverage" not in saved["output"]
+
+
+# ── On-demand AI Insights backfill ─────────────────────────────────────────
+# The synthesis is generated at analysis time and stored, so runs that
+# completed before that feature shipped have no aienrichment.* keys and can
+# never grow them on a read (unlike derived.*, which is recomputed every
+# time). This route makes the one Claude call against the vendor output that
+# is already saved, instead of re-running the multi-minute vendor workflow.
+
+_INSIGHTS_URL = "/p2/b2b-agents/linkedin-strategy-researcher/runs/1/insights"
+
+
+def _enrichment():
+    return {"headline": "H", "synthesis": "S", "topActions": ["a"], "coverage": "C"}
+
+
+def test_insights_cannot_be_generated_for_someone_elses_run(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    _owner_scoped_get_run(monkeypatch, _run(email=_OTHER))
+    assert _client().post(_INSIGHTS_URL).status_code == 404
+
+
+def test_insights_require_login(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    _owner_scoped_get_run(monkeypatch)
+    resp = appmod.app.test_client().post(_INSIGHTS_URL)
+    assert resp.status_code in (302, 401, 403)
+
+
+def test_insights_refuse_a_run_that_has_not_finished(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    _owner_scoped_get_run(monkeypatch, _run(status="running"))
+    resp = _client().post(_INSIGHTS_URL)
+    assert resp.status_code == 409
+
+
+def test_insights_report_a_clear_error_when_no_key_is_configured(monkeypatch):
+    """A 503 with a readable message, not a background thread that silently
+    does nothing and leaves the UI polling forever."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _owner_scoped_get_run(monkeypatch)
+    resp = _client().post(_INSIGHTS_URL)
+    assert resp.status_code == 503
+    assert "error" in resp.get_json()
+
+
+def test_insights_start_a_background_job(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    _owner_scoped_get_run(monkeypatch)
+    started = []
+    monkeypatch.setattr(appmod.threading, "Thread",
+                        lambda *a, **k: type("T", (), {"start": lambda s: started.append(k)})())
+    resp = _client().post(_INSIGHTS_URL)
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "running"
+    assert started[0]["args"] == (1, _OWNER)
+
+
+def test_insights_job_merges_the_synthesis_into_the_stored_output(monkeypatch):
+    run = _run_with_posts()
+    run["output"]["strategyagent.strategy"] = "vendor text"
+    _owner_scoped_get_run(monkeypatch, run)
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: _enrichment())
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+    assert saved["status"] == "complete"
+    assert saved["output"]["aienrichment.headline"] == "H"
+    assert saved["output"]["aienrichment.coverage"] == "C"
+    assert saved["output"]["strategyagent.strategy"] == "vendor text"
+
+
+def test_insights_job_does_not_persist_the_recomputed_metrics(monkeypatch):
+    """derived.* is handed to Claude but must stay out of the stored blob, so
+    later improvements to lps_analytics keep applying retroactively instead of
+    being frozen into whichever runs happened to be enriched."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: _enrichment())
+    saved = {}
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda run_id, status, **kwargs: saved.update(status=status, **kwargs))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+    assert not [k for k in saved["output"] if k.startswith("derived.")]
+
+
+def test_insights_job_hands_claude_the_computed_metrics(monkeypatch):
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+    seen = {}
+
+    def _capture(output, name, run_type):
+        seen["derived"] = [k for k in output if k.startswith("derived.")]
+        seen["name"] = name
+        return None
+
+    monkeypatch.setattr(lps_enrichment, "enrich_run", _capture)
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda *a, **k: pytest.fail("nothing to save"))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+    assert "derived.engagement" in seen["derived"]
+    assert seen["name"] == "Acme"
+
+
+def test_insights_job_saves_nothing_when_the_synthesis_comes_back_empty(monkeypatch):
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+    monkeypatch.setattr(lps_enrichment, "enrich_run", lambda *a, **k: None)
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda *a, **k: pytest.fail("must not write an empty synthesis"))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+
+def test_insights_job_never_raises_when_the_claude_call_blows_up(monkeypatch):
+    """It runs on a daemon thread with nothing to catch it, and the run it is
+    enriching is already complete and correct."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts())
+
+    def _boom(*a, **k):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(lps_enrichment, "enrich_run", _boom)
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda *a, **k: pytest.fail("nothing should be written"))
+    appmod._lps_run_insights_job(1, _OWNER)
+
+
+def test_insights_job_refuses_a_run_that_is_not_the_callers(monkeypatch):
+    """The job re-reads through the ownership-scoped get_run rather than
+    trusting the run_id it was handed."""
+    _owner_scoped_get_run(monkeypatch, _run_with_posts(email=_OTHER))
+    monkeypatch.setattr(lps_enrichment, "enrich_run",
+                        lambda *a, **k: pytest.fail("must not enrich another user's run"))
+    monkeypatch.setattr(lps_store, "update_run_status",
+                        lambda *a, **k: pytest.fail("must not write"))
+    appmod._lps_run_insights_job(1, _OWNER)

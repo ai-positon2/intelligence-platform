@@ -7682,6 +7682,60 @@ def linkedin_scraper_data():
 # longer than gunicorn's own worker timeout, so both run in a background
 # thread and the client polls for completion.
 
+def _lps_merge_enrichment(output: dict, enrichment) -> bool:
+    """Copy a Claude synthesis onto its `aienrichment.*` keys. Shared by the
+    analysis job (which enriches at analysis time) and the on-demand backfill
+    below (which enriches a run that predates the feature), so both write the
+    identical key set. Optional fields are omitted rather than stored empty,
+    so the report can skip their sections instead of rendering bare headings."""
+    if not enrichment:
+        return False
+    output["aienrichment.headline"] = enrichment["headline"]
+    output["aienrichment.synthesis"] = enrichment["synthesis"]
+    for field in ("topActions", "strengths", "risks", "contentAngles", "coverage"):
+        if enrichment.get(field):
+            output[f"aienrichment.{field}"] = enrichment[field]
+    return True
+
+
+def _lps_run_insights_job(run_id: int, email: str) -> None:
+    """Generate AI Insights for an already-completed run, on request.
+
+    The synthesis is produced at analysis time and stored, so every run that
+    completed before that feature shipped has no `aienrichment.*` keys and can
+    never grow them on its own -- unlike the derived.* metrics, which are
+    recomputed on every read. Re-running the whole multi-minute vendor
+    workflow just to get the synthesis would be wasteful (and would spend
+    vendor credits) when the vendor output is already saved, so this reads the
+    stored run, makes only the one Claude call, and merges the result back.
+
+    Only the vendor output plus `aienrichment.*` is persisted: the augmented
+    view handed to Claude carries derived.* too, but those stay recomputed on
+    read so improvements to them keep applying retroactively.
+    """
+    from tracker import lps_analytics
+    from tracker import lps_enrichment
+    from tracker import linkedin_playbook_store as lps_store
+    try:
+        run = lps_store.get_run(run_id, email)
+        if not run or run.get("status") != "complete" or not isinstance(run.get("output"), dict):
+            return
+        stored = run["output"]
+        enrichment = lps_enrichment.enrich_run(
+            lps_analytics.augment(stored),
+            run.get("company_name") or "",
+            run.get("run_type") or "OWN",
+        )
+        if not enrichment:
+            log.info("LinkedIn Strategy Researcher: no insights produced for run %s", run_id)
+            return
+        merged = dict(stored)
+        _lps_merge_enrichment(merged, enrichment)
+        lps_store.update_run_status(run_id, "complete", output=merged)
+    except Exception as e:
+        log.warning("LinkedIn Strategy Researcher: insights job failed for run %s: %s", run_id, e)
+
+
 def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email: str,
                           run_type: str, parent_arena_id: str) -> None:
     """Background worker: never touches Flask's request/session context --
@@ -7714,12 +7768,7 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
         except Exception as e:
             log.warning("LinkedIn Strategy Researcher: enrichment failed for run %s: %s", run_id, e)
             enrichment = None
-        if enrichment:
-            output["aienrichment.headline"] = enrichment["headline"]
-            output["aienrichment.synthesis"] = enrichment["synthesis"]
-            for field in ("topActions", "strengths", "risks", "contentAngles", "coverage"):
-                if enrichment.get(field):
-                    output[f"aienrichment.{field}"] = enrichment[field]
+        _lps_merge_enrichment(output, enrichment)
         # The history table's Summary column reads this one column. Every real
         # run returns `messagingagent.summary` as an OBJECT ({text, moves,
         # stats, ...}), never a bare string, so the previous isinstance(str)
@@ -7845,6 +7894,30 @@ def linkedin_playbook_studio_run(run_id):
         run["output"] = lps_analytics.augment(run["output"])
     run["children"] = lps_store.get_children(run_id, email)
     return jsonify(run)
+
+
+@app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/insights", methods=["POST"])
+@position2_required
+def linkedin_playbook_studio_insights(run_id):
+    """Backfill (or regenerate) the AI Insights synthesis for one saved run.
+
+    Ownership-scoped through the same get_run as every other route here, so a
+    run that isn't yours 404s rather than quietly being enriched. Runs off the
+    request thread like the analysis and playbook jobs, since the Claude call
+    is slower than gunicorn's worker timeout allows; the client polls the run
+    endpoint for the `aienrichment.*` keys to appear.
+    """
+    from tracker import linkedin_playbook_store as lps_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = lps_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    if run.get("status") != "complete":
+        return jsonify({"error": "This run hasn't finished yet."}), 409
+    if not os.environ.get("ANTHROPIC_API_KEY", ""):
+        return jsonify({"error": "AI insights aren't configured on this deployment."}), 503
+    threading.Thread(target=_lps_run_insights_job, args=(run_id, email), daemon=True).start()
+    return jsonify({"status": "running"})
 
 
 @app.route("/p2/b2b-agents/linkedin-strategy-researcher/runs/<int:run_id>/playbook", methods=["GET", "POST"])

@@ -1380,8 +1380,17 @@
     function aiInsightsContent(output){
       var headline=output['aienrichment.headline'];
       var synthesis=output['aienrichment.synthesis'];
+      /* The synthesis is produced at analysis time and stored, so a run that
+         completed before this feature shipped has no aienrichment.* keys and
+         cannot grow them on a read (unlike derived.*, which is recomputed
+         every time). Rather than a dead end telling the reader to re-run the
+         whole multi-minute vendor analysis, offer the one Claude call against
+         the vendor output that is already saved. */
       if(isEmptyValue(headline)&&isEmptyValue(synthesis))
-        return emptyState('aienrichment','Set ANTHROPIC_API_KEY and re-run an analysis to generate this section.');
+        return '<div id="lpsInsightsBody">'
+          +'<div class="lps-empty">This run was analyzed before AI Insights existed, so no synthesis was saved for it.'
+          +'<div class="lps-empty-note">Generating reads the analysis already stored for this run, so it takes seconds and does not re-run the five-agent workflow.</div></div>'
+          +'<div style="text-align:center"><button class="lps-act primary" style="margin-top:18px" onclick="generateInsights()">✨ Generate AI insights</button></div></div>';
       var html='<div class="lps-ai-badge">✨ AI-synthesized — combines signal across every section on this report, not vendor data on its own</div>';
       if(!isEmptyValue(headline))html+='<div class="lps-ai-headline">'+esc(headline)+'</div>';
       if(!isEmptyValue(synthesis)){
@@ -1404,6 +1413,39 @@
       if(!isEmptyValue(coverage))html+='<div class="lps-ai-coverage">'+esc(coverage)+'</div>';
       return html;
     }
+    /* Kicks off the one-call backfill and polls the run until the synthesis
+       lands, then reopens the report on this same tab so every section that
+       reads aienrichment.* (this pane and the Overview teaser) refreshes from
+       one source of truth rather than being patched in two places. */
+    function generateInsights(){
+      if(!DRAWER_RUN)return;
+      var runId=DRAWER_RUN.id;
+      var wrap=document.getElementById('lpsInsightsBody');
+      var fail=function(msg){
+        if(wrap)wrap.innerHTML='<div class="lps-empty">'+esc(msg)
+          +'</div><div style="text-align:center"><button class="lps-act" style="margin-top:16px" onclick="generateInsights()">Try again</button></div>';
+      };
+      if(wrap)wrap.innerHTML='<div class="lps-running"><div class="lps-spinner"></div>'
+        +'<div class="lps-running-text">Reading everything this analysis returned and writing one point of view across it…</div></div>';
+      fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+runId+'/insights',{method:'POST'})
+        .then(function(r){return r.json().then(function(d){return {ok:r.ok,data:d};});})
+        .then(function(res){
+          if(!res.ok){ fail(res.data.error||'Couldn\'t start generating insights.'); return; }
+          var tries=0;
+          (function poll(){
+            if(++tries>40){ fail('Insights are taking longer than expected. Try again in a moment.'); return; }
+            setTimeout(function(){
+              fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+runId)
+                .then(function(r){return r.json();}).then(function(run){
+                  var out=run.output||{};
+                  if(!isEmptyValue(out['aienrichment.headline'])){ openRunDrawer(runId,'aienrichment'); return; }
+                  poll();
+                }).catch(poll);
+            },3000);
+          })();
+        }).catch(function(){ fail('Couldn\'t reach the server.'); });
+    }
+
     function renderNumberedList(arr){
       return '<ol class="lps-num-list">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
         return '<li>'+esc(String(s))+'</li>';
