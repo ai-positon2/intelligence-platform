@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/gentle_dental_slot_checker.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gentle_dental_slot_checker.css') }}?v=7">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <script src="/static/js/pfx_bg.js?v=3" defer></script>
@@ -197,6 +197,52 @@
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function n(v){return (v==null?0:v).toLocaleString('en-US');}
+    function pxVar(k){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(k))||0; }
+
+    /* A round axis step, so gridlines read 0/250/500/750/1,000 rather than
+       0/200/400/600/801. Bars are scaled against the rounded top, not the
+       observed max, which is what makes the gridlines mean anything. */
+    function niceStep(v){
+      if(!(v>0)) return 1;
+      var e=Math.pow(10,Math.floor(Math.log(v)/Math.LN10)), f=v/e;
+      return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*e;
+    }
+
+    /* Top three plus a neutral "Other". Segment colours are fixed by rank and
+       nothing repaints them, and every segment is named in the key below, so
+       identity is never carried by colour alone. */
+    var RIB=['r1','r2','r3'], RIB_OTHER='r0';
+    function ribbon(items,total,label){
+      if(!total||!items.length) return '';
+      var top=items.slice(0,3), rest=items.slice(3), segs='', keys='';
+      var restSum=rest.reduce(function(a,x){return a+x.slots;},0);
+      top.forEach(function(x,i){
+        var pct=x.slots/total*100;
+        segs+='<span class="gd-ribbon-seg '+RIB[i]+'" data-w="'+pct.toFixed(2)+'"></span>';
+        keys+='<span><i class="'+RIB[i]+'"></i>'+esc(label(x))+' <b>'+Math.round(pct)+'%</b></span>';
+      });
+      if(restSum>0){
+        var pct=restSum/total*100;
+        segs+='<span class="gd-ribbon-seg '+RIB_OTHER+'" data-w="'+pct.toFixed(2)+'"></span>';
+        keys+='<span><i class="'+RIB_OTHER+'"></i>'+rest.length+' more <b>'+Math.round(pct)+'%</b></span>';
+      }
+      return '<div class="gd-ribbon" aria-hidden="true">'+segs+'</div><div class="gd-ribbon-key">'+keys+'</div>';
+    }
+    function barsHead(a,b,c){
+      return '<div class="gd-bar-row gd-bars-head">'+
+        '<span class="gd-bar-rank" style="visibility:hidden">0</span>'+
+        '<span class="gd-bar-name">'+a+'</span>'+
+        '<span class="gd-bar-track"></span>'+
+        '<span class="gd-bar-num">'+b+'</span>'+
+        '<span class="gd-bar-sub">'+c+'</span></div>';
+    }
+    function growBars(root){
+      requestAnimationFrame(function(){
+        [].slice.call(root.querySelectorAll('.gd-bar-fill,.gd-ribbon-seg')).forEach(function(f){
+          f.style.width=f.getAttribute('data-w')+'%';
+        });
+      });
+    }
 
     /* ── boot ────────────────────────────────────────────────────────────── */
     function boot(){
@@ -379,16 +425,55 @@
       }
       var peakIdx=0;
       d.forEach(function(x,i){ if(x.slots>d[peakIdx].slots) peakIdx=i; });
-      var html='<div class="gd-cols">';
+
+      /* Everything vertical is measured from one origin so the gridlines, the
+         y-axis ticks and the average line share the bars' baseline exactly:
+         `lbl-h + lbl-gap` up from the bottom of .gd-cols, plus a fraction of
+         bar-max. The peak badge lives in bar-head above the tallest bar, which
+         is why it can no longer overflow the card and land on the header. */
+      var BAR=pxVar('--gd-bar-max')||150;
+      var step=niceStep(max/4), niceMax=Math.max(step,Math.ceil(max/step)*step);
+      var avg=d.reduce(function(a,x){return a+x.slots;},0)/d.length;
+      var base='calc(var(--gd-lbl-h) + var(--gd-lbl-gap) + var(--gd-bar-max) * ';
+      var yh='', gl='';
+      for(var v=0; v<=niceMax+step/2; v+=step){
+        var f=(v/niceMax).toFixed(4);
+        yh+='<span class="gd-ytick" style="bottom:'+base+f+')">'+n(v)+'</span>';
+        gl+='<span class="gd-gl'+(v===0?' base':'')+'" style="bottom:'+base+f+')"></span>';
+      }
+      gl+='<span class="gd-avg" style="bottom:'+base+(avg/niceMax).toFixed(4)+')"></span>';
+
+      var prevMon=null, cols='', months='';
       d.forEach(function(x,i){
-        var h=x.slots>0?Math.max(4,Math.round(x.slots/max*140)):1;
-        var peak=(i===peakIdx&&x.slots>0)?'<div class="gd-col-peak">'+n(x.slots)+'</div>':'';
-        html+='<div class="gd-col'+(x.weekend?' weekend':'')+'" data-i="'+i+'">'+peak+
-          '<div class="gd-col-bar'+(x.slots>0?'':' zero')+'" style="height:'+h+'px"></div>'+
-          '<div class="gd-col-lbl"><b>'+esc(x.weekday)+'</b>'+esc(x.label.split(' ')[0])+'<i> '+esc(x.label.split(' ')[1]||'')+'</i></div></div>';
+        var h=x.slots>0?Math.max(3,Math.round(x.slots/niceMax*BAR)):1;
+        var parts=String(x.label||'').split(' '), dayNum=parts[0]||'', mon=parts[1]||'';
+        months+='<span class="gd-mo">'+(mon!==prevMon?esc(mon):'')+'</span>';
+        prevMon=mon;
+        cols+='<div class="gd-col'+(x.weekend?' weekend':'')+(i===peakIdx&&x.slots>0?' is-peak':'')+'" data-i="'+i+'">'+
+          ((i===peakIdx&&x.slots>0)?'<div class="gd-col-peak">'+n(x.slots)+'</div>':'')+
+          '<div class="gd-col-bar'+(x.slots>0?'':' zero')+'" data-h="'+h+'" style="height:0"></div>'+
+          '<div class="gd-col-lbl"><b>'+esc(x.weekday)+'</b><i>'+esc(dayNum)+'</i></div></div>';
       });
-      html+='</div>';
-      document.getElementById('daysBody').innerHTML=html;
+
+      document.getElementById('daysBody').innerHTML=
+        '<div class="gd-chart">'+
+          '<div class="gd-plot">'+
+            '<div class="gd-yaxis" aria-hidden="true">'+yh+'</div>'+
+            '<div class="gd-gls" aria-hidden="true">'+gl+'</div>'+
+            '<div class="gd-cols">'+cols+'</div>'+
+          '</div>'+
+          '<div class="gd-months" aria-hidden="true">'+months+'</div>'+
+          '<div class="gd-chart-key">'+
+            '<span><i class="k-wd"></i>Weekday</span>'+
+            '<span><i class="k-we"></i>Weekend</span>'+
+            '<span><i class="k-avg"></i>Daily average <b>'+n(Math.round(avg))+'</b></span>'+
+          '</div>'+
+        '</div>';
+      requestAnimationFrame(function(){
+        [].slice.call(document.querySelectorAll('#daysBody .gd-col-bar')).forEach(function(b){
+          b.style.height=b.getAttribute('data-h')+'px';
+        });
+      });
       [].slice.call(document.querySelectorAll('#daysBody .gd-col')).forEach(function(el){
         var x=d[parseInt(el.getAttribute('data-i'),10)];
         el.addEventListener('mousemove',function(ev){
@@ -406,22 +491,20 @@
       var s=DATA.by_state||[];
       if(!s.length){ document.getElementById('statesBody').innerHTML=''; return; }
       var max=Math.max.apply(null,s.map(function(x){return x.slots;}))||1;
-      var html='<div class="gd-bars">';
+      var tot=s.reduce(function(a,x){return a+x.slots;},0);
+      var html=ribbon(s,tot,function(x){return x.state;})+
+        barsHead('State','Slots','Avg/ea')+'<div class="gd-bars">';
       s.forEach(function(x,i){
         html+='<div class="gd-bar-row clickable" data-state="'+esc(x.state)+'">'+
           '<span class="gd-bar-rank'+(i===0?' top':'')+'">'+(i+1)+'</span>'+
           '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' practice'+(x.practices===1?'':'s')+'</span></span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
-          '<span class="gd-bar-sub">'+n(Math.round(x.avg))+'/ea</span></div>';
+          '<span class="gd-bar-sub">'+n(Math.round(x.avg))+'</span></div>';
       });
       html+='</div>';
       document.getElementById('statesBody').innerHTML=html;
-      requestAnimationFrame(function(){
-        [].slice.call(document.querySelectorAll('#statesBody .gd-bar-fill')).forEach(function(f){
-          f.style.width=f.getAttribute('data-w')+'%';
-        });
-      });
+      growBars(document.getElementById('statesBody'));
       [].slice.call(document.querySelectorAll('#statesBody .gd-bar-row')).forEach(function(el){
         el.addEventListener('click',function(){
           var st=el.getAttribute('data-state'), sel=document.getElementById('fState');
@@ -438,22 +521,20 @@
       if(!b.length){ el.innerHTML=''; return; }
       var top=b.slice(0,8);
       var max=Math.max.apply(null,top.map(function(x){return x.slots;}))||1;
-      var html='<div class="gd-bars">';
+      var tot=b.reduce(function(a,x){return a+x.slots;},0);
+      var html=ribbon(b,tot,function(x){return x.brand;})+
+        barsHead('Brand','Slots','Locations')+'<div class="gd-bars">';
       top.forEach(function(x,i){
         html+='<div class="gd-bar-row clickable" data-brand="'+esc(x.brand)+'">'+
           '<span class="gd-bar-rank'+(i===0?' top':'')+'">'+(i+1)+'</span>'+
           '<span class="gd-bar-name">'+esc(x.brand)+'</span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
-          '<span class="gd-bar-sub">'+x.practices+' loc</span></div>';
+          '<span class="gd-bar-sub">'+x.practices+'</span></div>';
       });
       html+='</div>';
       el.innerHTML=html;
-      requestAnimationFrame(function(){
-        [].slice.call(el.querySelectorAll('.gd-bar-fill')).forEach(function(f){
-          f.style.width=f.getAttribute('data-w')+'%';
-        });
-      });
+      growBars(el);
       [].slice.call(el.querySelectorAll('.gd-bar-row')).forEach(function(row){
         row.addEventListener('click',function(){
           var br=row.getAttribute('data-brand'), sel=document.getElementById('fBrand');
