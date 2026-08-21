@@ -295,7 +295,27 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
    Each page's own bg lives on body which was covering the fixed canvas.
    Move a base to the root (pages may override via :root for their gradient),
    make body transparent, and keep the canvas behind content. ═══ */
+/* The light ground below used to read
+   `:root[data-theme="light"] html,[data-theme="light"] html`, which can never
+   match: :root IS the html element, so both selectors ask for an html element
+   nested inside a light-themed html. The light ground never applied, and because
+   body is forced transparent further down, every page relying on this showed the
+   dark #070912 ground under light-mode text.
+   The replacement is spelled `html[data-theme="light"]` deliberately. :root is a
+   pseudo-CLASS, so weights here are less obvious than they look:
+     html                            0,0,1
+     :root                           0,1,0
+     html[data-theme="light"]        0,1,1   <- this rule
+     :root[data-theme="light"]       0,2,0
+     html:root[data-theme="light"]   0,2,1
+   0,1,1 is the slot we want. It beats the `html{...}` dark base (0,0,1) on
+   specificity rather than on load order, so it works no matter where a page
+   drops this file, while still yielding to a page that declares its own
+   `html[data-theme="light"]{...}` later — see templates/context.html, which
+   keeps its light gradient exactly that way. Writing this as
+   `:root[data-theme="light"]` instead would score 0,2,0 and silently flatten
+   that gradient to a solid fill. */
 html{background:#070912}
-:root[data-theme="light"] html,[data-theme="light"] html{background:#eef1f8}
+html[data-theme="light"]{background:#eef1f8}
 body{background:transparent!important}
 #pfx-bg{z-index:-1!important}

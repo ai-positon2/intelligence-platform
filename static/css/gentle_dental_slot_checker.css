@@ -15,17 +15,23 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* The page ground goes on the root element, not on body, and the selector is
-   `html:root` rather than `:root` on purpose.
-   aurora-app.css loads after this file and carries `body{background:transparent
-   !important}` plus `html{background:#070912}`, so a background on body is
-   discarded outright and a plain `:root{...}` here would lose the later-wins
-   tiebreak to its `html{...}`. `html:root` scores 0,0,2 against that 0,0,1 and
-   wins on specificity regardless of order.
-   Worth knowing: aurora-app.css's own light-mode ground
-   (`:root[data-theme="light"] html`) can never match, because :root IS html, so
-   it is asking for an html inside a light-themed html. Every page that relies on
-   it gets the dark ground in light mode. This page does not rely on it. */
+/* The page ground goes on the root element, not on body, and the selectors are
+   `html:root` / `html:root[data-theme="light"]` rather than the plainer `:root`
+   forms on purpose.
+   aurora-app.css loads AFTER this file and carries `body{background:transparent
+   !important}` plus its own root grounds, so a background on body here is
+   discarded outright and anything that merely ties aurora on specificity loses
+   the later-wins tiebreak. Beating it outright is the only stable option.
+   Weights, keeping in mind that :root is a pseudo-CLASS and so outweighs the
+   html type selector:
+                                   aurora   this file
+     dark    html                   0,0,1
+             html:root                       0,1,1   <- beats 0,0,1
+     light   html[data-theme=...]   0,1,1
+             html:root[data-...]             0,2,1   <- beats 0,1,1
+   Both win on specificity rather than on load order, which is the whole point.
+   Dropping either `html` prefix drops this to a tie or below and hands the
+   ground back to aurora-app.css. */
 html:root {
   background:
     radial-gradient(ellipse 80% 50% at 16% 0%,  rgba(74,222,128,.10) 0%, transparent 60%),
