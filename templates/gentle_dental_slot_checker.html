@@ -65,37 +65,28 @@
 
     <div class="gd-stats" id="statsRow">
       <div class="gd-stat s-slots" onclick="switchTab('heat')">
+        <div class="gd-stat-ico" aria-hidden="true">⚡</div>
         <div class="gd-stat-label">Open Slots</div>
         <div class="gd-stat-val" id="kSlots"><span class="skel" style="width:86px;height:34px"></span></div>
         <div class="gd-stat-hint">See the calendar →</div>
       </div>
       <div class="gd-stat s-practices" onclick="switchTab('practices')">
+        <div class="gd-stat-ico" aria-hidden="true">🏢</div>
         <div class="gd-stat-label">Practices Checked</div>
         <div class="gd-stat-val" id="kPractices"><span class="skel" style="width:70px;height:34px"></span></div>
         <div class="gd-stat-hint">Browse practices →</div>
       </div>
       <div class="gd-stat s-attention" onclick="switchTab('alerts')">
+        <div class="gd-stat-ico" aria-hidden="true">⚠</div>
         <div class="gd-stat-label">Needs Attention</div>
         <div class="gd-stat-val" id="kAttention"><span class="skel" style="width:56px;height:34px"></span></div>
         <div class="gd-stat-hint">Review problems →</div>
       </div>
       <div class="gd-stat s-avg" onclick="switchTab('services')">
+        <div class="gd-stat-ico" aria-hidden="true">📊</div>
         <div class="gd-stat-label">Avg per Practice</div>
         <div class="gd-stat-val" id="kAvg"><span class="skel" style="width:64px;height:34px"></span></div>
         <div class="gd-stat-hint">Service mix →</div>
-      </div>
-    </div>
-
-    <div class="card gd-ai" id="cardAI">
-      <div class="gd-ai-top">
-        <div class="gd-ai-badge"><span class="gd-ai-dot"></span>AI Insights</div>
-        <div class="gd-ai-actions">
-          <span class="gd-ai-meta" id="aiMeta"></span>
-          <button class="gd-ai-refresh" id="aiRefresh" onclick="loadInsights(true)" title="Regenerate" aria-label="Regenerate this week's briefing">⟳</button>
-        </div>
-      </div>
-      <div id="aiBody" class="gd-ai-body">
-        <div class="gd-ai-loading"><div class="gd-ai-pulse"></div>Reading this week's numbers…</div>
       </div>
     </div>
 
@@ -162,6 +153,19 @@
       </div>
       <div id="pane-services" class="gd-pane">
         <div id="servicesBody"><div class="gd-loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="card gd-ai compact" id="cardAI">
+      <div class="gd-ai-top">
+        <div class="gd-ai-badge"><span class="gd-ai-dot"></span>AI Weekly Briefing</div>
+        <div class="gd-ai-actions">
+          <span class="gd-ai-meta" id="aiMeta"></span>
+          <button class="gd-ai-refresh" id="aiRefresh" onclick="loadInsights(true)" title="Regenerate" aria-label="Regenerate this week's briefing">⟳</button>
+        </div>
+      </div>
+      <div id="aiBody" class="gd-ai-body">
+        <div class="gd-ai-loading"><div class="gd-ai-pulse"></div>Reading this week's numbers…</div>
       </div>
     </div>
   </div>
@@ -293,18 +297,39 @@
         return;
       }
       body.setAttribute('data-state','ok');
+      card.classList.remove('expanded');
       var ins=d.insights, h='';
+      var paras=String(ins.synthesis||'').split('\n\n').map(function(p){return p.trim();}).filter(Boolean);
+      var actions=ins.topActions||[], opps=ins.opportunities||[], risks=ins.risks||[];
       h+='<div class="gd-ai-headline">'+esc(ins.headline)+'</div>';
-      h+='<div class="gd-ai-syn">'+String(ins.synthesis||'').split('\n\n').map(function(p){
-        return p.trim()?'<p>'+esc(p)+'</p>':''; }).join('')+'</div>';
+      if(paras.length) h+='<div class="gd-ai-teaser">'+esc(paras[0])+'</div>';
+      var chips='';
+      if(actions.length) chips+='<span class="gd-ai-chip act">'+actions.length+' action'+(actions.length===1?'':'s')+'</span>';
+      if(opps.length) chips+='<span class="gd-ai-chip opp">'+opps.length+' opportunit'+(opps.length===1?'y':'ies')+'</span>';
+      if(risks.length) chips+='<span class="gd-ai-chip risk">'+risks.length+' risk'+(risks.length===1?'':'s')+'</span>';
+      var hasMore=paras.length>1 || actions.length || opps.length || risks.length || ins.coverage;
+      if(chips || hasMore){
+        h+='<div class="gd-ai-summary-row">'+chips+
+          (hasMore?'<button class="gd-ai-toggle" id="aiToggle" onclick="toggleAiExpand()">Full briefing <span id="aiToggleIcon">▾</span></button>':'')+
+          '</div>';
+      }
+      var more='';
+      if(paras.length>1) more+='<div class="gd-ai-syn">'+paras.slice(1).map(function(p){ return '<p>'+esc(p)+'</p>'; }).join('')+'</div>';
       var cols='';
-      if(ins.topActions && ins.topActions.length) cols+=aiList('Priority actions','act',ins.topActions);
-      if(ins.opportunities && ins.opportunities.length) cols+=aiList('Opportunities','opp',ins.opportunities);
-      if(ins.risks && ins.risks.length) cols+=aiList('Risks','risk',ins.risks);
-      if(cols) h+='<div class="gd-ai-cols">'+cols+'</div>';
-      if(ins.coverage) h+='<div class="gd-ai-coverage">'+esc(ins.coverage)+'</div>';
+      if(actions.length) cols+=aiList('Priority actions','act',actions);
+      if(opps.length) cols+=aiList('Opportunities','opp',opps);
+      if(risks.length) cols+=aiList('Risks','risk',risks);
+      if(cols) more+='<div class="gd-ai-cols">'+cols+'</div>';
+      if(ins.coverage) more+='<div class="gd-ai-coverage">'+esc(ins.coverage)+'</div>';
+      if(more) h+='<div class="gd-ai-more" id="aiMore">'+more+'</div>';
       body.innerHTML=h;
       document.getElementById('aiMeta').textContent="This week's snapshot";
+    }
+    function toggleAiExpand(){
+      var card=document.getElementById('cardAI'), willExpand=!card.classList.contains('expanded');
+      card.classList.toggle('expanded',willExpand);
+      var btn=document.getElementById('aiToggle');
+      if(btn) btn.innerHTML=willExpand?'Show less <span id="aiToggleIcon">▴</span>':'Full briefing <span id="aiToggleIcon">▾</span>';
     }
     function aiList(title,cls,items){
       return '<div class="gd-ai-col ai-'+cls+'"><div class="gd-ai-col-t">'+esc(title)+'</div><ul>'+
@@ -352,10 +377,13 @@
         document.getElementById('daysMeta').textContent =
           'weekends run '+Math.round((1-avgWk/avgWd)*100)+'% thinner';
       }
+      var peakIdx=0;
+      d.forEach(function(x,i){ if(x.slots>d[peakIdx].slots) peakIdx=i; });
       var html='<div class="gd-cols">';
       d.forEach(function(x,i){
         var h=x.slots>0?Math.max(4,Math.round(x.slots/max*140)):1;
-        html+='<div class="gd-col'+(x.weekend?' weekend':'')+'" data-i="'+i+'">'+
+        var peak=(i===peakIdx&&x.slots>0)?'<div class="gd-col-peak">'+n(x.slots)+'</div>':'';
+        html+='<div class="gd-col'+(x.weekend?' weekend':'')+'" data-i="'+i+'">'+peak+
           '<div class="gd-col-bar'+(x.slots>0?'':' zero')+'" style="height:'+h+'px"></div>'+
           '<div class="gd-col-lbl"><b>'+esc(x.weekday)+'</b>'+esc(x.label.split(' ')[0])+'<i> '+esc(x.label.split(' ')[1]||'')+'</i></div></div>';
       });
@@ -379,8 +407,9 @@
       if(!s.length){ document.getElementById('statesBody').innerHTML=''; return; }
       var max=Math.max.apply(null,s.map(function(x){return x.slots;}))||1;
       var html='<div class="gd-bars">';
-      s.forEach(function(x){
+      s.forEach(function(x,i){
         html+='<div class="gd-bar-row clickable" data-state="'+esc(x.state)+'">'+
+          '<span class="gd-bar-rank'+(i===0?' top':'')+'">'+(i+1)+'</span>'+
           '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' practice'+(x.practices===1?'':'s')+'</span></span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
@@ -410,8 +439,9 @@
       var top=b.slice(0,8);
       var max=Math.max.apply(null,top.map(function(x){return x.slots;}))||1;
       var html='<div class="gd-bars">';
-      top.forEach(function(x){
+      top.forEach(function(x,i){
         html+='<div class="gd-bar-row clickable" data-brand="'+esc(x.brand)+'">'+
+          '<span class="gd-bar-rank'+(i===0?' top':'')+'">'+(i+1)+'</span>'+
           '<span class="gd-bar-name">'+esc(x.brand)+'</span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
