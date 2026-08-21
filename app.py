@@ -4124,6 +4124,41 @@ def gentle_dental_slot_checker_data():
     return resp
 
 
+@app.route("/p2/b2b-agents/gentle-dental-slot-checker/insights")
+@position2_required
+def gentle_dental_slot_checker_insights():
+    """AI-synthesized weekly briefing over the current dashboard numbers.
+
+    tracker/slot_checker_insights.py degrades to (None, None) when
+    ANTHROPIC_API_KEY isn't configured -- that is a deployment state, not a
+    per-request failure, so it renders as "not configured" rather than an
+    error. A real per-call failure (timeout, truncated reply, bad key)
+    carries a describe_error()/is_retryable() pair the frontend can act on,
+    the same contract app.py already uses for LinkedIn Strategy Researcher's
+    AI Insights (see _lps_run_insights_job).
+    """
+    from tracker import slot_checker, slot_checker_insights
+    force = request.args.get("fresh") in ("1", "true", "yes")
+    dashboard = slot_checker.fetch()
+    if not dashboard.get("practices"):
+        return jsonify({"configured": bool(os.environ.get("ANTHROPIC_API_KEY", "")),
+                         "ok": False, "error": "There is no availability data yet to summarize.",
+                         "retryable": False})
+    if not os.environ.get("ANTHROPIC_API_KEY", ""):
+        return jsonify({"configured": False, "ok": False,
+                         "error": "AI Insights aren't configured on this deployment.",
+                         "retryable": False})
+    insights, err = slot_checker_insights.fetch(dashboard, force=force)
+    if insights:
+        resp = jsonify({"configured": True, "ok": True, "insights": insights})
+    else:
+        resp = jsonify({"configured": True, "ok": False,
+                         "error": slot_checker_insights.describe_error(err),
+                         "retryable": slot_checker_insights.is_retryable(err)})
+    resp.headers["Cache-Control"] = "private, max-age=60"
+    return resp
+
+
 _SEO_TOOLS_FALLBACK = [
     {"slug": "keyword-research",       "path": "/keyword-research",       "name": "Keyword Research",         "desc": "AI-powered keyword shortlisting",              "icon": "🔑", "tags": ["Keywords", "SEMrush"]},
     {"slug": "content-research",       "path": "/content-research",       "name": "Content Research",         "desc": "Competitor-based content briefs",              "icon": "🔎", "tags": ["Content", "SERP"]},

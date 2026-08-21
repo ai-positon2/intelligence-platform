@@ -27,9 +27,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
 from tracker import slot_checker as sc  # noqa: E402
+from tracker import slot_checker_insights as sci  # noqa: E402
 
 URL = "/p2/b2b-agents/gentle-dental-slot-checker"
 DATA = URL + "/data"
+INSIGHTS = URL + "/insights"
 
 
 def _client(email="reporting@position2.com"):
@@ -45,8 +47,10 @@ def _clean_caches():
     would in a running server, so a test that swaps the snapshot out would
     otherwise be answered from another test's data."""
     sc.reset_cache()
+    sci.reset_cache()
     yield
     sc.reset_cache()
+    sci.reset_cache()
 
 
 def _fake(generated_at="2026-08-21T00:00:00+00:00", slots=7):
@@ -215,3 +219,87 @@ def test_the_committed_snapshot_serves_a_populated_dashboard():
     assert t["slots"] > 0 and t["practices"] > 1
     assert t["window_days"] == len(body["dates"])
     assert sum(r["slots"] for r in body["by_date"]) == t["slots"]
+
+
+# ── /insights: the AI briefing route ─────────────────────────────────────────
+# This route is deliberately synchronous, unlike LinkedIn Strategy Researcher's
+# background-thread insights job: one Claude call over the dashboard's own
+# already-computed numbers finishes well inside a normal request, so there is
+# no run-id/poll dance here, just fetch-and-return with the same
+# configured/ok/error/retryable contract as slot_checker_insights.describe_error.
+
+def test_insights_requires_login():
+    resp = appmod.app.test_client().get(INSIGHTS, follow_redirects=False)
+    assert resp.status_code in (302, 401, 403)
+
+
+def test_insights_degrades_when_the_key_is_not_configured(monkeypatch, snapshot):
+    snapshot(_fake())
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    body = _client().get(INSIGHTS).get_json()
+    assert body["configured"] is False
+    assert body["ok"] is False
+    assert "error" in body
+
+
+def test_insights_returns_none_source_message_when_there_is_no_data(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-only")
+    monkeypatch.setattr(sc, "fetch", lambda force=False: {"practices": [], "totals": {}})
+    body = _client().get(INSIGHTS).get_json()
+    assert body["ok"] is False
+    assert "no availability data" in body["error"].lower()
+
+
+def test_insights_returns_the_generated_briefing_on_success(monkeypatch, snapshot):
+    snapshot(_fake())
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-only")
+    fake_result = {"headline": "H", "synthesis": "S", "topActions": []}
+    monkeypatch.setattr(sci, "generate_insights_result", lambda dashboard: (fake_result, None))
+    body = _client().get(INSIGHTS).get_json()
+    assert body["configured"] is True
+    assert body["ok"] is True
+    assert body["insights"]["headline"] == "H"
+
+
+def test_insights_surfaces_a_describable_error_and_whether_it_is_retryable(monkeypatch, snapshot):
+    snapshot(_fake())
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-only")
+    err = {"kind": sci.ERR_API, "status": 401, "detail": "rejected"}
+    monkeypatch.setattr(sci, "generate_insights_result", lambda dashboard: (None, err))
+    body = _client().get(INSIGHTS).get_json()
+    assert body["ok"] is False
+    assert body["retryable"] is False
+    assert "API key" in body["error"] or "renewed" in body["error"]
+
+
+def test_insights_is_cached_across_requests_within_the_ttl(monkeypatch, snapshot):
+    snapshot(_fake())
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-only")
+    calls = {"n": 0}
+
+    def fake_generate(dashboard):
+        calls["n"] += 1
+        return {"headline": "H" + str(calls["n"]), "synthesis": "S"}, None
+
+    monkeypatch.setattr(sci, "generate_insights_result", fake_generate)
+    c = _client()
+    first = c.get(INSIGHTS).get_json()
+    second = c.get(INSIGHTS).get_json()
+    assert first["insights"]["headline"] == second["insights"]["headline"]
+    assert calls["n"] == 1
+
+
+def test_insights_fresh_param_bypasses_the_cache(monkeypatch, snapshot):
+    snapshot(_fake())
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-only")
+    calls = {"n": 0}
+
+    def fake_generate(dashboard):
+        calls["n"] += 1
+        return {"headline": "H" + str(calls["n"]), "synthesis": "S"}, None
+
+    monkeypatch.setattr(sci, "generate_insights_result", fake_generate)
+    c = _client()
+    c.get(INSIGHTS)
+    c.get(INSIGHTS + "?fresh=1")
+    assert calls["n"] == 2

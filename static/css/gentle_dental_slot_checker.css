@@ -121,7 +121,8 @@ body {
 .s-avg .gd-stat-hint       { color: #67e8f9; }
 
 /* Cards */
-.gd-grid-2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--gutter); margin-bottom: 24px; }
+.gd-grid-3 { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: var(--gutter); margin-bottom: 24px; }
+.gd-grid-3 > :nth-child(3) { grid-column: 1 / -1; }
 .card { background: rgba(9,16,14,.9); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-lg); overflow: hidden; opacity: 0; transform: translateY(16px); transition: opacity .4s ease, transform .4s ease; }
 .card.visible { opacity: 1; transform: translateY(0); }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 0; flex-wrap: wrap; }
@@ -131,7 +132,10 @@ body {
 
 /* 14-day column chart */
 .gd-cols { display: flex; align-items: flex-end; gap: 6px; height: 168px; }
-.gd-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; cursor: default; }
+.gd-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; cursor: pointer; border-radius: 4px; transition: background .15s; }
+.gd-col:hover { background: rgba(74,222,128,.06); }
+.gd-col.active { background: rgba(74,222,128,.13); }
+.gd-col.active .gd-col-lbl b { color: #bef264; }
 .gd-col-bar { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg,#4ade80,#14b8a6); transition: height .7s cubic-bezier(.34,.6,.6,1), filter .15s; min-height: 2px; }
 .gd-col.weekend .gd-col-bar { background: linear-gradient(180deg,#5eead4,#0f766e); opacity: .62; }
 .gd-col:hover .gd-col-bar { filter: brightness(1.18); }
@@ -145,6 +149,10 @@ body {
 
 /* Bar lists */
 .gd-bars { display: flex; flex-direction: column; gap: 11px; }
+.gd-bar-row.clickable { cursor: pointer; padding: 5px 8px; margin: -5px -8px; border-radius: var(--radius-sm); transition: background .15s; }
+.gd-bar-row.clickable:hover { background: rgba(74,222,128,.07); }
+.gd-bar-row.clickable.active { background: rgba(74,222,128,.14); }
+.gd-bar-row.clickable.active .gd-bar-name { color: #d9f5e4; font-weight: 600; }
 .gd-bar-row { display: flex; align-items: center; gap: 10px; }
 .gd-bar-name { font-size: 11.5px; color: #c2d4cc; width: 148px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gd-bar-track { flex: 1; height: 6px; background: rgba(255,255,255,.06); border-radius: var(--radius-pill); overflow: hidden; }
@@ -175,6 +183,14 @@ body {
 .gd-clear:hover { color: #fda4af; border-color: rgba(251,113,133,.35); }
 .gd-count { font-size: 11.5px; color: #6c7f78; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gd-pane { display: none; }
+
+/* Filter chip -- the one piece of filter state that isn't a dropdown (the
+   day chart's click-to-filter-by-date), so it needs its own removable pill
+   rather than living silently in a <select>. */
+.gd-filter-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(74,222,128,.14); border: 1px solid rgba(74,222,128,.36); color: #a7f3c4; border-radius: var(--radius-pill); padding: 7px 12px 7px 14px; font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .15s; }
+.gd-filter-chip:hover { background: rgba(74,222,128,.24); }
+.gd-filter-chip .x { opacity: .65; font-size: 10px; }
+
 .gd-pane.active { display: block; }
 
 /* Two bits of colour that used to be inline style attributes. Inline styles
@@ -223,7 +239,7 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 .gd-heat tbody th.rowhead { z-index: 2; cursor: pointer; }
 .gd-heat tbody tr:hover th.rowhead { color: #bef264; }
 .gd-heat tbody th.rowhead span { color: #8ba39a; font-weight: 500; font-size: 10px; margin-left: 5px; }
-.gd-cell { width: 26px; height: 24px; border-radius: 4px; background: var(--gd-r0); position: relative; cursor: default; transition: transform .12s, box-shadow .12s; }
+.gd-cell { width: 26px; height: 24px; border-radius: 4px; background: var(--gd-r0); position: relative; cursor: pointer; transition: transform .12s, box-shadow .12s; }
 .gd-cell:hover { transform: scale(1.22); box-shadow: 0 0 0 2px rgba(74,222,128,.55); z-index: 5; }
 .gd-cell.r1 { background: var(--gd-r1); }
 .gd-cell.r2 { background: var(--gd-r2); }
@@ -289,6 +305,49 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 .gd-drw-svc-n { flex: 1; font-size: 12px; color: #d4e6dd; min-width: 0; }
 .gd-drw-svc-n em { display: block; font-style: normal; font-size: 10px; color: #8ba39a; margin-top: 2px; }
 .gd-drw-svc-v { font-size: 13px; font-weight: 700; color: #bef264; font-variant-numeric: tabular-nums; }
+
+/* AI Insights -- a Claude-synthesized weekly briefing over the dashboard's
+   own numbers. Deliberately a full-width card of its own between the KPI
+   tiles and the three-up grid: it is meant to read first, the way a human
+   analyst's cover note would sit above the tables it summarizes. Same green
+   accent family as the rest of the page (never a distinct "AI" hue), so it
+   reads as part of this dashboard, not a bolted-on widget. */
+.gd-ai { margin-bottom: 24px; }
+.gd-ai-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px 0; }
+.gd-ai-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #a7f3c4; }
+.gd-ai-dot { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg,#a3e635,#14b8a6); box-shadow: 0 0 10px rgba(74,222,128,.7); animation: gdAiPulse 2.2s ease-in-out infinite; }
+@keyframes gdAiPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.55;transform:scale(.72)} }
+.gd-ai-actions { display: flex; align-items: center; gap: 10px; }
+.gd-ai-meta { font-size: 11px; color: #6c7f78; }
+.gd-ai-refresh { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #8fa39c; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 13px; line-height: 1; transition: background .15s, color .15s, transform .15s; }
+.gd-ai-refresh:hover { background: rgba(74,222,128,.14); color: #a7f3c4; transform: rotate(45deg); }
+.gd-ai-refresh.spin { animation: gdAiSpin .9s linear infinite; }
+@keyframes gdAiSpin { to { transform: rotate(360deg); } }
+.gd-ai-body { padding: 14px 22px 22px; }
+.gd-ai-headline { font-size: 17px; font-weight: 700; color: #f0f7f3; letter-spacing: var(--ls-tight); line-height: 1.35; margin-bottom: 10px; }
+.gd-ai-syn { font-size: 13px; color: #b8c9c2; line-height: var(--lh-body); max-width: 900px; }
+.gd-ai-syn p { margin-bottom: 9px; }
+.gd-ai-syn p:last-child { margin-bottom: 0; }
+.gd-ai-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+.gd-ai-col { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md); padding: 13px 15px; }
+.gd-ai-col-t { font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; margin-bottom: 9px; }
+.gd-ai-col.ai-act .gd-ai-col-t { color: #bef264; }
+.gd-ai-col.ai-opp .gd-ai-col-t { color: #67e8f9; }
+.gd-ai-col.ai-risk .gd-ai-col-t { color: #fda4af; }
+.gd-ai-col ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.gd-ai-col li { font-size: 12px; color: #c2d4cc; line-height: 1.5; padding-left: 15px; position: relative; }
+.gd-ai-col li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .6; }
+.gd-ai-col.ai-act li::before { color: #bef264; }
+.gd-ai-col.ai-opp li::before { color: #67e8f9; }
+.gd-ai-col.ai-risk li::before { color: #fda4af; }
+.gd-ai-coverage { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; color: #6c7f78; font-style: italic; }
+.gd-ai-loading { display: flex; align-items: center; gap: 12px; color: #6c7f78; font-size: 12.5px; padding: 6px 0 2px; }
+.gd-ai-pulse { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(74,222,128,.25); border-top-color: #4ade80; animation: gdAiSpin .8s linear infinite; flex-shrink: 0; }
+.gd-ai-empty { color: #6c7f78; font-size: 12.5px; line-height: var(--lh-body); }
+.gd-ai-empty b { display: block; color: #c2d4cc; font-size: 13px; margin-bottom: 4px; }
+.gd-ai-retry { display: inline-block; margin-top: 10px; background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.32); color: #a7f3c4; border-radius: var(--radius-pill); padding: 6px 15px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; }
+.gd-ai-retry:hover { background: rgba(74,222,128,.22); }
+.gd-ai.quiet { opacity: .8; }
 
 /* States */
 .gd-empty { padding: 44px 20px; text-align: center; color: #6c7f78; font-size: 13px; line-height: var(--lh-body); }
@@ -449,8 +508,39 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 :root[data-theme="light"] .gd-drw-svc-v { color: #3f6212; }
 :root[data-theme="light"] .skel { background: linear-gradient(90deg, rgba(18,26,54,.05) 25%, rgba(18,26,54,.10) 50%, rgba(18,26,54,.05) 75%); background-size: 200% 100%; }
 
+/* AI Insights + new clickable affordances, light theme */
+:root[data-theme="light"] .gd-ai-badge { color: #04624a; }
+:root[data-theme="light"] .gd-ai-meta { color: #5f6a65; }
+:root[data-theme="light"] .gd-ai-refresh { background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.11); color: #55635d; }
+:root[data-theme="light"] .gd-ai-refresh:hover { background: rgba(4,120,87,.14); color: #04624a; }
+:root[data-theme="light"] .gd-ai-headline { color: #12251d; }
+:root[data-theme="light"] .gd-ai-syn { color: #3c4a44; }
+:root[data-theme="light"] .gd-ai-col { background: rgba(18,26,54,.03); border-color: rgba(18,26,54,.08); }
+:root[data-theme="light"] .gd-ai-col.ai-act .gd-ai-col-t { color: #4d7c0f; }
+:root[data-theme="light"] .gd-ai-col.ai-opp .gd-ai-col-t { color: #0e7490; }
+:root[data-theme="light"] .gd-ai-col.ai-risk .gd-ai-col-t { color: #be123c; }
+:root[data-theme="light"] .gd-ai-col li { color: #3c4a44; }
+:root[data-theme="light"] .gd-ai-col.ai-act li::before { color: #4d7c0f; }
+:root[data-theme="light"] .gd-ai-col.ai-opp li::before { color: #0e7490; }
+:root[data-theme="light"] .gd-ai-col.ai-risk li::before { color: #be123c; }
+:root[data-theme="light"] .gd-ai-coverage { border-top-color: rgba(18,26,54,.08); color: #5f6a65; }
+:root[data-theme="light"] .gd-ai-loading { color: #5f6a65; }
+:root[data-theme="light"] .gd-ai-empty { color: #5f6a65; }
+:root[data-theme="light"] .gd-ai-empty b { color: #12251d; }
+:root[data-theme="light"] .gd-ai-retry { background: rgba(4,120,87,.10); border-color: rgba(4,120,87,.3); color: #04624a; }
+:root[data-theme="light"] .gd-ai-retry:hover { background: rgba(4,120,87,.2); }
+:root[data-theme="light"] .gd-filter-chip { background: rgba(4,120,87,.12); border-color: rgba(4,120,87,.32); color: #04624a; }
+:root[data-theme="light"] .gd-filter-chip:hover { background: rgba(4,120,87,.2); }
+:root[data-theme="light"] .gd-col:hover { background: rgba(4,120,87,.06); }
+:root[data-theme="light"] .gd-col.active { background: rgba(4,120,87,.12); }
+:root[data-theme="light"] .gd-col.active .gd-col-lbl b { color: #047857; }
+:root[data-theme="light"] .gd-bar-row.clickable:hover { background: rgba(4,120,87,.06); }
+:root[data-theme="light"] .gd-bar-row.clickable.active { background: rgba(4,120,87,.13); }
+:root[data-theme="light"] .gd-bar-row.clickable.active .gd-bar-name { color: #12251d; }
+
 /* Responsive */
-@media (max-width: 1180px) { .gd-grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 1360px) { .gd-grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px)  { .gd-grid-3 { grid-template-columns: 1fr; } .gd-grid-3 > :nth-child(3) { grid-column: auto; } }
 /* Fourteen "12 Aug" labels stop fitting well before the page does, and an
    overlapping axis is worse than a terser one, so the month goes first. */
 @media (max-width: 1080px) { .gd-col-lbl i { display: none; } }
