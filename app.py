@@ -7688,6 +7688,7 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
     everything it needs is passed in explicitly, since those aren't available
     once the request that started this thread has returned."""
     from tracker import arena_client
+    from tracker import lps_analytics
     from tracker import lps_enrichment
     from tracker import linkedin_playbook_store as lps_store
     try:
@@ -7700,20 +7701,34 @@ def _lps_run_analysis_job(run_id: int, company_name: str, company_id: str, email
         # tracker/lps_enrichment.py). Runs on every completed analysis, not
         # only thin ones -- absence of ANTHROPIC_API_KEY, or any failure here,
         # must never stop a run from completing and saving without it.
+        #
+        # It is handed the AUGMENTED output (repaired text plus the computed
+        # derived.* metrics from tracker/lps_analytics.py), not the raw vendor
+        # response: cadence, engagement rate and format performance arrive as
+        # finished numbers instead of 100 raw posts the model would have to do
+        # arithmetic over, and the prose it quotes is no longer mojibake. Only
+        # the vendor output is persisted -- derived.* is recomputed on read.
         try:
-            enrichment = lps_enrichment.enrich_run(output, company_name, run_type)
+            enrichment = lps_enrichment.enrich_run(
+                lps_analytics.augment(output), company_name, run_type)
         except Exception as e:
             log.warning("LinkedIn Strategy Researcher: enrichment failed for run %s: %s", run_id, e)
             enrichment = None
         if enrichment:
             output["aienrichment.headline"] = enrichment["headline"]
             output["aienrichment.synthesis"] = enrichment["synthesis"]
-            if enrichment.get("topActions"):
-                output["aienrichment.topActions"] = enrichment["topActions"]
-            if enrichment.get("coverage"):
-                output["aienrichment.coverage"] = enrichment["coverage"]
+            for field in ("topActions", "strengths", "risks", "contentAngles", "coverage"):
+                if enrichment.get(field):
+                    output[f"aienrichment.{field}"] = enrichment[field]
+        # The history table's Summary column reads this one column. Every real
+        # run returns `messagingagent.summary` as an OBJECT ({text, moves,
+        # stats, ...}), never a bare string, so the previous isinstance(str)
+        # check discarded it every time and the column showed a dash for all
+        # runs. The prose lives in .text.
         summary = output.get("messagingagent.summary")
-        summary = summary if isinstance(summary, str) else None
+        if isinstance(summary, dict):
+            summary = summary.get("text")
+        summary = summary.strip() if isinstance(summary, str) and summary.strip() else None
         score = output.get("competitiveagent.scorecardOverall")
         score = score if isinstance(score, (int, float)) else None
         lps_store.update_run_status(run_id, "complete", output=output, summary=summary,
@@ -7814,10 +7829,20 @@ def linkedin_playbook_studio_history():
 @position2_required
 def linkedin_playbook_studio_run(run_id):
     from tracker import linkedin_playbook_store as lps_store
+    from tracker import lps_analytics
     email = (_get_user() or {}).get("email", "").lower()
     run = lps_store.get_run(run_id, email)
     if not run:
         abort(404)
+    # Text repair + derived analytics are applied HERE, on read, rather than
+    # being frozen into the stored blob at analysis time. Two reasons: every
+    # run already saved (including ones from before this code existed) gains
+    # the new sections without re-running a multi-minute vendor workflow, and
+    # any later improvement to tracker/lps_analytics.py applies retroactively
+    # to the whole history instead of only to runs made after the deploy. The
+    # cost is a few milliseconds of pure arithmetic over at most 100 posts.
+    if isinstance(run.get("output"), dict):
+        run["output"] = lps_analytics.augment(run["output"])
     run["children"] = lps_store.get_children(run_id, email)
     return jsonify(run)
 

@@ -79,10 +79,10 @@
         <div class="stat-value" id="statComp"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
         <div class="stat-hint">View history →</div>
       </div>
-      <div class="stat-card sc-playbooks" id="scPlaybooks" onclick="switchMainTab('history')">
+      <div class="stat-card sc-score" id="scScore" onclick="switchMainTab('history')">
         <div class="sc-glow"></div>
-        <div class="stat-label">Playbooks Generated</div>
-        <div class="stat-value" id="statPlaybooks"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
+        <div class="stat-label">Avg Competitive Score</div>
+        <div class="stat-value" id="statScore"><span class="skel" style="width:40px;height:34px;display:inline-block"></span></div>
         <div class="stat-hint">View history →</div>
       </div>
     </div>
@@ -169,16 +169,26 @@
     var POLL_TIMER = null;
     var HISTORY_SORT = { key: 'created_at', dir: -1 };
 
+    /* Report sections, in reading order. Three of these are not vendor
+       namespaces at all:
+         overview / aienrichment  -- synthesized views (see their renderers)
+         engagement               -- computed from the raw post feed by
+                                     tracker/lps_analytics.py (derived.*)
+       "Creative Insight" is deliberately NOT a tab of its own any more: the
+       vendor's creativeinsightagent.* namespace came back absent on every
+       real run, so it was a permanently empty nav item. Its fields still
+       render, folded into Content & Creative, if a run ever returns them. */
     var AGENT_TABS = [
-      {ns: 'overview',             label: 'Overview',         icon: '✦'},
-      {ns: 'aienrichment',         label: 'AI Insights',      icon: '✨'},
-      {ns: 'strategyagent',        label: 'Strategy',         icon: '◈'},
-      {ns: 'contentcreativeagent', label: 'Content',          icon: '✎'},
-      {ns: 'messagingagent',       label: 'Messaging',        icon: '✉'},
-      {ns: 'creativeinsightagent', label: 'Creative Insight', icon: '◐'},
-      {ns: 'competitiveagent',     label: 'Competitive',      icon: '⚔'},
-      {ns: 'getcompanyprofile',    label: 'Company Profile',  icon: '⬡'},
-      {ns: 'getcompanypost',       label: 'Posts',            icon: '▤'},
+      {ns: 'overview',             label: 'Overview',          icon: '✦'},
+      {ns: 'aienrichment',         label: 'AI Insights',       icon: '✨'},
+      {ns: 'engagement',           label: 'Engagement',        icon: '◔'},
+      {ns: 'audience',             label: 'Audience',          icon: '⬢'},
+      {ns: 'strategyagent',        label: 'Strategy',          icon: '◈'},
+      {ns: 'contentcreativeagent', label: 'Content & Creative', icon: '✎'},
+      {ns: 'messagingagent',       label: 'Messaging',         icon: '✉'},
+      {ns: 'competitiveagent',     label: 'Competitive',       icon: '⚔'},
+      {ns: 'getcompanyprofile',    label: 'Company',           icon: '⬡'},
+      {ns: 'getcompanypost',       label: 'Posts',             icon: '▤'},
     ];
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -193,6 +203,22 @@
       var units=[[31536000,'y'],[2592000,'mo'],[86400,'d'],[3600,'h'],[60,'m']];
       for(var i=0;i<units.length;i++){var v=Math.floor(s/units[i][0]);if(v>=1)return v+units[i][1]+' ago';}
       return 'just now';
+    }
+    /* Big follower/engagement totals read better abbreviated inside a metric
+       tile (42.3M, not 42,332,038) while exact figures stay in the tooltip. */
+    function compactNum(n){
+      var v=Number(n);
+      if(!isFinite(v))return '—';
+      var abs=Math.abs(v);
+      if(abs>=1e9)return (v/1e9).toFixed(abs>=1e10?0:1).replace(/\.0$/,'')+'B';
+      if(abs>=1e6)return (v/1e6).toFixed(abs>=1e7?0:1).replace(/\.0$/,'')+'M';
+      if(abs>=1e4)return Math.round(v/1e3)+'K';
+      if(abs>=1e3)return (v/1e3).toFixed(1).replace(/\.0$/,'')+'K';
+      return (Math.round(v*10)/10).toLocaleString('en-US');
+    }
+    function fullNum(n){
+      var v=Number(n);
+      return isFinite(v)?v.toLocaleString('en-US'):'';
     }
     function countUp(el,target){
       var t0=null;
@@ -331,8 +357,21 @@
         countUp(document.getElementById('statTotal'),RUNS.length);
         countUp(document.getElementById('statOwn'),RUNS.filter(function(r){return r.run_type==='OWN';}).length);
         countUp(document.getElementById('statComp'),RUNS.filter(function(r){return r.run_type==='COMPETITOR';}).length);
-        countUp(document.getElementById('statPlaybooks'),0);
+        /* Average competitive score across scored runs. This card used to be
+           a hardcoded zero labelled "Playbooks Generated" -- the history
+           endpoint returns no playbook counts, so it could only ever read 0.
+           scorecard_score is a real indexed column on every thin row. */
+        var scored=RUNS.map(function(r){return Number(r.scorecard_score);})
+                       .filter(function(v){return isFinite(v)&&v>0;});
+        var avgEl=document.getElementById('statScore');
+        if(scored.length){
+          var avg=scored.reduce(function(a,b){return a+b;},0)/scored.length;
+          avgEl.textContent=(Math.round(avg*10)/10).toFixed(1);
+        } else {
+          avgEl.textContent='—';
+        }
         if(MAIN_TAB==='history')renderHistory();
+        openRunFromHash();
       }).catch(function(){
         document.getElementById('historyTableWrap').innerHTML='<div class="lps-empty">Couldn\'t load history — try refreshing the page.</div>';
       });
@@ -366,18 +405,21 @@
         +'<th onclick="sortHistory(\'company_name\')">Company</th>'
         +'<th onclick="sortHistory(\'run_type\')">Type</th>'
         +'<th onclick="sortHistory(\'status\')">Status</th>'
+        +'<th onclick="sortHistory(\'scorecard_score\')">Score</th>'
         +'<th>Summary</th>'
         +'<th onclick="sortHistory(\'created_at\')">Run</th>'
         +'</tr></thead>';
       var body='<tbody>'+rows.map(function(r,i){
         var statusCls=r.status==='complete'?'lps-status-complete':r.status==='error'?'lps-status-error':'lps-status-running';
+        var score=Number(r.scorecard_score);
         return '<tr class="lps-row-in" data-idx="'+i+'" style="animation-delay:'+Math.min(i*25,400)+'ms">'
           +'<td><div class="lps-person">'
           +(r.company_logo?'<img class="lps-row-logo" src="'+esc(r.company_logo)+'" loading="lazy" onerror="this.outerHTML=\'<div class=&quot;lps-avatar-sq&quot;&gt;'+esc(initials(r.company_name))+'&lt;/div&gt;\'">':'<div class="lps-avatar-sq">'+esc(initials(r.company_name))+'</div>')
           +'<span class="lps-name">'+esc(r.company_name||'Unknown')+'</span></div></td>'
           +'<td>'+(r.run_type==='COMPETITOR'?'<span class="lps-badge comp">Competitor</span>':'<span class="lps-badge own">Own-Brand</span>')+'</td>'
           +'<td><span class="lps-badge '+statusCls+'">'+esc(r.status)+'</span></td>'
-          +'<td class="lps-muted">'+esc(r.summary||'—')+'</td>'
+          +'<td>'+(isFinite(score)&&score>0?'<span class="lps-score-pill">'+esc(String(Math.round(score*10)/10))+'</span>':'<span class="lps-muted">—</span>')+'</td>'
+          +'<td class="lps-muted lps-cell-clamp">'+esc(r.summary||'—')+'</td>'
           +'<td class="lps-muted">'+esc(relTime(r.created_at))+'</td>'
           +'</tr>';
       }).join('')+'</tbody>';
@@ -402,17 +444,40 @@
        rendering a wall of "—" dashes; humanizeKey() turns raw camelCase keys
        ("audienceDetail") into real headings ("Audience Detail"). */
 
+    /* Acronyms the vendor's keys and metric names are full of. Without this,
+       title-casing turns "CTA Effectiveness" into "Cta Effectiveness" and
+       "ROI" into "Roi" on every radar axis and section heading. */
+    var ACRONYMS={cta:'CTA',ctas:'CTAs',ai:'AI',b2b:'B2B',b2c:'B2C',seo:'SEO',
+      roi:'ROI',kpi:'KPI',kpis:'KPIs',usp:'USP',usps:'USPs',ugc:'UGC',
+      url:'URL',id:'ID',hq:'HQ',pr:'PR',dm:'DMs',faq:'FAQ',utc:'UTC'};
     function humanizeKey(k){
       var s=String(k||'').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_\-]+/g,' ').trim();
-      return s.replace(/\S+/g,function(w){return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();});
+      return s.replace(/\S+/g,function(w){
+        var lower=w.toLowerCase();
+        if(ACRONYMS[lower])return ACRONYMS[lower];
+        return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
+      });
     }
 
+    /* Real field names from live runs, given the heading a reader expects
+       rather than a camelCase-split of the vendor's key. */
     var FIELD_TITLES={
-      strategy:'Overall Strategy', hookLibrary:'Hook Library', ctaLibrary:'CTA Library',
+      strategy:'Strategy Signals', hookLibrary:'Hook Library', ctaLibrary:'CTA Library',
       audienceDetail:'Audience Breakdown', topicClusters:'Topic Clusters',
       imageryTypes:'Imagery Types', textStyle:'Text Style',
       public_identifier:'LinkedIn Handle', profile_url:'Profile URL',
-      followers_count:'Followers', employee_count:'Employees'
+      followers_count:'Followers', employee_count:'Employees',
+      hookEx:'Hook Examples', toneDist:'Tone Mix', ctas:'Calls To Action',
+      usps:'Differentiators', recs:'Recommendations', rivals:'Named Rivals',
+      messagingEvolution:'Messaging Over Time', scorecardOverall:'Overall Score',
+      pains:'Pain Points', value:'Value Propositions', benefits:'Benefits',
+      themes:'Themes', keywords:'Keyword Frequency', freq:'Posting Frequency',
+      swatches:'Brand Palette', formats:'Content Formats', imagery:'Imagery',
+      topPosts:'Best-Performing Posts', formatPerformance:'Engagement By Format',
+      lengthPerformance:'Engagement By Post Length', formatMix:'Format Mix',
+      insights:'What The Numbers Say', footprint:'Global Footprint',
+      voice:'Who Posts', activity:'Posting Activity', hiring:'Open Roles Posted',
+      polls:'Polls Run', articles:'Articles Shared', signals:'Content Signals'
     };
     function fieldTitle(field){ return FIELD_TITLES[field]||humanizeKey(field); }
 
@@ -441,8 +506,7 @@
        sentence (ctas/features/hooks/trust all use {l,v} with a description
        in v). Coercing a sentence with Number()||0 used to silently render
        every bar at zero width while cramming the sentence into a
-       nowrap right-aligned value cell -- exactly the kind of broken-looking
-       output a real run's "ctas"/"features"/"trust" fields produced. */
+       nowrap right-aligned value cell. */
     function numericLVValue(v){
       if(typeof v==='number')return v;
       var s=String(v).trim();
@@ -466,8 +530,18 @@
     function isCampaignArray(arr){ return arrayOfObjectsWithKeys(arr,['name','durationDays']); }
     function isObsRecArray(arr){ return arrayOfObjectsWithKeys(arr,['observation','recommendation']); }
     function isCountThemeArray(arr){ return arrayOfObjectsWithKeys(arr,['postCount','theme']); }
+    function isPerfArray(arr){ return arrayOfObjectsWithKeys(arr,['label','avgEngagement','posts']); }
+    function isTopPostArray(arr){ return arrayOfObjectsWithKeys(arr,['excerpt','engagement']); }
+    function isPollArray(arr){ return arrayOfObjectsWithKeys(arr,['question','options']); }
     function looksLikeUrl(s){ return typeof s==='string'&&/^https?:\/\//i.test(s.trim()); }
-    function looksLikeImageUrl(s){ return looksLikeUrl(s)&&/\.(png|jpe?g|svg|webp|gif)(\?|$)/i.test(s); }
+    /* LinkedIn's own CDN serves logos and post media from extension-less
+       paths (media.licdn.com/dms/image/…), so an extension test alone
+       classified every logo field as a plain link and rendered it as a bare
+       "Open link ↗" instead of the image. */
+    function looksLikeImageUrl(s){
+      return looksLikeUrl(s)&&(/\.(png|jpe?g|svg|webp|gif)(\?|$)/i.test(s)
+        ||/licdn\.com|\/dms\/image\/|company-logo/i.test(s));
+    }
 
     /* Fixed-order categorical palette -- validated with the dataviz skill's
        accessibility checker (lightness band + CVD separation + contrast) at
@@ -544,7 +618,8 @@
     function renderStatTiles(arr){
       return '<div class="lps-stat-tiles">'+arr.map(function(x,i){
         return '<div class="lps-stat-tile" style="--accent:'+CHART_PALETTE[i%CHART_PALETTE.length]+'">'
-          +'<div class="lps-stat-tile-val">'+esc(String(x.v))+'</div><div class="lps-stat-tile-label">'+esc(String(x.h))+'</div></div>';
+          +'<div class="lps-stat-tile-val">'+esc(String(x.v))+'</div><div class="lps-stat-tile-label">'+esc(String(x.h))+'</div>'
+          +(x.d?'<div class="lps-stat-tile-desc">'+esc(String(x.d))+'</div>':'')+'</div>';
       }).join('')+'</div>';
     }
     function renderSwatches(arr){
@@ -591,7 +666,7 @@
     function renderTimeline(arr){
       var isDated=arrayOfObjectsWithKeys(arr,['date','title']);
       var sorted=arr.slice();
-      if(isDated)sorted.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+      if(isDated)sorted.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
       return '<div class="lps-timeline">'+sorted.map(function(x){
         if(isDated){
           var color=TIMELINE_TYPE_COLOR[x.type]||CHART_PALETTE[0];
@@ -627,7 +702,7 @@
           +'</div>';
       }).join('')+'</div>';
     }
-    var _TITLE_KEYS=['title','name','headline','label','hook','cta','type','category','theme'];
+    var _TITLE_KEYS=['title','name','headline','label','hook','cta','type','category','theme','question'];
     function renderCardArray(arr){
       var cards=arr.filter(function(o){return !isEmptyValue(o);}).map(function(o){
         if(typeof o!=='object'||o==null)return '<div class="lps-mini-card">'+(renderSmart(o)||'')+'</div>';
@@ -646,11 +721,601 @@
       return cards?'<div class="lps-card-grid">'+cards+'</div>':null;
     }
 
-    /* Radar + arc-gauge for the competitive scorecard. The vendor's real
-       shape is an ARRAY of {metric,score} -- not an object keyed by
-       category -- so anything checking `!Array.isArray(breakdown)` before
-       treating it as a category map (as this file's first version did)
-       silently skips it for every real run; see competitiveContent below. */
+    /* ── Chart primitives for the computed metrics ──────────────────────────
+       All hand-rolled SVG, matching the rest of this page (no chart library
+       is loaded anywhere in this app). Each one carries direct value labels,
+       so none of them relies on axis-reading or color alone. */
+
+    /* Posting cadence over time: a filled area with a 2px line on top, one
+       point per week including the empty ones. Sparse x labels (first, last
+       and the peak) rather than one per week, which would collide at 15+
+       buckets. */
+    function renderTrend(series,opts){
+      opts=opts||{};
+      var pts=series.filter(function(p){return p&&p.l!=null;});
+      if(pts.length<2)return null;
+      var w=680,h=190,padL=34,padR=14,padT=18,padB=26;
+      var vals=pts.map(function(p){return Number(p.v)||0;});
+      var max=Math.max.apply(null,vals)||1;
+      /* Round the axis top up to a readable number, then keep it even so the
+         midpoint tick is a whole number too. A raw max*1.15 gives ceilings
+         like 21 (midpoint 11, which doesn't look like half of 21) or 25
+         (midpoint 12.5, a decimal on a chart counting whole posts). */
+      var steps=[1,2,5,10,20,25,50,100,250,500,1000];
+      var step=steps[steps.length-1];
+      for(var si=0;si<steps.length;si++){ if(max/steps[si]<=5){step=steps[si];break;} }
+      var ceil=Math.ceil(max/step)*step;
+      if(ceil<=max)ceil+=step;
+      if(ceil%2)ceil+=step;
+      var innerW=w-padL-padR, innerH=h-padT-padB;
+      var xAt=function(i){return padL+(pts.length===1?innerW/2:i*(innerW/(pts.length-1)));};
+      var yAt=function(v){return padT+innerH-(v/ceil)*innerH;};
+      var line=pts.map(function(p,i){return (i?'L':'M')+xAt(i).toFixed(1)+' '+yAt(Number(p.v)||0).toFixed(1);}).join(' ');
+      var area=line+' L'+xAt(pts.length-1).toFixed(1)+' '+(padT+innerH)+' L'+xAt(0).toFixed(1)+' '+(padT+innerH)+' Z';
+      var gridVals=[0,ceil/2,ceil];
+      var grid=gridVals.map(function(v){
+        return '<line x1="'+padL+'" y1="'+yAt(v).toFixed(1)+'" x2="'+(w-padR)+'" y2="'+yAt(v).toFixed(1)+'" class="lps-ch-grid"></line>'
+          +'<text x="'+(padL-7)+'" y="'+(yAt(v)+3.5).toFixed(1)+'" text-anchor="end" class="lps-ch-axis">'+v+'</text>';
+      }).join('');
+      var peakIdx=vals.indexOf(max);
+      /* Label the first, last and peak weeks only -- one label per bucket
+         collides at 15+ weeks. The peak label is dropped when it sits within
+         two buckets of either end, where it would overlap the end label. */
+      var labelIdx=[0,pts.length-1];
+      if(peakIdx>1&&peakIdx<pts.length-2)labelIdx.splice(1,0,peakIdx);
+      labelIdx=labelIdx.filter(function(v,i,a){return a.indexOf(v)===i;});
+      var xLabels=labelIdx.map(function(i){
+        var anchor=i===0?'start':(i===pts.length-1?'end':'middle');
+        return '<text x="'+xAt(i).toFixed(1)+'" y="'+(h-8)+'" text-anchor="'+anchor+'" class="lps-ch-axis">'+esc(String(pts[i].l))+'</text>';
+      }).join('');
+      var dots=pts.map(function(p,i){
+        return '<circle cx="'+xAt(i).toFixed(1)+'" cy="'+yAt(Number(p.v)||0).toFixed(1)+'" r="'+(i===peakIdx?4:2.6)+'" class="lps-ch-dot'+(i===peakIdx?' peak':'')+'"><title>'+esc(String(p.l))+': '+esc(String(p.v))+'</title></circle>';
+      }).join('');
+      var peakTag='<text x="'+xAt(peakIdx).toFixed(1)+'" y="'+(yAt(max)-9).toFixed(1)+'" text-anchor="middle" class="lps-ch-peak">'+max+'</text>';
+      return '<div class="lps-chart-block"><svg viewBox="0 0 '+w+' '+h+'" class="lps-ch-svg" preserveAspectRatio="none">'
+        +'<defs><linearGradient id="lpsTrendFill" x1="0" y1="0" x2="0" y2="1">'
+        +'<stop offset="0%" stop-color="#db2777" stop-opacity=".34"></stop>'
+        +'<stop offset="100%" stop-color="#db2777" stop-opacity="0"></stop></linearGradient></defs>'
+        +grid+'<path d="'+area+'" fill="url(#lpsTrendFill)"></path>'
+        +'<path d="'+line+'" class="lps-ch-line"></path>'+dots+peakTag+xLabels+'</svg>'
+        +(opts.caption?'<div class="lps-ch-caption">'+esc(opts.caption)+'</div>':'')+'</div>';
+    }
+
+    /* Vertical columns for a fixed small set of buckets (weekday, hour). The
+       tallest column is labelled with its value; zero-height buckets keep a
+       1px stub so "nothing on Sunday" is visibly a zero, not a gap. */
+    function renderColumns(series,opts){
+      opts=opts||{};
+      var pts=(series||[]).filter(function(p){return p&&p.l!=null;});
+      if(!pts.length)return null;
+      var vals=pts.map(function(p){return Number(p.v)||0;});
+      var max=Math.max.apply(null,vals)||1;
+      var bars=pts.map(function(p,i){
+        var v=Number(p.v)||0, pct=max>0?(v/max*100):0;
+        var isPeak=v===max&&v>0;
+        return '<div class="lps-col'+(isPeak?' peak':'')+(v===0?' zero':'')+'" title="'+esc(String(p.l))+': '+esc(String(v))+'">'
+          +'<div class="lps-col-val">'+(v||'')+'</div>'
+          +'<div class="lps-col-track"><div class="lps-col-bar" style="height:'+Math.max(v>0?4:1,pct)+'%"></div></div>'
+          +'<div class="lps-col-label">'+esc(String(p.l))+'</div></div>';
+      }).join('');
+      return '<div class="lps-cols'+(opts.dense?' dense':'')+'">'+bars+'</div>'
+        +(opts.caption?'<div class="lps-ch-caption">'+esc(opts.caption)+'</div>':'');
+    }
+
+    /* Performance comparison: one row per group with a bar scaled to the best
+       performer, the metric value, and the sample size behind it -- the
+       sample size matters here, since "Text + link averages 727" off two
+       posts is not the same claim as it is off thirty. */
+    function renderPerformanceBars(rows,opts){
+      opts=opts||{};
+      var valid=(rows||[]).filter(function(r){return r&&r.label!=null;});
+      if(!valid.length)return null;
+      var max=Math.max.apply(null,valid.map(function(r){return Number(r.avgEngagement)||0;}))||1;
+      var avg=opts.benchmark;
+      return '<div class="lps-perf">'+valid.map(function(r,i){
+        var v=Number(r.avgEngagement)||0, pct=Math.max(3,Math.round(v/max*100));
+        var color=CHART_PALETTE[i%CHART_PALETTE.length];
+        var above=avg!=null&&v>avg;
+        return '<div class="lps-perf-row">'
+          +'<div class="lps-perf-label">'+esc(String(r.label))+'</div>'
+          +'<div class="lps-perf-track"><div class="lps-perf-bar" style="width:'+pct+'%;background:'+color+'"></div></div>'
+          +'<div class="lps-perf-val">'+esc(compactNum(v))+'</div>'
+          +'<div class="lps-perf-n">'+esc(String(r.posts))+' post'+(r.posts===1?'':'s')+'</div>'
+          +'<div class="lps-perf-flag">'+(avg==null?'':(above?'<span class="lps-up">above avg</span>':'<span class="lps-down">below avg</span>'))+'</div>'
+          +'</div>';
+      }).join('')+'</div>'
+      +(avg!=null?'<div class="lps-ch-caption">Compared against an overall average of '+esc(compactNum(avg))+' engagements per post.</div>':'');
+    }
+
+    /* The metric strip under the report title, and the same component reused
+       inside the Engagement tab. Only metrics that exist are passed in, so
+       there is never a tile reading "—". */
+    function renderMetricBand(items){
+      var real=(items||[]).filter(function(m){return m&&m.value!=null&&m.value!=='';});
+      if(!real.length)return '';
+      return '<div class="lps-metrics">'+real.map(function(m){
+        return '<div class="lps-metric"'+(m.title?' title="'+esc(m.title)+'"':'')+'>'
+          +'<div class="lps-metric-val">'+esc(String(m.value))+(m.unit?'<span class="lps-metric-unit">'+esc(m.unit)+'</span>':'')+'</div>'
+          +'<div class="lps-metric-label">'+esc(m.label)+'</div>'
+          +(m.note?'<div class="lps-metric-note">'+esc(m.note)+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+    }
+
+    function renderRankedPosts(rows){
+      var valid=(rows||[]).filter(function(r){return r&&!isEmptyValue(r.excerpt);});
+      if(!valid.length)return null;
+      var max=Math.max.apply(null,valid.map(function(r){return Number(r.engagement)||0;}))||1;
+      return '<div class="lps-ranked">'+valid.map(function(r,i){
+        var pct=Math.max(3,Math.round((Number(r.engagement)||0)/max*100));
+        return '<div class="lps-ranked-row">'
+          +'<div class="lps-ranked-rank">'+(i+1)+'</div>'
+          +'<div class="lps-ranked-main">'
+          +'<p class="lps-ranked-text">'+esc(r.excerpt)+'</p>'
+          +'<div class="lps-ranked-meta">'
+            +(r.format?'<span class="lps-tag">'+esc(r.format)+'</span>':'')
+            +(r.date?'<span>'+esc(r.date)+'</span>':'')
+            +'<span>♥ '+esc(fullNum(r.reactions))+'</span>'
+            +'<span>💬 '+esc(fullNum(r.comments))+'</span>'
+            +'<span>↻ '+esc(fullNum(r.reposts))+'</span>'
+            +(r.url?'<a href="'+esc(r.url)+'" target="_blank" rel="noopener">View ↗</a>':'')
+          +'</div>'
+          +'<div class="lps-ranked-track"><div class="lps-ranked-bar" style="width:'+pct+'%"></div></div>'
+          +'</div>'
+          +'<div class="lps-ranked-total">'+esc(compactNum(r.engagement))+'</div>'
+          +'</div>';
+      }).join('')+'</div>';
+    }
+
+    function renderPolls(rows){
+      var valid=(rows||[]).filter(function(p){return p&&!isEmptyValue(p.question);});
+      if(!valid.length)return null;
+      return '<div class="lps-poll-grid">'+valid.map(function(p){
+        var opts=(p.options||[]).filter(function(o){return o&&!isEmptyValue(o.text);});
+        var total=Number(p.totalVotes)||opts.reduce(function(a,o){return a+(Number(o.votes)||0);},0)||1;
+        var top=Math.max.apply(null,opts.map(function(o){return Number(o.votes)||0;}))||0;
+        return '<div class="lps-poll-card">'
+          +'<div class="lps-poll-q">'+esc(p.question)+'</div>'
+          +opts.map(function(o){
+            var v=Number(o.votes)||0, pct=Math.round(v/total*100);
+            return '<div class="lps-poll-opt'+(v===top&&v>0?' win':'')+'">'
+              +'<div class="lps-poll-opt-fill" style="width:'+Math.max(2,pct)+'%"></div>'
+              +'<span class="lps-poll-opt-txt">'+esc(o.text)+'</span>'
+              +'<span class="lps-poll-opt-pct">'+pct+'%</span></div>';
+          }).join('')
+          +'<div class="lps-poll-total">'+esc(fullNum(total))+' votes'+(p.isOpen?' · still open':'')+'</div>'
+          +'</div>';
+      }).join('')+'</div>';
+    }
+
+    function renderSmart(v){
+      if(isEmptyValue(v))return null;
+      if(Array.isArray(v)){
+        if(isSwatchArray(v))return renderSwatches(v);
+        if(isKeywordArray(v))return renderKeywordCloud(v);
+        if(isLVArray(v)){
+          if(isNumericLVArray(v))return v.length<=6?renderDonut(v):renderDistribution(v);
+          return renderDefinitionCards(v);
+        }
+        if(isHVArray(v))return renderStatTiles(v);
+        if(isShortStringArray(v))return renderChips(v);
+        if(isStringArray(v))return renderStringList(v);
+        if(isPerfArray(v))return renderPerformanceBars(v);
+        if(isTopPostArray(v))return renderRankedPosts(v);
+        if(isPollArray(v))return renderPolls(v);
+        if(isPersonaArray(v))return renderPersonaCards(v);
+        if(isTimelineArray(v))return renderTimeline(v);
+        if(isCampaignArray(v))return renderCampaignCards(v);
+        if(isObsRecArray(v))return renderObsRecCards(v);
+        if(isCountThemeArray(v)){
+          var asLV=v.map(function(x){return {l:x.theme,v:x.postCount};});
+          return asLV.length<=6?renderDonut(asLV):renderDistribution(asLV);
+        }
+        return renderCardArray(v);
+      }
+      if(typeof v==='object'){
+        var keys=Object.keys(v).filter(function(k){return !isEmptyValue(v[k]);});
+        if(!keys.length)return null;
+        /* An object whose children are themselves arrays/objects (strategy,
+           audienceDetail, summary, messaging, competitive, …) reads far
+           better as full-width stacked sub-sections than crammed into a
+           2-column key/value grid -- that layout is reserved for genuinely
+           flat objects (a handful of short scalar fields, e.g. `company`). */
+        var hasComplexChild=keys.some(function(k){return typeof v[k]==='object';});
+        if(hasComplexChild){
+          var blocks=keys.map(function(k){
+            var inner=renderSmart(v[k]); if(inner==null)return '';
+            return '<div class="lps-subfield"><div class="lps-subfield-label">'+esc(fieldTitle(k))+'</div>'+inner+'</div>';
+          }).join('');
+          return blocks?'<div class="lps-subfield-stack">'+blocks+'</div>':null;
+        }
+        var cells=keys.map(function(k){
+          var inner=renderSmart(v[k]); if(inner==null)return '';
+          return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(fieldTitle(k))+'</span><div class="lps-kv-value">'+inner+'</div></div>';
+        }).join('');
+        return cells?'<div class="lps-kv-grid">'+cells+'</div>':null;
+      }
+      if(typeof v==='number')return '<span class="lps-stat-inline">'+esc(String(v))+'</span>';
+      var s=String(v).trim();
+      if(!s)return null;
+      if(looksLikeImageUrl(s))return '<img class="lps-inline-logo" src="'+esc(s)+'" loading="lazy" onerror="this.remove()">';
+      if(looksLikeUrl(s))return '<a class="lps-inline-link" href="'+esc(s)+'" target="_blank" rel="noopener">Open link ↗</a>';
+      return s.length>140?'<p class="lps-prose">'+esc(s)+'</p>':'<span>'+esc(s)+'</span>';
+    }
+
+    function section(label,body,note){
+      if(body==null||body==='')return '';
+      return '<div class="lps-section"><div class="lps-section-head"><div class="lps-section-label">'+esc(label)+'</div>'
+        +(note?'<div class="lps-section-note">'+esc(note)+'</div>':'')+'</div>'
+        +'<div class="lps-section-body">'+body+'</div></div>';
+    }
+
+    var NS_EMPTY_MESSAGE={
+      aienrichment:'AI insights aren\'t available for this run.',
+      engagement:'No post feed came back for this company, so there is nothing to measure engagement on.',
+      audience:'No audience or persona data was returned for this company.',
+      strategyagent:'No strategy data was returned for this company.',
+      contentcreativeagent:'No content or creative data was returned for this company.',
+      messagingagent:'No messaging data was returned for this company.',
+      competitiveagent:'No competitive data was returned for this company.',
+      getcompanyprofile:'No company profile data was returned.',
+      getcompanypost:'No recent posts could be pulled for this company.'
+    };
+
+    function emptyState(ns,extra){
+      return '<div class="lps-empty">'+esc(NS_EMPTY_MESSAGE[ns]||'No data returned for this section.')
+        +(extra?'<div class="lps-empty-note">'+esc(extra)+'</div>':'')+'</div>';
+    }
+
+    function omitKeys(obj,keys){
+      if(!obj||typeof obj!=='object'||Array.isArray(obj))return obj;
+      var out={};
+      Object.keys(obj).forEach(function(k){ if(keys.indexOf(k)<0)out[k]=obj[k]; });
+      return out;
+    }
+
+    /* Skips fields with nothing to show instead of rendering them dash-filled
+       -- a real run commonly has data for some agents and none for others. */
+    function agentTabContent(output,ns,excludeFields){
+      var prefix=ns+'.', exclude=excludeFields||[];
+      var keys=Object.keys(output||{}).filter(function(k){
+        return k.indexOf(prefix)===0 && exclude.indexOf(k.slice(prefix.length))<0;
+      });
+      var sections=keys.map(function(k){
+        var body=renderSmart(output[k]);
+        if(body==null)return '';
+        return section(fieldTitle(k.slice(prefix.length)),body);
+      }).filter(Boolean);
+      return sections.length?sections.join(''):emptyState(ns);
+    }
+
+    /* ── Engagement: entirely computed, not vendor-reported ──────────────────
+       The vendor's own contentcreativeagent.engagement.{activity,best,stats,
+       worst} arrays came back empty on every real run, while the same
+       response carried up to 100 full posts. tracker/lps_analytics.py does
+       the arithmetic those empty fields were supposed to hold, and this tab
+       renders it: cadence, rate, what format actually earns engagement, and
+       which posts won. Every number here is traceable to the post feed. */
+    function engagementContent(output){
+      var act=output['derived.activity']||{};
+      var eng=output['derived.engagement']||{};
+      var perf=output['derived.formatPerformance'];
+      var lens=output['derived.lengthPerformance'];
+      var top=output['derived.topPosts'];
+      var insights=output['derived.insights'];
+      var voice=output['derived.voice']||{};
+      if(isEmptyValue(act)&&isEmptyValue(eng))return emptyState('engagement');
+
+      var html='<div class="lps-derived-badge">◔ Computed from this company\'s '
+        +esc(String(act.postsAnalyzed||0))+' most recent posts, not vendor-reported</div>';
+
+      html+=renderMetricBand([
+        {label:'Posts / week', value:act.postsPerWeek},
+        {label:'Avg engagement', value:compactNum(eng.avgTotal), title:fullNum(eng.avgTotal)+' per post', note:'reactions + comments + reposts'},
+        {label:'Engagement rate', value:eng.engagementRatePct!=null?eng.engagementRatePct:null, unit:'%', note:eng.followers?compactNum(eng.followers)+' followers':''},
+        {label:'Median reactions', value:compactNum(eng.medianReactions), title:fullNum(eng.medianReactions)},
+        {label:'Best post', value:compactNum(eng.bestPostEngagement), title:fullNum(eng.bestPostEngagement)+' engagements'},
+        {label:'Comments / reaction', value:eng.commentsPerReaction}
+      ]);
+
+      if(insights&&insights.length)
+        html+=section('What The Numbers Say',renderStringList(insights));
+
+      var trend=renderTrend(act.cadence,{caption:act.windowStart?('Posts per week, '+act.windowStart+' to '+act.windowEnd+'. '
+        +(act.activeWeeks||0)+' of '+(act.totalWeeks||0)+' weeks had at least one post'
+        +(act.longestGapDays?', longest gap '+act.longestGapDays+' days':'')+'.'):''});
+      if(trend)html+=section('Posting Cadence',trend);
+
+      var cols=renderColumns(act.dayOfWeek,{caption:'Posts by day of week.'});
+      if(cols)html+=section('Day Of Week',cols);
+      var hours=renderColumns(act.hourOfDay,{dense:true,caption:'Posts by hour, UTC.'});
+      if(hours)html+=section('Time Of Day',hours);
+
+      var perfBars=renderPerformanceBars(perf,{benchmark:eng.avgTotal});
+      if(perfBars)html+=section('Engagement By Format',perfBars,'Average engagements per post');
+      var lenBars=renderPerformanceBars(lens,{benchmark:eng.avgTotal});
+      if(lenBars)html+=section('Engagement By Post Length',lenBars,'Average engagements per post');
+
+      var mixBits='';
+      if(!isEmptyValue(voice.mix))mixBits+='<div class="lps-split-col"><div class="lps-subfield-label">Who Posts</div>'+renderDonut(voice.mix)+'</div>';
+      if(!isEmptyValue(voice.originalVsRepost))mixBits+='<div class="lps-split-col"><div class="lps-subfield-label">Original vs Reposted</div>'+renderDonut(voice.originalVsRepost)+'</div>';
+      if(mixBits)html+=section('Voice Mix','<div class="lps-split">'+mixBits+'</div>');
+      if(!isEmptyValue(voice.topPeople))
+        html+=section('People Posting On This Feed',renderCardArray(voice.topPeople));
+
+      var ranked=renderRankedPosts(top);
+      if(ranked)html+=section('Best-Performing Posts',ranked);
+      return html;
+    }
+
+    /* ── Audience: pulled out of Strategy into its own section ───────────────
+       personas, the seniority/industry/experience breakdowns, and the
+       audience split inside strategyagent.strategy all answer the same
+       question ("who is this for") and were previously buried three sections
+       deep in a very long Strategy tab. */
+    function audienceContent(output){
+      var personas=output['strategyagent.personas'];
+      var detail=output['strategyagent.audienceDetail'];
+      var strategy=output['strategyagent.strategy'];
+      var audienceSplit=(strategy&&typeof strategy==='object')?strategy.audience:null;
+      if(isEmptyValue(personas)&&isEmptyValue(detail)&&isEmptyValue(audienceSplit))
+        return emptyState('audience');
+      var html='';
+      if(!isEmptyValue(personas)){
+        var body=renderSmart(personas);
+        if(body)html+=section('Personas',body,'Confidence is the vendor agent\'s own score');
+      }
+      if(!isEmptyValue(audienceSplit)){
+        var split=renderSmart(audienceSplit);
+        if(split)html+=section('Audience Split',split);
+      }
+      if(!isEmptyValue(detail)){
+        var d=renderSmart(detail);
+        if(d)html+=section('Audience Breakdown',d);
+      }
+      return html||emptyState('audience');
+    }
+
+    /* Strategy without the audience material Audience now owns, so the same
+       breakdown never appears twice in one report. */
+    function strategyContent(output){
+      var strategy=output['strategyagent.strategy'];
+      var html='';
+      if(!isEmptyValue(strategy)){
+        var trimmed=omitKeys(strategy,['audience']);
+        var body=renderSmart(trimmed);
+        if(body)html+=section('Strategy Signals',body);
+      }
+      var rest=agentTabContent(output,'strategyagent',['strategy','personas','audienceDetail']);
+      if(rest.indexOf('lps-empty')<0)html+=rest;
+      return html||emptyState('strategyagent');
+    }
+
+    /* Content & Creative folds in the vendor's creativeinsightagent.*
+       namespace (absent on every run so far, hence no tab of its own) plus
+       the computed format mix, content signals and hashtag usage. */
+    function contentCreativeContent(output){
+      var html='';
+      var mix=output['derived.formatMix'];
+      var content=output['derived.content']||{};
+      var derivedBits='';
+      if(!isEmptyValue(mix))derivedBits+='<div class="lps-split-col"><div class="lps-subfield-label">Format Mix</div>'
+        +(mix.length<=6?renderDonut(mix):renderDistribution(mix))+'</div>';
+      if(!isEmptyValue(content.signals))derivedBits+='<div class="lps-split-col"><div class="lps-subfield-label">Content Signals</div>'
+        +renderDistribution(content.signals)+'</div>';
+      if(derivedBits){
+        html+='<div class="lps-derived-badge">◔ Computed from the post feed</div>';
+        html+=section('How They Actually Post','<div class="lps-split">'+derivedBits+'</div>',
+          'Share of posts, computed across the window analyzed');
+      }
+      if(!isEmptyValue(content.hashtags))
+        html+=section('Hashtags Used',renderKeywordCloud(content.hashtags),
+          content.hashtagsUsed?(content.hashtagsUsed+' distinct hashtags across the window'):'');
+      if(!isEmptyValue(content.avgWords))
+        html+=renderMetricBand([
+          {label:'Avg post length', value:content.avgWords, unit:'w'},
+          {label:'Median length', value:content.medianWords, unit:'w'},
+          {label:'Longest post', value:content.longestPostWords, unit:'w'}
+        ]);
+      var vendor=agentTabContent(output,'contentcreativeagent');
+      if(vendor.indexOf('lps-empty')<0)html+=vendor;
+      var creative=agentTabContent(output,'creativeinsightagent');
+      if(creative.indexOf('lps-empty')<0)html+=creative;
+      return html||emptyState('contentcreativeagent');
+    }
+
+    /* Messaging reads `messagingagent.messaging`/`.stats` at the top level.
+       On Google-shaped runs the vendor omits both and nests the identical
+       objects inside `.summary` instead; tracker/lps_analytics.py hoists them
+       on read so this tab is never empty for that shape.
+
+       `company` is excluded: it repeats the follower count, industry, logo,
+       name and post count that the report header and the Company tab already
+       carry, and its logo/url fields render as bare "Open link" rows. */
+    function messagingContent(output){
+      return agentTabContent(output,'messagingagent',['company']);
+    }
+
+    /* Company Profile: a purpose-built profile card instead of a generic
+       key/value dump, since this namespace's shape is fully known. Falls
+       back to the company name/logo captured at search time (run.company_name/
+       company_logo, always present) when the vendor's own profile fields
+       come back empty for this run. The raw `profile` blob carries a lot more
+       than the flat fields this page requests individually (tagline, founding
+       date, office locations, an activities/hashtags list, viewer-permission
+       flags nobody needs) -- the genuinely useful extras are pulled out here,
+       and the office footprint is charted from derived.footprint. */
+    function companyProfileContent(output,run){
+      var get=function(f){return output['getcompanyprofile.'+f];};
+      var profile=get('profile'); if(!profile||typeof profile!=='object')profile={};
+      var foot=output['derived.footprint']||{};
+      var name=get('name')||(run&&run.company_name), desc=get('description'),
+          logo=get('logo')||(run&&run.company_logo),
+          website=get('website'), profileUrl=get('profile_url'), handle=get('public_identifier'),
+          followers=get('followers_count'), employees=get('employee_count');
+      if([name,desc,logo,website,profileUrl,followers,employees].every(isEmptyValue))
+        return emptyState('getcompanyprofile');
+      var industry=foot.industry||(Array.isArray(profile.industry)?profile.industry[0]:profile.industry);
+      var stats=[];
+      if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
+      if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
+      if(!isEmptyValue(foot.followersPerEmployee))stats.push({l:'Followers / employee',v:String(foot.followersPerEmployee)});
+      if(!isEmptyValue(handle))stats.push({l:'Handle',v:'@'+handle});
+      if(!isEmptyValue(foot.founded))stats.push({l:'Founded',v:String(foot.founded)});
+      if(!isEmptyValue(foot.headquarters))stats.push({l:'HQ',v:foot.headquarters});
+      if(!isEmptyValue(foot.officeCount)&&foot.officeCount>1)stats.push({l:'Offices',v:String(foot.officeCount)});
+      if(!isEmptyValue(foot.countryCount)&&foot.countryCount>1)stats.push({l:'Countries',v:String(foot.countryCount)});
+      var tags=[].concat(Array.isArray(profile.activities)?profile.activities.slice(0,12):[])
+        .concat(Array.isArray(profile.hashtags)?profile.hashtags.map(function(h){return typeof h==='object'?h.title:h;}):[])
+        .filter(function(t){return !isEmptyValue(t);});
+      var html='<div class="lps-profile-card">'
+        +(logo?'<img class="lps-profile-logo" src="'+esc(logo)+'" loading="lazy" onerror="this.remove()">':'')
+        +'<div class="lps-profile-main">'
+        +(name?'<div class="lps-profile-name">'+esc(name)+(industry?'<span class="lps-profile-industry">'+esc(industry)+'</span>':'')+'</div>':'')
+        +((profile.tagline||foot.tagline)?'<div class="lps-profile-tagline">'+esc(profile.tagline||foot.tagline)+'</div>':'')
+        +(desc?'<p class="lps-profile-desc">'+esc(desc)+'</p>':'')
+        +(tags.length?'<div class="lps-chips" style="margin-top:12px">'+tags.slice(0,14).map(function(t){return '<span class="lps-chip lps-chip-sm">'+esc(String(t))+'</span>';}).join('')+'</div>':'')
+        +((website||profileUrl)?'<div class="lps-profile-links">'
+          +(website?'<a href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
+          +(profileUrl?'<a href="'+esc(profileUrl)+'" target="_blank" rel="noopener">LinkedIn profile ↗</a>':'')
+          +'</div>':'')+'</div>'
+        +(stats.length?'<div class="lps-profile-stats">'+stats.map(function(s){
+            return '<div class="lps-profile-stat"><div class="lps-profile-stat-val">'+esc(String(s.v))+'</div><div class="lps-profile-stat-label">'+esc(s.l)+'</div></div>';
+          }).join('')+'</div>':'')
+        +'</div>';
+      if(!isEmptyValue(foot.topCountries))
+        html+=section('Where They Have Offices',renderDistribution(foot.topCountries),
+          (foot.officeCount||0)+' listed locations across '+(foot.countryCount||0)+' countries');
+      return html;
+    }
+
+    /* Posts: the vendor's actual field names (reaction_counter/comment_counter/
+       repost_counter/share_url) confirmed from a real production run. Sorted
+       by reactions so the best-performing posts surface first, with a toggle
+       for chronological order, the first image/video attachment as a
+       thumbnail, a format tag, and reposts flagged distinctly. Polls, shared
+       articles and job postings buried in the feed get their own sections --
+       an open role posted to a company feed is a GTM signal no vendor field
+       surfaced. */
+    var POSTS_SORT='top';
+    var POSTS_SHOW_ALL=false;
+    function setPostsSort(mode){
+      POSTS_SORT=mode; renderPostsPane();
+    }
+    function showAllPosts(){
+      POSTS_SHOW_ALL=true; renderPostsPane();
+    }
+    function renderPostsPane(){
+      var pane=document.querySelector('.lps-drw-pane[data-ns="getcompanypost"]');
+      if(pane&&DRAWER_RUN)pane.innerHTML=postsContent(DRAWER_RUN.output||{});
+    }
+    function postsContent(output){
+      var items=output['getcompanypost.items'];
+      var real=Array.isArray(items)?items.filter(function(p){return p&&typeof p==='object';}):[];
+      if(!real.length)return emptyState('getcompanypost');
+      var sorted=real.slice();
+      if(POSTS_SORT==='top'){
+        sorted.sort(function(a,b){
+          return ((Number(b.reaction_counter)||0)+(Number(b.comment_counter)||0))
+               - ((Number(a.reaction_counter)||0)+(Number(a.comment_counter)||0));
+        });
+      } else {
+        sorted.sort(function(a,b){return String(b.parsed_datetime||'').localeCompare(String(a.parsed_datetime||''));});
+      }
+      var limit=POSTS_SHOW_ALL?sorted.length:24;
+      var shown=sorted.slice(0,limit);
+      var html='<div class="lps-posts-bar">'
+        +'<div class="lps-seg">'
+        +'<button class="lps-seg-btn'+(POSTS_SORT==='top'?' active':'')+'" onclick="setPostsSort(\'top\')">Top</button>'
+        +'<button class="lps-seg-btn'+(POSTS_SORT==='recent'?' active':'')+'" onclick="setPostsSort(\'recent\')">Most recent</button>'
+        +'</div>'
+        +'<span class="lps-posts-count">Showing '+shown.length+' of '+real.length+' posts</span></div>';
+
+      html+='<div class="lps-post-grid">'+shown.map(function(p){
+        var text=p.text||(p.repost_content&&p.repost_content.text)||'';
+        var thumb=null;
+        if(Array.isArray(p.attachments)){
+          var media=p.attachments.filter(function(a){return a&&(a.type==='img'||a.type==='video')&&a.url;})[0];
+          if(media)thumb=media.url;
+        }
+        var meta=[];
+        if(!isEmptyValue(p.date))meta.push('<span>'+esc(String(p.date))+'</span>');
+        if(!isEmptyValue(p.reaction_counter))meta.push('<span>♥ '+Number(p.reaction_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.comment_counter))meta.push('<span>💬 '+Number(p.comment_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.repost_counter))meta.push('<span>↻ '+Number(p.repost_counter).toLocaleString('en-US')+'</span>');
+        if(!isEmptyValue(p.share_url))meta.push('<a href="'+esc(p.share_url)+'" target="_blank" rel="noopener">View ↗</a>');
+        var fmt=postFormatLabel(p);
+        return '<div class="lps-post-card">'
+          +(thumb?'<img class="lps-post-thumb" src="'+esc(thumb)+'" loading="lazy" onerror="this.remove()">':'')
+          +'<div class="lps-post-tags">'
+            +(fmt?'<span class="lps-tag">'+esc(fmt)+'</span>':'')
+            +(p.is_repost?'<span class="lps-badge comp">Repost</span>':'')
+          +'</div>'
+          +(text?'<p class="lps-post-text">'+esc(String(text))+'</p>':'<p class="lps-post-text lps-muted">No text captured for this post.</p>')
+          +(meta.length?'<div class="lps-post-meta">'+meta.join('')+'</div>':'')
+          +'</div>';
+      }).join('')+'</div>';
+      if(!POSTS_SHOW_ALL&&sorted.length>limit)
+        html+='<button class="lps-more-btn" onclick="showAllPosts()">Show all '+real.length+' posts</button>';
+
+      var polls=renderPolls(output['derived.polls']);
+      if(polls)html+=section('Polls Run',polls);
+      var hiring=output['derived.hiring'];
+      if(!isEmptyValue(hiring))html+=section('Open Roles Posted',renderCardArray(hiring),
+        'Job postings shared to this feed, a hiring signal in the post data');
+      var articles=output['derived.articles'];
+      if(!isEmptyValue(articles))html+=section('Articles Shared',renderCardArray(articles));
+      return html;
+    }
+    /* Mirrors tracker/lps_analytics.py's _post_format so a post card and the
+       computed format-performance chart never disagree about what a post is. */
+    function postFormatLabel(p){
+      if(p.poll&&typeof p.poll==='object')return 'Poll';
+      if(p.job_posting&&typeof p.job_posting==='object')return 'Job posting';
+      if(p.article&&typeof p.article==='object')return 'Article';
+      var types=(Array.isArray(p.attachments)?p.attachments:[]).map(function(a){return a&&a.type;});
+      if(types.indexOf('video')>=0)return 'Video';
+      if(types.indexOf('file')>=0)return 'Document';
+      var imgs=types.filter(function(t){return t==='img';}).length;
+      if(imgs>1)return 'Multi-image';
+      if(imgs===1)return 'Image';
+      return 'Text';
+    }
+
+    /* Competitive: the scorecard (an overall number plus a per-metric
+       breakdown) gets its own visual treatment up top -- a real run's
+       `scorecard` is an ARRAY of {metric,score} objects, not an object keyed
+       by category name, so anything checking `!Array.isArray(breakdown)`
+       before treating it as a category map silently skips it on every real
+       run. Rendered as a radar chart (reads a multi-metric shape better than
+       7 stacked bars) next to the overall score as an arc gauge, with the
+       weakest metrics called out as the actionable part. */
+    function competitiveContent(output){
+      var overall=output['competitiveagent.scorecardOverall'];
+      var breakdown=output['competitiveagent.scorecard'];
+      var validBreakdown=arrayOfObjectsWithKeys(breakdown,['metric','score']);
+      var top='';
+      if(!isEmptyValue(overall)||validBreakdown){
+        var maxVal=validBreakdown&&breakdown.some(function(x){return Number(x.score)>10;})?100:10;
+        var viz='<div class="lps-scorecard-viz">';
+        if(!isEmptyValue(overall))viz+=renderScoreGauge(overall,maxVal);
+        if(validBreakdown)viz+='<div class="lps-radar-block">'+renderRadar(breakdown)+'</div>';
+        viz+='</div>';
+        top+=section('Scorecard',viz,validBreakdown?('Scored out of '+maxVal+' per metric'):'');
+        if(validBreakdown){
+          var weakest=breakdown.slice().sort(function(a,b){return (Number(a.score)||0)-(Number(b.score)||0);}).slice(0,3);
+          top+=section('Weakest Metrics','<div class="lps-weak-row">'+weakest.map(function(m){
+            return '<div class="lps-weak"><div class="lps-weak-score">'+esc(String(m.score))+'<span>/'+maxVal+'</span></div>'
+              +'<div class="lps-weak-label">'+esc(humanizeKey(m.metric))+'</div></div>';
+          }).join('')+'</div>','Where the biggest gains are available');
+        }
+      }
+      var rest=agentTabContent(output,'competitiveagent',['scorecard','scorecardOverall']);
+      var restIsEmpty=rest.indexOf('lps-empty')>=0;
+      if(!top&&restIsEmpty)return emptyState('competitiveagent');
+      return top+(restIsEmpty?'':rest);
+    }
+
+    /* Radar + arc gauge for the competitive scorecard. */
     function renderRadar(items){
       var n=items.length, cx=155,cy=125,rMax=72;
       var scoreVals=items.map(function(x){return Number(x.score)||0;});
@@ -700,232 +1365,59 @@
         +'</svg><div class="lps-gauge-center"><div class="lps-gauge-num">'+esc(String(overall))+'</div><div class="lps-gauge-label">/ '+maxVal+'</div></div></div>';
     }
 
-    function renderSmart(v){
-      if(isEmptyValue(v))return null;
-      if(Array.isArray(v)){
-        if(isSwatchArray(v))return renderSwatches(v);
-        if(isKeywordArray(v))return renderKeywordCloud(v);
-        if(isLVArray(v)){
-          if(isNumericLVArray(v))return v.length<=6?renderDonut(v):renderDistribution(v);
-          return renderDefinitionCards(v);
-        }
-        if(isHVArray(v))return renderStatTiles(v);
-        if(isShortStringArray(v))return renderChips(v);
-        if(isStringArray(v))return renderStringList(v);
-        if(isPersonaArray(v))return renderPersonaCards(v);
-        if(isTimelineArray(v))return renderTimeline(v);
-        if(isCampaignArray(v))return renderCampaignCards(v);
-        if(isObsRecArray(v))return renderObsRecCards(v);
-        if(isCountThemeArray(v)){
-          var asLV=v.map(function(x){return {l:x.theme,v:x.postCount};});
-          return asLV.length<=6?renderDonut(asLV):renderDistribution(asLV);
-        }
-        return renderCardArray(v);
-      }
-      if(typeof v==='object'){
-        var keys=Object.keys(v).filter(function(k){return !isEmptyValue(v[k]);});
-        if(!keys.length)return null;
-        /* An object whose children are themselves arrays/objects (strategy,
-           audienceDetail, summary, messaging, competitive, …) reads far
-           better as full-width stacked sub-sections than crammed into a
-           2-column key/value grid -- that layout is reserved for genuinely
-           flat objects (a handful of short scalar fields, e.g. `company`). */
-        var hasComplexChild=keys.some(function(k){return typeof v[k]==='object';});
-        if(hasComplexChild){
-          var blocks=keys.map(function(k){
-            var inner=renderSmart(v[k]); if(inner==null)return '';
-            return '<div class="lps-subfield"><div class="lps-subfield-label">'+esc(humanizeKey(k))+'</div>'+inner+'</div>';
-          }).join('');
-          return blocks?'<div class="lps-subfield-stack">'+blocks+'</div>':null;
-        }
-        var cells=keys.map(function(k){
-          var inner=renderSmart(v[k]); if(inner==null)return '';
-          return '<div class="lps-kv-cell"><span class="lps-kv-label">'+esc(humanizeKey(k))+'</span><div class="lps-kv-value">'+inner+'</div></div>';
-        }).join('');
-        return cells?'<div class="lps-kv-grid">'+cells+'</div>':null;
-      }
-      if(typeof v==='number')return '<span class="lps-stat-inline">'+esc(String(v))+'</span>';
-      var s=String(v).trim();
-      if(!s)return null;
-      if(looksLikeImageUrl(s))return '<img class="lps-inline-logo" src="'+esc(s)+'" loading="lazy" onerror="this.remove()">';
-      if(looksLikeUrl(s))return '<a class="lps-inline-link" href="'+esc(s)+'" target="_blank" rel="noopener">Open link ↗</a>';
-      return s.length>140?'<p class="lps-prose">'+esc(s)+'</p>':'<span>'+esc(s)+'</span>';
-    }
-
-    var NS_EMPTY_MESSAGE={
-      aienrichment:'AI insights aren\'t available for this run.',
-      strategyagent:'No strategy data was returned for this company.',
-      contentcreativeagent:'No content or creative data was returned for this company.',
-      messagingagent:'No messaging data was returned for this company.',
-      creativeinsightagent:'No creative-insight data was returned for this company.',
-      competitiveagent:'No competitive data was returned for this company.',
-      getcompanyprofile:'No company profile data was returned.',
-      getcompanypost:'No recent posts could be pulled for this company.'
-    };
-
-    /* Skips fields with nothing to show instead of rendering them dash-filled
-       -- a real run commonly has data for some agents and none for others. */
-    function agentTabContent(output,ns,excludeFields){
-      var prefix=ns+'.', exclude=excludeFields||[];
-      var keys=Object.keys(output||{}).filter(function(k){
-        return k.indexOf(prefix)===0 && exclude.indexOf(k.slice(prefix.length))<0;
-      });
-      var sections=keys.map(function(k){
-        var body=renderSmart(output[k]);
-        if(body==null)return '';
-        return '<div class="lps-section"><div class="lps-section-label">'+esc(fieldTitle(k.slice(prefix.length)))+'</div><div class="lps-section-body">'+body+'</div></div>';
-      }).filter(Boolean);
-      return sections.length?sections.join(''):'<div class="lps-empty">'+(NS_EMPTY_MESSAGE[ns]||'No data returned for this section.')+'</div>';
-    }
-
-    /* Company Profile: a purpose-built profile card instead of a generic
-       key/value dump, since this namespace's shape is fully known. Falls
-       back to the company name/logo captured at search time (run.company_name/
-       company_logo, always present) when the vendor's own profile fields
-       come back empty for this run -- so the tab never shows a bare "no
-       data" message for a company whose name and logo we already know. */
-    /* The vendor's raw `profile` blob carries a lot more than the flat
-       fields this page requests individually (tagline, founding date,
-       office locations, an activities/hashtags list, viewer-permission
-       flags nobody needs) -- pulling a handful of the genuinely useful
-       extras out of it turns this tab from "name + description" into an
-       actual company snapshot, without rendering the whole 40-field object. */
-    function companyProfileContent(output,run){
-      var get=function(f){return output['getcompanyprofile.'+f];};
-      var profile=get('profile'); if(!profile||typeof profile!=='object')profile={};
-      var name=get('name')||(run&&run.company_name), desc=get('description'),
-          logo=get('logo')||(run&&run.company_logo),
-          website=get('website'), profileUrl=get('profile_url'), handle=get('public_identifier'),
-          followers=get('followers_count'), employees=get('employee_count');
-      if([name,desc,logo,website,profileUrl,followers,employees].every(isEmptyValue))
-        return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanyprofile+'</div>';
-      var industry=Array.isArray(profile.industry)?profile.industry[0]:profile.industry;
-      var stats=[];
-      if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
-      if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
-      if(!isEmptyValue(handle))stats.push({l:'Handle',v:'@'+handle});
-      if(!isEmptyValue(profile.foundation_date))stats.push({l:'Founded',v:String(profile.foundation_date).split('/').pop()});
-      var locations=Array.isArray(profile.locations)?profile.locations:[];
-      var hq=locations.filter(function(l){return l&&l.is_headquarter;})[0];
-      if(hq)stats.push({l:'HQ',v:[hq.city,hq.country].filter(Boolean).join(', ')});
-      if(locations.length>1)stats.push({l:'Offices',v:locations.length+' worldwide'});
-      var tags=[].concat(Array.isArray(profile.activities)?profile.activities.slice(0,12):[])
-        .concat(Array.isArray(profile.hashtags)?profile.hashtags.map(function(h){return typeof h==='object'?h.title:h;}):[])
-        .filter(function(t){return !isEmptyValue(t);});
-      return '<div class="lps-profile-card">'
-        +(logo?'<img class="lps-profile-logo" src="'+esc(logo)+'" loading="lazy" onerror="this.remove()">':'')
-        +'<div class="lps-profile-main">'
-        +(name?'<div class="lps-profile-name">'+esc(name)+(industry?'<span class="lps-profile-industry">'+esc(industry)+'</span>':'')+'</div>':'')
-        +(profile.tagline?'<div class="lps-profile-tagline">'+esc(profile.tagline)+'</div>':'')
-        +(desc?'<p class="lps-profile-desc">'+esc(desc)+'</p>':'')
-        +(tags.length?'<div class="lps-chips" style="margin-top:12px">'+tags.slice(0,14).map(function(t){return '<span class="lps-chip lps-chip-sm">'+esc(String(t))+'</span>';}).join('')+'</div>':'')
-        +((website||profileUrl)?'<div class="lps-profile-links">'
-          +(website?'<a href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
-          +(profileUrl?'<a href="'+esc(profileUrl)+'" target="_blank" rel="noopener">LinkedIn profile ↗</a>':'')
-          +'</div>':'')+'</div>'
-        +(stats.length?'<div class="lps-profile-stats">'+stats.map(function(s){
-            return '<div class="lps-profile-stat"><div class="lps-profile-stat-val">'+esc(String(s.v))+'</div><div class="lps-profile-stat-label">'+esc(s.l)+'</div></div>';
-          }).join('')+'</div>':'')
-        +'</div>';
-    }
-
-    /* Posts: the vendor's actual field names (reaction_counter/comment_counter/
-       repost_counter/share_url) confirmed from a real production run --
-       earlier guesses at likely key names (likes/comments/url, ported from a
-       different tool's assumed shape) never matched, so engagement numbers
-       and the "View" link silently never appeared. Sorted by reactions so
-       the best-performing posts surface first (a genuinely useful ranking,
-       not just recency), with the first image/video attachment as a
-       thumbnail and reposts flagged distinctly from original posts. */
-    function postsContent(output){
-      var items=output['getcompanypost.items'];
-      var real=Array.isArray(items)?items.filter(function(p){return p&&typeof p==='object';}):[];
-      if(!real.length)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.getcompanypost+'</div>';
-      var sorted=real.slice().sort(function(a,b){return (Number(b.reaction_counter)||0)-(Number(a.reaction_counter)||0);});
-      var cards=sorted.slice(0,24).map(function(p){
-        var text=p.text||(p.repost_content&&p.repost_content.text)||'';
-        var thumb=null;
-        if(Array.isArray(p.attachments)){
-          var media=p.attachments.filter(function(a){return a&&(a.type==='img'||a.type==='video')&&a.url;})[0];
-          if(media)thumb=media.url;
-        }
-        var meta=[];
-        if(!isEmptyValue(p.date))meta.push('<span>'+esc(String(p.date))+'</span>');
-        if(!isEmptyValue(p.reaction_counter))meta.push('<span>❤ '+Number(p.reaction_counter).toLocaleString('en-US')+'</span>');
-        if(!isEmptyValue(p.comment_counter))meta.push('<span>💬 '+Number(p.comment_counter).toLocaleString('en-US')+'</span>');
-        if(!isEmptyValue(p.repost_counter))meta.push('<span>↻ '+Number(p.repost_counter).toLocaleString('en-US')+'</span>');
-        if(!isEmptyValue(p.share_url))meta.push('<a href="'+esc(p.share_url)+'" target="_blank" rel="noopener">View ↗</a>');
-        return '<div class="lps-post-card">'
-          +(thumb?'<img class="lps-post-thumb" src="'+esc(thumb)+'" loading="lazy" onerror="this.remove()">':'')
-          +(p.is_repost?'<span class="lps-badge comp lps-post-repost">Repost</span>':'')
-          +(text?'<p class="lps-post-text">'+esc(String(text))+'</p>':'<p class="lps-post-text lps-muted">No text captured for this post.</p>')
-          +(meta.length?'<div class="lps-post-meta">'+meta.join('')+'</div>':'')
-          +'</div>';
-      }).join('');
-      return '<div class="lps-post-grid">'+cards+'</div>';
-    }
-
-    /* Competitive: the scorecard (an overall number plus a per-metric
-       breakdown) gets its own visual treatment up top -- a real run's
-       `scorecard` is an ARRAY of {metric,score} objects, not an object keyed
-       by category name, which this file's first version didn't account for
-       (`typeof x==='object' && !Array.isArray(x)` is false for an array, so
-       the whole breakdown branch was silently skipped on every real run --
-       the category bars simply never rendered). Now rendered as a radar
-       chart (reads a multi-metric shape better than 7 stacked bars) next to
-       the overall score as a proper arc gauge. Everything else in this
-       namespace renders through the generic path below it. */
-    function competitiveContent(output){
-      var overall=output['competitiveagent.scorecardOverall'];
-      var breakdown=output['competitiveagent.scorecard'];
-      var validBreakdown=arrayOfObjectsWithKeys(breakdown,['metric','score']);
-      var top='';
-      if(!isEmptyValue(overall)||validBreakdown){
-        var maxVal=validBreakdown&&breakdown.some(function(x){return Number(x.score)>10;})?100:10;
-        top+='<div class="lps-section"><div class="lps-section-label">Scorecard</div><div class="lps-section-body"><div class="lps-scorecard-viz">';
-        if(!isEmptyValue(overall))top+=renderScoreGauge(overall,maxVal);
-        if(validBreakdown)top+='<div class="lps-radar-block">'+renderRadar(breakdown)+'</div>';
-        top+='</div></div></div>';
-      }
-      var rest=agentTabContent(output,'competitiveagent',['scorecard','scorecardOverall']);
-      var restIsEmpty=rest.indexOf('lps-empty')>=0;
-      if(!top&&restIsEmpty)return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.competitiveagent+'</div>';
-      return top+(restIsEmpty?'':rest);
-    }
-
-    /* AI Insights: a single Claude call (tracker/lps_enrichment.py), run once
-       per completed analysis, that reads everything the vendor's five agents
-       returned and writes ONE point of view across all of it -- unlike every
-       other tab here, this section is never vendor data on its own, so it
-       carries a visible badge saying so and is held to a stricter rule than
-       the rest of this page: it must never state a fact that isn't traceable
-       to a real field in this run (see the system prompt), so a company with
+    /* ── AI Insights ────────────────────────────────────────────────────────
+       A single Claude call (tracker/lps_enrichment.py), run once per completed
+       analysis, that reads everything the vendor's five agents returned plus
+       the computed derived.* metrics and writes ONE point of view across all
+       of it. Unlike every other tab here this section is never vendor data on
+       its own, so it carries a visible badge saying so and is held to a
+       stricter rule: it must never state a fact that isn't traceable to a
+       real field in this run (see the system prompt), so a company with
        little real signal gets an honest "no organic content was found"
-       synthesis, not a fabricated one. Absent entirely (no ANTHROPIC_API_KEY,
-       or the call failed) just falls through to the normal empty state. */
+       synthesis rather than a fabricated one. Absent entirely (no
+       ANTHROPIC_API_KEY, or the call failed) falls through to the empty
+       state. */
     function aiInsightsContent(output){
       var headline=output['aienrichment.headline'];
       var synthesis=output['aienrichment.synthesis'];
-      var actions=output['aienrichment.topActions'];
-      var coverage=output['aienrichment.coverage'];
       if(isEmptyValue(headline)&&isEmptyValue(synthesis))
-        return '<div class="lps-empty">'+NS_EMPTY_MESSAGE.aienrichment+'</div>';
+        return emptyState('aienrichment','Set ANTHROPIC_API_KEY and re-run an analysis to generate this section.');
       var html='<div class="lps-ai-badge">✨ AI-synthesized — combines signal across every section on this report, not vendor data on its own</div>';
       if(!isEmptyValue(headline))html+='<div class="lps-ai-headline">'+esc(headline)+'</div>';
       if(!isEmptyValue(synthesis)){
         var paras=String(synthesis).split(/\n\s*\n/).map(function(p){return p.trim();}).filter(Boolean);
-        html+='<div class="lps-section"><div class="lps-section-label">Synthesis</div><div class="lps-section-body">'
-          +paras.map(function(p){return '<p class="lps-prose">'+esc(p)+'</p>';}).join('')+'</div></div>';
+        html+=section('Synthesis',paras.map(function(p){return '<p class="lps-prose">'+esc(p)+'</p>';}).join(''));
       }
-      if(Array.isArray(actions)&&actions.length)
-        html+='<div class="lps-section"><div class="lps-section-label">Top Actions</div><div class="lps-section-body">'+renderStringList(actions)+'</div></div>';
+      var actions=output['aienrichment.topActions'];
+      if(!isEmptyValue(actions))html+=section('Top Actions',renderNumberedList(actions));
+      var strengths=output['aienrichment.strengths'];
+      var risks=output['aienrichment.risks'];
+      if(!isEmptyValue(strengths)||!isEmptyValue(risks)){
+        var cols='';
+        if(!isEmptyValue(strengths))cols+='<div class="lps-sr-col good"><div class="lps-sr-head">Working</div>'+renderStringList(strengths)+'</div>';
+        if(!isEmptyValue(risks))cols+='<div class="lps-sr-col bad"><div class="lps-sr-head">Exposed</div>'+renderStringList(risks)+'</div>';
+        html+=section('Strengths And Risks','<div class="lps-sr">'+cols+'</div>');
+      }
+      var angles=output['aienrichment.contentAngles'];
+      if(!isEmptyValue(angles))html+=section('Content Angles To Run Next',renderStringList(angles));
+      var coverage=output['aienrichment.coverage'];
       if(!isEmptyValue(coverage))html+='<div class="lps-ai-coverage">'+esc(coverage)+'</div>';
       return html;
+    }
+    function renderNumberedList(arr){
+      return '<ol class="lps-num-list">'+arr.filter(function(s){return !isEmptyValue(s);}).map(function(s){
+        return '<li>'+esc(String(s))+'</li>';
+      }).join('')+'</ol>';
     }
 
     function tabPaneContent(output,ns,run){
       if(ns==='overview')return overviewContent(output,run);
       if(ns==='aienrichment')return aiInsightsContent(output);
+      if(ns==='engagement')return engagementContent(output);
+      if(ns==='audience')return audienceContent(output);
+      if(ns==='strategyagent')return strategyContent(output);
+      if(ns==='contentcreativeagent')return contentCreativeContent(output);
+      if(ns==='messagingagent')return messagingContent(output);
       if(ns==='getcompanyprofile')return companyProfileContent(output,run);
       if(ns==='getcompanypost')return postsContent(output);
       if(ns==='competitiveagent')return competitiveContent(output);
@@ -935,64 +1427,56 @@
     /* Whether a tab has anything to show, without duplicating each pane's own
        empty-state logic -- reuses the same render path the pane itself uses
        and checks for its own empty-state marker. Powers the nav dots and the
-       Overview tab's coverage list, so a user can see what's missing before
+       Overview coverage list, so a reader can see what's missing before
        clicking into it instead of discovering empty tabs one at a time. */
     function tabHasData(output,ns,run){
       return tabPaneContent(output,ns,run).indexOf('class="lps-empty"')===-1;
     }
 
-    /* Overview: a synthesized first-look instead of making the reader click
-       through every tab to get oriented -- company snapshot, competitive
-       score, a strategy/summary excerpt with a jump link to the full tab, top
-       hooks/CTAs, and an honest coverage list of which sections this run
+    /* ── Overview: a synthesized first look ─────────────────────────────────
+       Instead of making the reader click nine tabs to get oriented: what the
+       company is, the computed findings, the vendor's executive summary, the
+       best hooks, and an honest list of which sections this particular run
        actually has data for. */
     function overviewContent(output,run){
       var get=function(f){return output['getcompanyprofile.'+f];};
-      var desc=get('description'), website=get('website'),
-          followers=get('followers_count'), employees=get('employee_count');
-      var overall=output['competitiveagent.scorecardOverall'];
-      var scoreBreakdown=output['competitiveagent.scorecard'];
-      var maxScoreVal=arrayOfObjectsWithKeys(scoreBreakdown,['metric','score'])&&scoreBreakdown.some(function(x){return Number(x.score)>10;})?100:10;
+      var desc=get('description'), website=get('website');
       var summary=output['messagingagent.summary'];
       var strategy=output['strategyagent.strategy'];
+      var insights=output['derived.insights'];
       var hooks=output['strategyagent.hookLibrary'];
       var ctas=output['strategyagent.ctaLibrary'];
-      /* hookLibrary is an array of {example,type} objects, not plain
-         strings -- isStringArray(hooks) is false for the real shape, so
-         "Top Hooks" never rendered on Overview at all until this pulled
-         .example out explicitly. Truncated here since Overview is a taste,
-         not the full detail (that lives in the Strategy tab). */
+      /* hookLibrary is an array of {example,type} objects, not plain strings,
+         so isStringArray(hooks) is false for the real shape and "Top Hooks"
+         never rendered until .example was pulled out explicitly. Truncated
+         here because Overview is a taste; the full set lives in Strategy. */
       var hookExamples=Array.isArray(hooks)?hooks.map(function(h){
         var s=String((h&&typeof h==='object')?h.example:h||'');
         return s.length>70?s.slice(0,70).trim()+'…':s;
       }).filter(function(s){return s;}):[];
 
-      var stats=[];
-      if(!isEmptyValue(followers))stats.push({l:'Followers',v:Number(followers).toLocaleString('en-US')});
-      if(!isEmptyValue(employees))stats.push({l:'Employees',v:Number(employees).toLocaleString('en-US')});
-
       var html='';
-      if(!isEmptyValue(desc)||stats.length||!isEmptyValue(overall)){
+      if(!isEmptyValue(desc)||!isEmptyValue(website)){
         html+='<div class="lps-ov-hero">'
-          +'<div class="lps-ov-hero-main">'
           +(desc?'<p class="lps-ov-desc">'+esc(desc)+'</p>':'')
           +(website?'<a class="lps-ov-website" href="'+esc(website)+'" target="_blank" rel="noopener">'+esc(website)+' ↗</a>':'')
-          +(stats.length?'<div class="lps-ov-stats">'+stats.map(function(s){
-              return '<div class="lps-ov-stat"><div class="lps-ov-stat-val">'+esc(String(s.v))+'</div><div class="lps-ov-stat-label">'+esc(s.l)+'</div></div>';
-            }).join('')+'</div>':'')
-          +'</div>'
-          +(!isEmptyValue(overall)?'<div class="lps-ov-hero-score">'+renderScoreGauge(overall,maxScoreVal)+'<div class="lps-ov-stat-label">Competitive Score</div></div>':'')
           +'</div>';
       }
 
       /* A one-line teaser for the AI Insights tab -- the full synthesis lives
-         in its own tab (aiInsightsContent), this is just enough to make its
-         existence and headline visible without leaving Overview. */
+         in its own tab, this is just enough to make its existence and
+         headline visible without leaving Overview. */
       var aiHeadline=output['aienrichment.headline'];
       if(!isEmptyValue(aiHeadline)){
         html+='<button class="lps-ov-ai-teaser" onclick="switchDrawerTab(\'aienrichment\')">'
           +'<span class="lps-ov-ai-icon">✨</span><span class="lps-ov-ai-text">'+esc(aiHeadline)+'</span>'
           +'<span class="lps-ov-ai-link">Full AI insights →</span></button>';
+      }
+
+      if(!isEmptyValue(insights)){
+        html+=section('Key Findings',renderStringList(insights.slice(0,6))
+          +(insights.length>6?'<button class="lps-ov-more" onclick="switchDrawerTab(\'engagement\')">All engagement analysis →</button>':''),
+          'Computed from the post feed');
       }
 
       /* messagingagent.summary is commonly an object ({text, moves, stats, …}),
@@ -1002,20 +1486,22 @@
          renderer instead of assuming a string. */
       var summaryText=(summary&&typeof summary==='object'&&!Array.isArray(summary))?summary.text:summary;
       if(!isEmptyValue(summaryText)&&typeof summaryText==='string'){
-        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body"><p class="lps-prose">'+esc(summaryText)+'</p></div></div>';
+        html+=section('Executive Summary','<p class="lps-prose">'+esc(summaryText)+'</p>');
       } else if(!isEmptyValue(summary)){
-        html+='<div class="lps-section"><div class="lps-section-label">Executive Summary</div><div class="lps-section-body">'+renderSmart(summary)+'</div></div>';
-      } else if(!isEmptyValue(strategy)){
+        html+=section('Executive Summary',renderSmart(summary));
+      } else if(!isEmptyValue(strategy)&&typeof strategy==='string'){
         var s=String(strategy), long=s.length>320, excerpt=long?s.slice(0,320).trim()+'…':s;
-        html+='<div class="lps-section"><div class="lps-section-label">Strategy Snapshot</div><div class="lps-section-body"><p class="lps-prose">'+esc(excerpt)+'</p>'
-          +(long?'<button class="lps-ov-more" onclick="switchDrawerTab(\'strategyagent\')">Read full strategy →</button>':'')
-          +'</div></div>';
+        html+=section('Strategy Snapshot','<p class="lps-prose">'+esc(excerpt)+'</p>'
+          +(long?'<button class="lps-ov-more" onclick="switchDrawerTab(\'strategyagent\')">Read full strategy →</button>':''));
       }
 
+      if(summary&&typeof summary==='object'&&!isEmptyValue(summary.moves))
+        html+=section('Signature Moves',renderStringList(summary.moves));
+
       if(hookExamples.length)
-        html+='<div class="lps-section"><div class="lps-section-label">Top Hooks</div><div class="lps-section-body">'+renderChips(hookExamples.slice(0,6))+'</div></div>';
+        html+=section('Top Hooks',renderChips(hookExamples.slice(0,6)));
       if(isStringArray(ctas))
-        html+='<div class="lps-section"><div class="lps-section-label">Top CTAs</div><div class="lps-section-body">'+renderChips(ctas.slice(0,6))+'</div></div>';
+        html+=section('Top CTAs',renderChips(ctas.slice(0,6)));
 
       var coverage=AGENT_TABS.filter(function(t){return t.ns!=='overview';}).map(function(t){
         var has=tabHasData(output,t.ns,run);
@@ -1023,27 +1509,158 @@
           +'<span class="lps-ov-cov-dot"></span><span class="lps-ov-cov-label">'+esc(t.label)+'</span>'
           +'<span class="lps-ov-cov-state">'+(has?'Available':'No data')+'</span></button>';
       }).join('');
-      html+='<div class="lps-section"><div class="lps-section-label">Report Coverage</div><div class="lps-section-body"><div class="lps-ov-coverage">'+coverage+'</div></div></div>';
+      html+=section('Report Coverage','<div class="lps-ov-coverage">'+coverage+'</div>',
+        'Which sections this run actually returned data for');
 
       return html||'<div class="lps-empty">No overview data available yet — check the individual tabs.</div>';
     }
 
     var DRAWER_RUN = null;
 
-    function drawerHeader(run){
+    /* The report's identity band: who this is about, how it was run, and the
+       handful of headline numbers worth keeping on screen no matter which tab
+       is open. Actions live here too -- printing (which the print stylesheet
+       turns into a full flat report, so "Save as PDF" produces a real
+       deliverable) and copying the findings as plain text for a Slack message
+       or an email. */
+    function reportHeader(run,output){
       var typeLabel=run.run_type==='COMPETITOR'?'Competitor analysis':'Own-brand analysis';
-      var html='<div class="drw-head">'
-        +(run.company_logo?'<img class="lps-drw-logo" src="'+esc(run.company_logo)+'" loading="lazy" onerror="this.remove()">':'<div class="lps-avatar-sq drw-avatar">'+esc(initials(run.company_name))+'</div>')
-        +'<div class="drw-head-txt"><h3>'+esc(run.company_name||'Unknown company')+'</h3>'
-        +'<div class="drw-sub">'+esc(typeLabel)+' · '+esc(relTime(run.created_at))+'</div></div>';
-      html+='</div>';
-      return html;
+      var foot=output['derived.footprint']||{};
+      var act=output['derived.activity']||{};
+      var eng=output['derived.engagement']||{};
+      var score=output['competitiveagent.scorecardOverall'];
+      var followers=output['getcompanyprofile.followers_count'];
+      var profileUrl=output['getcompanyprofile.profile_url'];
+
+      var chips='<span class="lps-badge '+(run.run_type==='COMPETITOR'?'comp':'own')+'">'+esc(typeLabel)+'</span>';
+      if(!isEmptyValue(foot.industry))chips+='<span class="lps-chip lps-chip-sm">'+esc(foot.industry)+'</span>';
+      if(!isEmptyValue(act.windowStart))chips+='<span class="lps-chip lps-chip-sm">'+esc(act.windowStart)+' → '+esc(act.windowEnd)+'</span>';
+
+      /* LinkedIn's logo CDN URLs carry an expiry, so a logo captured at
+         search time can 404 by the time an older report is reopened.
+         Swapping in the initials tile on error keeps the identity block from
+         collapsing to a ragged gap where the logo used to be. */
+      var logoFallback='<div class=\'lps-avatar-sq drw-avatar\'>'+esc(initials(run.company_name))+'</div>';
+      var html='<div class="lps-rep-head">'
+        +'<div class="lps-rep-id">'
+        +(run.company_logo
+            ?'<img class="lps-drw-logo" src="'+esc(run.company_logo)+'" loading="lazy" onerror="this.outerHTML='+esc(JSON.stringify(logoFallback))+'">'
+            :logoFallback)
+        +'<div class="lps-rep-txt">'
+        +'<h3>'+esc(run.company_name||'Unknown company')+'</h3>'
+        +'<div class="lps-rep-chips">'+chips+'</div>'
+        +'<div class="drw-sub">Analyzed '+esc(relTime(run.created_at))+'</div>'
+        +'</div></div>'
+        +'<div class="lps-rep-actions">'
+        +(profileUrl?'<a class="lps-act" href="'+esc(profileUrl)+'" target="_blank" rel="noopener">↗ LinkedIn</a>':'')
+        +'<button class="lps-act" onclick="copyReportSummary()" id="lpsCopyBtn">⧉ Copy findings</button>'
+        +'<button class="lps-act primary" onclick="printReport()">⎙ Save as PDF</button>'
+        +'</div></div>';
+
+      var band=renderMetricBand([
+        {label:'Competitive score', value:isEmptyValue(score)?null:score, unit:'/10'},
+        {label:'Followers', value:isEmptyValue(followers)?null:compactNum(followers), title:fullNum(followers)+' followers'},
+        {label:'Posts / week', value:isEmptyValue(act.postsPerWeek)?null:act.postsPerWeek},
+        {label:'Avg engagement', value:isEmptyValue(eng.avgTotal)?null:compactNum(eng.avgTotal), title:fullNum(eng.avgTotal)+' per post'},
+        {label:'Engagement rate', value:isEmptyValue(eng.engagementRatePct)?null:eng.engagementRatePct, unit:'%'},
+        {label:'Posts analyzed', value:isEmptyValue(act.postsAnalyzed)?null:act.postsAnalyzed}
+      ]);
+      return html+(band?'<div class="lps-rep-band">'+band+'</div>':'');
+    }
+
+    /* Plain-text findings for pasting into Slack or an email. Built from the
+       same fields the report shows, so it can never claim something the
+       report doesn't. */
+    function reportSummaryText(){
+      if(!DRAWER_RUN)return '';
+      var out=DRAWER_RUN.output||{};
+      var lines=['LinkedIn Strategy Researcher — '+(DRAWER_RUN.company_name||'Unknown company')];
+      var score=out['competitiveagent.scorecardOverall'];
+      if(!isEmptyValue(score))lines.push('Competitive score: '+score+'/10');
+      var headline=out['aienrichment.headline'];
+      if(!isEmptyValue(headline))lines.push('','Headline: '+headline);
+      var insights=out['derived.insights'];
+      if(!isEmptyValue(insights)){
+        lines.push('','What the numbers say:');
+        insights.forEach(function(s){lines.push('  - '+s);});
+      }
+      var actions=out['aienrichment.topActions'];
+      if(!isEmptyValue(actions)){
+        lines.push('','Recommended next actions:');
+        actions.forEach(function(s,i){lines.push('  '+(i+1)+'. '+s);});
+      }
+      return lines.join('\n');
+    }
+    function copyReportSummary(){
+      var text=reportSummaryText();
+      if(!text)return;
+      var btn=document.getElementById('lpsCopyBtn');
+      var done=function(ok){
+        if(!btn)return;
+        var prev=btn.textContent;
+        btn.textContent=ok?'✓ Copied':'Copy failed';
+        setTimeout(function(){btn.textContent=prev;},1600);
+      };
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(true);},function(){done(false);});
+        return;
+      }
+      /* execCommand fallback for non-secure contexts, where the async
+         clipboard API is unavailable. */
+      try{
+        var ta=document.createElement('textarea');
+        ta.value=text; ta.setAttribute('readonly','');
+        ta.style.position='fixed'; ta.style.left='-9999px';
+        document.body.appendChild(ta); ta.select();
+        var ok=document.execCommand('copy');
+        document.body.removeChild(ta);
+        done(ok);
+      }catch(e){ done(false); }
+    }
+
+    /* Printing flattens the report: the print stylesheet reveals every pane
+       at once and drops the nav, overlay and page chrome, so the browser's
+       own "Save as PDF" produces the whole report rather than one tab of it.
+       The body class is what the stylesheet keys off, and is removed again
+       after the dialog closes so the on-screen layout is untouched. */
+    function printReport(){
+      document.body.classList.add('lps-printing');
+      var cleanup=function(){ document.body.classList.remove('lps-printing'); };
+      if(window.matchMedia){
+        var mq=window.matchMedia('print');
+        var onChange=function(e){ if(!e.matches){cleanup(); if(mq.removeEventListener)mq.removeEventListener('change',onChange);} };
+        if(mq.addEventListener)mq.addEventListener('change',onChange);
+      }
+      window.addEventListener('afterprint',cleanup,{once:true});
+      setTimeout(function(){ window.print(); setTimeout(cleanup,1200); },60);
     }
 
     function switchDrawerTab(ns){
       document.querySelectorAll('.lps-drw-tab').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-ns')===ns);});
       document.querySelectorAll('.lps-drw-pane').forEach(function(p){p.classList.toggle('active',p.getAttribute('data-ns')===ns);});
+      var body=document.querySelector('.lps-drw-body');
+      if(body)body.scrollTop=0;
+      if(DRAWER_RUN)setHash(DRAWER_RUN.id,ns);
       if(ns==='playbook')loadPlaybook();
+    }
+
+    /* Deep links: a report (and a specific section of it) survives a refresh
+       and can be pasted to a colleague, who lands on the same tab. */
+    function setHash(runId,ns){
+      var next='#report/'+runId+(ns&&ns!=='overview'?('/'+ns):'');
+      if(location.hash!==next){
+        try{ history.replaceState(null,'',next); }catch(e){ location.hash=next; }
+      }
+    }
+    function clearHash(){
+      if(location.hash.indexOf('#report/')===0){
+        try{ history.replaceState(null,'',location.pathname); }catch(e){ location.hash=''; }
+      }
+    }
+    function openRunFromHash(){
+      var m=/^#report\/(\d+)(?:\/([a-z]+))?$/i.exec(location.hash||'');
+      if(!m)return;
+      openRunDrawer(parseInt(m[1],10),m[2]||'overview');
     }
 
     /* The vendor's playbook content is either a structured dict of
@@ -1060,17 +1677,18 @@
 
     function loadPlaybook(){
       var wrap=document.getElementById('lpsPlaybookBody');
-      if(!DRAWER_RUN)return;
+      if(!DRAWER_RUN||!wrap)return;
       var mode=DRAWER_RUN.run_type==='COMPETITOR'?'COMPETITOR':'OWN';
       wrap.innerHTML='<div class="lps-loading">Loading…</div>';
       fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+DRAWER_RUN.id+'/playbook?mode='+mode)
         .then(function(r){return r.json();}).then(function(data){
           if(data.playbook&&data.playbook.content){
-            wrap.innerHTML='<button class="lps-mode-btn own" style="margin-bottom:16px" onclick="generatePlaybook()">↻ Regenerate playbook</button>'
+            wrap.innerHTML='<button class="lps-act" style="margin-bottom:16px" onclick="generatePlaybook()">↻ Regenerate playbook</button>'
               +renderPlaybookContent(data.playbook.content);
           } else {
-            wrap.innerHTML='<div class="lps-empty">No playbook generated yet.</div>'
-              +'<button class="lps-mode-btn own" style="margin-top:16px" onclick="generatePlaybook()">Generate playbook</button>';
+            wrap.innerHTML='<div class="lps-empty">No playbook generated yet.'
+              +'<div class="lps-empty-note">A playbook turns this analysis into a sequenced plan of what to publish next.</div></div>'
+              +'<div style="text-align:center"><button class="lps-mode-btn own" style="margin-top:16px;max-width:280px" onclick="generatePlaybook()">Generate playbook</button></div>';
           }
         }).catch(function(){
           wrap.innerHTML='<div class="lps-empty">Couldn\'t load the playbook — try again.</div>';
@@ -1101,34 +1719,44 @@
       setTimeout(check,5000);
     }
 
-    function openRunDrawer(runId){
+    function openRunDrawer(runId,initialTab){
       var d=document.getElementById('drawer');
       document.getElementById('drawerBody').innerHTML='<div class="lps-loading" style="padding:60px">Loading report…</div>';
       d.classList.add('open');
       document.getElementById('drawerOverlay').classList.add('open');
-      requestAnimationFrame(function(){});
       document.body.style.overflow='hidden';
+      POSTS_SORT='top'; POSTS_SHOW_ALL=false;
       fetch('/p2/b2b-agents/linkedin-strategy-researcher/runs/'+runId).then(function(r){
         if(!r.ok)throw new Error('not found');
         return r.json();
       }).then(function(run){
         DRAWER_RUN=run;
         var output=run.output||{};
-        var tabsHtml=AGENT_TABS.map(function(t,i){
+        var wanted=AGENT_TABS.some(function(t){return t.ns===initialTab;})||initialTab==='playbook'
+          ? initialTab : 'overview';
+        var tabsHtml=AGENT_TABS.map(function(t){
           var has=t.ns==='overview'||tabHasData(output,t.ns,run);
-          return '<button class="lps-drw-tab'+(i===0?' active':'')+(has?'':' lps-drw-tab-empty')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
+          return '<button class="lps-drw-tab'+(t.ns===wanted?' active':'')+(has?'':' lps-drw-tab-empty')+'" data-ns="'+t.ns+'" onclick="switchDrawerTab(\''+t.ns+'\')">'
             +'<span class="lps-drw-tab-ic">'+t.icon+'</span><span class="lps-drw-tab-label">'+esc(t.label)+'</span>'
             +'<span class="lps-drw-tab-dot" aria-hidden="true"></span></button>';
-        }).join('')+'<button class="lps-drw-tab" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">'
+        }).join('')
+          +'<div class="lps-drw-nav-sep"></div>'
+          +'<button class="lps-drw-tab'+(wanted==='playbook'?' active':'')+'" data-ns="playbook" onclick="switchDrawerTab(\'playbook\')">'
           +'<span class="lps-drw-tab-ic">⎘</span><span class="lps-drw-tab-label">Playbook</span></button>';
-        var panesHtml=AGENT_TABS.map(function(t,i){
-          return '<div class="lps-drw-pane'+(i===0?' active':'')+'" data-ns="'+t.ns+'">'+tabPaneContent(output,t.ns,run)+'</div>';
-        }).join('')+'<div class="lps-drw-pane" data-ns="playbook"><div id="lpsPlaybookBody"></div></div>';
-        document.getElementById('drawerBody').innerHTML=drawerHeader(run)
+        var panesHtml=AGENT_TABS.map(function(t){
+          return '<section class="lps-drw-pane'+(t.ns===wanted?' active':'')+'" data-ns="'+t.ns+'">'
+            +'<h4 class="lps-pane-title">'+esc(t.label)+'</h4>'
+            +tabPaneContent(output,t.ns,run)+'</section>';
+        }).join('')
+          +'<section class="lps-drw-pane'+(wanted==='playbook'?' active':'')+'" data-ns="playbook">'
+          +'<h4 class="lps-pane-title">Playbook</h4><div id="lpsPlaybookBody"></div></section>';
+        document.getElementById('drawerBody').innerHTML=reportHeader(run,output)
           +'<div class="lps-drw-shell">'
-          +'<div class="lps-drw-nav">'+tabsHtml+'</div>'
+          +'<nav class="lps-drw-nav">'+tabsHtml+'</nav>'
           +'<div class="drw-body lps-drw-body">'+panesHtml+'</div>'
           +'</div>';
+        setHash(run.id,wanted);
+        if(wanted==='playbook')loadPlaybook();
       }).catch(function(){
         document.getElementById('drawerBody').innerHTML='<div class="lps-empty" style="padding:60px">Couldn\'t load this report.</div>';
       });
@@ -1139,6 +1767,7 @@
       document.getElementById('drawerOverlay').classList.remove('open');
       document.body.style.overflow='';
       DRAWER_RUN=null;
+      clearHash();
     }
     document.addEventListener('keydown',function(e){ if(e.key==='Escape')closeDrawer(); });
 
