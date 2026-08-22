@@ -26,12 +26,27 @@
    (`:root[data-theme="light"] html`) can never match, because :root IS html, so
    it is asking for an html inside a light-themed html. Every page that relies on
    it gets the dark ground in light mode. This page does not rely on it. */
+/* `background:` is a shorthand: writing only gradients into it resets the
+   longhand background-color to its initial value, transparent -- gradients
+   are images, not a colour, and the shorthand does not infer one from them.
+   That mattered here because macOS's rubber-band overscroll (and a fast
+   trackpad fling in general) paints the canvas past the document's edges
+   using the root element's background-*color*, never its background-image
+   layers. A transparent html background-color means that region falls
+   through to the browser's own default canvas, which is white -- seen as a
+   white flash popping in from the top or bottom on a fast scroll, in dark
+   mode as much as light, because the gradient was never the thing being
+   shown there. background-color is declared as its own line, after the
+   shorthand, on purpose: the same line inside the shorthand itself would be
+   overwritten by it. Confirmed by reading getComputedStyle(html).
+   backgroundColor before this fix: rgba(0,0,0,0). */
 html:root {
   background:
     radial-gradient(ellipse 80% 50% at 16% 0%,  rgba(74,222,128,.10) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 90% 52%, rgba(20,184,166,.10) 0%, transparent 55%),
     radial-gradient(ellipse 50% 60% at 50% 100%,rgba(6,40,32,.45)    0%, transparent 70%),
     linear-gradient(160deg, #08100e 0%, #070d0e 40%, #06090f 100%);
+  background-color: #06090f;
   background-attachment: fixed;
 }
 html:root[data-theme="light"] {
@@ -39,6 +54,7 @@ html:root[data-theme="light"] {
     radial-gradient(ellipse 80% 50% at 16% 0%,  rgba(74,222,128,.16) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 90% 52%, rgba(20,184,166,.14) 0%, transparent 55%),
     linear-gradient(160deg, #eef4f1 0%, #e8f0ec 45%, #e6eaf4 100%);
+  background-color: #e6eaf4;
   background-attachment: fixed;
 }
 body {
