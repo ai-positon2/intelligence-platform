@@ -159,6 +159,22 @@ def test_the_x_axis_prints_the_month_on_its_own_row():
     assert _decl(css, ".gd-months", "padding-left") == _decl(css, ".gd-plot", "padding-left")
 
 
+def test_the_table_card_keeps_the_pages_section_rhythm():
+    """Every other major section (.ph, .gd-stats, .gd-grid-3) declares its own
+    margin-bottom to the section after it. #mainCard -- the practices/calendar/
+    alerts/services card -- did not, so it sat flush against the AI briefing
+    card below it with zero gap: reported live as the table and the briefing
+    touching with no space between them."""
+    css = _read(CSS)
+    section_gap = _decl(css, ".gd-stats", "margin-bottom")
+    main_gap = _decl(css, "#mainCard", "margin-bottom")
+    assert main_gap, "#mainCard must declare its own margin-bottom"
+    assert main_gap == section_gap, (
+        "the table card's gap to the next section should match the page's "
+        "established rhythm (%r), got %r" % (section_gap, main_gap)
+    )
+
+
 def test_html_root_has_an_explicit_background_color_in_both_themes():
     """`background: <gradient-list>` is a shorthand: writing only images into it
     resets the longhand background-color to transparent, because gradients are
