@@ -159,6 +159,25 @@ def test_the_x_axis_prints_the_month_on_its_own_row():
     assert _decl(css, ".gd-months", "padding-left") == _decl(css, ".gd-plot", "padding-left")
 
 
+def test_html_root_has_an_explicit_background_color_in_both_themes():
+    """`background: <gradient-list>` is a shorthand: writing only images into it
+    resets the longhand background-color to transparent, because gradients are
+    images, not a colour. That is not cosmetic here -- the root element's
+    background-*color* (never its background-image) is what a browser paints
+    behind the document during macOS's rubber-band overscroll and during the
+    brief unpainted gap on a fast trackpad fling. A transparent one means that
+    region falls through to the browser's own default canvas: a white flash
+    popping in from the top or bottom on a fast scroll, in dark mode too, since
+    the gradient was never the layer being shown there. Confirmed live via
+    getComputedStyle(html).backgroundColor before this test existed: rgba(0,0,0,0)."""
+    css = _read(CSS)
+    dark = _decl(css, "html:root", "background-color")
+    light = _decl(css, 'html:root[data-theme="light"]', "background-color")
+    assert dark and dark != "transparent", dark
+    assert light and light != "transparent", light
+    assert dark != light, "the two themes must not share one fallback colour"
+
+
 def test_the_ribbon_palette_is_themed_rather_than_inlined():
     """Inline background colours from JS cannot be restyled per theme, and the
     dark ramp tops out near 2:1 on a white card."""
