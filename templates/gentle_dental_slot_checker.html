@@ -898,10 +898,14 @@
       document.getElementById('drawerOv').classList.add('open');
       [].slice.call(document.querySelectorAll('#drwDbd .gd-dbd-col')).forEach(function(el){
         var i=parseInt(el.getAttribute('data-i'),10), d=dates[i], c=p.counts[i];
-        el.addEventListener('mousemove',function(ev){
+        function dbdTip(ev){
           showTip(ev,'<span class="t-name">'+esc(d.weekday)+' '+esc(d.label)+'</span>'+
             (c>0?('<b>'+n(c)+'</b> open'):'Nothing open'));
-        });
+        }
+        el.addEventListener('mousemove',dbdTip);
+        /* Hover never fires on touch, so a tap shows the same tip in place --
+           it just needs an explicit dismiss since there is no mouseleave. */
+        el.addEventListener('click',function(ev){ ev.stopPropagation(); dbdTip(ev); });
         el.addEventListener('mouseleave',hideTip);
       });
     }

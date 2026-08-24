@@ -381,8 +381,11 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 .gd-legend-steps i.l4 { background: var(--gd-r4); }
 .gd-legend-steps i.l5 { background: var(--gd-r5); }
 
-/* Tooltip (shared by chart + heatmap) */
-.gd-tip { position: fixed; pointer-events: none; z-index: 200; background: rgba(8,16,13,.97); border: 1px solid rgba(74,222,128,.32); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11px; line-height: 1.55; color: #c2d4cc; white-space: nowrap; opacity: 0; transition: opacity .12s; box-shadow: 0 12px 34px rgba(0,0,0,.55); }
+/* Tooltip (shared by chart + heatmap + the drawer's day-by-day strip).
+   z-index must clear the drawer (301) and its overlay (300): at 200 the tip
+   still fired correctly on hover, it just rendered underneath the now-
+   centered drawer and was invisible the entire time it was open. */
+.gd-tip { position: fixed; pointer-events: none; z-index: 400; background: rgba(8,16,13,.97); border: 1px solid rgba(74,222,128,.32); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11px; line-height: 1.55; color: #c2d4cc; white-space: nowrap; opacity: 0; transition: opacity .12s; box-shadow: 0 12px 34px rgba(0,0,0,.55); }
 .gd-tip.show { opacity: 1; }
 .gd-tip b { color: #bef264; font-weight: 700; }
 .gd-tip .t-name { color: #e6f0ea; font-weight: 600; display: block; margin-bottom: 2px; }
