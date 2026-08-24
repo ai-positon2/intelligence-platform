@@ -290,6 +290,11 @@ body {
 .gd-select:focus { border-color: rgba(74,222,128,.4); }
 .gd-clear { background: none; border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill); color: #6c7f78; font-family: inherit; font-size: 11.5px; padding: 7px 13px; cursor: pointer; transition: color .15s, border-color .15s; }
 .gd-clear:hover { color: #fda4af; border-color: rgba(251,113,133,.35); }
+/* Same pill shape as .gd-clear, but a neutral/green hover rather than red --
+   sort and export aren't destructive actions, so they shouldn't read as one. */
+.gd-btn { background: none; border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill); color: #a9bdb6; font-family: inherit; font-size: 11.5px; padding: 7px 13px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.gd-btn:hover { color: #6ee7b7; border-color: rgba(74,222,128,.35); background: rgba(74,222,128,.06); }
+.gd-toolbar-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.08); margin: 0 2px; }
 .gd-count { font-size: 11.5px; color: #6c7f78; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gd-pane { display: none; }
 
@@ -656,6 +661,9 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 :root[data-theme="light"] .gd-select:focus { border-color: rgba(4,120,87,.45); }
 :root[data-theme="light"] .gd-clear { border-color: rgba(18,26,54,.12); color: #6a7570; }
 :root[data-theme="light"] .gd-clear:hover { color: #be123c; border-color: rgba(190,18,60,.35); }
+:root[data-theme="light"] .gd-btn { border-color: rgba(18,26,54,.12); color: #3c4a44; }
+:root[data-theme="light"] .gd-btn:hover { color: #047857; border-color: rgba(4,120,87,.35); background: rgba(4,120,87,.06); }
+:root[data-theme="light"] .gd-toolbar-sep { background: rgba(18,26,54,.1); }
 :root[data-theme="light"] table.gd-tbl thead th { background: rgba(255,255,255,.99); color: #6a7570; border-bottom-color: rgba(18,26,54,.11); }
 :root[data-theme="light"] table.gd-tbl thead th:hover { color: #12251d; }
 :root[data-theme="light"] table.gd-tbl tbody tr { border-bottom-color: rgba(18,26,54,.07); }
