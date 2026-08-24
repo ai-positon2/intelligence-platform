@@ -703,8 +703,9 @@
       var max=Math.max.apply(null,DATA.practices.map(function(p){return p.peak;}))||1;
       var h='<table class="gd-tbl"><thead><tr>';
       COLS.forEach(function(c){
-        var arrow=SORT.key===c[0]?(SORT.dir>0?' ↑':' ↓'):'';
-        h+='<th class="'+c[2]+'" onclick="sortBy(\''+c[0]+'\')">'+esc(c[1])+arrow+'</th>';
+        var active=SORT.key===c[0];
+        var arrow=active?'<span class="gd-sort-arrow">'+(SORT.dir>0?'↑':'↓')+'</span>':'';
+        h+='<th class="'+c[2]+(active?' sorted':'')+'" onclick="sortBy(\''+c[0]+'\')">'+esc(c[1])+arrow+'</th>';
       });
       h+='</tr></thead><tbody>';
       rows.forEach(function(p,i){
