@@ -124,29 +124,33 @@
       </div>
 
       <div class="gd-toolbar" id="toolbar">
-        <div class="gd-search">
-          <span class="gd-search-ico" aria-hidden="true">⌕</span>
-          <input id="q" type="text" placeholder="Search practice, brand, city or office number…" oninput="onFilter()" autocomplete="off">
+        <div class="gd-toolbar-row gd-toolbar-filters">
+          <div class="gd-search">
+            <span class="gd-search-ico" aria-hidden="true">⌕</span>
+            <input id="q" type="text" placeholder="Search practice, brand, city or office number…" oninput="onFilter()" autocomplete="off">
+          </div>
+          <select class="gd-select" id="fState" onchange="syncBarHighlights();onFilter()"></select>
+          <select class="gd-select" id="fBrand" onchange="syncBarHighlights();onFilter()"></select>
+          <select class="gd-select" id="fService" onchange="syncBarHighlights();onFilter()"></select>
+          <select class="gd-select" id="fStatus" onchange="onFilter()"></select>
+          <span class="gd-filter-chip" id="dateChip" style="display:none" onclick="clearDateFilter()"><span>📅</span><span id="dateChipLabel"></span><span class="x">✕</span></span>
+          <button class="gd-clear" onclick="clearFilters()">✕ Clear</button>
         </div>
-        <select class="gd-select" id="fState" onchange="syncBarHighlights();onFilter()"></select>
-        <select class="gd-select" id="fBrand" onchange="syncBarHighlights();onFilter()"></select>
-        <select class="gd-select" id="fService" onchange="syncBarHighlights();onFilter()"></select>
-        <select class="gd-select" id="fStatus" onchange="onFilter()"></select>
-        <span class="gd-filter-chip" id="dateChip" style="display:none" onclick="clearDateFilter()"><span>📅</span><span id="dateChipLabel"></span><span class="x">✕</span></span>
-        <button class="gd-clear" onclick="clearFilters()">✕ Clear</button>
-        <span class="gd-toolbar-sep" aria-hidden="true"></span>
-        <select class="gd-select" id="sortField" onchange="onSortFieldChange()">
-          <option value="total">Sort: Open slots</option>
-          <option value="name">Sort: Practice</option>
-          <option value="brand">Sort: Brand</option>
-          <option value="state">Sort: State</option>
-          <option value="service_count">Sort: Services</option>
-          <option value="lead_days">Sort: Next open</option>
-          <option value="office">Sort: Office #</option>
-        </select>
-        <button class="gd-btn" id="sortDirBtn" onclick="toggleSortDir()" title="Reverse sort direction">↓</button>
-        <button class="gd-btn" onclick="exportLocations()" title="Download every practice's per-service, per-day counts as CSV">⬇ Export</button>
-        <span class="gd-count" id="resultCount"></span>
+        <div class="gd-toolbar-row gd-toolbar-actions">
+          <span class="gd-toolbar-label">Sort by</span>
+          <select class="gd-select" id="sortField" onchange="onSortFieldChange()">
+            <option value="total">Open slots</option>
+            <option value="name">Practice</option>
+            <option value="brand">Brand</option>
+            <option value="state">State</option>
+            <option value="service_count">Services</option>
+            <option value="lead_days">Next open</option>
+            <option value="office">Office #</option>
+          </select>
+          <button class="gd-btn" id="sortDirBtn" onclick="toggleSortDir()" title="Reverse sort direction">↓</button>
+          <button class="gd-btn" onclick="exportLocations()" title="Download every practice's per-service, per-day counts as CSV">⬇ Export</button>
+          <span class="gd-count" id="resultCount"></span>
+        </div>
       </div>
 
       <div id="pane-practices" class="gd-pane active">
