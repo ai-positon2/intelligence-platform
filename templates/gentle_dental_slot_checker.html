@@ -55,7 +55,7 @@
       <div>
         <div class="eyebrow">B2B Agents · Appointment availability</div>
         <h1>Gentle Dental Slot Checker</h1>
-        <p>What a new patient would actually be offered if they tried to book right now, across every practice the agent checks: which services are open, on which days, and where the calendar is full.</p>
+        <p>What a new patient would actually be offered if they tried to book right now, across every location the agent checks: which services are open, on which days, and where the calendar is full.</p>
       </div>
       <div class="gd-ph-side">
         <span class="gd-pill" id="windowPill"><span class="gd-pill-dot"></span><span id="windowText">Loading…</span></span>
@@ -72,9 +72,9 @@
       </div>
       <div class="gd-stat s-practices" onclick="switchTab('practices')">
         <div class="gd-stat-ico" aria-hidden="true">🏢</div>
-        <div class="gd-stat-label">Practices Checked</div>
+        <div class="gd-stat-label">Locations Checked</div>
         <div class="gd-stat-val" id="kPractices"><span class="skel" style="width:70px;height:34px"></span></div>
-        <div class="gd-stat-hint">Browse practices →</div>
+        <div class="gd-stat-hint">Browse locations →</div>
       </div>
       <div class="gd-stat s-attention" onclick="switchTab('alerts')">
         <div class="gd-stat-ico" aria-hidden="true">⚠</div>
@@ -84,7 +84,7 @@
       </div>
       <div class="gd-stat s-avg" onclick="switchTab('services')">
         <div class="gd-stat-ico" aria-hidden="true">📊</div>
-        <div class="gd-stat-label">Avg per Practice</div>
+        <div class="gd-stat-label">Avg per Location</div>
         <div class="gd-stat-val" id="kAvg"><span class="skel" style="width:64px;height:34px"></span></div>
         <div class="gd-stat-hint">Service mix →</div>
       </div>
@@ -117,7 +117,7 @@
     <div class="card" id="mainCard">
       <div class="gd-tabs at-practices" id="gdTabs">
         <div class="gd-tab-ind" aria-hidden="true"></div>
-        <button class="gd-tab active" id="tab-practices" onclick="switchTab('practices')">Practices<span class="gd-tab-count" id="cntPractices"></span></button>
+        <button class="gd-tab active" id="tab-practices" onclick="switchTab('practices')">Locations<span class="gd-tab-count" id="cntPractices"></span></button>
         <button class="gd-tab" id="tab-heat" onclick="switchTab('heat')">Calendar</button>
         <button class="gd-tab" id="tab-alerts" onclick="switchTab('alerts')">Needs Attention<span class="gd-tab-count" id="cntAlerts"></span></button>
         <button class="gd-tab" id="tab-services" onclick="switchTab('services')">Services<span class="gd-tab-count" id="cntServices"></span></button>
@@ -127,7 +127,7 @@
         <div class="gd-toolbar-row gd-toolbar-filters">
           <div class="gd-search">
             <span class="gd-search-ico" aria-hidden="true">⌕</span>
-            <input id="q" type="text" placeholder="Search practice, brand, city or office number…" oninput="onFilter()" autocomplete="off">
+            <input id="q" type="text" placeholder="Search location, brand, city or office number…" oninput="onFilter()" autocomplete="off">
           </div>
           <select class="gd-select" id="fState" onchange="syncBarHighlights();onFilter()"></select>
           <select class="gd-select" id="fBrand" onchange="syncBarHighlights();onFilter()"></select>
@@ -140,7 +140,7 @@
           <span class="gd-toolbar-label">Sort by</span>
           <select class="gd-select" id="sortField" onchange="onSortFieldChange()">
             <option value="total">Open slots</option>
-            <option value="name">Practice</option>
+            <option value="name">Location</option>
             <option value="brand">Brand</option>
             <option value="state">State</option>
             <option value="service_count">Services</option>
@@ -148,7 +148,7 @@
             <option value="office">Office #</option>
           </select>
           <button class="gd-btn" id="sortDirBtn" onclick="toggleSortDir()" title="Reverse sort direction">↓</button>
-          <button class="gd-btn" onclick="exportLocations()" title="Download every practice's per-service, per-day counts as CSV">⬇ Export</button>
+          <button class="gd-btn" onclick="exportLocations()" title="Download every location's per-service, per-day counts as CSV">⬇ Export</button>
           <span class="gd-count" id="resultCount"></span>
         </div>
       </div>
@@ -287,7 +287,7 @@
     function renderNoData(d){
       document.getElementById('windowText').textContent='No data';
       var msg='<div class="gd-empty"><b>No availability data in this snapshot</b>'+
-        'The snapshot parsed cleanly but contained no practices. Re-run '+
+        'The snapshot parsed cleanly but contained no locations. Re-run '+
         'scripts/import_slot_checker_snapshot.py against a fresh export.</div>';
       ['practicesBody','heatBody','alertsBody','servicesBody'].forEach(function(id){
         document.getElementById(id).innerHTML=msg; });
@@ -494,7 +494,7 @@
         var x=d[parseInt(el.getAttribute('data-i'),10)];
         el.addEventListener('mousemove',function(ev){
           showTip(ev,'<span class="t-name">'+esc(x.weekday)+' '+esc(x.label)+'</span><b>'+
-            n(x.slots)+'</b> open slots · '+n(x.practices_open)+' practices open');
+            n(x.slots)+'</b> open slots · '+n(x.practices_open)+' locations open');
         });
         el.addEventListener('mouseleave',hideTip);
         el.addEventListener('click',function(){ setDateFilter(parseInt(el.getAttribute('data-i'),10)); });
@@ -513,7 +513,7 @@
       s.forEach(function(x,i){
         html+='<div class="gd-bar-row clickable" data-state="'+esc(x.state)+'">'+
           '<span class="gd-bar-rank'+(i===0?' top':'')+'">'+(i+1)+'</span>'+
-          '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' practice'+(x.practices===1?'':'s')+'</span></span>'+
+          '<span class="gd-bar-name">'+esc(x.state)+' <span style="opacity:.6">· '+x.practices+' location'+(x.practices===1?'':'s')+'</span></span>'+
           '<span class="gd-bar-track"><span class="gd-bar-fill" data-w="'+(x.slots/max*100)+'"></span></span>'+
           '<span class="gd-bar-num">'+n(x.slots)+'</span>'+
           '<span class="gd-bar-sub">'+n(Math.round(x.avg))+'</span></div>';
@@ -605,7 +605,7 @@
       });
       var shown=VIEW.reduce(function(s,p){return s+p.total;},0);
       document.getElementById('resultCount').textContent=
-        VIEW.length+' of '+DATA.practices.length+' practices · '+n(shown)+' slots';
+        VIEW.length+' of '+DATA.practices.length+' locations · '+n(shown)+' slots';
       document.getElementById('cntPractices').textContent=' '+VIEW.length;
       renderPractices(); renderHeat();
     }
@@ -655,7 +655,7 @@
 
     /* ── practices table ─────────────────────────────────────────────────── */
     var COLS=[
-      ['office','#',''],['name','Practice',''],['brand','Brand',''],['state','State',''],
+      ['office','#',''],['name','Location',''],['brand','Brand',''],['state','State',''],
       ['service_count','Services','num'],['total','Open slots','num'],
       ['lead_days','Next open','num'],['spark','Pattern','']
     ];
@@ -687,7 +687,7 @@
     function renderPractices(){
       syncSortControls();
       var body=document.getElementById('practicesBody');
-      if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No practices match</b>Try clearing a filter.</div>'; return; }
+      if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No locations match</b>Try clearing a filter.</div>'; return; }
       var rows=VIEW.slice().sort(function(a,b){
         var k=SORT.key;
         if(k==='spark') k='total';
@@ -751,7 +751,7 @@
     }
     function exportLocations(){
       var dates=DATA.dates||[];
-      var header=['Office','Practice','Account','Brand','State','City','Service','Runs']
+      var header=['Office','Location','Account','Brand','State','City','Service','Runs']
         .concat(dates.map(function(d){return d.weekday+' '+d.label;}))
         .concat(['Total']);
       var rows=[header];
@@ -816,9 +816,9 @@
       var body=document.getElementById('heatBody');
       var dates=DATA.dates||[];
       if(!VIEW.length||!dates.length){
-        body.innerHTML='<div class="gd-empty"><b>Nothing to chart</b>No practices match the current filters.</div>'; return; }
+        body.innerHTML='<div class="gd-empty"><b>Nothing to chart</b>No locations match the current filters.</div>'; return; }
       var rows=VIEW.slice().sort(function(a,b){return b.total-a.total;});
-      var h='<table class="gd-heat"><thead><tr><th class="rowhead">Practice</th>';
+      var h='<table class="gd-heat"><thead><tr><th class="rowhead">Location</th>';
       dates.forEach(function(d){
         var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
         h+='<th class="'+(wknd?'wk':'')+'">'+esc(d.weekday)+'<br>'+esc(d.label.split(' ')[0])+'</th>';
@@ -863,7 +863,7 @@
       document.getElementById('cntServices').textContent=' '+(DATA.by_service||[]).length;
       if(!total){
         document.getElementById('alertsBody').innerHTML=
-          '<div class="gd-empty"><b>Nothing needs attention</b>Every practice returned data and has bookable availability.</div>';
+          '<div class="gd-empty"><b>Nothing needs attention</b>Every location returned data and has bookable availability.</div>';
         return;
       }
       h+=sec('sev-none','Fully booked', a.zero,
@@ -872,14 +872,14 @@
         function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+'</span>'; });
       h+=sec('sev-none','No data returned', a.no_data,
         'The agent never returned a row for these. That is a gap in the crawl, not a finding about '+
-        'the practice, so it is kept separate from fully booked above.',
+        'the location, so it is kept separate from fully booked above.',
         function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+'</span>'; });
       h+=sec('sev-thin','Thin availability', a.thin,
         'Bookable, but under 20 slots across the whole window, so most specific days a patient asks for will be a no.',
         function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.state)+' · '+x.total+' slots</span>'; });
       h+=sec('','Unbookable services', a.unbookable_services,
-        'These practices are healthy overall, but this one service has no openings at all, which the '+
-        'practice-level total hides.',
+        'These locations are healthy overall, but this one service has no openings at all, which the '+
+        'location-level total hides.',
         function(x){ return '<b>'+esc(x.name)+'</b> <span class="st">'+esc(x.service)+'</span>'; });
       document.getElementById('alertsBody').innerHTML=h+'</div>';
       [].slice.call(document.querySelectorAll('#alertsBody .gd-alert-item[data-o]')).forEach(function(el){
@@ -915,7 +915,7 @@
       h+='</div><div style="margin-top:22px">';
       s.forEach(function(x){
         h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(x.name)+
-           '<em>offered at '+x.practices+' practice'+(x.practices===1?'':'s')+
+           '<em>offered at '+x.practices+' location'+(x.practices===1?'':'s')+
            (x.zero?', unbookable at '+x.zero:'')+'</em></span>'+
            spark(x.counts,pmax,DATA.dates)+
            '<span class="gd-drw-svc-v" style="margin-left:12px">'+n(x.slots)+'</span></div>';
@@ -956,7 +956,7 @@
         kpi('Next open',leadLabel(p.lead_days))+'</div></div>';
       h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">By service</div>';
       if(!p.services.length){
-        h+='<div class="gd-empty" style="padding:18px 0;text-align:left">The agent returned no rows for this practice, so there is nothing to break down. Its booking page may be failing to load for the crawler.</div>';
+        h+='<div class="gd-empty" style="padding:18px 0;text-align:left">The agent returned no rows for this location, so there is nothing to break down. Its booking page may be failing to load for the crawler.</div>';
       } else {
         p.services.forEach(function(s){
           h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(s.name)+
@@ -1040,9 +1040,9 @@
 
   <script>
   window.__KP_ITEMS=[
-    {t:'Practices',d:'Availability by practice',u:'#practices',i:'▤'},
-    {t:'Calendar',d:'Practice by day heatmap',u:'#heat',i:'◷'},
-    {t:'Needs Attention',d:'Fully booked and silent practices',u:'#alerts',i:'⚠'}
+    {t:'Locations',d:'Availability by location',u:'#practices',i:'▤'},
+    {t:'Calendar',d:'Location by day heatmap',u:'#heat',i:'◷'},
+    {t:'Needs Attention',d:'Fully booked and silent locations',u:'#alerts',i:'⚠'}
   ];
   </script>
   <script>
