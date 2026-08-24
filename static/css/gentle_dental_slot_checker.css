@@ -61,6 +61,17 @@ body {
   font-family: 'Space Grotesk', sans-serif; color: #e2e8f0;
   min-height: 100vh; display: flex; flex-direction: column;
 }
+/* The page itself scrolls at the document level -- .main has no height/
+   overflow of its own, so aurora-app.css's shared `.main::-webkit-scrollbar`
+   rule never fires here and the window is left with the OS's stock grey
+   scrollbar. Same slim branded-pill treatment as the internal .gd-tbl-wrap/
+   .gd-drawer/.gd-heat-wrap scrollbars, just a touch wider since it is the
+   outermost one on the page. */
+html { scrollbar-width: thin; scrollbar-color: rgba(74,222,128,.35) transparent; }
+html::-webkit-scrollbar { width: 10px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { background-color: rgba(74,222,128,.32); border-radius: var(--radius-pill); border: 3px solid transparent; background-clip: padding-box; }
+html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); background-clip: padding-box; }
 .bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(circle, rgba(74,222,128,.07) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse 85% 85% at 50% 40%, black 30%, transparent 100%); }
 .gd-aurora { position: fixed; inset: -25%; z-index: 0; pointer-events: none; filter: blur(76px); }
 .gd-aurora .b { position: absolute; border-radius: 50%; mix-blend-mode: screen; }
@@ -745,6 +756,9 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 :root[data-theme="light"] .gd-tbl-wrap, :root[data-theme="light"] .gd-drawer, :root[data-theme="light"] .gd-heat-wrap { scrollbar-color: rgba(4,120,87,.32) transparent; }
 :root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb, :root[data-theme="light"] .gd-heat-wrap::-webkit-scrollbar-thumb { background-color: rgba(4,120,87,.3); background-clip: padding-box; }
 :root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb:hover, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb:hover, :root[data-theme="light"] .gd-heat-wrap::-webkit-scrollbar-thumb:hover { background-color: rgba(4,120,87,.55); background-clip: padding-box; }
+html:root[data-theme="light"] { scrollbar-color: rgba(4,120,87,.32) transparent; }
+html:root[data-theme="light"]::-webkit-scrollbar-thumb { background-color: rgba(4,120,87,.3); background-clip: padding-box; }
+html:root[data-theme="light"]::-webkit-scrollbar-thumb:hover { background-color: rgba(4,120,87,.55); background-clip: padding-box; }
 :root[data-theme="light"] .skel { background: linear-gradient(90deg, rgba(18,26,54,.05) 25%, rgba(18,26,54,.10) 50%, rgba(18,26,54,.05) 75%); background-size: 200% 100%; }
 
 /* AI Insights + new clickable affordances, light theme */
