@@ -11,7 +11,7 @@ Claude call over the dashboard's own derived numbers and writes a short
 briefing that already did that cross-referencing.
 
 Same hard rule as lps_enrichment, and for the same reason: this is read as a
-finding about real dental practices and real patients being turned away, so
+finding about real dental locations and real patients being turned away, so
 it must never invent a fact that is not traceable to the JSON it was given.
 And it must degrade to None on any failure (no ANTHROPIC_API_KEY, a timeout,
 a malformed reply) -- AI Insights is additive, never a reason the dashboard
@@ -30,23 +30,23 @@ logger = logging.getLogger(__name__)
 
 _SYSTEM = (
     "You are a B2B operations analyst writing a short weekly briefing about "
-    "appointment availability across a multi-location dental practice "
-    "portfolio. You are given JSON with: totals (aggregate slots/practices/"
+    "appointment availability across a portfolio of dental locations. "
+    "You are given JSON with: totals (aggregate slots/locations/"
     "services across the crawl window), by_state, by_service, by_brand, and "
-    "by_weekday breakdowns, an alerts block (practices with no data, fully "
+    "by_weekday breakdowns, an alerts block (locations with no data, fully "
     "booked, or thin availability, plus specific services that are unbookable "
-    "at otherwise-healthy practices), top_practices and bottom_practices "
-    "(the busiest and least-available practices that do have data), and "
+    "at otherwise-healthy locations), top_practices and bottom_practices "
+    "(the busiest and least-available locations that do have data), and "
     "freshness (how stale the crawl is). Synthesize ONE point of view across "
     "all of it -- do not just restate a single table.\n\n"
     "Quote the real numbers you were given specifically: a named state or "
-    "brand with its slot count, a named practice with its total, the count of "
-    "practices with no data at all. Concrete numbers and names are what makes "
+    "brand with its slot count, a named location with its total, the count of "
+    "locations with no data at all. Concrete numbers and names are what makes "
     "this useful to someone who has not opened the dashboard.\n\n"
     "HARD RULE: never state a fact that is not traceable to a field in the "
     "JSON you were given. If a breakdown is empty, say so plainly instead of "
     "guessing. Never estimate, benchmark against an industry average, or "
-    "invent a practice, state, or service name not present in the data. It "
+    "invent a location, state, or service name not present in the data. It "
     "is always better to say less than to invent.\n\n"
     "Return ONLY a JSON object with these keys, nothing else:\n"
     '  "headline": one sentence, the single most useful thing to know this '
@@ -54,7 +54,7 @@ _SYSTEM = (
     '  "synthesis": 2 to 4 short paragraphs giving the full point of view, '
     "separated by blank lines\n"
     '  "topActions": an array of up to 5 short (140 characters or fewer) '
-    "prioritized action strings, each naming a specific practice, state, or "
+    "prioritized action strings, each naming a specific location, state, or "
     "service from the data\n"
     '  "risks": an array of up to 4 short strings -- crawl gaps or capacity '
     "exposures visible in this data, each citing the number or name that "
