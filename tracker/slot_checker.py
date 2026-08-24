@@ -1,32 +1,46 @@
 """Slot Checker — appointment availability across the dental practice portfolio.
 
-Reads the snapshot produced by scripts/import_slot_checker_snapshot.py and turns
-it into everything the dashboard renders. Pure functions over plain dicts: no
-network, no Sheets, no database, so the whole derivation is testable directly.
+Reads the "Slot Checker" Google Sheet (refreshed weekly by the scraping agent)
+and turns it into everything the dashboard renders. The derivation itself
+(build_dashboard and everything below it) is a pure function over a plain
+dict, unchanged from when that dict came from a committed file -- only where
+the dict comes from changed.
 
-Why a snapshot and not a live Sheets read
-─────────────────────────────────────────
-The Slot Checker agent writes to an office-internal Google Sheet that cannot be
-shared with the platform's service account. `fetch()` below is the single seam
-where a live read would go, and `_rows_from_live_sheet()` documents exactly what
-it has to return; nothing else in this module or in the dashboard needs to
-change when that access arrives.
+Live sheet, with a committed-file fallback
+───────────────────────────────────────────
+`_rows_from_live_sheet()` reads two tabs -- "LPs" (the location registry) and
+"Locations" (one row per office + service, with one column per date) -- via
+the platform's service account (signal-tracker@signal-tracker-496308.iam.gserviceaccount.com,
+shared as Viewer on the sheet). Their rows are handed to
+scripts.import_slot_checker_snapshot.build_snapshot(), the same parser a
+prior .xlsx-based snapshot used, since "LPs" lines up with that parser's
+expected "All LPs" shape unchanged and "Locations" is reordered in
+_reorder_locations_rows() to match its expected "Available Slots Final" shape.
+
+If the live read or parse fails for any reason (revoked share, renamed tab,
+network error, quota), `_snapshot()` falls back to the last snapshot committed
+to data/slot_checker_snapshot.json -- same pattern as Job Change Alert's
+JOB_CHANGE_TRACKED_SNAPSHOT_PATH fallback. This only ever serves *stale* data
+on a live-read failure, never wrong data: a live read that succeeds but
+legitimately returns zero rows is not treated as a failure and does not fall
+back, since the sheet being genuinely emptied out is a fact to show, not an
+error to paper over.
 
 The one modelling decision worth knowing about
 ──────────────────────────────────────────────
-A row in the source sheet is an OBSERVATION, not a fact. One export holds
-several runs of the agent, and a practice re-scraped on three consecutive days
-appears three times with three different sets of counts, because real
-availability moved in between. So "current availability" is the NEWEST
-observation per (practice, service), and summing the sheet as-is overstates the
-total by about 70% -- it double- and triple-counts exactly the practices the
-agent happened to revisit.
+A row in the source sheet is an OBSERVATION, not a fact. The sheet holds
+several runs of the agent, and a practice re-scraped on consecutive days
+appears more than once with different counts, because real availability moved
+in between. So "current availability" is the NEWEST observation per (practice,
+service), and summing the sheet as-is overstates the total -- it double- and
+triple-counts exactly the practices the agent happened to revisit.
 """
 from __future__ import annotations
 
 import datetime
 import json
 import logging
+import os
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -34,6 +48,10 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "data" / "slot_checker_snapshot.json"
+
+SLOT_CHECKER_SHEET_ID = "10vENVV_SIqY4NsqHJJ67QFtjhi2FLAdi_Pp2pvXYr84"
+LP_TAB = "LPs"
+LOCATIONS_TAB = "Locations"
 
 CACHE_TTL = 300  # seconds, matching every other sheet-backed panel in this app
 _CACHE: dict = {"data": None, "ts": 0.0}
@@ -76,27 +94,104 @@ def _empty_snapshot() -> dict:
     return {"generated_at": "", "source": {}, "dates": [], "locations": []}
 
 
-def _rows_from_live_sheet():
-    """Not wired up. The shape a live read must return, for whoever wires it.
+def _sheets_service():
+    """Authenticated read-only Sheets client, matching app.py's own
+    _sheets_service() (GOOGLE_SA_JSON env var, Railway). Duplicated here
+    rather than imported from app.py to keep this tracker importable on its
+    own, same as tracker/sheets_client.py's _get_service()."""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
 
-    Two lists of sheets-style rows -- ("All LPs" rows, "Available Slots Final"
-    rows), header row first, exactly as
-    `svc.spreadsheets().values().get(...).execute()["values"]` returns them.
-    Hand both to scripts.import_slot_checker_snapshot.build_snapshot() and the
-    result is interchangeable with load_snapshot()'s.
+    sa_str = os.environ.get("GOOGLE_SA_JSON", "")
+    if not sa_str:
+        raise RuntimeError("GOOGLE_SA_JSON env var not set")
+    creds = service_account.Credentials.from_service_account_info(
+        json.loads(sa_str),
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    )
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
 
-    Blocked on the sheet being shared with the platform's service account
-    (signal-tracker@signal-tracker-496308.iam.gserviceaccount.com, Viewer).
+
+def _iso_stamp_from_sheet(v: str) -> str:
+    """A Sheets execution-time cell ('8/11/2026 14:52:13') as an ISO string.
+
+    The prior .xlsx-based pipeline got real datetime objects from openpyxl,
+    so import_slot_checker_snapshot._iso_stamp's isoformat() round-trip just
+    worked. The Sheets API returns the same cell as a plain display string,
+    which _iso_stamp does not parse (it only handles already-ISO strings) --
+    and observations are sorted by this value as a plain string, so an
+    unparsed 'M/D/YYYY' would sort '8/9/2026' after '8/13/2026' and pick the
+    wrong observation as "current". Normalising here, before the row ever
+    reaches _parse_slots, keeps that parser untouched.
     """
-    raise NotImplementedError("live Sheets read not enabled; see module docstring")
+    v = (v or "").strip()
+    for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M", "%m/%d/%Y"):
+        try:
+            return datetime.datetime.strptime(v, fmt).isoformat()
+        except ValueError:
+            continue
+    return v
 
 
-def fetch(force: bool = False, path=None) -> dict:
+def _reorder_locations_rows(rows: list) -> list:
+    """"Locations" tab rows, reshaped into the "Available Slots Final" shape
+    scripts.import_slot_checker_snapshot._parse_slots already knows how to
+    read.
+
+    Source shape (both header and data rows): office, category, url, service,
+    checked_at, *dates. Target shape: url, service, checked_at, *dates --
+    office and category are dropped: office is redundant once joined by URL
+    (the "LPs" side already carries it), and category isn't part of the
+    existing snapshot/dashboard contract. The Sheets API trims each row to
+    its own last non-blank cell, so short rows are padded defensively rather
+    than assumed to be full width.
+    """
+    def cell(row, i):
+        return row[i] if len(row) > i else ""
+
+    return [
+        [cell(row, 2), cell(row, 3), _iso_stamp_from_sheet(cell(row, 4))] + list(row[5:])
+        for row in rows
+    ]
+
+
+def _rows_from_live_sheet() -> tuple:
+    """Live read of the weekly-refreshed Slot Checker Google Sheet.
+
+    Returns (lp_rows, slot_rows) in the exact shape
+    scripts.import_slot_checker_snapshot.build_snapshot() expects. "LPs"
+    columns A-E already line up with build_snapshot()'s "All LPs" shape --
+    anything past column E is an unrelated scratch list the sheet's owner
+    keeps in spare columns and is simply never read. "Locations" is reordered
+    by _reorder_locations_rows() into the "Available Slots Final" shape.
+    """
+    svc = _sheets_service()
+    lp_rows = svc.spreadsheets().values().get(
+        spreadsheetId=SLOT_CHECKER_SHEET_ID, range=f"{LP_TAB}!A1:N500").execute().get("values", [])
+    loc_rows = svc.spreadsheets().values().get(
+        spreadsheetId=SLOT_CHECKER_SHEET_ID, range=f"{LOCATIONS_TAB}!A1:AF5000").execute().get("values", [])
+    return lp_rows, _reorder_locations_rows(loc_rows)
+
+
+def _snapshot() -> dict:
+    """Live sheet if reachable and parseable, else the last committed
+    fallback snapshot. Never raises: a revoked share, a renamed tab, or a
+    network error has to render a (possibly stale) dashboard, not a 500."""
+    try:
+        lp_rows, slot_rows = _rows_from_live_sheet()
+        from scripts.import_slot_checker_snapshot import build_snapshot
+        return build_snapshot(lp_rows, slot_rows, source=f"sheet:{SLOT_CHECKER_SHEET_ID}")
+    except Exception as e:
+        log.warning("slot_checker: live sheet read failed, falling back to committed snapshot: %s", e)
+        return load_snapshot()
+
+
+def fetch(force: bool = False) -> dict:
     """The dashboard payload, TTL-cached."""
     now = time.time()
     if not force and _CACHE["data"] is not None and (now - _CACHE["ts"]) < CACHE_TTL:
         return _CACHE["data"]
-    data = build_dashboard(load_snapshot(path))
+    data = build_dashboard(_snapshot())
     _CACHE["data"] = data
     _CACHE["ts"] = now
     return data
