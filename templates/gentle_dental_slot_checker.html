@@ -751,14 +751,14 @@
         var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
         h+='<th class="'+(wknd?'wk':'')+'">'+esc(d.weekday)+'<br>'+esc(d.label.split(' ')[0])+'</th>';
       });
-      h+='<th style="padding-left:10px">Total</th></tr></thead><tbody>';
+      h+='<th class="gd-heat-total-h">Total</th></tr></thead><tbody>';
       rows.forEach(function(p){
         h+='<tr><th class="rowhead" onclick="openDrawer(\''+esc(p.office)+'\')">'+esc(p.name)+
            '<span>'+esc(p.state)+'</span></th>';
         p.counts.forEach(function(c,i){
           h+='<td><div class="gd-cell '+ramp(c)+'" data-o="'+esc(p.office)+'" data-i="'+i+'"></div></td>';
         });
-        h+='<td class="num" class="gd-heat-total">'+n(p.total)+'</td></tr>';
+        h+='<td class="num gd-heat-total">'+n(p.total)+'</td></tr>';
       });
       body.innerHTML=h+'</tbody></table>';
       var byOffice={};
