@@ -874,16 +874,15 @@
         });
       }
       h+='</div>';
-      h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Day by day</div>'+
-        '<table class="gd-heat" style="border-spacing:3px"><tbody><tr>';
-      dates.forEach(function(d){ h+='<th class="'+((d.weekday==='Sat'||d.weekday==='Sun')?'wk':'')+
-        '" style="position:static;background:none;padding:0 0 5px">'+esc(d.weekday.slice(0,1))+'</th>'; });
-      h+='</tr><tr>';
-      p.counts.forEach(function(c,i){
-        h+='<td title="'+esc(dates[i].weekday+' '+dates[i].label)+' · '+c+' open">'+
-           '<div class="gd-cell '+ramp(c)+'"></div></td>';
+      h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Day by day</div><div class="gd-drw-dbd" id="drwDbd">';
+      dates.forEach(function(d,i){
+        var wknd=(d.weekday==='Sat'||d.weekday==='Sun');
+        var dayNum=String(d.label||'').split(' ')[0]||'';
+        h+='<div class="gd-dbd-col'+(wknd?' wk':'')+'" data-i="'+i+'">'+
+           '<div class="gd-cell '+ramp(p.counts[i])+'"></div>'+
+           '<div class="gd-dbd-lbl"><b>'+esc(d.weekday.slice(0,1))+'</b><i>'+esc(dayNum)+'</i></div></div>';
       });
-      h+='</tr></tbody></table></div>';
+      h+='</div></div>';
       h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">Provenance</div>'+
         '<div class="gd-drw-svc"><span class="gd-drw-svc-n">Last checked<em>'+
         (p.checked_at?esc(fmtStamp(p.checked_at)):'never')+'</em></span></div>'+
@@ -897,6 +896,14 @@
       document.getElementById('drawerContent').innerHTML=h;
       document.getElementById('drawer').classList.add('open');
       document.getElementById('drawerOv').classList.add('open');
+      [].slice.call(document.querySelectorAll('#drwDbd .gd-dbd-col')).forEach(function(el){
+        var i=parseInt(el.getAttribute('data-i'),10), d=dates[i], c=p.counts[i];
+        el.addEventListener('mousemove',function(ev){
+          showTip(ev,'<span class="t-name">'+esc(d.weekday)+' '+esc(d.label)+'</span>'+
+            (c>0?('<b>'+n(c)+'</b> open'):'Nothing open'));
+        });
+        el.addEventListener('mouseleave',hideTip);
+      });
     }
     function kpi(l,v){ return '<div class="gd-drw-kpi"><div class="gd-drw-kpi-l">'+esc(l)+
       '</div><div class="gd-drw-kpi-v">'+v+'</div></div>'; }
