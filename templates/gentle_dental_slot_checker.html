@@ -641,12 +641,11 @@
     var COLS=[
       ['office','#',''],['name','Practice',''],['brand','Brand',''],['state','State',''],
       ['service_count','Services','num'],['total','Open slots','num'],
-      ['days_open','Days open','num'],['lead_days','First open','num'],
-      ['spark','Pattern',''],['status','Status','']
+      ['lead_days','Next open','num'],['spark','Pattern','']
     ];
     function sortBy(k){
       if(SORT.key===k) SORT.dir=-SORT.dir;
-      else { SORT.key=k; SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office'||k==='status')?1:-1; }
+      else { SORT.key=k; SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office')?1:-1; }
       renderPractices();
     }
     function renderPractices(){
@@ -684,18 +683,16 @@
           '<td><span class="gd-state">'+esc(p.state||'—')+'</span></td>'+
           '<td class="num">'+p.service_count+(p.zero_services?' <span class="gd-full-note">('+p.zero_services+' full)</span>':'')+'</td>'+
           '<td class="num"><b>'+n(p.total)+'</b></td>'+
-          '<td class="num">'+p.days_open+'</td>'+
           '<td class="num">'+leadLabel(p.lead_days)+'</td>'+
-          '<td>'+spark(p.counts,max,DATA.dates)+'</td>'+
-          '<td>'+badge(p.status)+'</td></tr>';
+          '<td>'+spark(p.counts,max,DATA.dates)+'</td></tr>';
       });
       body.innerHTML=h+'</tbody></table>';
       wireSparkTips(body);
     }
     function leadLabel(v){
       if(v==null) return '<span class="gd-full-note">never</span>';
-      if(v===0) return 'day 1';
-      return 'day '+(v+1);
+      var d=(DATA.dates||[])[v];
+      return d?(d.weekday+' '+d.label):'day '+(v+1);
     }
     function badge(s){
       var L={open:'Bookable',thin:'Thin',none:'Fully booked','no-data':'No data'};
@@ -881,7 +878,7 @@
       h+='</div><div class="gd-drw-body">';
       h+='<div class="gd-drw-sec"><div class="gd-drw-kpis">'+
         kpi('Open slots',n(p.total))+kpi('Days open',p.days_open+' of '+dates.length)+
-        kpi('First open',leadLabel(p.lead_days))+'</div></div>';
+        kpi('Next open',leadLabel(p.lead_days))+'</div></div>';
       h+='<div class="gd-drw-sec"><div class="gd-drw-sec-t">By service</div>';
       if(!p.services.length){
         h+='<div class="gd-empty" style="padding:18px 0;text-align:left">The agent returned no rows for this practice, so there is nothing to break down. Its booking page may be failing to load for the crawler.</div>';
