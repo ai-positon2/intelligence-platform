@@ -307,7 +307,7 @@ body {
    dropped to 1.6:1 and 1.9:1 against white. */
 .gd-search-ico { color: #4ade80; font-size: 12px; }
 .gd-full-note { color: #fda4af; }
-.gd-heat-total { padding-left: 10px; font-weight: 700; color: #bef264; font-variant-numeric: tabular-nums; }
+.gd-heat-total { padding-left: 22px; border-left: 1px solid rgba(255,255,255,.08); font-weight: 700; color: #bef264; font-variant-numeric: tabular-nums; }
 
 /* Table */
 .gd-tbl-wrap { overflow-x: auto; max-height: 620px; overflow-y: auto; }
@@ -353,15 +353,21 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 @keyframes gdRowIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 
 /* Availability heatmap — practice × date */
-.gd-heat-wrap { overflow: auto; max-height: 620px; padding: 4px 0 8px; }
-.gd-heat { border-collapse: separate; border-spacing: 3px; font-size: 11px; }
-.gd-heat thead th { position: sticky; top: 0; z-index: 3; background: rgba(9,16,14,.98); padding: 6px 4px; font-size: 9.5px; font-weight: 700; color: #6c7f78; text-align: center; letter-spacing: .02em; white-space: nowrap; }
+.gd-heat-wrap { overflow: auto; max-height: 620px; padding: 10px 24px 20px; }
+/* margin:0 auto centers the grid inside the pane once it's narrower than the
+   card (the common case: a handful of weeks of dates), instead of it sitting
+   flush left with a wall of empty space beside it. Auto margins collapse to 0
+   the moment the table is wide enough to need the wrap's own horizontal
+   scroll, so the sticky Practice column's behavior there is unaffected. */
+.gd-heat { border-collapse: separate; border-spacing: 6px; font-size: 11.5px; margin: 0 auto; }
+.gd-heat thead th { position: sticky; top: 0; z-index: 3; background: rgba(9,16,14,.98); padding: 8px 7px; font-size: 9.5px; font-weight: 700; color: #6c7f78; text-align: center; letter-spacing: .02em; white-space: nowrap; }
 .gd-heat thead th.wk { color: #5eead4; }
-.gd-heat thead th.rowhead, .gd-heat tbody th.rowhead { position: sticky; left: 0; z-index: 4; background: rgba(9,16,14,.98); text-align: left; padding: 6px 12px 6px 14px; font-size: 11px; font-weight: 600; color: #d4e6dd; white-space: nowrap; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.gd-heat thead th.rowhead, .gd-heat tbody th.rowhead { position: sticky; left: 0; z-index: 4; background: rgba(9,16,14,.98); text-align: left; padding: 8px 18px 8px 20px; font-size: 11.5px; font-weight: 600; color: #d4e6dd; white-space: nowrap; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
 .gd-heat tbody th.rowhead { z-index: 2; cursor: pointer; }
 .gd-heat tbody tr:hover th.rowhead { color: #bef264; }
 .gd-heat tbody th.rowhead span { color: #8ba39a; font-weight: 500; font-size: 10px; margin-left: 5px; }
-.gd-cell { width: 26px; height: 24px; border-radius: 4px; background: var(--gd-r0); position: relative; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.gd-heat thead th.gd-heat-total-h { padding-left: 22px; border-left: 1px solid rgba(255,255,255,.08); }
+.gd-cell { width: 30px; height: 27px; border-radius: 5px; background: var(--gd-r0); position: relative; cursor: pointer; transition: transform .12s, box-shadow .12s; }
 .gd-cell:hover { transform: scale(1.22); box-shadow: 0 0 0 2px rgba(74,222,128,.55); z-index: 5; }
 .gd-cell.r1 { background: var(--gd-r1); }
 .gd-cell.r2 { background: var(--gd-r2); }
