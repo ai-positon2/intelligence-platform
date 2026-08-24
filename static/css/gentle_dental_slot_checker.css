@@ -317,12 +317,12 @@ body {
    read as a slim floating pill rather than a bar flush with the edge. The
    centered drawer picks up the same treatment since it now scrolls its own
    content instead of the page. */
-.gd-tbl-wrap, .gd-drawer { scrollbar-width: thin; scrollbar-color: rgba(74,222,128,.35) transparent; }
-.gd-tbl-wrap::-webkit-scrollbar, .gd-drawer::-webkit-scrollbar { width: 8px; height: 8px; }
-.gd-tbl-wrap::-webkit-scrollbar-track, .gd-drawer::-webkit-scrollbar-track { background: transparent; }
-.gd-tbl-wrap::-webkit-scrollbar-thumb, .gd-drawer::-webkit-scrollbar-thumb { background-color: rgba(74,222,128,.32); border-radius: var(--radius-pill); border: 2px solid transparent; background-clip: padding-box; }
-.gd-tbl-wrap::-webkit-scrollbar-thumb:hover, .gd-drawer::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); background-clip: padding-box; }
-.gd-tbl-wrap::-webkit-scrollbar-corner, .gd-drawer::-webkit-scrollbar-corner { background: transparent; }
+.gd-tbl-wrap, .gd-drawer, .gd-heat-wrap { scrollbar-width: thin; scrollbar-color: rgba(74,222,128,.35) transparent; }
+.gd-tbl-wrap::-webkit-scrollbar, .gd-drawer::-webkit-scrollbar, .gd-heat-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+.gd-tbl-wrap::-webkit-scrollbar-track, .gd-drawer::-webkit-scrollbar-track, .gd-heat-wrap::-webkit-scrollbar-track { background: transparent; }
+.gd-tbl-wrap::-webkit-scrollbar-thumb, .gd-drawer::-webkit-scrollbar-thumb, .gd-heat-wrap::-webkit-scrollbar-thumb { background-color: rgba(74,222,128,.32); border-radius: var(--radius-pill); border: 2px solid transparent; background-clip: padding-box; }
+.gd-tbl-wrap::-webkit-scrollbar-thumb:hover, .gd-drawer::-webkit-scrollbar-thumb:hover, .gd-heat-wrap::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); background-clip: padding-box; }
+.gd-tbl-wrap::-webkit-scrollbar-corner, .gd-drawer::-webkit-scrollbar-corner, .gd-heat-wrap::-webkit-scrollbar-corner { background: transparent; }
 table.gd-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.gd-tbl thead { position: sticky; top: 0; z-index: 2; }
 table.gd-tbl thead th { padding: 11px 14px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps); text-transform: uppercase; color: #6c7f78; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(9,16,14,.98); white-space: nowrap; cursor: pointer; user-select: none; }
@@ -697,9 +697,9 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 :root[data-theme="light"] .gd-dbd-lbl b { color: #55635d; }
 :root[data-theme="light"] .gd-dbd-lbl i { color: #33403a; }
 :root[data-theme="light"] .gd-dbd-col.wk .gd-dbd-lbl b { color: #0f766e; }
-:root[data-theme="light"] .gd-tbl-wrap, :root[data-theme="light"] .gd-drawer { scrollbar-color: rgba(4,120,87,.32) transparent; }
-:root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb { background-color: rgba(4,120,87,.3); background-clip: padding-box; }
-:root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb:hover, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb:hover { background-color: rgba(4,120,87,.55); background-clip: padding-box; }
+:root[data-theme="light"] .gd-tbl-wrap, :root[data-theme="light"] .gd-drawer, :root[data-theme="light"] .gd-heat-wrap { scrollbar-color: rgba(4,120,87,.32) transparent; }
+:root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb, :root[data-theme="light"] .gd-heat-wrap::-webkit-scrollbar-thumb { background-color: rgba(4,120,87,.3); background-clip: padding-box; }
+:root[data-theme="light"] .gd-tbl-wrap::-webkit-scrollbar-thumb:hover, :root[data-theme="light"] .gd-drawer::-webkit-scrollbar-thumb:hover, :root[data-theme="light"] .gd-heat-wrap::-webkit-scrollbar-thumb:hover { background-color: rgba(4,120,87,.55); background-clip: padding-box; }
 :root[data-theme="light"] .skel { background: linear-gradient(90deg, rgba(18,26,54,.05) 25%, rgba(18,26,54,.10) 50%, rgba(18,26,54,.05) 75%); background-size: 200% 100%; }
 
 /* AI Insights + new clickable affordances, light theme */
