@@ -134,6 +134,18 @@
         <select class="gd-select" id="fStatus" onchange="onFilter()"></select>
         <span class="gd-filter-chip" id="dateChip" style="display:none" onclick="clearDateFilter()"><span>📅</span><span id="dateChipLabel"></span><span class="x">✕</span></span>
         <button class="gd-clear" onclick="clearFilters()">✕ Clear</button>
+        <span class="gd-toolbar-sep" aria-hidden="true"></span>
+        <select class="gd-select" id="sortField" onchange="onSortFieldChange()">
+          <option value="total">Sort: Open slots</option>
+          <option value="name">Sort: Practice</option>
+          <option value="brand">Sort: Brand</option>
+          <option value="state">Sort: State</option>
+          <option value="service_count">Sort: Services</option>
+          <option value="lead_days">Sort: Next open</option>
+          <option value="office">Sort: Office #</option>
+        </select>
+        <button class="gd-btn" id="sortDirBtn" onclick="toggleSortDir()" title="Reverse sort direction">↓</button>
+        <button class="gd-btn" onclick="exportLocations()" title="Download every practice's per-service, per-day counts as CSV">⬇ Export</button>
         <span class="gd-count" id="resultCount"></span>
       </div>
 
@@ -648,7 +660,28 @@
       else { SORT.key=k; SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office')?1:-1; }
       renderPractices();
     }
+    /* The header clicks and the "Sort by" dropdown drive the same SORT state,
+       so each has to be able to update the other -- syncSortControls() runs on
+       every render (whichever triggered it) rather than being called from
+       both places separately. */
+    function onSortFieldChange(){
+      var k=document.getElementById('sortField').value;
+      SORT.key=k;
+      SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office')?1:-1;
+      renderPractices();
+    }
+    function toggleSortDir(){
+      SORT.dir=-SORT.dir;
+      renderPractices();
+    }
+    function syncSortControls(){
+      var f=document.getElementById('sortField');
+      if(f && f.value!==SORT.key) f.value=SORT.key;
+      var b=document.getElementById('sortDirBtn');
+      if(b) b.textContent=SORT.dir>0?'↑':'↓';
+    }
     function renderPractices(){
+      syncSortControls();
       var body=document.getElementById('practicesBody');
       if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No practices match</b>Try clearing a filter.</div>'; return; }
       var rows=VIEW.slice().sort(function(a,b){
@@ -693,6 +726,43 @@
       if(v==null) return '<span class="gd-full-note">never</span>';
       var d=(DATA.dates||[])[v];
       return d?(d.weekday+' '+d.label):'day '+(v+1);
+    }
+    /* ── export: one row per (practice, service), one column per date -- the
+       same shape as the source "Locations" sheet, joined with the practice
+       identity fields that only live on the "LPs" side. Respects whatever
+       filter/sort is currently applied, so the file matches what's on screen. */
+    function csvCell(v){
+      v=(v==null?'':String(v));
+      return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    }
+    function downloadCsv(filename,rows){
+      var csv=rows.map(function(r){return r.map(csvCell).join(',');}).join('\r\n');
+      var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.download=filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+    }
+    function exportLocations(){
+      var dates=DATA.dates||[];
+      var header=['Office','Practice','Account','Brand','State','City','Service','Runs']
+        .concat(dates.map(function(d){return d.weekday+' '+d.label;}))
+        .concat(['Total']);
+      var rows=[header];
+      VIEW.forEach(function(p){
+        var services=(p.services&&p.services.length)?p.services:[{name:'(none)',counts:[],runs:0,total:0}];
+        services.forEach(function(s){
+          rows.push([p.office,p.name,p.account,p.brand,p.state,p.city,s.name,s.runs]
+            .concat(_pad(s.counts,dates.length)).concat([s.total]));
+        });
+      });
+      downloadCsv('slot-checker-locations-'+(DATA.generated_at||'').slice(0,10)+'.csv', rows);
+    }
+    function _pad(counts,n){
+      var out=(counts||[]).slice(0,n);
+      while(out.length<n) out.push(0);
+      return out;
     }
     function badge(s){
       var L={open:'Bookable',thin:'Thin',none:'Fully booked','no-data':'No data'};
