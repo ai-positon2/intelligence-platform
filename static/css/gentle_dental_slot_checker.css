@@ -346,7 +346,8 @@ table.gd-tbl td { padding: 11px 14px; color: #c2d4cc; vertical-align: middle; }
 .gd-badge.no-data { background: rgba(255,255,255,.05); color: #8fa39c; }
 .gd-badge.no-data::before { background: #6c7f78; }
 .gd-spark { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 22px; }
-.gd-spark i { width: 3px; background: #2dd4aa; border-radius: 1px; min-height: 1px; display: block; }
+.gd-spark i { width: 3px; background: #2dd4aa; border-radius: 1px; min-height: 1px; display: block; cursor: pointer; transition: filter .12s; }
+.gd-spark i:hover { filter: brightness(1.5); }
 .gd-spark i.z { background: rgba(255,255,255,.10); }
 .gd-row-in { animation: gdRowIn .5s cubic-bezier(.22,1,.36,1) both; }
 @keyframes gdRowIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }

@@ -686,10 +686,11 @@
           '<td class="num"><b>'+n(p.total)+'</b></td>'+
           '<td class="num">'+p.days_open+'</td>'+
           '<td class="num">'+leadLabel(p.lead_days)+'</td>'+
-          '<td>'+spark(p.counts,max)+'</td>'+
+          '<td>'+spark(p.counts,max,DATA.dates)+'</td>'+
           '<td>'+badge(p.status)+'</td></tr>';
       });
       body.innerHTML=h+'</tbody></table>';
+      wireSparkTips(body);
     }
     function leadLabel(v){
       if(v==null) return '<span class="gd-full-note">never</span>';
@@ -700,11 +701,29 @@
       var L={open:'Bookable',thin:'Thin',none:'Fully booked','no-data':'No data'};
       return '<span class="gd-badge '+s+'">'+esc(L[s]||s)+'</span>';
     }
-    function spark(counts,max){
-      return '<span class="gd-spark">'+counts.map(function(c){
+    /* `dates`, when passed, is baked into each bar as a data attribute rather
+       than closed over, so wireSparkTips() can read a bar's own day and count
+       straight off the element -- one wiring pass works for every spark in a
+       container, whichever practice or service it belongs to. */
+    function spark(counts,max,dates){
+      return '<span class="gd-spark">'+counts.map(function(c,i){
         var hh=c>0?Math.max(2,Math.round(c/max*22)):1;
-        return '<i class="'+(c>0?'':'z')+'" style="height:'+hh+'px"></i>';
+        var d=dates&&dates[i];
+        return '<i class="'+(c>0?'':'z')+'" style="height:'+hh+'px" data-c="'+c+'"'+
+          (d?' data-d="'+esc(d.weekday+' '+d.label)+'"':'')+'></i>';
       }).join('')+'</span>';
+    }
+    function wireSparkTips(root){
+      [].slice.call(root.querySelectorAll('.gd-spark i')).forEach(function(el){
+        var c=parseInt(el.getAttribute('data-c'),10)||0, d=el.getAttribute('data-d');
+        function tip(ev){
+          showTip(ev,(d?'<span class="t-name">'+esc(d)+'</span>':'')+
+            (c>0?('<b>'+n(c)+'</b> open'):'Nothing open'));
+        }
+        el.addEventListener('mousemove',tip);
+        el.addEventListener('click',function(ev){ ev.stopPropagation(); tip(ev); });
+        el.addEventListener('mouseleave',hideTip);
+      });
     }
 
     /* ── calendar heatmap ────────────────────────────────────────────────── */
@@ -826,10 +845,11 @@
         h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(x.name)+
            '<em>offered at '+x.practices+' practice'+(x.practices===1?'':'s')+
            (x.zero?', unbookable at '+x.zero:'')+'</em></span>'+
-           spark(x.counts,pmax)+
+           spark(x.counts,pmax,DATA.dates)+
            '<span class="gd-drw-svc-v" style="margin-left:12px">'+n(x.slots)+'</span></div>';
       });
-      document.getElementById('servicesBody').innerHTML=h+'</div></div>';
+      var servicesBody=document.getElementById('servicesBody');
+      servicesBody.innerHTML=h+'</div></div>';
       requestAnimationFrame(function(){
         [].slice.call(document.querySelectorAll('#servicesBody .gd-bar-fill')).forEach(function(f){
           f.style.width=f.getAttribute('data-w')+'%'; });
@@ -841,6 +861,7 @@
           syncBarHighlights(); switchTab('practices'); onFilter();
         });
       });
+      wireSparkTips(servicesBody);
       syncBarHighlights();
     }
 
@@ -869,7 +890,7 @@
           h+='<div class="gd-drw-svc"><span class="gd-drw-svc-n">'+esc(s.name)+
              '<em>'+(s.bookable?(s.days_open+' of '+dates.length+' days'):'nothing open')+
              (s.runs>1?' · checked '+s.runs+'×':'')+'</em></span>'+
-             spark(s.counts,pmax)+
+             spark(s.counts,pmax,dates)+
              '<span class="gd-drw-svc-v" style="margin-left:12px">'+n(s.total)+'</span></div>';
         });
       }
@@ -893,9 +914,11 @@
         h+='<a class="gd-drw-link" href="'+esc(p.url)+'" target="_blank" rel="noopener">Open booking page ↗</a>';
       }
       h+='</div>';
-      document.getElementById('drawerContent').innerHTML=h;
+      var drawerContent=document.getElementById('drawerContent');
+      drawerContent.innerHTML=h;
       document.getElementById('drawer').classList.add('open');
       document.getElementById('drawerOv').classList.add('open');
+      wireSparkTips(drawerContent);
       [].slice.call(document.querySelectorAll('#drwDbd .gd-dbd-col')).forEach(function(el){
         var i=parseInt(el.getAttribute('data-i'),10), d=dates[i], c=p.counts[i];
         function dbdTip(ev){
