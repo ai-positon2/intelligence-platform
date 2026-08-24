@@ -657,6 +657,7 @@
     var COLS=[
       ['office','#',''],['name','Location',''],['brand','Brand',''],['state','State',''],
       ['service_count','Services','num'],['total','Open slots','num'],
+      ['total_pct','% of Total','num'],
       ['lead_days','Next open','num'],['spark','Pattern','']
     ];
     function sortBy(k){
@@ -690,7 +691,10 @@
       if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No locations match</b>Try clearing a filter.</div>'; return; }
       var rows=VIEW.slice().sort(function(a,b){
         var k=SORT.key;
-        if(k==='spark') k='total';
+        /* Percentage of the (fixed) portfolio total is a straight scaling of
+           total -- same order either way -- so it piggybacks on that sort
+           rather than needing its own comparator. */
+        if(k==='spark'||k==='total_pct') k='total';
         var x=a[k], y=b[k];
         /* Never-open practices sort last on "first open" whichever way the
            column is pointed: null is the absence of a lead time, not a small one. */
@@ -721,6 +725,7 @@
           '<td><span class="gd-state">'+esc(p.state||'—')+'</span></td>'+
           '<td class="num">'+p.service_count+(p.zero_services?' <span class="gd-full-note">('+p.zero_services+' full)</span>':'')+'</td>'+
           '<td class="num"><b>'+n(p.total)+'</b></td>'+
+          '<td class="num">'+pctOfTotal(p.total)+'</td>'+
           '<td class="num">'+leadLabel(p.lead_days)+'</td>'+
           '<td>'+spark(p.counts,max,DATA.dates)+'</td></tr>';
       });
@@ -731,6 +736,13 @@
       if(v==null) return '<span class="gd-full-note">never</span>';
       var d=(DATA.dates||[])[v];
       return d?(d.weekday+' '+d.label):'day '+(v+1);
+    }
+    /* Share of the portfolio's total open slots -- against the fixed
+       DATA.totals.slots, not the currently filtered VIEW, so a location's
+       percentage does not shift as someone applies or clears a filter. */
+    function pctOfTotal(v){
+      var tot=(DATA.totals&&DATA.totals.slots)||0;
+      return (tot?(v||0)/tot*100:0).toFixed(1)+'%';
     }
     /* ── export: one row per (practice, service), one column per date -- the
        same shape as the source "Locations" sheet, joined with the practice
