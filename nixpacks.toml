@@ -1,6 +1,15 @@
 # First custom Nixpacks config in this repo -- added for Social Creative
 # Intelligence Analyst's video-frame extraction (tracker/sci_video.py), which
-# shells out to ffmpeg/ffprobe. Railway's default Nixpacks build has no
-# system packages beyond what auto-detecting a Python project pulls in.
+# shells out to ffmpeg/ffprobe.
+#
+# The "..." entry is load-bearing, not decorative: Nixpacks merges a phase's
+# nixPkgs by replacing it outright unless the list contains "...", which it
+# expands to whatever that phase's auto-detected provider (here, Python) would
+# have used. Without it, defining phases.setup.nixPkgs = ["ffmpeg"] discards
+# the auto-detected Python package entirely -- the build still "succeeds" at
+# detecting a Python app, then fails with "python: command not found" the
+# moment it tries to create a venv, because there is no python in the
+# environment to run. (Confirmed the hard way: this broke every deploy from
+# 2026-08-25 to 2026-08-26 before being caught.)
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+nixPkgs = ["...", "ffmpeg"]
