@@ -1605,11 +1605,6 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "Competitive", "AI"],
     },
     {
-        # HIDDEN via HIDDEN_AGENT_SLUGS until every platform + the synthesis
-        # report ship -- see that set's comment and the section header above
-        # this agent's routes in app.py for the full rollout plan. Remove
-        # this comment's "not yet listed" framing (and the b2b_agents.html
-        # card + command-palette wiring) when it's unhidden.
         "slug": "social-creative-intelligence", "name": "Social Creative Intelligence Analyst",
         "tagline": "Cross-Platform Creative Analysis",
         "ac": "#fb923c", "ac2": "#f472b6", "icon": _asvg("<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M8 5l1.5-2h5L16 5\"/>"),
@@ -1706,13 +1701,12 @@ APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 #   linkedin-social-researcher: HIDDEN 2026-08-14 at the owner's request,
 #   expected back in a few days. (Renamed from linkedin-strategy-researcher
 #   on 2026-08-20 when that slug moved to a new, unrelated agent.)
-#   social-creative-intelligence: HIDDEN since it shipped (2026-08-25) --
-#   this is a staged rollout, not a withdrawal. Instagram + YouTube collection
-#   and Claude vision analysis are live; the remaining 4 platforms and the
-#   cross-platform synthesis report are still being built. Reachable the
-#   whole time at its direct URL by any @position2.com account. Unhide once
-#   Phase 3 (synthesis + report UI, all 6 platforms) ships.
-HIDDEN_AGENT_SLUGS = {"linkedin-social-researcher", "social-creative-intelligence"}
+#   social-creative-intelligence: was HIDDEN 2026-08-25 to 2026-08-26 for a
+#   staged rollout (Instagram + YouTube shipped first, then the remaining 4
+#   platforms and the cross-platform synthesis report) -- unhidden now that
+#   all 6 platforms + synthesis + the report UI are live. Left as a worked
+#   example of the pattern in this comment; not currently in the set below.
+HIDDEN_AGENT_SLUGS = {"linkedin-social-researcher"}
 
 def _visible_app_agents():
     """APP_AGENTS minus anything currently withdrawn from the listings. Every
@@ -8176,18 +8170,19 @@ def linkedin_playbook_studio_legacy_redirect(rest=""):
 # ── Social Creative Intelligence Analyst ──────────────────────────────────────
 # Internal, staff-only agent: given a company name/URL, identify its organic
 # presence across Instagram/LinkedIn/X/TikTok/YouTube/Facebook, scrape recent
-# posts, and run every image/video through Claude vision (+ later audio
-# transcription) to describe what the creative actually shows -- not just
-# captions or engagement counts. Same async-job shape as LinkedIn Strategy
+# posts, and run every image/video through Claude vision (plus audio
+# transcription for spoken dialogue) to describe what the creative actually
+# shows -- not just captions or engagement counts, then synthesize a cited,
+# per-platform and cross-platform report (tracker/sci_classify.py +
+# tracker/sci_synthesize.py). Same async-job shape as LinkedIn Strategy
 # Researcher: a request only ever does a cheap DB read/write, the actual
-# scrape-and-analyze work runs in a daemon thread (tracker/sci_pipeline.py),
-# and the page polls /runs/<id>/status until it's done.
+# scrape-and-analyze-and-synthesize work runs in a daemon thread
+# (tracker/sci_pipeline.py), and the page polls /runs/<id>/status until done.
 #
-# Rollout: listed in APP_AGENTS but ALSO in HIDDEN_AGENT_SLUGS from day one --
-# reachable at its direct URL by any @position2.com account the whole time,
-# but not surfaced by b2b_agents.html or the command palette until every
-# platform + the synthesis report ship. See HIDDEN_AGENT_SLUGS's own comment
-# for the general pattern this reuses.
+# Shipped in stages behind HIDDEN_AGENT_SLUGS (Instagram + YouTube 2026-08-25,
+# the remaining platforms the same day, synthesis + all 6 platforms
+# 2026-08-26) -- fully unhidden now, listed on b2b_agents.html and in the
+# command palette like any other agent.
 def _sci_run_status_payload(run_id: int, email: str):
     from tracker import sci_store
     run = sci_store.get_run(run_id, email)
