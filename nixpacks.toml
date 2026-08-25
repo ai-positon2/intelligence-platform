@@ -1,0 +1,6 @@
+# First custom Nixpacks config in this repo -- added for Social Creative
+# Intelligence Analyst's video-frame extraction (tracker/sci_video.py), which
+# shells out to ffmpeg/ffprobe. Railway's default Nixpacks build has no
+# system packages beyond what auto-detecting a Python project pulls in.
+[phases.setup]
+nixPkgs = ["ffmpeg"]

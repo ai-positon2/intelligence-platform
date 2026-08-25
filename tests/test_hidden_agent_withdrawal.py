@@ -157,13 +157,19 @@ def test_run_history_can_still_name_the_hidden_agent():
     the filtered list, a run logged last week starts rendering as a raw slug."""
     assert appmod.APP_AGENTS_BY_SLUG.get(_SLUG, {}).get("name") == _NAME
     assert _SLUG not in {a["slug"] for a in appmod._visible_app_agents()}
-    assert len(appmod._visible_app_agents()) == len(appmod.APP_AGENTS) - 1
+    # Other agents may also be hidden for their own unrelated reasons (e.g. a
+    # staged rollout) -- the property under test is "hidden count == filtered
+    # count", not "this is the only hidden agent".
+    assert len(appmod._visible_app_agents()) == len(appmod.APP_AGENTS) - len(appmod.HIDDEN_AGENT_SLUGS)
 
 
 # ── Restoring it is one edit ────────────────────────────────────────────────
 
 def test_one_set_drives_every_data_driven_surface():
-    assert appmod.HIDDEN_AGENT_SLUGS == {_SLUG}
+    """The property worth pinning is that THIS agent's hide is driven by
+    HIDDEN_AGENT_SLUGS -- not that the set never grows for an unrelated
+    agent's own reasons (see social-creative-intelligence's staged rollout)."""
+    assert _SLUG in appmod.HIDDEN_AGENT_SLUGS
 
 
 def test_the_hand_written_card_says_how_to_come_back():
