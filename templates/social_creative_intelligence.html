@@ -6,81 +6,18 @@
   <title>Social Creative Intelligence Analyst, Platform</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
   <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <link rel="stylesheet" href="/static/css/grid-tokens.css">
-  <style>
-    .sci-form{display:flex;gap:var(--space-3,12px);flex-wrap:wrap;align-items:flex-end;margin-bottom:var(--space-5,24px)}
-    .sci-form .field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:220px}
-    .sci-form label{font-size:12px;color:var(--text-secondary,#9aa4b2);text-transform:uppercase;letter-spacing:.04em}
-    .sci-form input{background:var(--surface-2,#151b2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:10px 12px;color:inherit;font:inherit}
-    .sci-platform-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
-    .sci-chip{border:1px solid var(--border,rgba(255,255,255,.12));border-radius:var(--radius-md,10px);padding:10px 12px;font-size:13px}
-    .sci-chip .p-name{text-transform:capitalize;font-weight:600;display:block;margin-bottom:4px}
-    .sci-chip .p-status{font-size:12px;color:var(--text-secondary,#9aa4b2)}
-    .sci-chip[data-status="ok"]{border-color:rgba(74,222,128,.4)}
-    .sci-chip[data-status="low_activity"]{border-color:rgba(251,191,36,.4)}
-    .sci-chip[data-status="no_presence"],.sci-chip[data-status="handle_not_found"],.sci-chip[data-status="scrape_failed"],.sci-chip[data-status="error"]{border-color:rgba(248,113,113,.4)}
-    .sci-run-row{border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:12px 14px;margin-bottom:10px;cursor:pointer}
-    .sci-run-row:hover{border-color:rgba(255,255,255,.25)}
-    .sci-run-row .r-name{font-weight:600}
-    .sci-run-row .r-meta{font-size:12px;color:var(--text-secondary,#9aa4b2)}
-    .sci-empty{color:var(--text-secondary,#9aa4b2);font-size:14px;padding:16px 0}
-
-    /* Page header + topbar user menu -- not covered by the shared
-       ds-components.css/aurora-app.css files (every other agent page defines
-       these itself, in its own dedicated CSS file; this page keeps everything
-       inline instead of adding one). */
-    .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px;flex-wrap:wrap}
-    .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fb923c;margin-bottom:8px}
-    .ph h1{font-size:30px;font-weight:700;color:#f5f0ed;letter-spacing:-.01em}
-    .ph p{font-size:13.5px;color:#9aa4b2;max-width:660px;margin-top:5px;line-height:1.5}
-    .user-menu{position:relative}
-    .user-pill{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:var(--radius-pill,999px);padding:4px 14px 4px 4px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
-    .user-pill:hover,.user-pill.open{background:rgba(255,255,255,.08);border-color:rgba(251,146,60,.35)}
-    .user-avatar{width:28px;height:28px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#fb923c,#f472b6);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#1f0f00;flex-shrink:0}
-    .user-avatar img{width:100%;height:100%;object-fit:cover}
-    .user-name{font-size:13px;font-weight:500;color:#94a3b8}
-    .pill-chevron{font-size:10px;color:#55617a;margin-left:2px;transition:transform .2s}
-    .user-pill.open .pill-chevron{transform:rotate(180deg)}
-    .user-dropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;width:220px;z-index:9999;background:rgba(13,10,8,.97);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-md,10px);overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.6);backdrop-filter:blur(20px);animation:sci-dd-in .15s cubic-bezier(.34,1.56,.64,1)}
-    @keyframes sci-dd-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-    .user-dropdown.open{display:block}
-    .dd-header{padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
-    .dd-name{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:2px}
-    .dd-email{font-size:11.5px;color:#55617a}
-    .dd-items{padding:6px}
-    .dd-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm,6px);font-size:13px;color:#94a3b8;text-decoration:none;transition:background .12s,color .12s;width:100%}
-    .dd-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0}
-    .dd-item-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-    .dd-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 6px}
-    .dd-item.danger:hover{background:rgba(239,68,68,.08);color:#f87171}
-
-    /* Report drawer */
-    .sci-drawer-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(4,6,14,.6);backdrop-filter:blur(4px)}
-    .sci-drawer-overlay.open{display:block}
-    .sci-drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,94vw);background:var(--surface-1,#0c1120);border-left:1px solid var(--border,rgba(255,255,255,.1));overflow-y:auto;padding:24px 28px 60px}
-    .sci-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
-    .sci-drawer-close{background:none;border:1px solid var(--border,rgba(255,255,255,.15));border-radius:var(--radius-md,10px);color:inherit;cursor:pointer;padding:6px 12px;font-size:13px}
-    .sci-drawer-title{font-size:20px;font-weight:700;margin:0 0 4px}
-    .sci-drawer-meta{font-size:12px;color:var(--text-secondary,#9aa4b2)}
-    .sci-banner{border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);border-radius:var(--radius-md,10px);padding:10px 14px;font-size:13px;margin-bottom:10px}
-    .sci-banner.sci-banner-none{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.08)}
-    .sci-platform-section{border-top:1px solid var(--border,rgba(255,255,255,.08));padding:18px 0}
-    .sci-platform-section h3{margin:0 0 6px;text-transform:capitalize;display:flex;align-items:center;gap:8px}
-    .sci-format-mix{font-size:12px;color:var(--text-secondary,#9aa4b2);margin-bottom:10px}
-    .sci-claim{border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:10px 12px;margin-bottom:8px;font-size:13.5px}
-    .sci-claim-cites{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
-    .sci-cite-link{font-size:11px;color:var(--text-secondary,#9aa4b2);border:1px solid var(--border,rgba(255,255,255,.12));border-radius:var(--radius-sm,6px);padding:2px 8px;text-decoration:none}
-    .sci-cite-link:hover{border-color:rgba(255,255,255,.3);color:inherit}
-    .sci-cross-section{border-top:2px solid var(--border,rgba(255,255,255,.15));padding-top:18px;margin-top:6px}
-  </style>
+  <link rel="stylesheet" href="/static/css/social_creative_intelligence.css?v=1">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
 </head>
 <body>
   <div class="bg-grid"></div>
+  <div class="sci-aurora"><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
+  <div class="sci-grain"></div>
 
   <div class="topbar">
     <div class="tl">
@@ -115,43 +52,62 @@
   <div class="main">
     <div class="ph">
       <div>
-        <div class="eyebrow">B2B Agents · Cross-platform creative analysis</div>
-        <h1>Social Creative Intelligence Analyst</h1>
-        <p>Give it a company name or URL. It finds the company's organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually looks at every image and video to describe what the creative shows and synthesizes what's working, cited back to real posts.</p>
+        <div class="eyebrow"><span class="dot"></span>B2B Agents · Cross-platform creative analysis</div>
+        <h1>See what their <em>creative</em> is actually doing.</h1>
+        <p>Give it a company name or URL. It finds the company's organic presence across six platforms, then actually looks at every image and video to describe what the creative shows, and synthesizes what's working, cited back to real posts.</p>
+        <div class="ph-platforms" aria-hidden="true">
+          <div class="ph-plat-ic" title="Instagram" style="color:#e1306c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg></div>
+          <div class="ph-plat-ic" title="LinkedIn" style="color:#0a66c2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8" cy="8.3" r="1" fill="currentColor" stroke="none"/><path d="M8 11.3v6.2M12.6 17.5v-3.6c0-1.6 1-2.5 2.2-2.5s2 .9 2 2.5v3.6"/></svg></div>
+          <div class="ph-plat-ic" title="X" style="color:#cbd5e1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 16M19 4L5 20"/></svg></div>
+          <div class="ph-plat-ic" title="TikTok" style="color:#fe2c55"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5v11.2a3.3 3.3 0 11-2.7-3.24M14 3.5c.5 2.6 2.4 4.5 4.8 4.9"/></svg></div>
+          <div class="ph-plat-ic" title="YouTube" style="color:#ff0033"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.7" y="6" width="18.6" height="12" rx="3.6"/><path d="M10.3 9.6l5 2.4-5 2.4z" fill="currentColor" stroke="none"/></svg></div>
+          <div class="ph-plat-ic" title="Facebook" style="color:#1877f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21v-7.2h2.4l.4-2.8h-2.8v-1.8c0-.8.2-1.4 1.4-1.4h1.5V5.3A20 20 0 0015.6 5c-2.3 0-3.9 1.4-3.9 4v2h-2.4v2.8h2.4V21"/></svg></div>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <form class="sci-form" id="analyzeForm" onsubmit="return startAnalysis(event)">
-        <div class="field">
-          <label for="companyName">Company name</label>
-          <input type="text" id="companyName" placeholder="e.g. Acme Inc." required />
-        </div>
-        <div class="field">
-          <label for="companyUrl">Website (optional)</label>
-          <input type="text" id="companyUrl" placeholder="acme.com" />
-        </div>
-        <button type="submit" class="btn btn-primary" id="analyzeBtn">Analyze</button>
-      </form>
+    <div class="sci-card">
+      <div class="sci-card-pad">
+        <form class="sci-form" id="analyzeForm" onsubmit="return startAnalysis(event)">
+          <div class="sci-field">
+            <label for="companyName">Company name</label>
+            <input type="text" id="companyName" placeholder="e.g. Acme Inc." required />
+          </div>
+          <div class="sci-field">
+            <label for="companyUrl">Website (optional)</label>
+            <input type="text" id="companyUrl" placeholder="acme.com" />
+          </div>
+          <button type="submit" class="sci-btn" id="analyzeBtn">Analyze →</button>
+        </form>
 
-      <div id="runningWrap" style="display:none">
-        <div class="sci-empty">Identifying platforms and collecting posts. This runs in the background and can take a few minutes. You can leave this page; your run will be here in History when it's done.</div>
-        <div class="sci-platform-grid" id="platformGrid"></div>
+        <div id="runningWrap" style="display:none;margin-top:20px">
+          <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes &mdash; you can leave this page; your run will be here in History when it's done.</span></div>
+          <div class="sci-platform-grid" id="platformGrid"></div>
+        </div>
       </div>
     </div>
 
-    <div class="card" style="margin-top:var(--space-5,24px)">
-      <h2 style="margin-top:0">History</h2>
-      <div id="historyList">
+    <div class="sci-card">
+      <div class="sci-card-head">
+        <h2>History</h2>
+        <span class="cnt">{{ runs|length }} run{{ '' if runs|length == 1 else 's' }}</span>
+      </div>
+      <div class="sci-run-list" id="historyList">
         {% if runs %}
           {% for r in runs %}
+          {% set st = 'st-running' if r.status == 'running' else ('st-error' if r.status == 'error' else 'st-done') %}
           <div class="sci-run-row" onclick="viewRun({{ r.id }})">
-            <div class="r-name">{{ r.company_name }}</div>
-            <div class="r-meta">{{ r.status }} · {{ r.created_at }}</div>
+            <div class="sci-run-mono">{{ (r.company_name or '?')[0]|upper }}</div>
+            <div class="sci-run-info">
+              <div class="r-name">{{ r.company_name }}</div>
+              <div class="r-meta">{{ r.created_at }}</div>
+            </div>
+            <span class="status-pill {{ st }}"><span class="d"></span>{{ r.status }}</span>
+            <span class="sci-run-arrow">→</span>
           </div>
           {% endfor %}
         {% else %}
-          <div class="sci-empty">No analyses yet, run one above.</div>
+          <div class="sci-empty">No analyses yet &mdash; run one above and it'll show up here.</div>
         {% endif %}
       </div>
     </div>
@@ -175,6 +131,21 @@
   <script>
     var POLL_TIMER = null;
     var BASE = '/p2/b2b-agents/social-creative-intelligence';
+
+    var PLATFORM_META = {
+      instagram: {color:'#e1306c', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>'},
+      linkedin: {color:'#0a66c2', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8" cy="8.3" r="1" fill="currentColor" stroke="none"/><path d="M8 11.3v6.2M12.6 17.5v-3.6c0-1.6 1-2.5 2.2-2.5s2 .9 2 2.5v3.6"/></svg>'},
+      x: {color:'#cbd5e1', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 16M19 4L5 20"/></svg>'},
+      tiktok: {color:'#fe2c55', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5v11.2a3.3 3.3 0 11-2.7-3.24M14 3.5c.5 2.6 2.4 4.5 4.8 4.9"/></svg>'},
+      youtube: {color:'#ff0033', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.7" y="6" width="18.6" height="12" rx="3.6"/><path d="M10.3 9.6l5 2.4-5 2.4z" fill="currentColor" stroke="none"/></svg>'},
+      facebook: {color:'#1877f2', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21v-7.2h2.4l.4-2.8h-2.8v-1.8c0-.8.2-1.4 1.4-1.4h1.5V5.3A20 20 0 0015.6 5c-2.3 0-3.9 1.4-3.9 4v2h-2.4v2.8h2.4V21"/></svg>'}
+    };
+    var DEFAULT_META = {color:'#8b86a0', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/></svg>'};
+    var PLATFORM_ORDER = ['instagram','linkedin','x','tiktok','youtube','facebook'];
+
+    function platformMeta(p){ return PLATFORM_META[p] || DEFAULT_META; }
+    function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function monogram(name){ var s = String(name||'?').trim(); return (s[0]||'?').toUpperCase(); }
 
     function startAnalysis(evt){
       evt.preventDefault();
@@ -202,11 +173,19 @@
 
     function renderPlatforms(platforms){
       var grid = document.getElementById('platformGrid');
-      grid.innerHTML = (platforms || []).map(function(p){
-        return '<div class="sci-chip" data-status="' + p.status + '">' +
-          '<span class="p-name">' + p.platform + '</span>' +
-          '<span class="p-status">' + (p.status || '').replace(/_/g, ' ') +
-          (p.post_count ? ' · ' + p.post_count + ' posts' : '') + '</span></div>';
+      var byName = {};
+      (platforms || []).forEach(function(p){ byName[p.platform] = p; });
+      var order = PLATFORM_ORDER.filter(function(p){ return byName[p]; }).concat(
+        (platforms || []).map(function(p){ return p.platform; }).filter(function(p){ return PLATFORM_ORDER.indexOf(p) < 0; })
+      );
+      grid.innerHTML = order.map(function(name){
+        var p = byName[name], meta = platformMeta(name);
+        return '<div class="pf-chip" data-status="' + esc(p.status) + '" style="--pf-color:' + meta.color + '">' +
+          '<div class="pf-chip-ic">' + meta.icon + '</div>' +
+          '<div class="pf-chip-txt"><span class="pf-name">' + esc(name) + '</span>' +
+          '<span class="pf-status">' + esc((p.status || '').replace(/_/g, ' ')) + '</span></div>' +
+          (p.post_count ? '<span class="pf-count">' + p.post_count + '</span>' : '') +
+          '</div>';
       }).join('');
     }
 
@@ -224,11 +203,10 @@
       check();
     }
 
-    function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-
     var NO_ACTIVITY_STATUSES = {no_presence:1, handle_not_found:1, scrape_failed:1, error:1, low_activity:1};
     var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
+    var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
 
     function renderClaims(claims, postsById){
       return (claims || []).map(function(c){
@@ -245,48 +223,120 @@
       }).join('');
     }
 
+    function computeFormatMix(posts, platform){
+      var counts = {}, total = 0;
+      (posts || []).forEach(function(p){
+        if(p.platform !== platform) return;
+        var t = p.post_type || 'post';
+        counts[t] = (counts[t] || 0) + 1; total++;
+      });
+      return {counts: counts, total: total};
+    }
+
+    function renderFormatMix(mix){
+      if(!mix.total) return '';
+      var types = Object.keys(mix.counts);
+      var bar = types.map(function(t, i){
+        var pct = (mix.counts[t] / mix.total * 100);
+        return '<div class="fm-seg" style="width:' + pct.toFixed(1) + '%;background:' + FM_PALETTE[i % FM_PALETTE.length] + '"></div>';
+      }).join('');
+      var legend = types.map(function(t, i){
+        return '<span><i style="background:' + FM_PALETTE[i % FM_PALETTE.length] + '"></i>' + esc(t) + ' · ' + mix.counts[t] + '</span>';
+      }).join('');
+      return '<div class="sci-format-mix"><div class="fm-bar">' + bar + '</div></div><div class="fm-legend">' + legend + '</div>';
+    }
+
+    function renderThumbs(posts, platform){
+      var items = (posts || []).filter(function(p){
+        return p.platform === platform && Array.isArray(p.media_urls) && p.media_urls.length;
+      }).slice(0, 8);
+      if(!items.length) return '';
+      var html = items.map(function(p){
+        var url = p.media_urls[0];
+        if(!url) return '';
+        var href = p.post_url || url;
+        return '<a class="sci-thumb" href="' + esc(href) + '" target="_blank" rel="noopener">' +
+          '<img src="' + esc(url) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-thumb\').style.display=\'none\'"></a>';
+      }).join('');
+      return '<div class="sci-thumb-strip">' + html + '</div>';
+    }
+
+    function renderCoverage(platforms){
+      return (platforms || []).map(function(p){
+        var meta = platformMeta(p.platform);
+        var hasSection = !NO_ACTIVITY_STATUSES[p.status];
+        var tag = hasSection ? 'a' : 'span';
+        var href = hasSection ? ' href="#sci-plat-' + esc(p.platform) + '"' : '';
+        var off = hasSection ? '' : ' cov-off';
+        return '<' + tag + ' class="cov-chip' + off + '" data-status="' + esc(p.status) + '" style="--pf-color:' + meta.color + '"' + href + '>' +
+          '<span class="cov-chip-ic">' + meta.icon + '</span>' + esc(p.platform) +
+          (p.post_count ? ' · ' + p.post_count : '') + '</' + tag + '>';
+      }).join('');
+    }
+
     function renderReport(run){
-      var postsById = {};
-      (run.posts || []).forEach(function(p){ postsById[p.id] = p; });
+      var postsById = {}, allPosts = run.posts || [];
+      allPosts.forEach(function(p){ postsById[p.id] = p; });
       var synthesis = run.synthesis || null;
       var platformsByName = {};
       (run.platforms || []).forEach(function(p){ platformsByName[p.platform] = p; });
+      var statusCls = run.status === 'done' ? 'st-done' : (run.status === 'error' ? 'st-error' : 'st-running');
+      var siteUrl = run.company_url ? (/^https?:\/\//i.test(run.company_url) ? run.company_url : 'https://' + run.company_url) : null;
 
-      var html = '<div class="sci-drawer-head">' +
-        '<div><div class="sci-drawer-title">' + esc(run.company_name) + '</div>' +
-        '<div class="sci-drawer-meta">' + esc(run.status) + ' · started ' + esc(run.created_at) + '</div></div>' +
-        '<button class="sci-drawer-close" onclick="closeReport()">Close ✕</button></div>';
+      var html = '<button class="sci-drawer-close" onclick="closeReport()">✕</button>' +
+        '<div class="sci-drawer-head">' +
+          '<div class="sci-drawer-mono">' + esc(monogram(run.company_name)) + '</div>' +
+          '<div style="min-width:0">' +
+            '<div class="sci-drawer-title">' + esc(run.company_name) + '</div>' +
+            '<div class="sci-drawer-meta">' +
+              '<span class="status-pill ' + statusCls + '"><span class="d"></span>' + esc(run.status) + '</span>' +
+              '<span>started ' + esc(run.created_at) + '</span>' +
+              (siteUrl ? '<a href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' + esc(run.company_url) + '</a>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sci-drawer-body">';
+
+      html += '<div class="sci-coverage">' + renderCoverage(run.platforms) + '</div>';
 
       if(run.status === 'running'){
-        html += '<div class="sci-empty">This run is still in progress. Refresh once it finishes, or leave this open -- it will keep polling.</div>';
+        html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress &mdash; leave this open, it keeps polling, or come back from History once it finishes.</div></div>';
       }
 
       (run.platforms || []).forEach(function(p){
         if(NO_ACTIVITY_STATUSES[p.status]){
           var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
-          html += '<div class="sci-banner' + cls + '"><b style="text-transform:capitalize">' + esc(p.platform) + ':</b> ' +
-            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ' -- ' + esc(p.status_detail) : '') + '</div>';
+          html += '<div class="sci-banner' + cls + '"><span class="bic">' + (p.status === 'low_activity' ? '◐' : '○') + '</span><div><b>' + esc(p.platform) + ':</b> ' +
+            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ' &mdash; ' + esc(p.status_detail) : '') + '</div></div>';
         }
       });
 
       if(!synthesis){
-        html += '<div class="sci-empty">Synthesis has not run yet for this analysis.</div>';
+        html += '<div class="sci-drawer-empty">Synthesis has not run yet for this analysis.</div>';
       } else if(synthesis.error){
-        html += '<div class="sci-empty">Synthesis is unavailable for this run (' + esc(synthesis.error) + '). Per-platform posts and creative analysis are still collected above once this run has platform data.</div>';
+        html += '<div class="sci-drawer-empty">Synthesis is unavailable for this run (' + esc(synthesis.error) + '). Per-platform posts and creative analysis are still collected above once this run has platform data.</div>';
       } else {
         Object.keys(synthesis.platforms || {}).forEach(function(platform){
           var entry = synthesis.platforms[platform];
           var pr = platformsByName[platform] || {};
-          html += '<div class="sci-platform-section"><h3>' + esc(platform) +
-            (pr.post_count ? '<span class="sci-format-mix" style="margin:0">' + pr.post_count + ' posts analyzed</span>' : '') + '</h3>' +
-            '<p>' + esc(entry.summary) + '</p>' +
-            renderClaims(entry.claims, postsById) + '</div>';
+          var meta = platformMeta(platform);
+          var mix = computeFormatMix(allPosts, platform);
+          html += '<div class="sci-platform-section" id="sci-plat-' + esc(platform) + '" style="--pf-color:' + meta.color + '">' +
+            '<div class="sci-plat-head"><span class="sci-plat-ic">' + meta.icon + '</span><h3>' + esc(platform) + '</h3>' +
+            (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') + '</div>' +
+            renderFormatMix(mix) +
+            '<p class="sci-summary">' + esc(entry.summary) + '</p>' +
+            renderThumbs(allPosts, platform) +
+            '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' +
+          '</div>';
         });
         if(synthesis.cross_platform && (synthesis.cross_platform.summary || (synthesis.cross_platform.claims || []).length)){
-          html += '<div class="sci-cross-section"><h3>Cross-platform</h3><p>' + esc(synthesis.cross_platform.summary) + '</p>' +
-            renderClaims(synthesis.cross_platform.claims, postsById) + '</div>';
+          html += '<div class="sci-cross-section"><h3>Cross-platform</h3><p class="sci-summary">' + esc(synthesis.cross_platform.summary) + '</p>' +
+            '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div></div>';
         }
       }
+
+      html += '</div>';
 
       document.getElementById('drawerPanel').innerHTML = html;
       document.getElementById('drawerOverlay').classList.add('open');
