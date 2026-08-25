@@ -89,10 +89,14 @@ def run_identify(run_id: int, company_name: str, company_url: str | None) -> dic
     return result
 
 
-# Phase 1: instagram + youtube. Phase 2 adds facebook/tiktok/x/linkedin here
-# -- sci_pipeline's control flow does not change, only this registry grows.
+# Same-shape Apify collectors, dispatched generically by _collect_via_apify.
+# LinkedIn is deliberately NOT in this registry -- see _collect_linkedin,
+# which gates on sci_source_linkedin.actor_id() before ever calling Apify.
 _APIFY_COLLECTORS = {
     "instagram": "sci_source_instagram",
+    "facebook": "sci_source_facebook",
+    "tiktok": "sci_source_tiktok",
+    "x": "sci_source_x",
 }
 
 
@@ -108,6 +112,8 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
     try:
         if platform == "youtube":
             posts = _collect_youtube(handle)
+        elif platform == "linkedin":
+            posts = _collect_linkedin(handle)
         elif platform in _APIFY_COLLECTORS:
             posts = _collect_via_apify(platform, handle)
         else:
@@ -144,6 +150,22 @@ def _collect_via_apify(platform: str, handle: str) -> list[dict]:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
     module = importlib.import_module(f"tracker.{_APIFY_COLLECTORS[platform]}")
     return module.collect(handle, token, strict=True)
+
+
+def _collect_linkedin(handle: str) -> list[dict]:
+    """LinkedIn is feature-flagged, not just another Apify collector: an
+    unset SCI_APIFY_LINKEDIN_ACTOR_ID means "disabled" and must never reach
+    apify_transport at all -- raising here (before any network call) is what
+    lets this platform be killed instantly by unsetting the env var, with no
+    deploy and no risk of a retry storm against a fragile, easily-detected
+    actor."""
+    from tracker import sci_source_linkedin
+    if not sci_source_linkedin.actor_id():
+        raise RuntimeError("LinkedIn collection is disabled on this deployment (no actor configured).")
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
+    return sci_source_linkedin.collect(handle, token, strict=True)
 
 
 def _collect_youtube(handle: str) -> list[dict]:
