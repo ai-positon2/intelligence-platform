@@ -266,6 +266,16 @@
       --card-glow: 0 0 40px rgba(74,222,128,0.10);
       --arrow-color: #bef264;
     }
+    /* Orange -> pink -> purple: matches this agent's own ac/ac2 accent
+       colors in app.py's APP_AGENTS entry. */
+    .c-sci {
+      --band: linear-gradient(90deg,#fb923c,#f472b6,#a855f7);
+      --thumb: linear-gradient(135deg,#1f0f00 0%,#2a0a1a 100%);
+      --icon-glow: rgba(251,146,60,0.5);
+      --card-border: rgba(251,146,60,0.35);
+      --card-glow: 0 0 40px rgba(251,146,60,0.10);
+      --arrow-color: #fdba74;
+    }
     .c-visitors {
       --band: linear-gradient(90deg,#10b981,#06b6d4,#0ea5e9);
       --thumb: linear-gradient(135deg,#001a12 0%,#001e28 100%);

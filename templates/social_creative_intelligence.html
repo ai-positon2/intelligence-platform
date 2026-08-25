@@ -29,6 +29,54 @@
     .sci-run-row .r-name{font-weight:600}
     .sci-run-row .r-meta{font-size:12px;color:var(--text-secondary,#9aa4b2)}
     .sci-empty{color:var(--text-secondary,#9aa4b2);font-size:14px;padding:16px 0}
+
+    /* Page header + topbar user menu -- not covered by the shared
+       ds-components.css/aurora-app.css files (every other agent page defines
+       these itself, in its own dedicated CSS file; this page keeps everything
+       inline instead of adding one). */
+    .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px;flex-wrap:wrap}
+    .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fb923c;margin-bottom:8px}
+    .ph h1{font-size:30px;font-weight:700;color:#f5f0ed;letter-spacing:-.01em}
+    .ph p{font-size:13.5px;color:#9aa4b2;max-width:660px;margin-top:5px;line-height:1.5}
+    .user-menu{position:relative}
+    .user-pill{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:var(--radius-pill,999px);padding:4px 14px 4px 4px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+    .user-pill:hover,.user-pill.open{background:rgba(255,255,255,.08);border-color:rgba(251,146,60,.35)}
+    .user-avatar{width:28px;height:28px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#fb923c,#f472b6);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#1f0f00;flex-shrink:0}
+    .user-avatar img{width:100%;height:100%;object-fit:cover}
+    .user-name{font-size:13px;font-weight:500;color:#94a3b8}
+    .pill-chevron{font-size:10px;color:#55617a;margin-left:2px;transition:transform .2s}
+    .user-pill.open .pill-chevron{transform:rotate(180deg)}
+    .user-dropdown{display:none;position:absolute;top:calc(100% + 10px);right:0;width:220px;z-index:9999;background:rgba(13,10,8,.97);border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-md,10px);overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.6);backdrop-filter:blur(20px);animation:sci-dd-in .15s cubic-bezier(.34,1.56,.64,1)}
+    @keyframes sci-dd-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .user-dropdown.open{display:block}
+    .dd-header{padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .dd-name{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:2px}
+    .dd-email{font-size:11.5px;color:#55617a}
+    .dd-items{padding:6px}
+    .dd-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm,6px);font-size:13px;color:#94a3b8;text-decoration:none;transition:background .12s,color .12s;width:100%}
+    .dd-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0}
+    .dd-item-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+    .dd-divider{height:1px;background:rgba(255,255,255,.05);margin:4px 6px}
+    .dd-item.danger:hover{background:rgba(239,68,68,.08);color:#f87171}
+
+    /* Report drawer */
+    .sci-drawer-overlay{display:none;position:fixed;inset:0;z-index:9000;background:rgba(4,6,14,.6);backdrop-filter:blur(4px)}
+    .sci-drawer-overlay.open{display:block}
+    .sci-drawer{position:fixed;top:0;right:0;bottom:0;width:min(720px,94vw);background:var(--surface-1,#0c1120);border-left:1px solid var(--border,rgba(255,255,255,.1));overflow-y:auto;padding:24px 28px 60px}
+    .sci-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .sci-drawer-close{background:none;border:1px solid var(--border,rgba(255,255,255,.15));border-radius:var(--radius-md,10px);color:inherit;cursor:pointer;padding:6px 12px;font-size:13px}
+    .sci-drawer-title{font-size:20px;font-weight:700;margin:0 0 4px}
+    .sci-drawer-meta{font-size:12px;color:var(--text-secondary,#9aa4b2)}
+    .sci-banner{border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.08);border-radius:var(--radius-md,10px);padding:10px 14px;font-size:13px;margin-bottom:10px}
+    .sci-banner.sci-banner-none{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.08)}
+    .sci-platform-section{border-top:1px solid var(--border,rgba(255,255,255,.08));padding:18px 0}
+    .sci-platform-section h3{margin:0 0 6px;text-transform:capitalize;display:flex;align-items:center;gap:8px}
+    .sci-format-mix{font-size:12px;color:var(--text-secondary,#9aa4b2);margin-bottom:10px}
+    .sci-claim{border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:10px 12px;margin-bottom:8px;font-size:13.5px}
+    .sci-claim-cites{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+    .sci-cite-link{font-size:11px;color:var(--text-secondary,#9aa4b2);border:1px solid var(--border,rgba(255,255,255,.12));border-radius:var(--radius-sm,6px);padding:2px 8px;text-decoration:none}
+    .sci-cite-link:hover{border-color:rgba(255,255,255,.3);color:inherit}
+    .sci-cross-section{border-top:2px solid var(--border,rgba(255,255,255,.15));padding-top:18px;margin-top:6px}
   </style>
 </head>
 <body>
@@ -67,9 +115,9 @@
   <div class="main">
     <div class="ph">
       <div>
-        <div class="eyebrow">B2B Agents · Beta: Instagram + YouTube live, more platforms in progress</div>
+        <div class="eyebrow">B2B Agents · Cross-platform creative analysis</div>
         <h1>Social Creative Intelligence Analyst</h1>
-        <p>Give it a company name or URL. It finds the company's organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually looks at every image and video to describe what the creative shows.</p>
+        <p>Give it a company name or URL. It finds the company's organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually looks at every image and video to describe what the creative shows and synthesizes what's working, cited back to real posts.</p>
       </div>
     </div>
 
@@ -108,6 +156,21 @@
       </div>
     </div>
   </div>
+
+  <div class="sci-drawer-overlay" id="drawerOverlay" onclick="if(event.target===this) closeReport()">
+    <div class="sci-drawer" id="drawerPanel"></div>
+  </div>
+
+  {% include 'ppc_chat_widget.html' %}
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+  </script>
 
   <script>
     var POLL_TIMER = null;
@@ -161,11 +224,177 @@
       check();
     }
 
-    function viewRun(runId){
-      // Full report drawer ships in a later phase; for now, the raw run
-      // JSON is reachable directly for verification while this is unlisted.
-      window.location.href = BASE + '/runs/' + runId;
+    function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+    var NO_ACTIVITY_STATUSES = {no_presence:1, handle_not_found:1, scrape_failed:1, error:1, low_activity:1};
+    var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
+      scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
+
+    function renderClaims(claims, postsById){
+      return (claims || []).map(function(c){
+        var cites = (c.post_ids || []).map(function(id){
+          var p = postsById[id];
+          if(!p) return '';
+          var label = (p.platform || '') + (p.post_type ? ' · ' + p.post_type : '');
+          return p.post_url
+            ? '<a class="sci-cite-link" href="' + esc(p.post_url) + '" target="_blank" rel="noopener">' + esc(label) + '</a>'
+            : '<span class="sci-cite-link">' + esc(label) + '</span>';
+        }).join('');
+        return '<div class="sci-claim">' + esc(c.text) +
+          (cites ? '<div class="sci-claim-cites">' + cites + '</div>' : '') + '</div>';
+      }).join('');
     }
+
+    function renderReport(run){
+      var postsById = {};
+      (run.posts || []).forEach(function(p){ postsById[p.id] = p; });
+      var synthesis = run.synthesis || null;
+      var platformsByName = {};
+      (run.platforms || []).forEach(function(p){ platformsByName[p.platform] = p; });
+
+      var html = '<div class="sci-drawer-head">' +
+        '<div><div class="sci-drawer-title">' + esc(run.company_name) + '</div>' +
+        '<div class="sci-drawer-meta">' + esc(run.status) + ' · started ' + esc(run.created_at) + '</div></div>' +
+        '<button class="sci-drawer-close" onclick="closeReport()">Close ✕</button></div>';
+
+      if(run.status === 'running'){
+        html += '<div class="sci-empty">This run is still in progress. Refresh once it finishes, or leave this open -- it will keep polling.</div>';
+      }
+
+      (run.platforms || []).forEach(function(p){
+        if(NO_ACTIVITY_STATUSES[p.status]){
+          var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
+          html += '<div class="sci-banner' + cls + '"><b style="text-transform:capitalize">' + esc(p.platform) + ':</b> ' +
+            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ' -- ' + esc(p.status_detail) : '') + '</div>';
+        }
+      });
+
+      if(!synthesis){
+        html += '<div class="sci-empty">Synthesis has not run yet for this analysis.</div>';
+      } else if(synthesis.error){
+        html += '<div class="sci-empty">Synthesis is unavailable for this run (' + esc(synthesis.error) + '). Per-platform posts and creative analysis are still collected above once this run has platform data.</div>';
+      } else {
+        Object.keys(synthesis.platforms || {}).forEach(function(platform){
+          var entry = synthesis.platforms[platform];
+          var pr = platformsByName[platform] || {};
+          html += '<div class="sci-platform-section"><h3>' + esc(platform) +
+            (pr.post_count ? '<span class="sci-format-mix" style="margin:0">' + pr.post_count + ' posts analyzed</span>' : '') + '</h3>' +
+            '<p>' + esc(entry.summary) + '</p>' +
+            renderClaims(entry.claims, postsById) + '</div>';
+        });
+        if(synthesis.cross_platform && (synthesis.cross_platform.summary || (synthesis.cross_platform.claims || []).length)){
+          html += '<div class="sci-cross-section"><h3>Cross-platform</h3><p>' + esc(synthesis.cross_platform.summary) + '</p>' +
+            renderClaims(synthesis.cross_platform.claims, postsById) + '</div>';
+        }
+      }
+
+      document.getElementById('drawerPanel').innerHTML = html;
+      document.getElementById('drawerOverlay').classList.add('open');
+    }
+
+    function closeReport(){
+      document.getElementById('drawerOverlay').classList.remove('open');
+    }
+
+    function viewRun(runId){
+      fetch(BASE + '/runs/' + runId)
+        .then(function(r){ return r.json(); })
+        .then(renderReport)
+        .catch(function(){ alert('Could not load this run.'); });
+    }
+
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape') closeReport();
+    });
   </script>
+  <script>
+  (function(){
+    if(window.__kpal)return;window.__kpal=1;
+    var BASE_KP=[
+      {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+      {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+      {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+      {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+      {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+      {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
+      {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
+      {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
+      {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+      {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
+      {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
+      {t:'Gentle Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/gentle-dental-slot-checker',i:'◷'},
+      {t:'Social Creative Intelligence Analyst',d:'Cross-platform creative analysis',u:'/p2/b2b-agents/social-creative-intelligence',i:'▣'},
+      {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
+    ];
+    var ITEMS=(window.__KP_ITEMS||[]).concat(BASE_KP);
+    var css=document.createElement('style');
+    css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+      +'#kpal.on{display:block;animation:kpalF .14s ease}'
+      +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+      +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(11,14,28,.96);border:1px solid rgba(251,146,60,.3);border-radius:var(--radius-lg);box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(251,146,60,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+      +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+      +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+      +'.kpal-iw .ic{color:#fb923c;font-size:15px}'
+      +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+      +'#kpal-in::placeholder{color:#4b5572}'
+      +'.kpal-iw kbd{font-family:inherit;font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xs);padding:3px 7px}'
+      +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+      +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:var(--radius-md);cursor:pointer;border:1px solid transparent}'
+      +'.kpal-it .ki{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fdba74;flex-shrink:0}'
+      +'.kpal-it .kt{font-size:13px;font-weight:600;color:#dbe2f1}'
+      +'.kpal-it .kd{font-size:11.5px;color:#55617a;margin-top:1px}'
+      +'.kpal-it.sel{background:linear-gradient(95deg,rgba(251,146,60,.22),rgba(244,114,182,.12));border-color:rgba(251,146,60,.35)}'
+      +'.kpal-it.sel .kt{color:#fff}'
+      +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:13px}'
+      +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4460;display:flex;gap:14px}';
+    document.head.appendChild(css);
+    var ov=document.createElement('div');ov.id='kpal';
+    ov.innerHTML='<div class="kpal-box">'
+      +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+      +'<div id="kpal-list"></div>'
+      +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+    document.body.appendChild(ov);
+    var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+    var cur=[],sel=0;
+    function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function render(){
+      if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+      list.innerHTML=cur.map(function(x,i){
+        return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc2(x.t)+'</div><div class="kd">'+esc2(x.d||'')+'</div></span></div>';
+      }).join('');
+      var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+    }
+    function filter(q){
+      q=(q||'').toLowerCase().trim();
+      cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+      sel=0;render();
+    }
+    function go(x){
+      if(!x)return;
+      closeKpal();
+      if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
+      if(x.u.charAt(0)==='#'){ if(typeof switchTab==='function') switchTab(x.u.slice(1)); return; }
+      if(location.pathname===x.u)return;
+      window.location.href=x.u;
+    }
+    function openKpal(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+    function closeKpal(){ov.classList.remove('on');}
+    inp.addEventListener('input',function(){filter(inp.value);});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+      else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+      else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+    });
+    list.addEventListener('click',function(e){
+      var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+    });
+    ov.addEventListener('mousedown',function(e){if(e.target===ov)closeKpal();});
+    document.addEventListener('keydown',function(e){
+      if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?closeKpal():openKpal();}
+      else if(e.key==='Escape'&&ov.classList.contains('on')){closeKpal();}
+    });
+  })();
+  </script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Social Creative Intelligence Analyst',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 </body>
 </html>

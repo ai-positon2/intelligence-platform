@@ -194,7 +194,7 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
     platform row analyzed_at when done, regardless of individual post
     failures -- per-post failure is recorded on the post row itself
     (creative_analysis_status), not surfaced as a platform-level failure."""
-    from tracker import sci_store, sci_vision, sci_video
+    from tracker import sci_store, sci_vision, sci_video, sci_audio
 
     posts = sci_store.get_posts(run_id, platform)
     for post in posts:
@@ -214,6 +214,10 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
                     continue
                 frame_analyses = [sci_vision.analyze_image_bytes(f, context=context) for f in frames]
                 analysis = sci_vision.summarize_frames(frame_analyses, context=context)
+                if "error" not in analysis:
+                    # A failed/absent transcript degrades to None here -- it
+                    # never turns a working frame analysis into a failure.
+                    analysis["dialogue_transcript"] = sci_audio.transcribe_video(media_urls[0])
             else:
                 # image or carousel -- analyze the first image; carousel's
                 # remaining images are in media_urls for a later phase that
@@ -227,6 +231,22 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
             sci_store.update_post_creative_analysis(post["id"], None, status="failed", error=str(e)[:500])
 
     sci_store.upsert_platform_run(run_id, platform, analyzed_at=datetime.now(timezone.utc).isoformat())
+
+
+def run_synthesis(run_id: int) -> None:
+    """Steps 4 + 5 for the whole run, after every platform has finished
+    collecting and analyzing. Own try/except -- a classify or synthesize
+    failure must never fail the run itself; it still completes with
+    whatever platform/post data it collected, just without a synthesis
+    section (the per-platform posts render either way)."""
+    from tracker import sci_classify, sci_synthesize, sci_store
+
+    try:
+        classify_result = sci_classify.classify_patterns(run_id)
+        synthesis = sci_synthesize.synthesize_report(run_id, classify_result)
+        sci_store.update_run_status(run_id, "running", synthesis=synthesis)
+    except Exception as e:
+        logger.warning("sci_pipeline: synthesis failed for run %s: %s", run_id, e)
 
 
 def _sci_run_analysis_job(run_id: int, email: str, company_name: str, company_url: str | None) -> None:
@@ -249,6 +269,7 @@ def _sci_run_analysis_job(run_id: int, email: str, company_name: str, company_ur
             except Exception as e:
                 logger.warning("sci_pipeline: platform %s failed entirely for run %s: %s", platform, run_id, e)
                 sci_store.upsert_platform_run(run_id, platform, status="error", status_detail=str(e)[:500])
+        run_synthesis(run_id)
         sci_store.update_run_status(run_id, "done")
     except Exception as e:
         logger.warning("sci_pipeline: analysis job failed for run %s: %s", run_id, e)

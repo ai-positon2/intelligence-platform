@@ -78,20 +78,20 @@
           <div class="card-title">B2B Agents</div>
           <div class="card-desc">
             Buyer signals, job-change alerts, competitor ad intelligence, anonymous visitor
-            de-anonymisation, LinkedIn engagement, appointment availability, and live
-            contact lookup.
+            de-anonymisation, LinkedIn engagement, appointment availability, cross-platform
+            creative analysis, and live contact lookup.
           </div>
           <div class="card-footer">
             <div class="card-meta">
-              <!-- Counts the cards on /p2/b2b-agents: all 8 are live as of
-                   2026-08-21 (Gentle Dental Slot Checker shipped). test_hub_card_
-                   counts.py fails if these drift from the dashboard page again.
-                   Was 7/7 before the Slot Checker, 6/6 before LinkedIn Strategy
-                   Researcher, and 7/6 until LinkedIn Social Researcher was hidden
-                   on 2026-08-14, which is also why the description no longer says
-                   "and strategy research". -->
-              <div class="card-stat"><span>8</span> dashboards</div>
-              <div class="card-stat"><span>8</span> live</div>
+              <!-- Counts the cards on /p2/b2b-agents: all 9 are live as of
+                   2026-08-26 (Social Creative Intelligence Analyst unhidden).
+                   test_hub_card_counts.py fails if these drift from the dashboard
+                   page again. Was 8/8 before this, 7/7 before the Slot Checker,
+                   6/6 before LinkedIn Strategy Researcher, and 7/6 until LinkedIn
+                   Social Researcher was hidden on 2026-08-14, which is also why
+                   the description no longer says "and strategy research". -->
+              <div class="card-stat"><span>9</span> dashboards</div>
+              <div class="card-stat"><span>9</span> live</div>
             </div>
             <div class="card-cta">Open <span class="card-arrow">→</span></div>
           </div>
@@ -136,10 +136,11 @@
         <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
         {% endif %}
         <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
-        {# Live dashboards across both workspaces: 8 on /p2/b2b-agents (Gentle
-           Dental Slot Checker shipped 2026-08-21) + 16 SEO tools. Was 23 before
-           the Slot Checker, and 22 before LinkedIn Strategy Researcher. #}
-        <div><b data-lxn="24">0</b><span>dashboards</span></div>
+        {# Live dashboards across both workspaces: 9 on /p2/b2b-agents (Social
+           Creative Intelligence Analyst unhidden 2026-08-26) + 16 SEO tools.
+           Was 24 before this, 23 before the Slot Checker, and 22 before
+           LinkedIn Strategy Researcher. #}
+        <div><b data-lxn="25">0</b><span>dashboards</span></div>
         <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
       </div>
     </section>
@@ -199,6 +200,7 @@
     {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
     {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
     {t:'Gentle Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/gentle-dental-slot-checker',i:'◷'},
+    {t:'Social Creative Intelligence Analyst',d:'Cross-platform creative analysis',u:'/p2/b2b-agents/social-creative-intelligence',i:'▣'},
     {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
   ];
   var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);

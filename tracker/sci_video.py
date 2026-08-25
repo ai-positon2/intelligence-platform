@@ -30,10 +30,12 @@ _FFMPEG_TIMEOUT = 30
 _YTDLP_TIMEOUT = 30
 
 
-def _resolve_playable_url(video_url: str) -> str | None:
+def resolve_playable_url(video_url: str) -> str | None:
     """A direct, ffmpeg-readable media URL for `video_url`. Returns the input
     unchanged for a non-YouTube URL (already a direct CDN link); resolves a
-    YouTube watch URL via yt-dlp; None if resolution fails."""
+    YouTube watch URL via yt-dlp; None if resolution fails. Public -- also
+    used by tracker/sci_audio.py, which needs the same playable URL to pull
+    a video's audio track."""
     if "youtube.com" not in video_url and "youtu.be" not in video_url:
         return video_url
     try:
@@ -90,7 +92,7 @@ def extract_frames(video_url: str, n: int = 6) -> list[bytes]:
     """Up to `n` evenly-spaced JPEG frames from `video_url`, as raw bytes.
     [] (not an error) on any failure -- the caller marks that post's
     creative_analysis_status='failed' rather than blocking the platform."""
-    playable_url = _resolve_playable_url(video_url)
+    playable_url = resolve_playable_url(video_url)
     if not playable_url:
         return []
     duration = _probe_duration(playable_url)

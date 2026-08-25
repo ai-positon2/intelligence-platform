@@ -168,7 +168,9 @@ def test_run_history_can_still_name_the_hidden_agent():
 def test_one_set_drives_every_data_driven_surface():
     """The property worth pinning is that THIS agent's hide is driven by
     HIDDEN_AGENT_SLUGS -- not that the set never grows for an unrelated
-    agent's own reasons (see social-creative-intelligence's staged rollout)."""
+    agent's own reasons (a staged rollout, for instance -- see
+    social-creative-intelligence's HIDDEN_AGENT_SLUGS comment in app.py for
+    a worked example, even though that particular agent is unhidden now)."""
     assert _SLUG in appmod.HIDDEN_AGENT_SLUGS
 
 
