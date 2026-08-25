@@ -1713,6 +1713,15 @@ _LEGACY_AGENT_SLUGS = {
 # visible to admins and enforceable across devices/browsers (unlike the
 # localStorage-based "recently opened" list, which is just a UX nicety).
 AGENT_RUN_CAP = 10
+AGENT_RUN_CAP_INTERNAL = 100  # @position2.com staff get a higher ceiling than
+                              # external users on the same public /app and
+                              # client-portal surfaces (same shared "Agent Runs"
+                              # sheet/cap mechanism, just a per-user multiplier).
+
+def _agent_run_cap(email: str) -> int:
+    """Per-agent run cap for one user, by email domain."""
+    return AGENT_RUN_CAP_INTERNAL if (email or "").lower().endswith("@position2.com") else AGENT_RUN_CAP
+
 _AR_TAB = "Agent Runs"
 _AR_HEADER = ["Timestamp (IST)", "Date", "Email", "Name", "Agent Slug", "Agent Name"]
 
@@ -1845,13 +1854,14 @@ def _fetch_agent_run_stats() -> dict:
     agent_meta = {a["slug"]: a for a in APP_AGENTS}
     users_out = []
     for email, u in by_user.items():
+        cap = _agent_run_cap(email)
         agents_list = []
         for slug, cnt in sorted(u["agents"].items(), key=lambda x: -x[1]):
             meta = agent_meta.get(slug, {})
             agents_list.append({
                 "slug": slug, "name": meta.get("name", slug), "count": cnt,
-                "cap": AGENT_RUN_CAP, "remaining": max(0, AGENT_RUN_CAP - cnt),
-                "at_cap": cnt >= AGENT_RUN_CAP,
+                "cap": cap, "remaining": max(0, cap - cnt),
+                "at_cap": cnt >= cap,
                 "ac": meta.get("ac", "#8b5cf6"), "ac2": meta.get("ac2", "#22d3ee"),
             })
         users_out.append({"email": u["email"], "name": u["name"] or u["email"],
@@ -3032,7 +3042,7 @@ def app_home():
     run_counts = _agent_run_counts(email)
     requested = _agent_access_requested_slugs(email)
     return render_template("app.html", user=user, agents=_visible_app_agents(),
-                           run_counts=run_counts, run_cap=AGENT_RUN_CAP,
+                           run_counts=run_counts, run_cap=_agent_run_cap(email),
                            requested_agents=requested)
 
 @app.route("/app/<slug>")
@@ -3049,7 +3059,7 @@ def app_detail(slug):
     runs_used = _agent_run_counts(email).get(slug, 0)
     already_requested = slug in _agent_access_requested_slugs(email)
     return render_template("app_detail.html", user=user, agent=agent,
-                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP,
+                           runs_used=runs_used, runs_cap=_agent_run_cap(email),
                            already_requested=already_requested)
 
 @app.route("/app/<slug>/request-access", methods=["POST"])
@@ -3093,16 +3103,17 @@ def app_use(slug):
     user = _get_user()
     email = (user or {}).get("email", "")
     uncapped = bool(agent.get("uncapped"))
+    cap = _agent_run_cap(email)
     runs_used = 0 if uncapped else _agent_run_counts(email).get(slug, 0)
-    if not uncapped and runs_used >= AGENT_RUN_CAP:
+    if not uncapped and runs_used >= cap:
         return render_template("app_embed.html", user=user, agent=agent, embed_url=None,
-                               runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=True,
+                               runs_used=runs_used, runs_cap=cap, limit_reached=True,
                                serp_origin=_SERP_BASE)
     embed_url = _app_embed_url(agent)
     if not embed_url:
         return redirect("/app/" + slug)
     return render_template("app_embed.html", user=user, agent=agent, embed_url=embed_url,
-                           runs_used=runs_used, runs_cap=AGENT_RUN_CAP, limit_reached=False,
+                           runs_used=runs_used, runs_cap=cap, limit_reached=False,
                            serp_origin=_SERP_BASE)
 
 @app.route("/app/<slug>/use/log-run", methods=["POST"])
@@ -3121,13 +3132,14 @@ def app_use_log_run(slug):
         return jsonify({"logged": False, "error": "agent is uncapped, runs aren't tracked"}), 400
     user = _get_user()
     email = (user or {}).get("email", "")
+    cap = _agent_run_cap(email)
     runs_used = _agent_run_counts(email).get(slug, 0)
-    if runs_used >= AGENT_RUN_CAP:
-        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP, "at_cap": True})
+    if runs_used >= cap:
+        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": cap, "at_cap": True})
     _log_agent_run(user, agent)
     runs_used += 1
-    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP,
-                    "at_cap": runs_used >= AGENT_RUN_CAP})
+    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": cap,
+                    "at_cap": runs_used >= cap})
 
 @app.route("/app/<slug>/use/finish-run", methods=["POST"])
 @login_required
@@ -3391,10 +3403,11 @@ def _client_home(client_slug):
         return gate
     agents = _client_agents(client)
     user = _get_user()
-    run_counts = _agent_run_counts((user or {}).get("email", ""))
+    email = (user or {}).get("email", "")
+    run_counts = _agent_run_counts(email)
     return render_template("client_portal.html", client=client,
                            agents=agents, nav_agents=agents, user=user,
-                           run_counts=run_counts, run_cap=AGENT_RUN_CAP)
+                           run_counts=run_counts, run_cap=_agent_run_cap(email))
 
 def _client_agent_detail(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)
@@ -3411,10 +3424,11 @@ def _client_agent_detail(client_slug, agent_slug):
     agents = _client_agents(client)
     related = [v for v in agents if v["slug"] != agent_slug][:3]
     user = _get_user()
-    runs_used = _agent_run_counts((user or {}).get("email", "")).get(agent_slug, 0)
+    email = (user or {}).get("email", "")
+    runs_used = _agent_run_counts(email).get(agent_slug, 0)
     return render_template("client_agent.html", client=client, agent=agent,
                            related=related, nav_agents=agents, user=user,
-                           runs_used=runs_used, run_cap=AGENT_RUN_CAP)
+                           runs_used=runs_used, run_cap=_agent_run_cap(email))
 
 def _client_agent_use(client_slug, agent_slug):
     client = CLIENTS.get(client_slug)
@@ -3429,6 +3443,8 @@ def _client_agent_use(client_slug, agent_slug):
     if not agent:
         return redirect("/" + client_slug)
     user = _get_user()
+    email = (user or {}).get("email", "")
+    cap = _agent_run_cap(email)
     # Dashboard-backed agent: serve the co-branded dashboard in the portal shell.
     # These are not run-metered (a dashboard has no "runs"), so no cap logic applies.
     if agent.get("is_dashboard"):
@@ -3436,36 +3452,35 @@ def _client_agent_use(client_slug, agent_slug):
                                embed_url="", serp_origin=_SERP_BASE, user=user,
                                is_dashboard=True,
                                dashboard_url="/%s/agents/%s/dashboard" % (client_slug, agent_slug),
-                               runs_used=0, run_cap=AGENT_RUN_CAP, limit_reached=False)
+                               runs_used=0, run_cap=cap, limit_reached=False)
     # External-tool agent: iframes the hosted tool (its host masked behind this portal
-    # path). Run-metered like a SERP tool and capped at AGENT_RUN_CAP per user. The tool
-    # now emits the same postMessage run contract as a SERP tool (source 'p2-agent'
-    # instead of 'p2-seo-tool', no per-tool slug since one external tool = one embed),
-    # so a run counts only when client_embed.html's listener sees a real
-    # 'agent-run-started' message, not on page load — see log-run/finish-run below.
+    # path). Run-metered like a SERP tool and capped at _agent_run_cap(email) per user
+    # (higher for @position2.com staff than external users). The tool now emits the
+    # same postMessage run contract as a SERP tool (source 'p2-agent' instead of
+    # 'p2-seo-tool', no per-tool slug since one external tool = one embed), so a run
+    # counts only when client_embed.html's listener sees a real 'agent-run-started'
+    # message, not on page load — see log-run/finish-run below.
     ext = _client_external_tool(client, agent_slug)
     if ext:
-        email = (user or {}).get("email", "")
         runs_used = _agent_run_counts(email).get(agent_slug, 0)
-        limit_reached = runs_used >= AGENT_RUN_CAP
+        limit_reached = runs_used >= cap
         ext_origin = "{0.scheme}://{0.netloc}".format(urlsplit(ext))
         return render_template("client_embed.html", client=client, agent=agent,
                                embed_url=("" if limit_reached else ext),
                                serp_origin=_SERP_BASE, ext_origin=ext_origin,
                                user=user, is_dashboard=False,
                                is_external=True,
-                               runs_used=runs_used, run_cap=AGENT_RUN_CAP,
+                               runs_used=runs_used, run_cap=cap,
                                limit_reached=limit_reached)
-    email = (user or {}).get("email", "")
     # Same per-agent, per-account run cap as /app (Agent Runs sheet is shared, so a
     # user's runs count identically no matter which surface they ran the agent on).
     runs_used = _agent_run_counts(email).get(agent_slug, 0)
-    limit_reached = bool(agent.get("connected")) and runs_used >= AGENT_RUN_CAP
+    limit_reached = bool(agent.get("connected")) and runs_used >= cap
     embed_url = "" if limit_reached else (_app_embed_url(agent) if agent.get("connected") else "")
     return render_template("client_embed.html", client=client, agent=agent,
                            embed_url=embed_url, serp_origin=_SERP_BASE, user=user,
                            is_dashboard=False,
-                           runs_used=runs_used, run_cap=AGENT_RUN_CAP, limit_reached=limit_reached)
+                           runs_used=runs_used, run_cap=cap, limit_reached=limit_reached)
 
 def _client_agent_dashboard(client_slug, agent_slug):
     """Serve this client's co-branded dashboard HTML for a dashboard-backed agent.
@@ -3545,13 +3560,14 @@ def _client_agent_log_run(client_slug, agent_slug):
         return jsonify({"logged": False, "error": "agent not connected"}), 400
     user = _get_user()
     email = (user or {}).get("email", "")
+    cap = _agent_run_cap(email)
     runs_used = _agent_run_counts(email).get(agent_slug, 0)
-    if runs_used >= AGENT_RUN_CAP:
-        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP, "at_cap": True})
+    if runs_used >= cap:
+        return jsonify({"logged": False, "runs_used": runs_used, "runs_cap": cap, "at_cap": True})
     _log_agent_run(user, agent)
     runs_used += 1
-    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": AGENT_RUN_CAP,
-                    "at_cap": runs_used >= AGENT_RUN_CAP})
+    return jsonify({"logged": True, "runs_used": runs_used, "runs_cap": cap,
+                    "at_cap": runs_used >= cap})
 
 def _client_agent_finish_run(client_slug, agent_slug):
     """Saves one finished run's full output to the shared Postgres history, so it

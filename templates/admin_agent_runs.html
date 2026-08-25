@@ -125,7 +125,7 @@ tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
 <div class="wrap">
   <div class="hero">
     <h1>Public Agent <em>usage</em></h1>
-    <p>Every run of a public <b>/app</b> agent, per user, against the <b>10-run cap</b> we enforce per agent per account. A "run" is one open of the live tool (we can't see what happens inside the embedded tool itself, since it's a separate app).</p>
+    <p>Every run of a public <b>/app</b> agent, per user, against the per-agent, per-account run cap we enforce (<b>10</b> for external users, <b>100</b> for @position2.com staff). A "run" is one open of the live tool (we can't see what happens inside the embedded tool itself, since it's a separate app).</p>
   </div>
 
   <div id="emptyNote" class="note" style="display:none"></div>
@@ -196,16 +196,16 @@ var KPI_INFO={
   },
   users_at_cap:{
     title:'Users at cap',
-    desc:'Users who have hit the '+ '10' +'-run cap on at least one agent. They can still use their other agents — the cap is per agent, not account-wide.',
+    desc:'Users who have hit their run cap (10 external, 100 for @position2.com) on at least one agent. They can still use their other agents — the cap is per agent, not account-wide.',
     render:function(d){
       return '<div class="kstats"><div class="kstat"><b>'+(d.users_at_cap||0)+'</b><span>At cap on &ge;1 agent</span></div></div>';
     }
   },
   cap:{
     title:'Run cap',
-    desc:'The fixed number of runs each user gets per agent. Configured in app.py (AGENT_RUN_CAP) — not user-editable from this dashboard.',
+    desc:'The number of runs each user gets per agent: 10 for external users, 100 for @position2.com staff. Configured in app.py (AGENT_RUN_CAP / AGENT_RUN_CAP_INTERNAL) — not user-editable from this dashboard.',
     render:function(d){
-      return '<div class="kstats"><div class="kstat"><b>'+(d.cap||10)+'</b><span>Runs per agent</span></div></div>';
+      return '<div class="kstats"><div class="kstat"><b>'+(d.cap||10)+'</b><span>Runs per agent (external)</span></div></div>';
     }
   }
 };
