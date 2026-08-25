@@ -1605,6 +1605,24 @@ APP_AGENTS = [
         "tags": ["LinkedIn", "Competitive", "AI"],
     },
     {
+        # HIDDEN via HIDDEN_AGENT_SLUGS until every platform + the synthesis
+        # report ship -- see that set's comment and the section header above
+        # this agent's routes in app.py for the full rollout plan. Remove
+        # this comment's "not yet listed" framing (and the b2b_agents.html
+        # card + command-palette wiring) when it's unhidden.
+        "slug": "social-creative-intelligence", "name": "Social Creative Intelligence Analyst",
+        "tagline": "Cross-Platform Creative Analysis",
+        "ac": "#fb923c", "ac2": "#f472b6", "icon": _asvg("<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M8 5l1.5-2h5L16 5\"/>"),
+        "pill1": "Cross-Platform Creative Analysis", "pill2": "6 platforms · vision-analyzed",
+        "lead": ("Given a company name or URL, find its organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually look at every image and video to report what the creative shows and why it works."),
+        "trips": [
+            {"t": "What it does", "d": "Goes past post counts and captions to describe the actual creative: subject, style, narrative, tone, and ties it back to what drives engagement."},
+            {"t": "How it works", "d": "Resolves the company's handle on each platform, pulls recent organic posts, runs every image and video through Claude vision, then synthesizes per-platform and cross-platform patterns."},
+            {"t": "Best for", "d": "Marketing and creative teams studying a competitor's (or their own) content strategy."},
+        ],
+        "tags": ["Social", "Vision", "AI"],
+    },
+    {
         "slug": "company-people-intelligence", "name": "Contact Finder",
         "tagline": "Apollo-Powered Lookup",
         "ac": "#7c83f5", "ac2": "#22d3ee", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/>"),
@@ -1688,7 +1706,13 @@ APP_AGENTS_BY_SLUG = {a["slug"]: a for a in APP_AGENTS}
 #   linkedin-social-researcher: HIDDEN 2026-08-14 at the owner's request,
 #   expected back in a few days. (Renamed from linkedin-strategy-researcher
 #   on 2026-08-20 when that slug moved to a new, unrelated agent.)
-HIDDEN_AGENT_SLUGS = {"linkedin-social-researcher"}
+#   social-creative-intelligence: HIDDEN since it shipped (2026-08-25) --
+#   this is a staged rollout, not a withdrawal. Instagram + YouTube collection
+#   and Claude vision analysis are live; the remaining 4 platforms and the
+#   cross-platform synthesis report are still being built. Reachable the
+#   whole time at its direct URL by any @position2.com account. Unhide once
+#   Phase 3 (synthesis + report UI, all 6 platforms) ships.
+HIDDEN_AGENT_SLUGS = {"linkedin-social-researcher", "social-creative-intelligence"}
 
 def _visible_app_agents():
     """APP_AGENTS minus anything currently withdrawn from the listings. Every
@@ -8147,6 +8171,88 @@ def linkedin_playbook_studio_legacy_redirect(rest=""):
     if request.query_string:
         target += "?" + request.query_string.decode("utf-8", "ignore")
     return redirect(target, code=308)
+
+
+# ── Social Creative Intelligence Analyst ──────────────────────────────────────
+# Internal, staff-only agent: given a company name/URL, identify its organic
+# presence across Instagram/LinkedIn/X/TikTok/YouTube/Facebook, scrape recent
+# posts, and run every image/video through Claude vision (+ later audio
+# transcription) to describe what the creative actually shows -- not just
+# captions or engagement counts. Same async-job shape as LinkedIn Strategy
+# Researcher: a request only ever does a cheap DB read/write, the actual
+# scrape-and-analyze work runs in a daemon thread (tracker/sci_pipeline.py),
+# and the page polls /runs/<id>/status until it's done.
+#
+# Rollout: listed in APP_AGENTS but ALSO in HIDDEN_AGENT_SLUGS from day one --
+# reachable at its direct URL by any @position2.com account the whole time,
+# but not surfaced by b2b_agents.html or the command palette until every
+# platform + the synthesis report ship. See HIDDEN_AGENT_SLUGS's own comment
+# for the general pattern this reuses.
+def _sci_run_status_payload(run_id: int, email: str):
+    from tracker import sci_store
+    run = sci_store.get_run(run_id, email)
+    if not run:
+        return None
+    return {
+        "id": run["id"], "status": run["status"], "error": run.get("error"),
+        "platforms": sci_store.get_platform_runs(run_id),
+    }
+
+
+@app.route("/p2/b2b-agents/social-creative-intelligence")
+@position2_required
+def social_creative_intelligence():
+    from tracker import sci_store
+    user = _get_user() or {}
+    email = user.get("email", "").lower()
+    return render_template("social_creative_intelligence.html", user=user,
+                           runs=sci_store.list_runs(email))
+
+
+@app.route("/p2/b2b-agents/social-creative-intelligence/analyze", methods=["POST"])
+@position2_required
+def social_creative_intelligence_analyze():
+    from tracker import sci_pipeline, sci_store
+    payload = request.get_json(silent=True) or {}
+    company_name = str(payload.get("company_name") or "").strip()
+    company_url = str(payload.get("company_url") or "").strip() or None
+    if not company_name:
+        return jsonify({"error": "A company name is required."}), 400
+
+    email = (_get_user() or {}).get("email", "").lower()
+    run_id = sci_store.save_run(email, company_name, company_url)
+    if run_id is None:
+        return jsonify({"error": "Could not start the analysis."}), 500
+
+    threading.Thread(
+        target=sci_pipeline._sci_run_analysis_job,
+        args=(run_id, email, company_name, company_url),
+        daemon=True,
+    ).start()
+    return jsonify({"run_id": run_id, "status": "running"})
+
+
+@app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>/status")
+@position2_required
+def social_creative_intelligence_run_status(run_id):
+    email = (_get_user() or {}).get("email", "").lower()
+    payload = _sci_run_status_payload(run_id, email)
+    if payload is None:
+        abort(404)
+    return jsonify(payload)
+
+
+@app.route("/p2/b2b-agents/social-creative-intelligence/runs/<int:run_id>")
+@position2_required
+def social_creative_intelligence_run(run_id):
+    from tracker import sci_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = sci_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    run["platforms"] = sci_store.get_platform_runs(run_id)
+    run["posts"] = sci_store.get_posts(run_id)
+    return jsonify(run)
 
 
 # ── Contact Finder ────────────────────────────────────────────────────────────

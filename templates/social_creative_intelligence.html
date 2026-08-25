@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Social Creative Intelligence Analyst, Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <style>
+    .sci-form{display:flex;gap:var(--space-3,12px);flex-wrap:wrap;align-items:flex-end;margin-bottom:var(--space-5,24px)}
+    .sci-form .field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:220px}
+    .sci-form label{font-size:12px;color:var(--text-secondary,#9aa4b2);text-transform:uppercase;letter-spacing:.04em}
+    .sci-form input{background:var(--surface-2,#151b2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:10px 12px;color:inherit;font:inherit}
+    .sci-platform-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+    .sci-chip{border:1px solid var(--border,rgba(255,255,255,.12));border-radius:var(--radius-md,10px);padding:10px 12px;font-size:13px}
+    .sci-chip .p-name{text-transform:capitalize;font-weight:600;display:block;margin-bottom:4px}
+    .sci-chip .p-status{font-size:12px;color:var(--text-secondary,#9aa4b2)}
+    .sci-chip[data-status="ok"]{border-color:rgba(74,222,128,.4)}
+    .sci-chip[data-status="low_activity"]{border-color:rgba(251,191,36,.4)}
+    .sci-chip[data-status="no_presence"],.sci-chip[data-status="handle_not_found"],.sci-chip[data-status="scrape_failed"],.sci-chip[data-status="error"]{border-color:rgba(248,113,113,.4)}
+    .sci-run-row{border:1px solid var(--border,rgba(255,255,255,.1));border-radius:var(--radius-md,10px);padding:12px 14px;margin-bottom:10px;cursor:pointer}
+    .sci-run-row:hover{border-color:rgba(255,255,255,.25)}
+    .sci-run-row .r-name{font-weight:600}
+    .sci-run-row .r-meta{font-size:12px;color:var(--text-secondary,#9aa4b2)}
+    .sci-empty{color:var(--text-secondary,#9aa4b2);font-size:14px;padding:16px 0}
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Social Creative Intelligence Analyst</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div>
+        <div class="eyebrow">B2B Agents · Beta: Instagram + YouTube live, more platforms in progress</div>
+        <h1>Social Creative Intelligence Analyst</h1>
+        <p>Give it a company name or URL. It finds the company's organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually looks at every image and video to describe what the creative shows.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <form class="sci-form" id="analyzeForm" onsubmit="return startAnalysis(event)">
+        <div class="field">
+          <label for="companyName">Company name</label>
+          <input type="text" id="companyName" placeholder="e.g. Acme Inc." required />
+        </div>
+        <div class="field">
+          <label for="companyUrl">Website (optional)</label>
+          <input type="text" id="companyUrl" placeholder="acme.com" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="analyzeBtn">Analyze</button>
+      </form>
+
+      <div id="runningWrap" style="display:none">
+        <div class="sci-empty">Identifying platforms and collecting posts. This runs in the background and can take a few minutes. You can leave this page; your run will be here in History when it's done.</div>
+        <div class="sci-platform-grid" id="platformGrid"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:var(--space-5,24px)">
+      <h2 style="margin-top:0">History</h2>
+      <div id="historyList">
+        {% if runs %}
+          {% for r in runs %}
+          <div class="sci-run-row" onclick="viewRun({{ r.id }})">
+            <div class="r-name">{{ r.company_name }}</div>
+            <div class="r-meta">{{ r.status }} · {{ r.created_at }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="sci-empty">No analyses yet, run one above.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var POLL_TIMER = null;
+    var BASE = '/p2/b2b-agents/social-creative-intelligence';
+
+    function startAnalysis(evt){
+      evt.preventDefault();
+      var name = document.getElementById('companyName').value.trim();
+      var url = document.getElementById('companyUrl').value.trim();
+      if(!name) return false;
+      document.getElementById('analyzeBtn').disabled = true;
+      fetch(BASE + '/analyze', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({company_name: name, company_url: url}),
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if(data.error){
+          alert(data.error);
+          document.getElementById('analyzeBtn').disabled = false;
+          return;
+        }
+        document.getElementById('runningWrap').style.display = 'block';
+        pollRun(data.run_id);
+      }).catch(function(){
+        document.getElementById('analyzeBtn').disabled = false;
+      });
+      return false;
+    }
+
+    function renderPlatforms(platforms){
+      var grid = document.getElementById('platformGrid');
+      grid.innerHTML = (platforms || []).map(function(p){
+        return '<div class="sci-chip" data-status="' + p.status + '">' +
+          '<span class="p-name">' + p.platform + '</span>' +
+          '<span class="p-status">' + (p.status || '').replace(/_/g, ' ') +
+          (p.post_count ? ' · ' + p.post_count + ' posts' : '') + '</span></div>';
+      }).join('');
+    }
+
+    function pollRun(runId){
+      if(POLL_TIMER) clearTimeout(POLL_TIMER);
+      function check(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){ return r.json(); }).then(function(data){
+            renderPlatforms(data.platforms);
+            if(data.status === 'running'){ POLL_TIMER = setTimeout(check, 4000); return; }
+            document.getElementById('analyzeBtn').disabled = false;
+            location.reload();
+          }).catch(function(){ POLL_TIMER = setTimeout(check, 6000); });
+      }
+      check();
+    }
+
+    function viewRun(runId){
+      // Full report drawer ships in a later phase; for now, the raw run
+      // JSON is reachable directly for verification while this is unlisted.
+      window.location.href = BASE + '/runs/' + runId;
+    }
+  </script>
+</body>
+</html>
