@@ -89,6 +89,8 @@
       </div>
     </div>
 
+    <div id="dataSourcesPanel"></div>
+
     <div class="sci-card">
       <div class="sci-card-head">
         <h2>History</h2>
@@ -241,6 +243,74 @@
         });
     }
 
+    // Admin-only "Data sources" panel: which platforms have a Unipile
+    // account connected right now, and a one-click hosted-auth link to
+    // connect the rest. A live read (unipile-check calls
+    // tracker/unipile_client.list_accounts() fresh, no local table) so this
+    // never drifts the way a cached "connected" flag could -- see
+    // tracker/unipile_client.is_available's docstring. Only LinkedIn and
+    // Instagram show here: Facebook/TikTok/X collect through Apify only,
+    // Unipile doesn't cover them for this feature.
+    var UNIPILE_PLATFORMS = ['linkedin', 'instagram'];
+
+    function renderDataSourcesPanel(){
+      if(!IS_ADMIN) return;
+      var panel = document.getElementById('dataSourcesPanel');
+      if(!panel) return;
+      panel.innerHTML = '<div class="sci-card sci-datasrc">' +
+        '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
+        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" onclick="loadDataSources()">Refresh</button></div>' +
+        '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
+      '</div>';
+      loadDataSources();
+    }
+
+    function dsRow(platform, connected, count){
+      var meta = platformMeta(platform);
+      var statusHtml = connected
+        ? '<span class="sci-datasrc-status ok">' + count + ' account' + (count === 1 ? '' : 's') + ' connected</span>'
+        : '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
+      return '<div class="sci-datasrc-row"><span class="sci-datasrc-ic" style="color:' + meta.color + '">' + meta.icon + '</span>' +
+        '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
+    }
+
+    function loadDataSources(){
+      var body = document.getElementById('dsBody'), btn = document.getElementById('dsRefreshBtn');
+      if(!body) return;
+      if(btn) btn.disabled = true;
+      fetch('/p2/admin/external-usage/unipile-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(btn) btn.disabled = false;
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">UNIPILE_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Unipile is unavailable right now.') + '</div>';
+            return;
+          }
+          var byPlatform = d.by_platform || {};
+          body.innerHTML = UNIPILE_PLATFORMS.map(function(p){
+            return dsRow(p, !!byPlatform[p], byPlatform[p] || 0);
+          }).join('') + '<div class="sci-datasrc-note">Facebook, TikTok and X collect through Apify once its key is configured &mdash; Unipile only covers LinkedIn and Instagram here.</div>';
+        })
+        .catch(function(){
+          if(btn) btn.disabled = false;
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Unipile check.</div>';
+        });
+    }
+
+    function connectUnipile(providers){
+      fetch('/p2/admin/external-usage/unipile-connect', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({providers: providers}),
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d.error || !d.url){ alert('Could not start the connect flow: ' + (d.error || 'no URL returned')); return; }
+        window.open(d.url, '_blank', 'noopener');
+      }).catch(function(){ alert('Could not start the connect flow.'); });
+    }
+
     function renderCompanySuggestions(companies, error, q){
       var panel = document.getElementById('sciSuggestPanel');
       window.__sciCompanies = companies || [];
@@ -348,6 +418,7 @@
     var NO_ACTIVITY_STATUSES = {no_presence:1, handle_not_found:1, scrape_failed:1, error:1, low_activity:1};
     var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
+    var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API'};
     var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
 
     // ── Small formatting helpers ────────────────────────────────────────────
@@ -670,7 +741,8 @@
           var topPosts = topEngagingPosts(allPosts, platform, 3);
           html += '<div class="sci-platform-section" id="sci-plat-' + esc(platform) + '" style="--pf-color:' + meta.color + '">' +
             '<div class="sci-plat-head"><span class="sci-plat-ic">' + meta.icon + '</span><h3>' + esc(platform) + '</h3>' +
-            (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') + '</div>' +
+            (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') +
+            (VENDOR_LABEL[pr.source_vendor] ? '<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>' : '') + '</div>' +
             renderFormatMix(mix) +
             renderThemeChips(allPosts, platform) +
             renderSection('Top performing posts', '▣', topPosts.length ? '<div class="sci-postcard-grid">' + topPosts.map(renderPostCard).join('') + '</div>' : '') +
@@ -680,10 +752,16 @@
           '</div>';
         });
         if(synthesis.cross_platform && (toPoints(synthesis.cross_platform.summary).length || toPoints(synthesis.cross_platform.messaging_and_strategy).length || (synthesis.cross_platform.claims || []).length)){
-          html += '<div class="sci-cross-section"><h3>Cross-platform</h3>' +
+          var crossClaims = (synthesis.cross_platform.claims || []).length ?
+            '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div>' : '';
+          html += '<div class="sci-cross-section">' +
+            '<div class="sci-cross-head"><span class="sci-cross-dot"></span><h3>Cross-platform synthesis</h3></div>' +
             renderSection('Content patterns', '◈', renderBulletList(synthesis.cross_platform.summary, 'sci-summary-list')) +
             renderStrategy(synthesis.cross_platform.messaging_and_strategy) +
-            renderSection('Evidence from real posts', '◇', (synthesis.cross_platform.claims || []).length ? '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div>' : '') +
+            (crossClaims ?
+              '<button type="button" class="sci-cross-toggle" onclick="toggleCrossEvidence(this)">Show evidence from real posts ▾</button>' +
+              '<div class="sci-cross-more">' + renderSection('Evidence from real posts', '◇', crossClaims) + '</div>'
+              : '') +
           '</div>';
         }
       }
@@ -692,6 +770,19 @@
 
       document.getElementById('drawerPanel').innerHTML = html;
       document.getElementById('drawerOverlay').classList.add('open');
+      revealStatTiles();
+    }
+
+    function toggleCrossEvidence(btn){
+      var section = btn.closest('.sci-cross-section');
+      var expanded = section.classList.toggle('expanded');
+      btn.textContent = expanded ? 'Hide evidence ▴' : 'Show evidence from real posts ▾';
+    }
+
+    function revealStatTiles(){
+      document.querySelectorAll('#drawerPanel .sci-stat-tile').forEach(function(el, i){
+        setTimeout(function(){ el.classList.add('visible'); }, i * 70);
+      });
     }
 
     function closeReport(){
@@ -711,6 +802,8 @@
       if(panel && panel.style.display !== 'none' && panel.innerHTML){ panel.style.display = 'none'; return; }
       closeReport();
     });
+
+    renderDataSourcesPanel();
   </script>
   <script>
   (function(){

@@ -90,6 +90,12 @@ def _ensure_tables(conn) -> None:
                 UNIQUE (run_id, platform)
             )
         """)
+        # Added after the table shipped, alongside Unipile as a second
+        # collection vendor for LinkedIn/Instagram: which vendor actually
+        # served this platform (unipile / apify / youtube_api) so the report
+        # UI can show it and so a Unipile-vs-Apify fallback is visible in the
+        # data, not just in logs.
+        cur.execute("ALTER TABLE sci_platform_runs ADD COLUMN IF NOT EXISTS source_vendor VARCHAR(20)")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sci_posts (
                 id SERIAL PRIMARY KEY,
@@ -326,17 +332,18 @@ def get_run(run_id: int, email: str) -> dict | None:
 _PLATFORM_RUN_COLUMNS = ["id", "run_id", "platform", "handle", "handle_confidence", "status",
                          "status_detail", "post_count", "last_post_at", "window_start",
                          "window_end", "collected_at", "analyzed_at", "error",
-                         "created_at", "updated_at"]
+                         "created_at", "updated_at", "source_vendor"]
 
 
 def upsert_platform_run(run_id: int, platform: str, **fields: Any) -> int | None:
     """Create-or-update the one row for (run_id, platform). Not ownership-
     scoped -- the background worker already knows its own run_id. Accepts any
     subset of: handle, handle_confidence, status, status_detail, post_count,
-    last_post_at, window_start, window_end, collected_at, analyzed_at, error."""
+    last_post_at, window_start, window_end, collected_at, analyzed_at, error,
+    source_vendor."""
     allowed = {"handle", "handle_confidence", "status", "status_detail", "post_count",
               "last_post_at", "window_start", "window_end", "collected_at",
-              "analyzed_at", "error"}
+              "analyzed_at", "error", "source_vendor"}
     fields = {k: v for k, v in fields.items() if k in allowed}
     conn = _pg_conn()
     if not conn:

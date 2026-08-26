@@ -255,6 +255,7 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-plat-ic { width: 30px; height: 30px; border-radius: var(--radius-sm, 8px); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--pf-color, #8b86a0) 16%, transparent); color: var(--pf-color, #8b86a0); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); }
 .sci-plat-ic svg { width: 16px; height: 16px; }
 .sci-plat-head h3 { text-transform: capitalize; font-size: 15.5px; font-weight: 700; color: #f3ecf5; }
+.sci-plat-vendor { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #877b8f; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 9px; white-space: nowrap; }
 .sci-plat-sub { font-size: 11.5px; color: #877b8f; margin-left: auto; white-space: nowrap; }
 
 .sci-format-mix { display: flex; align-items: center; gap: 10px; margin: 14px 0 16px; }
@@ -328,7 +329,12 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
    mechanical (no AI needed), shown right under the coverage strip. */
 .sci-overview { padding: 18px 30px 4px; }
 .sci-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; margin-bottom: 16px; }
-.sci-stat-tile { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md, 12px); padding: 13px 15px; }
+/* Staggered rise-in on open (revealStatTiles() adds .visible per tile, one
+   after another) rather than appearing all at once with the rest of the
+   drawer -- same technique job_change_alert.html's .stat-card uses. */
+.sci-stat-tile { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md, 12px); padding: 13px 15px; opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .35s ease; }
+.sci-stat-tile.visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .sci-stat-tile { transition: none; opacity: 1; transform: none; } }
 .sci-stat-val { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 21px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .sci-stat-label { font-size: 10.5px; color: #877b8f; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); margin-top: 4px; }
 .sci-pbar-chart { display: flex; flex-direction: column; gap: 8px; }
@@ -340,10 +346,37 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-pbar-fill { height: 100%; border-radius: var(--radius-pill, 80px); transition: width .6s cubic-bezier(.22,1,.36,1); }
 .sci-pbar-val { font-size: 11px; font-variant-numeric: tabular-nums; color: #877b8f; text-align: right; }
 
-.sci-cross-section { padding: 26px 30px 8px; margin-top: 4px; border-top: 2px solid transparent; border-image: linear-gradient(90deg,#fb923c,#f472b6,#a855f7) 1; position: relative; }
-.sci-cross-section h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 16.5px; font-weight: 700; margin-bottom: 10px; background: linear-gradient(100deg,#fdba74,#f472b6 60%,#c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.sci-cross-section { padding: 26px 30px 22px; margin-top: 4px; border-top: 2px solid transparent; border-image: linear-gradient(90deg,#fb923c,#f472b6,#a855f7) 1; position: relative; }
+.sci-cross-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sci-cross-dot { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg,#fb923c,#a855f7); box-shadow: 0 0 10px rgba(168,85,247,.6); animation: sciCrossPulse 2.2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes sciCrossPulse { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+.sci-cross-section h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 16.5px; font-weight: 700; margin: 0; background: linear-gradient(100deg,#fdba74,#f472b6 60%,#c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.sci-cross-toggle { margin-top: 6px; background: none; border: none; color: #c9a8d6; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 6px 10px; border-radius: var(--radius-sm, 8px); transition: color .15s, background .15s; }
+.sci-cross-toggle:hover { color: #f472b6; background: rgba(244,114,182,.09); }
+.sci-cross-more { display: none; margin-top: 10px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.07); }
+.sci-cross-section.expanded .sci-cross-more { display: block; }
 
 .sci-drawer-empty { text-align: center; padding: 44px 20px; color: #6b5f72; font-size: 13.5px; line-height: 1.6; }
+
+/* Admin-only "Data sources" panel: per-platform Unipile connection status
+   plus a one-click connect link. Reuses .sci-card's own look; only the
+   inner row/status/connect pieces are new. */
+.sci-datasrc-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #877b8f; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+.sci-datasrc-refresh { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #877b8f; border-radius: var(--radius-sm, 8px); padding: 5px 12px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.sci-datasrc-refresh:hover { background: rgba(255,255,255,.09); color: #d6c9db; }
+.sci-datasrc-refresh:disabled { opacity: .6; cursor: default; }
+.sci-datasrc-body { padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 10px; }
+.sci-datasrc-loading { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #877b8f; }
+.sci-datasrc-row { display: flex; align-items: center; gap: 10px; }
+.sci-datasrc-ic { width: 24px; height: 24px; flex-shrink: 0; display: inline-flex; }
+.sci-datasrc-ic svg { width: 100%; height: 100%; }
+.sci-datasrc-name { font-size: 13px; font-weight: 600; color: #d6c9db; text-transform: capitalize; }
+.sci-datasrc-status { margin-left: auto; font-size: 11px; font-weight: 600; }
+.sci-datasrc-status.ok { color: #4ade80; }
+.sci-datasrc-connect { margin-left: auto; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm, 8px); padding: 6px 13px; font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sci-datasrc-connect:hover { background: rgba(251,191,36,.24); }
+.sci-datasrc-empty { font-size: 12.5px; color: #877b8f; }
+.sci-datasrc-note { font-size: 11px; color: #6b5f72; line-height: 1.5; margin-top: 4px; }
 
 @media (max-width: 640px) {
   .sci-drawer { width: 96vw; max-height: 94vh; }
@@ -414,6 +447,7 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-platform-section { border-top-color: rgba(18,26,54,.07); }
 [data-theme="light"] .sci-plat-head h3 { color: #1c1420; }
 [data-theme="light"] .sci-plat-sub { color: #8b7f92; }
+[data-theme="light"] .sci-plat-vendor { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-theme-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); color: #443a4a; }
 [data-theme="light"] .sci-section-label { color: #6b5f72; }
 [data-theme="light"] .sci-section-label span { color: #c2410c; }
@@ -438,6 +472,17 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-stat-tile { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-stat-val { color: #1c1420; }
 [data-theme="light"] .sci-stat-label { color: #8b7f92; }
+[data-theme="light"] .sci-cross-toggle { color: #a3306e; }
+[data-theme="light"] .sci-cross-toggle:hover { color: #c2410c; background: rgba(194,65,12,.08); }
+[data-theme="light"] .sci-cross-more { border-top-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-datasrc-tag { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-datasrc-refresh { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); color: #5c5163; }
+[data-theme="light"] .sci-datasrc-refresh:hover { background: rgba(18,26,54,.08); color: #1c1420; }
+[data-theme="light"] .sci-datasrc-name { color: #1c1420; }
+[data-theme="light"] .sci-datasrc-status.ok { color: #16a34a; }
+[data-theme="light"] .sci-datasrc-connect { background: rgba(180,120,10,.1); border-color: rgba(180,120,10,.35); color: #8a5806; }
+[data-theme="light"] .sci-datasrc-empty { color: #8b7f92; }
+[data-theme="light"] .sci-datasrc-note { color: #a89bb0; }
 [data-theme="light"] .sci-pbar-label { color: #362a3d; }
 [data-theme="light"] .sci-pbar-val { color: #8b7f92; }
 [data-theme="light"] .sci-pbar-track { background: rgba(18,26,54,.08); }

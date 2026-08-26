@@ -331,6 +331,16 @@ def test_upsert_platform_run_creates_then_updates_the_same_row(fake_db):
     assert rows[0]["handle"] == "acme"  # earlier field survives a later partial update
 
 
+def test_source_vendor_round_trips_through_upsert_platform_run(fake_db):
+    """Added alongside Unipile as a second collection vendor -- which vendor
+    actually served a platform (unipile / apify / youtube_api) must persist
+    and read back exactly like any other field."""
+    run_id = store.save_run("alice@position2.com", "Acme Inc")
+    store.upsert_platform_run(run_id, "linkedin", status="ok", post_count=8, source_vendor="unipile")
+    rows = store.get_platform_runs(run_id)
+    assert rows[0]["source_vendor"] == "unipile"
+
+
 def test_one_platform_failing_does_not_touch_another_platforms_row(fake_db):
     run_id = store.save_run("alice@position2.com", "Acme Inc")
     store.upsert_platform_run(run_id, "instagram", status="ok", post_count=5)
