@@ -82,6 +82,34 @@ def test_a_successful_search_normalizes_and_reports_no_error(monkeypatch):
     assert result["source"] == "mixed_companies/search"
 
 
+def test_duplicate_rows_across_apollo_organizations_and_accounts_are_collapsed(monkeypatch):
+    # Real observed shape: the same company appears once as a fresh
+    # "organizations" match and again (with a different account-derived id)
+    # once or more as an already-saved "account", all merged into one list
+    # by apollo_client before this module ever sees it.
+    monkeypatch.setattr(apollo_client, "search_companies",
+                        lambda filters, key, **kw: [
+                            {"id": "org-1", "name": "Apple Inc.", "primary_domain": "apple.com"},
+                            {"id": "acct-9", "name": "Apple Inc.", "primary_domain": "apple.com"},
+                            {"id": "acct-14", "name": "Apple Inc.", "website_url": "http://www.apple.com/"},
+                            {"id": "org-2", "name": "Applebee's Restaurants LLC.", "primary_domain": "applebees.com"},
+                        ])
+    result = scs.search_companies_result("apple")
+    names = [c["name"] for c in result["companies"]]
+    assert names == ["Apple Inc.", "Applebee's Restaurants LLC."]
+    assert result["companies"][0]["id"] == "org-1"
+
+
+def test_dedupe_falls_back_to_id_when_no_row_has_a_website():
+    companies = [
+        {"id": "1", "name": "Solo Co", "website": None},
+        {"id": "1", "name": "Solo Co", "website": None},
+        {"id": "2", "name": "Solo Co", "website": None},
+    ]
+    out = scs._dedupe_companies(companies)
+    assert [c["id"] for c in out] == ["1", "2"]
+
+
 def test_a_genuine_zero_result_has_no_error(monkeypatch):
     monkeypatch.setattr(apollo_client, "search_companies", lambda filters, key, **kw: [])
     result = scs.search_companies_result("zzz-no-such-company")
