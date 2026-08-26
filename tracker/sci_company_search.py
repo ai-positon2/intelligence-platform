@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 
 import requests
@@ -131,6 +132,36 @@ def _to_company(org: dict) -> dict | None:
     }
 
 
+def _normalize_domain(url: str | None) -> str:
+    d = (url or "").strip().lower()
+    d = re.sub(r"^https?://", "", d)
+    d = re.sub(r"^www\.", "", d)
+    return d.rstrip("/")
+
+
+def _dedupe_companies(companies: list[dict]) -> list[dict]:
+    """apollo_client.search_companies merges two buckets from a single
+    Apollo response -- net-new "organizations" and this team's already-saved
+    "accounts" -- and the SAME company can legitimately appear in both, or
+    more than once within accounts if it was saved more than once. Apollo's
+    own org id is not reliably consistent across the two buckets, but the
+    website is, so dedupe on the normalized domain first and only fall back
+    to id/name when a row has no domain at all. Keeps the first occurrence,
+    which is the (fresher) "organizations" bucket's record when both exist,
+    since apollo_client lists that bucket before accounts."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for c in companies:
+        key = _normalize_domain(c.get("website")) or (c.get("id") or "") \
+            or (c.get("name") or "").strip().lower()
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        out.append(c)
+    return out
+
+
 def search_companies_result(company_name: str) -> dict:
     """Company search, with the reason attached when it fails. Same contract
     as arena_client.search_companies_result: `error` is None both on success
@@ -170,7 +201,7 @@ def search_companies_result(company_name: str) -> dict:
     except Exception as e:
         return _fail(_err(ERR_UNPARSABLE, "%s: %s" % (type(e).__name__, e)))
 
-    companies = [c for c in (_to_company(o) for o in orgs) if c is not None]
+    companies = _dedupe_companies([c for c in (_to_company(o) for o in orgs) if c is not None])
     elapsed = int((time.monotonic() - started) * 1000)
     return {"companies": companies, "error": None, "elapsed_ms": elapsed,
             "source": "mixed_companies/search"}
