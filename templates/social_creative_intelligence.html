@@ -133,6 +133,7 @@
   <script>
     var POLL_TIMER = null;
     var BASE = '/p2/b2b-agents/social-creative-intelligence';
+    var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
 
     var PLATFORM_META = {
       instagram: {color:'#e1306c', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>'},
@@ -174,10 +175,49 @@
         (c.website ? '<div class="sci-suggest-site">' + esc(c.website) + '</div>' : '') + '</div>';
     }
 
+    // Admin-only diagnostic: the vendor's own body + a free self-test call,
+    // same as linkedin_playbook_studio's arena check -- this is what turned
+    // a previous "No companies found" for this same vendor from a shrug into
+    // a real diagnosis (the Arena workspace's LinkedIn account connection
+    // lapsing), so it ships here from day one rather than after it recurs.
+    function sciAdminDiagControl(){
+      if(!IS_ADMIN) return '';
+      return '<button type="button" class="sci-suggest-check-btn" id="sciArenaCheckBtn" onclick="runSciArenaCheck()">Run provider check</button>' +
+        '<pre class="sci-suggest-error-detail" id="sciArenaCheckOut" style="display:none"></pre>';
+    }
+
+    function runSciArenaCheck(){
+      var b = document.getElementById('sciArenaCheckBtn'), out = document.getElementById('sciArenaCheckOut');
+      if(!b || !out) return;
+      b.disabled = true; b.textContent = 'Checking…';
+      fetch('/p2/admin/external-usage/arena-check', {method: 'POST'})
+        .then(function(r){ return r.json(); }).then(function(d){
+          b.disabled = false; b.textContent = 'Run provider check';
+          out.style.display = 'block';
+          out.textContent =
+            'Key configured: ' + (d.configured ? 'yes (' + d.key_len + ' chars)' : 'NO') + '\n' +
+            'Probe: ' + (d.probe || '?') + ' → ' + (d.companies || 0) + ' companies' +
+            (d.sample && d.sample.length ? ' (' + d.sample.join(', ') + ')' : '') + '\n' +
+            'Attempts: ' + (d.attempts || 0) + ' · ' + (d.elapsed_ms || 0) + 'ms' +
+            (d.http_status ? ' · HTTP ' + d.http_status : '') + '\n' +
+            (d.source ? 'Rows found under: ' + d.source + '\n' : '') +
+            (d.error ? '\n' + d.error : '') + (d.detail ? '\n' + d.detail : '');
+        }).catch(function(e){
+          b.disabled = false; b.textContent = 'Run provider check';
+          out.style.display = 'block'; out.textContent = 'Could not run the check: ' + e;
+        });
+    }
+
     function renderCompanySuggestions(companies, error, q){
       var panel = document.getElementById('sciSuggestPanel');
       window.__sciCompanies = companies || [];
-      var html = error ? '<div class="sci-suggest-error">' + esc(error.message || 'Company search is unavailable right now — you can still fill this in manually.') + '</div>' : '';
+      var html = '';
+      if(error){
+        html += '<div class="sci-suggest-error">' +
+          '<div class="sci-suggest-error-msg">' + esc(error.message || 'Company search is unavailable right now — you can still fill this in manually.') + '</div>' +
+          (error.detail ? '<pre class="sci-suggest-error-detail">' + esc(error.detail) + '</pre>' : '') +
+          sciAdminDiagControl() + '</div>';
+      }
       if(companies && companies.length){
         if(error) html += '<div class="sci-suggest-fallback-note">Companies you have analyzed before are shown below.</div>';
         html += '<div class="sci-suggest-list">' + companies.map(sciSuggestRow).join('') + '</div>';
