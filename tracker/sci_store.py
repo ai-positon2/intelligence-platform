@@ -50,6 +50,7 @@ def _ensure_tables(conn) -> None:
                 email TEXT NOT NULL,
                 company_name TEXT NOT NULL,
                 company_url TEXT,
+                company_logo TEXT,
                 status VARCHAR(20) NOT NULL DEFAULT 'running',
                 error TEXT,
                 identify_result JSONB,
@@ -62,6 +63,12 @@ def _ensure_tables(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_sci_runs_email
             ON sci_runs (email, created_at DESC)
         """)
+        # Added after the table shipped (see linkedin_playbook_store's own
+        # company_logo, always present from creation there): the picker's
+        # candidates carry a real logo URL (tracker/sci_company_search.py,
+        # Apollo-backed) that a run had no column to keep, so History fell
+        # back to a plain monogram for every row.
+        cur.execute("ALTER TABLE sci_runs ADD COLUMN IF NOT EXISTS company_logo TEXT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sci_platform_runs (
                 id SERIAL PRIMARY KEY,
@@ -132,13 +139,17 @@ def _ts(d: dict, *keys: str) -> None:
 
 # ── Runs ───────────────────────────────────────────────────────────────────
 
-_RUN_COLUMNS = ["id", "email", "company_name", "company_url", "status", "error",
+_RUN_COLUMNS = ["id", "email", "company_name", "company_url", "company_logo", "status", "error",
                 "identify_result", "synthesis", "created_at", "updated_at"]
 
 
-def save_run(email: str, company_name: str, company_url: str | None = None) -> int | None:
+def save_run(email: str, company_name: str, company_url: str | None = None,
+            company_logo: str | None = None) -> int | None:
     """Create a new run row with status='running'. Returns the new row's id,
-    or None on any failure."""
+    or None on any failure. `company_logo` is the logo URL from whichever
+    picker candidate (see tracker/sci_company_search.py) the user selected,
+    if any -- carried through so History can show a real logo instead of a
+    monogram for every run, same as linkedin_playbook_store.save_run."""
     conn = _pg_conn()
     if not conn:
         return None
@@ -146,9 +157,9 @@ def save_run(email: str, company_name: str, company_url: str | None = None) -> i
         _ensure_tables(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO sci_runs (email, company_name, company_url) "
-                "VALUES (%s, %s, %s) RETURNING id",
-                (email.lower(), company_name, company_url),
+                "INSERT INTO sci_runs (email, company_name, company_url, company_logo) "
+                "VALUES (%s, %s, %s, %s) RETURNING id",
+                (email.lower(), company_name, company_url, company_logo),
             )
             new_id = cur.fetchone()[0]
         conn.commit()
@@ -253,7 +264,7 @@ def search_known_companies(email: str, query: str, limit: int = 8) -> list[dict]
             # its most recent row, so re-analyzing Nike five times still
             # offers one Nike card.
             cur.execute(
-                "SELECT DISTINCT ON (company_name) company_name, company_url "
+                "SELECT DISTINCT ON (company_name) company_name, company_url, company_logo "
                 "FROM sci_runs WHERE email = %s AND company_name ILIKE %s "
                 "ORDER BY company_name, created_at DESC LIMIT %s",
                 (email.lower(), "%" + q + "%", limit),
@@ -261,10 +272,10 @@ def search_known_companies(email: str, query: str, limit: int = 8) -> list[dict]
             rows = cur.fetchall()
         out = []
         for row in rows:
-            name, url = row[0], row[1]
+            name, url, logo = row[0], row[1], row[2]
             if not name:
                 continue
-            out.append({"id": "", "name": name, "logo": None, "industry": None,
+            out.append({"id": "", "name": name, "logo": logo, "industry": None,
                        "location": None, "description": None, "summary": None,
                        "followers_count": None, "profile_url": None,
                        "website": url, "from_history": True})

@@ -99,10 +99,13 @@
           {% for r in runs %}
           {% set st = 'st-running' if r.status == 'running' else ('st-error' if r.status == 'error' else 'st-done') %}
           <div class="sci-run-row" onclick="viewRun({{ r.id }})">
-            <div class="sci-run-mono">{{ (r.company_name or '?')[0]|upper }}</div>
+            <div class="sci-run-mono{{ '' if r.company_logo else ' sci-run-nologo' }}">
+              {% if r.company_logo %}<img src="{{ r.company_logo }}" alt="" loading="lazy" onerror="this.closest('.sci-run-mono').classList.add('sci-run-nologo');this.remove()">{% endif %}
+              <span class="sci-run-initial">{{ (r.company_name or '?')[0]|upper }}</span>
+            </div>
             <div class="sci-run-info">
               <div class="r-name">{{ r.company_name }}</div>
-              <div class="r-meta">{{ r.created_at }}</div>
+              <div class="r-meta" data-created="{{ r.created_at }}">{{ r.created_at }}</div>
             </div>
             <span class="status-pill {{ st }}"><span class="d"></span>{{ r.status }}</span>
             <span class="sci-run-arrow">→</span>
@@ -166,7 +169,7 @@
     function sciSuggestRow(c, i){
       var initial = esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase());
       var logo = '<div class="sci-suggest-logo' + (c.logo ? '' : ' sci-suggest-nologo') + '">' +
-        (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-suggest-logo\').classList.add(\'sci-suggest-nologo\')">' : '') +
+        (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-suggest-logo\').classList.add(\'sci-suggest-nologo\');this.remove()">' : '') +
         '<span class="sci-suggest-initial">' + initial + '</span></div>';
       var meta = c.from_history ? 'Analyzed before' : [c.industry, c.location].filter(Boolean).join(' · ');
       return '<div class="sci-suggest-row" onclick="pickCompany(' + i + ')">' + logo +
@@ -228,7 +231,10 @@
       panel.style.display = 'block';
     }
 
+    var PICKED_LOGO = null;
+
     function runCompanySearch(){
+      PICKED_LOGO = null; // the name field changed since any earlier pick, so its logo no longer applies
       var q = (document.getElementById('companyName').value || '').trim();
       var panel = document.getElementById('sciSuggestPanel');
       if(q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
@@ -246,6 +252,7 @@
       if(!c) return;
       document.getElementById('companyName').value = c.name;
       document.getElementById('companyUrl').value = c.website || '';
+      PICKED_LOGO = c.logo || null;
       var panel = document.getElementById('sciSuggestPanel');
       panel.style.display = 'none';
       panel.innerHTML = '';
@@ -261,7 +268,7 @@
       fetch(BASE + '/analyze', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({company_name: name, company_url: url}),
+        body: JSON.stringify({company_name: name, company_url: url, company_logo: PICKED_LOGO || ''}),
       }).then(function(r){ return r.json(); }).then(function(data){
         if(data.error){
           alert(data.error);
@@ -327,6 +334,34 @@
       if(isNaN(d.getTime())) return '';
       return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
     }
+    // A run's raw timestamp (e.g. "2026-08-26T09:38:07.479941+00:00") is
+    // useless at a glance and indistinguishable between several runs done
+    // minutes apart on the same day. Same-day rows show just a clock time
+    // (each is already distinct); anything older gets a short date, falling
+    // back to a full year once it's not this year -- same convention Slack/
+    // Gmail use. The full precise timestamp is always still one hover away.
+    function historyTimestamp(iso){
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return {short: '', full: ''};
+      var full = d.toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+      var now = new Date(), time = d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+      var yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      var short;
+      if(d.toDateString() === now.toDateString()) short = time;
+      else if(d.toDateString() === yesterday.toDateString()) short = 'Yesterday, ' + time;
+      else if(d.getFullYear() === now.getFullYear()) short = d.toLocaleDateString(undefined, {month:'short', day:'numeric'}) + ', ' + time;
+      else short = d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+      return {short: short, full: full};
+    }
+    function renderHistoryTimestamps(){
+      var els = document.querySelectorAll('.r-meta[data-created]');
+      for(var i = 0; i < els.length; i++){
+        var t = historyTimestamp(els[i].getAttribute('data-created'));
+        if(t.short){ els[i].textContent = t.short; els[i].title = t.full; }
+      }
+    }
+    renderHistoryTimestamps();
+
     function toPoints(v){
       if(Array.isArray(v)) return v.filter(function(x){ return x; });
       if(typeof v === 'string' && v.trim()) return [v.trim()];
@@ -424,7 +459,7 @@
     function renderPostCard(post){
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
       var media = '<div class="sci-postcard-media' + (thumb ? '' : ' sci-postcard-noimg') + '">' +
-        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\')">' : '') +
+        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\');this.remove()">' : '') +
         '<span class="sci-postcard-ic">' + meta.icon + '</span>' +
         '<span class="sci-postcard-type">' + esc(post.post_type || 'post') + '</span></div>';
       return '<a class="sci-postcard" href="' + esc(post.post_url || '#') + '" target="_blank" rel="noopener" style="--pf-color:' + meta.color + '">' +
@@ -439,7 +474,7 @@
       if(!post) return '';
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
       var thumbHtml = '<span class="sci-chip-thumb' + (thumb ? '' : ' sci-chip-noimg') + '" style="--pf-color:' + meta.color + '">' +
-        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-chip-thumb\').classList.add(\'sci-chip-noimg\')">' : '') +
+        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-chip-thumb\').classList.add(\'sci-chip-noimg\');this.remove()">' : '') +
         '<span class="sci-chip-ic">' + meta.icon + '</span></span>';
       var inner = thumbHtml + '<span class="sci-chip-txt">' + esc(title) + '</span>';
       return post.post_url
