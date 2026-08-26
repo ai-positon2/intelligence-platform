@@ -8019,6 +8019,27 @@ def admin_external_usage_sci_company_search_check():
     return jsonify(_sci_company_search_selftest())
 
 
+def _sci_identify_selftest() -> dict:
+    """Prove SCI's handle-identification step (Claude + web_search) end to
+    end -- see tracker/sci_identify.probe. This is the step that silently
+    failed for every platform on every run when Anthropic's dated
+    web_search tool version got sunset; this check exists so that's visible
+    from the admin panel instead of only surfacing via a real user's run."""
+    from tracker import sci_identify
+    try:
+        return sci_identify.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/sci-identify-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_identify_check():
+    """Run SCI's identify-handles self-test. POST so no crawler or prefetch
+    can trigger it, matching the checks next to it."""
+    return jsonify(_sci_identify_selftest())
+
+
 def _lps_insights_selftest() -> dict:
     """Prove the AI Insights synthesis call end to end (see
     lps_enrichment.probe). Costs one small Claude call against a synthetic

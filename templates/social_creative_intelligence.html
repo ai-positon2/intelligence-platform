@@ -211,6 +211,36 @@
         });
     }
 
+    // Admin-only diagnostic for the IDENTIFY step (Claude + web_search) --
+    // shown on a run where every platform came back handle_not_found, since
+    // that shape (all six failing at once) usually means the vendor call
+    // itself broke rather than this company genuinely having no accounts.
+    function sciIdentifyDiagControl(){
+      if(!IS_ADMIN) return '';
+      return '<button type="button" class="sci-suggest-check-btn" id="sciIdentifyCheckBtn" onclick="runSciIdentifyCheck()">Check identification step</button>' +
+        '<pre class="sci-suggest-error-detail" id="sciIdentifyCheckOut" style="display:none"></pre>';
+    }
+
+    function runSciIdentifyCheck(){
+      var b = document.getElementById('sciIdentifyCheckBtn'), out = document.getElementById('sciIdentifyCheckOut');
+      if(!b || !out) return;
+      b.disabled = true; b.textContent = 'Checking…';
+      fetch('/p2/admin/external-usage/sci-identify-check', {method: 'POST'})
+        .then(function(r){ return r.json(); }).then(function(d){
+          b.disabled = false; b.textContent = 'Check identification step';
+          out.style.display = 'block';
+          out.textContent =
+            'Key configured: ' + (d.configured ? 'yes (' + d.key_len + ' chars)' : 'NO') + '\n' +
+            'Probe against Nike: ' + (d.ok ? 'found ' + Object.keys(d.found || {}).length + ' platform(s)' : 'found nothing') + '\n' +
+            (d.web_search_tool ? 'web_search tool version in use: ' + d.web_search_tool + '\n' : '') +
+            (d.elapsed_ms ? 'Elapsed: ' + d.elapsed_ms + 'ms\n' : '') +
+            (d.reasoning ? '\n' + d.reasoning : '') + (d.error ? '\n' + d.error : '');
+        }).catch(function(e){
+          b.disabled = false; b.textContent = 'Check identification step';
+          out.style.display = 'block'; out.textContent = 'Could not run the check: ' + e;
+        });
+    }
+
     function renderCompanySuggestions(companies, error, q){
       var panel = document.getElementById('sciSuggestPanel');
       window.__sciCompanies = companies || [];
@@ -618,6 +648,14 @@
             esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ' &mdash; ' + esc(p.status_detail) : '') + '</div></div>';
         }
       });
+
+      // All six platforms unresolved is the shape of the identify step
+      // itself failing (a broken vendor call), not six independent "this
+      // company has no account here" verdicts -- surface the admin check.
+      if((run.platforms || []).length && (run.platforms || []).every(function(p){ return p.status === 'handle_not_found'; })){
+        html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once -- this usually means the identification step itself broke, not that none of these accounts exist.' +
+          sciIdentifyDiagControl() + '</div></div>';
+      }
 
       if(!synthesis){
         html += '<div class="sci-drawer-empty">Synthesis has not run yet for this analysis.</div>';
