@@ -71,7 +71,7 @@
         <form class="sci-form" id="analyzeForm" onsubmit="return startAnalysis(event)">
           <div class="sci-field">
             <label for="companyName">Company name</label>
-            <input type="text" id="companyName" placeholder="e.g. Acme Inc." required />
+            <input type="text" id="companyName" placeholder="e.g. Acme Inc." required autocomplete="off" oninput="onCompanyNameInput()" />
           </div>
           <div class="sci-field">
             <label for="companyUrl">Website (optional)</label>
@@ -79,6 +79,8 @@
           </div>
           <button type="submit" class="sci-btn" id="analyzeBtn">Analyze →</button>
         </form>
+
+        <div class="sci-suggest-panel" id="sciSuggestPanel" style="display:none"></div>
 
         <div id="runningWrap" style="display:none;margin-top:20px">
           <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes &mdash; you can leave this page; your run will be here in History when it's done.</span></div>
@@ -147,11 +149,74 @@
     function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function monogram(name){ var s = String(name||'?').trim(); return (s[0]||'?').toUpperCase(); }
 
+    // ── Company disambiguation -- shown as the user types, so an ambiguous
+    // name (e.g. "apple") can be resolved to one real company + domain
+    // before the six-platform identify step has to guess. Same pattern as
+    // the LinkedIn Strategy Researcher's company search, minus its own
+    // mode picker (SCI has none): picking a card just fills the two form
+    // fields, which stay editable -- there's no hard requirement to pick
+    // one, since SCI (unlike LSR) has to work for companies Arena's own
+    // database doesn't know about too. ──────────────────────────────────
+    function debounce(fn, ms){
+      var t = null;
+      return function(){ var a = arguments; clearTimeout(t); t = setTimeout(function(){ fn.apply(null, a); }, ms); };
+    }
+
+    function sciSuggestRow(c, i){
+      var initial = esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase());
+      var logo = '<div class="sci-suggest-logo' + (c.logo ? '' : ' sci-suggest-nologo') + '">' +
+        (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-suggest-logo\').classList.add(\'sci-suggest-nologo\')">' : '') +
+        '<span class="sci-suggest-initial">' + initial + '</span></div>';
+      var meta = c.from_history ? 'Analyzed before' : [c.industry, c.location].filter(Boolean).join(' · ');
+      return '<div class="sci-suggest-row" onclick="pickCompany(' + i + ')">' + logo +
+        '<div class="sci-suggest-info"><div class="sci-suggest-name">' + esc(c.name) + '</div>' +
+        (meta ? '<div class="sci-suggest-meta">' + esc(meta) + '</div>' : '') + '</div>' +
+        (c.website ? '<div class="sci-suggest-site">' + esc(c.website) + '</div>' : '') + '</div>';
+    }
+
+    function renderCompanySuggestions(companies, error, q){
+      var panel = document.getElementById('sciSuggestPanel');
+      window.__sciCompanies = companies || [];
+      var html = error ? '<div class="sci-suggest-error">' + esc(error.message || 'Company search is unavailable right now — you can still fill this in manually.') + '</div>' : '';
+      if(companies && companies.length){
+        if(error) html += '<div class="sci-suggest-fallback-note">Companies you have analyzed before are shown below.</div>';
+        html += '<div class="sci-suggest-list">' + companies.map(sciSuggestRow).join('') + '</div>';
+      } else if(!error){
+        html += '<div class="sci-suggest-empty">No matches for "' + esc(q || '') + '" — you can still type the exact name and analyze it directly.</div>';
+      }
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+    }
+
+    function runCompanySearch(){
+      var q = (document.getElementById('companyName').value || '').trim();
+      var panel = document.getElementById('sciSuggestPanel');
+      if(q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="sci-suggest-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Searching…</div>';
+      fetch(BASE + '/search?q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data){ renderCompanySuggestions(data.companies || [], data.error || null, q); })
+        .catch(function(){ renderCompanySuggestions([], {message: 'The search request itself failed to complete.'}, q); });
+    }
+    var onCompanyNameInput = debounce(runCompanySearch, 350);
+
+    function pickCompany(idx){
+      var c = (window.__sciCompanies || [])[idx];
+      if(!c) return;
+      document.getElementById('companyName').value = c.name;
+      document.getElementById('companyUrl').value = c.website || '';
+      var panel = document.getElementById('sciSuggestPanel');
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+
     function startAnalysis(evt){
       evt.preventDefault();
       var name = document.getElementById('companyName').value.trim();
       var url = document.getElementById('companyUrl').value.trim();
       if(!name) return false;
+      document.getElementById('sciSuggestPanel').style.display = 'none';
       document.getElementById('analyzeBtn').disabled = true;
       fetch(BASE + '/analyze', {
         method: 'POST',
@@ -528,7 +593,10 @@
     }
 
     document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape') closeReport();
+      if(e.key !== 'Escape') return;
+      var panel = document.getElementById('sciSuggestPanel');
+      if(panel && panel.style.display !== 'none' && panel.innerHTML){ panel.style.display = 'none'; return; }
+      closeReport();
     });
   </script>
   <script>
