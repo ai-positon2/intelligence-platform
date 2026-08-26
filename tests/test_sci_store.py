@@ -67,8 +67,8 @@ class _FakeCursor:
 
         if sql.startswith("INSERT INTO sci_runs"):
             row = {"id": self.db.next_run_id, "email": params[0], "company_name": params[1],
-                  "company_url": params[2], "status": "running", "error": None,
-                  "identify_result": None, "synthesis": None,
+                  "company_url": params[2], "company_logo": params[3], "status": "running",
+                  "error": None, "identify_result": None, "synthesis": None,
                   "created_at": _FIXED_TS, "updated_at": _FIXED_TS}
             self.db.runs.append(row)
             self.db.next_run_id += 1
@@ -246,6 +246,23 @@ def test_list_runs_only_returns_that_emails_runs(fake_db):
     runs = store.list_runs("alice@position2.com")
     assert len(runs) == 1
     assert runs[0]["company_name"] == "Acme Inc"
+
+
+def test_company_logo_round_trips_through_get_and_list(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc", "acme.com", "https://cdn/acme.png")
+    assert store.get_run(run_id, "alice@position2.com")["company_logo"] == "https://cdn/acme.png"
+    assert store.list_runs("alice@position2.com")[0]["company_logo"] == "https://cdn/acme.png"
+
+
+def test_company_logo_defaults_to_none_when_not_picked_from_a_suggestion(fake_db):
+    run_id = store.save_run("alice@position2.com", "Acme Inc", "acme.com")
+    assert store.get_run(run_id, "alice@position2.com")["company_logo"] is None
+
+
+def test_known_companies_surfaces_the_stored_logo(fake_db):
+    store.save_run("alice@position2.com", "Google", "google.com", "https://cdn/google.png")
+    found = store.search_known_companies("alice@position2.com", "goo")
+    assert found[0]["logo"] == "https://cdn/google.png"
 
 
 def test_known_companies_match_by_partial_name(fake_db):

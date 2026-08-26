@@ -8273,11 +8273,12 @@ def social_creative_intelligence_analyze():
     payload = request.get_json(silent=True) or {}
     company_name = str(payload.get("company_name") or "").strip()
     company_url = str(payload.get("company_url") or "").strip() or None
+    company_logo = str(payload.get("company_logo") or "").strip() or None
     if not company_name:
         return jsonify({"error": "A company name is required."}), 400
 
     email = (_get_user() or {}).get("email", "").lower()
-    run_id = sci_store.save_run(email, company_name, company_url)
+    run_id = sci_store.save_run(email, company_name, company_url, company_logo)
     if run_id is None:
         return jsonify({"error": "Could not start the analysis."}), 500
 
