@@ -90,10 +90,10 @@ def run_identify(run_id: int, company_name: str, company_url: str | None) -> dic
 
 
 # Same-shape Apify collectors, dispatched generically by _collect_via_apify.
-# LinkedIn is deliberately NOT in this registry -- see _collect_linkedin,
-# which gates on sci_source_linkedin.actor_id() before ever calling Apify.
+# LinkedIn and Instagram are deliberately NOT in this registry -- both have
+# their own _collect_* function that tries a connected Unipile account
+# before ever falling back to Apify (see _collect_linkedin/_collect_instagram).
 _APIFY_COLLECTORS = {
-    "instagram": "sci_source_instagram",
     "facebook": "sci_source_facebook",
     "tiktok": "sci_source_tiktok",
     "x": "sci_source_x",
@@ -111,11 +111,13 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
     sci_store.upsert_platform_run(run_id, platform, status="collecting")
     try:
         if platform == "youtube":
-            posts = _collect_youtube(handle)
+            posts, vendor = _collect_youtube(handle)
         elif platform == "linkedin":
-            posts = _collect_linkedin(handle)
+            posts, vendor = _collect_linkedin(handle)
+        elif platform == "instagram":
+            posts, vendor = _collect_instagram(handle)
         elif platform in _APIFY_COLLECTORS:
-            posts = _collect_via_apify(platform, handle)
+            posts, vendor = _collect_via_apify(platform, handle)
         else:
             sci_store.upsert_platform_run(
                 run_id, platform, status="scrape_failed",
@@ -140,35 +142,76 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
     sci_store.upsert_platform_run(
         run_id, platform, status=status, post_count=written,
         last_post_at=max(dated) if dated else None,
-        collected_at=datetime.now(timezone.utc).isoformat())
+        collected_at=datetime.now(timezone.utc).isoformat(),
+        source_vendor=vendor)
 
 
-def _collect_via_apify(platform: str, handle: str) -> list[dict]:
+def _collect_via_apify(platform: str, handle: str) -> tuple[list[dict], str]:
     import importlib
     token = os.environ.get("APIFY_API_TOKEN", "")
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
     module = importlib.import_module(f"tracker.{_APIFY_COLLECTORS[platform]}")
-    return module.collect(handle, token, strict=True)
+    return module.collect(handle, token, strict=True), "apify"
 
 
-def _collect_linkedin(handle: str) -> list[dict]:
-    """LinkedIn is feature-flagged, not just another Apify collector: an
-    unset SCI_APIFY_LINKEDIN_ACTOR_ID means "disabled" and must never reach
+def _collect_linkedin(handle: str) -> tuple[list[dict], str]:
+    """Unipile-first, Apify-fallback, in that order -- a connected Unipile
+    account is a real authenticated LinkedIn session, not a scraper actor
+    fighting LinkedIn's own detection, so it's tried first whenever one is
+    available. Falls back to the pre-existing Apify path unchanged: an unset
+    SCI_APIFY_LINKEDIN_ACTOR_ID still means "disabled" and must never reach
     apify_transport at all -- raising here (before any network call) is what
     lets this platform be killed instantly by unsetting the env var, with no
     deploy and no risk of a retry storm against a fragile, easily-detected
-    actor."""
+    actor. A Unipile call that raises (a genuinely broken connected account,
+    not just "none configured") falls through to Apify rather than failing
+    the whole platform outright, same as the account being absent."""
+    from tracker import unipile_client
+    if unipile_client.is_available("linkedin"):
+        from tracker import sci_source_linkedin_unipile
+        try:
+            return sci_source_linkedin_unipile.collect(handle, strict=True), "unipile"
+        except Exception as e:
+            logger.warning("sci_pipeline: Unipile LinkedIn collection failed for %r, "
+                           "falling back to Apify: %s", handle, e)
+
     from tracker import sci_source_linkedin
     if not sci_source_linkedin.actor_id():
-        raise RuntimeError("LinkedIn collection is disabled on this deployment (no actor configured).")
+        raise RuntimeError(
+            "LinkedIn collection is disabled on this deployment "
+            "(no Unipile account connected and no Apify actor configured).")
     token = os.environ.get("APIFY_API_TOKEN", "")
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
-    return sci_source_linkedin.collect(handle, token, strict=True)
+    return sci_source_linkedin.collect(handle, token, strict=True), "apify"
 
 
-def _collect_youtube(handle: str) -> list[dict]:
+def _collect_instagram(handle: str) -> tuple[list[dict], str]:
+    """Unipile-first, Apify-fallback -- same shape as _collect_linkedin,
+    carved out of the generic _APIFY_COLLECTORS dispatch specifically so
+    Instagram can try a connected Unipile account before ever touching
+    Apify. See _collect_linkedin's docstring for why a Unipile failure falls
+    through to Apify rather than failing the platform outright."""
+    from tracker import unipile_client
+    if unipile_client.is_available("instagram"):
+        from tracker import sci_source_instagram_unipile
+        try:
+            return sci_source_instagram_unipile.collect(handle, strict=True), "unipile"
+        except Exception as e:
+            logger.warning("sci_pipeline: Unipile Instagram collection failed for %r, "
+                           "falling back to Apify: %s", handle, e)
+
+    token = os.environ.get("APIFY_API_TOKEN", "")
+    if not token:
+        raise RuntimeError(
+            "Instagram collection is unavailable "
+            "(no Unipile account connected and APIFY_API_TOKEN is not configured).")
+    from tracker import sci_source_instagram
+    return sci_source_instagram.collect(handle, token, strict=True), "apify"
+
+
+def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     from tracker import sci_youtube_client
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
     if not api_key:
@@ -177,15 +220,16 @@ def _collect_youtube(handle: str) -> list[dict]:
     if not channel_id:
         # Distinct from a real scrape failure: the handle just didn't resolve
         # to a channel. Treated as "found nothing" rather than "failed".
-        return []
+        return [], "youtube_api"
     # Note: list_recent_videos currently degrades a mid-fetch API failure to
     # [] rather than raising, unlike the Apify collectors -- acceptable for
     # Phase 1 since the official API is far less prone to the opaque
     # actor-blocked failures the scrapers see; worth tightening in Phase 4
     # alongside tracker/sci_scraper_registry.py's fallback work if it proves
     # to matter in practice.
-    return sci_youtube_client.list_recent_videos(channel_id, api_key,
-                                                  max_results=DEFAULT_MIN_POSTS, days=DEFAULT_WINDOW_DAYS)
+    posts = sci_youtube_client.list_recent_videos(channel_id, api_key,
+                                                   max_results=DEFAULT_MIN_POSTS, days=DEFAULT_WINDOW_DAYS)
+    return posts, "youtube_api"
 
 
 def _video_thumbnail_url(post: dict) -> str | None:

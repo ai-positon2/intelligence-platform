@@ -8040,6 +8040,50 @@ def admin_external_usage_sci_identify_check():
     return jsonify(_sci_identify_selftest())
 
 
+def _unipile_selftest() -> dict:
+    """Prove the Unipile integration end to end -- see
+    tracker/unipile_client.probe. Free: list_accounts() needs no connected
+    account and spends nothing."""
+    from tracker import unipile_client
+    try:
+        return unipile_client.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/unipile-check", methods=["POST"])
+@admin_required
+def admin_external_usage_unipile_check():
+    """Run the Unipile self-test. POST so no crawler or prefetch can trigger
+    it, matching the checks next to it."""
+    return jsonify(_unipile_selftest())
+
+
+@app.route("/p2/admin/external-usage/unipile-connect", methods=["POST"])
+@admin_required
+def admin_external_usage_unipile_connect():
+    """Generate a Unipile hosted-auth link for connecting a LinkedIn or
+    Instagram account -- the SCI Data Sources panel opens this URL in a new
+    tab for a human to actually log in through. Nothing in this app can
+    complete that login on someone's behalf (see tracker/unipile_client.
+    create_hosted_auth_link's docstring); this route only ever produces the
+    link, never an account connection by itself."""
+    from tracker import unipile_client
+    payload = request.get_json(silent=True) or {}
+    providers = payload.get("providers") or ["LINKEDIN", "INSTAGRAM"]
+    if not isinstance(providers, list) or not providers:
+        return jsonify({"error": "providers must be a non-empty list."}), 400
+    base = request.url_root.rstrip("/")
+    data, err = unipile_client.create_hosted_auth_link(
+        providers,
+        success_redirect_url=base + "/p2/admin/external-usage",
+        failure_redirect_url=base + "/p2/admin/external-usage",
+        name="Social Creative Intelligence")
+    if err is not None:
+        return jsonify({"error": unipile_client.describe_error(err)}), 502
+    return jsonify(data)
+
+
 def _lps_insights_selftest() -> dict:
     """Prove the AI Insights synthesis call end to end (see
     lps_enrichment.probe). Costs one small Claude call against a synthetic
