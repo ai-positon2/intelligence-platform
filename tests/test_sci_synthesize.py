@@ -81,29 +81,53 @@ def test_synthesize_report_parses_a_good_reply(monkeypatch):
     assert result["cross_platform"]["claims"][0]["post_ids"] == [101]
 
 
-def test_synthesize_report_defaults_messaging_and_strategy_to_empty_when_the_model_omits_it(monkeypatch):
+def test_synthesize_report_defaults_summary_and_strategy_to_an_empty_list_when_the_model_omits_them(monkeypatch):
     from tracker import sci_store
     monkeypatch.setattr(sci_synthesize, "_anthropic", lambda: _FakeClient(response_text=_GOOD_REPLY))
     monkeypatch.setattr(sci_store, "get_posts", lambda run_id: _posts())
     monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
     result = sci_synthesize.synthesize_report(1, {})
-    assert result["platforms"]["instagram"]["messaging_and_strategy"] == ""
-    assert result["cross_platform"]["messaging_and_strategy"] == ""
+    assert result["platforms"]["instagram"]["messaging_and_strategy"] == []
+    assert result["cross_platform"]["messaging_and_strategy"] == []
 
 
-def test_synthesize_report_parses_messaging_and_strategy_when_present(monkeypatch):
+def test_synthesize_report_parses_summary_and_strategy_as_bullet_lists(monkeypatch):
     from tracker import sci_store
     reply = json.dumps({
-        "platforms": {"instagram": {"summary": "s", "messaging_and_strategy": "Leans on urgency and discounts.",
-                                    "claims": [{"text": "claim", "post_ids": [101]}]}},
-        "cross_platform": {"summary": "", "messaging_and_strategy": "Consistent urgency-led messaging.", "claims": []},
+        "platforms": {"instagram": {
+            "summary": ["Mostly studio product shots.", "A handful of UGC-style clips."],
+            "messaging_and_strategy": ["Leans on urgency and discounts.", "CTAs always point to the bio link."],
+            "claims": [{"text": "claim", "post_ids": [101]}]}},
+        "cross_platform": {"summary": [], "messaging_and_strategy": ["Consistent urgency-led messaging."], "claims": []},
     })
     monkeypatch.setattr(sci_synthesize, "_anthropic", lambda: _FakeClient(response_text=reply))
     monkeypatch.setattr(sci_store, "get_posts", lambda run_id: _posts())
     monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
     result = sci_synthesize.synthesize_report(1, {})
-    assert result["platforms"]["instagram"]["messaging_and_strategy"] == "Leans on urgency and discounts."
-    assert result["cross_platform"]["messaging_and_strategy"] == "Consistent urgency-led messaging."
+    assert result["platforms"]["instagram"]["summary"] == ["Mostly studio product shots.", "A handful of UGC-style clips."]
+    assert result["platforms"]["instagram"]["messaging_and_strategy"] == [
+        "Leans on urgency and discounts.", "CTAs always point to the bio link."]
+    assert result["cross_platform"]["messaging_and_strategy"] == ["Consistent urgency-led messaging."]
+
+
+def test_synthesize_report_tolerates_a_bare_string_for_summary_or_strategy(monkeypatch):
+    """Defensive: a model slip (or an older stored run's shape) that returns
+    a plain string instead of a list must degrade to a single bullet, never
+    crash the parse."""
+    from tracker import sci_store
+    reply = json.dumps({
+        "platforms": {"instagram": {"summary": "One paragraph instead of a list.",
+                                    "messaging_and_strategy": "Also a bare string.",
+                                    "claims": []}},
+        "cross_platform": {"summary": "", "messaging_and_strategy": "", "claims": []},
+    })
+    monkeypatch.setattr(sci_synthesize, "_anthropic", lambda: _FakeClient(response_text=reply))
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id: _posts())
+    monkeypatch.setattr(sci_store, "get_platform_runs", lambda run_id: [])
+    result = sci_synthesize.synthesize_report(1, {})
+    assert result["platforms"]["instagram"]["summary"] == ["One paragraph instead of a list."]
+    assert result["platforms"]["instagram"]["messaging_and_strategy"] == ["Also a bare string."]
+    assert result["cross_platform"]["summary"] == []
 
 
 def test_synthesize_report_strips_post_ids_the_run_never_actually_had(monkeypatch):
