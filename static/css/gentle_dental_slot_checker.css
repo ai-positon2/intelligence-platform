@@ -412,13 +412,16 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 .gd-cell.r4 { background: var(--gd-r4); }
 .gd-cell.r5 { background: var(--gd-r5); }
 /* Zero is a hairline stub, not the palest ramp step: "closed that day" and
-   "one slot left" must not look like neighbours on the same scale. */
-.gd-cell.r0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
-.gd-cell.r0::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 1px; background: rgba(255,255,255,.13); }
+   "one slot left" must not look like neighbours on the same scale. The
+   hairline itself is red-tinted now (was a neutral white) so a scan for
+   "closed" reads as the low end of the same red-to-green scale, not as a
+   colorless gap in it. */
+.gd-cell.r0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(248,113,113,.35); }
+.gd-cell.r0::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 1px; background: rgba(248,113,113,.55); }
 .gd-legend { display: flex; align-items: center; gap: 9px; font-size: 10.5px; color: #6c7f78; padding: 10px 14px 0; flex-wrap: wrap; }
 .gd-legend-steps { display: inline-flex; gap: 3px; }
 .gd-legend-steps i { width: 20px; height: 11px; border-radius: 3px; display: block; }
-.gd-legend-steps i.l0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); }
+.gd-legend-steps i.l0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(248,113,113,.4); }
 .gd-legend-steps i.l1 { background: var(--gd-r1); }
 .gd-legend-steps i.l2 { background: var(--gd-r2); }
 .gd-legend-steps i.l3 { background: var(--gd-r3); }
@@ -556,22 +559,27 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 }
 
 /* ── The sequential ramp, per theme ─────────────────────────────────────────
-   Dark: alpha steps of #2dd4aa over the card, 1.6:1 → 9.9:1 vs surface.
-   Light: a far darker emerald (#065f46), because the dark-theme hue tops out at
-   1.9:1 on white and collapses the whole scale into one indistinct band. */
+   Red-to-green by hue step, not a single hue faded by opacity: "3 to 5 slots"
+   and "21 or more" need to read apart at a glance. The zero state below is
+   red-tinted to match this end of the ramp too (it was a neutral hairline
+   before) -- a front-desk scan for "which office needs slots" reads red as
+   the thing to act on.
+   Light gets its own, deeper steps rather than a dimmed copy of the dark
+   ramp, matching the rest of this file's per-theme convention (see the ribbon
+   steps below) since a color tuned for a near-black card washes out on white. */
 :root {
-  --gd-r1: rgba(45,212,170,.22);
-  --gd-r2: rgba(45,212,170,.38);
-  --gd-r3: rgba(45,212,170,.56);
-  --gd-r4: rgba(45,212,170,.76);
-  --gd-r5: rgba(45,212,170,1);
+  --gd-r1: #f97316;
+  --gd-r2: #f59e0b;
+  --gd-r3: #eab308;
+  --gd-r4: #84cc16;
+  --gd-r5: #22c55e;
 }
 :root[data-theme="light"] {
-  --gd-r1: rgba(6,95,70,.22);
-  --gd-r2: rgba(6,95,70,.38);
-  --gd-r3: rgba(6,95,70,.56);
-  --gd-r4: rgba(6,95,70,.76);
-  --gd-r5: rgba(6,95,70,1);
+  --gd-r1: #ea580c;
+  --gd-r2: #d97706;
+  --gd-r3: #ca8a04;
+  --gd-r4: #65a30d;
+  --gd-r5: #16a34a;
 }
 
 /* ════ LIGHT THEME ════ */
@@ -726,10 +734,10 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 :root[data-theme="light"] .gd-heat tbody th.rowhead { color: #12251d; }
 :root[data-theme="light"] .gd-heat tbody tr:hover th.rowhead { color: #047857; }
 :root[data-theme="light"] .gd-heat tbody th.rowhead span { color: #5c665f; }
-:root[data-theme="light"] .gd-cell.r0 { box-shadow: inset 0 0 0 1px rgba(18,26,54,.11); }
-:root[data-theme="light"] .gd-cell.r0::after { background: rgba(18,26,54,.15); }
+:root[data-theme="light"] .gd-cell.r0 { box-shadow: inset 0 0 0 1px rgba(220,38,38,.35); }
+:root[data-theme="light"] .gd-cell.r0::after { background: rgba(220,38,38,.45); }
 :root[data-theme="light"] .gd-cell:hover { box-shadow: 0 0 0 2px rgba(4,120,87,.6); }
-:root[data-theme="light"] .gd-legend-steps i.l0 { box-shadow: inset 0 0 0 1px rgba(18,26,54,.14); }
+:root[data-theme="light"] .gd-legend-steps i.l0 { box-shadow: inset 0 0 0 1px rgba(220,38,38,.4); }
 :root[data-theme="light"] .gd-tip { background: rgba(255,255,255,.99); border-color: rgba(4,120,87,.3); color: #3c4a44; box-shadow: 0 12px 34px rgba(30,40,80,.2); }
 :root[data-theme="light"] .gd-tip b { color: #3f6212; }
 :root[data-theme="light"] .gd-tip .t-name { color: #12251d; }
