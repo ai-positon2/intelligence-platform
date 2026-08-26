@@ -70,6 +70,18 @@ def test_classify_patterns_ranks_top_engaging_posts_by_summed_metrics():
     assert result["top_engaging_post_ids"][0] == 2
 
 
+def test_classify_patterns_folds_tone_and_format_technique_into_themes():
+    posts = [
+        _post(1, "x", status="ok", analysis={"subject": "shoes", "tone": "urgent",
+                                             "format_technique": "studio product shot"}),
+        _post(2, "x", status="ok", analysis={"subject": "shoes", "tone": "urgent",
+                                             "format_technique": "studio product shot"}),
+    ]
+    result = sci_classify._group_patterns(posts)
+    assert "urgent" in result["top_themes"]
+    assert "studio product shot" in result["top_themes"]
+
+
 def test_classify_patterns_treats_a_post_with_no_creative_analysis_as_no_themes():
     posts = [_post(1, "x", status="ok", analysis=None)]
     result = sci_classify._group_patterns(posts)

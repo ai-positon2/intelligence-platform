@@ -15,19 +15,38 @@ import os
 logger = logging.getLogger(__name__)
 
 _SYSTEM = (
-    "You are a creative analyst describing what is actually depicted in a "
-    "social media image, for a competitive-intelligence report. Describe "
-    "only what you can see -- subject, setting, people, product, visual "
-    "style, and any on-screen text -- never what the caption claims or "
-    "implies. If the image shows nothing meaningful (a blank frame, a "
-    "loading placeholder, a broken thumbnail), say so plainly instead of "
-    "guessing. Respond with ONLY a JSON object, no prose before or after: "
-    '{"subject": str, "setting": str, "people": str, "product": str, '
-    '"style": str, "on_screen_text": str, "summary": str}. Use empty '
+    "You are a creative and messaging analyst describing one social media post for a "
+    "competitive-intelligence report -- both what is visually depicted AND what message "
+    "is being communicated.\n\n"
+    "VISUAL fields (subject, setting, people, product, style, on_screen_text) -- describe "
+    "ONLY what you can actually see in the image. Never infer these from the caption. If "
+    "the image shows nothing meaningful (a blank frame, a loading placeholder, a broken "
+    "thumbnail), say so plainly instead of guessing.\n\n"
+    "MESSAGING fields (messaging, cta, tone, hook, format_technique, branding) -- these "
+    "MAY draw on the post's real caption/description text as well as the image, since "
+    "that caption is the brand's own first-party copy, not a guess:\n"
+    "- messaging: the core value proposition, offer, or idea being communicated.\n"
+    "- cta: the specific call-to-action shown or stated (e.g. \"Shop now\", \"Link in bio\", "
+    "\"Book a demo\") -- empty string if there genuinely isn't one.\n"
+    "- tone: the emotional/brand voice in one or two words (e.g. playful, authoritative, "
+    "urgent, aspirational, technical, irreverent).\n"
+    "- hook: whatever is designed to grab attention in the first instant -- the opening "
+    "visual, headline, or question. For a video frame, only fill this in if the frame IS "
+    "the video's opening moment; otherwise leave it empty.\n"
+    "- format_technique: the production style (e.g. UGC-style, studio product shot, "
+    "talking-head, text-meme, screen recording, animated/motion graphic, customer "
+    "testimonial, behind-the-scenes, carousel infographic).\n"
+    "- branding: visible logo, brand colors, or other identifiable brand elements -- "
+    "empty string if none are visible.\n\n"
+    "Respond with ONLY a JSON object, no prose before or after: "
+    '{"subject": str, "setting": str, "people": str, "product": str, "style": str, '
+    '"on_screen_text": str, "messaging": str, "cta": str, "tone": str, "hook": str, '
+    '"format_technique": str, "branding": str, "summary": str}. Use empty '
     'strings for fields that do not apply -- never omit a key.'
 )
 
-_FIELDS = ("subject", "setting", "people", "product", "style", "on_screen_text", "summary")
+_FIELDS = ("subject", "setting", "people", "product", "style", "on_screen_text",
+          "messaging", "cta", "tone", "hook", "format_technique", "branding", "summary")
 
 
 def _anthropic():
@@ -67,16 +86,16 @@ def analyze_image(image_url: str, context: dict | None = None) -> dict:
         return {"error": "no_image_url"}
 
     context = context or {}
-    caption = (context.get("caption") or "")[:500]
-    user_text = "Describe what is actually depicted in this image."
+    caption = (context.get("caption") or "")[:1200]
+    user_text = "Analyze this image: describe what is depicted, and read its messaging and creative approach."
     if caption:
-        user_text += (" For reference only (do not trust it as fact -- verify against the "
-                      f"image itself), the post's caption was: {caption!r}")
+        user_text += (" The post's real caption/description (usable for the messaging fields, "
+                      f"not for the visual fields): {caption!r}")
 
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=700,
+            max_tokens=900,
             system=_SYSTEM,
             messages=[{
                 "role": "user",
@@ -111,16 +130,16 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
     import base64
     b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
     context = context or {}
-    caption = (context.get("caption") or "")[:500]
-    user_text = "Describe what is actually depicted in this video frame."
+    caption = (context.get("caption") or "")[:1200]
+    user_text = "Analyze this video frame: describe what is depicted, and read its messaging and creative approach."
     if caption:
-        user_text += (" For reference only (do not trust it as fact -- verify against the "
-                      f"frame itself), the video's caption was: {caption!r}")
+        user_text += (" The video's real caption/description (usable for the messaging fields, "
+                      f"not for the visual fields): {caption!r}")
 
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=700,
+            max_tokens=900,
             system=_SYSTEM,
             messages=[{
                 "role": "user",
@@ -142,13 +161,38 @@ def analyze_image_bytes(image_bytes: bytes, media_type: str = "image/jpeg",
     return parsed
 
 
+def _dedupe_join(values, limit: int = 3, sep: str = "; ") -> str:
+    """Unique, order-preserving, non-empty values folded into one string --
+    used for the messaging-level fields (messaging/cta/tone/format_technique/
+    branding) that are attributes of the whole video rather than a single
+    frame, so repeating the same value once per sampled frame would just be
+    noise."""
+    seen = []
+    for v in values:
+        v = (v or "").strip()
+        if v and v not in seen:
+            seen.append(v)
+        if len(seen) >= limit:
+            break
+    return sep.join(seen)
+
+
 def summarize_frames(frame_analyses: list[dict], context: dict | None = None) -> dict:
-    """Fold several per-frame analyze_image() results (a video's sampled
-    frames) into one video-level creative_analysis. Purely mechanical --
-    the actual narrative/pacing/dialogue synthesis across frames is
-    tracker/sci_classify.py's job in a later phase; this just gives Phase 1
-    a usable per-post summary without inventing a second Claude call per
-    video yet."""
+    """Fold several per-frame analyze_image_bytes() results (a video's
+    sampled frames) into one video-level creative_analysis. Purely
+    mechanical -- the actual narrative synthesis across posts is
+    tracker/sci_classify.py + tracker/sci_synthesize.py's job; this just
+    gives Step 3 a usable per-post summary without a second Claude call per
+    video.
+
+    subject/setting/on_screen_text stay per-frame lists since what's on
+    screen genuinely changes shot to shot. messaging/cta/tone/
+    format_technique/branding are whole-video attributes (a single ad has
+    one core message, one voice) so they're deduplicated into one string --
+    this also keeps their key names identical to analyze_image()'s
+    single-image shape, so callers never need to branch on post_type to
+    read them. hook is taken from the OPENING frame only, since that's the
+    one moment "hook" actually describes."""
     ok_frames = [f for f in frame_analyses if "error" not in f]
     if not ok_frames:
         return {"error": "no_frames_analyzed", "frame_count": len(frame_analyses)}
@@ -158,5 +202,11 @@ def summarize_frames(frame_analyses: list[dict], context: dict | None = None) ->
         "subjects": [f["subject"] for f in ok_frames if f.get("subject")],
         "settings": [f["setting"] for f in ok_frames if f.get("setting")],
         "on_screen_text": [f["on_screen_text"] for f in ok_frames if f.get("on_screen_text")],
+        "messaging": _dedupe_join(f.get("messaging") for f in ok_frames),
+        "cta": _dedupe_join(f.get("cta") for f in ok_frames),
+        "tone": _dedupe_join(f.get("tone") for f in ok_frames),
+        "format_technique": _dedupe_join(f.get("format_technique") for f in ok_frames),
+        "branding": _dedupe_join(f.get("branding") for f in ok_frames),
+        "hook": ok_frames[0].get("hook", ""),
         "summary": " / ".join(f["summary"] for f in ok_frames if f.get("summary")),
     }

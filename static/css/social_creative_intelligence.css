@@ -237,6 +237,15 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 
 .sci-summary { font-size: 13.5px; line-height: 1.62; color: #d6c9db; margin-bottom: 16px; }
 
+/* Messaging & strategy panel -- a distinct analytical read, deliberately
+   separated from the descriptive .sci-summary above it so "what it looks
+   like" and "what it means strategically" don't blur into one paragraph. */
+.sci-strategy { position: relative; margin: 0 0 16px; padding: 15px 18px 15px 21px; border-radius: var(--radius-md, 12px); background: linear-gradient(135deg, rgba(168,85,247,.09), rgba(244,114,182,.05)); border: 1px solid rgba(168,85,247,.24); }
+.sci-strategy::before { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: var(--radius-pill, 80px); background: linear-gradient(180deg,#a855f7,#f472b6,#fb923c); }
+.sci-strategy-label { display: flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #e2a6dc; margin-bottom: 8px; }
+.sci-strategy-label span { font-size: 11px; color: #c084fc; }
+.sci-strategy p { font-size: 13.5px; line-height: 1.68; color: #f1e9f3; white-space: pre-wrap; }
+
 /* Thumbnail strip -- real scraped media, hotlinked (may 404: hidden on
    error rather than left as a broken-image glyph). */
 .sci-thumb-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 18px; }
@@ -313,6 +322,10 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-plat-head h3 { color: #1c1420; }
 [data-theme="light"] .sci-plat-sub { color: #8b7f92; }
 [data-theme="light"] .sci-summary { color: #443a4a; }
+[data-theme="light"] .sci-strategy { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
+[data-theme="light"] .sci-strategy-label { color: #9333ea; }
+[data-theme="light"] .sci-strategy-label span { color: #a855f7; }
+[data-theme="light"] .sci-strategy p { color: #362a3d; }
 [data-theme="light"] .sci-claim { background: rgba(18,26,54,.03); border-color: rgba(18,26,54,.09); color: #362a3d; }
 [data-theme="light"] .sci-cite-link { border-color: rgba(18,26,54,.14); color: #8b7f92; }
 [data-theme="light"] .cov-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); color: #8b7f92; }
