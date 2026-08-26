@@ -34,9 +34,20 @@ def _where_conditions(sql):
 
 def _row_matches(row, conds, params):
     for (col, op), val in zip(conds, params):
-        if row.get(col) != val:
+        actual = row.get(col)
+        if op == "ILIKE":
+            if str(val).strip("%").lower() not in str(actual or "").lower():
+                return False
+        elif actual != val:
             return False
     return True
+
+
+def _select_columns(sql, table):
+    m = re.search(r"SELECT (.+?) FROM %s" % table, sql)
+    # A DISTINCT ON (col) prefix is not part of the column list.
+    cols = re.sub(r"^DISTINCT ON \(\w+\)\s*", "", m.group(1))
+    return [c.strip() for c in cols.split(",")]
 
 
 class _FakeCursor:
@@ -78,11 +89,23 @@ class _FakeCursor:
             return
 
         if sql.startswith("SELECT") and "FROM sci_runs" in sql:
-            cols = re.search(r"SELECT (.+?) FROM sci_runs", sql).group(1).split(", ")
+            cols = _select_columns(sql, "sci_runs")
             conds = _where_conditions(sql)
             matches = [r for r in self.db.runs if _row_matches(r, conds, params)]
             if "created_at DESC" in sql:
                 matches = sorted(matches, key=lambda r: r["id"], reverse=True)
+            distinct_on = re.search(r"DISTINCT ON \((\w+)\)", sql)
+            if distinct_on:
+                seen, deduped = set(), []
+                for r in matches:
+                    marker = r.get(distinct_on.group(1))
+                    if marker in seen:
+                        continue
+                    seen.add(marker)
+                    deduped.append(r)
+                matches = deduped
+            if "LIMIT %s" in sql:
+                matches = matches[:params[len(conds)]]
             self._result = [tuple(r.get(c) for c in cols) for r in matches]
             return
 
@@ -223,6 +246,50 @@ def test_list_runs_only_returns_that_emails_runs(fake_db):
     runs = store.list_runs("alice@position2.com")
     assert len(runs) == 1
     assert runs[0]["company_name"] == "Acme Inc"
+
+
+def test_known_companies_match_by_partial_name(fake_db):
+    store.save_run("alice@position2.com", "Google", "google.com")
+    store.save_run("alice@position2.com", "Myntra", "myntra.com")
+    found = store.search_known_companies("alice@position2.com", "goo")
+    assert [c["name"] for c in found] == ["Google"]
+    assert found[0]["website"] == "google.com"
+    assert found[0]["from_history"] is True
+
+
+def test_known_companies_are_scoped_to_the_asking_user(fake_db):
+    """One user's analyzed-company list must never leak into another's
+    search, the same ownership property every read in this module guarantees."""
+    store.save_run("alice@position2.com", "Google", "google.com")
+    assert store.search_known_companies("bob@position2.com", "goo") == []
+
+
+def test_known_companies_collapse_repeat_analyses_of_one_company(fake_db):
+    for _ in range(3):
+        store.save_run("alice@position2.com", "Google", "google.com")
+    found = store.search_known_companies("alice@position2.com", "google")
+    assert len(found) == 1
+
+
+def test_known_companies_is_case_insensitive(fake_db):
+    store.save_run("alice@position2.com", "Google", "google.com")
+    assert len(store.search_known_companies("alice@position2.com", "GOOGLE")) == 1
+
+
+def test_known_companies_needs_a_query(fake_db):
+    store.save_run("alice@position2.com", "Google", "google.com")
+    assert store.search_known_companies("alice@position2.com", "  ") == []
+
+
+def test_known_companies_honours_the_limit(fake_db):
+    for i in range(5):
+        store.save_run("alice@position2.com", "Acme %d" % i, None)
+    assert len(store.search_known_companies("alice@position2.com", "acme", limit=2)) == 2
+
+
+def test_known_companies_returns_empty_without_postgres(monkeypatch):
+    monkeypatch.setattr(store, "_pg_conn", lambda: None)
+    assert store.search_known_companies("alice@position2.com", "goo") == []
 
 
 def test_update_run_status_is_not_ownership_scoped(fake_db):

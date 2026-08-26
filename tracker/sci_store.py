@@ -233,6 +233,52 @@ def list_runs(email: str, limit: int = 100) -> list[dict]:
             pass
 
 
+def search_known_companies(email: str, query: str, limit: int = 8) -> list[dict]:
+    """Companies this user has already analyzed, matching `query` by name --
+    the fallback for when the Arena company-search vendor (used to
+    disambiguate an ambiguous name like "apple" before a run starts, see
+    app.py's search route) is unavailable. Ownership-scoped in the query
+    itself, like every other read here. Shaped like an arena_client company
+    dict (see arena_client._to_company) so the frontend can render either
+    source with the same card renderer; `from_history: True` marks it as a
+    past run rather than a live vendor result. [] on any failure."""
+    conn = _pg_conn()
+    q = (query or "").strip()
+    if not conn or not email or not q:
+        return []
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            # DISTINCT ON collapses repeat analyses of the same company to
+            # its most recent row, so re-analyzing Nike five times still
+            # offers one Nike card.
+            cur.execute(
+                "SELECT DISTINCT ON (company_name) company_name, company_url "
+                "FROM sci_runs WHERE email = %s AND company_name ILIKE %s "
+                "ORDER BY company_name, created_at DESC LIMIT %s",
+                (email.lower(), "%" + q + "%", limit),
+            )
+            rows = cur.fetchall()
+        out = []
+        for row in rows:
+            name, url = row[0], row[1]
+            if not name:
+                continue
+            out.append({"id": "", "name": name, "logo": None, "industry": None,
+                       "location": None, "description": None, "summary": None,
+                       "followers_count": None, "profile_url": None,
+                       "website": url, "from_history": True})
+        return out
+    except Exception as e:
+        logger.warning("sci_store: search_known_companies failed: %s", e)
+        return []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_run(run_id: int, email: str) -> dict | None:
     """One run, ownership-scoped in the query itself. Returns None for a run
     that doesn't exist AND for one that belongs to a different email,

@@ -22,7 +22,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
-from tracker import sci_store, sci_pipeline  # noqa: E402
+from tracker import sci_store, sci_pipeline, arena_client  # noqa: E402
 
 _OWNER = "owner@position2.com"
 _OTHER = "other@position2.com"
@@ -81,6 +81,124 @@ def test_analyze_requires_login():
     c = appmod.app.test_client()
     resp = c.post("/p2/b2b-agents/social-creative-intelligence/analyze",
                   json={"company_name": "Acme"}, follow_redirects=False)
+    assert resp.status_code in (302, 401, 403)
+
+
+# ── /search ───────────────────────────────────────────────────────────────
+# Shown before a run starts, so an ambiguous free-text name (the "apple"
+# case: identify_handles couldn't confidently resolve it on any platform)
+# can be disambiguated into one real company + domain first. Same vendor
+# (Arena) and error-reporting contract as linkedin_playbook_studio_search,
+# see tests/test_linkedin_playbook_studio_route.py's own Search section.
+
+def test_search_returns_companies_from_the_arena_client(monkeypatch):
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [{"id": "", "name": "Acme", "website": "acme.com"}], "error": None})
+    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["companies"] == [{"id": "", "name": "Acme", "website": "acme.com"}]
+    assert "error" not in body
+
+
+def test_search_with_no_query_returns_an_empty_list_without_calling_arena(monkeypatch):
+    called = []
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: called.append(q) or {"companies": [], "error": None})
+    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search")
+    assert resp.get_json()["companies"] == []
+    assert called == []
+
+
+def test_search_degrades_to_an_empty_list_without_a_configured_key(monkeypatch):
+    monkeypatch.delenv("ARENA_API_KEY", raising=False)
+    resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple")
+    assert resp.status_code == 200
+    assert resp.get_json()["companies"] == []
+
+
+def _failing_search(monkeypatch, kind="http_status", status=401, detail="HTTP 401. Body: bad key"):
+    monkeypatch.setattr(arena_client, "search_companies_result", lambda q: {
+        "companies": [], "error": {"kind": kind, "status": status,
+                                   "detail": detail, "attempts": 1},
+        "elapsed_ms": 12, "source": "",
+    })
+
+
+def test_a_failed_search_returns_a_reason_not_a_bare_empty_list(monkeypatch):
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    assert body["companies"] == []
+    assert body["error"]["code"] == "http_status"
+    assert "rejected our API key" in body["error"]["message"]
+
+
+def test_a_dead_key_is_not_offered_as_retryable(monkeypatch):
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    assert body["error"]["retryable"] is False
+
+
+def test_a_rate_limit_is_offered_as_retryable(monkeypatch):
+    _failing_search(monkeypatch, status=429, detail="HTTP 429")
+    monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    assert body["error"]["retryable"] is True
+
+
+def test_the_vendors_own_words_go_only_to_admins(monkeypatch):
+    _failing_search(monkeypatch)
+    monkeypatch.setattr(sci_store, "search_known_companies", lambda *a, **k: [])
+    admin = sorted(appmod.ADMIN_EMAILS)[0]
+    admin_body = _client(admin).get(
+        "/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    plain_body = _client("nobody@position2.com").get(
+        "/p2/b2b-agents/social-creative-intelligence/search?q=apple").get_json()
+    assert admin_body["error"]["detail"] == "HTTP 401. Body: bad key"
+    assert admin_body["error"]["status"] == 401
+    assert "detail" not in plain_body["error"]
+    assert "status" not in plain_body["error"]
+
+
+def test_a_failed_search_falls_back_to_the_users_own_analyzed_companies(monkeypatch):
+    _failing_search(monkeypatch)
+    seen = {}
+
+    def _known(email, q, *a, **k):
+        seen["args"] = (email, q)
+        return [{"id": "", "name": "Google", "website": "google.com", "from_history": True}]
+
+    monkeypatch.setattr(sci_store, "search_known_companies", _known)
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=goo").get_json()
+    assert [c["name"] for c in body["companies"]] == ["Google"]
+    assert body["companies"][0]["from_history"] is True
+    assert seen["args"] == (_OWNER, "goo")
+    assert body["error"]["code"] == "http_status"
+
+
+def test_a_successful_search_never_consults_history(monkeypatch):
+    called = []
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [{"id": "", "name": "Acme"}], "error": None})
+    monkeypatch.setattr(sci_store, "search_known_companies",
+                        lambda *a, **k: called.append(1) or [])
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme").get_json()
+    assert not called
+    assert body["companies"][0]["name"] == "Acme"
+
+
+def test_a_genuine_zero_result_carries_no_error_at_all(monkeypatch):
+    monkeypatch.setattr(arena_client, "search_companies_result",
+                        lambda q: {"companies": [], "error": None})
+    body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=zzz").get_json()
+    assert body == {"companies": []}
+
+
+def test_search_requires_login():
+    c = appmod.app.test_client()
+    resp = c.get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 

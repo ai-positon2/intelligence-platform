@@ -8204,6 +8204,43 @@ def social_creative_intelligence():
                            runs=sci_store.list_runs(email))
 
 
+@app.route("/p2/b2b-agents/social-creative-intelligence/search")
+@position2_required
+def social_creative_intelligence_search():
+    """Company search shown before a run starts, so an ambiguous free-text
+    name (e.g. "apple") can be disambiguated into one real company + domain
+    before the six-platform identify step ever spends a call guessing --
+    reuses the same Arena company-search vendor and error-reporting contract
+    as linkedin_playbook_studio_search."""
+    from tracker import arena_client, sci_store
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"companies": []})
+    email = (_get_user() or {}).get("email") or ""
+    result = arena_client.search_companies_result(q)
+    companies = result.get("companies") or []
+    err = result.get("error")
+    payload = {"companies": companies}
+    if err:
+        # Falling back to companies this user has already analyzed keeps the
+        # page actionable while the provider is down -- everything needed to
+        # confirm a company (name, domain) is already stored on those rows.
+        fallback = sci_store.search_known_companies(email, q)
+        payload["companies"] = fallback
+        payload["error"] = {
+            "code": err.get("kind") or "unavailable",
+            "message": arena_client.describe_error(err),
+            "retryable": arena_client.is_retryable(err),
+        }
+        if email.lower() in ADMIN_EMAILS:
+            payload["error"]["detail"] = err.get("detail") or ""
+            payload["error"]["status"] = err.get("status")
+            payload["error"]["attempts"] = err.get("attempts")
+        app.logger.warning("sci search failed for %r: %s (%s)", q,
+                           err.get("kind"), err.get("detail"))
+    return jsonify(payload)
+
+
 @app.route("/p2/b2b-agents/social-creative-intelligence/analyze", methods=["POST"])
 @position2_required
 def social_creative_intelligence_analyze():
