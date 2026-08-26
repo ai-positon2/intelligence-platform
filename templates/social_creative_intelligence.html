@@ -175,22 +175,22 @@
         (c.website ? '<div class="sci-suggest-site">' + esc(c.website) + '</div>' : '') + '</div>';
     }
 
-    // Admin-only diagnostic: the vendor's own body + a free self-test call,
-    // same as linkedin_playbook_studio's arena check -- this is what turned
-    // a previous "No companies found" for this same vendor from a shrug into
-    // a real diagnosis (the Arena workspace's LinkedIn account connection
-    // lapsing), so it ships here from day one rather than after it recurs.
+    // Admin-only diagnostic: the vendor's own body + a self-test call. SCI's
+    // company search is native (tracker/sci_company_search.py, backed by
+    // Apollo -- see that module's docstring for why it doesn't depend on
+    // Arena's own workspace staying healthy the way linkedin_playbook_studio's
+    // search does), so this checks THAT integration.
     function sciAdminDiagControl(){
       if(!IS_ADMIN) return '';
-      return '<button type="button" class="sci-suggest-check-btn" id="sciArenaCheckBtn" onclick="runSciArenaCheck()">Run provider check</button>' +
-        '<pre class="sci-suggest-error-detail" id="sciArenaCheckOut" style="display:none"></pre>';
+      return '<button type="button" class="sci-suggest-check-btn" id="sciProviderCheckBtn" onclick="runSciProviderCheck()">Run provider check</button>' +
+        '<pre class="sci-suggest-error-detail" id="sciProviderCheckOut" style="display:none"></pre>';
     }
 
-    function runSciArenaCheck(){
-      var b = document.getElementById('sciArenaCheckBtn'), out = document.getElementById('sciArenaCheckOut');
+    function runSciProviderCheck(){
+      var b = document.getElementById('sciProviderCheckBtn'), out = document.getElementById('sciProviderCheckOut');
       if(!b || !out) return;
       b.disabled = true; b.textContent = 'Checking…';
-      fetch('/p2/admin/external-usage/arena-check', {method: 'POST'})
+      fetch('/p2/admin/external-usage/sci-company-search-check', {method: 'POST'})
         .then(function(r){ return r.json(); }).then(function(d){
           b.disabled = false; b.textContent = 'Run provider check';
           out.style.display = 'block';

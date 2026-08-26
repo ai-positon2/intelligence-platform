@@ -8000,6 +8000,25 @@ def admin_external_usage_arena_check():
     return jsonify(_arena_selftest())
 
 
+def _sci_company_search_selftest() -> dict:
+    """Prove SCI's native (Apollo-backed) company search end to end -- see
+    tracker/sci_company_search.probe. Costs 1 Apollo credit only if the
+    probe itself returns a match."""
+    from tracker import sci_company_search
+    try:
+        return sci_company_search.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/sci-company-search-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_company_search_check():
+    """Run SCI's company-search self-test. POST so no crawler or prefetch can
+    trigger it, matching the Arena/Apollo checks next to it."""
+    return jsonify(_sci_company_search_selftest())
+
+
 def _lps_insights_selftest() -> dict:
     """Prove the AI Insights synthesis call end to end (see
     lps_enrichment.probe). Costs one small Claude call against a synthetic
@@ -8209,15 +8228,21 @@ def social_creative_intelligence():
 def social_creative_intelligence_search():
     """Company search shown before a run starts, so an ambiguous free-text
     name (e.g. "apple") can be disambiguated into one real company + domain
-    before the six-platform identify step ever spends a call guessing --
-    reuses the same Arena company-search vendor and error-reporting contract
-    as linkedin_playbook_studio_search."""
-    from tracker import arena_client, sci_store
+    before the six-platform identify step ever spends a call guessing.
+    Native to this platform -- built on tracker/sci_company_search.py, which
+    wraps the Apollo integration this app already pays for and uses
+    elsewhere (Contact Finder, Person Enrichment) -- deliberately NOT the
+    Arena vendor linkedin_playbook_studio_search uses, since Arena's own
+    workspace periodically loses its connected LinkedIn account and takes
+    that search down with it (see tracker/arena_client.py's module docs).
+    Same typed-error contract either way, so this route's shape is
+    unaffected by which vendor answers it."""
+    from tracker import sci_company_search, sci_store
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify({"companies": []})
     email = (_get_user() or {}).get("email") or ""
-    result = arena_client.search_companies_result(q)
+    result = sci_company_search.search_companies_result(q)
     companies = result.get("companies") or []
     err = result.get("error")
     payload = {"companies": companies}
@@ -8229,8 +8254,8 @@ def social_creative_intelligence_search():
         payload["companies"] = fallback
         payload["error"] = {
             "code": err.get("kind") or "unavailable",
-            "message": arena_client.describe_error(err),
-            "retryable": arena_client.is_retryable(err),
+            "message": sci_company_search.describe_error(err),
+            "retryable": sci_company_search.is_retryable(err),
         }
         if email.lower() in ADMIN_EMAILS:
             payload["error"]["detail"] = err.get("detail") or ""
