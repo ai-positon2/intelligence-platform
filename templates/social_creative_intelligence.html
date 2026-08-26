@@ -208,16 +208,143 @@
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
     var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
 
+    // ── Small formatting helpers ────────────────────────────────────────────
+    function fmtNum(n){
+      if(n == null || isNaN(n)) return null;
+      n = Number(n);
+      if(Math.abs(n) >= 1000000) return (n/1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + 'M';
+      if(Math.abs(n) >= 1000) return (n/1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K';
+      return String(n);
+    }
+    function fmtDate(iso){
+      if(!iso) return '';
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    }
+    function toPoints(v){
+      if(Array.isArray(v)) return v.filter(function(x){ return x; });
+      if(typeof v === 'string' && v.trim()) return [v.trim()];
+      return [];
+    }
+
+    // ── Mechanical, client-side pattern reads over the raw posts -- accurate
+    // and instant regardless of what the AI narrative says, and the source
+    // for every chart/card below. Mirrors tracker/sci_classify.py's logic. ──
+    function engagementScore(metrics){
+      if(!metrics) return 0;
+      var s = 0;
+      Object.keys(metrics).forEach(function(k){ if(typeof metrics[k] === 'number') s += metrics[k]; });
+      return s;
+    }
+    function topEngagingPosts(posts, platform, n){
+      return (posts || []).filter(function(p){ return p.platform === platform; })
+        .slice().sort(function(a,b){ return engagementScore(b.metrics) - engagementScore(a.metrics); })
+        .slice(0, n || 3);
+    }
+    function postThemeWords(post){
+      var a = post.creative_analysis;
+      if(!a || a.error) return [];
+      var words = [];
+      ['subject','setting','style','tone','format_technique'].forEach(function(k){
+        var v = a[k];
+        if(typeof v === 'string' && v.trim()) words.push(v.trim().toLowerCase());
+      });
+      ['subjects','settings'].forEach(function(k){
+        var v = a[k];
+        if(Array.isArray(v)) v.forEach(function(x){ var s = String(x||'').trim().toLowerCase(); if(s) words.push(s); });
+      });
+      return words;
+    }
+    function topThemes(posts, platform, n){
+      var counts = {};
+      (posts || []).filter(function(p){ return p.platform === platform && p.creative_analysis_status === 'ok'; })
+        .forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
+      return Object.keys(counts).sort(function(a,b){ return counts[b] - counts[a]; }).slice(0, n || 8);
+    }
+
+    // ── Real thumbnails, resolved per-platform from the raw scraped item --
+    // media_urls[0] is often a playable video file (fine for vision, useless
+    // in an <img>), so this looks for the platform's own cover/display image
+    // instead. Returns null (never a broken-image glyph) when none exists. ──
+    function postThumbnail(post){
+      var raw = post.raw || {}, platform = post.platform;
+      if(platform === 'youtube'){
+        var thumbs = (raw.snippet || {}).thumbnails || {};
+        var order = ['maxres','standard','high','medium','default'];
+        for(var i=0;i<order.length;i++){ var t = thumbs[order[i]]; if(t && t.url) return t.url; }
+        return null;
+      }
+      if(platform === 'instagram'){
+        return raw.displayUrl || ((post.post_type === 'image' && post.media_urls && post.media_urls[0]) || null);
+      }
+      if(platform === 'facebook'){
+        var photo = raw.photo_image, media0 = (raw.media && raw.media[0]) || {};
+        return (photo && photo.uri) || raw.picture || raw.photoUrl ||
+          (media0.photo_image && media0.photo_image.uri) || media0.thumbnail || null;
+      }
+      if(platform === 'tiktok'){
+        var vm = raw.videoMeta || {};
+        return vm.coverUrl || vm.originCover || vm.dynamicCover || (raw.covers && raw.covers.default) || null;
+      }
+      if(platform === 'x'){
+        var media = raw.media || (raw.extendedEntities && raw.extendedEntities.media) || [];
+        for(var j=0;j<media.length;j++){ if(media[j].media_url_https) return media[j].media_url_https; }
+        return null;
+      }
+      if(platform === 'linkedin'){
+        var imgs = raw.images || raw.imageUrls || [];
+        if(imgs.length){ var im = imgs[0]; return (typeof im === 'string') ? im : (im && im.url) || null; }
+        return null;
+      }
+      return (post.post_type === 'image' && post.media_urls && post.media_urls[0]) || null;
+    }
+    function postTitle(post){
+      var raw = post.raw || {};
+      if(post.platform === 'youtube' && raw.snippet && raw.snippet.title) return raw.snippet.title;
+      var cap = (post.caption || '').split('\n')[0].trim();
+      if(cap) return cap.length > 90 ? cap.slice(0, 88) + '…' : cap;
+      return (post.platform || 'post') + ' · ' + (post.post_type || 'post');
+    }
+    function metricChips(metrics){
+      if(!metrics) return '';
+      var order = [['views','views'],['likes','likes'],['comments','comments'],['shares','shares']];
+      return order.map(function(pair){
+        var v = metrics[pair[0]];
+        if(typeof v !== 'number') return '';
+        return '<span class="sci-metric-chip">' + fmtNum(v) + ' ' + pair[1] + '</span>';
+      }).join('');
+    }
+
+    function renderPostCard(post){
+      var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
+      var media = '<div class="sci-postcard-media' + (thumb ? '' : ' sci-postcard-noimg') + '">' +
+        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\')">' : '') +
+        '<span class="sci-postcard-ic">' + meta.icon + '</span>' +
+        '<span class="sci-postcard-type">' + esc(post.post_type || 'post') + '</span></div>';
+      return '<a class="sci-postcard" href="' + esc(post.post_url || '#') + '" target="_blank" rel="noopener" style="--pf-color:' + meta.color + '">' +
+        media +
+        '<div class="sci-postcard-body">' +
+          '<div class="sci-postcard-title">' + esc(title) + '</div>' +
+          '<div class="sci-postcard-foot"><span class="sci-postcard-date">' + esc(fmtDate(post.posted_at)) + '</span>' + metricChips(post.metrics) + '</div>' +
+        '</div></a>';
+    }
+
+    function renderPostChip(post){
+      if(!post) return '';
+      var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
+      var thumbHtml = '<span class="sci-chip-thumb' + (thumb ? '' : ' sci-chip-noimg') + '" style="--pf-color:' + meta.color + '">' +
+        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.remove();this.closest(\'.sci-chip-thumb\').classList.add(\'sci-chip-noimg\')">' : '') +
+        '<span class="sci-chip-ic">' + meta.icon + '</span></span>';
+      var inner = thumbHtml + '<span class="sci-chip-txt">' + esc(title) + '</span>';
+      return post.post_url
+        ? '<a class="sci-cite-chip" href="' + esc(post.post_url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+        : '<span class="sci-cite-chip">' + inner + '</span>';
+    }
+
     function renderClaims(claims, postsById){
       return (claims || []).map(function(c){
-        var cites = (c.post_ids || []).map(function(id){
-          var p = postsById[id];
-          if(!p) return '';
-          var label = (p.platform || '') + (p.post_type ? ' · ' + p.post_type : '');
-          return p.post_url
-            ? '<a class="sci-cite-link" href="' + esc(p.post_url) + '" target="_blank" rel="noopener">' + esc(label) + '</a>'
-            : '<span class="sci-cite-link">' + esc(label) + '</span>';
-        }).join('');
+        var cites = (c.post_ids || []).map(function(id){ return renderPostChip(postsById[id]); }).join('');
         return '<div class="sci-claim">' + esc(c.text) +
           (cites ? '<div class="sci-claim-cites">' + cites + '</div>' : '') + '</div>';
       }).join('');
@@ -246,24 +373,59 @@
       return '<div class="sci-format-mix"><div class="fm-bar">' + bar + '</div></div><div class="fm-legend">' + legend + '</div>';
     }
 
-    function renderStrategy(text){
-      if(!text) return '';
-      return '<div class="sci-strategy"><div class="sci-strategy-label"><span>◆</span>Messaging &amp; strategy</div><p>' + esc(text) + '</p></div>';
+    function renderThemeChips(posts, platform){
+      var themes = topThemes(posts, platform, 8);
+      if(!themes.length) return '';
+      return '<div class="sci-theme-row">' + themes.map(function(t){ return '<span class="sci-theme-chip">' + esc(t) + '</span>'; }).join('') + '</div>';
     }
 
-    function renderThumbs(posts, platform){
-      var items = (posts || []).filter(function(p){
-        return p.platform === platform && Array.isArray(p.media_urls) && p.media_urls.length;
-      }).slice(0, 8);
-      if(!items.length) return '';
-      var html = items.map(function(p){
-        var url = p.media_urls[0];
-        if(!url) return '';
-        var href = p.post_url || url;
-        return '<a class="sci-thumb" href="' + esc(href) + '" target="_blank" rel="noopener">' +
-          '<img src="' + esc(url) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-thumb\').style.display=\'none\'"></a>';
+    function renderSection(label, glyph, innerHtml){
+      if(!innerHtml) return '';
+      return '<div class="sci-section"><div class="sci-section-label"><span>' + glyph + '</span>' + esc(label) + '</div>' + innerHtml + '</div>';
+    }
+
+    function renderBulletList(points, cls){
+      var pts = toPoints(points);
+      if(!pts.length) return '';
+      return '<ul class="' + cls + '">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>';
+    }
+
+    function renderStrategy(text){
+      var pts = toPoints(text);
+      if(!pts.length) return '';
+      return '<div class="sci-strategy"><div class="sci-strategy-label"><span>◆</span>Messaging &amp; strategy</div>' +
+        '<ul class="sci-strategy-list">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul></div>';
+    }
+
+    // ── Cross-platform overview dashboard: stat tiles + a platform post-count
+    // bar chart, both computed straight from run.platforms/posts -- accurate
+    // even before/without a synthesis narrative. ──────────────────────────
+    function renderPlatformBarChart(platforms){
+      var active = (platforms || []).filter(function(p){ return p.post_count; });
+      if(!active.length) return '';
+      var max = Math.max.apply(null, active.map(function(p){ return p.post_count; }));
+      var rows = active.slice().sort(function(a,b){ return b.post_count - a.post_count; }).map(function(p){
+        var meta = platformMeta(p.platform), pct = max ? (p.post_count / max * 100) : 0;
+        return '<div class="sci-pbar-row">' +
+          '<span class="sci-pbar-label"><span class="sci-pbar-ic" style="color:' + meta.color + '">' + meta.icon + '</span>' + esc(p.platform) + '</span>' +
+          '<div class="sci-pbar-track"><div class="sci-pbar-fill" style="width:' + pct.toFixed(1) + '%;background:' + meta.color + '"></div></div>' +
+          '<span class="sci-pbar-val">' + p.post_count + '</span></div>';
       }).join('');
-      return '<div class="sci-thumb-strip">' + html + '</div>';
+      return '<div class="sci-pbar-chart">' + rows + '</div>';
+    }
+
+    function renderOverview(run, allPosts){
+      var active = (run.platforms || []).filter(function(p){ return !NO_ACTIVITY_STATUSES[p.status]; });
+      var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
+      var tiles = [
+        {label: 'Posts analyzed', value: allPosts.length},
+        {label: 'Active platforms', value: active.length + ' / ' + (run.platforms || []).length},
+        {label: 'Video-led content', value: allPosts.length ? Math.round(videoLike / allPosts.length * 100) + '%' : '—'},
+      ];
+      var tileHtml = tiles.map(function(t){
+        return '<div class="sci-stat-tile"><div class="sci-stat-val">' + esc(String(t.value)) + '</div><div class="sci-stat-label">' + esc(t.label) + '</div></div>';
+      }).join('');
+      return '<div class="sci-overview"><div class="sci-stat-row">' + tileHtml + '</div>' + renderPlatformBarChart(run.platforms) + '</div>';
     }
 
     function renderCoverage(platforms){
@@ -303,6 +465,7 @@
         '<div class="sci-drawer-body">';
 
       html += '<div class="sci-coverage">' + renderCoverage(run.platforms) + '</div>';
+      if(allPosts.length) html += renderOverview(run, allPosts);
 
       if(run.status === 'running'){
         html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress &mdash; leave this open, it keeps polling, or come back from History once it finishes.</div></div>';
@@ -326,20 +489,24 @@
           var pr = platformsByName[platform] || {};
           var meta = platformMeta(platform);
           var mix = computeFormatMix(allPosts, platform);
+          var topPosts = topEngagingPosts(allPosts, platform, 3);
           html += '<div class="sci-platform-section" id="sci-plat-' + esc(platform) + '" style="--pf-color:' + meta.color + '">' +
             '<div class="sci-plat-head"><span class="sci-plat-ic">' + meta.icon + '</span><h3>' + esc(platform) + '</h3>' +
             (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') + '</div>' +
             renderFormatMix(mix) +
-            '<p class="sci-summary">' + esc(entry.summary) + '</p>' +
+            renderThemeChips(allPosts, platform) +
+            renderSection('Top performing posts', '▣', topPosts.length ? '<div class="sci-postcard-grid">' + topPosts.map(renderPostCard).join('') + '</div>' : '') +
+            renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
             renderStrategy(entry.messaging_and_strategy) +
-            renderThumbs(allPosts, platform) +
-            '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' +
+            renderSection('Evidence from real posts', '◇', entry.claims && entry.claims.length ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '') +
           '</div>';
         });
-        if(synthesis.cross_platform && (synthesis.cross_platform.summary || synthesis.cross_platform.messaging_and_strategy || (synthesis.cross_platform.claims || []).length)){
-          html += '<div class="sci-cross-section"><h3>Cross-platform</h3><p class="sci-summary">' + esc(synthesis.cross_platform.summary) + '</p>' +
+        if(synthesis.cross_platform && (toPoints(synthesis.cross_platform.summary).length || toPoints(synthesis.cross_platform.messaging_and_strategy).length || (synthesis.cross_platform.claims || []).length)){
+          html += '<div class="sci-cross-section"><h3>Cross-platform</h3>' +
+            renderSection('Content patterns', '◈', renderBulletList(synthesis.cross_platform.summary, 'sci-summary-list')) +
             renderStrategy(synthesis.cross_platform.messaging_and_strategy) +
-            '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div></div>';
+            renderSection('Evidence from real posts', '◇', (synthesis.cross_platform.claims || []).length ? '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div>' : '') +
+          '</div>';
         }
       }
 

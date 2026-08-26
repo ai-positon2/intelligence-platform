@@ -34,32 +34,42 @@ _SYSTEM = (
     "cta, tone, hook, format_technique, branding: grounded in the depicted "
     "creative AND the post's real caption/description copy, since that's the "
     "brand's own words, not a guess).\n\n"
-    "For each platform with real activity, write TWO distinct pieces of "
-    "analysis -- do not blend them into one paragraph:\n"
-    "- summary: a descriptive read of what the content actually looks like "
-    "and shows.\n"
-    "- messaging_and_strategy: a genuinely analytical read. Cover: what value "
-    "proposition(s) and message pillars recur across posts; what tone/brand "
-    "voice comes through; what production technique(s) dominate (UGC vs. "
-    "studio vs. talking-head vs. meme-format vs. testimonial, etc.); how "
-    "hooks and CTAs are actually used; and -- critically -- what specifically "
-    "about the creative or messaging differs between the platform's "
-    "top-engaging posts and its weaker ones. Be concrete and specific to "
-    "this company's actual content; never write generic marketing advice "
-    "that could apply to any brand.\n\n"
+    "Write for someone skimming on a screen, not reading a print essay: "
+    "SHORT, SCANNABLE BULLET POINTS, never a dense paragraph. For each "
+    "platform with real activity, produce TWO distinct bulleted lists (do "
+    "not blend them):\n"
+    "- summary: 2-5 short bullets, each ONE focused, self-contained idea in "
+    "plain language (one or two sentences), describing what the content "
+    "actually looks like and shows.\n"
+    "- messaging_and_strategy: 2-5 short analytical bullets, each ONE "
+    "focused idea. Across the list, cover: what value proposition(s) and "
+    "message pillars recur; what tone/brand voice comes through; what "
+    "production technique(s) dominate (UGC vs. studio vs. talking-head vs. "
+    "meme-format vs. testimonial, etc.); how hooks and CTAs are actually "
+    "used; and -- critically -- what specifically about the creative or "
+    "messaging differs between the platform's top-engaging posts and its "
+    "weaker ones. Be concrete and specific to this company's actual "
+    "content; never write generic marketing advice that could apply to any "
+    "brand.\n\n"
+    "Never write a raw post id inline in summary or messaging_and_strategy "
+    "text (e.g. never write \"(id 12, 13)\") -- a normal reader has no idea "
+    "what that means. Citations belong ONLY in claims, below, where the "
+    "reader will see them rendered as real linked post cards (thumbnail, "
+    "title, date), never bare numbers.\n\n"
     "Ground every claim in what was actually seen, and every claim must cite "
     "2-3 real post ids from the digest that support it, using the \"id\" "
     "field exactly as given -- never invent an id. If a platform has little "
     "or no organic activity (a status of no_presence, low_activity, "
-    "handle_not_found, scrape_failed, or error), say so plainly in that "
-    "platform's summary instead of fabricating patterns from nothing, and "
-    "leave messaging_and_strategy as an empty string for that platform -- "
-    "there is nothing real to analyze. Respond with ONLY a JSON object, no "
-    "prose before or after:\n"
-    '{"platforms": {"<platform>": {"summary": str, "messaging_and_strategy": '
-    'str, "claims": [{"text": str, "post_ids": [int, ...]}]}}, '
-    '"cross_platform": {"summary": str, "messaging_and_strategy": str, '
-    '"claims": [{"text": str, "post_ids": [int, ...]}]}}'
+    "handle_not_found, scrape_failed, or error), say so plainly as a single "
+    "summary bullet instead of fabricating patterns from nothing, and leave "
+    "messaging_and_strategy as an empty list for that platform -- there is "
+    "nothing real to analyze. Respond with ONLY a JSON object, no prose "
+    "before or after:\n"
+    '{"platforms": {"<platform>": {"summary": [str, ...], '
+    '"messaging_and_strategy": [str, ...], "claims": [{"text": str, '
+    '"post_ids": [int, ...]}]}}, "cross_platform": {"summary": [str, ...], '
+    '"messaging_and_strategy": [str, ...], "claims": [{"text": str, '
+    '"post_ids": [int, ...]}]}}'
 )
 
 
@@ -82,6 +92,18 @@ def _post_digest(post: dict) -> dict:
         "metrics": post.get("metrics") or {},
         "what_was_seen": analysis if analysis and "error" not in analysis else None,
     }
+
+
+def _clean_points(points) -> list[str]:
+    """summary/messaging_and_strategy are now bulleted lists, not a single
+    paragraph -- but tolerate a bare string too (a model slip, or an older
+    stored run's shape) by treating it as one bullet, rather than dropping
+    it or crashing."""
+    if isinstance(points, str):
+        points = [points] if points.strip() else []
+    if not isinstance(points, list):
+        return []
+    return [text for text in (str(p or "").strip() for p in points) if text]
 
 
 def _clean_claims(claims, valid_ids: set) -> list:
@@ -115,14 +137,14 @@ def _parse(raw: str, valid_ids: set) -> dict | None:
         if not isinstance(entry, dict):
             continue
         platforms[platform] = {
-            "summary": str(entry.get("summary") or ""),
-            "messaging_and_strategy": str(entry.get("messaging_and_strategy") or ""),
+            "summary": _clean_points(entry.get("summary")),
+            "messaging_and_strategy": _clean_points(entry.get("messaging_and_strategy")),
             "claims": _clean_claims(entry.get("claims"), valid_ids),
         }
     cross = parsed.get("cross_platform") or {}
     cross_platform = {
-        "summary": str(cross.get("summary") or ""),
-        "messaging_and_strategy": str(cross.get("messaging_and_strategy") or ""),
+        "summary": _clean_points(cross.get("summary")),
+        "messaging_and_strategy": _clean_points(cross.get("messaging_and_strategy")),
         "claims": _clean_claims(cross.get("claims"), valid_ids),
     }
     return {"platforms": platforms, "cross_platform": cross_platform}
