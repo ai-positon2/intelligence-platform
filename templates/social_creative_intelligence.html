@@ -420,6 +420,21 @@
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
     var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API'};
     var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
+    var VIEW_GLYPH = '↗';
+
+    // Which run's data the "Top performing posts" toolbars (sort/show-all)
+    // read from -- set once per renderReport() call, so a sort click can
+    // re-render just its own platform section without a second fetch.
+    var CURRENT_RUN = null;
+    var POST_SORT = {};    // platform -> 'top' | 'recent'
+    var POST_SHOWALL = {}; // platform -> bool
+
+    var METRIC_ICONS = {
+      likes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2s-7.2-4.4-9.6-8.9C.9 7.9 2.4 4.6 5.6 3.8c2-.5 4 .3 5.2 2 .5.7 1 .7 1.5 0 1.2-1.7 3.2-2.5 5.2-2 3.2.8 4.7 4.1 3.2 7.5-2.4 4.5-9.6 8.9-9.6 8.9z"/></svg>',
+      comments: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8 8 0 01-11.6 7.1L4 20l1.4-4.2A8 8 0 1121 11.5z"/></svg>',
+      shares: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V8a2 2 0 012-2h9M11 2l4 4-4 4M20 12v4a2 2 0 01-2 2H9M13 22l-4-4 4-4"/></svg>',
+      views: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+    };
 
     // ── Small formatting helpers ────────────────────────────────────────────
     function fmtNum(n){
@@ -435,6 +450,18 @@
       if(isNaN(d.getTime())) return '';
       return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
     }
+    // Compact "3mo"/"2w"/"5d" style age, for post-card footers -- fmtDate's
+    // full date is still one hover (the card's title attribute) away.
+    function relTime(iso){
+      if(!iso) return '';
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return '';
+      var s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+      var units = [[31536000,'y'],[2592000,'mo'],[604800,'w'],[86400,'d'],[3600,'h'],[60,'m']];
+      for(var i=0;i<units.length;i++){ var v = Math.floor(s/units[i][0]); if(v>=1) return v+units[i][1]; }
+      return 'now';
+    }
+    function fmtFullNum(n){ return Number(n).toLocaleString('en-US'); }
     // A run's raw timestamp (e.g. "2026-08-26T09:38:07.479941+00:00") is
     // useless at a glance and indistinguishable between several runs done
     // minutes apart on the same day. Same-day rows show just a clock time
@@ -478,10 +505,17 @@
       Object.keys(metrics).forEach(function(k){ if(typeof metrics[k] === 'number') s += metrics[k]; });
       return s;
     }
-    function topEngagingPosts(posts, platform, n){
-      return (posts || []).filter(function(p){ return p.platform === platform; })
-        .slice().sort(function(a,b){ return engagementScore(b.metrics) - engagementScore(a.metrics); })
-        .slice(0, n || 3);
+    function platformPosts(platform){
+      return ((CURRENT_RUN && CURRENT_RUN.posts) || []).filter(function(p){ return p.platform === platform; });
+    }
+    function sortedPlatformPosts(platform){
+      var posts = platformPosts(platform).slice();
+      if((POST_SORT[platform] || 'top') === 'recent'){
+        posts.sort(function(a,b){ return new Date(b.posted_at || 0) - new Date(a.posted_at || 0); });
+      } else {
+        posts.sort(function(a,b){ return engagementScore(b.metrics) - engagementScore(a.metrics); });
+      }
+      return posts;
     }
     function postThemeWords(post){
       var a = post.creative_analysis;
@@ -553,8 +587,16 @@
       return order.map(function(pair){
         var v = metrics[pair[0]];
         if(typeof v !== 'number') return '';
-        return '<span class="sci-metric-chip">' + fmtNum(v) + ' ' + pair[1] + '</span>';
+        return '<span class="sci-metric-chip" title="' + fmtFullNum(v) + ' ' + pair[1] + '"><span class="sci-metric-ic">' + METRIC_ICONS[pair[0]] + '</span>' + fmtNum(v) + '</span>';
       }).join('');
+    }
+    // "carousel" is the only post_type that needs a friendlier label than a
+    // plain capitalized post_type -- everything else already reads fine
+    // uppercased by .sci-postcard-type's own CSS.
+    function postFormatLabel(post){
+      var t = post.post_type || 'post';
+      if(t === 'carousel') return 'Multi-image';
+      return t.charAt(0).toUpperCase() + t.slice(1);
     }
 
     function renderPostCard(post){
@@ -562,13 +604,48 @@
       var media = '<div class="sci-postcard-media' + (thumb ? '' : ' sci-postcard-noimg') + '">' +
         (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\');this.remove()">' : '') +
         '<span class="sci-postcard-ic">' + meta.icon + '</span>' +
-        '<span class="sci-postcard-type">' + esc(post.post_type || 'post') + '</span></div>';
+        '<span class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</span></div>';
+      var when = relTime(post.posted_at);
       return '<a class="sci-postcard" href="' + esc(post.post_url || '#') + '" target="_blank" rel="noopener" style="--pf-color:' + meta.color + '">' +
         media +
         '<div class="sci-postcard-body">' +
           '<div class="sci-postcard-title">' + esc(title) + '</div>' +
-          '<div class="sci-postcard-foot"><span class="sci-postcard-date">' + esc(fmtDate(post.posted_at)) + '</span>' + metricChips(post.metrics) + '</div>' +
+          '<div class="sci-postcard-foot">' +
+            (when ? '<span class="sci-postcard-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
+            metricChips(post.metrics) +
+            (post.post_url ? '<span class="sci-postcard-view">View ' + VIEW_GLYPH + '</span>' : '') +
+          '</div>' +
         '</div></a>';
+    }
+
+    // ── "Top performing posts" toolbar: Top/Most-recent sort + a capped grid
+    // with a "Show all" expand -- reads live from CURRENT_RUN so a toggle
+    // click only needs to swap this one platform's #sci-postsec-<platform>. ──
+    function renderPostsSection(platform){
+      var all = sortedPlatformPosts(platform);
+      if(!all.length) return '';
+      var showAll = !!POST_SHOWALL[platform];
+      var limit = showAll ? all.length : Math.min(24, all.length);
+      var shown = all.slice(0, limit);
+      var mode = POST_SORT[platform] || 'top';
+      var bar = '<div class="sci-posts-bar"><div class="sci-seg">' +
+        '<button type="button" class="sci-seg-btn' + (mode === 'top' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'top\')">Top</button>' +
+        '<button type="button" class="sci-seg-btn' + (mode === 'recent' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'recent\')">Most recent</button>' +
+        '</div><span class="sci-posts-count">Showing ' + shown.length + ' of ' + all.length + ' posts</span></div>';
+      var grid = '<div class="sci-postcard-grid">' + shown.map(renderPostCard).join('') + '</div>';
+      var more = (!showAll && all.length > limit) ?
+        '<button type="button" class="sci-posts-more" onclick="showAllPlatformPosts(\'' + platform + '\')">Show all ' + all.length + ' posts</button>' : '';
+      return '<div class="sci-postsec" id="sci-postsec-' + esc(platform) + '">' + bar + grid + more + '</div>';
+    }
+    function setPostSort(platform, mode){
+      POST_SORT[platform] = mode;
+      var el = document.getElementById('sci-postsec-' + platform);
+      if(el) el.outerHTML = renderPostsSection(platform);
+    }
+    function showAllPlatformPosts(platform){
+      POST_SHOWALL[platform] = true;
+      var el = document.getElementById('sci-postsec-' + platform);
+      if(el) el.outerHTML = renderPostsSection(platform);
     }
 
     function renderPostChip(post){
@@ -683,6 +760,9 @@
     }
 
     function renderReport(run){
+      CURRENT_RUN = run;
+      POST_SORT = {};
+      POST_SHOWALL = {};
       var postsById = {}, allPosts = run.posts || [];
       allPosts.forEach(function(p){ postsById[p.id] = p; });
       var synthesis = run.synthesis || null;
@@ -738,14 +818,13 @@
           var pr = platformsByName[platform] || {};
           var meta = platformMeta(platform);
           var mix = computeFormatMix(allPosts, platform);
-          var topPosts = topEngagingPosts(allPosts, platform, 3);
           html += '<div class="sci-platform-section" id="sci-plat-' + esc(platform) + '" style="--pf-color:' + meta.color + '">' +
             '<div class="sci-plat-head"><span class="sci-plat-ic">' + meta.icon + '</span><h3>' + esc(platform) + '</h3>' +
             (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') +
             (VENDOR_LABEL[pr.source_vendor] ? '<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>' : '') + '</div>' +
             renderFormatMix(mix) +
             renderThemeChips(allPosts, platform) +
-            renderSection('Top performing posts', '▣', topPosts.length ? '<div class="sci-postcard-grid">' + topPosts.map(renderPostCard).join('') + '</div>' : '') +
+            renderSection('Top performing posts', '▣', renderPostsSection(platform)) +
             renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
             renderStrategy(entry.messaging_and_strategy) +
             renderSection('Evidence from real posts', '◇', entry.claims && entry.claims.length ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '') +
