@@ -416,12 +416,12 @@ table.gd-tbl td:last-child { padding-right: 22px; }
    hairline itself is red-tinted now (was a neutral white) so a scan for
    "closed" reads as the low end of the same red-to-green scale, not as a
    colorless gap in it. */
-.gd-cell.r0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(248,113,113,.35); }
-.gd-cell.r0::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 1px; background: rgba(248,113,113,.55); }
+.gd-cell.r0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(224,150,140,.4); }
+.gd-cell.r0::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 1px; background: rgba(224,150,140,.6); }
 .gd-legend { display: flex; align-items: center; gap: 9px; font-size: 10.5px; color: #6c7f78; padding: 10px 14px 0; flex-wrap: wrap; }
 .gd-legend-steps { display: inline-flex; gap: 3px; }
 .gd-legend-steps i { width: 20px; height: 11px; border-radius: 3px; display: block; }
-.gd-legend-steps i.l0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(248,113,113,.4); }
+.gd-legend-steps i.l0 { background: transparent; box-shadow: inset 0 0 0 1px rgba(224,150,140,.45); }
 .gd-legend-steps i.l1 { background: var(--gd-r1); }
 .gd-legend-steps i.l2 { background: var(--gd-r2); }
 .gd-legend-steps i.l3 { background: var(--gd-r3); }
@@ -564,22 +564,26 @@ table.gd-tbl td:last-child { padding-right: 22px; }
    red-tinted to match this end of the ramp too (it was a neutral hairline
    before) -- a front-desk scan for "which office needs slots" reads red as
    the thing to act on.
+   Desaturated on purpose -- this is a grid of 80-odd cells sitting on screen
+   at all times, not a one-off alert, so it stays pastel (low saturation, high
+   lightness) rather than the fully-saturated version of the same hues, which
+   read as loud/alarming at that scale.
    Light gets its own, deeper steps rather than a dimmed copy of the dark
    ramp, matching the rest of this file's per-theme convention (see the ribbon
    steps below) since a color tuned for a near-black card washes out on white. */
 :root {
-  --gd-r1: #f97316;
-  --gd-r2: #f59e0b;
-  --gd-r3: #eab308;
-  --gd-r4: #84cc16;
-  --gd-r5: #22c55e;
+  --gd-r1: #e8b48f;
+  --gd-r2: #edc98e;
+  --gd-r3: #ecdd9c;
+  --gd-r4: #cbdda0;
+  --gd-r5: #a8cdac;
 }
 :root[data-theme="light"] {
-  --gd-r1: #ea580c;
-  --gd-r2: #d97706;
-  --gd-r3: #ca8a04;
-  --gd-r4: #65a30d;
-  --gd-r5: #16a34a;
+  --gd-r1: #d99a6c;
+  --gd-r2: #d6b06a;
+  --gd-r3: #d0c073;
+  --gd-r4: #a8c274;
+  --gd-r5: #82b389;
 }
 
 /* ════ LIGHT THEME ════ */
@@ -734,10 +738,10 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 :root[data-theme="light"] .gd-heat tbody th.rowhead { color: #12251d; }
 :root[data-theme="light"] .gd-heat tbody tr:hover th.rowhead { color: #047857; }
 :root[data-theme="light"] .gd-heat tbody th.rowhead span { color: #5c665f; }
-:root[data-theme="light"] .gd-cell.r0 { box-shadow: inset 0 0 0 1px rgba(220,38,38,.35); }
-:root[data-theme="light"] .gd-cell.r0::after { background: rgba(220,38,38,.45); }
+:root[data-theme="light"] .gd-cell.r0 { box-shadow: inset 0 0 0 1px rgba(196,120,108,.45); }
+:root[data-theme="light"] .gd-cell.r0::after { background: rgba(196,120,108,.55); }
 :root[data-theme="light"] .gd-cell:hover { box-shadow: 0 0 0 2px rgba(4,120,87,.6); }
-:root[data-theme="light"] .gd-legend-steps i.l0 { box-shadow: inset 0 0 0 1px rgba(220,38,38,.4); }
+:root[data-theme="light"] .gd-legend-steps i.l0 { box-shadow: inset 0 0 0 1px rgba(196,120,108,.5); }
 :root[data-theme="light"] .gd-tip { background: rgba(255,255,255,.99); border-color: rgba(4,120,87,.3); color: #3c4a44; box-shadow: 0 12px 34px rgba(30,40,80,.2); }
 :root[data-theme="light"] .gd-tip b { color: #3f6212; }
 :root[data-theme="light"] .gd-tip .t-name { color: #12251d; }
