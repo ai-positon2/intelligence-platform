@@ -38,6 +38,23 @@ class _FakeBlock:
         self.text = text
 
 
+class _FakeStreamManager:
+    """Stands in for anthropic's MessageStreamManager -- production code
+    only ever does `with client.messages.stream(...) as stream:
+    stream.get_final_message()`, so that's all this needs to support."""
+    def __init__(self, text):
+        self._text = text
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def get_final_message(self):
+        return type("FakeResponse", (), {"content": [_FakeBlock(self._text)]})()
+
+
 class _FakeMessages:
     """`fail_types` maps a web_search tool-type string to the exception that
     call should raise, so a test can simulate one dated version being
@@ -50,14 +67,14 @@ class _FakeMessages:
         self._fail_types = fail_types or {}
         self.calls = []
 
-    def create(self, **kwargs):
+    def stream(self, **kwargs):
         tool_type = kwargs.get("tools", [{}])[0].get("type")
         self.calls.append(tool_type)
         if tool_type in self._fail_types:
             raise self._fail_types[tool_type]
         if self._exc:
             raise self._exc
-        return type("FakeResponse", (), {"content": [_FakeBlock(self._text)]})()
+        return _FakeStreamManager(self._text)
 
 
 class _FakeClient:
@@ -146,6 +163,24 @@ def test_identify_handles_falls_back_when_the_newest_tool_version_is_rejected(mo
     assert result["instagram"]["handle"] == "acmeinc"
     assert client.messages.calls == [newest, next_best]
     assert sci_identify._WEB_SEARCH_TOOL == next_best
+
+
+def test_identify_handles_treats_a_real_anthropic_timeout_as_transient(monkeypatch):
+    """The actual production failure: a 6-platform, up-to-15-search call
+    genuinely running long enough to hit anthropic.APITimeoutError. This
+    must not be misread as "this tool version is unsupported" (which would
+    pointlessly retry it against two more versions, each equally likely to
+    also time out) and the real timeout detail must reach the caller."""
+    import anthropic
+    import httpx
+    timeout_err = anthropic.APITimeoutError(request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+    newest = sci_identify._WEB_SEARCH_TOOL_VERSIONS[0]
+    client = _FakeClient(fail_types={newest: timeout_err})
+    monkeypatch.setattr(sci_identify, "_anthropic", lambda: client)
+    result = sci_identify.identify_handles("Acme Inc")
+    assert client.messages.calls == [newest]
+    assert all(v["confidence"] == "none" for v in result.values())
+    assert "timed out" in result["instagram"]["reasoning"].lower()
 
 
 def test_identify_handles_does_not_burn_through_versions_on_a_transient_error(monkeypatch):
