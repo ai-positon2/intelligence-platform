@@ -22,7 +22,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app as appmod  # noqa: E402
-from tracker import sci_store, sci_pipeline, arena_client  # noqa: E402
+from tracker import sci_store, sci_pipeline, sci_company_search  # noqa: E402
 
 _OWNER = "owner@position2.com"
 _OTHER = "other@position2.com"
@@ -87,12 +87,13 @@ def test_analyze_requires_login():
 # ── /search ───────────────────────────────────────────────────────────────
 # Shown before a run starts, so an ambiguous free-text name (the "apple"
 # case: identify_handles couldn't confidently resolve it on any platform)
-# can be disambiguated into one real company + domain first. Same vendor
-# (Arena) and error-reporting contract as linkedin_playbook_studio_search,
-# see tests/test_linkedin_playbook_studio_route.py's own Search section.
+# can be disambiguated into one real company + domain first. Native to this
+# platform (tracker/sci_company_search.py, Apollo-backed) rather than the
+# Arena vendor linkedin_playbook_studio_search uses -- see that module's
+# docstring for why. Same typed-error-reporting contract either way.
 
-def test_search_returns_companies_from_the_arena_client(monkeypatch):
-    monkeypatch.setattr(arena_client, "search_companies_result",
+def test_search_returns_companies_from_sci_company_search(monkeypatch):
+    monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: {"companies": [{"id": "", "name": "Acme", "website": "acme.com"}], "error": None})
     resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=Acme")
     assert resp.status_code == 200
@@ -101,9 +102,9 @@ def test_search_returns_companies_from_the_arena_client(monkeypatch):
     assert "error" not in body
 
 
-def test_search_with_no_query_returns_an_empty_list_without_calling_arena(monkeypatch):
+def test_search_with_no_query_returns_an_empty_list_without_calling_apollo(monkeypatch):
     called = []
-    monkeypatch.setattr(arena_client, "search_companies_result",
+    monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: called.append(q) or {"companies": [], "error": None})
     resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search")
     assert resp.get_json()["companies"] == []
@@ -111,14 +112,14 @@ def test_search_with_no_query_returns_an_empty_list_without_calling_arena(monkey
 
 
 def test_search_degrades_to_an_empty_list_without_a_configured_key(monkeypatch):
-    monkeypatch.delenv("ARENA_API_KEY", raising=False)
+    monkeypatch.delenv("APOLLO_API_KEY", raising=False)
     resp = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=apple")
     assert resp.status_code == 200
     assert resp.get_json()["companies"] == []
 
 
 def _failing_search(monkeypatch, kind="http_status", status=401, detail="HTTP 401. Body: bad key"):
-    monkeypatch.setattr(arena_client, "search_companies_result", lambda q: {
+    monkeypatch.setattr(sci_company_search, "search_companies_result", lambda q: {
         "companies": [], "error": {"kind": kind, "status": status,
                                    "detail": detail, "attempts": 1},
         "elapsed_ms": 12, "source": "",
@@ -180,7 +181,7 @@ def test_a_failed_search_falls_back_to_the_users_own_analyzed_companies(monkeypa
 
 def test_a_successful_search_never_consults_history(monkeypatch):
     called = []
-    monkeypatch.setattr(arena_client, "search_companies_result",
+    monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: {"companies": [{"id": "", "name": "Acme"}], "error": None})
     monkeypatch.setattr(sci_store, "search_known_companies",
                         lambda *a, **k: called.append(1) or [])
@@ -190,7 +191,7 @@ def test_a_successful_search_never_consults_history(monkeypatch):
 
 
 def test_a_genuine_zero_result_carries_no_error_at_all(monkeypatch):
-    monkeypatch.setattr(arena_client, "search_companies_result",
+    monkeypatch.setattr(sci_company_search, "search_companies_result",
                         lambda q: {"companies": [], "error": None})
     body = _client().get("/p2/b2b-agents/social-creative-intelligence/search?q=zzz").get_json()
     assert body == {"companies": []}
