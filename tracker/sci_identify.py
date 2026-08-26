@@ -84,7 +84,14 @@ def _anthropic():
     if not key:
         return None
     from anthropic import Anthropic
-    return Anthropic(api_key=key, timeout=90.0, max_retries=1)
+    # A 6-platform identification with up to 15 web searches routinely runs
+    # long enough to blow past a short timeout -- that showed up in
+    # production as "Request timed out or interrupted" on every platform at
+    # once (see the streamed call below, which is the other half of this
+    # fix). 280s gives the tool-use loop real room; max_retries covers a
+    # dropped connection mid-stream without this module's own version
+    # fallback loop having to treat that as "try the next tool version".
+    return Anthropic(api_key=key, timeout=280.0, max_retries=2)
 
 
 def _empty_result(reasoning: str) -> dict[str, dict]:
@@ -150,13 +157,21 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
     last_err = None
     for version in versions:
         try:
-            resp = client.messages.create(
+            # Streamed, not a plain create() -- a 6-platform lookup with up
+            # to 15 web searches is exactly the kind of long-running call
+            # Anthropic's own docs (see the "long-requests" link in a
+            # timeout error's message) say to stream rather than wait on as
+            # one blocking response; get_final_message() still hands back a
+            # normal Message with the same .content shape the rest of this
+            # function expects.
+            with client.messages.stream(
                 model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
                 max_tokens=4000,
                 system=_SYSTEM,
                 tools=[{"type": version, "name": "web_search", "max_uses": 15}],
                 messages=[{"role": "user", "content": user_text}],
-            )
+            ) as stream:
+                resp = stream.get_final_message()
         except Exception as e:
             last_err = e
             logger.warning("sci_identify: web_search tool '%s' failed for %r: %s",
