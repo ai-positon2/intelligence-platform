@@ -246,6 +246,11 @@
       return '<div class="sci-format-mix"><div class="fm-bar">' + bar + '</div></div><div class="fm-legend">' + legend + '</div>';
     }
 
+    function renderStrategy(text){
+      if(!text) return '';
+      return '<div class="sci-strategy"><div class="sci-strategy-label"><span>◆</span>Messaging &amp; strategy</div><p>' + esc(text) + '</p></div>';
+    }
+
     function renderThumbs(posts, platform){
       var items = (posts || []).filter(function(p){
         return p.platform === platform && Array.isArray(p.media_urls) && p.media_urls.length;
@@ -326,12 +331,14 @@
             (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') + '</div>' +
             renderFormatMix(mix) +
             '<p class="sci-summary">' + esc(entry.summary) + '</p>' +
+            renderStrategy(entry.messaging_and_strategy) +
             renderThumbs(allPosts, platform) +
             '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' +
           '</div>';
         });
-        if(synthesis.cross_platform && (synthesis.cross_platform.summary || (synthesis.cross_platform.claims || []).length)){
+        if(synthesis.cross_platform && (synthesis.cross_platform.summary || synthesis.cross_platform.messaging_and_strategy || (synthesis.cross_platform.claims || []).length)){
           html += '<div class="sci-cross-section"><h3>Cross-platform</h3><p class="sci-summary">' + esc(synthesis.cross_platform.summary) + '</p>' +
+            renderStrategy(synthesis.cross_platform.messaging_and_strategy) +
             '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div></div>';
         }
       }

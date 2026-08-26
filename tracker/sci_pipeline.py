@@ -188,6 +188,26 @@ def _collect_youtube(handle: str) -> list[dict]:
                                                   max_results=DEFAULT_MIN_POSTS, days=DEFAULT_WINDOW_DAYS)
 
 
+def _video_thumbnail_url(post: dict) -> str | None:
+    """Best-effort static thumbnail for a video post whose frames couldn't be
+    extracted -- most commonly YouTube, where yt-dlp/ffmpeg frame extraction
+    (tracker/sci_video.py) frequently gets blocked by YouTube's bot detection
+    from a datacenter IP like Railway's, leaving creative_analysis null for
+    every video on that platform. YouTube's Data API returns a real
+    thumbnail URL for free (tracker/sci_youtube_client.py already stores it
+    under raw.snippet.thumbnails); analyzing that instead of giving up keeps
+    the post grounded in real visual data rather than leaving it blank.
+    Written platform-agnostically so any other adapter that starts
+    populating the same raw.snippet.thumbnails shape benefits automatically."""
+    thumbs = ((post.get("raw") or {}).get("snippet") or {}).get("thumbnails") or {}
+    for key in ("maxres", "standard", "high", "medium", "default"):
+        entry = thumbs.get(key)
+        url = entry.get("url") if isinstance(entry, dict) else None
+        if url:
+            return url
+    return None
+
+
 def run_platform_creative_analysis(run_id: int, platform: str) -> None:
     """Step 3 for one platform's already-collected posts, staged per-post so
     one slow/failed video never blocks the rest of the platform. Marks the
@@ -209,8 +229,23 @@ def run_platform_creative_analysis(run_id: int, platform: str) -> None:
             if post_type in ("video", "reel", "short"):
                 frames = sci_video.extract_frames(media_urls[0], n=MAX_VIDEO_FRAMES)
                 if not frames:
+                    thumbnail_url = _video_thumbnail_url(post)
+                    if not thumbnail_url:
+                        sci_store.update_post_creative_analysis(
+                            post["id"], None, status="failed", error="Could not extract any video frames.")
+                        continue
+                    # Frame extraction failed (most commonly YouTube blocking
+                    # yt-dlp) -- fall back to the platform's own thumbnail
+                    # image rather than leaving this post fully unanalyzed.
+                    # No transcript is possible from a single static image.
+                    analysis = sci_vision.analyze_image(thumbnail_url, context=context)
+                    if "error" not in analysis:
+                        analysis["frame_extraction_note"] = (
+                            "Video frame extraction was unavailable for this post; "
+                            "analyzed the platform-provided thumbnail instead.")
+                    status = "failed" if "error" in analysis else "ok"
                     sci_store.update_post_creative_analysis(
-                        post["id"], None, status="failed", error="Could not extract any video frames.")
+                        post["id"], analysis, status=status, error=analysis.get("error"))
                     continue
                 frame_analyses = [sci_vision.analyze_image_bytes(f, context=context) for f in frames]
                 analysis = sci_vision.summarize_frames(frame_analyses, context=context)

@@ -40,6 +40,15 @@ _GOOD_REPLY = json.dumps({
     "on_screen_text": "30% OFF", "summary": "A product shot promoting a discount.",
 })
 
+_RICH_REPLY = json.dumps({
+    "subject": "a pair of running shoes", "setting": "studio, white background",
+    "people": "", "product": "running shoes", "style": "clean product photography",
+    "on_screen_text": "30% OFF", "messaging": "Discount urgency on the new running line",
+    "cta": "Shop now", "tone": "urgent", "hook": "Bold 30% OFF text over the product",
+    "format_technique": "studio product shot", "branding": "logo bottom-right",
+    "summary": "A product shot promoting a discount.",
+})
+
 
 def test_analyze_image_returns_not_configured_without_a_key(monkeypatch):
     monkeypatch.setattr(sci_vision, "_anthropic", lambda: None)
@@ -90,6 +99,25 @@ def test_analyze_image_bytes_parses_a_good_reply(monkeypatch):
     assert result["subject"] == "a pair of running shoes"
 
 
+def test_analyze_image_parses_the_new_messaging_fields(monkeypatch):
+    monkeypatch.setattr(sci_vision, "_anthropic", lambda: _FakeClient(response_text=_RICH_REPLY))
+    result = sci_vision.analyze_image("https://cdn/x.jpg", context={"caption": "30% off shoes!"})
+    assert result["messaging"] == "Discount urgency on the new running line"
+    assert result["cta"] == "Shop now"
+    assert result["tone"] == "urgent"
+    assert result["hook"] == "Bold 30% OFF text over the product"
+    assert result["format_technique"] == "studio product shot"
+    assert result["branding"] == "logo bottom-right"
+
+
+def test_analyze_image_defaults_messaging_fields_to_empty_string_when_absent(monkeypatch):
+    monkeypatch.setattr(sci_vision, "_anthropic", lambda: _FakeClient(response_text=_GOOD_REPLY))
+    result = sci_vision.analyze_image("https://cdn/x.jpg")
+    assert result["messaging"] == ""
+    assert result["cta"] == ""
+    assert result["tone"] == ""
+
+
 def test_summarize_frames_reports_when_every_frame_failed():
     result = sci_vision.summarize_frames([{"error": "vendor_call_failed"}, {"error": "vendor_call_failed"}])
     assert result["error"] == "no_frames_analyzed"
@@ -106,3 +134,28 @@ def test_summarize_frames_folds_successful_frames_only():
     assert result["frame_count"] == 3
     assert result["frames_analyzed"] == 2
     assert result["subjects"] == ["logo intro", "product in hand"]
+
+
+def test_summarize_frames_dedupes_messaging_level_fields_across_frames():
+    frames = [
+        {"subject": "logo intro", "messaging": "New running line launch", "cta": "Shop now",
+         "tone": "urgent", "format_technique": "studio product shot", "branding": "logo intro card",
+         "hook": "Logo animates in over a bold headline", "summary": "Opens on the logo."},
+        {"subject": "product in hand", "messaging": "New running line launch", "cta": "",
+         "tone": "urgent", "format_technique": "studio product shot", "branding": "",
+         "hook": "", "summary": "Shows the product."},
+    ]
+    result = sci_vision.summarize_frames(frames)
+    assert result["messaging"] == "New running line launch"
+    assert result["cta"] == "Shop now"
+    assert result["tone"] == "urgent"
+    assert result["format_technique"] == "studio product shot"
+
+
+def test_summarize_frames_takes_hook_only_from_the_opening_frame():
+    frames = [
+        {"subject": "logo intro", "hook": "Bold opening headline", "summary": "s1"},
+        {"subject": "product in hand", "hook": "should be ignored, not the opener", "summary": "s2"},
+    ]
+    result = sci_vision.summarize_frames(frames)
+    assert result["hook"] == "Bold opening headline"

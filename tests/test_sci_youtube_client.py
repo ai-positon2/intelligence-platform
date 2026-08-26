@@ -59,6 +59,35 @@ def test_list_recent_videos_normalizes_snippet_and_stats(mock_get):
 
 
 @patch("tracker.sci_youtube_client.requests.get")
+def test_list_recent_videos_folds_the_description_into_the_caption(mock_get):
+    mock_get.side_effect = [
+        _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),
+        _resp({"items": [
+            {"contentDetails": {"videoId": "v1", "videoPublishedAt": "2026-08-01T00:00:00Z"},
+             "snippet": {"title": "Our new launch", "description": "30% off this week. Link in bio.",
+                        "publishedAt": "2026-08-01T00:00:00Z"}},
+        ], "nextPageToken": None}),
+        _resp({"items": []}),
+    ]
+    out = yt.list_recent_videos("UC123", "key", max_results=5, days=30)
+    assert out[0]["caption"] == "Our new launch\n\n30% off this week. Link in bio."
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_list_recent_videos_caption_falls_back_to_title_without_a_description(mock_get):
+    mock_get.side_effect = [
+        _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),
+        _resp({"items": [
+            {"contentDetails": {"videoId": "v1", "videoPublishedAt": "2026-08-01T00:00:00Z"},
+             "snippet": {"title": "Our new launch", "publishedAt": "2026-08-01T00:00:00Z"}},
+        ], "nextPageToken": None}),
+        _resp({"items": []}),
+    ]
+    out = yt.list_recent_videos("UC123", "key", max_results=5, days=30)
+    assert out[0]["caption"] == "Our new launch"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
 def test_list_recent_videos_flags_a_shorts_title(mock_get):
     mock_get.side_effect = [
         _resp({"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUxyz"}}}]}),

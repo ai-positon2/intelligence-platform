@@ -23,12 +23,15 @@ def _engagement_score(metrics: dict) -> float:
 def _post_keywords(post: dict) -> list[str]:
     """Recurring-theme words from one post's creative_analysis -- covers
     both the image/carousel shape (sci_vision.analyze_image's own fields)
-    and the video shape (sci_vision.summarize_frames's folded lists)."""
+    and the video shape (sci_vision.summarize_frames's folded lists). tone
+    and format_technique use the SAME key name in both shapes (video folds
+    them into one dedupe-joined string, see summarize_frames), so they only
+    need the singular loop -- no plural variant to also check."""
     analysis = post.get("creative_analysis") or {}
     if not analysis or "error" in analysis:
         return []
     words = []
-    for key in ("subject", "setting", "style"):
+    for key in ("subject", "setting", "style", "tone", "format_technique"):
         v = analysis.get(key)
         if isinstance(v, str) and v.strip():
             words.append(v.strip().lower())

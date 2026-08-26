@@ -142,6 +142,68 @@ def test_image_posts_never_call_transcription(monkeypatch):
     assert called == []
 
 
+def _yt_post(id_, thumbnails=None, media_urls=("https://www.youtube.com/watch?v=v1",)):
+    return {"id": id_, "post_type": "video", "caption": "Our launch",
+           "media_urls": list(media_urls),
+           "raw": {"snippet": {"thumbnails": thumbnails or {}}}}
+
+
+def test_video_falls_back_to_the_platform_thumbnail_when_frame_extraction_fails(monkeypatch):
+    """The bug this round exists to fix: YouTube's yt-dlp/ffmpeg frame
+    extraction commonly gets blocked from a datacenter IP, so extract_frames
+    returns [] for every video -- creative_analysis must not just go null;
+    it should fall back to the real thumbnail the Data API already gave us."""
+    from tracker import sci_store
+    post = _yt_post(1, thumbnails={"high": {"url": "https://i.ytimg.com/vi/v1/hqdefault.jpg"}})
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [post])
+    monkeypatch.setattr("tracker.sci_video.extract_frames", lambda url, n: [])
+
+    seen_urls = []
+    def fake_analyze_image(url, context=None):
+        seen_urls.append(url)
+        return {"subject": "a product demo", "messaging": "New launch", "summary": "s"}
+    monkeypatch.setattr("tracker.sci_vision.analyze_image", fake_analyze_image)
+
+    called = []
+    monkeypatch.setattr("tracker.sci_vision.analyze_image_bytes", lambda *a, **k: called.append(1))
+    monkeypatch.setattr("tracker.sci_audio.transcribe_video", lambda url: called.append(1))
+
+    written = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written.update(analysis=analysis, status=status))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "youtube")
+
+    assert seen_urls == ["https://i.ytimg.com/vi/v1/hqdefault.jpg"]
+    assert called == []  # never fell through to frame-based analysis or transcription
+    assert written["status"] == "ok"
+    assert written["analysis"]["subject"] == "a product demo"
+    assert "frame_extraction_note" in written["analysis"]
+
+
+def test_video_with_no_frames_and_no_thumbnail_is_marked_failed(monkeypatch):
+    from tracker import sci_store
+    post = _yt_post(1, thumbnails={})
+    monkeypatch.setattr(sci_store, "get_posts", lambda run_id, platform: [post])
+    monkeypatch.setattr("tracker.sci_video.extract_frames", lambda url, n: [])
+    called = []
+    monkeypatch.setattr("tracker.sci_vision.analyze_image", lambda *a, **k: called.append(1))
+
+    written = {}
+    monkeypatch.setattr(sci_store, "update_post_creative_analysis",
+                        lambda post_id, analysis, status="ok", error=None:
+                        written.update(analysis=analysis, status=status, error=error))
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+
+    sci_pipeline.run_platform_creative_analysis(1, "youtube")
+
+    assert called == []
+    assert written["status"] == "failed"
+    assert written["analysis"] is None
+
+
 def test_a_failed_frame_analysis_never_calls_transcription(monkeypatch):
     """summarize_frames returning an error dict (every frame failed) must
     skip transcription entirely -- there is nothing to attach it to."""

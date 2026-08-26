@@ -146,7 +146,7 @@ def list_recent_videos(channel_id: str, api_key: str, max_results: int = 20, day
             "platform_post_id": vid,
             "post_url": f"https://www.youtube.com/watch?v={vid}",
             "post_type": "short" if _looks_like_short(snip) else "video",
-            "caption": snip.get("title", ""),
+            "caption": _caption(snip),
             "posted_at": snip.get("publishedAt"),
             "media_urls": [f"https://www.youtube.com/watch?v={vid}"],
             "metrics": {
@@ -172,6 +172,17 @@ def _video_stats(video_ids: list[str], api_key: str) -> dict[str, dict]:
     except requests.RequestException as e:
         logger.warning("sci_youtube_client: videos.statistics fetch failed: %s", e)
     return out
+
+
+def _caption(snippet: dict) -> str:
+    """Title alone is rarely more than a few words -- the real marketing
+    copy (offers, CTAs, messaging) usually lives in the description, so fold
+    both in rather than discarding the description entirely."""
+    title = snippet.get("title", "")
+    description = (snippet.get("description") or "").strip()
+    if not description:
+        return title
+    return f"{title}\n\n{description[:800]}"
 
 
 def _looks_like_short(snippet: dict) -> bool:

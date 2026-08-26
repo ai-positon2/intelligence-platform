@@ -26,20 +26,40 @@ _SYSTEM = (
     "You are a creative-intelligence analyst writing a report on a company's "
     "organic social content, platform by platform and then across platforms. "
     "You are given, for each platform, a pattern summary (format mix, "
-    "recurring visual themes, which posts got the most engagement) and a "
-    "digest of individual posts with what Claude vision actually saw in "
-    "each one's image or video -- not the caption. Ground every claim in "
-    "what was actually seen, and every claim must cite 2-3 real post ids "
-    "from the digest that support it, using the \"id\" field exactly as "
-    "given -- never invent an id. If a platform has little or no organic "
-    "activity (a status of no_presence, low_activity, handle_not_found, "
-    "scrape_failed, or error), say so plainly in that platform's summary "
-    "instead of fabricating patterns from nothing. Respond with ONLY a JSON "
-    "object, no prose before or after:\n"
-    '{"platforms": {"<platform>": {"summary": str, "claims": '
-    '[{"text": str, "post_ids": [int, ...]}]}}, '
-    '"cross_platform": {"summary": str, "claims": '
-    '[{"text": str, "post_ids": [int, ...]}]}}'
+    "recurring visual/production themes, which posts got the most engagement) "
+    "and a digest of individual posts. Each post's \"what_was_seen\" is what "
+    "Claude vision actually saw -- not the caption -- and includes both "
+    "visual fields (subject, setting, people, product, style, on_screen_text: "
+    "grounded strictly in what's depicted) and messaging fields (messaging, "
+    "cta, tone, hook, format_technique, branding: grounded in the depicted "
+    "creative AND the post's real caption/description copy, since that's the "
+    "brand's own words, not a guess).\n\n"
+    "For each platform with real activity, write TWO distinct pieces of "
+    "analysis -- do not blend them into one paragraph:\n"
+    "- summary: a descriptive read of what the content actually looks like "
+    "and shows.\n"
+    "- messaging_and_strategy: a genuinely analytical read. Cover: what value "
+    "proposition(s) and message pillars recur across posts; what tone/brand "
+    "voice comes through; what production technique(s) dominate (UGC vs. "
+    "studio vs. talking-head vs. meme-format vs. testimonial, etc.); how "
+    "hooks and CTAs are actually used; and -- critically -- what specifically "
+    "about the creative or messaging differs between the platform's "
+    "top-engaging posts and its weaker ones. Be concrete and specific to "
+    "this company's actual content; never write generic marketing advice "
+    "that could apply to any brand.\n\n"
+    "Ground every claim in what was actually seen, and every claim must cite "
+    "2-3 real post ids from the digest that support it, using the \"id\" "
+    "field exactly as given -- never invent an id. If a platform has little "
+    "or no organic activity (a status of no_presence, low_activity, "
+    "handle_not_found, scrape_failed, or error), say so plainly in that "
+    "platform's summary instead of fabricating patterns from nothing, and "
+    "leave messaging_and_strategy as an empty string for that platform -- "
+    "there is nothing real to analyze. Respond with ONLY a JSON object, no "
+    "prose before or after:\n"
+    '{"platforms": {"<platform>": {"summary": str, "messaging_and_strategy": '
+    'str, "claims": [{"text": str, "post_ids": [int, ...]}]}}, '
+    '"cross_platform": {"summary": str, "messaging_and_strategy": str, '
+    '"claims": [{"text": str, "post_ids": [int, ...]}]}}'
 )
 
 
@@ -96,11 +116,13 @@ def _parse(raw: str, valid_ids: set) -> dict | None:
             continue
         platforms[platform] = {
             "summary": str(entry.get("summary") or ""),
+            "messaging_and_strategy": str(entry.get("messaging_and_strategy") or ""),
             "claims": _clean_claims(entry.get("claims"), valid_ids),
         }
     cross = parsed.get("cross_platform") or {}
     cross_platform = {
         "summary": str(cross.get("summary") or ""),
+        "messaging_and_strategy": str(cross.get("messaging_and_strategy") or ""),
         "claims": _clean_claims(cross.get("claims"), valid_ids),
     }
     return {"platforms": platforms, "cross_platform": cross_platform}
@@ -138,7 +160,7 @@ def synthesize_report(run_id: int, classify_result: dict) -> dict:
     try:
         resp = client.messages.create(
             model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-            max_tokens=4000,
+            max_tokens=6000,
             system=_SYSTEM,
             messages=[{"role": "user", "content": json.dumps(payload)[:180000]}],
         )
