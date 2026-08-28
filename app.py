@@ -1608,7 +1608,7 @@ APP_AGENTS = [
         "slug": "social-creative-intelligence", "name": "Social Creative Intelligence Analyst",
         "tagline": "Cross-Platform Creative Analysis",
         "ac": "#fb923c", "ac2": "#f472b6", "icon": _asvg("<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M8 5l1.5-2h5L16 5\"/>"),
-        "pill1": "Cross-Platform Creative Analysis", "pill2": "6 platforms · vision-analyzed",
+        "pill1": "Cross-Platform Creative Analysis", "pill2": "7 platforms · vision-analyzed",
         "lead": ("Given a company name or URL, find its organic presence across Instagram, LinkedIn, X, TikTok, YouTube and Facebook, then actually look at every image and video to report what the creative shows and why it works."),
         "trips": [
             {"t": "What it does", "d": "Goes past post counts and captions to describe the actual creative: subject, style, narrative, tone, and ties it back to what drives engagement."},
@@ -8040,6 +8040,28 @@ def admin_external_usage_sci_identify_check():
     return jsonify(_sci_identify_selftest())
 
 
+def _sci_reddit_selftest() -> dict:
+    """Prove the Reddit integration end to end -- see
+    tracker/sci_reddit_client.probe. Free: one app-only token mint plus one
+    tiny public read. Reddit's unauthenticated .json endpoints now return a
+    403 block page to server traffic, so "is it configured" and "does it
+    actually answer" are genuinely different questions here, and this check
+    distinguishes them (token minted vs. read succeeded)."""
+    from tracker import sci_reddit_client
+    try:
+        return sci_reddit_client.probe()
+    except Exception as e:
+        return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
+
+
+@app.route("/p2/admin/external-usage/sci-reddit-check", methods=["POST"])
+@admin_required
+def admin_external_usage_sci_reddit_check():
+    """Run SCI's Reddit self-test. POST so no crawler or prefetch can
+    trigger it, matching the checks next to it."""
+    return jsonify(_sci_reddit_selftest())
+
+
 def _unipile_selftest() -> dict:
     """Prove the Unipile integration end to end -- see
     tracker/unipile_client.probe. Free: list_accounts() needs no connected
@@ -8293,7 +8315,7 @@ def social_creative_intelligence():
 def social_creative_intelligence_search():
     """Company search shown before a run starts, so an ambiguous free-text
     name (e.g. "apple") can be disambiguated into one real company + domain
-    before the six-platform identify step ever spends a call guessing.
+    before the seven-platform identify step ever spends a call guessing.
     Native to this platform -- built on tracker/sci_company_search.py, which
     wraps the Apollo integration this app already pays for and uses
     elsewhere (Contact Finder, Person Enrichment) -- deliberately NOT the

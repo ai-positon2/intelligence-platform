@@ -1,5 +1,5 @@
 """Step 1 (IDENTIFY) for Social Creative Intelligence Analyst: resolve a
-company name/URL to its actual handle on each of the 6 platforms, using
+company name/URL to its actual handle on each of the 7 platforms, using
 Claude's server-side web_search tool. Refusal to guess is enforced by a
 confidence threshold on the model's own output, not by prompt wording alone
 -- a 'low'/'none' confidence result is never treated as a usable handle by
@@ -20,7 +20,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-PLATFORMS = ("instagram", "linkedin", "x", "tiktok", "youtube", "facebook")
+PLATFORMS = ("instagram", "linkedin", "x", "tiktok", "youtube", "facebook", "reddit")
 
 # Anthropic's web_search tool is versioned by date and older versions get
 # sunset -- newest first, so a fresh process tries the current one before
@@ -68,8 +68,9 @@ def _describe_exception(e) -> str:
 
 _SYSTEM = (
     "You identify a company's own official, organic (non-paid) presence on "
-    "six social platforms: Instagram, LinkedIn, X (Twitter), TikTok, YouTube, "
-    "and Facebook. Use web search to find and verify each one -- do not guess "
+    "seven social platforms: Instagram, LinkedIn, X (Twitter), TikTok, "
+    "YouTube, Facebook, and Reddit. Use web search to find and verify each "
+    "one -- do not guess "
     "from pattern-matching a likely handle. Verify a candidate account "
     "actually belongs to this company (its bio, pinned post, or profile links "
     "back to the company's real website; it is not a fan page, a regional "
@@ -79,9 +80,17 @@ _SYSTEM = (
     "inventing a plausible-looking handle -- a wrong handle is worse than no "
     "handle, since everything downstream of this step scrapes whatever you "
     "return here.\n\n"
+    "For Reddit specifically, report ONLY an account the company itself "
+    "posts from (\"u/acme\"). A subreddit named after the company "
+    "(\"r/acme\") is its community, written by its users rather than by "
+    "the company, so it is NOT the company's own presence -- report "
+    "confidence \"none\" for reddit rather than returning a subreddit, and "
+    "note in the reasoning if a community exists. Most companies have no "
+    "Reddit account of their own, and \"none\" is the correct, expected "
+    "answer there.\n\n"
     "After searching, respond with ONLY a JSON object (no prose before or "
-    "after), with exactly these six keys: instagram, linkedin, x, tiktok, "
-    "youtube, facebook. Each value is an object: "
+    "after), with exactly these seven keys: instagram, linkedin, x, tiktok, "
+    "youtube, facebook, reddit. Each value is an object: "
     '{"handle": str|null, "profile_url": str|null, '
     '"confidence": "high"|"medium"|"low"|"none", "reasoning": str}. '
     '"handle" and "profile_url" MUST be null when confidence is "none".'
@@ -93,7 +102,7 @@ def _anthropic():
     if not key:
         return None
     from anthropic import Anthropic
-    # A 6-platform identification with up to 15 web searches routinely runs
+    # A 7-platform identification with up to 15 web searches routinely runs
     # long enough to blow past a short timeout -- that showed up in
     # production as "Request timed out or interrupted" on every platform at
     # once (see the streamed call below, which is the other half of this
@@ -174,7 +183,7 @@ def _parse(raw: str) -> dict[str, dict] | None:
 
 
 def identify_handles(company_name: str, company_url: str | None = None) -> dict[str, dict]:
-    """One Claude + web-search call resolving all 6 platform handles at once.
+    """One Claude + web-search call resolving all 7 platform handles at once.
     Never raises -- an unconfigured key, a timeout, or an unparsable reply
     all degrade to every platform reporting confidence='none', so a caller
     that always maps 'none' to handle_not_found behaves correctly either
@@ -200,7 +209,7 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
     last_err = None
     for version in versions:
         try:
-            # Streamed, not a plain create() -- a 6-platform lookup with up
+            # Streamed, not a plain create() -- a 7-platform lookup with up
             # to 15 web searches is exactly the kind of long-running call
             # Anthropic's own docs (see the "long-requests" link in a
             # timeout error's message) say to stream rather than wait on as
@@ -209,7 +218,7 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
             # function expects.
             with client.messages.stream(
                 model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-                # Headroom, not a tuned number. A 6-platform answer is well
+                # Headroom, not a tuned number. A 7-platform answer is well
                 # under 1k tokens on its own, but it is emitted at the END of
                 # a tool-use loop that also spends budget on up to 15 search
                 # queries and the citation-carrying prose around them; at
@@ -246,7 +255,7 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
     # block per cited span (anthropic.types.TextBlock carries `citations`),
     # so the JSON object arrives in several pieces and text_blocks[-1] is a
     # bare tail like '}' or a trailing sentence. That parsed as None and
-    # surfaced as "returned an unreadable response" on all six platforms at
+    # surfaced as "returned an unreadable response" on all seven platforms at
     # once, deterministically, every run. tests/test_sci_identify.py's
     # fixture only ever built a single text block, so the suite stayed green
     # through all of it -- the multi-block cases below exist to keep that

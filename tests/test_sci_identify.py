@@ -159,10 +159,17 @@ def test_identify_handles_degrades_on_a_vendor_exception(monkeypatch):
     assert all(v["confidence"] == "none" for v in result.values())
 
 
-def test_identify_handles_covers_exactly_the_six_platforms(monkeypatch):
+def test_identify_handles_covers_exactly_the_seven_platforms(monkeypatch):
+    """Reddit joined the set; a platform missing from the model's reply must
+    still come back as a well-formed 'none' entry rather than be absent, or
+    every caller iterating result.items() silently skips it."""
     monkeypatch.setattr(sci_identify, "_anthropic", lambda: _FakeClient(response_text=_MIXED_REPLY))
     result = sci_identify.identify_handles("Acme Inc")
-    assert set(result.keys()) == {"instagram", "linkedin", "x", "tiktok", "youtube", "facebook"}
+    assert set(result.keys()) == {"instagram", "linkedin", "x", "tiktok", "youtube",
+                                  "facebook", "reddit"}
+    # _MIXED_REPLY predates Reddit and does not mention it at all.
+    assert result["reddit"]["confidence"] == "none"
+    assert result["reddit"]["handle"] is None
 
 
 # --- web_search tool version fallback -- regression coverage for the bug

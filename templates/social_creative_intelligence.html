@@ -54,7 +54,7 @@
       <div>
         <div class="eyebrow"><span class="dot"></span>B2B Agents · Cross-platform creative analysis</div>
         <h1>See what their <em>creative</em> is actually doing.</h1>
-        <p>Give it a company name or URL. It finds the company's organic presence across six platforms, then actually looks at every image and video to describe what the creative shows, and synthesizes what's working, cited back to real posts.</p>
+        <p>Give it a company name or URL. It finds the company's organic presence across seven platforms, then actually looks at every image and video to describe what the creative shows, and synthesizes what's working, cited back to real posts.</p>
         <div class="ph-platforms" aria-hidden="true">
           <div class="ph-plat-ic" title="Instagram" style="color:#e1306c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg></div>
           <div class="ph-plat-ic" title="LinkedIn" style="color:#0a66c2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8" cy="8.3" r="1" fill="currentColor" stroke="none"/><path d="M8 11.3v6.2M12.6 17.5v-3.6c0-1.6 1-2.5 2.2-2.5s2 .9 2 2.5v3.6"/></svg></div>
@@ -146,10 +146,11 @@
       x: {color:'#cbd5e1', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 16M19 4L5 20"/></svg>'},
       tiktok: {color:'#fe2c55', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5v11.2a3.3 3.3 0 11-2.7-3.24M14 3.5c.5 2.6 2.4 4.5 4.8 4.9"/></svg>'},
       youtube: {color:'#ff0033', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.7" y="6" width="18.6" height="12" rx="3.6"/><path d="M10.3 9.6l5 2.4-5 2.4z" fill="currentColor" stroke="none"/></svg>'},
+      reddit: {color:'#ff4500', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.3"/><circle cx="9.3" cy="12.4" r="1" fill="currentColor" stroke="none"/><circle cx="14.7" cy="12.4" r="1" fill="currentColor" stroke="none"/><path d="M9.4 16.1c1.5 1 3.7 1 5.2 0"/><path d="M15.6 5.7l.9 3.9"/><circle cx="16.1" cy="4.6" r="1.3"/></svg>'},
       facebook: {color:'#1877f2', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21v-7.2h2.4l.4-2.8h-2.8v-1.8c0-.8.2-1.4 1.4-1.4h1.5V5.3A20 20 0 0015.6 5c-2.3 0-3.9 1.4-3.9 4v2h-2.4v2.8h2.4V21"/></svg>'}
     };
     var DEFAULT_META = {color:'#8b86a0', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/></svg>'};
-    var PLATFORM_ORDER = ['instagram','linkedin','x','tiktok','youtube','facebook'];
+    var PLATFORM_ORDER = ['instagram','linkedin','x','tiktok','youtube','facebook','reddit'];
 
     function platformMeta(p){ return PLATFORM_META[p] || DEFAULT_META; }
     function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
@@ -157,7 +158,7 @@
 
     // ── Company disambiguation -- shown as the user types, so an ambiguous
     // name (e.g. "apple") can be resolved to one real company + domain
-    // before the six-platform identify step has to guess. Same pattern as
+    // before the seven-platform identify step has to guess. Same pattern as
     // the LinkedIn Strategy Researcher's company search, minus its own
     // mode picker (SCI has none): picking a card just fills the two form
     // fields, which stay editable -- there's no hard requirement to pick
@@ -215,7 +216,7 @@
 
     // Admin-only diagnostic for the IDENTIFY step (Claude + web_search) --
     // shown on a run where every platform came back handle_not_found, since
-    // that shape (all six failing at once) usually means the vendor call
+    // that shape (all of them failing at once) usually means the vendor call
     // itself broke rather than this company genuinely having no accounts.
     function sciIdentifyDiagControl(){
       if(!IS_ADMIN) return '';
@@ -427,7 +428,7 @@
     var NO_ACTIVITY_STATUSES = {no_presence:1, handle_not_found:1, scrape_failed:1, error:1, low_activity:1};
     var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
-    var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API'};
+    var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API', reddit_api:'via Reddit API'};
     var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
     var VIEW_GLYPH = '↗';
 
@@ -559,6 +560,9 @@
         for(var i=0;i<order.length;i++){ var t = thumbs[order[i]]; if(t && t.url) return t.url; }
         return null;
       }
+      if(platform === 'reddit'){
+        return raw.thumbnail_url || null;
+      }
       if(platform === 'instagram'){
         return raw.displayUrl || ((post.post_type === 'image' && post.media_urls && post.media_urls[0]) || null);
       }
@@ -586,6 +590,7 @@
     function postTitle(post){
       var raw = post.raw || {};
       if(post.platform === 'youtube' && raw.snippet && raw.snippet.title) return raw.snippet.title;
+      if(post.platform === 'reddit' && raw.title) return raw.title;
       var cap = (post.caption || '').split('\n')[0].trim();
       if(cap) return cap.length > 90 ? cap.slice(0, 88) + '…' : cap;
       return (post.platform || 'post') + ' · ' + (post.post_type || 'post');
@@ -771,6 +776,232 @@
       }).join('');
     }
 
+    // ── Reddit conversation ("pulse") ─────────────────────────────────────
+    //
+    // Structurally different from the six owned-content sections above and
+    // rendered to look different on purpose. Those answer "what does this
+    // company publish"; this answers "what does the market say about it",
+    // which exists for companies that have no Reddit account at all. Its own
+    // visual language (outside-in, not brand-colored per platform) is what
+    // stops a reader mistaking community complaints for the brand's own copy.
+
+    // Sentiment is the one place here where color carries meaning, so every
+    // swatch ships with its label and count -- never color alone (a
+    // red/green split is invisible to the most common form of colorblindness).
+    var RD_SENTIMENT = [
+      {key:'positive', label:'Positive', color:'#4ade80'},
+      {key:'mixed',    label:'Mixed',    color:'#fbbf24'},
+      {key:'neutral',  label:'Neutral',  color:'#94a3b8'},
+      {key:'negative', label:'Negative', color:'#f87171'}
+    ];
+    var RD_STANCE = {
+      praise:     {label:'Praise',     color:'#4ade80'},
+      complaint:  {label:'Complaint',  color:'#f87171'},
+      question:   {label:'Question',   color:'#60a5fa'},
+      comparison: {label:'Comparison', color:'#c084fc'},
+      neutral:    {label:'Observation',color:'#94a3b8'}
+    };
+
+    function rdMonthLabel(ym){
+      var parts = String(ym || '').split('-');
+      if(parts.length !== 2) return ym || '';
+      var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var i = parseInt(parts[1], 10) - 1;
+      return (names[i] || parts[1]) + " '" + parts[0].slice(2);
+    }
+
+    function renderRedditSentiment(analysis){
+      var s = (analysis || {}).sentiment || {};
+      var counts = s.counts || {}, total = s.labelled || 0;
+      if(!total) return '';
+      var segs = RD_SENTIMENT.filter(function(x){ return (counts[x.key] || 0) > 0; });
+      var bar = segs.map(function(x){
+        var pct = (counts[x.key] / total) * 100;
+        return '<span class="rd-sent-seg" style="width:' + pct.toFixed(2) + '%;background:' + x.color + '"' +
+          ' title="' + esc(x.label) + ': ' + counts[x.key] + ' of ' + total + ' threads"></span>';
+      }).join('');
+      var legend = segs.map(function(x){
+        return '<span class="rd-sent-key"><span class="rd-sent-dot" style="background:' + x.color + '"></span>' +
+          esc(x.label) + ' <b>' + counts[x.key] + '</b></span>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">How Reddit feels about them</div>' +
+        '<div class="rd-sent-bar">' + bar + '</div>' +
+        '<div class="rd-sent-legend">' + legend + '</div>' +
+        '<div class="rd-sent-foot">' + total + ' thread' + (total === 1 ? '' : 's') + ' judged toward the company itself, not the thread’s general mood.</div>' +
+        '</div>';
+    }
+
+    function renderRedditSubreddits(pulse){
+      var subs = (pulse.subreddits || []).slice(0, 8);
+      if(!subs.length) return '';
+      var max = Math.max.apply(null, subs.map(function(s){ return s.threads; }));
+      var rows = subs.map(function(s){
+        var pct = max ? (s.threads / max) * 100 : 0;
+        return '<a class="rd-sub-row" href="https://www.reddit.com/r/' + esc(s.name) + '/" target="_blank" rel="noopener">' +
+          '<span class="rd-sub-name">r/' + esc(s.name) + '</span>' +
+          '<span class="rd-sub-track"><span class="rd-sub-fill" style="width:' + pct.toFixed(2) + '%"></span></span>' +
+          '<span class="rd-sub-val">' + s.threads + '</span>' +
+        '</a>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Where the conversation happens</div>' +
+        '<div class="rd-subs">' + rows + '</div></div>';
+    }
+
+    function renderRedditTimeline(pulse){
+      var tl = pulse.timeline || [];
+      if(tl.length < 2) return '';
+      var max = Math.max.apply(null, tl.map(function(t){ return t.threads; }));
+      var cols = tl.map(function(t){
+        var pct = max ? (t.threads / max) * 100 : 0;
+        return '<span class="rd-tl-col" title="' + esc(rdMonthLabel(t.month)) + ': ' + t.threads + ' threads">' +
+          '<span class="rd-tl-bar" style="height:' + Math.max(pct, 3).toFixed(2) + '%"></span>' +
+          '<span class="rd-tl-lab">' + esc(rdMonthLabel(t.month)) + '</span></span>';
+      }).join('');
+      // Without a peak label the columns show shape but not scale, and a
+      // reader cannot tell a busy month of 7 threads from one of 70.
+      return '<div class="rd-block"><div class="rd-block-h">Mention volume by month' +
+        '<span class="rd-tl-peak">peak ' + max + '/mo</span></div>' +
+        '<div class="rd-tl">' + cols + '</div></div>';
+    }
+
+    function renderRedditThreadRefs(ids, byId, sentiment){
+      var cards = (ids || []).map(function(id){
+        var t = byId[id];
+        if(!t) return '';
+        var mood = (sentiment || {})[id];
+        return '<a class="rd-ref' + (mood ? ' rd-ref-' + esc(mood) : '') + '" href="' + esc(t.url || '#') + '" target="_blank" rel="noopener">' +
+          '<span class="rd-ref-sub">r/' + esc(t.subreddit || '?') + '</span>' +
+          '<span class="rd-ref-title">' + esc(t.title || '') + '</span>' +
+          '<span class="rd-ref-meta">' + fmtNum(t.score || 0) + ' upvotes · ' + fmtNum(t.comments || 0) + ' comments</span>' +
+        '</a>';
+      }).join('');
+      return cards ? '<div class="rd-refs">' + cards + '</div>' : '';
+    }
+
+    function renderRedditThemes(analysis, byId){
+      var themes = (analysis || {}).themes || [];
+      if(!themes.length) return '';
+      var cards = themes.map(function(t){
+        var key = RD_STANCE[t.stance] ? t.stance : 'neutral';
+        var stance = RD_STANCE[key];
+        // The stance also goes on as a class, not just an inline colour:
+        // these hues are tuned for the dark ground and drop to ~2.7:1 on the
+        // light one, so light mode needs its own darker step per stance and
+        // an inline style would be unreachable from CSS.
+        return '<div class="rd-theme rd-stance-' + esc(key) + '" style="--rd-stance:' + stance.color + '">' +
+          '<div class="rd-theme-h">' +
+            '<span class="rd-stance">' + esc(stance.label) + '</span>' +
+            '<span class="rd-theme-t">' + esc(t.label) + '</span>' +
+          '</div>' +
+          '<p class="rd-theme-d">' + esc(t.detail || '') + '</p>' +
+          renderRedditThreadRefs(t.thread_ids, byId, (analysis || {}).thread_sentiment) +
+        '</div>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">What they actually talk about</div>' +
+        '<div class="rd-themes">' + cards + '</div></div>';
+    }
+
+    function renderRedditCompetitors(analysis, byId){
+      var comps = (analysis || {}).competitors || [];
+      if(!comps.length) return '';
+      var rows = comps.map(function(c){
+        return '<div class="rd-comp">' +
+          '<div class="rd-comp-n">' + esc(c.name) + '</div>' +
+          '<div class="rd-comp-c">' + esc(c.context || '') + '</div>' +
+          renderRedditThreadRefs(c.thread_ids, byId, (analysis || {}).thread_sentiment) +
+        '</div>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Who they get compared to</div>' +
+        '<div class="rd-comps">' + rows + '</div></div>';
+    }
+
+    function renderRedditList(title, items, cls){
+      if(!items || !items.length) return '';
+      return '<div class="rd-block"><div class="rd-block-h">' + esc(title) + '</div>' +
+        '<ul class="rd-list ' + (cls || '') + '">' +
+        items.map(function(i){ return '<li>' + esc(i) + '</li>'; }).join('') +
+        '</ul></div>';
+    }
+
+    function renderRedditTopThreads(pulse, analysis){
+      var threads = (pulse.top_threads || []).slice(0, 8);
+      if(!threads.length) return '';
+      var sentiment = (analysis || {}).thread_sentiment || {};
+      var rows = threads.map(function(t){
+        var mood = sentiment[t.id];
+        var ratio = (typeof t.upvote_ratio === 'number') ? Math.round(t.upvote_ratio * 100) + '% upvoted' : '';
+        return '<a class="rd-thread' + (mood ? ' rd-ref-' + esc(mood) : '') + '" href="' + esc(t.url || '#') + '" target="_blank" rel="noopener">' +
+          '<div class="rd-thread-top"><span class="rd-thread-sub">r/' + esc(t.subreddit || '?') + '</span>' +
+            (mood ? '<span class="rd-mood rd-mood-' + esc(mood) + '">' + esc(mood) + '</span>' : '') +
+            '<span class="rd-thread-when">' + esc(relTime(t.posted_at)) + '</span></div>' +
+          '<div class="rd-thread-title">' + esc(t.title || '') + '</div>' +
+          '<div class="rd-thread-foot"><span>' + fmtNum(t.score || 0) + ' upvotes</span><span>' +
+            fmtNum(t.comments || 0) + ' comments</span>' + (ratio ? '<span>' + ratio + '</span>' : '') +
+            '<span class="rd-thread-go">' + VIEW_GLYPH + '</span></div>' +
+        '</a>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Most-engaged threads</div>' +
+        '<div class="rd-threads">' + rows + '</div></div>';
+    }
+
+    function renderRedditPulse(run){
+      var pulse = run.reddit_pulse;
+      if(!pulse) return '';
+      var meta = platformMeta('reddit');
+      var analysis = pulse.analysis || null;
+      var byId = {};
+      (pulse.threads || []).concat(pulse.top_threads || []).forEach(function(t){ if(t && t.id) byId[t.id] = t; });
+
+      var head = '<div class="rd-head"><span class="rd-head-ic">' + meta.icon + '</span>' +
+        '<div><h3>Reddit conversation</h3>' +
+        '<p class="rd-head-sub">Not what this company posts. What Reddit says about it: Unprompted, unmoderated, and the one place a brand cannot edit the copy.</p></div></div>';
+
+      // A note is the whole story when there is one: not configured, search
+      // unavailable, or a genuine zero. None of those are errors, and each
+      // reads very differently to someone deciding whether to trust the gap.
+      if(pulse.note && !pulse.thread_count){
+        return '<div class="rd-section">' + head +
+          '<div class="rd-empty">' + esc(pulse.note) + '</div></div>';
+      }
+
+      var stats = [
+        {label:'Threads', value: fmtNum(pulse.thread_count || 0)},
+        {label:'Comments', value: fmtNum(pulse.comment_total || 0)},
+        {label:'Subreddits', value: fmtNum(pulse.subreddit_count || 0)},
+        {label:'Upvotes', value: fmtNum(pulse.score_total || 0)}
+      ];
+      var tiles = '<div class="rd-stats">' + stats.map(function(s){
+        return '<div class="rd-stat"><div class="rd-stat-v">' + esc(s.value) + '</div>' +
+          '<div class="rd-stat-l">' + esc(s.label) + '</div></div>';
+      }).join('') + '</div>';
+
+      var community = pulse.community ? '<a class="rd-community" href="' + esc(pulse.community.url) + '" target="_blank" rel="noopener">' +
+        '<div class="rd-community-n">' + esc(pulse.community.name) + '</div>' +
+        '<div class="rd-community-d">' + esc(pulse.community.description || pulse.community.title || '') + '</div>' +
+        '<div class="rd-community-s">' + fmtNum(pulse.community.subscribers || 0) + ' members' +
+        '<span class="rd-community-note">community, not a company account</span></div></a>' : '';
+
+      var verdict = (analysis && analysis.verdict) ?
+        '<div class="rd-verdict"><span class="rd-verdict-q">“</span>' + esc(analysis.verdict) + '</div>' : '';
+
+      var body;
+      if(analysis && analysis.error){
+        body = '<div class="rd-empty">' + esc(analysis.error) +
+          ' The counts and threads below were still collected.</div>' +
+          renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) + renderRedditTopThreads(pulse, null);
+      } else {
+        body = renderRedditSentiment(analysis) +
+          renderRedditThemes(analysis, byId) +
+          renderRedditCompetitors(analysis, byId) +
+          '<div class="rd-two">' + renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) + '</div>' +
+          renderRedditList('Who is talking', (analysis || {}).audience) +
+          renderRedditList('Openings this suggests', (analysis || {}).opportunities, 'rd-list-op') +
+          renderRedditTopThreads(pulse, analysis);
+      }
+
+      return '<div class="rd-section">' + head + verdict + tiles + community + body + '</div>';
+    }
+
     function renderReport(run){
       CURRENT_RUN = run;
       POST_SORT = {};
@@ -805,15 +1036,25 @@
       }
 
       (run.platforms || []).forEach(function(p){
-        if(NO_ACTIVITY_STATUSES[p.status]){
-          var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
-          html += '<div class="sci-banner' + cls + '"><span class="bic">' + (p.status === 'low_activity' ? '◐' : '○') + '</span><div><b>' + esc(p.platform) + ':</b> ' +
-            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ': ' + esc(p.status_detail) : '') + '</div></div>';
+        if(!NO_ACTIVITY_STATUSES[p.status]) return;
+        // Reddit is the one platform where "no company account" is the
+        // expected answer rather than a failure: almost no B2B company posts
+        // as u/them. Flagging that in the same alarm banner as a real scrape
+        // failure would read as broken, when the section that actually
+        // matters for Reddit is the conversation below.
+        if(p.platform === 'reddit' && p.status === 'handle_not_found'){
+          html += '<div class="sci-banner sci-banner-info"><span class="bic">◇</span><div>' +
+            '<b>reddit:</b> no company-owned account found, which is normal. ' +
+            'What Reddit says about this company is analysed further down.</div></div>';
+          return;
         }
+        var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
+        html += '<div class="sci-banner' + cls + '"><span class="bic">' + (p.status === 'low_activity' ? '◐' : '○') + '</span><div><b>' + esc(p.platform) + ':</b> ' +
+          esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ': ' + esc(p.status_detail) : '') + '</div></div>';
       });
 
-      // All six platforms unresolved is the shape of the identify step
-      // itself failing (a broken vendor call), not six independent "this
+      // Every platform unresolved is the shape of the identify step
+      // itself failing (a broken vendor call), not seven independent "this
       // company has no account here" verdicts -- surface the admin check.
       if((run.platforms || []).length && (run.platforms || []).every(function(p){ return p.status === 'handle_not_found'; })){
         html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once -- this usually means the identification step itself broke, not that none of these accounts exist.' +
@@ -856,6 +1097,8 @@
           '</div>';
         }
       }
+
+      html += renderRedditPulse(run);
 
       html += '</div>';
 

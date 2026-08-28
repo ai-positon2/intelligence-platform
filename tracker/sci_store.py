@@ -69,6 +69,12 @@ def _ensure_tables(conn) -> None:
         # Apollo-backed) that a run had no column to keep, so History fell
         # back to a plain monogram for every row.
         cur.execute("ALTER TABLE sci_runs ADD COLUMN IF NOT EXISTS company_logo TEXT")
+        # Added when Reddit joined the platform set. Reddit contributes two
+        # different things and only one of them is posts: the brand
+        # conversation (what Reddit says ABOUT the company, which exists for
+        # companies that have no Reddit account at all) has no home in
+        # sci_posts, so it lives on the run the way `synthesis` does.
+        cur.execute("ALTER TABLE sci_runs ADD COLUMN IF NOT EXISTS reddit_pulse JSONB")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sci_platform_runs (
                 id SERIAL PRIMARY KEY,
@@ -146,7 +152,7 @@ def _ts(d: dict, *keys: str) -> None:
 # ── Runs ───────────────────────────────────────────────────────────────────
 
 _RUN_COLUMNS = ["id", "email", "company_name", "company_url", "company_logo", "status", "error",
-                "identify_result", "synthesis", "created_at", "updated_at"]
+                "identify_result", "synthesis", "reddit_pulse", "created_at", "updated_at"]
 
 
 def save_run(email: str, company_name: str, company_url: str | None = None,
@@ -185,7 +191,8 @@ def save_run(email: str, company_name: str, company_url: str | None = None,
 
 
 def update_run_status(run_id: int, status: str, error: str | None = None,
-                      identify_result: dict | None = None, synthesis: dict | None = None) -> bool:
+                      identify_result: dict | None = None, synthesis: dict | None = None,
+                      reddit_pulse: dict | None = None) -> bool:
     """Update a run's top-level status. Deliberately not ownership-scoped by
     email -- the background worker already knows run_id from having created
     the row itself, and never accepts a caller-supplied run_id."""
@@ -199,10 +206,12 @@ def update_run_status(run_id: int, status: str, error: str | None = None,
             cur.execute(
                 "UPDATE sci_runs SET status = %s, error = %s, "
                 "identify_result = COALESCE(%s, identify_result), "
-                "synthesis = COALESCE(%s, synthesis), updated_at = now() "
+                "synthesis = COALESCE(%s, synthesis), "
+                "reddit_pulse = COALESCE(%s, reddit_pulse), updated_at = now() "
                 "WHERE id = %s",
                 (status, error, Json(identify_result) if identify_result is not None else None,
-                 Json(synthesis) if synthesis is not None else None, run_id),
+                 Json(synthesis) if synthesis is not None else None,
+                 Json(reddit_pulse) if reddit_pulse is not None else None, run_id),
             )
         conn.commit()
         return True

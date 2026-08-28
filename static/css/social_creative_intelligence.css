@@ -510,3 +510,202 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-pbar-label { color: #362a3d; }
 [data-theme="light"] .sci-pbar-val { color: #8b7f92; }
 [data-theme="light"] .sci-pbar-track { background: rgba(18,26,54,.08); }
+
+/* ── Reddit conversation ───────────────────────────────────────────────────
+   Given its own visual register rather than the per-platform one above,
+   because it is a different KIND of information: the six platform sections
+   are the company's own creative, this is the market talking back. It reads
+   as an inset panel with Reddit's own orange-red rail so a skimmer can never
+   confuse a community complaint for the brand's own copy. */
+.rd-section { margin: 8px 22px 26px; padding: 22px 24px 20px; border-radius: var(--radius-lg, 18px);
+  border: 1px solid rgba(255,69,0,.22); background: linear-gradient(170deg, rgba(255,69,0,.075), rgba(255,255,255,.018) 42%, rgba(255,255,255,.014));
+  box-shadow: 0 20px 50px -38px rgba(255,69,0,.5); }
+.rd-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.rd-head-ic { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px;
+  background: rgba(255,69,0,.14); border: 1px solid rgba(255,69,0,.32); color: #ff6a33; }
+.rd-head-ic svg { width: 19px; height: 19px; }
+.rd-head h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 16.5px; font-weight: 700; color: #f8eee9; margin: 0 0 3px; }
+.rd-head-sub { font-size: 12.5px; line-height: 1.55; color: #a4959c; max-width: 68ch; }
+
+.rd-verdict { position: relative; font-size: 15px; line-height: 1.6; color: #f4e8e2; font-weight: 500;
+  padding: 14px 18px 14px 40px; margin-bottom: 16px; border-radius: var(--radius-md, 12px);
+  background: rgba(255,69,0,.07); border: 1px solid rgba(255,69,0,.18); }
+.rd-verdict-q { position: absolute; left: 14px; top: 6px; font-family: 'Bricolage Grotesque', serif; font-size: 34px; line-height: 1; color: rgba(255,106,51,.5); }
+
+.rd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 10px; margin-bottom: 16px; }
+.rd-stat { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md, 12px); padding: 12px 14px; }
+.rd-stat-v { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 20px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rd-stat-l { font-size: 10.5px; color: #9a8c92; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); margin-top: 3px; }
+
+.rd-community { display: block; text-decoration: none; padding: 13px 16px; margin-bottom: 16px;
+  border-radius: var(--radius-md, 12px); border: 1px dashed rgba(255,69,0,.3); background: rgba(255,69,0,.045); transition: background .18s ease, border-color .18s ease; }
+.rd-community:hover { background: rgba(255,69,0,.08); border-color: rgba(255,69,0,.45); }
+.rd-community-n { font-size: 14px; font-weight: 700; color: #ff8354; }
+.rd-community-d { font-size: 12.5px; line-height: 1.5; color: #b3a4aa; margin-top: 3px; }
+.rd-community-s { font-size: 11px; color: #9a8c92; margin-top: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.rd-community-note { font-size: 9.5px; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); font-weight: 700;
+  color: #b09aa2; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-pill, 80px); padding: 2px 8px; }
+
+.rd-block { margin-bottom: 20px; }
+.rd-block-h { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #b0a2a8; margin-bottom: 10px; }
+.rd-two { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.rd-two .rd-block { margin-bottom: 20px; min-width: 0; }
+
+/* Sentiment: a single 100% stacked bar. Every segment is also named and
+   counted in the legend below it, so the split survives colorblindness,
+   greyscale printing and forced-colors mode. */
+.rd-sent-bar { display: flex; gap: 2px; height: 12px; border-radius: var(--radius-pill, 80px); overflow: hidden; background: rgba(255,255,255,.05); }
+.rd-sent-seg { display: block; height: 100%; }
+.rd-sent-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.rd-sent-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #b3a4aa; }
+.rd-sent-key b { color: #f2e8ec; font-variant-numeric: tabular-nums; }
+.rd-sent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rd-sent-foot { font-size: 11px; color: #92858b; margin-top: 8px; line-height: 1.5; }
+
+.rd-subs { display: flex; flex-direction: column; gap: 7px; }
+.rd-sub-row { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; align-items: center; gap: 10px; text-decoration: none; }
+.rd-sub-name { font-size: 12px; color: #d8c9cf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-sub-row:hover .rd-sub-name { color: #ff8354; }
+.rd-sub-track { height: 8px; border-radius: var(--radius-pill, 80px); background: rgba(255,255,255,.055); overflow: hidden; }
+.rd-sub-fill { display: block; height: 100%; border-radius: var(--radius-pill, 80px); background: linear-gradient(90deg, rgba(255,69,0,.55), #ff6a33); }
+.rd-sub-val { font-size: 11.5px; color: #a4959c; font-variant-numeric: tabular-nums; min-width: 22px; text-align: right; }
+
+.rd-tl { display: flex; align-items: flex-end; gap: 4px; height: 104px; padding-top: 6px; }
+.rd-tl-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+.rd-tl-bar { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #ff6a33, rgba(255,69,0,.4)); }
+.rd-tl-lab { font-size: 9px; color: #92858b; margin-top: 6px; white-space: nowrap; transform: rotate(-42deg); transform-origin: center; }
+
+.rd-themes { display: flex; flex-direction: column; gap: 12px; }
+.rd-theme { border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.028);
+  padding: 13px 15px 13px 16px; border-left: 3px solid var(--rd-stance, #94a3b8); }
+.rd-theme-h { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 6px; }
+.rd-stance { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em);
+  color: var(--rd-stance, #94a3b8); border: 1px solid currentColor; border-radius: var(--radius-pill, 80px); padding: 2px 8px; }
+.rd-theme-t { font-size: 13.5px; font-weight: 700; color: #f3ebee; }
+.rd-theme-d { font-size: 13px; line-height: 1.58; color: #cdbfc5; }
+
+.rd-refs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+/* The mood stripe is carried on a custom property, not on a `border-left`
+   in the .rd-ref-* rules. A later `[data-theme="light"] .rd-ref{border-color}`
+   is a shorthand and outranks a plain class selector, so it silently erased
+   every sentiment stripe in light mode -- routing the colour through a
+   variable makes the two rules compose instead of collide. */
+.rd-ref { display: block; max-width: 300px; text-decoration: none; padding: 8px 11px; border-radius: 9px;
+  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08);
+  border-left: 2px solid var(--rd-mood, rgba(255,255,255,.08)); transition: border-color .18s ease, background .18s ease; }
+.rd-ref:hover { background: rgba(255,255,255,.06); border-color: rgba(255,69,0,.4); }
+.rd-ref-sub { display: block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.06em); color: #ff8354; }
+.rd-ref-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 11.5px; line-height: 1.45; color: #ddd0d5; margin: 3px 0 4px; }
+.rd-ref-meta { display: block; font-size: 10px; color: #92858b; font-variant-numeric: tabular-nums; }
+.rd-ref-positive { --rd-mood: #4ade80; }
+.rd-ref-negative { --rd-mood: #f87171; }
+.rd-ref-mixed { --rd-mood: #fbbf24; }
+.rd-ref-neutral { --rd-mood: #94a3b8; }
+
+.rd-comps { display: flex; flex-direction: column; gap: 11px; }
+.rd-comp { border-radius: var(--radius-md, 12px); border: 1px solid rgba(192,132,252,.22); background: rgba(192,132,252,.05); padding: 12px 15px; }
+.rd-comp-n { font-size: 13.5px; font-weight: 700; color: #d8b4fe; }
+.rd-comp-c { font-size: 12.5px; line-height: 1.55; color: #cdbfc5; margin-top: 4px; }
+
+.rd-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rd-list li { position: relative; padding-left: 16px; font-size: 13px; line-height: 1.58; color: #d3c6cb; }
+.rd-list li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: #ff6a33; }
+.rd-list-op li::before { border-radius: 1px; transform: rotate(45deg); background: #4ade80; }
+
+.rd-threads { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 11px; }
+.rd-thread { display: flex; flex-direction: column; gap: 6px; text-decoration: none; padding: 12px 14px;
+  border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08);
+  border-left: 2px solid var(--rd-mood, rgba(255,255,255,.08)); background: rgba(255,255,255,.03);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.rd-thread:hover { border-color: rgba(255,69,0,.42); background: rgba(255,69,0,.055); transform: translateY(-1px); }
+.rd-thread-top { display: flex; align-items: center; gap: 8px; }
+.rd-thread-sub { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.06em); color: #ff8354; }
+.rd-mood { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.05em); border-radius: var(--radius-pill,80px); padding: 1px 7px; }
+.rd-mood-positive { color: #86efac; background: rgba(74,222,128,.13); }
+.rd-mood-negative { color: #fca5a5; background: rgba(248,113,113,.13); }
+.rd-mood-mixed { color: #fcd34d; background: rgba(251,191,36,.13); }
+.rd-mood-neutral { color: #cbd5e1; background: rgba(148,163,184,.13); }
+.rd-thread-when { margin-left: auto; font-size: 10px; color: #92858b; white-space: nowrap; }
+.rd-thread-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 13px; line-height: 1.45; color: #ece1e5; font-weight: 500; }
+.rd-thread-foot { display: flex; align-items: center; gap: 11px; font-size: 10.5px; color: #9a8c92;
+  font-variant-numeric: tabular-nums; padding-top: 9px; margin-top: auto; border-top: 1px solid rgba(255,255,255,.055); }
+.rd-thread-go { margin-left: auto; color: #ff8354; font-size: 12px; }
+
+.rd-empty { text-align: center; padding: 26px 18px; color: #9a8c92; font-size: 13px; line-height: 1.6;
+  border-radius: var(--radius-md, 12px); background: rgba(255,255,255,.025); border: 1px dashed rgba(255,255,255,.11); }
+
+@media (max-width: 780px) {
+  .rd-section { margin-left: 14px; margin-right: 14px; padding: 18px 16px; }
+  .rd-two { grid-template-columns: 1fr; gap: 0; }
+  .rd-threads { grid-template-columns: 1fr; }
+}
+
+/* Light mode: the panel keeps Reddit's orange rail but drops to a warm
+   paper ground, and every muted grey is re-picked against it -- the dark
+   greys above sit at ~3:1 on white and fail the 4.5:1 body-text floor. */
+[data-theme="light"] .rd-section { border-color: rgba(255,69,0,.28); background: linear-gradient(170deg, rgba(255,69,0,.07), rgba(255,255,255,.72) 45%, rgba(255,255,255,.8)); box-shadow: 0 20px 50px -40px rgba(255,69,0,.4); }
+[data-theme="light"] .rd-head h3 { color: #2a1a14; }
+[data-theme="light"] .rd-head-sub { color: #6a5a60; }
+[data-theme="light"] .rd-head-ic { color: #c2410c; background: rgba(255,69,0,.1); }
+[data-theme="light"] .rd-verdict { color: #2c1c16; background: rgba(255,69,0,.06); border-color: rgba(255,69,0,.2); }
+[data-theme="light"] .rd-verdict-q { color: rgba(194,65,12,.45); }
+[data-theme="light"] .rd-stat { background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .rd-stat-v { color: #1c1420; }
+[data-theme="light"] .rd-stat-l, [data-theme="light"] .rd-block-h { color: #6a5f66; }
+[data-theme="light"] .rd-community { background: rgba(255,69,0,.05); border-color: rgba(255,69,0,.3); }
+[data-theme="light"] .rd-community-n { color: #c2410c; }
+[data-theme="light"] .rd-community-d { color: #5c5163; }
+[data-theme="light"] .rd-community-s { color: #6a5f66; }
+[data-theme="light"] .rd-community-note { color: #6a5f66; background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .rd-sent-bar { background: rgba(18,26,54,.07); }
+[data-theme="light"] .rd-sent-key { color: #5c5163; }
+[data-theme="light"] .rd-sent-key b { color: #1c1420; }
+[data-theme="light"] .rd-sent-foot { color: #6a5f66; }
+[data-theme="light"] .rd-sub-name { color: #40353f; }
+[data-theme="light"] .rd-sub-track { background: rgba(18,26,54,.075); }
+[data-theme="light"] .rd-sub-val { color: #6a5f66; }
+[data-theme="light"] .rd-tl-lab { color: #6a5f66; }
+[data-theme="light"] .rd-theme { background: rgba(255,255,255,.72); border-color: rgba(18,26,54,.1);
+  border-left-color: var(--rd-stance, rgba(18,26,54,.1)); }  /* shorthand above would erase the stance rail */
+[data-theme="light"] .rd-theme-t { color: #1c1420; }
+[data-theme="light"] .rd-theme-d { color: #4a3f4d; }
+[data-theme="light"] .rd-ref { background: rgba(255,255,255,.75); border-color: rgba(18,26,54,.1); border-left-color: var(--rd-mood, rgba(18,26,54,.1)); }
+[data-theme="light"] .rd-ref:hover { background: #fff; }
+[data-theme="light"] .rd-ref-sub { color: #c2410c; }
+[data-theme="light"] .rd-ref-title { color: #40353f; }
+[data-theme="light"] .rd-ref-meta { color: #6a5f66; }
+[data-theme="light"] .rd-comp { background: rgba(168,85,247,.06); border-color: rgba(168,85,247,.25); }
+[data-theme="light"] .rd-comp-n { color: #7e22ce; }
+[data-theme="light"] .rd-comp-c { color: #4a3f4d; }
+[data-theme="light"] .rd-list li { color: #4a3f4d; }
+[data-theme="light"] .rd-thread { background: rgba(255,255,255,.75); border-color: rgba(18,26,54,.1); border-left-color: var(--rd-mood, rgba(18,26,54,.1)); }
+[data-theme="light"] .rd-thread:hover { background: #fff; border-color: rgba(255,69,0,.4); }
+[data-theme="light"] .rd-thread-sub, [data-theme="light"] .rd-thread-go { color: #c2410c; }
+[data-theme="light"] .rd-thread-title { color: #241a28; }
+[data-theme="light"] .rd-thread-when, [data-theme="light"] .rd-thread-foot { color: #6a5f66; }
+[data-theme="light"] .rd-thread-foot { border-top-color: rgba(18,26,54,.09); }
+[data-theme="light"] .rd-mood-positive { color: #15803d; background: rgba(74,222,128,.18); }
+[data-theme="light"] .rd-mood-negative { color: #b91c1c; background: rgba(248,113,113,.18); }
+[data-theme="light"] .rd-mood-mixed { color: #a16207; background: rgba(251,191,36,.2); }
+[data-theme="light"] .rd-mood-neutral { color: #475569; background: rgba(148,163,184,.2); }
+[data-theme="light"] .rd-empty { color: #5c5163; background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.13); }
+.rd-block-h { display: flex; align-items: baseline; gap: 10px; }
+.rd-tl-peak { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 10px; font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: #8e8187; font-variant-numeric: tabular-nums; }
+[data-theme="light"] .rd-tl-peak { color: #6a5f66; }
+
+/* Stance chips in light mode: the dark-ground hues measure ~2.7:1 on paper,
+   so each stance gets its own darker step plus a tint behind it. The left
+   rail keeps the brighter hue, where it is a graphic and not text. */
+[data-theme="light"] .rd-stance { background: rgba(18,26,54,.04); }
+[data-theme="light"] .rd-stance-praise .rd-stance { color: #15803d; background: rgba(74,222,128,.14); }
+[data-theme="light"] .rd-stance-complaint .rd-stance { color: #b91c1c; background: rgba(248,113,113,.14); }
+[data-theme="light"] .rd-stance-question .rd-stance { color: #1d4ed8; background: rgba(96,165,250,.14); }
+[data-theme="light"] .rd-stance-comparison .rd-stance { color: #7e22ce; background: rgba(192,132,252,.14); }
+[data-theme="light"] .rd-stance-neutral .rd-stance { color: #475569; background: rgba(148,163,184,.16); }
+/* Informational, not a warning: see the Reddit branch in renderReport. */
+.sci-banner.sci-banner-info { border-color: rgba(255,69,0,.26); background: rgba(255,69,0,.05); }
+[data-theme="light"] .sci-banner.sci-banner-info { border-color: rgba(255,69,0,.3); background: rgba(255,69,0,.055); }

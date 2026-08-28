@@ -35,7 +35,7 @@ DEFAULT_MIN_POSTS = 20
 
 # Per-platform collection depth, defaulting to DEFAULT_MIN_POSTS.
 #
-# YouTube is the only platform here with a sanctioned, effectively free API:
+# YouTube and Reddit are the two platforms here with a sanctioned, free API:
 # pulling 100 videos costs about 4 units of a 10,000/day quota, so there is
 # no reason to look at a 20-post slice of a channel when the whole recent
 # history is this cheap. Every other platform either bills per scrape
@@ -45,7 +45,7 @@ DEFAULT_MIN_POSTS = 20
 #
 # Raising a platform here widens BOTH the collection call and the
 # _window_posts trim; raising one without the other silently does nothing.
-PLATFORM_MIN_POSTS = {"youtube": 100}
+PLATFORM_MIN_POSTS = {"youtube": 100, "reddit": 100}
 
 LOW_ACTIVITY_THRESHOLD = 3
 MAX_VIDEO_FRAMES = 6
@@ -88,14 +88,14 @@ def _apply_youtube_fallback(result: dict, company_name: str) -> None:
     """Resolve YouTube directly when the identify step didn't. Mutates
     `result` in place; never raises.
 
-    YouTube is the only one of the six platforms with a sanctioned public
+    YouTube is one of only two platforms here with a sanctioned public
     search API, so when identify comes back empty for it there is still an
     authoritative way to find the channel: ask YouTube. Every other platform
     correctly stays gated behind identify, because the only alternative
     there is guessing a handle and scraping whatever it hits.
 
     This matters most in exactly the case that keeps happening: identify
-    fails wholesale (one API call, so all six platforms fail together) and
+    fails wholesale (one API call, so all seven platforms fail together) and
     the entire run returns nothing, even though the one platform that needs
     no scraper at all could have answered on its own."""
     entry = result.get("youtube") or {}
@@ -126,6 +126,43 @@ def _apply_youtube_fallback(result: dict, company_name: str) -> None:
     logger.info("sci_pipeline: YouTube fallback resolved %r to %s", company_name, found["handle"])
 
 
+def _apply_reddit_fallback(result: dict, company_name: str) -> None:
+    """Resolve Reddit directly when the identify step didn't. Mutates
+    `result` in place; never raises. Same reasoning as
+    _apply_youtube_fallback: Reddit has a sanctioned API of its own, so it
+    does not have to be hostage to a single identify call that fails for all
+    seven platforms at once.
+
+    Unlike YouTube's, this fallback never searches. Reddit's search ranks by
+    engagement, so searching a company name returns whichever redditor
+    talks about it most -- a person, not the brand -- and collecting that
+    account's submissions would report a stranger's posts as the company's
+    own content. Only an exact u/<name> handle hit counts (see
+    sci_reddit_client.resolve_company_account), and most companies
+    legitimately have none."""
+    entry = result.get("reddit") or {}
+    if entry.get("confidence") in _USABLE_CONFIDENCE and entry.get("handle"):
+        return
+    try:
+        from tracker import sci_reddit_client
+        if not sci_reddit_client.is_configured():
+            return
+        found = sci_reddit_client.resolve_company_account(company_name)
+    except Exception as e:
+        logger.warning("sci_pipeline: Reddit fallback resolution failed for %r: %s", company_name, e)
+        return
+    if not found:
+        return
+    result["reddit"] = {
+        "handle": found["handle"],
+        "profile_url": found["profile_url"],
+        "confidence": "medium",
+        "reasoning": ("Matched directly against the Reddit API as %s, because the "
+                      "identification step did not return a usable account." % found["handle"]),
+    }
+    logger.info("sci_pipeline: Reddit fallback resolved %r to %s", company_name, found["handle"])
+
+
 def run_identify(run_id: int, company_name: str, company_url: str | None) -> dict:
     """Step 1. Writes identify_result onto the run row and creates the
     per-platform rows up front (status='identifying' if usable,
@@ -135,6 +172,7 @@ def run_identify(run_id: int, company_name: str, company_url: str | None) -> dic
 
     result = sci_identify.identify_handles(company_name, company_url)
     _apply_youtube_fallback(result, company_name)
+    _apply_reddit_fallback(result, company_name)
     sci_store.update_run_status(run_id, "running", identify_result=result)
 
     for platform, entry in result.items():
@@ -174,6 +212,8 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
     try:
         if platform == "youtube":
             posts, vendor = _collect_youtube(handle)
+        elif platform == "reddit":
+            posts, vendor = _collect_reddit(handle)
         elif platform == "linkedin":
             posts, vendor = _collect_linkedin(handle)
         elif platform == "instagram":
@@ -294,6 +334,43 @@ def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     return posts, "youtube_api"
 
 
+def _collect_reddit(handle: str) -> tuple[list[dict], str]:
+    """Submissions authored by the company's own Reddit account.
+
+    Only owned posts land here. What Reddit says ABOUT the company is a
+    different question with a different answer shape (no author, no
+    creative to vision-analyze, and it exists for companies that have no
+    Reddit account at all), so it is collected separately by
+    run_reddit_pulse and stored on the run rather than as posts."""
+    from tracker import sci_reddit_client
+    if not sci_reddit_client.is_configured():
+        raise RuntimeError(
+            "Reddit collection is unavailable (REDDIT_CLIENT_ID and "
+            "REDDIT_CLIENT_SECRET are not configured on this deployment).")
+    username = (handle or "").strip()
+    if username.lower().startswith("u/"):
+        username = username[2:]
+    if not username:
+        return [], "reddit_api"
+    return sci_reddit_client.list_user_posts(username, limit=min_posts_for("reddit")), "reddit_api"
+
+
+def run_reddit_pulse(run_id: int, company_name: str, company_url: str | None) -> None:
+    """The brand-conversation half of Reddit, written onto the run row.
+
+    Deliberately outside the per-platform loop: it runs whether or not the
+    company has a Reddit account, which is the entire point -- for most
+    companies the conversation is the only Reddit signal that exists. Its
+    own try/except, because a failure here must leave the seven platforms'
+    collected posts and the synthesis completely untouched."""
+    from tracker import sci_reddit_pulse, sci_store
+    try:
+        pulse = sci_reddit_pulse.build_pulse(company_name, company_url)
+        sci_store.update_run_status(run_id, "running", reddit_pulse=pulse)
+    except Exception as e:
+        logger.warning("sci_pipeline: Reddit pulse failed for run %s: %s", run_id, e)
+
+
 def _video_thumbnail_url(post: dict) -> str | None:
     """Best-effort static thumbnail for a video post whose frames couldn't be
     extracted -- most commonly YouTube, where yt-dlp/ffmpeg frame extraction
@@ -410,6 +487,7 @@ def _sci_run_analysis_job(run_id: int, email: str, company_name: str, company_ur
             except Exception as e:
                 logger.warning("sci_pipeline: platform %s failed entirely for run %s: %s", platform, run_id, e)
                 sci_store.upsert_platform_run(run_id, platform, status="error", status_detail=str(e)[:500])
+        run_reddit_pulse(run_id, company_name, company_url)
         run_synthesis(run_id)
         sci_store.update_run_status(run_id, "done")
     except Exception as e:
