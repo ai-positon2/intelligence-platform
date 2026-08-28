@@ -66,15 +66,21 @@ def test_the_full_job_runs_synthesis_after_every_platform_and_before_done(monkey
                         lambda run_id, platform, handle: order.append(("collect", platform)))
     monkeypatch.setattr(sci_pipeline, "run_platform_creative_analysis",
                         lambda run_id, platform: order.append(("analyze", platform)))
+    monkeypatch.setattr(sci_pipeline, "run_reddit_pulse",
+                        lambda run_id, name, url: order.append(("reddit_pulse",)))
     monkeypatch.setattr(sci_pipeline, "run_synthesis", lambda run_id: order.append(("synthesize",)))
     monkeypatch.setattr(sci_store, "update_run_status",
                         lambda run_id, status, **k: order.append(("status", status)))
 
     sci_pipeline._sci_run_analysis_job(1, _OWNER, "Acme Inc", None)
 
+    # The Reddit pulse runs outside the per-platform loop and before the run
+    # is marked done: it is the one signal that exists for companies with no
+    # Reddit account at all, so it must never be gated on a platform row.
     assert order == [
         ("collect", "instagram"),
         ("analyze", "instagram"),
+        ("reddit_pulse",),
         ("synthesize",),
         ("status", "done"),
     ]
@@ -95,12 +101,14 @@ def test_the_full_job_still_reaches_synthesis_when_a_platform_errors(monkeypatch
     monkeypatch.setattr(sci_pipeline, "run_platform_collection", failing_collection)
     monkeypatch.setattr(sci_pipeline, "run_platform_creative_analysis", lambda run_id, platform: None)
     monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_pipeline, "run_reddit_pulse",
+                        lambda run_id, name, url: order.append("reddit_pulse"))
     monkeypatch.setattr(sci_pipeline, "run_synthesis", lambda run_id: order.append("synthesize"))
     monkeypatch.setattr(sci_store, "update_run_status",
                         lambda run_id, status, **k: order.append(status))
 
     sci_pipeline._sci_run_analysis_job(1, _OWNER, "Acme Inc", None)
-    assert order == ["synthesize", "done"]
+    assert order == ["reddit_pulse", "synthesize", "done"]
 
 
 # ── run_platform_creative_analysis: dialogue_transcript ──────────────────────

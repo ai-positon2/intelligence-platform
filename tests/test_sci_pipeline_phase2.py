@@ -233,3 +233,122 @@ def test_run_platform_collection_windows_with_the_platform_specific_depth(monkey
     monkeypatch.setattr(sci_pipeline, "_collect_youtube", lambda h: (posts, "youtube_api"))
     sci_pipeline.run_platform_collection(1, "youtube", "@acme")
     assert written["youtube"] == 60, "youtube was trimmed to the default depth"
+
+
+# --- Reddit: two different questions, only one of them about owned posts ---
+#
+# Reddit contributes both a (usually absent) company account and the brand
+# conversation, which exists for companies with no Reddit account at all.
+# Conflating the two is what would make Reddit a seventh empty row.
+
+def test_reddit_collects_deeper_than_the_billed_platforms():
+    assert sci_pipeline.min_posts_for("reddit") == 100
+
+
+def test_collect_reddit_refuses_without_credentials(monkeypatch):
+    monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
+    monkeypatch.delenv("REDDIT_CLIENT_SECRET", raising=False)
+    try:
+        sci_pipeline._collect_reddit("u/acme")
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        assert "REDDIT_CLIENT_ID" in str(e)
+
+
+def test_collect_reddit_strips_the_u_prefix_before_fetching(monkeypatch):
+    from tracker import sci_reddit_client
+    seen = {}
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    monkeypatch.setattr(sci_reddit_client, "list_user_posts",
+                        lambda u, limit=None: seen.setdefault("user", u) or [])
+    posts, vendor = sci_pipeline._collect_reddit("u/acme")
+    assert seen["user"] == "acme"
+    assert vendor == "reddit_api"
+
+
+def test_reddit_fallback_never_searches(monkeypatch):
+    """The mirror of sci_reddit_client's own rule, enforced at the pipeline
+    boundary: only an exact handle hit may resolve a Reddit account."""
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    called = []
+    monkeypatch.setattr(sci_reddit_client, "resolve_company_account",
+                        lambda name: called.append(name) or None)
+    monkeypatch.setattr(sci_reddit_client, "search_posts",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not search")))
+    result = _all_none()
+    sci_pipeline._apply_reddit_fallback(result, "Acme Inc")
+    assert called == ["Acme Inc"]
+    assert result["reddit"]["handle"] is None
+
+
+def test_reddit_fallback_applies_an_exact_handle_hit(monkeypatch):
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    monkeypatch.setattr(sci_reddit_client, "resolve_company_account", lambda name: {
+        "kind": "user", "handle": "u/position2",
+        "profile_url": "https://www.reddit.com/user/position2/", "title": "position2"})
+    result = _all_none()
+    sci_pipeline._apply_reddit_fallback(result, "Position2")
+    assert result["reddit"]["handle"] == "u/position2"
+    assert result["reddit"]["confidence"] in sci_pipeline._USABLE_CONFIDENCE
+    assert "Reddit API" in result["reddit"]["reasoning"]
+
+
+def test_reddit_fallback_is_a_no_op_without_credentials(monkeypatch):
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: False)
+    result = _all_none()
+    sci_pipeline._apply_reddit_fallback(result, "Position2")
+    assert result["reddit"]["handle"] is None
+
+
+def test_reddit_fallback_never_raises(monkeypatch):
+    from tracker import sci_reddit_client
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    monkeypatch.setattr(sci_reddit_client, "resolve_company_account",
+                        lambda name: (_ for _ in ()).throw(RuntimeError("boom")))
+    result = _all_none()
+    sci_pipeline._apply_reddit_fallback(result, "Position2")
+    assert result["reddit"]["handle"] is None
+
+
+def test_run_identify_actually_applies_the_reddit_fallback(monkeypatch):
+    """Wiring test, for the same reason the YouTube one exists: every
+    assertion above calls _apply_reddit_fallback directly and stays green
+    even if run_identify never calls it."""
+    from tracker import sci_store, sci_identify, sci_reddit_client
+    rows = {}
+    monkeypatch.setattr(sci_store, "update_run_status", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "upsert_platform_run",
+                        lambda run_id, platform, **k: rows.__setitem__(platform, k))
+    monkeypatch.setattr(sci_identify, "identify_handles", lambda *a, **k: _all_none())
+    monkeypatch.setattr(sci_reddit_client, "is_configured", lambda: True)
+    monkeypatch.setattr(sci_reddit_client, "resolve_company_account", lambda name: {
+        "kind": "user", "handle": "u/position2",
+        "profile_url": "https://www.reddit.com/user/position2/", "title": "position2"})
+    monkeypatch.setenv("YOUTUBE_API_KEY", "")
+
+    result = sci_pipeline.run_identify(1, "Position2", "http://www.position2.com")
+    assert result["reddit"]["handle"] == "u/position2"
+    assert rows["reddit"]["status"] == "identifying"
+
+
+def test_run_reddit_pulse_writes_the_pulse_onto_the_run(monkeypatch):
+    from tracker import sci_store, sci_reddit_pulse
+    written = {}
+    monkeypatch.setattr(sci_reddit_pulse, "build_pulse",
+                        lambda name, url: {"company": name, "thread_count": 3})
+    monkeypatch.setattr(sci_store, "update_run_status",
+                        lambda run_id, status, **k: written.update(k))
+    sci_pipeline.run_reddit_pulse(9, "Acme", "acme.com")
+    assert written["reddit_pulse"]["thread_count"] == 3
+
+
+def test_run_reddit_pulse_never_raises(monkeypatch):
+    """A failure here must leave every platform's collected posts and the
+    synthesis completely untouched."""
+    from tracker import sci_reddit_pulse
+    monkeypatch.setattr(sci_reddit_pulse, "build_pulse",
+                        lambda name, url: (_ for _ in ()).throw(RuntimeError("boom")))
+    sci_pipeline.run_reddit_pulse(9, "Acme", None)  # must not raise

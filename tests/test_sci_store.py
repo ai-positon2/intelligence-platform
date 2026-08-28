@@ -68,7 +68,7 @@ class _FakeCursor:
         if sql.startswith("INSERT INTO sci_runs"):
             row = {"id": self.db.next_run_id, "email": params[0], "company_name": params[1],
                   "company_url": params[2], "company_logo": params[3], "status": "running",
-                  "error": None, "identify_result": None, "synthesis": None,
+                  "error": None, "identify_result": None, "synthesis": None, "reddit_pulse": None,
                   "created_at": _FIXED_TS, "updated_at": _FIXED_TS}
             self.db.runs.append(row)
             self.db.next_run_id += 1
@@ -76,7 +76,7 @@ class _FakeCursor:
             return
 
         if sql.startswith("UPDATE sci_runs SET status"):
-            status, error, identify_result, synthesis, run_id = params
+            status, error, identify_result, synthesis, reddit_pulse, run_id = params
             for r in self.db.runs:
                 if r["id"] == run_id:
                     r["status"] = status
@@ -85,6 +85,8 @@ class _FakeCursor:
                         r["identify_result"] = identify_result
                     if synthesis is not None:
                         r["synthesis"] = synthesis
+                    if reddit_pulse is not None:
+                        r["reddit_pulse"] = reddit_pulse
             self._result = []
             return
 

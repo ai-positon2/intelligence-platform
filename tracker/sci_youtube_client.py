@@ -68,49 +68,13 @@ def resolve_channel(handle_or_url: str, api_key: str) -> str | None:
     return None
 
 
-# Corporate boilerplate carries no identifying signal, so it must not be
-# what makes a company name "match" a channel title.
-_CORP_NOISE = {
-    "inc", "llc", "ltd", "limited", "corp", "corporation", "co", "company",
-    "group", "holdings", "plc", "gmbh", "pvt", "private", "the", "and",
-    "technologies", "technology", "solutions", "systems", "services",
-    "partners", "labs", "global", "international",
-}
-
-
-def _name_tokens(value: str) -> set[str]:
-    tokens = re.findall(r"[a-z0-9]+", (value or "").lower())
-    significant = [t for t in tokens if t not in _CORP_NOISE]
-    return set(significant or tokens)
-
-
-def _plausible_channel_match(company_name: str, channel_title: str) -> bool:
-    """Does this channel title plausibly belong to this company?
-
-    YouTube's search returns a best-effort match for almost any query, not
-    only for queries that have a real answer: searching "Harborview
-    Compliance Systems" returns "Outdoor Blinds and Awnings Australia" as a
-    confident-looking top hit. Without this check the fallback would attach
-    that channel to the report and collect its videos as the company's own,
-    which is exactly the wrong-handle failure sci_identify.py refuses to
-    make. Verified against the live API, not assumed.
-
-    Deliberately conservative: a company whose channel is branded under a
-    different name is rejected and reported as not found, because a missing
-    platform is recoverable and a wrong one silently poisons the report."""
-    a, b = _name_tokens(company_name), _name_tokens(channel_title)
-    if not a or not b:
-        return False
-    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
-    if shorter <= longer:
-        return True
-    # Spacing differs between a company name and its channel ("Gentle Dental"
-    # vs "GentleDental"), so compare with separators stripped as well.
-    flat_a = re.sub(r"[^a-z0-9]", "", (company_name or "").lower())
-    flat_b = re.sub(r"[^a-z0-9]", "", (channel_title or "").lower())
-    if flat_a and flat_b and (flat_a in flat_b or flat_b in flat_a):
-        return True
-    return len(a & b) / len(a | b) >= 0.5
+# The company-name/account-title matcher lives in tracker/sci_name_match.py
+# so YouTube and Reddit -- both of which resolve a company against a vendor's
+# own fuzzy search index -- cannot drift apart on the one check that stops an
+# unrelated account being attached to a report. Aliased to the original
+# private names so this module's callers and tests are unaffected by the move.
+from tracker.sci_name_match import name_tokens as _name_tokens  # noqa: E402
+from tracker.sci_name_match import plausible_match as _plausible_channel_match  # noqa: E402
 
 
 def resolve_company_channel(company_name: str, api_key: str) -> dict | None:
@@ -118,7 +82,7 @@ def resolve_company_channel(company_name: str, api_key: str) -> dict | None:
 
     Distinct from resolve_channel() above, which takes a handle the identify
     step already produced. This one needs no identify step at all, and exists
-    because YouTube is the only one of the six platforms with a sanctioned
+    because YouTube is one of only two platforms here with a sanctioned
     public search API: a company name can be resolved here authoritatively,
     against the platform's own index, rather than by the pattern-matching
     guess that sci_identify.py deliberately refuses to make. That refusal is
