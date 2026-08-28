@@ -68,6 +68,56 @@ def resolve_channel(handle_or_url: str, api_key: str) -> str | None:
     return None
 
 
+def resolve_company_channel(company_name: str, api_key: str) -> dict | None:
+    """Resolve a bare company NAME to its channel, using YouTube's own index.
+
+    Distinct from resolve_channel() above, which takes a handle the identify
+    step already produced. This one needs no identify step at all, and exists
+    because YouTube is the only one of the six platforms with a sanctioned
+    public search API: a company name can be resolved here authoritatively,
+    against the platform's own index, rather than by the pattern-matching
+    guess that sci_identify.py deliberately refuses to make. That refusal is
+    right for the five scraped platforms and wrong for this one, which is why
+    only YouTube gets this fallback.
+
+    Returns {channel_id, title, handle, profile_url}, or None if nothing
+    matched. Never raises."""
+    name = (company_name or "").strip()
+    if not name or not api_key:
+        return None
+
+    try:
+        data = _get("search", api_key, part="snippet", type="channel", q=name, maxResults=1)
+        items = data.get("items") or []
+        if not items:
+            return None
+        channel_id = ((items[0].get("id") or {}).get("channelId")
+                      or (items[0].get("snippet") or {}).get("channelId"))
+    except (requests.RequestException, KeyError) as e:
+        logger.warning("sci_youtube_client: company channel search failed for %r: %s", name, e)
+        return None
+    if not channel_id:
+        return None
+
+    # Second call purely for display: a bare UC... id is correct but
+    # unreadable in the report UI, and customUrl gives the real @handle.
+    title = custom_url = None
+    try:
+        data = _get("channels", api_key, part="snippet", id=channel_id)
+        detail = (data.get("items") or [{}])[0].get("snippet") or {}
+        title, custom_url = detail.get("title"), detail.get("customUrl")
+    except (requests.RequestException, KeyError) as e:
+        logger.warning("sci_youtube_client: channel detail lookup failed for %s: %s", channel_id, e)
+
+    return {
+        "channel_id": channel_id,
+        "title": title or name,
+        "handle": custom_url or channel_id,
+        "profile_url": (f"https://www.youtube.com/{custom_url}" if custom_url
+                        else f"https://www.youtube.com/channel/{channel_id}"),
+    }
+
+
 def _uploads_playlist_id(channel_id: str, api_key: str) -> str | None:
     try:
         data = _get("channels", api_key, part="contentDetails", id=channel_id)

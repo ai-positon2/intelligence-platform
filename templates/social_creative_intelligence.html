@@ -236,7 +236,16 @@
             'Probe against Nike: ' + (d.ok ? 'found ' + Object.keys(d.found || {}).length + ' platform(s)' : 'found nothing') + '\n' +
             (d.web_search_tool ? 'web_search tool version in use: ' + d.web_search_tool + '\n' : '') +
             (d.elapsed_ms ? 'Elapsed: ' + d.elapsed_ms + 'ms\n' : '') +
-            (d.reasoning ? '\n' + d.reasoning : '') + (d.error ? '\n' + d.error : '');
+            (d.reasoning ? '\n' + d.reasoning : '') + (d.error ? '\n' + d.error : '') +
+            // The reply body itself, when the probe found nothing. Without
+            // it, "the model answered and we mis-read it" and "the model
+            // never answered" look identical from here, which is how a
+            // fragmented-response bug survived two rounds of fixes.
+            (d.last_response ? '\n\n--- last reply from the model ---\n' +
+              'text blocks: ' + d.last_response.text_block_count +
+              '  stop_reason: ' + d.last_response.stop_reason +
+              '  chars: ' + d.last_response.chars + '\n' +
+              (d.last_response.excerpt || '(empty)') : '');
         }).catch(function(e){
           b.disabled = false; b.textContent = 'Check identification step';
           out.style.display = 'block'; out.textContent = 'Could not run the check: ' + e;
