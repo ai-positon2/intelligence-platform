@@ -32,6 +32,15 @@ PLATFORMS = ("instagram", "linkedin", "x", "tiktok", "youtube", "facebook")
 _WEB_SEARCH_TOOL_VERSIONS = ("web_search_20260318", "web_search_20260209", "web_search_20250305")
 _WEB_SEARCH_TOOL = None
 
+# The last reply this module actually received, kept for the admin
+# self-test only (probe() below, reachable solely from the @admin_required
+# /p2/admin/external-usage/sci-identify-check route). When a parse fails,
+# the one thing worth knowing is what the model really sent -- guessing at
+# that from a one-line status string is what let a fragmented-response bug
+# survive two rounds of fixes. Never rendered into sci_platform_runs
+# .status_detail, which every user of the report can see.
+_LAST_RAW_EXCERPT: dict | None = None
+
 _UNSUPPORTED_TOOL_MARKERS = ("unsupported", "unknown tool", "invalid tool", "not supported",
                              "does not support", "unrecognized", "no such tool", "deprecated",
                              "invalid_value", "invalid_request_error")
@@ -99,15 +108,49 @@ def _empty_result(reasoning: str) -> dict[str, dict]:
            for p in PLATFORMS}
 
 
+def _extract_json_object(raw: str) -> str | None:
+    """The outermost {...} inside a blob of text, or None if there isn't a
+    balanced one. The model is told to answer with bare JSON, but with the
+    web_search tool active it routinely wraps that JSON in a code fence or a
+    sentence of preamble, and json.loads() on the whole blob rejects either.
+
+    Brace-matched rather than regex'd, because a regex either stops at the
+    first nested '}' or greedily runs past the object's real end; and
+    string-aware, because a brace inside a "reasoning" value would otherwise
+    unbalance the count and truncate the match."""
+    start = raw.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start:i + 1]
+    return None
+
+
 def _parse(raw: str) -> dict[str, dict] | None:
-    raw = (raw or "").strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`")
-        if raw.lower().startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+    candidate = _extract_json_object(raw or "")
+    if candidate is None:
+        return None
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(candidate)
     except (ValueError, json.JSONDecodeError):
         return None
     if not isinstance(parsed, dict):
@@ -166,7 +209,14 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
             # function expects.
             with client.messages.stream(
                 model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
-                max_tokens=4000,
+                # Headroom, not a tuned number. A 6-platform answer is well
+                # under 1k tokens on its own, but it is emitted at the END of
+                # a tool-use loop that also spends budget on up to 15 search
+                # queries and the citation-carrying prose around them; at
+                # 4000 a truncated run lost exactly the JSON and nothing
+                # else. Cheap to over-provision, since unused budget costs
+                # nothing.
+                max_tokens=8000,
                 system=_SYSTEM,
                 tools=[{"type": version, "name": "web_search", "max_uses": 15}],
                 messages=[{"role": "user", "content": user_text}],
@@ -191,11 +241,46 @@ def identify_handles(company_name: str, company_url: str | None = None) -> dict[
         detail = _describe_exception(last_err) if last_err is not None else "no usable web_search tool version"
         return _empty_result("The identification step failed unexpectedly (%s)." % detail)
 
+    # Every text block joined, in order -- NOT just the last one. With the
+    # web_search tool active the API splits the model's answer into one text
+    # block per cited span (anthropic.types.TextBlock carries `citations`),
+    # so the JSON object arrives in several pieces and text_blocks[-1] is a
+    # bare tail like '}' or a trailing sentence. That parsed as None and
+    # surfaced as "returned an unreadable response" on all six platforms at
+    # once, deterministically, every run. tests/test_sci_identify.py's
+    # fixture only ever built a single text block, so the suite stayed green
+    # through all of it -- the multi-block cases below exist to keep that
+    # blind spot closed.
     text_blocks = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
-    raw = text_blocks[-1] if text_blocks else ""
+    raw = "".join(text_blocks)
+
+    global _LAST_RAW_EXCERPT
+    _LAST_RAW_EXCERPT = {
+        "company": company_name,
+        "text_block_count": len(text_blocks),
+        "stop_reason": getattr(resp, "stop_reason", None),
+        "chars": len(raw),
+        "excerpt": raw[:1500],
+    }
+
     parsed = _parse(raw)
     if parsed is None:
-        logger.warning("sci_identify: unparsable response for %r", company_name)
+        stop_reason = getattr(resp, "stop_reason", None)
+        logger.warning("sci_identify: unparsable response for %r "
+                       "(stop_reason=%s, text_blocks=%d, chars=%d)",
+                       company_name, stop_reason, len(text_blocks), len(raw))
+        if stop_reason == "max_tokens":
+            # A distinct failure from "the model wrote something we couldn't
+            # read": it ran out of room mid-answer. Named separately so this
+            # never again hides behind the generic unreadable-response text.
+            return _empty_result(
+                "The identification step ran out of output budget before it finished "
+                "(stop_reason=max_tokens). Raise max_tokens or lower the web_search "
+                "max_uses in tracker/sci_identify.py.")
+        if not text_blocks:
+            return _empty_result(
+                "The identification step returned no text at all (stop_reason=%s). "
+                "The web search ran but the model never wrote an answer." % stop_reason)
         return _empty_result("The identification step returned an unreadable response.")
     return parsed
 
@@ -224,4 +309,8 @@ def probe(company_name: str = "Nike") -> dict:
         # string, since a real vendor failure and a genuine "couldn't find
         # Nike's TikTok" both look the same shape otherwise.
         result["reasoning"] = next(iter(handles.values()), {}).get("reasoning")
+        # ...and the actual reply body, which is the only thing that
+        # distinguishes "the model answered and we mis-read it" from "the
+        # model never answered". Admin-only: this route is @admin_required.
+        result["last_response"] = _LAST_RAW_EXCERPT
     return result

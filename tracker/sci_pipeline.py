@@ -65,6 +65,48 @@ def _window_posts(posts: list[dict], days: int = DEFAULT_WINDOW_DAYS,
     return [p for p, _ in dated[:keep]]
 
 
+def _apply_youtube_fallback(result: dict, company_name: str) -> None:
+    """Resolve YouTube directly when the identify step didn't. Mutates
+    `result` in place; never raises.
+
+    YouTube is the only one of the six platforms with a sanctioned public
+    search API, so when identify comes back empty for it there is still an
+    authoritative way to find the channel: ask YouTube. Every other platform
+    correctly stays gated behind identify, because the only alternative
+    there is guessing a handle and scraping whatever it hits.
+
+    This matters most in exactly the case that keeps happening: identify
+    fails wholesale (one API call, so all six platforms fail together) and
+    the entire run returns nothing, even though the one platform that needs
+    no scraper at all could have answered on its own."""
+    entry = result.get("youtube") or {}
+    if entry.get("confidence") in _USABLE_CONFIDENCE and entry.get("handle"):
+        return
+    api_key = os.environ.get("YOUTUBE_API_KEY", "")
+    if not api_key:
+        return
+    try:
+        from tracker import sci_youtube_client
+        found = sci_youtube_client.resolve_company_channel(company_name, api_key)
+    except Exception as e:
+        logger.warning("sci_pipeline: YouTube fallback resolution failed for %r: %s", company_name, e)
+        return
+    if not found:
+        return
+    # 'medium', never 'high': this is YouTube's own top match for the company
+    # name, which is authoritative about what the channel IS but not proof
+    # that it is the company's official one rather than a fan channel. The
+    # reasoning string says so plainly, since it renders in the report.
+    result["youtube"] = {
+        "handle": found["handle"],
+        "profile_url": found["profile_url"],
+        "confidence": "medium",
+        "reasoning": ("Matched directly against the YouTube Data API as %s, because the "
+                      "identification step did not return a usable channel." % found["title"]),
+    }
+    logger.info("sci_pipeline: YouTube fallback resolved %r to %s", company_name, found["handle"])
+
+
 def run_identify(run_id: int, company_name: str, company_url: str | None) -> dict:
     """Step 1. Writes identify_result onto the run row and creates the
     per-platform rows up front (status='identifying' if usable,
@@ -73,6 +115,7 @@ def run_identify(run_id: int, company_name: str, company_url: str | None) -> dic
     from tracker import sci_identify, sci_store
 
     result = sci_identify.identify_handles(company_name, company_url)
+    _apply_youtube_fallback(result, company_name)
     sci_store.update_run_status(run_id, "running", identify_result=result)
 
     for platform, entry in result.items():

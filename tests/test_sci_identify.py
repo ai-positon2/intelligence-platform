@@ -41,9 +41,15 @@ class _FakeBlock:
 class _FakeStreamManager:
     """Stands in for anthropic's MessageStreamManager -- production code
     only ever does `with client.messages.stream(...) as stream:
-    stream.get_final_message()`, so that's all this needs to support."""
-    def __init__(self, text):
-        self._text = text
+    stream.get_final_message()`, so that's all this needs to support.
+
+    Takes a LIST of block texts, not one string: with the web_search tool
+    active the real API splits the answer into one text block per cited
+    span, and a single-block fixture cannot reproduce that. Getting this
+    wrong is precisely what let the fragmented-reply bug ship green."""
+    def __init__(self, texts, stop_reason="end_turn"):
+        self._texts = texts
+        self._stop_reason = stop_reason
 
     def __enter__(self):
         return self
@@ -52,7 +58,10 @@ class _FakeStreamManager:
         return False
 
     def get_final_message(self):
-        return type("FakeResponse", (), {"content": [_FakeBlock(self._text)]})()
+        return type("FakeResponse", (), {
+            "content": [_FakeBlock(t) for t in self._texts],
+            "stop_reason": self._stop_reason,
+        })()
 
 
 class _FakeMessages:
@@ -60,9 +69,14 @@ class _FakeMessages:
     call should raise, so a test can simulate one dated version being
     rejected while another succeeds. `calls` records the tool type used on
     every attempt, in order, so a test can assert exactly which versions
-    were (or weren't) tried."""
-    def __init__(self, response_text=None, exc=None, fail_types=None):
-        self._text = response_text
+    were (or weren't) tried. Pass `response_blocks` for a multi-text-block
+    reply, or `response_text` for the single-block shorthand."""
+    def __init__(self, response_text=None, exc=None, fail_types=None,
+                 response_blocks=None, stop_reason="end_turn"):
+        if response_blocks is None:
+            response_blocks = [] if response_text is None else [response_text]
+        self._texts = response_blocks
+        self._stop_reason = stop_reason
         self._exc = exc
         self._fail_types = fail_types or {}
         self.calls = []
@@ -74,12 +88,14 @@ class _FakeMessages:
             raise self._fail_types[tool_type]
         if self._exc:
             raise self._exc
-        return _FakeStreamManager(self._text)
+        return _FakeStreamManager(self._texts, self._stop_reason)
 
 
 class _FakeClient:
-    def __init__(self, response_text=None, exc=None, fail_types=None):
-        self.messages = _FakeMessages(response_text, exc, fail_types)
+    def __init__(self, response_text=None, exc=None, fail_types=None,
+                 response_blocks=None, stop_reason="end_turn"):
+        self.messages = _FakeMessages(response_text, exc, fail_types,
+                                      response_blocks, stop_reason)
 
 
 _MIXED_REPLY = json.dumps({
@@ -232,6 +248,91 @@ def test_identify_handles_reports_the_real_failure_when_every_version_fails(monk
     # The old blind "failed unexpectedly" gave no way to tell this apart from
     # any other failure -- the real error now travels with the result.
     assert "unsupported" in result["instagram"]["reasoning"].lower()
+
+
+# --- the reply shapes web_search actually produces ----------------------
+#
+# Every test in this section fails against the pre-fix code, which read only
+# text_blocks[-1] and required that one block to be exactly a JSON document.
+# In production that surfaced as "The identification step returned an
+# unreadable response" on all six platforms at once, on every single run.
+
+def test_identify_handles_reads_a_reply_split_across_text_blocks(monkeypatch):
+    """The regression that mattered: with web_search on, the API returns one
+    text block per cited span, so the JSON arrives in pieces and the last
+    block on its own is a meaningless tail."""
+    head, tail = _MIXED_REPLY[:60], _MIXED_REPLY[60:]
+    monkeypatch.setattr(sci_identify, "_anthropic",
+                        lambda: _FakeClient(response_blocks=[head, tail]))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert result["instagram"]["handle"] == "acmeinc"
+    assert result["youtube"]["confidence"] == "medium"
+
+
+def test_identify_handles_reads_json_after_a_preamble_block(monkeypatch):
+    """The model narrating its search before answering must not cost us the
+    answer -- nor should the narration itself be mistaken for the answer."""
+    monkeypatch.setattr(sci_identify, "_anthropic", lambda: _FakeClient(
+        response_blocks=["I'll search for each platform now.", _MIXED_REPLY]))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert result["instagram"]["handle"] == "acmeinc"
+
+
+def test_identify_handles_reads_json_wrapped_in_prose_and_a_code_fence(monkeypatch):
+    monkeypatch.setattr(sci_identify, "_anthropic", lambda: _FakeClient(
+        response_text="Here is what I found:\n```json\n" + _MIXED_REPLY +
+                      "\n```\nLet me know if you need more detail."))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert result["instagram"]["handle"] == "acmeinc"
+
+
+def test_identify_handles_tolerates_braces_inside_reasoning_text(monkeypatch):
+    """The JSON extractor is string-aware, so a brace inside a value can't
+    unbalance the scan and truncate the object."""
+    # Deliberately an UNBALANCED brace: a balanced "{like_this}" would leave
+    # a naive depth counter correct by luck, so it proves nothing. A lone '{'
+    # inside a string is what actually strands the count above zero and makes
+    # a non-string-aware scan return None for a perfectly valid document.
+    reply = json.dumps({p: {"handle": None, "profile_url": None, "confidence": "none",
+                            "reasoning": "Bio had a stray { in it."}
+                        for p in sci_identify.PLATFORMS})
+    monkeypatch.setattr(sci_identify, "_anthropic",
+                        lambda: _FakeClient(response_text="Result:\n" + reply))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert all(v["confidence"] == "none" for v in result.values())
+    assert "stray {" in result["instagram"]["reasoning"]
+
+
+def test_identify_handles_names_truncation_instead_of_calling_it_unreadable(monkeypatch):
+    """Running out of output budget is a different failure from writing
+    something unreadable, and must say so -- an operator who can't tell them
+    apart cannot fix either."""
+    monkeypatch.setattr(sci_identify, "_anthropic", lambda: _FakeClient(
+        response_blocks=["I'll search for each platform now.", '{"instagram": {"han'],
+        stop_reason="max_tokens"))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert all(v["confidence"] == "none" for v in result.values())
+    assert "max_tokens" in result["instagram"]["reasoning"]
+
+
+def test_identify_handles_distinguishes_a_reply_with_no_text_at_all(monkeypatch):
+    monkeypatch.setattr(sci_identify, "_anthropic",
+                        lambda: _FakeClient(response_blocks=[]))
+    result = sci_identify.identify_handles("Acme Inc")
+    assert all(v["confidence"] == "none" for v in result.values())
+    assert "no text at all" in result["instagram"]["reasoning"]
+
+
+def test_probe_exposes_the_raw_reply_when_parsing_failed(monkeypatch):
+    """Admin-only diagnostic: without the actual body, a parse failure is
+    indistinguishable from the model genuinely finding nothing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(sci_identify, "_anthropic",
+                        lambda: _FakeClient(response_blocks=["total gibberish"]))
+    result = sci_identify.probe("Nike")
+    assert result["ok"] is False
+    assert result["last_response"]["text_block_count"] == 1
+    assert "total gibberish" in result["last_response"]["excerpt"]
 
 
 # --- probe() -- the admin self-test ------------------------------------

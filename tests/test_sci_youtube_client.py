@@ -104,3 +104,56 @@ def test_list_recent_videos_flags_a_shorts_title(mock_get):
 def test_list_recent_videos_returns_empty_without_a_channel_or_key():
     assert yt.list_recent_videos("", "key") == []
     assert yt.list_recent_videos("UC123", "") == []
+
+
+# --- resolve_company_channel: YouTube resolved without the identify step ---
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_finds_a_channel_from_a_bare_company_name(mock_get):
+    mock_get.side_effect = [
+        _resp({"items": [{"id": {"channelId": "UC" + "a" * 22}}]}),
+        _resp({"items": [{"snippet": {"title": "Position2", "customUrl": "@position2"}}]}),
+    ]
+    out = yt.resolve_company_channel("Position2", "key")
+    assert out["channel_id"] == "UC" + "a" * 22
+    assert out["handle"] == "@position2"
+    assert out["title"] == "Position2"
+    assert out["profile_url"] == "https://www.youtube.com/@position2"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_reads_channel_id_from_snippet_too(mock_get):
+    """search?type=channel carries the id in both id.channelId and
+    snippet.channelId; neither shape may be the one that breaks it."""
+    mock_get.side_effect = [
+        _resp({"items": [{"snippet": {"channelId": "UC" + "b" * 22}}]}),
+        _resp({"items": [{"snippet": {"title": "Acme", "customUrl": None}}]}),
+    ]
+    out = yt.resolve_company_channel("Acme", "key")
+    assert out["channel_id"] == "UC" + "b" * 22
+    assert out["handle"] == "UC" + "b" * 22
+    assert out["profile_url"] == "https://www.youtube.com/channel/UC" + "b" * 22
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_survives_a_failed_detail_lookup(mock_get):
+    """The second call is cosmetic -- losing it must not lose the channel."""
+    import requests as _requests
+    mock_get.side_effect = [
+        _resp({"items": [{"id": {"channelId": "UC" + "c" * 22}}]}),
+        _requests.RequestException("boom"),
+    ]
+    out = yt.resolve_company_channel("Acme", "key")
+    assert out["channel_id"] == "UC" + "c" * 22
+    assert out["title"] == "Acme"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_returns_none_when_nothing_matches(mock_get):
+    mock_get.side_effect = [_resp({"items": []})]
+    assert yt.resolve_company_channel("Nonexistent Co", "key") is None
+
+
+def test_resolve_company_channel_returns_none_without_a_name_or_key():
+    assert yt.resolve_company_channel("", "key") is None
+    assert yt.resolve_company_channel("Acme", "") is None
