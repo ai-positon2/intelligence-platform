@@ -197,3 +197,39 @@ def test_run_identify_actually_applies_the_youtube_fallback(monkeypatch):
     assert rows["youtube"]["status"] == "identifying"
     assert rows["youtube"]["handle"] == "@position2"
     assert rows["facebook"]["status"] == "handle_not_found"
+
+
+# --- per-platform collection depth --------------------------------------
+
+def test_youtube_collects_deeper_than_the_billed_platforms():
+    """YouTube's API is sanctioned and effectively free, so it collects the
+    real recent history; every scraped platform stays at the conservative
+    default until its per-scrape cost is measured."""
+    assert sci_pipeline.min_posts_for("youtube") == 100
+    for platform in ("instagram", "linkedin", "x", "tiktok", "facebook"):
+        assert sci_pipeline.min_posts_for(platform) == sci_pipeline.DEFAULT_MIN_POSTS
+
+
+def test_windowing_keeps_the_full_youtube_depth():
+    """The collection call and the _window_posts trim must agree: raising
+    one without the other silently discards what the other fetched."""
+    old = [{"platform_post_id": str(i), "posted_at": "2015-01-01T00:00:00Z"} for i in range(60)]
+    assert len(sci_pipeline._window_posts(
+        old, min_count=sci_pipeline.min_posts_for("youtube"))) == 60
+    # ...while a billed platform still trims to the conservative default.
+    assert len(sci_pipeline._window_posts(
+        old, min_count=sci_pipeline.min_posts_for("tiktok"))) == 20
+
+
+def test_run_platform_collection_windows_with_the_platform_specific_depth(monkeypatch):
+    """Wiring test: run_platform_collection must pass the per-platform depth
+    into _window_posts, not the module default."""
+    from tracker import sci_store
+    written = {}
+    monkeypatch.setattr(sci_store, "upsert_platform_run", lambda *a, **k: None)
+    monkeypatch.setattr(sci_store, "upsert_posts",
+                        lambda run_id, platform, posts: written.setdefault(platform, len(posts)))
+    posts = [{"platform_post_id": str(i), "posted_at": "2015-01-01T00:00:00Z"} for i in range(60)]
+    monkeypatch.setattr(sci_pipeline, "_collect_youtube", lambda h: (posts, "youtube_api"))
+    sci_pipeline.run_platform_collection(1, "youtube", "@acme")
+    assert written["youtube"] == 60, "youtube was trimmed to the default depth"

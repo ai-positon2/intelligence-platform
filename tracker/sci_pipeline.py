@@ -32,12 +32,31 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_DAYS = 30
 DEFAULT_MIN_POSTS = 20
+
+# Per-platform collection depth, defaulting to DEFAULT_MIN_POSTS.
+#
+# YouTube is the only platform here with a sanctioned, effectively free API:
+# pulling 100 videos costs about 4 units of a 10,000/day quota, so there is
+# no reason to look at a 20-post slice of a channel when the whole recent
+# history is this cheap. Every other platform either bills per scrape
+# (Apify) or spends against a connected account's own daily lookup budget
+# (Unipile, ~100/day before automation flagging), so those stay at the
+# conservative default until their real cost is measured in production.
+#
+# Raising a platform here widens BOTH the collection call and the
+# _window_posts trim; raising one without the other silently does nothing.
+PLATFORM_MIN_POSTS = {"youtube": 100}
+
 LOW_ACTIVITY_THRESHOLD = 3
 MAX_VIDEO_FRAMES = 6
 
 # Confidence levels from sci_identify.identify_handles() that are trusted
 # enough to actually attempt a scrape. 'low' and 'none' both refuse to guess.
 _USABLE_CONFIDENCE = {"high", "medium"}
+
+
+def min_posts_for(platform: str) -> int:
+    return PLATFORM_MIN_POSTS.get(platform, DEFAULT_MIN_POSTS)
 
 
 def _window_posts(posts: list[dict], days: int = DEFAULT_WINDOW_DAYS,
@@ -171,7 +190,7 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
         sci_store.upsert_platform_run(run_id, platform, status="scrape_failed", status_detail=str(e)[:500])
         return
 
-    windowed = _window_posts(posts)
+    windowed = _window_posts(posts, min_count=min_posts_for(platform))
     written = sci_store.upsert_posts(run_id, platform, windowed)
 
     if not posts:
@@ -271,7 +290,7 @@ def _collect_youtube(handle: str) -> tuple[list[dict], str]:
     # alongside tracker/sci_scraper_registry.py's fallback work if it proves
     # to matter in practice.
     posts = sci_youtube_client.list_recent_videos(channel_id, api_key,
-                                                   max_results=DEFAULT_MIN_POSTS, days=DEFAULT_WINDOW_DAYS)
+                                                   max_results=min_posts_for('youtube'), days=DEFAULT_WINDOW_DAYS)
     return posts, "youtube_api"
 
 
