@@ -612,12 +612,15 @@
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
       var media = '<div class="sci-postcard-media' + (thumb ? '' : ' sci-postcard-noimg') + '">' +
         (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\');this.remove()">' : '') +
-        '<span class="sci-postcard-ic">' + meta.icon + '</span>' +
-        '<span class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</span></div>';
+        '<span class="sci-postcard-ic">' + meta.icon + '</span></div>';
       var when = relTime(post.posted_at);
       return '<a class="sci-postcard" href="' + esc(post.post_url || '#') + '" target="_blank" rel="noopener" style="--pf-color:' + meta.color + '">' +
         media +
         '<div class="sci-postcard-body">' +
+          // Format label sits BELOW the thumbnail as its own chip rather than
+          // overlaid on it: an overlay competes with the image for the eye and
+          // is unreadable over a busy frame, which most video stills are.
+          '<div class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</div>' +
           '<div class="sci-postcard-title">' + esc(title) + '</div>' +
           '<div class="sci-postcard-foot">' +
             (when ? '<span class="sci-postcard-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
@@ -805,7 +808,7 @@
         if(NO_ACTIVITY_STATUSES[p.status]){
           var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
           html += '<div class="sci-banner' + cls + '"><span class="bic">' + (p.status === 'low_activity' ? '◐' : '○') + '</span><div><b>' + esc(p.platform) + ':</b> ' +
-            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ' &mdash; ' + esc(p.status_detail) : '') + '</div></div>';
+            esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ': ' + esc(p.status_detail) : '') + '</div></div>';
         }
       });
 

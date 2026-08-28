@@ -111,7 +111,8 @@ def test_list_recent_videos_returns_empty_without_a_channel_or_key():
 @patch("tracker.sci_youtube_client.requests.get")
 def test_resolve_company_channel_finds_a_channel_from_a_bare_company_name(mock_get):
     mock_get.side_effect = [
-        _resp({"items": [{"id": {"channelId": "UC" + "a" * 22}}]}),
+        _resp({"items": []}),                                        # forHandle: miss
+        _resp({"items": [{"id": {"channelId": "UC" + "a" * 22}}]}),  # search: hit
         _resp({"items": [{"snippet": {"title": "Position2", "customUrl": "@position2"}}]}),
     ]
     out = yt.resolve_company_channel("Position2", "key")
@@ -126,6 +127,7 @@ def test_resolve_company_channel_reads_channel_id_from_snippet_too(mock_get):
     """search?type=channel carries the id in both id.channelId and
     snippet.channelId; neither shape may be the one that breaks it."""
     mock_get.side_effect = [
+        _resp({"items": []}),
         _resp({"items": [{"snippet": {"channelId": "UC" + "b" * 22}}]}),
         _resp({"items": [{"snippet": {"title": "Acme", "customUrl": None}}]}),
     ]
@@ -136,12 +138,13 @@ def test_resolve_company_channel_reads_channel_id_from_snippet_too(mock_get):
 
 
 @patch("tracker.sci_youtube_client.requests.get")
-def test_resolve_company_channel_survives_a_failed_detail_lookup(mock_get):
-    """The second call is cosmetic -- losing it must not lose the channel."""
+def test_a_handle_hit_survives_a_failed_detail_lookup(mock_get):
+    """The detail call is cosmetic on the authoritative path -- losing it
+    must not lose the channel."""
     import requests as _requests
     mock_get.side_effect = [
-        _resp({"items": [{"id": {"channelId": "UC" + "c" * 22}}]}),
-        _requests.RequestException("boom"),
+        _resp({"items": [{"id": "UC" + "c" * 22}]}),   # forHandle: hit
+        _requests.RequestException("boom"),             # detail: fails
     ]
     out = yt.resolve_company_channel("Acme", "key")
     assert out["channel_id"] == "UC" + "c" * 22
@@ -149,11 +152,95 @@ def test_resolve_company_channel_survives_a_failed_detail_lookup(mock_get):
 
 
 @patch("tracker.sci_youtube_client.requests.get")
+def test_a_search_hit_is_rejected_when_the_detail_lookup_fails(mock_get):
+    """Opposite call for the opposite path: a search hit is unverified until
+    its title backs it up, so losing the title means we cannot trust it.
+    Refusing here is the point -- a missing platform is recoverable, a wrong
+    one silently poisons the whole report."""
+    import requests as _requests
+    mock_get.side_effect = [
+        _resp({"items": []}),                                        # forHandle: miss
+        _resp({"items": [{"id": {"channelId": "UC" + "d" * 22}}]}),  # search: hit
+        _requests.RequestException("boom"),                          # detail: fails
+    ]
+    assert yt.resolve_company_channel("Acme", "key") is None
+
+
+@patch("tracker.sci_youtube_client.requests.get")
 def test_resolve_company_channel_returns_none_when_nothing_matches(mock_get):
-    mock_get.side_effect = [_resp({"items": []})]
+    mock_get.side_effect = [_resp({"items": []}), _resp({"items": []})]
     assert yt.resolve_company_channel("Nonexistent Co", "key") is None
 
 
 def test_resolve_company_channel_returns_none_without_a_name_or_key():
     assert yt.resolve_company_channel("", "key") is None
     assert yt.resolve_company_channel("Acme", "") is None
+
+
+# --- a search hit must be verified before it is trusted -----------------
+#
+# Confirmed against the live API while building this: YouTube's search
+# returns a best-effort match for almost any query, not only for queries
+# that have a real answer. Searching "Harborview Compliance Systems"
+# returned "Outdoor Blinds and Awnings Australia (OBA)" as a top hit. Left
+# unchecked, the fallback attaches that channel to the report and collects
+# its videos as the company's own.
+
+def test_plausible_channel_match_accepts_real_pairs():
+    assert yt._plausible_channel_match("Position2", "Position2")
+    assert yt._plausible_channel_match("Apple Inc.", "Apple")
+    assert yt._plausible_channel_match("Quantum Ledger Advisory", "Quantum Ledger")
+    # Spacing differences between a company name and its channel branding.
+    assert yt._plausible_channel_match("Gentle Dental", "GentleDental")
+    # Corporate boilerplate must not be what carries the match.
+    assert yt._plausible_channel_match("Northstar Anesthesia Group LLC", "Northstar Anesthesia")
+
+
+def test_plausible_channel_match_rejects_an_unrelated_channel():
+    # The exact live false positive this guard exists for.
+    assert not yt._plausible_channel_match(
+        "Harborview Compliance Systems", "Outdoor Blinds and Awnings Australia (OBA)")
+    assert not yt._plausible_channel_match("Acme Dental", "Minnie's Diaries")
+    assert not yt._plausible_channel_match("Position2", "")
+
+
+def test_plausible_channel_match_is_not_satisfied_by_boilerplate_alone():
+    """Two unrelated companies that share only 'Group'/'Systems' style words
+    must not match on that basis."""
+    assert not yt._plausible_channel_match("Harborview Systems Group", "Riverbend Systems Group")
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_rejects_a_search_hit_with_a_mismatched_title(mock_get):
+    mock_get.side_effect = [
+        _resp({"items": []}),                                             # forHandle: miss
+        _resp({"items": [{"id": {"channelId": "UC" + "z" * 22}}]}),       # search: a hit
+        _resp({"items": [{"snippet": {"title": "Outdoor Blinds and Awnings Australia",
+                                      "customUrl": "@oba"}}]}),           # ...but unrelated
+    ]
+    assert yt.resolve_company_channel("Harborview Compliance Systems", "key") is None
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_prefers_the_exact_handle_lookup(mock_get):
+    """forHandle is authoritative and costs 1 quota unit against search's
+    100, so a handle hit must short-circuit before search is ever called."""
+    mock_get.side_effect = [
+        _resp({"items": [{"id": "UC" + "a" * 22}]}),                      # forHandle: hit
+        _resp({"items": [{"snippet": {"title": "Position2", "customUrl": "@position2"}}]}),
+    ]
+    out = yt.resolve_company_channel("Position2", "key")
+    assert out["channel_id"] == "UC" + "a" * 22
+    assert mock_get.call_count == 2, "search should not have been called after a handle hit"
+
+
+@patch("tracker.sci_youtube_client.requests.get")
+def test_resolve_company_channel_trusts_a_handle_hit_without_a_title_check(mock_get):
+    """A handle hit needs no title check -- the handle IS the identity -- so
+    a channel branded differently from its handle is still accepted."""
+    mock_get.side_effect = [
+        _resp({"items": [{"id": "UC" + "a" * 22}]}),
+        _resp({"items": [{"snippet": {"title": "Something Else Entirely",
+                                      "customUrl": "@acme"}}]}),
+    ]
+    assert yt.resolve_company_channel("Acme", "key") is not None
