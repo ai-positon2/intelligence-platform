@@ -445,8 +445,23 @@
     // card. The full wording still shows on the platform's own pane.
     var STATUS_SHORT = {no_presence:'No presence found', handle_not_found:'No account found',
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low activity'};
-    var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
     var VIEW_GLYPH = '↗';
+
+    // Categorical hues live in CSS as .sci-c0 … .sci-c5 (each sets --c), never
+    // as an inline style: the dark steps are chosen against the dark panel and
+    // measure far under 3:1 on paper, so light mode re-steps every one of them,
+    // and an inline colour would win over that override. Both sets were run
+    // through an adjacent-pair CVD check (OKLab dE under simulated deuter-,
+    // prot- and tritanopia) rather than eyeballed; the previous set had two
+    // adjacent pairs a tritanope could not separate at all.
+    //
+    // Assignment is by identity and fixed for the whole report: a post format
+    // keeps its hue in every chart in every pane (FORMAT_CI), so the reader
+    // learns the key once. Never cycled past six -- the 7th format folds into
+    // the ramp's last step rather than inventing a hue.
+    var CAT_N = 6;
+    var FORMAT_CI = {};    // post_type -> palette index, stable across panes
+    var CHART_UID = 0;
 
     // Which run's data the "Top performing posts" toolbars (sort/show-all)
     // read from -- set once per renderReport() call, so a sort click can
@@ -454,6 +469,9 @@
     var CURRENT_RUN = null;
     var POST_SORT = {};    // platform -> 'top' | 'recent'
     var POST_SHOWALL = {}; // platform -> bool
+    var POST_FILTER = {};  // platform -> post_type | null
+    var TREND_METRIC = {}; // chart scope -> 'n' | 'inter' | 'views'
+    var SCORE_SORT = {key: 'count', dir: -1};
 
     var METRIC_ICONS = {
       likes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2s-7.2-4.4-9.6-8.9C.9 7.9 2.4 4.6 5.6 3.8c2-.5 4 .3 5.2 2 .5.7 1 .7 1.5 0 1.2-1.7 3.2-2.5 5.2-2 3.2.8 4.7 4.1 3.2 7.5-2.4 4.5-9.6 8.9-9.6 8.9z"/></svg>',
@@ -667,8 +685,28 @@
     // with a "Show all" expand -- reads live from CURRENT_RUN so a toggle
     // click only needs to swap this one platform's #sci-postsec-<platform>. ──
     function renderPostsSection(platform){
-      var all = sortedPlatformPosts(platform);
-      if(!all.length) return '';
+      var everything = sortedPlatformPosts(platform);
+      if(!everything.length) return '';
+      // Format filter chips. They read straight off what this platform
+      // actually published, so a company that never posted a carousel never
+      // gets a carousel chip that filters to nothing. The chips carry their
+      // own counts, which makes the row a small format breakdown in itself.
+      var counts = {};
+      everything.forEach(function(p){ var t = p.post_type || 'post'; counts[t] = (counts[t] || 0) + 1; });
+      var types = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var active = POST_FILTER[platform];
+      if(active && !counts[active]){ active = null; POST_FILTER[platform] = null; }
+      var all = active ? everything.filter(function(p){ return (p.post_type || 'post') === active; }) : everything;
+
+      var chips = types.length > 1 ? '<div class="sci-fchips">' +
+        '<button type="button" class="sci-fchip' + (active ? '' : ' active') +
+          '" onclick="setPostFilter(\'' + platform + '\',\'\')">All<b>' + everything.length + '</b></button>' +
+        types.map(function(t){
+          return '<button type="button" class="sci-fchip sci-c' + formatCi(t) + (active === t ? ' active' : '') +
+            '" onclick="setPostFilter(\'' + platform + '\',\'' + esc(t) + '\')">' +
+            esc(postFormatLabel({post_type: t})) + '<b>' + counts[t] + '</b></button>';
+        }).join('') + '</div>' : '';
+
       var showAll = !!POST_SHOWALL[platform];
       var limit = showAll ? all.length : Math.min(24, all.length);
       var shown = all.slice(0, limit);
@@ -676,21 +714,32 @@
       var bar = '<div class="sci-posts-bar"><div class="sci-seg">' +
         '<button type="button" class="sci-seg-btn' + (mode === 'top' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'top\')">Top</button>' +
         '<button type="button" class="sci-seg-btn' + (mode === 'recent' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'recent\')">Most recent</button>' +
-        '</div><span class="sci-posts-count">Showing ' + shown.length + ' of ' + all.length + ' posts</span></div>';
+        '</div><span class="sci-posts-count">Showing ' + shown.length + ' of ' + all.length + ' post' + (all.length === 1 ? '' : 's') +
+        (active ? ' · ' + esc(postFormatLabel({post_type: active})) + ' only' : '') + '</span></div>';
       var grid = '<div class="sci-postcard-grid">' + shown.map(function(p){ return renderPostCard(p); }).join('') + '</div>';
       var more = (!showAll && all.length > limit) ?
         '<button type="button" class="sci-posts-more" onclick="showAllPlatformPosts(\'' + platform + '\')">Show all ' + all.length + ' posts</button>' : '';
-      return '<div class="sci-postsec" id="sci-postsec-' + esc(platform) + '">' + bar + grid + more + '</div>';
+      return '<div class="sci-postsec" id="sci-postsec-' + esc(platform) + '">' + chips + bar + grid + more + '</div>';
+    }
+    function repaintPosts(platform){
+      var el = document.getElementById('sci-postsec-' + platform);
+      if(el) el.outerHTML = renderPostsSection(platform);
     }
     function setPostSort(platform, mode){
       POST_SORT[platform] = mode;
-      var el = document.getElementById('sci-postsec-' + platform);
-      if(el) el.outerHTML = renderPostsSection(platform);
+      repaintPosts(platform);
+    }
+    function setPostFilter(platform, type){
+      POST_FILTER[platform] = type || null;
+      // Filtering resets the cap. Carrying "show all" across a filter change
+      // means picking a format silently expands to every post of it, which is
+      // not what the click asked for.
+      POST_SHOWALL[platform] = false;
+      repaintPosts(platform);
     }
     function showAllPlatformPosts(platform){
       POST_SHOWALL[platform] = true;
-      var el = document.getElementById('sci-postsec-' + platform);
-      if(el) el.outerHTML = renderPostsSection(platform);
+      repaintPosts(platform);
     }
 
     function renderPostChip(post){
@@ -725,23 +774,418 @@
       return {counts: counts, total: total};
     }
 
-    function renderFormatMix(mix){
-      if(!mix.total) return '';
-      var types = Object.keys(mix.counts);
-      var bar = types.map(function(t, i){
-        var pct = (mix.counts[t] / mix.total * 100);
-        return '<div class="fm-seg" style="width:' + pct.toFixed(1) + '%;background:' + FM_PALETTE[i % FM_PALETTE.length] + '"></div>';
+    // ══ Chart toolkit ═══════════════════════════════════════════════════════
+    //
+    // Four primitives cover every chart in the report: a trend (magnitude over
+    // time), ranked bars (magnitude by category), a mix (parts of a whole) and
+    // a heat grid (magnitude across two categorical axes). Each one is built
+    // as a string like everything else here, and each one is hoverable.
+    //
+    // Two rules hold across all of them, and they are the reason the charts
+    // are readable rather than decorative:
+    //   * ONE value axis, always. Two measures of different scale become two
+    //     charts or a toggle between them, never two y-scales on one plot.
+    //   * Colour encodes identity or magnitude, never rank. A filter that
+    //     drops a series must not repaint the ones that survive, so hues are
+    //     assigned from a fixed map (FORMAT_CI) and not from array position.
+
+    // One tooltip node for the whole report, driven by data-tip. Charts are
+    // re-rendered wholesale on every toggle, so per-element listeners would
+    // leak on each click; a single delegated listener survives any re-render.
+    //
+    // data-hi is the companion: hovering any element tagged with a key dims
+    // everything in the same chart that is NOT that key. It is what makes a
+    // legend row and its bar segment feel like one object.
+    var TIP_EL = null;
+    function sciChartsInit(){
+      if(TIP_EL) return;
+      TIP_EL = document.createElement('div');
+      TIP_EL.className = 'sci-tip';
+      TIP_EL.setAttribute('role', 'tooltip');
+      document.body.appendChild(TIP_EL);
+      var cur = null, curHi = null;
+
+      function place(e){
+        var pad = 14, w = TIP_EL.offsetWidth, h = TIP_EL.offsetHeight;
+        var x = e.clientX + pad, y = e.clientY + pad;
+        if(x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+        if(y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+        TIP_EL.style.transform = 'translate(' + Math.max(8, x) + 'px,' + Math.max(8, y) + 'px)';
+      }
+      function hideTip(){ cur = null; TIP_EL.classList.remove('on'); }
+      function clearHi(){
+        if(!curHi) return;
+        curHi.chart.classList.remove('hi-live');
+        curHi.chart.querySelectorAll('.hi-on').forEach(function(n){ n.classList.remove('hi-on'); });
+        curHi = null;
+      }
+
+      document.addEventListener('mouseover', function(e){
+        var t = e.target;
+        var el = (t && t.closest) ? t.closest('[data-tip]') : null;
+        if(el !== cur){
+          cur = el;
+          if(!el) TIP_EL.classList.remove('on');
+          else { TIP_EL.innerHTML = el.getAttribute('data-tip'); TIP_EL.classList.add('on'); place(e); }
+        }
+        var hiEl = (t && t.closest) ? t.closest('[data-hi]') : null;
+        var chart = hiEl && hiEl.closest ? hiEl.closest('.sci-chart, .sci-hi-scope') : null;
+        var key = hiEl ? hiEl.getAttribute('data-hi') : null;
+        if(curHi && curHi.key === key && curHi.chart === chart) return;
+        clearHi();
+        if(!chart || !key) return;
+        chart.classList.add('hi-live');
+        chart.querySelectorAll('[data-hi="' + key.replace(/"/g, '') + '"]').forEach(function(n){ n.classList.add('hi-on'); });
+        curHi = {key: key, chart: chart};
+      });
+      // A tooltip left floating over a scrolled-away chart points at nothing,
+      // so scrolling anywhere dismisses it rather than chasing the element.
+      document.addEventListener('scroll', function(){ hideTip(); clearHi(); }, true);
+      document.addEventListener('mousemove', function(e){ if(cur) place(e); });
+      window.addEventListener('blur', function(){ hideTip(); clearHi(); });
+    }
+    sciChartsInit();
+
+    // Tooltip bodies are built here, not in each chart, so every tooltip in the
+    // report has the same shape: a title line, then labelled rows.
+    //
+    // Escaped TWICE on purpose, and the order matters. The values are escaped
+    // first so a caption containing "<" survives as text; the finished markup
+    // is escaped again because it has to live inside an HTML attribute, and
+    // getAttribute hands back exactly one layer of decoding to innerHTML. Skip
+    // the inner pass and a post caption becomes markup in the tooltip.
+    function tipHtml(title, rows){
+      var html = '<b>' + esc(title) + '</b>' + (rows || []).map(function(r){
+        return '<i>' + esc(r[0]) + '</i><s>' + esc(r[1]) + '</s>';
       }).join('');
-      var legend = types.map(function(t, i){
-        return '<span><i style="background:' + FM_PALETTE[i % FM_PALETTE.length] + '"></i>' + esc(t) + ' · ' + mix.counts[t] + '</span>';
-      }).join('');
-      return '<div class="sci-format-mix"><div class="fm-bar">' + bar + '</div></div><div class="fm-legend">' + legend + '</div>';
+      return esc(html);
     }
 
+    function chartCard(o){
+      if(!o.body) return '';
+      return '<div class="sci-chart' + (o.cls ? ' ' + o.cls : '') + '"' +
+        (o.id ? ' id="' + esc(o.id) + '"' : '') + '>' +
+        '<div class="sci-chart-head"><div class="sci-chart-ht">' +
+          '<h5>' + esc(o.title) + '</h5>' +
+          (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') +
+        '</div>' + (o.controls || '') + '</div>' +
+        o.body + (o.note ? '<div class="sci-chart-note">' + esc(o.note) + '</div>' : '') +
+      '</div>';
+    }
+
+    // `pre` is an already-quoted leading argument, for controls that belong to
+    // one scope (a platform, a chart id) rather than to the page.
+    // Side-by-side pair that collapses to nothing when neither half has
+    // anything to show. Without this an empty wrapper is still a truthy
+    // string, and renderSection dutifully draws a heading over blank space.
+    function duo(){
+      var parts = [].slice.call(arguments).filter(Boolean);
+      if(!parts.length) return '';
+      return '<div class="sci-chart-duo' + (parts.length === 1 ? ' sci-chart-solo' : '') + '">' +
+        parts.join('') + '</div>';
+    }
+
+    function segControl(opts, active, fn, pre){
+      var lead = pre != null ? "'" + pre + "'," : '';
+      return '<div class="sci-seg sci-seg-sm">' + opts.map(function(o){
+        return '<button type="button" class="sci-seg-btn' + (o.k === active ? ' active' : '') +
+          '" onclick="' + fn + '(' + lead + '\'' + o.k + '\')">' + esc(o.label) + '</button>';
+      }).join('') + '</div>';
+    }
+
+    // Axis maxima are rounded up to a 1/2/5 step so the gridline labels read as
+    // round numbers. A raw max puts the top gridline at "37" and makes every
+    // value look precise to a digit the data does not have.
+    function niceMax(v){
+      if(!(v > 0)) return 1;
+      var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+      var n = v / mag;
+      var step = n <= 1 ? 1 : (n <= 2 ? 2 : (n <= 5 ? 5 : 10));
+      return step * mag;
+    }
+
+    // ── Trend: one series, magnitude over time ───────────────────────────────
+    // Points are pre-bucketed by the caller; empty buckets arrive as zeros and
+    // are plotted as zeros. Dropping them would draw a straight line over a
+    // silence, and a silence in a publishing calendar is the finding.
+    function trendSvg(pts, o){
+      o = o || {};
+      if(!pts || pts.length < 2) return '';
+      var W = 960, H = 210, PL = 46, PR = 12, PT = 12, PB = 26;
+      var iw = W - PL - PR, ih = H - PT - PB, base = PT + ih;
+      var raw = Math.max.apply(null, pts.map(function(p){ return p.value; }));
+      if(!(raw > 0)) return '';
+      var top = niceMax(raw);
+      var X = function(i){ return PL + iw * i / (pts.length - 1); };
+      var Y = function(v){ return base - (v / top) * ih; };
+
+      // Three gridlines, unless the midpoint would print the same number as a
+      // neighbour. On a chart whose peak is 1 post a week, [0, 0.5, 1] renders
+      // as "0 / 1 / 1" and the axis looks broken.
+      var seen = {}, ticks = [];
+      [0, top / 2, top].forEach(function(v){
+        var lab = fmtNum(Math.round(v));
+        if(seen[lab]) return;
+        seen[lab] = 1; ticks.push(v);
+      });
+      var grid = '';
+      ticks.forEach(function(v){
+        var y = Y(v).toFixed(1);
+        grid += '<line class="sci-tr-grid" x1="' + PL + '" y1="' + y + '" x2="' + (PL + iw) + '" y2="' + y + '"/>' +
+          '<text class="sci-tr-axis" x="' + (PL - 8) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" text-anchor="end">' +
+          esc(fmtNum(Math.round(v))) + '</text>';
+      });
+
+      var line = pts.map(function(p, i){
+        return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.value).toFixed(1);
+      }).join(' ');
+      var area = line + ' L' + X(pts.length - 1).toFixed(1) + ' ' + base + ' L' + X(0).toFixed(1) + ' ' + base + ' Z';
+
+      var step = pts.length <= 8 ? 1 : (pts.length <= 16 ? 2 : Math.ceil(pts.length / 8));
+      var labels = pts.map(function(p, i){
+        if(i % step !== 0) return '';
+        var anchor = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
+        return '<text class="sci-tr-lab" x="' + X(i).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="' + anchor + '">' +
+          esc(p.label) + '</text>';
+      }).join('');
+
+      // Marks stay visible only while there is room for them; past ~40 buckets
+      // a dot per point is a smear, and the hover layer carries the detail.
+      var dots = pts.length <= 30 ? pts.map(function(p, i){
+        return '<circle class="sci-tr-pt" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="2.6"/>';
+      }).join('') : '';
+
+      // A full-height invisible column per point: the hit target is the whole
+      // band, not the 3px mark, so the crosshair is catchable with a real hand.
+      var half = iw / (pts.length - 1) / 2;
+      var hits = pts.map(function(p, i){
+        var x0 = Math.max(PL, X(i) - half), x1 = Math.min(PL + iw, X(i) + half);
+        return '<g class="sci-tr-col" data-tip="' + p.tip + '">' +
+          '<rect class="sci-tr-hit" x="' + x0.toFixed(1) + '" y="' + PT + '" width="' + (x1 - x0).toFixed(1) + '" height="' + ih + '"/>' +
+          '<line class="sci-tr-cross" x1="' + X(i).toFixed(1) + '" y1="' + PT + '" x2="' + X(i).toFixed(1) + '" y2="' + base + '"/>' +
+          '<circle class="sci-tr-dot" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="5"/>' +
+        '</g>';
+      }).join('');
+
+      return '<div class="sci-tr-wrap"><svg class="sci-tr" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+        'aria-label="' + esc(o.aria || 'Trend chart') + '">' +
+        grid +
+        '<path class="sci-tr-area" d="' + area + '"/>' +
+        '<path class="sci-tr-line" d="' + line + '" pathLength="1"/>' +
+        dots + labels + hits +
+      '</svg></div>';
+    }
+
+    // ── Ranked bars: magnitude by category, biggest first ────────────────────
+    // Horizontal, because the labels are words. A vertical bar chart with
+    // category names under it either rotates the text or truncates it.
+    function rankBars(rows, o){
+      o = o || {};
+      var real = (rows || []).filter(function(r){ return r && r.value > 0; });
+      if(!real.length) return '';
+      var max = Math.max.apply(null, real.map(function(r){ return r.value; }));
+      return '<div class="sci-rank' + (o.cls ? ' ' + o.cls : '') + '">' + real.map(function(r){
+        var pct = max ? Math.max((r.value / max) * 100, 1.5) : 0;
+        var tag = r.href ? 'a' : 'div';
+        var attrs = r.href ? ' href="' + esc(r.href) + '" target="_blank" rel="noopener"' : '';
+        return '<' + tag + ' class="sci-rank-row"' + attrs +
+          (r.tip ? ' data-tip="' + r.tip + '"' : '') +
+          (r.hi ? ' data-hi="' + esc(r.hi) + '"' : '') + '>' +
+          '<span class="sci-rank-l">' + esc(r.label) + '</span>' +
+          '<span class="sci-rank-track"><span class="sci-rank-fill' +
+            (r.ci != null ? ' sci-c' + r.ci : '') + '" style="--w:' + pct.toFixed(2) + '%"></span></span>' +
+          '<span class="sci-rank-v">' + esc(r.display != null ? r.display : fmtNum(r.value)) + '</span>' +
+        '</' + tag + '>';
+      }).join('') + '</div>';
+    }
+
+    // ── Mix: one 100% bar plus a key, both hoverable as one object ───────────
+    // Every segment is named and counted in the key, so the split survives
+    // being read by someone who cannot separate two of the hues.
+    function mixBar(segs, o){
+      o = o || {};
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      if(!total) return '';
+      var bar = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        return '<span class="sci-mixseg sci-c' + s.ci + '" style="--w:' + pct.toFixed(2) + '%"' +
+          ' data-hi="' + esc(s.key) + '" data-tip="' + tipHtml(s.label, [
+            [o.unit || 'Posts', fmtFullNum(s.value)], ['Share', pct.toFixed(1) + '%']]) + '"></span>';
+      }).join('');
+      var key = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        return '<span class="sci-mk" data-hi="' + esc(s.key) + '">' +
+          '<i class="sci-c' + s.ci + '"></i>' + esc(s.label) +
+          '<b>' + fmtNum(s.value) + '</b><em>' + pct.toFixed(0) + '%</em></span>';
+      }).join('');
+      return '<div class="sci-mix"><div class="sci-mixbar">' + bar + '</div>' +
+        '<div class="sci-mixkey">' + key + '</div></div>';
+    }
+
+    // ── Donut: parts of a whole where the whole is itself the headline ───────
+    // pathLength="100" makes the dash array literally a percentage, so the arc
+    // lengths cannot drift from the numbers printed beside them.
+    function donut(segs, o){
+      o = o || {};
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      if(!total) return '';
+      var off = 0;
+      var arcs = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        var arc = '<circle class="sci-dn-arc sci-c' + s.ci + '" cx="60" cy="60" r="46" pathLength="100"' +
+          ' stroke-dasharray="' + Math.max(pct - 0.9, 0.4).toFixed(2) + ' ' + (100 - Math.max(pct - 0.9, 0.4)).toFixed(2) + '"' +
+          ' stroke-dashoffset="' + (-off).toFixed(2) + '"' +
+          ' data-hi="' + esc(s.key) + '" data-tip="' + tipHtml(s.label, [
+            [o.unit || 'Count', fmtFullNum(s.value)], ['Share', pct.toFixed(1) + '%']]) + '"/>';
+        off += pct;
+        return arc;
+      }).join('');
+      var key = segs.map(function(s){
+        return '<span class="sci-mk" data-hi="' + esc(s.key) + '">' +
+          '<i class="sci-c' + s.ci + '"></i>' + esc(s.label) +
+          '<b>' + fmtNum(s.value) + '</b><em>' + ((s.value / total) * 100).toFixed(0) + '%</em></span>';
+      }).join('');
+      return '<div class="sci-donut-wrap">' +
+        '<svg class="sci-dn" viewBox="0 0 120 120" role="img" aria-label="' + esc(o.aria || 'Composition') + '">' +
+          '<circle class="sci-dn-track" cx="60" cy="60" r="46"/>' + arcs +
+        '</svg>' +
+        '<div class="sci-dn-mid"><span class="sci-dn-v">' + esc(o.center || fmtNum(total)) + '</span>' +
+          '<span class="sci-dn-l">' + esc(o.centerLabel || '') + '</span></div>' +
+        '<div class="sci-mixkey sci-mixkey-col">' + key + '</div></div>';
+    }
+
+    // ── Heat grid: two categorical axes, one magnitude ───────────────────────
+    // Sequential, one hue, five steps. Continuous alpha looks smoother and
+    // lies: nobody reads a 6% opacity difference, and the legend would have to
+    // claim they can. Five steps is what a reader can actually match back.
+    function heatGrid(cells, rowLabels, colLabels, o){
+      o = o || {};
+      var max = 0;
+      cells.forEach(function(r){ r.forEach(function(c){ if(c.value > max) max = c.value; }); });
+      if(!max) return '';
+      var head = '<div class="sci-heat-row sci-heat-head"><span class="sci-heat-rl"></span>' +
+        colLabels.map(function(l){ return '<span class="sci-heat-cl">' + esc(l) + '</span>'; }).join('') + '</div>';
+      var body = cells.map(function(row, ri){
+        return '<div class="sci-heat-row"><span class="sci-heat-rl">' + esc(rowLabels[ri]) + '</span>' +
+          row.map(function(c){
+            var lvl = c.value ? Math.min(5, Math.ceil((c.value / max) * 5)) : 0;
+            // No separate "peak" marker: the darkest step already IS the peak,
+            // and a ring drawn in the same hue as the cell it rings is a
+            // decoration nobody can see.
+            return '<span class="sci-heat-c sci-heat-' + lvl + '" data-tip="' + c.tip + '"><i></i></span>';
+          }).join('') + '</div>';
+      }).join('');
+      var scale = [0,1,2,3,4,5].map(function(l){ return '<span class="sci-heat-c sci-heat-' + l + '"><i></i></span>'; }).join('');
+      return '<div class="sci-heat">' + head + body +
+        '<div class="sci-heat-legend"><span>' + esc(o.low || 'quiet') + '</span>' + scale +
+        '<span>' + esc(o.high || 'busiest') + '</span></div></div>';
+    }
+
+    // ── Format mix, now with what each format actually earns ─────────────────
+    // Share and performance are two different questions and two different
+    // scales, so they are two charts side by side rather than one plot with a
+    // second axis. Reading them together is the whole point: a company can
+    // publish 70% carousels that earn a third of what its videos do.
+    function formatSegs(mix){
+      return Object.keys(mix.counts).sort(function(a, b){ return mix.counts[b] - mix.counts[a]; })
+        .map(function(t){
+          return {key: t, label: postFormatLabel({post_type: t}), value: mix.counts[t], ci: formatCi(t)};
+        });
+    }
+    // A pure lookup, never an assignment. The first build assigned lazily on
+    // first ask, which happened to produce the right answer only because the
+    // overview's format block is rendered first and happens to sort by share:
+    // any future chart rendering earlier would have silently repainted every
+    // format in the report. Hues are decided once, in seedFormatHues, and
+    // anything the seeder did not see takes the ramp's last step rather than
+    // colliding with whatever is already at index 0.
+    function formatCi(t){
+      return FORMAT_CI[t] == null ? CAT_N - 1 : FORMAT_CI[t];
+    }
+
+    // Ordered by share of the whole run, so the format a company publishes
+    // most is the one that reads first in every key on every pane.
+    function seedFormatHues(posts){
+      FORMAT_CI = {};
+      var totals = {};
+      (posts || []).forEach(function(p){ var t = p.post_type || 'post'; totals[t] = (totals[t] || 0) + 1; });
+      Object.keys(totals).sort(function(a, b){ return totals[b] - totals[a]; })
+        .forEach(function(t, i){ if(i < CAT_N - 1) FORMAT_CI[t] = i; });
+    }
+    function renderFormatMix(mix){
+      if(!mix.total) return '';
+      return mixBar(formatSegs(mix), {unit: 'Posts'});
+    }
+
+    // Average, not total: a total just restates the mix bar above it and hands
+    // the win to whatever format was published most.
+    function formatPerf(posts, platform){
+      var by = {};
+      (posts || []).forEach(function(p){
+        if(platform && p.platform !== platform) return;
+        var t = p.post_type || 'post';
+        if(!by[t]) by[t] = {n: 0, sum: 0};
+        by[t].n++; by[t].sum += interactionScore(p.metrics);
+      });
+      var rows = Object.keys(by).map(function(t){
+        return {t: t, n: by[t].n, avg: by[t].sum / by[t].n};
+      }).filter(function(r){ return r.avg > 0; })
+        .sort(function(a, b){ return b.avg - a.avg; });
+      if(rows.length < 2) return '';
+      return rankBars(rows.map(function(r){
+        return {label: postFormatLabel({post_type: r.t}), value: r.avg, ci: formatCi(r.t), hi: r.t,
+          display: fmtNum(Math.round(r.avg)),
+          tip: tipHtml(postFormatLabel({post_type: r.t}), [
+            ['Avg interactions', fmtFullNum(Math.round(r.avg))],
+            ['Posts', String(r.n)]])};
+      }));
+    }
+
+    // A pane's format section: the split, and what the split is worth.
+    function renderFormatBlock(posts, platform){
+      var mix = computeFormatMix(posts, platform);
+      // One format is not a mix. A single full-width bar reading "Video 100%"
+      // is a chart that has been given a whole section to restate the
+      // "dominant format" tile three inches above it.
+      if(Object.keys(mix.counts).length < 2) return '';
+      return duo(
+        chartCard({title: 'What they publish', sub: 'Share of every post collected',
+          body: renderFormatMix(mix)}),
+        chartCard({title: 'What it earns', sub: 'Average interactions per post, by format',
+          body: formatPerf(posts, platform),
+          note: 'Views are excluded. A view is delivery, not a response.'})
+      );
+    }
+
+    // ── Recurring creative themes ────────────────────────────────────────────
+    // The old chip row said which themes recur but not how much, so a theme
+    // seen twice looked identical to one seen in half the library. Counted
+    // bars answer "how dominant", which is the actual question.
+    function themeCounts(posts, platform){
+      var counts = {};
+      (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+      }).forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
+      return counts;
+    }
     function renderThemeChips(posts, platform){
-      var themes = topThemes(posts, platform, 8);
-      if(!themes.length) return '';
-      return '<div class="sci-theme-row">' + themes.map(function(t){ return '<span class="sci-theme-chip">' + esc(t) + '</span>'; }).join('') + '</div>';
+      var counts = themeCounts(posts, platform);
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      // A theme seen exactly once is not a recurring theme, it is one caption.
+      // Singletons are always dropped, and the card goes with them when fewer
+      // than two themes actually repeat: one bar is not a pattern, and ten
+      // bars all sitting at 1 is a chart saying nothing very loudly.
+      keys = keys.filter(function(k){ return counts[k] > 1; });
+      if(keys.length < 2) return '';
+      keys = keys.slice(0, 10);
+      var described = (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+      }).length;
+      return rankBars(keys.map(function(k){
+        return {label: k, value: counts[k], display: String(counts[k]),
+          tip: tipHtml(k, [['Appears in', counts[k] + ' of ' + described + ' described creatives'],
+            ['Share', Math.round(counts[k] / Math.max(described, 1) * 100) + '%']])};
+      }), 'sci-rank-theme');
     }
 
     function renderSection(label, glyph, innerHtml){
@@ -911,13 +1355,15 @@
       var bar = segs.map(function(x){
         var pct = (counts[x.key] / total) * 100;
         return '<span class="rd-sent-seg" style="width:' + pct.toFixed(2) + '%;background:' + x.color + '"' +
-          ' title="' + esc(x.label) + ': ' + counts[x.key] + ' of ' + total + ' threads"></span>';
+          ' data-hi="' + esc(x.key) + '" data-tip="' + tipHtml(x.label, [
+            ['Threads', counts[x.key] + ' of ' + total], ['Share', pct.toFixed(1) + '%']]) + '"></span>';
       }).join('');
       var legend = segs.map(function(x){
-        return '<span class="rd-sent-key"><span class="rd-sent-dot" style="background:' + x.color + '"></span>' +
+        return '<span class="rd-sent-key" data-hi="' + esc(x.key) + '">' +
+          '<span class="rd-sent-dot" style="background:' + x.color + '"></span>' +
           esc(x.label) + ' <b>' + counts[x.key] + '</b></span>';
       }).join('');
-      return '<div class="rd-block"><div class="rd-block-h">How Reddit feels about them</div>' +
+      return '<div class="rd-block sci-hi-scope"><div class="rd-block-h">How Reddit feels about them</div>' +
         '<div class="rd-sent-bar">' + bar + '</div>' +
         '<div class="rd-sent-legend">' + legend + '</div>' +
         '<div class="rd-sent-foot">' + total + ' thread' + (total === 1 ? '' : 's') + ' judged toward the company itself, not the thread’s general mood.</div>' +
@@ -930,7 +1376,9 @@
       var max = Math.max.apply(null, subs.map(function(s){ return s.threads; }));
       var rows = subs.map(function(s){
         var pct = max ? (s.threads / max) * 100 : 0;
-        return '<a class="rd-sub-row" href="https://www.reddit.com/r/' + esc(s.name) + '/" target="_blank" rel="noopener">' +
+        return '<a class="rd-sub-row" href="https://www.reddit.com/r/' + esc(s.name) + '/" target="_blank" rel="noopener"' +
+          ' data-tip="' + tipHtml('r/' + s.name, [['Threads', fmtFullNum(s.threads)],
+            ['Share of all mentions', Math.round(s.threads / Math.max(pulse.thread_count || 1, 1) * 100) + '%']]) + '">' +
           '<span class="rd-sub-name">r/' + esc(s.name) + '</span>' +
           '<span class="rd-sub-track"><span class="rd-sub-fill" style="width:' + pct.toFixed(2) + '%"></span></span>' +
           '<span class="rd-sub-val">' + s.threads + '</span>' +
@@ -944,17 +1392,26 @@
       var tl = pulse.timeline || [];
       if(tl.length < 2) return '';
       var max = Math.max.apply(null, tl.map(function(t){ return t.threads; }));
-      var cols = tl.map(function(t){
-        var pct = max ? (t.threads / max) * 100 : 0;
-        return '<span class="rd-tl-col" title="' + esc(rdMonthLabel(t.month)) + ': ' + t.threads + ' threads">' +
-          '<span class="rd-tl-bar" style="height:' + Math.max(pct, 3).toFixed(2) + '%"></span>' +
-          '<span class="rd-tl-lab">' + esc(rdMonthLabel(t.month)) + '</span></span>';
-      }).join('');
-      // Without a peak label the columns show shape but not scale, and a
+      // Three or more months earn the same trend plot as everything else in
+      // the report; two get bars, because a two-point "line" implies a slope
+      // that two observations cannot support.
+      var body = tl.length >= 3
+        ? trendSvg(tl.map(function(t){
+            return {label: rdMonthLabel(t.month), value: t.threads,
+              tip: tipHtml(rdMonthLabel(t.month), [['Threads', fmtFullNum(t.threads)]])};
+          }), {aria: 'Reddit threads per month'})
+        : '<div class="rd-tl">' + tl.map(function(t){
+            var pct = max ? (t.threads / max) * 100 : 0;
+            return '<span class="rd-tl-col" data-tip="' +
+                tipHtml(rdMonthLabel(t.month), [['Threads', fmtFullNum(t.threads)]]) + '">' +
+              '<span class="rd-tl-bar" style="height:' + Math.max(pct, 3).toFixed(2) + '%"></span>' +
+              '<span class="rd-tl-lab">' + esc(rdMonthLabel(t.month)) + '</span></span>';
+          }).join('') + '</div>';
+      // Without a peak label the shape is visible but not the scale, and a
       // reader cannot tell a busy month of 7 threads from one of 70.
       return '<div class="rd-block"><div class="rd-block-h">Mention volume by month' +
         '<span class="rd-tl-peak">peak ' + max + '/mo</span></div>' +
-        '<div class="rd-tl">' + cols + '</div></div>';
+        '<div class="sci-chart rd-chart drawn">' + body + '</div></div>';
     }
 
     function renderRedditThreadRefs(ids, byId, sentiment){
@@ -1086,7 +1543,10 @@
         body = renderRedditSentiment(analysis) +
           renderRedditThemes(analysis, byId) +
           renderRedditCompetitors(analysis, byId) +
-          '<div class="rd-two">' + renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) + '</div>' +
+          // Both blocks run full width. They used to sit side by side, which
+          // was fine for two bar stubs but squeezes the mention-volume trend
+          // into ~280px, where its axis labels render at about three pixels.
+          renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) +
           renderRedditList('Who is talking', (analysis || {}).audience) +
           renderRedditList('Openings this suggests', (analysis || {}).opportunities, 'rd-list-op') +
           renderRedditTopThreads(pulse, analysis);
@@ -1142,7 +1602,7 @@
       });
       var scroller = root.querySelector('.sci-panes');
       if(scroller) scroller.scrollTop = 0;
-      revealStatTiles();
+      revealCharts();
     }
 
     // Tiles rise in one after another, but only the ones on screen: running
@@ -1158,6 +1618,20 @@
       tiles.forEach(function(el, i){ setTimeout(function(){ el.classList.add('visible'); }, i * 55); });
     }
 
+    // Charts draw themselves in the same way, and for the same reason: only
+    // the visible pane's, so a chart is never already-drawn the first time it
+    // is looked at. A chart that has drawn once keeps .drawn and stays put --
+    // re-running the entrance on every tab switch would turn navigation into
+    // a strobe.
+    function revealCharts(){
+      revealStatTiles();
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      var scope = root.querySelector('.sci-pane.active') || root;
+      [].slice.call(scope.querySelectorAll('.sci-chart:not(.drawn)'))
+        .forEach(function(el, i){ setTimeout(function(){ el.classList.add('drawn'); }, 60 + i * 90); });
+    }
+
     function overviewPane(run, allPosts, names, byName){
       var html = '';
       if(run.status === 'running'){
@@ -1171,8 +1645,12 @@
           sciIdentifyDiagControl() + '</div></div>';
       }
       html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts));
-      html += renderSection('Publishing rhythm', '▨', renderRhythm(allPosts));
-      html += renderSection('What they publish, everywhere', '▦', renderFormatMix(computeFormatMix(allPosts, null)));
+      html += renderSection('How the platforms compare', '⊞', renderScorecard(run));
+      html += renderSection('Cadence and timing', '▨',
+        renderRhythm(allPosts, 'all') + renderClock(allPosts));
+      html += renderSection('What they publish, everywhere', '▦', renderFormatBlock(allPosts, null));
+      html += renderSection('How the audience responds', '◍',
+        duo(renderEngageMix(allPosts, null), renderPerfSpread(allPosts, null)));
       html += renderSection('Strongest posts anywhere', '★', renderTopPostsAnywhere(allPosts));
       if(!allPosts.length && run.status !== 'running'){
         html += paneEmpty('No posts were collected on this run',
@@ -1188,78 +1666,289 @@
     // build and it encoded platform in hue -- but TikTok (#fe2c55), YouTube
     // (#ff0033) and Instagram (#e1306c) are three reds nobody can tell apart
     // when stacked adjacent, so the breakdown was unreadable exactly where it
-    // mattered. Per-platform volume is already on the launcher cards and in
-    // each pane; this chart answers cadence, and answers it in one colour.
+    // mattered. Per-platform volume is on the scorecard below; this chart
+    // answers cadence, and answers it in one colour.
     //
     // Buckets adapt to the window: a 30-day collection has no months to plot,
     // and a 100-post YouTube backfill can span a year. Empty buckets are drawn
     // rather than skipped -- a gap IS the finding, and closing it up would
     // draw a steady cadence straight over a silence.
-    function renderRhythm(posts){
-      var times = (posts || []).map(function(p){
+    function weekStart(ms){
+      var d = new Date(ms);
+      d.setUTCHours(0,0,0,0);
+      d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+      return d.getTime();
+    }
+    function bucketPosts(posts){
+      var dated = (posts || []).filter(function(p){
         var d = p.posted_at ? new Date(p.posted_at) : null;
-        return (d && !isNaN(d.getTime())) ? d.getTime() : null;
-      }).filter(function(t){ return t; });
-      if(times.length < 4) return '';
+        return d && !isNaN(d.getTime());
+      });
+      if(dated.length < 4) return null;
+      var times = dated.map(function(p){ return new Date(p.posted_at).getTime(); });
       var min = Math.min.apply(null, times), max = Math.max.apply(null, times);
       var spanDays = (max - min) / 86400000;
-      if(spanDays < 10) return '';
+      if(spanDays < 10) return null;
       var weekly = spanDays <= 140;
 
       var buckets = [], index = {};
-      function weekStart(ms){
-        var d = new Date(ms);
-        d.setUTCHours(0,0,0,0);
-        d.setUTCDate(d.getUTCDate() - d.getUTCDay());
-        return d.getTime();
-      }
       if(weekly){
-        for(var t = weekStart(min); t <= max; t += 7 * 86400000){
+        for(var t = weekStart(min); t <= max && buckets.length <= 60; t += 7 * 86400000){
           index[t] = buckets.length;
-          buckets.push({key: t, n: 0});
-          if(buckets.length > 40) break;
+          buckets.push({key: t, label: shortDayLabel(t), n: 0, inter: 0, views: 0});
         }
       } else {
         var d0 = new Date(min), y = d0.getUTCFullYear(), m = d0.getUTCMonth();
         var dEnd = new Date(max), yE = dEnd.getUTCFullYear(), mE = dEnd.getUTCMonth();
-        while((y < yE || (y === yE && m <= mE)) && buckets.length <= 40){
-          index[y + '-' + ('0' + (m + 1)).slice(-2)] = buckets.length;
-          buckets.push({key: y + '-' + ('0' + (m + 1)).slice(-2), n: 0});
+        while((y < yE || (y === yE && m <= mE)) && buckets.length <= 60){
+          var k = y + '-' + ('0' + (m + 1)).slice(-2);
+          index[k] = buckets.length;
+          buckets.push({key: k, label: rdMonthLabel(k), n: 0, inter: 0, views: 0});
           m++; if(m > 11){ m = 0; y++; }
         }
       }
-      if(buckets.length < 3) return '';
-      times.forEach(function(ms){
-        var d = new Date(ms);
+      if(buckets.length < 3) return null;
+      dated.forEach(function(p){
+        var ms = new Date(p.posted_at).getTime(), d = new Date(ms);
         var k = weekly ? weekStart(ms) : (d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2));
         var i = index[k];
-        if(i != null) buckets[i].n++;
+        if(i == null) return;
+        buckets[i].n++;
+        buckets[i].inter += interactionScore(p.metrics);
+        if(p.metrics && typeof p.metrics.views === 'number') buckets[i].views += p.metrics.views;
       });
-      var peak = Math.max.apply(null, buckets.map(function(b){ return b.n; }));
-      if(!peak) return '';
+      return {buckets: buckets, weekly: weekly, spanDays: spanDays};
+    }
 
-      // Label every bucket when there is room, otherwise every other or every
-      // fourth, so the axis never becomes a smear of overlapping dates.
-      var step = buckets.length <= 10 ? 1 : (buckets.length <= 20 ? 2 : 4);
-      var cols = buckets.map(function(b, i){
-        var label = weekly ? shortDayLabel(b.key) : rdMonthLabel(b.key);
-        var pct = (b.n / peak) * 100;
-        return '<span class="sci-rh-col" title="' + esc(label) + ': ' + b.n + ' post' + (b.n === 1 ? '' : 's') + '">' +
-          '<span class="sci-rh-bars">' +
-            (b.n ? '<span class="sci-rh-bar" style="height:' + Math.max(pct, 4).toFixed(2) + '%"></span>'
-                 : '<span class="sci-rh-zero"></span>') +
-          '</span>' +
-          '<span class="sci-rh-lab">' + ((i % step === 0) ? esc(label) : '') + '</span></span>';
-      }).join('');
-      return '<div class="sci-rhythm">' +
-        '<div class="sci-rh-peak">peak ' + peak + ' post' + (peak === 1 ? '' : 's') + ' in a ' + (weekly ? 'week' : 'month') + '</div>' +
-        '<div class="sci-rh">' + cols + '</div></div>';
+    var TREND_METRICS = [
+      {k: 'n',     label: 'Posts',        unit: 'Posts',        round: false},
+      {k: 'inter', label: 'Interactions', unit: 'Interactions', round: true},
+      {k: 'views', label: 'Views',        unit: 'Views',        round: true}
+    ];
+
+    // The metric toggle is not decoration. Volume and response are different
+    // stories and they routinely disagree: a quarter with half the posts and
+    // triple the interactions is the single most useful thing this chart says,
+    // and it is invisible until you can put both on the same time axis one at
+    // a time. Two y-scales on one plot would be the wrong way to show it.
+    function setTrendMetric(scope, metric){
+      TREND_METRIC[scope] = metric;
+      var el = document.getElementById('sci-trend-' + scope);
+      if(el) el.outerHTML = renderRhythm(trendScopePosts(scope), scope);
+      revealCharts();
+    }
+    function trendScopePosts(scope){
+      var all = (CURRENT_RUN && CURRENT_RUN.posts) || [];
+      return scope === 'all' ? all : all.filter(function(p){ return p.platform === scope; });
+    }
+    function renderRhythm(posts, scope){
+      scope = scope || 'all';
+      var b = bucketPosts(posts);
+      if(!b) return '';
+      // A metric with nothing in it is not offered: an all-zero "Views" tab on
+      // LinkedIn is a dead control that teaches the reader the toggle is broken.
+      var avail = TREND_METRICS.filter(function(m){
+        return b.buckets.some(function(bk){ return bk[m.k] > 0; });
+      });
+      if(!avail.length) return '';
+      var want = TREND_METRIC[scope];
+      var metric = avail.filter(function(m){ return m.k === want; })[0] || avail[0];
+      var pts = b.buckets.map(function(bk){
+        return {label: bk.label, value: bk[metric.k],
+          tip: tipHtml(bk.label + (b.weekly ? ' week' : ''), [
+            ['Posts', fmtFullNum(bk.n)],
+            ['Interactions', fmtFullNum(Math.round(bk.inter))]
+          ].concat(bk.views ? [['Views', fmtFullNum(Math.round(bk.views))]] : []))};
+      });
+      var svg = trendSvg(pts, {aria: metric.label + ' per ' + (b.weekly ? 'week' : 'month')});
+      if(!svg) return '';
+      var peak = Math.max.apply(null, pts.map(function(p){ return p.value; }));
+      var quiet = pts.filter(function(p){ return !p.value; }).length;
+      return chartCard({
+        id: 'sci-trend-' + scope,
+        title: 'Publishing rhythm',
+        sub: (b.weekly ? 'Per week' : 'Per month') + ' across ' + Math.round(b.spanDays) + ' days',
+        controls: avail.length > 1 ? segControl(avail, metric.k, 'setTrendMetric', scope) : '',
+        body: svg,
+        note: 'Peak ' + fmtNum(Math.round(peak)) + ' ' +
+          (peak === 1 ? metric.unit.toLowerCase().replace(/s$/, '') : metric.unit.toLowerCase()) +
+          ' in one ' + (b.weekly ? 'week' : 'month') +
+          (quiet ? ' · ' + quiet + ' ' + (b.weekly ? 'week' : 'month') + (quiet === 1 ? '' : 's') + ' with nothing published' : '')
+      });
     }
 
     function shortDayLabel(ms){
       var d = new Date(ms);
       if(isNaN(d.getTime())) return '';
       return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', timeZone: 'UTC'});
+    }
+
+    // ── When they post ───────────────────────────────────────────────────────
+    // Day of week against time of day. Two categorical axes and one count, so
+    // a grid rather than a chart: it makes a posting calendar legible at a
+    // glance in a way no bar chart of 7 or 24 values does, and it is the one
+    // read here that is directly actionable.
+    //
+    // Times are rendered in the READER's zone, not the poster's -- the raw
+    // timestamps are UTC and a "9am" bucket that is really 2am local would be
+    // a confident lie. The subtitle says so rather than leaving it implied.
+    var CLOCK_DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var CLOCK_BLOCKS = [[0,'12–4a'],[4,'4–8a'],[8,'8a–12p'],[12,'12–4p'],[16,'4–8p'],[20,'8p–12a']];
+    function renderClock(posts, o){
+      o = o || {};
+      var dated = (posts || []).filter(function(p){
+        var d = p.posted_at ? new Date(p.posted_at) : null;
+        return d && !isNaN(d.getTime());
+      });
+      if(dated.length < 8) return '';
+      var cells = CLOCK_DAYS.map(function(){
+        return CLOCK_BLOCKS.map(function(){ return {value: 0, inter: 0}; });
+      });
+      dated.forEach(function(p){
+        var d = new Date(p.posted_at);
+        var c = cells[d.getDay()][Math.floor(d.getHours() / 4)];
+        c.value++; c.inter += interactionScore(p.metrics);
+      });
+      // A day nobody ever posts on is a real finding, but seven rows of which
+      // six are empty is not a chart. Rows are kept, columns are not trimmed:
+      // the shape of the week is the point.
+      var used = 0;
+      cells.forEach(function(r){ r.forEach(function(c){ if(c.value) used++; }); });
+      if(used < 4) return '';
+      cells.forEach(function(row, ri){
+        row.forEach(function(c, ci){
+          c.tip = tipHtml(CLOCK_DAYS[ri] + ' ' + CLOCK_BLOCKS[ci][1],
+            c.value ? [['Posts', String(c.value)],
+                       ['Avg interactions', fmtFullNum(Math.round(c.inter / c.value))]]
+                    : [['Posts', 'none']]);
+        });
+      });
+      var body = heatGrid(cells, CLOCK_DAYS, CLOCK_BLOCKS.map(function(b){ return b[1]; }),
+        {low: 'never', high: 'most often'});
+      if(!body) return '';
+      return chartCard({title: o.title || 'When they post', cls: 'sci-chart-clock',
+        sub: 'Posts by day and time of day, in your timezone', body: body});
+    }
+
+    // ── Platform scorecard ───────────────────────────────────────────────────
+    // The comparison the launcher cards cannot make. Every column is its own
+    // scale, so each cell carries a bar measured against that COLUMN's max,
+    // never a shared one: interactions and posts-per-week share no unit and
+    // putting them on one scale would make cadence invisible next to a
+    // five-figure like count.
+    var SCORE_COLS = [
+      {k: 'count',           label: 'Posts',       fmt: function(v){ return String(v); }},
+      {k: 'avgInteractions', label: 'Avg interactions', fmt: function(v){ return fmtNum(Math.round(v)); }},
+      {k: 'avgViews',        label: 'Avg views',   fmt: function(v){ return fmtNum(Math.round(v)); }},
+      {k: 'perWeek',         label: 'Posts / week', fmt: function(v){ return v.toFixed(1); }},
+      {k: 'bestScore',       label: 'Best post',   fmt: function(v){ return fmtNum(v); }}
+    ];
+    function setScoreSort(key){
+      if(SCORE_SORT.key === key) SCORE_SORT.dir = -SCORE_SORT.dir;
+      else { SCORE_SORT.key = key; SCORE_SORT.dir = -1; }
+      var el = document.getElementById('sci-scorecard');
+      if(el && CURRENT_RUN) el.outerHTML = renderScorecard(CURRENT_RUN);
+      revealCharts();
+    }
+    function renderScorecard(run){
+      var posts = run.posts || [];
+      var rows = (run.platforms || []).map(function(pr){
+        var s = platformStats(pr.platform, posts);
+        return s ? {platform: pr.platform, s: s} : null;
+      }).filter(Boolean);
+      if(rows.length < 2) return '';
+      var maxes = {};
+      SCORE_COLS.forEach(function(c){
+        maxes[c.k] = Math.max.apply(null, rows.map(function(r){ return r.s[c.k] || 0; }));
+      });
+      var sortKey = SCORE_SORT.key, dir = SCORE_SORT.dir;
+      rows.sort(function(a, b){ return ((a.s[sortKey] || 0) - (b.s[sortKey] || 0)) * dir; });
+
+      var head = '<div class="sci-sc-row sci-sc-head"><span class="sci-sc-name">Platform</span>' +
+        SCORE_COLS.map(function(c){
+          return '<button type="button" class="sci-sc-h' + (c.k === sortKey ? ' active' : '') +
+            '" onclick="setScoreSort(\'' + c.k + '\')">' + esc(c.label) +
+            '<span class="sci-sc-arrow">' + (c.k === sortKey ? (dir < 0 ? '▾' : '▴') : '') + '</span></button>';
+        }).join('') + '</div>';
+
+      var body = rows.map(function(r){
+        var meta = platformMeta(r.platform);
+        return '<button type="button" class="sci-sc-row sci-sc-body" data-platform="' + esc(r.platform) + '"' +
+          ' onclick="switchPane(\'' + esc(r.platform) + '\')">' +
+          '<span class="sci-sc-name"><span class="sci-sc-ic">' + meta.icon + '</span>' +
+            esc(platformLabel(r.platform)) + '</span>' +
+          SCORE_COLS.map(function(c){
+            var v = r.s[c.k];
+            if(v == null) return '<span class="sci-sc-c sci-sc-na" data-tip="' +
+              tipHtml(platformLabel(r.platform), [[c.label, 'not reported by this platform']]) + '">–</span>';
+            var pct = maxes[c.k] ? (v / maxes[c.k]) * 100 : 0;
+            return '<span class="sci-sc-c" data-tip="' + tipHtml(platformLabel(r.platform),
+                [[c.label, c.fmt(v)], ['Share of column peak', Math.round(pct) + '%']]) + '">' +
+              '<span class="sci-sc-v">' + esc(c.fmt(v)) + '</span>' +
+              '<span class="sci-sc-track"><span class="sci-sc-bar" style="--w:' + pct.toFixed(1) + '%"></span></span>' +
+            '</span>';
+          }).join('') + '</button>';
+      }).join('');
+
+      return chartCard({id: 'sci-scorecard', cls: 'sci-chart-wide',
+        title: 'Platform scorecard', sub: 'Sort by any column. Each bar is measured against that column.',
+        body: '<div class="sci-sc">' + head + body + '</div>',
+        note: 'A dash means the platform does not report that number, not that it is zero.'});
+    }
+
+    // ── Engagement composition ───────────────────────────────────────────────
+    // Where the response actually lands. A like is one tap; a comment or a
+    // share is somebody spending something. The centre number is that ratio,
+    // because it is the read, and the arcs are how it was arrived at.
+    var ENGAGE_PARTS = [{k: 'likes', label: 'Likes', ci: 0}, {k: 'comments', label: 'Comments', ci: 1},
+      {k: 'shares', label: 'Shares', ci: 2}];
+    function renderEngageMix(posts, platform){
+      var totals = {likes: 0, comments: 0, shares: 0};
+      var scoped = (posts || []).filter(function(p){ return !platform || p.platform === platform; });
+      scoped.forEach(function(p){
+        ENGAGE_PARTS.forEach(function(e){
+          if(p.metrics && typeof p.metrics[e.k] === 'number') totals[e.k] += p.metrics[e.k];
+        });
+      });
+      var segs = ENGAGE_PARTS.filter(function(e){ return totals[e.k] > 0; })
+        .map(function(e){ return {key: e.k, label: e.label, value: totals[e.k], ci: e.ci}; });
+      if(segs.length < 2) return '';
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      var deep = (totals.comments + totals.shares) / total;
+      return chartCard({title: 'Where the response lands',
+        sub: 'Every like, comment and share collected here',
+        body: donut(segs, {unit: 'Total', center: Math.round(deep * 100) + '%',
+          centerLabel: 'beyond a like', aria: 'Engagement composition'}),
+        note: 'Comments and shares cost the audience something. Likes do not, which is why the split is worth reading.'});
+    }
+
+    // ── Concentration of performance ─────────────────────────────────────────
+    // Ranked bars over the top posts, with the median drawn in. The gap
+    // between the best post and the median is the finding: a library where one
+    // post carries everything is a different problem from one that performs
+    // evenly, and the average alone cannot tell them apart.
+    function renderPerfSpread(posts, platform){
+      var scoped = (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && interactionScore(p.metrics) > 0;
+      }).sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); });
+      if(scoped.length < 5) return '';
+      var scores = scoped.map(function(p){ return interactionScore(p.metrics); });
+      var mid = Math.floor(scores.length / 2);
+      var median = scores.length % 2 ? scores[mid] : (scores[mid - 1] + scores[mid]) / 2;
+      var top = scoped.slice(0, 10);
+      var topShare = scores.slice(0, Math.max(1, Math.round(scores.length * 0.1)))
+        .reduce(function(a, b){ return a + b; }, 0) / scores.reduce(function(a, b){ return a + b; }, 0);
+      return chartCard({title: 'Which posts carry it',
+        sub: 'Top ' + top.length + ' by interactions, of ' + scoped.length + ' with any response',
+        body: rankBars(top.map(function(p){
+          return {label: postTitle(p), value: interactionScore(p.metrics), href: p.post_url,
+            tip: tipHtml(postTitle(p), [
+              ['Interactions', fmtFullNum(interactionScore(p.metrics))],
+              ['Format', postFormatLabel(p)],
+              ['Posted', fmtDate(p.posted_at) || 'unknown']])};
+        }), 'sci-rank-posts'),
+        note: 'Median post earns ' + fmtNum(Math.round(median)) + '. The top 10% of posts take ' +
+          Math.round(topShare * 100) + '% of all interactions.'});
     }
 
     // The best posts regardless of platform, which is the comparison a reader
@@ -1319,9 +2008,17 @@
             pr.status_detail || 'Nothing was collected for this platform on this run.');
         }
       } else {
+        var own = allPosts.filter(function(p){ return p.platform === name; });
         body = platformTiles(name, stats) +
-          renderSection('Format mix', '▦', renderFormatMix(computeFormatMix(allPosts, name))) +
-          renderSection('Recurring creative themes', '✦', renderThemeChips(allPosts, name)) +
+          renderSection('Cadence and timing', '▨',
+            renderRhythm(own, name) + renderClock(own, {title: 'When they post here'})) +
+          renderSection('Format mix', '▦', renderFormatBlock(allPosts, name)) +
+          renderSection('How the audience responds', '◍',
+            duo(renderEngageMix(allPosts, name), renderPerfSpread(allPosts, name))) +
+          renderSection('Recurring creative themes', '✦',
+            chartCard({title: 'What the creative keeps showing',
+              sub: 'Counted across every image and video we described on ' + platformLabel(name),
+              body: renderThemeChips(allPosts, name)})) +
           renderSection('Posts', '▣', renderPostsSection(name));
         if(entry){
           body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
@@ -1381,18 +2078,56 @@
         (band ? '<div class="sci-rep-band">' + band + '</div>' : '');
     }
 
-    function printReport(){
+    // Paper is white, so the report prints in the light theme regardless of
+    // which one is on screen. Not a nicety: the dark palette is ink chosen for
+    // a near-black panel, and printing it onto white put the post titles at
+    // 1.3:1 and the stat numbers at 1.0:1 -- a PDF that was fully searchable
+    // and almost entirely invisible. Reusing the light theme rather than
+    // writing a third set of print colours means the printed page inherits
+    // the same measured contrast the light theme already passes.
+    //
+    // Hung off beforeprint/afterprint, not just the button, so Ctrl+P prints
+    // the same document. The exact previous value is restored, including "no
+    // attribute at all", which is what a reader on the system default has.
+    var PRINT_THEME = null;
+    function enterPrintTheme(){
+      if(PRINT_THEME !== null) return;
+      PRINT_THEME = document.documentElement.getAttribute('data-theme') || '';
+      document.documentElement.setAttribute('data-theme', 'light');
       document.body.classList.add('sci-printing');
+    }
+    function exitPrintTheme(){
+      if(PRINT_THEME === null) return;
+      if(PRINT_THEME) document.documentElement.setAttribute('data-theme', PRINT_THEME);
+      else document.documentElement.removeAttribute('data-theme');
+      PRINT_THEME = null;
+      document.body.classList.remove('sci-printing');
+    }
+    window.addEventListener('beforeprint', enterPrintTheme);
+    window.addEventListener('afterprint', exitPrintTheme);
+    function printReport(){
+      enterPrintTheme();
       window.print();
-      setTimeout(function(){ document.body.classList.remove('sci-printing'); }, 400);
+      // Backstop for browsers that fire afterprint unreliably. Without it a
+      // reader who prints from a dark session can be left sitting in light.
+      setTimeout(exitPrintTheme, 600);
     }
 
     function renderReport(run){
       CURRENT_RUN = run;
       POST_SORT = {};
       POST_SHOWALL = {};
+      POST_FILTER = {};
+      TREND_METRIC = {};
+      SCORE_SORT = {key: 'count', dir: -1};
       var postsById = {}, allPosts = run.posts || [];
       allPosts.forEach(function(p){ postsById[p.id] = p; });
+
+      // Hues are assigned to formats ONCE per run and every chart in every
+      // pane then looks the colour up, rather than taking it from its own
+      // array position. That is what stops "video" being orange on the
+      // overview and cyan on LinkedIn just because LinkedIn posts fewer.
+      seedFormatHues(allPosts);
 
       var synthesis = run.synthesis || null;
       var synthOk = !!(synthesis && !synthesis.error);
@@ -1447,7 +2182,7 @@
           '<div class="sci-panes">' + panes + '</div>' +
         '</div>';
       document.getElementById('drawerOverlay').classList.add('open');
-      revealStatTiles();
+      revealCharts();
     }
 
     function closeReport(){
