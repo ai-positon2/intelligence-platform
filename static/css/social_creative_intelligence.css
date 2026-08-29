@@ -166,7 +166,7 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .pf-chip-ic { width: 32px; height: 32px; border-radius: var(--radius-sm, 8px); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--pf-color, #8b86a0) 16%, transparent); color: var(--pf-color, #8b86a0); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
 .pf-chip-ic svg { width: 17px; height: 17px; }
 .pf-chip-txt { min-width: 0; flex: 1; }
-.pf-name { text-transform: capitalize; font-weight: 700; font-size: 13px; color: #eee6f0; display: block; }
+.pf-name { font-weight: 700; font-size: 13px; color: #eee6f0; display: block; }
 .pf-status { font-size: 11px; color: #877b8f; display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-chip[data-status="pending"] .pf-chip-ic,
 .pf-chip[data-status="identifying"] .pf-chip-ic,
@@ -212,51 +212,181 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 
 .sci-empty { text-align: center; color: #6b5f72; font-size: 13.5px; padding: 40px 20px; }
 
-/* ── Report drawer (centered modal) ─────────────────────────────────────── */
+/* ── Platform brand colours ──────────────────────────────────────────────────
+   Set here rather than inline on each element, so light mode can re-pick the
+   ones that were chosen against a dark ground. Every rule downstream reads
+   --pf-color and falls back to a neutral, so an unknown platform still
+   renders; only these seven get a brand hue. */
+[data-platform="instagram"] { --pf-color: #e1306c; }
+[data-platform="linkedin"]  { --pf-color: #0a66c2; }
+[data-platform="x"]         { --pf-color: #cbd5e1; }
+[data-platform="tiktok"]    { --pf-color: #fe2c55; }
+[data-platform="youtube"]   { --pf-color: #ff0033; }
+[data-platform="facebook"]  { --pf-color: #1877f2; }
+[data-platform="reddit"]    { --pf-color: #ff4500; }
+/* X's own brand grey is a near-white picked for a black app. On paper it is
+   invisible -- icon, rail item and tiles all vanished -- so light mode swaps
+   in the dark end of the same neutral ramp. */
+[data-theme="light"] [data-platform="x"] { --pf-color: #334155; }
+.sci-datasrc-ic { color: var(--pf-color, #8b86a0); }
+
+/* ── Report modal ───────────────────────────────────────────────────────────
+   A two-column workspace, not a scroll: a fixed rail of platforms on the left,
+   one pane each on the right. The chrome (gradient bar, logo tile, action
+   buttons) stays in SCI's own orange->pink->purple; everything INSIDE a pane
+   is tinted by that platform's own brand colour, carried down on --pf-color.
+   That split is the whole system -- the frame is ours, the contents are
+   theirs -- and it is what makes a pane identifiable at a glance without
+   reading its heading. */
 .sci-drawer-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(8,4,10,.68); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
 .sci-drawer-overlay.open { opacity: 1; pointer-events: auto; }
-.sci-drawer { position: fixed; top: 50%; left: 50%; width: min(1180px, 95vw); max-height: 90vh; background: rgba(17,10,14,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg, 18px); box-shadow: 0 60px 140px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02); z-index: 9001; transform: translate(-50%,-50%) scale(.94) translateY(8px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.22,1.3,.36,1), opacity .22s ease; display: flex; flex-direction: column; overflow: hidden; }
+.sci-drawer { position: fixed; top: 50%; left: 50%; width: min(1240px, 95vw); height: 92vh; background: rgba(17,10,14,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg, 18px); box-shadow: 0 60px 140px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02); z-index: 9001; transform: translate(-50%,-50%) scale(.94) translateY(8px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.22,1.3,.36,1), opacity .22s ease; display: flex; flex-direction: column; overflow: hidden; }
 .sci-drawer-overlay.open .sci-drawer { transform: translate(-50%,-50%) scale(1) translateY(0); opacity: 1; pointer-events: auto; }
 .sci-drawer::before { content: ''; height: 4px; flex-shrink: 0; background: linear-gradient(90deg,#fb923c,#f472b6,#a855f7); }
-.sci-drawer-body { overflow-y: auto; padding: 26px 30px 44px; }
-.sci-drawer-body::-webkit-scrollbar { width: 8px; }
-.sci-drawer-body::-webkit-scrollbar-track { background: transparent; }
-.sci-drawer-body::-webkit-scrollbar-thumb { background-image: linear-gradient(180deg, rgba(251,146,60,.5), rgba(244,114,182,.4)); border-radius: var(--radius-pill, 80px); }
 
-.sci-drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #b3a6b8; font-size: 13px; cursor: pointer; transition: background .15s, color .15s; z-index: 2; flex-shrink: 0; }
+.sci-drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #b3a6b8; font-size: 13px; cursor: pointer; transition: background .15s, color .15s; z-index: 3; flex-shrink: 0; }
 .sci-drawer-close:hover { background: rgba(255,255,255,.12); color: #f3ecf5; }
 
-.sci-drawer-head { display: flex; align-items: flex-start; gap: 16px; padding: 24px 56px 20px 30px; border-bottom: 1px solid rgba(255,255,255,.07); }
-.sci-drawer-mono { width: 52px; height: 52px; border-radius: var(--radius-md, 12px); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: #1a0a02; background: linear-gradient(135deg,#fb923c,#f472b6); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-.sci-drawer-title { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 21px; font-weight: 700; color: #fbf4f2; line-height: 1.22; letter-spacing: -.01em; }
-.sci-drawer-meta { font-size: 12px; color: #877b8f; margin-top: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.sci-drawer-meta a { color: #fdba74; text-decoration: none; }
-.sci-drawer-meta a:hover { text-decoration: underline; }
+/* ── Report header ───────────────────────────────────────────────────────── */
+.sci-rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 30px 16px; flex-wrap: wrap; flex-shrink: 0; }
+.sci-rep-id { display: flex; align-items: center; gap: 15px; min-width: 0; flex: 1 1 300px; }
+.sci-rep-logo { position: relative; width: 52px; height: 52px; border-radius: var(--radius-md, 14px); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: linear-gradient(135deg,#fb923c,#f472b6); box-shadow: 0 12px 30px -12px rgba(244,114,182,.6); }
+.sci-rep-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.sci-rep-logo span { display: none; font-size: 19px; font-weight: 800; color: #1a0a02; }
+.sci-rep-logo.sci-rep-nologo span { display: block; }
+.sci-rep-txt { min-width: 0; }
+.sci-rep-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 22px; font-weight: 700; color: #fbf4f2; line-height: 1.2; letter-spacing: -.015em; overflow-wrap: break-word; }
+.sci-rep-chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.sci-rep-chip { font-size: 11px; font-weight: 600; color: #a99fb0; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 10px; white-space: nowrap; }
+.sci-rep-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-right: 42px; }
+.sci-act { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm, 9px); border: 1px solid rgba(255,255,255,.11); background: rgba(255,255,255,.04); color: #b3a6b8; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s, border-color .15s, transform .15s; }
+.sci-act:hover { background: rgba(255,255,255,.09); color: #f3ecf5; border-color: rgba(251,146,60,.42); transform: translateY(-1px); }
+.sci-rep-band { padding: 0 30px 18px; border-bottom: 1px solid rgba(255,255,255,.07); flex-shrink: 0; }
 
-/* Platform coverage strip */
-.sci-coverage { display: flex; gap: 8px; flex-wrap: wrap; padding: 18px 30px 0; }
-.cov-chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px 7px 8px; border-radius: var(--radius-pill, 80px); border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); font-size: 11.5px; font-weight: 600; color: #877b8f; text-decoration: none; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
-.cov-chip:hover { transform: translateY(-1px); }
-.cov-chip-ic { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--pf-color, #8b86a0) 18%, transparent); color: var(--pf-color, #8b86a0); flex-shrink: 0; }
-.cov-chip-ic svg { width: 11px; height: 11px; }
-.cov-chip[data-status="ok"] { border-color: color-mix(in srgb, var(--pf-color, #4ade80) 42%, transparent); color: #eee6f0; }
-.cov-chip[data-status="low_activity"] { border-color: rgba(251,191,36,.35); color: #d6c9db; }
-.cov-chip.cov-off { opacity: .45; }
+/* ── Stat tiles ──────────────────────────────────────────────────────────── */
+/* A full row shares the width evenly. Only a short row caps and packs left:
+   with auto-fit + 1fr a run that produced a single tile stretched it across
+   the whole 1200px panel, which read as a broken layout rather than as one
+   number, but capping every row wrapped the five-tile band to 4 + 1. */
+.sci-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
+.sci-tiles-few { grid-template-columns: repeat(auto-fit, minmax(150px, 236px)); justify-content: start; }
+.sci-tile { background: rgba(255,255,255,.032); border: 1px solid rgba(255,255,255,.075); border-radius: var(--radius-md, 12px); padding: 13px 15px 12px; opacity: 0; transform: translateY(9px); transition: opacity .4s ease, transform .4s cubic-bezier(.22,1,.36,1); }
+.sci-tile.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .sci-tile { transition: none; opacity: 1; transform: none; } }
+.sci-tile-v { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 22px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.05; }
+.sci-tile-u { font-size: 12px; font-weight: 700; color: #8b7f92; margin-left: 2px; letter-spacing: 0; }
+/* A word, not a number: drops to a size that fits the tile on one line rather
+   than hyphenating ("Multi-" / "image") and stretching the whole row. */
+.sci-tile-word { font-size: 15.5px; line-height: 1.24; letter-spacing: -.01em; }
+.sci-tile-l { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); color: #8b7f92; margin-top: 8px; }
+.sci-tile-n { font-size: 10.5px; color: #857a8c; margin-top: 4px; line-height: 1.42; }
+/* Inside a platform pane the headline number takes that platform's own hue,
+   lightened toward white so it clears the body-text contrast floor on the
+   dark ground (a raw #0a66c2 LinkedIn blue does not). */
+.sci-tiles-plat .sci-tile-v { color: color-mix(in srgb, var(--pf-color, #ffffff) 52%, #ffffff); }
+
+/* ── Shell: rail + panes ─────────────────────────────────────────────────── */
+.sci-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); flex: 1; min-height: 0; }
+.sci-nav { display: flex; flex-direction: column; gap: 2px; padding: 16px 12px 22px; border-right: 1px solid rgba(255,255,255,.07); overflow-y: auto; min-height: 0; }
+.sci-nav::-webkit-scrollbar { width: 6px; }
+.sci-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: var(--radius-pill, 80px); }
+.sci-nav-item { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 11px; border-radius: var(--radius-sm, 10px); border: 1px solid transparent; background: transparent; color: #8b7f92; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .16s, color .16s, border-color .16s; }
+.sci-nav-item:hover { background: rgba(255,255,255,.045); color: #ded3e2; }
+.sci-nav-item.active { background: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 26%, transparent); color: color-mix(in srgb, var(--pf-color, #fb923c) 42%, #ffffff); }
+/* The active rail bleeds left into the nav's own padding, so it reads as an
+   edge marker on the panel rather than a border on the button. */
+.sci-nav-item.active::before { content: ''; position: absolute; left: -12px; top: 7px; bottom: 7px; width: 3px; border-radius: var(--radius-pill, 80px); background: var(--pf-color, #fb923c); }
+.sci-nav-ic { width: 23px; height: 23px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #a99fb0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 13%, transparent); transition: background .16s, transform .2s cubic-bezier(.34,1.56,.64,1); }
+.sci-nav-ic svg { width: 13.5px; height: 13.5px; }
+.sci-nav-item:hover .sci-nav-ic { transform: scale(1.09); }
+.sci-nav-item.active .sci-nav-ic { background: color-mix(in srgb, var(--pf-color, #fb923c) 24%, transparent); }
+.sci-nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-nav-count { flex-shrink: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #948899; background: rgba(255,255,255,.055); border-radius: var(--radius-pill, 80px); padding: 2px 7px; }
+.sci-nav-item.active .sci-nav-count { color: color-mix(in srgb, var(--pf-color, #fb923c) 38%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+.sci-nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--pf-color, #fb923c); box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+/* A platform that returned nothing is dimmed with a dead grey dot rather than
+   hidden: "we looked at TikTok and found nothing" and "we never checked
+   TikTok" are different findings, and the rail has to tell them apart. */
+.sci-nav-empty { opacity: .48; }
+.sci-nav-empty:hover { opacity: .78; }
+.sci-nav-empty .sci-nav-dot { background: rgba(255,255,255,.2); box-shadow: none; }
+.sci-nav-sep { height: 1px; background: rgba(255,255,255,.07); margin: 11px 4px 3px; }
+.sci-nav-cap { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: #8a7e91; padding: 7px 11px 5px; }
+
+.sci-panes { overflow-y: auto; min-height: 0; min-width: 0; padding: 24px 30px 44px; }
+.sci-panes::-webkit-scrollbar { width: 8px; }
+.sci-panes::-webkit-scrollbar-track { background: transparent; }
+.sci-panes::-webkit-scrollbar-thumb { background-image: linear-gradient(180deg, rgba(251,146,60,.5), rgba(244,114,182,.4)); border-radius: var(--radius-pill, 80px); }
+.sci-pane { display: none; }
+.sci-pane.active { display: block; animation: sci-pane-in .34s cubic-bezier(.22,1,.36,1); }
+@keyframes sci-pane-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sci-pane.active { animation: none; } }
+.sci-pane-title { display: none; }  /* screen: the rail names it. print: revealed */
 
 /* Status banners */
-.sci-banner { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgba(251,191,36,.32); background: rgba(251,191,36,.06); border-radius: var(--radius-md, 12px); padding: 12px 15px; font-size: 12.5px; line-height: 1.55; margin: 12px 30px 0; color: #e9dfe0; }
+.sci-banner { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgba(251,191,36,.32); background: rgba(251,191,36,.06); border-radius: var(--radius-md, 12px); padding: 12px 15px; font-size: 12.5px; line-height: 1.55; margin: 0 0 16px; color: #e9dfe0; }
 .sci-banner.sci-banner-none { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.055); }
 .sci-banner b { text-transform: capitalize; color: #f3ecf5; }
 .sci-banner .bic { flex-shrink: 0; font-size: 14px; margin-top: -1px; }
 
-/* Platform report sections */
-.sci-platform-section { padding: 26px 30px; border-top: 1px solid rgba(255,255,255,.06); scroll-margin-top: 20px; }
-.sci-plat-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.sci-plat-ic { width: 30px; height: 30px; border-radius: var(--radius-sm, 8px); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--pf-color, #8b86a0) 16%, transparent); color: var(--pf-color, #8b86a0); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); }
-.sci-plat-ic svg { width: 16px; height: 16px; }
-.sci-plat-head h3 { text-transform: capitalize; font-size: 15.5px; font-weight: 700; color: #f3ecf5; }
-.sci-plat-vendor { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #877b8f; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 9px; white-space: nowrap; }
-.sci-plat-sub { font-size: 11.5px; color: #877b8f; margin-left: auto; white-space: nowrap; }
+/* ── Platform pane hero ──────────────────────────────────────────────────── */
+.sci-phero { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sci-phero-ic { width: 46px; height: 46px; border-radius: var(--radius-md, 14px); display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #8b86a0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); box-shadow: 0 12px 30px -14px color-mix(in srgb, var(--pf-color, #8b86a0) 85%, transparent); }
+.sci-phero-ic svg { width: 24px; height: 24px; }
+.sci-phero-txt { min-width: 0; flex: 1; }
+.sci-phero-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 20px; font-weight: 700; color: #fbf4f2; letter-spacing: -.015em; }
+.sci-phero-meta { display: flex; align-items: center; gap: 7px 12px; flex-wrap: wrap; margin-top: 6px; font-size: 11.5px; color: #877b8f; }
+.sci-phero-handle { font-weight: 600; color: color-mix(in srgb, var(--pf-color, #fdba74) 45%, #ffffff); }
+.sci-phero-go { flex-shrink: 0; font-size: 11.5px; font-weight: 700; text-decoration: none; white-space: nowrap; color: color-mix(in srgb, var(--pf-color, #fdba74) 65%, #ffffff); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 34%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent); border-radius: var(--radius-pill, 80px); padding: 8px 15px; transition: background .16s, transform .16s; }
+.sci-phero-go:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+.sci-plat-vendor { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #948899; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 9px; white-space: nowrap; }
+
+/* ── Overview: the platform grid, which doubles as the rail's launcher ───── */
+.sci-pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px,1fr)); gap: 10px; }
+.sci-pcard { display: flex; align-items: center; gap: 11px; text-align: left; padding: 12px 13px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-family: inherit; cursor: pointer; transition: border-color .2s, background .2s, transform .2s; }
+.sci-pcard:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 7%, transparent); }
+.sci-pcard-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #8b86a0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); }
+.sci-pcard-ic svg { width: 17px; height: 17px; }
+.sci-pcard-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.sci-pcard-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
+.sci-pcard-v { font-size: 10.5px; color: #877b8f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-pcard-x { flex-shrink: 0; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--pf-color, #fdba74) 60%, #ffffff); }
+.sci-pcard-off { opacity: .5; }
+.sci-pcard-off:hover { opacity: .8; }
+
+/* ── Pane-level empty and degraded states ────────────────────────────────── */
+.sci-pane-empty { text-align: center; padding: 42px 26px; border-radius: var(--radius-lg, 16px); border: 1px dashed rgba(255,255,255,.13); background: rgba(255,255,255,.022); }
+.sci-pane-empty-h { font-size: 14.5px; font-weight: 700; color: #d6c9db; }
+.sci-pane-empty p { font-size: 12.5px; line-height: 1.62; color: #877b8f; margin: 8px auto 0; max-width: 54ch; }
+.sci-pane-note { font-size: 12.5px; line-height: 1.6; color: #877b8f; padding: 13px 16px; border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.025); }
+
+.sci-cross-lede { font-size: 13.5px; line-height: 1.6; color: #cbbfd1; padding: 15px 19px; border-radius: var(--radius-md, 12px); margin-bottom: 22px; background: linear-gradient(120deg, rgba(251,146,60,.1), rgba(168,85,247,.07)); border: 1px solid rgba(244,114,182,.2); }
+
+/* ── Publishing rhythm: one series, volume over time ─────────────────────── */
+.sci-rhythm { position: relative; }
+.sci-rh-peak { position: absolute; top: -25px; right: 0; font-size: 10px; font-weight: 500; color: #857a8c; font-variant-numeric: tabular-nums; }
+.sci-rh { display: flex; align-items: stretch; gap: 4px; height: 132px; }
+.sci-rh-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* The bar area is its own definite-height box, so a bar's percentage height
+   resolves against the plot and never against the plot-plus-axis. */
+.sci-rh-bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; }
+.sci-rh-bar { display: block; width: 100%; max-width: 30px; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, #fb923c, rgba(244,114,182,.55)); }
+/* A bucket with nothing published still gets a mark: a flat baseline tick, so
+   the silence is visibly a measured zero rather than a rendering gap. */
+.sci-rh-zero { display: block; width: 100%; max-width: 30px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.1); }
+.sci-rh-lab { height: 26px; padding-top: 8px; font-size: 9px; color: #857a8c; text-align: center; white-space: nowrap; overflow: visible; font-variant-numeric: tabular-nums; }
+
+/* ── Prose measure ───────────────────────────────────────────────────────────
+   The pane is up to ~950px wide so post grids can breathe, which is far too
+   wide for running text -- a bullet ran past 110 characters and the eye lost
+   the line on the return sweep. Text blocks cap their own measure; grids and
+   charts keep the full width. */
+.sci-summary-list li, .sci-strategy-list li, .sci-claim, .sci-cross-lede,
+.sci-pane-note, .rd-theme-d, .rd-list li, .rd-comp-c { max-width: 78ch; }
+
+/* The Reddit conversation keeps its own inset panel, but inside a pane it no
+   longer needs the drawer's own 22px side margin. */
+.sci-pane .rd-section { margin: 24px 0 0; }
 
 .sci-format-mix { display: flex; align-items: center; gap: 10px; margin: 14px 0 16px; }
 .fm-bar { flex: 1; height: 8px; border-radius: var(--radius-pill, 80px); overflow: hidden; display: flex; background: rgba(255,255,255,.06); }
@@ -299,10 +429,16 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-postcard:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); }
 .sci-postcard-media { position: relative; aspect-ratio: 16 / 9; background: color-mix(in srgb, var(--pf-color, #8b86a0) 14%, transparent); display: flex; align-items: center; justify-content: center; }
 .sci-postcard-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.sci-postcard-ic { display: none; width: 38px; height: 38px; color: var(--pf-color, #8b86a0); }
-.sci-postcard-media.sci-postcard-noimg .sci-postcard-ic { display: flex; }
-.sci-postcard-ic svg { width: 100%; height: 100%; }
-.sci-postcard-type { align-self: flex-start; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: color-mix(in srgb, var(--pf-color, #fdba74) 82%, #fff); background: color-mix(in srgb, var(--pf-color, #fb923c) 15%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 28%, transparent); border-radius: var(--radius-xs, 5px); padding: 3px 8px; }
+/* A text-only post has no media block at all. It gets a faint wash of the
+   platform's hue instead, so it still reads as belonging to the same set, and
+   spends the reclaimed height on more of the caption. */
+.sci-postcard-text { background: linear-gradient(158deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 60%); }
+.sci-postcard-text .sci-postcard-title { -webkit-line-clamp: 8; font-size: 13.5px; }
+.sci-postcard-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sci-postcard-plat { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: color-mix(in srgb, var(--pf-color, #fdba74) 62%, #ffffff); }
+.sci-postcard-plat-ic { width: 12px; height: 12px; display: inline-flex; color: var(--pf-color, #8b86a0); }
+.sci-postcard-plat-ic svg { width: 100%; height: 100%; }
+.sci-postcard-type { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: color-mix(in srgb, var(--pf-color, #fdba74) 58%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 15%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 28%, transparent); border-radius: var(--radius-xs, 5px); padding: 3px 8px; }
 .sci-postcard-body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
 .sci-postcard-title { font-size: 13px; font-weight: 500; color: #e7dfea; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .sci-postcard-foot { display: flex; flex-wrap: nowrap; align-items: center; gap: 11px; margin-top: auto; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.06); min-width: 0; }
@@ -310,16 +446,16 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-metric-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #a79dae; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 .sci-metric-ic { width: 12.5px; height: 12.5px; display: inline-flex; flex-shrink: 0; color: #6b5f72; }
 .sci-metric-ic svg { width: 100%; height: 100%; }
-.sci-postcard-view { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--pf-color, #7dd3fc); white-space: nowrap; flex-shrink: 0; }
+.sci-postcard-view { margin-left: auto; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--pf-color, #7dd3fc) 52%, #ffffff); white-space: nowrap; flex-shrink: 0; }
 .sci-postcard:hover .sci-postcard-view { text-decoration: underline; }
 
 /* ── Posts toolbar: Top / Most-recent toggle, count, show-all ──────────── */
 .sci-posts-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .sci-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-sm, 8px); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
-.sci-seg-btn { border: none; background: none; font-family: inherit; font-size: 11px; font-weight: 700; color: #877b8f; padding: 6px 13px; border-radius: var(--radius-xs, 5px); cursor: pointer; transition: background .15s, color .15s; }
+.sci-seg-btn { border: none; background: none; font-family: inherit; font-size: 11px; font-weight: 700; color: #948899; padding: 6px 13px; border-radius: var(--radius-xs, 5px); cursor: pointer; transition: background .15s, color .15s; }
 .sci-seg-btn:hover { color: #eee6f0; }
-.sci-seg-btn.active { background: color-mix(in srgb, var(--pf-color, #fb923c) 22%, transparent); color: var(--pf-color, #fdba74); }
-.sci-posts-count { font-size: 11px; color: #6b5f72; }
+.sci-seg-btn.active { background: color-mix(in srgb, var(--pf-color, #fb923c) 22%, transparent); color: color-mix(in srgb, var(--pf-color, #fdba74) 48%, #ffffff); }
+.sci-posts-count { font-size: 11px; color: #8a7e91; }
 .sci-posts-more { display: block; width: 100%; margin-top: 12px; padding: 11px; border-radius: var(--radius-md, 12px); border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.02); color: #877b8f; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
 .sci-posts-more:hover { background: rgba(255,255,255,.05); color: #eee6f0; }
 
@@ -339,38 +475,6 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-chip-ic svg { width: 100%; height: 100%; }
 .sci-chip-txt { font-size: 10.5px; font-weight: 600; color: #d6c9db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Overview dashboard -- stat tiles + a platform post-count bar chart, both
-   mechanical (no AI needed), shown right under the coverage strip. */
-.sci-overview { padding: 18px 30px 4px; }
-.sci-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; margin-bottom: 16px; }
-/* Staggered rise-in on open (revealStatTiles() adds .visible per tile, one
-   after another) rather than appearing all at once with the rest of the
-   drawer -- same technique job_change_alert.html's .stat-card uses. */
-.sci-stat-tile { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md, 12px); padding: 13px 15px; opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .35s ease; }
-.sci-stat-tile.visible { opacity: 1; transform: translateY(0); }
-@media (prefers-reduced-motion: reduce) { .sci-stat-tile { transition: none; opacity: 1; transform: none; } }
-.sci-stat-val { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 21px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.sci-stat-label { font-size: 10.5px; color: #877b8f; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); margin-top: 4px; }
-.sci-pbar-chart { display: flex; flex-direction: column; gap: 8px; }
-.sci-pbar-row { display: grid; grid-template-columns: 112px 1fr 32px; align-items: center; gap: 10px; }
-.sci-pbar-label { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #d6c9db; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sci-pbar-ic { width: 14px; height: 14px; flex-shrink: 0; display: inline-flex; }
-.sci-pbar-ic svg { width: 100%; height: 100%; }
-.sci-pbar-track { height: 7px; border-radius: var(--radius-pill, 80px); background: rgba(255,255,255,.06); overflow: hidden; }
-.sci-pbar-fill { height: 100%; border-radius: var(--radius-pill, 80px); transition: width .6s cubic-bezier(.22,1,.36,1); }
-.sci-pbar-val { font-size: 11px; font-variant-numeric: tabular-nums; color: #877b8f; text-align: right; }
-
-.sci-cross-section { padding: 26px 30px 22px; margin-top: 4px; border-top: 2px solid transparent; border-image: linear-gradient(90deg,#fb923c,#f472b6,#a855f7) 1; position: relative; }
-.sci-cross-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.sci-cross-dot { width: 7px; height: 7px; border-radius: 50%; background: linear-gradient(135deg,#fb923c,#a855f7); box-shadow: 0 0 10px rgba(168,85,247,.6); animation: sciCrossPulse 2.2s ease-in-out infinite; flex-shrink: 0; }
-@keyframes sciCrossPulse { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
-.sci-cross-section h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 16.5px; font-weight: 700; margin: 0; background: linear-gradient(100deg,#fdba74,#f472b6 60%,#c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
-.sci-cross-toggle { margin-top: 6px; background: none; border: none; color: #c9a8d6; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 6px 10px; border-radius: var(--radius-sm, 8px); transition: color .15s, background .15s; }
-.sci-cross-toggle:hover { color: #f472b6; background: rgba(244,114,182,.09); }
-.sci-cross-more { display: none; margin-top: 10px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.07); }
-.sci-cross-section.expanded .sci-cross-more { display: block; }
-
-.sci-drawer-empty { text-align: center; padding: 44px 20px; color: #6b5f72; font-size: 13.5px; line-height: 1.6; }
 
 /* Admin-only "Data sources" panel: per-platform Unipile connection status
    plus a one-click connect link. Reuses .sci-card's own look; only the
@@ -392,13 +496,59 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-datasrc-empty { font-size: 12.5px; color: #877b8f; }
 .sci-datasrc-note { font-size: 11px; color: #6b5f72; line-height: 1.5; margin-top: 4px; }
 
+/* Below the rail's own width the two columns stop being two columns: the rail
+   becomes a horizontal, scrollable strip of pills across the top of the panes
+   and keeps every item reachable, rather than collapsing into a select or
+   eating half a narrow screen. */
+@media (max-width: 860px) {
+  /* The desktop shell keeps a fixed header and scrolls only the pane. On a
+     phone the header plus the tile band is taller than the whole modal, so
+     `flex: 1; min-height: 0` correctly resolved the shell to ZERO height and
+     the report rendered as an invisible strip. Narrow screens scroll the
+     drawer as one document instead, with the rail stuck to the top of it. */
+  .sci-drawer { display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .sci-drawer::before { display: block; }
+  .sci-shell { display: block; }
+  .sci-panes { overflow: visible; }
+  .sci-nav { position: sticky; top: 0; z-index: 2; background: rgba(17,10,14,.98); flex-direction: row; align-items: center; gap: 6px; padding: 12px 16px; border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; }
+  .sci-nav-item { width: auto; flex-shrink: 0; border-radius: var(--radius-pill, 80px); padding: 7px 13px 7px 8px; }
+  .sci-nav-item.active::before { display: none; }
+  .sci-nav-sep { width: 1px; height: 22px; margin: 0 4px; flex-shrink: 0; }
+  .sci-nav-cap { display: none; }
+  .sci-panes { padding: 20px 20px 40px; }
+}
 @media (max-width: 640px) {
-  .sci-drawer { width: 96vw; max-height: 94vh; }
-  .sci-drawer-head { padding: 22px 48px 18px 20px; }
-  .sci-coverage, .sci-banner, .sci-platform-section, .sci-cross-section, .sci-overview { padding-left: 20px; padding-right: 20px; }
-  .sci-pbar-row { grid-template-columns: 88px 1fr 28px; }
+  .sci-drawer { width: 96vw; height: 94vh; }
+  .sci-rep-head { padding: 22px 20px 14px; }
+  /* Only the first row needs to clear the absolutely-positioned close button;
+     the actions wrap below it. Padding the whole header would squeeze them. */
+  .sci-rep-id { padding-right: 40px; }
+  .sci-rep-actions { padding-right: 0; }
+  .sci-rep-band { padding: 0 20px 16px; }
+  /* Tiles fill the column here rather than capping at 236px and leaving a
+     dead strip down the right of a 390px screen. */
+  .sci-tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .sci-form { flex-direction: column; align-items: stretch; }
   .sci-btn { width: 100%; }
+}
+
+/* ── Print ──────────────────────────────────────────────────────────────────
+   Cutting the report into panes would otherwise cost Ctrl+F and Save-as-PDF,
+   since only one pane is in the layout at a time. Print flattens all of them
+   back into one document, one platform per page, and reveals the pane titles
+   that the rail carries on screen. */
+@media print {
+  .bg-grid, .sci-aurora, .sci-grain, .topbar, .main, .sci-drawer-close,
+  .sci-nav, .sci-rep-actions, .sci-posts-more, .sci-seg { display: none !important; }
+  .sci-drawer-overlay { position: static !important; opacity: 1 !important; background: none !important; backdrop-filter: none !important; pointer-events: auto !important; }
+  .sci-drawer { position: static !important; transform: none !important; opacity: 1 !important; width: auto !important; height: auto !important; max-height: none !important; border: none !important; box-shadow: none !important; background: #fff !important; display: block !important; }
+  .sci-shell { display: block !important; }
+  .sci-panes { overflow: visible !important; padding: 0 !important; }
+  .sci-pane { display: block !important; animation: none !important; }
+  .sci-pane + .sci-pane { break-before: page; page-break-before: always; padding-top: 18px; }
+  .sci-pane-title { display: block !important; font-family: 'Bricolage Grotesque', sans-serif; font-size: 19px; font-weight: 700; text-transform: capitalize; color: #1c1420; border-bottom: 2px solid #c2410c; padding-bottom: 6px; margin-bottom: 16px; }
+  .sci-tile { opacity: 1 !important; transform: none !important; }
+  .sci-postcard, .rd-thread, .rd-theme, .sci-claim { break-inside: avoid; page-break-inside: avoid; }
 }
 
 /* ═══ LIGHT THEME ═══ */
@@ -455,20 +605,57 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-drawer { background: rgba(255,255,255,.98); border-color: rgba(18,26,54,.1); }
 [data-theme="light"] .sci-drawer-close { background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.12); color: #5c5163; }
 [data-theme="light"] .sci-drawer-close:hover { background: rgba(18,26,54,.1); color: #1c1420; }
-[data-theme="light"] .sci-drawer-head { border-bottom-color: rgba(18,26,54,.08); }
-[data-theme="light"] .sci-drawer-title { color: #1c1420; }
-[data-theme="light"] .sci-drawer-meta { color: #8b7f92; }
-[data-theme="light"] .sci-platform-section { border-top-color: rgba(18,26,54,.07); }
-[data-theme="light"] .sci-plat-head h3 { color: #1c1420; }
-[data-theme="light"] .sci-plat-sub { color: #8b7f92; }
-[data-theme="light"] .sci-plat-vendor { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
+
+/* Every platform-hue mix in this file lightens toward white so it clears the
+   contrast floor on the dark ground. On paper that is exactly backwards, so
+   each one is re-mixed toward the ink colour instead -- same variable, other
+   direction. Anything left un-mirrored renders near-white text on white. */
+[data-theme="light"] .sci-rep-txt h3 { color: #1c1420; }
+[data-theme="light"] .sci-rep-chip { color: #5c5163; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rep-band { border-bottom-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-act { background: rgba(18,26,54,.035); border-color: rgba(18,26,54,.12); color: #5c5163; }
+[data-theme="light"] .sci-act:hover { background: rgba(18,26,54,.075); color: #1c1420; border-color: rgba(194,65,12,.4); }
+[data-theme="light"] .sci-tile { background: rgba(255,255,255,.68); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-tile-v { color: #1c1420; }
+[data-theme="light"] .sci-tiles-plat .sci-tile-v { color: color-mix(in srgb, var(--pf-color, #1c1420) 74%, #140c18); }
+[data-theme="light"] .sci-tile-u, [data-theme="light"] .sci-tile-l { color: #6f6376; }
+[data-theme="light"] .sci-tile-n { color: #7d7185; }
+
+[data-theme="light"] .sci-nav { border-right-color: rgba(18,26,54,.08); }
+@media (max-width: 860px) { [data-theme="light"] .sci-nav { background: rgba(255,255,255,.98); border-bottom-color: rgba(18,26,54,.08); } }
+[data-theme="light"] .sci-nav-item { color: #6f6376; }
+[data-theme="light"] .sci-nav-item:hover { background: rgba(18,26,54,.045); color: #241a28; }
+[data-theme="light"] .sci-nav-item.active { background: color-mix(in srgb, var(--pf-color, #c2410c) 11%, transparent); border-color: color-mix(in srgb, var(--pf-color, #c2410c) 30%, transparent); color: color-mix(in srgb, var(--pf-color, #c2410c) 68%, #140c18); }
+[data-theme="light"] .sci-nav-count { color: #6f6376; background: rgba(18,26,54,.06); }
+[data-theme="light"] .sci-nav-item.active .sci-nav-count { color: color-mix(in srgb, var(--pf-color, #c2410c) 62%, #140c18); }
+[data-theme="light"] .sci-nav-empty .sci-nav-dot { background: rgba(18,26,54,.22); }
+[data-theme="light"] .sci-nav-sep { background: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-nav-cap { color: #6f6376; }
+
+[data-theme="light"] .sci-phero { border-bottom-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-phero-txt h3 { color: #1c1420; }
+[data-theme="light"] .sci-phero-meta { color: #6f6376; }
+[data-theme="light"] .sci-phero-handle { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-phero-go { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-plat-vendor { color: #6f6376; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
+
+[data-theme="light"] .sci-pcard { background: rgba(255,255,255,.66); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-pcard-n { color: #1c1420; }
+[data-theme="light"] .sci-pcard-v { color: #6f6376; }
+[data-theme="light"] .sci-pcard-x { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+
+[data-theme="light"] .sci-pane-empty { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.14); }
+[data-theme="light"] .sci-pane-empty-h { color: #241a28; }
+[data-theme="light"] .sci-pane-empty p, [data-theme="light"] .sci-pane-note { color: #5c5163; }
+[data-theme="light"] .sci-pane-note { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-cross-lede { color: #40353f; background: linear-gradient(120deg, rgba(251,146,60,.11), rgba(168,85,247,.08)); border-color: rgba(244,114,182,.26); }
 [data-theme="light"] .sci-theme-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); color: #443a4a; }
 [data-theme="light"] .sci-section-label { color: #6b5f72; }
 [data-theme="light"] .sci-section-label span { color: #c2410c; }
 [data-theme="light"] .sci-summary-list li { color: #443a4a; }
 [data-theme="light"] .sci-strategy { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
 [data-theme="light"] .sci-strategy-label { color: #9333ea; }
-[data-theme="light"] .sci-strategy-label span { color: #a855f7; }
+[data-theme="light"] .sci-strategy-label span { color: #7e22ce; }
 [data-theme="light"] .sci-strategy-list li { color: #362a3d; }
 [data-theme="light"] .sci-postcard { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-postcard-title { color: #1c1420; }
@@ -478,7 +665,7 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-postcard-view { color: color-mix(in srgb, var(--pf-color, #7dd3fc) 72%, #23111c); }
 [data-theme="light"] .sci-postcard-type { color: color-mix(in srgb, var(--pf-color, #fb923c) 70%, #23111c); background: color-mix(in srgb, var(--pf-color, #fb923c) 12%, transparent); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); }
 [data-theme="light"] .sci-seg { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
-[data-theme="light"] .sci-seg-btn { color: #6a5f73; }
+[data-theme="light"] .sci-seg-btn { color: #574d61; }
 [data-theme="light"] .sci-seg-btn:hover { color: #1c1420; }
 [data-theme="light"] .sci-posts-count { color: #6a5f73; }
 [data-theme="light"] .sci-posts-more { border-color: rgba(18,26,54,.14); color: #8b7f92; }
@@ -486,19 +673,10 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-claim { background: rgba(18,26,54,.03); border-color: rgba(18,26,54,.09); color: #362a3d; }
 [data-theme="light"] .sci-cite-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.12); }
 [data-theme="light"] .sci-chip-txt { color: #443a4a; }
-[data-theme="light"] .cov-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); color: #8b7f92; }
-[data-theme="light"] .cov-chip[data-status="ok"] { color: #1c1420; }
 [data-theme="light"] .sci-banner { color: #443a4a; }
 [data-theme="light"] .sci-banner b { color: #1c1420; }
-[data-theme="light"] .sci-drawer-empty { color: #8b7f92; }
 [data-theme="light"] .fm-bar { background: rgba(18,26,54,.08); }
-[data-theme="light"] .fm-legend { color: #8b7f92; }
-[data-theme="light"] .sci-stat-tile { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
-[data-theme="light"] .sci-stat-val { color: #1c1420; }
-[data-theme="light"] .sci-stat-label { color: #8b7f92; }
-[data-theme="light"] .sci-cross-toggle { color: #a3306e; }
-[data-theme="light"] .sci-cross-toggle:hover { color: #c2410c; background: rgba(194,65,12,.08); }
-[data-theme="light"] .sci-cross-more { border-top-color: rgba(18,26,54,.08); }
+[data-theme="light"] .fm-legend { color: #6a5f72; }
 [data-theme="light"] .sci-datasrc-tag { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
 [data-theme="light"] .sci-datasrc-refresh { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); color: #5c5163; }
 [data-theme="light"] .sci-datasrc-refresh:hover { background: rgba(18,26,54,.08); color: #1c1420; }
@@ -507,9 +685,6 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .sci-datasrc-connect { background: rgba(180,120,10,.1); border-color: rgba(180,120,10,.35); color: #8a5806; }
 [data-theme="light"] .sci-datasrc-empty { color: #8b7f92; }
 [data-theme="light"] .sci-datasrc-note { color: #a89bb0; }
-[data-theme="light"] .sci-pbar-label { color: #362a3d; }
-[data-theme="light"] .sci-pbar-val { color: #8b7f92; }
-[data-theme="light"] .sci-pbar-track { background: rgba(18,26,54,.08); }
 
 /* ── Reddit conversation ───────────────────────────────────────────────────
    Given its own visual register rather than the per-platform one above,
@@ -687,9 +862,9 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 [data-theme="light"] .rd-thread-title { color: #241a28; }
 [data-theme="light"] .rd-thread-when, [data-theme="light"] .rd-thread-foot { color: #6a5f66; }
 [data-theme="light"] .rd-thread-foot { border-top-color: rgba(18,26,54,.09); }
-[data-theme="light"] .rd-mood-positive { color: #15803d; background: rgba(74,222,128,.18); }
+[data-theme="light"] .rd-mood-positive { color: #166534; background: rgba(74,222,128,.18); }
 [data-theme="light"] .rd-mood-negative { color: #b91c1c; background: rgba(248,113,113,.18); }
-[data-theme="light"] .rd-mood-mixed { color: #a16207; background: rgba(251,191,36,.2); }
+[data-theme="light"] .rd-mood-mixed { color: #854d0e; background: rgba(251,191,36,.22); }
 [data-theme="light"] .rd-mood-neutral { color: #475569; background: rgba(148,163,184,.2); }
 [data-theme="light"] .rd-empty { color: #5c5163; background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.13); }
 .rd-block-h { display: flex; align-items: baseline; gap: 10px; }
@@ -709,3 +884,17 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 /* Informational, not a warning: see the Reddit branch in renderReport. */
 .sci-banner.sci-banner-info { border-color: rgba(255,69,0,.26); background: rgba(255,69,0,.05); }
 [data-theme="light"] .sci-banner.sci-banner-info { border-color: rgba(255,69,0,.3); background: rgba(255,69,0,.055); }
+
+/* Measured additions: each of these sat below 4.5:1 on the paper ground.
+   The status pill's greens and ambers were picked for a black panel; the
+   platform-hue chips need mixing toward the ink, not toward white. */
+[data-theme="light"] .status-pill.st-done { color: #166534; background: rgba(74,222,128,.2); }
+[data-theme="light"] .status-pill.st-running { color: #92400e; background: rgba(251,191,36,.24); }
+[data-theme="light"] .status-pill.st-error { color: #b91c1c; background: rgba(248,113,113,.2); }
+[data-theme="light"] .sci-postcard-plat { color: color-mix(in srgb, var(--pf-color, #c2410c) 68%, #140c18); }
+[data-theme="light"] .sci-postcard-type { color: color-mix(in srgb, var(--pf-color, #c2410c) 66%, #140c18); }
+[data-theme="light"] .sci-postcard-view { color: color-mix(in srgb, var(--pf-color, #c2410c) 66%, #140c18); }
+[data-theme="light"] .sci-seg-btn.active { color: color-mix(in srgb, var(--pf-color, #c2410c) 62%, #140c18); }
+[data-theme="light"] .sci-tile-n { color: #6f6376; }
+[data-theme="light"] .sci-rh-peak, [data-theme="light"] .sci-rh-lab { color: #6a5f72; }
+[data-theme="light"] .sci-posts-count, [data-theme="light"] .sci-nav-count { color: #6a5f72; }
