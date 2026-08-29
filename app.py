@@ -1236,7 +1236,7 @@ ACCOUNTS = {
 }
 
 # ── Auth helpers ────────────────────────────────────────────────────────────────
-ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com"}
+ADMIN_EMAILS = {"krishna.ladha@position2.com", "sudheer.d@position2.com", "reporting@position2.com", "sparikh@position2.com", "abhilash.dg@position2.com", "pushpendra.k@position2.com", "sangeeta@position2.com"}
 
 def _get_user():
     """Return current user dict or None."""
