@@ -66,7 +66,13 @@ global.document = {
   createElement(t){ return el(t); },
   addEventListener(){}, head: { appendChild(){} }, body: { appendChild(){}, classList: {add(){},remove(){}} },
 };
-global.window = { location: { pathname: "/" } };
+// The charts install one delegated tooltip listener and a print-theme pair on
+// window at load. They are not what these tests exercise, but the script does
+// not get to run at all without somewhere to hang them.
+global.window = {
+  location: { pathname: "/" },
+  addEventListener(){}, innerWidth: 1400, innerHeight: 900,
+};
 global.fetch = () => new Promise(() => {});
 global.alert = () => {};
 
@@ -172,9 +178,9 @@ def test_platform_stats_is_null_when_the_platform_collected_nothing():
 
 # ── Publishing rhythm ──────────────────────────────────────────────────────
 
-def test_rhythm_draws_silent_buckets_instead_of_closing_the_gap():
-    """A month with nothing published IS the finding. Skipping empty buckets
-    would draw a steady cadence straight over a two-month silence."""
+def test_rhythm_plots_silent_buckets_as_zero_instead_of_closing_the_gap():
+    """A week with nothing published IS the finding. Skipping empty buckets
+    would draw a straight line over a six-week silence."""
     probe = """
       var posts = [
         {platform:'a', posted_at:'2026-01-05T00:00:00Z', metrics:{}},
@@ -182,31 +188,39 @@ def test_rhythm_draws_silent_buckets_instead_of_closing_the_gap():
         {platform:'a', posted_at:'2026-02-20T00:00:00Z', metrics:{}},
         {platform:'a', posted_at:'2026-02-21T00:00:00Z', metrics:{}}
       ];
+      var b = bucketPosts(posts);
       var html = renderRhythm(posts);
-      ({cols: (html.match(/sci-rh-col/g)||[]).length,
-        zeros: (html.match(/sci-rh-zero/g)||[]).length,
-        bars: (html.match(/sci-rh-bar"/g)||[]).length});
+      ({buckets: b.buckets.length, weekly: b.weekly,
+        counted: b.buckets.reduce(function(a, x){ return a + x.n; }, 0),
+        silent: b.buckets.filter(function(x){ return x.n === 0; }).length,
+        // Every bucket, silent or not, becomes a point on the plotted line.
+        hits: (html.match(/class="sci-tr-col"/g)||[]).length,
+        saysSilent: html.indexOf('with nothing published') >= 0});
     """
     got = _run(probe)
-    # Six-ish weeks span; only two of them carry posts, the rest are drawn flat.
-    assert got["cols"] >= 6
-    assert got["bars"] == 2
-    assert got["zeros"] == got["cols"] - 2
+    assert got["weekly"] is True
+    assert got["buckets"] >= 6
+    assert got["counted"] == 4
+    assert got["silent"] == got["buckets"] - 2
+    assert got["hits"] == got["buckets"], "a silent week is a plotted zero, not a missing point"
+    assert got["saysSilent"] is True, "the chart says in words how many buckets were empty"
 
 
 def test_rhythm_buckets_by_month_once_weeks_would_be_unreadable():
-    """A 100-post backfill can span a year; 50-odd weekly columns is a smear."""
+    """A 100-post backfill can span a year; 50-odd weekly points is a smear."""
     probe = """
       var posts = [];
       for(var m = 1; m <= 12; m++)
         posts.push({platform:'a', posted_at:'2026-' + ('0'+m).slice(-2) + '-10T00:00:00Z', metrics:{}});
+      var b = bucketPosts(posts);
       var html = renderRhythm(posts);
-      ({cols: (html.match(/sci-rh-col/g)||[]).length, monthly: html.indexOf('in a month') >= 0,
-        weekly: html.indexOf('in a week') >= 0});
+      ({buckets: b.buckets.length, weekly: b.weekly,
+        monthly: html.indexOf('in one month') >= 0, saysWeek: html.indexOf('in one week') >= 0});
     """
     got = _run(probe)
-    assert got["monthly"] is True and got["weekly"] is False
-    assert got["cols"] == 12
+    assert got["weekly"] is False
+    assert got["monthly"] is True and got["saysWeek"] is False
+    assert got["buckets"] == 12
 
 
 def test_rhythm_declines_to_draw_a_chart_from_too_little_data():
@@ -403,3 +417,388 @@ def test_every_platform_gets_a_pane_even_when_synthesis_produced_nothing():
     assert got["instagram"] is True
     assert got["linkedin"] is True
     assert got["postsRendered"] == 2
+
+
+# ══ Charts ══════════════════════════════════════════════════════════════════
+#
+# Every chart in the report is built from these primitives, and the failure
+# mode they share is that a broken one still renders. A stacked bar with the
+# wrong denominators, an axis whose labels repeat, a hue that moves between
+# panes: all of them look like charts. So these read the numbers back.
+
+
+def test_a_tooltip_cannot_be_talked_into_becoming_markup():
+    """Tooltip bodies are escaped twice: once as values inside the markup,
+    once because that markup then lives in an HTML attribute, where
+    getAttribute hands innerHTML exactly one layer of decoding back. Escape
+    only once and a post caption containing a tag becomes a tag."""
+    got = _run("""
+      var t = tipHtml('<img src=x onerror=alert(1)>',
+                      [['Format', '<svg onload=alert(2)>'], ['Posts', '<b>7</b>']]);
+      // What the browser stores on the attribute, i.e. one decode of ours.
+      var decoded = t.replace(/&quot;/g,'"').replace(/&lt;/g,'<')
+                     .replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+      ({attr: t, decoded: decoded});
+    """)
+    # The attribute itself carries no raw angle brackets at all.
+    assert "<" not in got["attr"] and ">" not in got["attr"]
+    # After the browser's own decode, the only live tags are the ones tipHtml
+    # writes. The caption's tag has survived as visible text.
+    assert got["decoded"].startswith("<b>")
+    # Neither the title nor any row value survives as a live tag.
+    assert "<img" not in got["decoded"] and "<svg" not in got["decoded"]
+    assert "&lt;img src=x onerror=alert(1)&gt;" in got["decoded"]
+    assert "&lt;svg onload=alert(2)&gt;" in got["decoded"]
+    # The tooltip's own markup is still markup: it is a formatted body, not
+    # a flattened string.
+    assert got["decoded"].count("<i>") == 2 and got["decoded"].count("<s>") == 2
+
+
+def test_axis_maxima_round_up_to_a_readable_step():
+    got = _run("""({
+      a: niceMax(37), b: niceMax(4), c: niceMax(1), d: niceMax(1400),
+      e: niceMax(0), f: niceMax(0.4)
+    })""")
+    assert got["a"] == 50
+    assert got["b"] == 5
+    assert got["c"] == 1
+    assert got["d"] == 2000
+    assert got["e"] == 1          # an empty series still needs a scale
+    assert got["f"] == 0.5
+
+
+def test_a_tiny_axis_does_not_print_the_same_number_twice():
+    """With a peak of one post a week the three gridlines are 0, 0.5 and 1,
+    which rounded to "0 / 1 / 1" and made the axis look broken."""
+    got = _run(r"""
+      function pts(vals){ return vals.map(function(v, i){
+        return {label: 'w' + i, value: v, tip: ''}; }); }
+      var tiny = trendSvg(pts([0,1,0,1,1]), {});
+      var big  = trendSvg(pts([0,4,9,3,7]), {});
+      function axisLabels(html){
+        return (html.match(/class="sci-tr-axis"[^>]*>([^<]*)</g) || [])
+          .map(function(m){ return m.slice(m.lastIndexOf('>') + 1, -1); });
+      }
+      ({tiny: axisLabels(tiny), big: axisLabels(big)});
+    """)
+    assert got["tiny"] == ["0", "1"], "a duplicate tick label is dropped, not printed twice"
+    assert len(got["big"]) == 3 and len(set(got["big"])) == 3
+
+
+def test_format_performance_is_an_average_not_a_total():
+    """A total hands the win to whatever format was published most, which is
+    already what the mix bar beside it says. The question here is different."""
+    got = _run("""
+      var posts = [];
+      for(var i = 0; i < 10; i++)
+        posts.push({platform:'ig', post_type:'image', metrics:{likes: 100}});
+      posts.push({platform:'ig', post_type:'video', metrics:{likes: 900}});
+      var html = formatPerf(posts, 'ig');
+      ({rows: (html.match(/class="sci-rank-row"/g)||[]).length,
+        firstLabel: html.split('sci-rank-l">')[1].split('<')[0],
+        values: (html.match(/class="sci-rank-v">([^<]*)</g)||[])
+          .map(function(m){ return m.slice(m.indexOf('>') + 1, -1); })});
+    """)
+    assert got["rows"] == 2
+    # Video: one post at 900. Image: ten posts at 100 each, 1000 in total.
+    assert got["firstLabel"] == "Video", "the format with the best average leads, not the loudest total"
+    assert got["values"] == ["900", "100"]
+
+
+def test_a_format_keeps_one_hue_in_every_chart_in_every_pane():
+    """Colour follows the entity, never its rank in some local array. Keying
+    off array position meant "video" was orange on the overview and cyan on
+    LinkedIn purely because LinkedIn posts fewer of them."""
+    got = _run(r"""
+      var run = {id:1, company_name:'A', status:'done', created_at:'2026-08-29T10:00:00+00:00',
+        synthesis:null, reddit_pulse:null,
+        platforms:[{platform:'instagram', status:'ok', post_count:3},
+                   {platform:'linkedin', status:'ok', post_count:2}],
+        // "image" is the FIRST post_type any consumer meets, and "video" is
+        // the bigger share. Assigning on first sight and assigning on share
+        // give different answers here, which is the whole point of the run.
+        posts:[
+          {id:1, platform:'instagram', post_type:'image', post_url:'u1', media_urls:[], raw:{}, metrics:{likes:5}, posted_at:'2026-08-01T00:00:00Z'},
+          {id:2, platform:'instagram', post_type:'video', post_url:'u2', media_urls:[], raw:{}, metrics:{likes:5}, posted_at:'2026-08-02T00:00:00Z'},
+          {id:3, platform:'instagram', post_type:'video', post_url:'u3', media_urls:[], raw:{}, metrics:{likes:5}, posted_at:'2026-08-03T00:00:00Z'},
+          {id:4, platform:'linkedin',  post_type:'image', post_url:'u4', media_urls:[], raw:{}, metrics:{likes:5}, posted_at:'2026-08-04T00:00:00Z'},
+          {id:5, platform:'linkedin',  post_type:'video', post_url:'u5', media_urls:[], raw:{}, metrics:{likes:5}, posted_at:'2026-08-05T00:00:00Z'}]};
+      renderReport(run);
+      // The class carrying each format's hue, read out of the LinkedIn pane,
+      // where "image" outnumbers "video" and a rank-based scheme would flip.
+      function ciOf(html, label){
+        var i = html.indexOf('>' + label + '<b>');
+        if(i < 0) return null;
+        var open = html.lastIndexOf('<span', i);
+        return (html.slice(open, i).match(/sci-c(\d)/) || [])[1];
+      }
+      var html = document.getElementById('drawerPanel').innerHTML;
+      ({video: FORMAT_CI.video, image: FORMAT_CI.image,
+        keyVideo: ciOf(html, 'Video'), keyImage: ciOf(html, 'Image'),
+        // A format the seeder never saw takes the ramp's last step rather
+        // than colliding with whatever already sits at index 0.
+        unseen: formatCi('livestream'),
+        // And the map is a lookup: asking about a format must not quietly
+        // hand it a hue that some other format already owns.
+        stillTwo: Object.keys(FORMAT_CI).length});
+    """)
+    # Video is the bigger share of the whole run, so it takes the first hue.
+    assert got["video"] == 0 and got["image"] == 1
+    # And the key in the pane where image leads still paints them that way.
+    assert got["keyVideo"] == "0" and got["keyImage"] == "1"
+    assert got["unseen"] == 5
+    assert got["stillTwo"] == 2
+
+
+def test_the_trend_offers_only_metrics_that_have_something_in_them():
+    """A dead "Views" tab that draws a flat zero teaches the reader the
+    toggle is broken. LinkedIn reports no view count at all."""
+    got = _run("""
+      function feed(withViews){
+        var posts = [];
+        for(var i = 0; i < 12; i++){
+          var m = {likes: 3};
+          if(withViews) m.views = 500;
+          posts.push({platform:'p', post_type:'text', metrics: m,
+                      posted_at: '2026-0' + (1 + Math.floor(i/4)) + '-' + (5 + (i%4)*7) + 'T00:00:00Z'});
+        }
+        return posts;
+      }
+      TREND_METRIC = {};
+      var noViews = renderRhythm(feed(false), 'a');
+      var hasViews = renderRhythm(feed(true), 'b');
+      ({noViewsTabs: (noViews.match(/sci-seg-btn/g)||[]).length,
+        noViewsHasViews: noViews.indexOf('>Views<') >= 0,
+        withViewsTabs: (hasViews.match(/sci-seg-btn/g)||[]).length,
+        withViewsHasViews: hasViews.indexOf('>Views<') >= 0});
+    """)
+    assert got["noViewsTabs"] == 2 and got["noViewsHasViews"] is False
+    assert got["withViewsTabs"] == 3 and got["withViewsHasViews"] is True
+
+
+def test_the_scorecard_sorts_by_the_column_that_was_clicked():
+    got = _run(r"""
+      CURRENT_RUN = {platforms:[{platform:'instagram'},{platform:'linkedin'}],
+        posts:[
+          {platform:'instagram', post_type:'image', metrics:{likes: 10}, posted_at:'2026-08-01T00:00:00Z'},
+          {platform:'instagram', post_type:'image', metrics:{likes: 10}, posted_at:'2026-08-02T00:00:00Z'},
+          {platform:'instagram', post_type:'image', metrics:{likes: 10}, posted_at:'2026-08-03T00:00:00Z'},
+          {platform:'linkedin',  post_type:'text',  metrics:{likes: 900}, posted_at:'2026-08-04T00:00:00Z'}]};
+      function order(html){
+        return (html.match(/sci-sc-body" data-platform="(\w+)"/g)||[])
+          .map(function(m){ return m.match(/data-platform="(\w+)"/)[1]; });
+      }
+      SCORE_SORT = {key:'count', dir:-1};
+      var byCount = order(renderScorecard(CURRENT_RUN));
+      SCORE_SORT = {key:'avgInteractions', dir:-1};
+      var byInter = order(renderScorecard(CURRENT_RUN));
+      SCORE_SORT = {key:'count', dir:1};
+      var ascending = order(renderScorecard(CURRENT_RUN));
+      ({byCount: byCount, byInter: byInter, ascending: ascending,
+        onePlatform: renderScorecard({platforms:[{platform:'instagram'}], posts:[
+          {platform:'instagram', post_type:'image', metrics:{likes:1}, posted_at:'2026-08-01T00:00:00Z'}]})});
+    """)
+    assert got["byCount"] == ["instagram", "linkedin"]
+    assert got["byInter"] == ["linkedin", "instagram"], "sorting must actually reorder, not just move the arrow"
+    assert got["ascending"] == ["linkedin", "instagram"]
+    # One platform is not a comparison.
+    assert got["onePlatform"] == ""
+
+
+def test_a_cell_the_platform_does_not_report_is_a_dash_not_a_zero():
+    """LinkedIn publishes no view count. Drawing a zero-length bar there says
+    "nobody watched", which is a different and false claim."""
+    got = _run("""
+      function feed(platform, views){
+        var out = [];
+        for(var i = 0; i < 4; i++){
+          var m = {likes: 5};
+          if(views) m.views = 900;
+          out.push({platform: platform, post_type:'image', metrics: m,
+                    posted_at: '2026-08-0' + (1 + i * 2) + 'T00:00:00Z'});
+        }
+        return out;
+      }
+      CURRENT_RUN = {platforms:[{platform:'instagram'},{platform:'linkedin'}],
+        posts: feed('instagram', true).concat(feed('linkedin', false))};
+      SCORE_SORT = {key:'count', dir:-1};
+      var html = renderScorecard(CURRENT_RUN);
+      var rows = html.split('sci-sc-body');
+      ({liDashes: (rows[2].match(/sci-sc-na"/g)||[]).length,
+        igDashes: (rows[1].match(/sci-sc-na"/g)||[]).length,
+        explains: html.indexOf('does not report that number') >= 0});
+    """)
+    assert got["liDashes"] == 1, "exactly the one column LinkedIn does not report"
+    assert got["igDashes"] == 0
+    assert got["explains"] is True
+
+
+def test_filtering_the_post_grid_narrows_it_and_resets_the_show_all_cap():
+    """Carrying "show all" across a filter change means picking one format
+    silently expands the grid to every post of it, which is not what the
+    click asked for."""
+    got = _run("""
+      var posts = [];
+      for(var i = 0; i < 30; i++)
+        posts.push({id: i, platform:'x', post_type: i < 20 ? 'text' : 'image',
+                    caption:'c' + i, post_url:'u' + i, media_urls:[], raw:{},
+                    metrics:{likes: 30 - i}, posted_at:'2026-08-01T00:00:00Z'});
+      CURRENT_RUN = {posts: posts};
+      POST_SORT = {}; POST_SHOWALL = {}; POST_FILTER = {}; FORMAT_CI = {};
+      var capped = renderPostsSection('x');
+      showAllPlatformPosts('x');
+      var expanded = renderPostsSection('x');
+      setPostFilter('x', 'image');
+      var filtered = renderPostsSection('x');
+      function cards(h){ return (h.match(/class="sci-postcard[ "]/g)||[]).length; }
+      function types(h){ var s = new Set((h.match(/sci-postcard-type">([^<]*)</g)||[])
+        .map(function(m){ return m.slice(m.indexOf('>') + 1, -1); })); return [].concat(Array.from(s)); }
+      ({capped: cards(capped), expanded: cards(expanded), filtered: cards(filtered),
+        filteredTypes: types(filtered), showAllAfterFilter: !!POST_SHOWALL.x,
+        chips: (capped.match(/class="sci-fchip[ "]/g)||[]).length,
+        cleared: cards((setPostFilter('x', ''), renderPostsSection('x')))});
+    """)
+    assert got["capped"] == 24 and got["expanded"] == 30
+    assert got["filtered"] == 10 and got["filteredTypes"] == ["Image"]
+    assert got["showAllAfterFilter"] is False
+    # "All", plus one chip per format that actually exists.
+    assert got["chips"] == 3
+    assert got["cleared"] == 24, "clearing the filter goes back to the capped grid, not to all 30"
+
+
+def test_a_single_format_gets_no_mix_chart():
+    """A full-width bar reading "Video 100%" is a whole section spent
+    restating the dominant-format tile above it."""
+    got = _run("""
+      function post(t){ return {platform:'yt', post_type: t, metrics:{likes: 5}}; }
+      ({one: renderFormatBlock([post('video'), post('video')], 'yt'),
+        two: renderFormatBlock([post('video'), post('image')], 'yt').indexOf('sci-mixbar') >= 0,
+        none: renderFormatBlock([], 'yt')});
+    """)
+    assert got["one"] == ""
+    assert got["two"] is True
+    assert got["none"] == ""
+
+
+def test_a_pair_of_charts_with_nothing_in_either_half_renders_no_heading():
+    """An empty wrapper is still a truthy string, and renderSection will
+    dutifully draw a section heading over blank space."""
+    got = _run("""({
+      both: duo('', ''), one: duo('', '<i>x</i>'), two: duo('<i>a</i>', '<i>b</i>')
+    })""")
+    assert got["both"] == ""
+    assert "sci-chart-solo" in got["one"], "a lone chart caps its width instead of stretching"
+    assert "sci-chart-solo" not in got["two"]
+
+
+def test_a_theme_seen_once_is_not_a_recurring_theme():
+    got = _run("""
+      function post(words){
+        return {platform:'ig', creative_analysis_status:'ok',
+                creative_analysis: {subject: words[0], setting: words[1]}};
+      }
+      var recurring = [post(['office','desk']), post(['office','desk']),
+                       post(['office','studio']), post(['portrait','desk'])];
+      var allSingletons = [post(['a','b']), post(['c','d'])];
+      var html = renderThemeChips(recurring, 'ig');
+      ({rows: (html.match(/class="sci-rank-row"/g)||[]).length,
+        hasStudio: html.indexOf('>studio<') >= 0,
+        hasOffice: html.indexOf('>office<') >= 0,
+        nothingRecurs: renderThemeChips(allSingletons, 'ig'),
+        noAnalysis: renderThemeChips([{platform:'ig', creative_analysis_status:'error'}], 'ig')});
+    """)
+    # office x3 and desk x2 recur; studio and portrait appear once and go.
+    assert got["rows"] == 2
+    assert got["hasOffice"] is True and got["hasStudio"] is False
+    assert got["nothingRecurs"] == ""
+    assert got["noAnalysis"] == ""
+
+
+def test_the_posting_clock_bins_by_day_and_four_hour_block():
+    got = _run(r"""
+      function at(iso){ return {platform:'p', metrics:{likes: 4}, posted_at: iso}; }
+      var posts = [];
+      // Ten posts all in one local Wednesday-morning block, then four more
+      // spread across three other blocks.
+      for(var i = 0; i < 10; i++) posts.push(at('2026-08-05T09:30:00'));
+      posts.push(at('2026-08-02T21:00:00')); posts.push(at('2026-08-02T22:00:00'));
+      posts.push(at('2026-08-03T13:00:00')); posts.push(at('2026-08-07T02:00:00'));
+      var html = renderClock(posts);
+      // The legend below the grid carries one swatch of every level, so the
+      // grid is read on its own or every count comes out one too high.
+      var grid = html.split('sci-heat-legend')[0];
+      var levels = (grid.match(/sci-heat-c sci-heat-(\d)/g)||[])
+        .map(function(m){ return +m.slice(-1); });
+      ({cells: levels.length, peak: levels.filter(function(l){ return l === 5; }).length,
+        empty: levels.filter(function(l){ return l === 0; }).length,
+        tooFew: renderClock(posts.slice(0, 5)),
+        oneBlockOnly: renderClock(posts.slice(0, 10)),
+        saysTimezone: html.indexOf('in your timezone') >= 0});
+    """)
+    assert got["cells"] == 7 * 6, "seven days by six four-hour blocks, every cell drawn"
+    assert got["peak"] == 1, "one Wednesday-morning block holds ten of the fourteen posts"
+    assert got["empty"] == 7 * 6 - 4
+    assert got["tooFew"] == "", "five posts is not a posting pattern"
+    assert got["oneBlockOnly"] == "", "one filled cell in a 42-cell grid is a spike, not a pattern"
+    assert got["saysTimezone"] is True, "the grid must say whose clock it is drawn in"
+
+
+def test_the_engagement_donut_reports_the_share_that_cost_something():
+    got = _run("""
+      var posts = [{platform:'p', metrics:{likes: 800, comments: 150, shares: 50}}];
+      var html = renderEngageMix(posts, null);
+      ({centre: (html.match(/sci-dn-v">([^<]*)</)||[])[1],
+        arcs: (html.match(/class="sci-dn-arc/g)||[]).length,
+        likesOnly: renderEngageMix([{platform:'p', metrics:{likes: 5}}], null),
+        nothing: renderEngageMix([{platform:'p', metrics:{}}], null)});
+    """)
+    assert got["centre"] == "20%", "(150 + 50) of 1000"
+    assert got["arcs"] == 3
+    # One component is not a composition.
+    assert got["likesOnly"] == ""
+    assert got["nothing"] == ""
+
+
+def test_performance_spread_reports_the_median_not_just_the_average():
+    """The gap between the best post and the median is the finding. An
+    average alone cannot tell an even library from one carried by one post."""
+    got = _run("""
+      var scores = [1000, 10, 10, 10, 10, 10, 10];
+      var posts = scores.map(function(v, i){
+        return {id: i, platform:'p', post_type:'text', caption:'c' + i, post_url:'u' + i,
+                media_urls:[], raw:{}, metrics:{likes: v}, posted_at:'2026-08-01T00:00:00Z'}; });
+      var html = renderPerfSpread(posts, null);
+      ({note: (html.match(/sci-chart-note">([^<]*)</)||[])[1],
+        rows: (html.match(/class="sci-rank-row"/g)||[]).length,
+        tooFew: renderPerfSpread(posts.slice(0, 4), null)});
+    """)
+    assert "Median post earns 10." in got["note"]
+    # 1000 of 1060 interactions sit in the top 10% (one post of seven).
+    assert "top 10% of posts take 94% of all interactions" in got["note"]
+    assert got["rows"] == 7
+    assert got["tooFew"] == ""
+
+
+def test_no_chart_paints_a_categorical_hue_inline():
+    """Inline styles beat the stylesheet, so a hue written inline is one the
+    light theme cannot re-step -- and the dark steps measure under 3:1 on
+    paper. The only thing a chart may put in a style attribute is geometry."""
+    got = _run("""
+      var posts = [];
+      for(var i = 0; i < 12; i++)
+        posts.push({id: i, platform:'p', post_type: ['video','image','text'][i % 3],
+                    caption:'c' + i, post_url:'u' + i, media_urls:[], raw:{},
+                    metrics:{likes: 10 + i, comments: 3, shares: 1},
+                    posted_at: '2026-0' + (1 + Math.floor(i/4)) + '-' + (5 + (i%4)*7) + 'T14:00:00Z'});
+      CURRENT_RUN = {posts: posts}; FORMAT_CI = {video:0, image:1, text:2}; TREND_METRIC = {};
+      var html = [renderRhythm(posts, 'all'), renderClock(posts),
+                  renderFormatBlock(posts, null), renderEngageMix(posts, null),
+                  renderPerfSpread(posts, null), renderThemeChips(posts, null)].join('');
+      // Every style attribute in every chart, so a stray colour cannot hide.
+      ({styles: (html.match(/style="[^"]*"/g)||[]).map(function(s){
+          return s.slice(7, -1); })});
+    """)
+    assert got["styles"], "the probe found no style attributes at all, so it proves nothing"
+    for style in got["styles"]:
+        assert re.fullmatch(r"(--w|width|height):[\d.]+%?;?", style), (
+            "charts may only inline geometry, found: %r" % style)
