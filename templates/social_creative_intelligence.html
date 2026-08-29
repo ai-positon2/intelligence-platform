@@ -152,7 +152,18 @@
     var DEFAULT_META = {color:'#8b86a0', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/></svg>'};
     var PLATFORM_ORDER = ['instagram','linkedin','x','tiktok','youtube','facebook','reddit'];
 
+    // Platform names are stored lowercase, and CSS capitalize turns them into
+    // "Linkedin", "Tiktok" and "Youtube" -- three brands spelled wrong in every
+    // heading. These are proper nouns, so they get a real table and the
+    // capitalize rule is off wherever this is used.
+    var PLATFORM_LABEL = {instagram:'Instagram', linkedin:'LinkedIn', x:'X', tiktok:'TikTok',
+      youtube:'YouTube', facebook:'Facebook', reddit:'Reddit'};
+
     function platformMeta(p){ return PLATFORM_META[p] || DEFAULT_META; }
+    function platformLabel(p){
+      var s = String(p == null ? '' : p);
+      return PLATFORM_LABEL[s] || (s.charAt(0).toUpperCase() + s.slice(1));
+    }
     function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function monogram(name){ var s = String(name||'?').trim(); return (s[0]||'?').toUpperCase(); }
 
@@ -280,7 +291,7 @@
       var statusHtml = connected
         ? '<span class="sci-datasrc-status ok">' + count + ' account' + (count === 1 ? '' : 's') + ' connected</span>'
         : '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
-      return '<div class="sci-datasrc-row"><span class="sci-datasrc-ic" style="color:' + meta.color + '">' + meta.icon + '</span>' +
+      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
         '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
     }
 
@@ -402,9 +413,9 @@
       );
       grid.innerHTML = order.map(function(name){
         var p = byName[name], meta = platformMeta(name);
-        return '<div class="pf-chip" data-status="' + esc(p.status) + '" style="--pf-color:' + meta.color + '">' +
+        return '<div class="pf-chip" data-status="' + esc(p.status) + '" data-platform="' + esc(name) + '">' +
           '<div class="pf-chip-ic">' + meta.icon + '</div>' +
-          '<div class="pf-chip-txt"><span class="pf-name">' + esc(name) + '</span>' +
+          '<div class="pf-chip-txt"><span class="pf-name">' + esc(platformLabel(name)) + '</span>' +
           '<span class="pf-status">' + esc((p.status || '').replace(/_/g, ' ')) + '</span></div>' +
           (p.post_count ? '<span class="pf-count">' + p.post_count + '</span>' : '') +
           '</div>';
@@ -429,6 +440,11 @@
     var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
       scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
     var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API', reddit_api:'via Reddit API'};
+    // Short forms for the overview's launcher cards, which are far too narrow
+    // for STATUS_LABEL's full sentence -- it truncated to "...iden..." on every
+    // card. The full wording still shows on the platform's own pane.
+    var STATUS_SHORT = {no_presence:'No presence found', handle_not_found:'No account found',
+      scrape_failed:'Collection failed', error:'Failed', low_activity:'Low activity'};
     var FM_PALETTE = ['#fb923c','#f472b6','#a855f7','#22d3ee','#4ade80','#fbbf24'];
     var VIEW_GLYPH = '↗';
 
@@ -613,19 +629,31 @@
       return t.charAt(0).toUpperCase() + t.slice(1);
     }
 
-    function renderPostCard(post){
+    function renderPostCard(post, showPlatform){
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
-      var media = '<div class="sci-postcard-media' + (thumb ? '' : ' sci-postcard-noimg') + '">' +
-        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-postcard-media\').classList.add(\'sci-postcard-noimg\');this.remove()">' : '') +
-        '<span class="sci-postcard-ic">' + meta.icon + '</span></div>';
+      // A post with no image is not a broken image. Rendering the 16:9 media
+      // box for a text-only post gave every text LinkedIn and X post a large
+      // empty rectangle with a logo floating in it, which reads as a thumbnail
+      // that failed to load. Those cards drop the box entirely and spend the
+      // height on the words, which are the whole post.
+      var media = thumb
+        ? '<div class="sci-postcard-media"><img src="' + esc(thumb) + '" alt="" loading="lazy" ' +
+          'onerror="this.closest(\'.sci-postcard\').classList.add(\'sci-postcard-text\');' +
+          'this.closest(\'.sci-postcard-media\').remove()"></div>'
+        : '';
       var when = relTime(post.posted_at);
-      return '<a class="sci-postcard" href="' + esc(post.post_url || '#') + '" target="_blank" rel="noopener" style="--pf-color:' + meta.color + '">' +
+      return '<a class="sci-postcard' + (thumb ? '' : ' sci-postcard-text') + '" href="' + esc(post.post_url || '#') +
+        '" target="_blank" rel="noopener" data-platform="' + esc(post.platform) + '">' +
         media +
         '<div class="sci-postcard-body">' +
           // Format label sits BELOW the thumbnail as its own chip rather than
           // overlaid on it: an overlay competes with the image for the eye and
           // is unreadable over a busy frame, which most video stills are.
-          '<div class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</div>' +
+          '<div class="sci-postcard-tags">' +
+            (showPlatform ? '<span class="sci-postcard-plat"><span class="sci-postcard-plat-ic">' + meta.icon + '</span>' +
+              esc(platformLabel(post.platform)) + '</span>' : '') +
+            '<span class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</span>' +
+          '</div>' +
           '<div class="sci-postcard-title">' + esc(title) + '</div>' +
           '<div class="sci-postcard-foot">' +
             (when ? '<span class="sci-postcard-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
@@ -649,7 +677,7 @@
         '<button type="button" class="sci-seg-btn' + (mode === 'top' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'top\')">Top</button>' +
         '<button type="button" class="sci-seg-btn' + (mode === 'recent' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'recent\')">Most recent</button>' +
         '</div><span class="sci-posts-count">Showing ' + shown.length + ' of ' + all.length + ' posts</span></div>';
-      var grid = '<div class="sci-postcard-grid">' + shown.map(renderPostCard).join('') + '</div>';
+      var grid = '<div class="sci-postcard-grid">' + shown.map(function(p){ return renderPostCard(p); }).join('') + '</div>';
       var more = (!showAll && all.length > limit) ?
         '<button type="button" class="sci-posts-more" onclick="showAllPlatformPosts(\'' + platform + '\')">Show all ' + all.length + ' posts</button>' : '';
       return '<div class="sci-postsec" id="sci-postsec-' + esc(platform) + '">' + bar + grid + more + '</div>';
@@ -668,7 +696,7 @@
     function renderPostChip(post){
       if(!post) return '';
       var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
-      var thumbHtml = '<span class="sci-chip-thumb' + (thumb ? '' : ' sci-chip-noimg') + '" style="--pf-color:' + meta.color + '">' +
+      var thumbHtml = '<span class="sci-chip-thumb' + (thumb ? '' : ' sci-chip-noimg') + '" data-platform="' + esc(post.platform) + '">' +
         (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-chip-thumb\').classList.add(\'sci-chip-noimg\');this.remove()">' : '') +
         '<span class="sci-chip-ic">' + meta.icon + '</span></span>';
       var inner = thumbHtml + '<span class="sci-chip-txt">' + esc(title) + '</span>';
@@ -685,10 +713,12 @@
       }).join('');
     }
 
+    // A null platform means "every platform at once", for the overview's
+    // whole-footprint format mix.
     function computeFormatMix(posts, platform){
       var counts = {}, total = 0;
       (posts || []).forEach(function(p){
-        if(p.platform !== platform) return;
+        if(platform && p.platform !== platform) return;
         var t = p.post_type || 'post';
         counts[t] = (counts[t] || 0) + 1; total++;
       });
@@ -735,45 +765,108 @@
     // ── Cross-platform overview dashboard: stat tiles + a platform post-count
     // bar chart, both computed straight from run.platforms/posts -- accurate
     // even before/without a synthesis narrative. ──────────────────────────
-    function renderPlatformBarChart(platforms){
-      var active = (platforms || []).filter(function(p){ return p.post_count; });
-      if(!active.length) return '';
-      var max = Math.max.apply(null, active.map(function(p){ return p.post_count; }));
-      var rows = active.slice().sort(function(a,b){ return b.post_count - a.post_count; }).map(function(p){
-        var meta = platformMeta(p.platform), pct = max ? (p.post_count / max * 100) : 0;
-        return '<div class="sci-pbar-row">' +
-          '<span class="sci-pbar-label"><span class="sci-pbar-ic" style="color:' + meta.color + '">' + meta.icon + '</span>' + esc(p.platform) + '</span>' +
-          '<div class="sci-pbar-track"><div class="sci-pbar-fill" style="width:' + pct.toFixed(1) + '%;background:' + meta.color + '"></div></div>' +
-          '<span class="sci-pbar-val">' + p.post_count + '</span></div>';
-      }).join('');
-      return '<div class="sci-pbar-chart">' + rows + '</div>';
+    // ── Stat tiles ──────────────────────────────────────────────────────────
+    // A tile whose value is missing is dropped rather than rendered holding a
+    // dash. An empty tile reads as a broken metric; an absent one reads as
+    // "this platform doesn't report that", which is what is actually true --
+    // YouTube has no share count, X has no view count on every post.
+    function renderTiles(items, cls){
+      var real = (items || []).filter(function(t){ return t && t.value != null && t.value !== ''; });
+      if(!real.length) return '';
+      // A full row of tiles shares the width evenly; one or two would stretch
+      // to 1200px each and read as a broken layout, so those cap their width
+      // and pack left instead.
+      return '<div class="sci-tiles' + (cls ? ' ' + cls : '') +
+        (real.length < 3 ? ' sci-tiles-few' : '') + '">' + real.map(function(t){
+        var word = !/^[\d.,+-]/.test(String(t.value));
+        return '<div class="sci-tile"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' +
+          '<div class="sci-tile-v' + (word ? ' sci-tile-word' : '') + '">' + esc(String(t.value)) +
+            (t.unit ? '<span class="sci-tile-u">' + esc(t.unit) + '</span>' : '') + '</div>' +
+          '<div class="sci-tile-l">' + esc(t.label) + '</div>' +
+          (t.note ? '<div class="sci-tile-n">' + esc(t.note) + '</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
     }
 
-    function renderOverview(run, allPosts){
-      var active = (run.platforms || []).filter(function(p){ return !NO_ACTIVITY_STATUSES[p.status]; });
-      var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
-      var tiles = [
-        {label: 'Posts analyzed', value: allPosts.length},
-        {label: 'Active platforms', value: active.length + ' / ' + (run.platforms || []).length},
-        {label: 'Video-led content', value: allPosts.length ? Math.round(videoLike / allPosts.length * 100) + '%' : '—'},
-      ];
-      var tileHtml = tiles.map(function(t){
-        return '<div class="sci-stat-tile"><div class="sci-stat-val">' + esc(String(t.value)) + '</div><div class="sci-stat-label">' + esc(t.label) + '</div></div>';
-      }).join('');
-      return '<div class="sci-overview"><div class="sci-stat-row">' + tileHtml + '</div>' + renderPlatformBarChart(run.platforms) + '</div>';
+    // Interactions deliberately exclude views: a view is a delivery number, not
+    // an audience response, and summing it in makes a video platform's "average
+    // engagement" a restatement of its reach. They are reported as two separate
+    // tiles for the same reason.
+    function interactionScore(metrics){
+      if(!metrics) return 0;
+      var s = 0;
+      ['likes','comments','shares'].forEach(function(k){ if(typeof metrics[k] === 'number') s += metrics[k]; });
+      return s;
     }
 
-    function renderCoverage(platforms){
-      return (platforms || []).map(function(p){
-        var meta = platformMeta(p.platform);
-        var hasSection = !NO_ACTIVITY_STATUSES[p.status];
-        var tag = hasSection ? 'a' : 'span';
-        var href = hasSection ? ' href="#sci-plat-' + esc(p.platform) + '"' : '';
-        var off = hasSection ? '' : ' cov-off';
-        return '<' + tag + ' class="cov-chip' + off + '" data-status="' + esc(p.status) + '" style="--pf-color:' + meta.color + '"' + href + '>' +
-          '<span class="cov-chip-ic">' + meta.icon + '</span>' + esc(p.platform) +
-          (p.post_count ? ' · ' + p.post_count : '') + '</' + tag + '>';
-      }).join('');
+    // Everything here is mechanical -- counted from the collected posts, never
+    // from the model's narrative -- so a platform's numbers stay right even on
+    // a run where synthesis failed outright.
+    function platformStats(platform, posts){
+      var ps = (posts || []).filter(function(p){ return p.platform === platform; });
+      if(!ps.length) return null;
+      var inter = ps.map(function(p){ return interactionScore(p.metrics); });
+      var interTotal = inter.reduce(function(a,b){ return a + b; }, 0);
+      var viewed = ps.filter(function(p){ return p.metrics && typeof p.metrics.views === 'number'; });
+      var viewTotal = viewed.reduce(function(a,p){ return a + p.metrics.views; }, 0);
+
+      var types = {};
+      ps.forEach(function(p){ var t = p.post_type || 'post'; types[t] = (types[t] || 0) + 1; });
+      var topType = Object.keys(types).sort(function(a,b){ return types[b] - types[a]; })[0];
+
+      var times = ps.map(function(p){ return p.posted_at ? new Date(p.posted_at).getTime() : 0; })
+        .filter(function(t){ return t && !isNaN(t); });
+      var perWeek = null, spanDays = null;
+      if(times.length >= 2){
+        spanDays = (Math.max.apply(null, times) - Math.min.apply(null, times)) / 86400000;
+        if(spanDays >= 3) perWeek = ps.length / (spanDays / 7);
+      }
+      var best = ps.slice().sort(function(a,b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0];
+      return {
+        count: ps.length,
+        avgInteractions: inter.length ? interTotal / inter.length : null,
+        avgViews: viewed.length ? viewTotal / viewed.length : null,
+        topType: topType, topTypeShare: Math.round(types[topType] / ps.length * 100),
+        perWeek: perWeek, spanDays: spanDays,
+        analyzed: ps.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length,
+        best: best, bestScore: interactionScore(best.metrics)
+      };
+    }
+
+    function platformTiles(platform, stats){
+      if(!stats) return '';
+      return renderTiles([
+        {label: 'Avg interactions', value: stats.avgInteractions != null ? fmtNum(Math.round(stats.avgInteractions)) : null,
+         note: 'likes, comments and shares', title: 'Views are counted separately, not folded in here'},
+        {label: 'Avg views', value: stats.avgViews != null ? fmtNum(Math.round(stats.avgViews)) : null},
+        {label: 'Dominant format', value: stats.topType ? postFormatLabel({post_type: stats.topType}) : null,
+         note: stats.topType ? stats.topTypeShare + '% of everything posted here' : null},
+        {label: 'Cadence', value: stats.perWeek != null ? stats.perWeek.toFixed(1) : null, unit: '/wk',
+         note: stats.spanDays ? 'across ' + Math.round(stats.spanDays) + ' days' : null},
+        {label: 'Best post', value: stats.bestScore ? fmtNum(stats.bestScore) : null,
+         note: 'interactions on the top post'}
+      ], 'sci-tiles-plat');
+    }
+
+    // Overview's platform grid doubles as the launcher: clicking a card is the
+    // same as clicking its rail item, so the rail is discoverable from the
+    // first screen rather than being the only way in.
+    function renderPlatformCards(names, byName, posts){
+      return '<div class="sci-pcards">' + names.map(function(n){
+        var pr = byName[n], meta = platformMeta(n), live = !NO_ACTIVITY_STATUSES[pr.status];
+        var stats = platformStats(n, posts);
+        var line = live
+          ? (pr.post_count || 0) + ' post' + ((pr.post_count === 1) ? '' : 's')
+          : (n === 'reddit' ? 'Conversation only, no account'
+                            : (STATUS_SHORT[pr.status] || String(pr.status || '').replace(/_/g, ' ')));
+        return '<button type="button" class="sci-pcard' + (live ? '' : ' sci-pcard-off') + '"' +
+          ' data-platform="' + esc(n) + '" onclick="switchPane(\'' + esc(n) + '\')">' +
+          '<span class="sci-pcard-ic">' + meta.icon + '</span>' +
+          '<span class="sci-pcard-body"><span class="sci-pcard-n">' + esc(platformLabel(n)) + '</span>' +
+          '<span class="sci-pcard-v">' + esc(line) + '</span></span>' +
+          (stats && stats.avgInteractions ? '<span class="sci-pcard-x">' + fmtNum(Math.round(stats.avgInteractions)) + ' avg</span>' : '') +
+        '</button>';
+      }).join('') + '</div>';
     }
 
     // ── Reddit conversation ("pulse") ─────────────────────────────────────
@@ -1002,121 +1095,359 @@
       return '<div class="rd-section">' + head + verdict + tiles + community + body + '</div>';
     }
 
+    // ── The report shell ────────────────────────────────────────────────────
+    //
+    // A left rail of platforms, one pane each, rather than one long scroll.
+    // Seven platforms of posts, format mixes, creative themes and cited
+    // evidence in a single column meant nothing was comparable and everything
+    // was a scroll away; a platform is the unit a reader actually thinks in,
+    // so it is the unit the report is cut into.
+    //
+    // Every pane is built once and lives in the DOM, hidden by CSS. That is
+    // deliberate and not laziness: a sort toggle inside a hidden pane still
+    // finds its own node by id, and @media print can flatten all of them back
+    // into one document, so tabbing does not cost us Ctrl+F or Save-as-PDF.
+
+    var NAV_ICONS = {
+      overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="7.2" height="7.2" rx="2.1"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="2.1"/><rect x="3.4" y="13.4" width="7.2" height="7.2" rx="2.1"/><rect x="13.4" y="13.4" width="7.2" height="7.2" rx="2.1"/></svg>',
+      cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.3" r="2.6"/><circle cx="5.5" cy="17.2" r="2.6"/><circle cx="18.5" cy="17.2" r="2.6"/><path d="M10.4 7.6l-3 7.2M13.6 7.6l3 7.2M8.1 17.2h7.8"/></svg>'
+    };
+
+    function navItem(o){
+      return '<button type="button" class="sci-nav-item' + (o.active ? ' active' : '') +
+        (o.has ? '' : ' sci-nav-empty') + '" data-ns="' + esc(o.ns) + '"' +
+        (o.platform ? ' data-platform="' + esc(o.platform) + '"' : '') +
+        ' onclick="switchPane(\'' + esc(o.ns) + '\')">' +
+        '<span class="sci-nav-ic">' + o.icon + '</span>' +
+        '<span class="sci-nav-label">' + esc(o.label) + '</span>' +
+        (o.count ? '<span class="sci-nav-count">' + o.count + '</span>'
+                 : '<span class="sci-nav-dot" aria-hidden="true"></span>') +
+      '</button>';
+    }
+
+    function paneEmpty(heading, detail, extra){
+      return '<div class="sci-pane-empty">' +
+        '<div class="sci-pane-empty-h">' + esc(heading) + '</div>' +
+        (detail ? '<p>' + esc(detail) + '</p>' : '') + (extra || '') + '</div>';
+    }
+
+    function switchPane(ns){
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      root.querySelectorAll('.sci-nav-item').forEach(function(b){
+        b.classList.toggle('active', b.getAttribute('data-ns') === ns);
+      });
+      root.querySelectorAll('.sci-pane').forEach(function(p){
+        p.classList.toggle('active', p.getAttribute('data-ns') === ns);
+      });
+      var scroller = root.querySelector('.sci-panes');
+      if(scroller) scroller.scrollTop = 0;
+      revealStatTiles();
+    }
+
+    // Tiles rise in one after another, but only the ones on screen: running
+    // the stagger across every hidden pane at open would burn the effect on
+    // panes nobody is looking at, and land them already-visible later.
+    function revealStatTiles(){
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      var scope = root.querySelector('.sci-pane.active') || root;
+      var band = root.querySelector('.sci-rep-band');
+      var tiles = [].slice.call(scope.querySelectorAll('.sci-tile:not(.visible)'));
+      if(band) tiles = [].slice.call(band.querySelectorAll('.sci-tile:not(.visible)')).concat(tiles);
+      tiles.forEach(function(el, i){ setTimeout(function(){ el.classList.add('visible'); }, i * 55); });
+    }
+
+    function overviewPane(run, allPosts, names, byName){
+      var html = '';
+      if(run.status === 'running'){
+        html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress. Leave this open and it keeps polling, or come back from History once it finishes.</div></div>';
+      }
+      // Every platform unresolved at once is the shape of the identify step
+      // itself failing (a broken vendor call), not seven independent "this
+      // company has no account here" verdicts -- surface the admin check.
+      if((run.platforms || []).length && (run.platforms || []).every(function(p){ return p.status === 'handle_not_found'; })){
+        html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once. That usually means the identification step itself broke, not that none of these accounts exist.' +
+          sciIdentifyDiagControl() + '</div></div>';
+      }
+      html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts));
+      html += renderSection('Publishing rhythm', '▨', renderRhythm(allPosts));
+      html += renderSection('What they publish, everywhere', '▦', renderFormatMix(computeFormatMix(allPosts, null)));
+      html += renderSection('Strongest posts anywhere', '★', renderTopPostsAnywhere(allPosts));
+      if(!allPosts.length && run.status !== 'running'){
+        html += paneEmpty('No posts were collected on this run',
+          'Nothing was published in the window, or no collection vendor is connected for the platforms that were found. Each platform in the rail explains its own case.');
+      }
+      return html;
+    }
+
+    // Publishing volume over time. The one view no per-platform pane can give:
+    // whether a company publishes steadily or in bursts around launches.
+    //
+    // Deliberately ONE series, not a per-platform stack. A stack was the first
+    // build and it encoded platform in hue -- but TikTok (#fe2c55), YouTube
+    // (#ff0033) and Instagram (#e1306c) are three reds nobody can tell apart
+    // when stacked adjacent, so the breakdown was unreadable exactly where it
+    // mattered. Per-platform volume is already on the launcher cards and in
+    // each pane; this chart answers cadence, and answers it in one colour.
+    //
+    // Buckets adapt to the window: a 30-day collection has no months to plot,
+    // and a 100-post YouTube backfill can span a year. Empty buckets are drawn
+    // rather than skipped -- a gap IS the finding, and closing it up would
+    // draw a steady cadence straight over a silence.
+    function renderRhythm(posts){
+      var times = (posts || []).map(function(p){
+        var d = p.posted_at ? new Date(p.posted_at) : null;
+        return (d && !isNaN(d.getTime())) ? d.getTime() : null;
+      }).filter(function(t){ return t; });
+      if(times.length < 4) return '';
+      var min = Math.min.apply(null, times), max = Math.max.apply(null, times);
+      var spanDays = (max - min) / 86400000;
+      if(spanDays < 10) return '';
+      var weekly = spanDays <= 140;
+
+      var buckets = [], index = {};
+      function weekStart(ms){
+        var d = new Date(ms);
+        d.setUTCHours(0,0,0,0);
+        d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+        return d.getTime();
+      }
+      if(weekly){
+        for(var t = weekStart(min); t <= max; t += 7 * 86400000){
+          index[t] = buckets.length;
+          buckets.push({key: t, n: 0});
+          if(buckets.length > 40) break;
+        }
+      } else {
+        var d0 = new Date(min), y = d0.getUTCFullYear(), m = d0.getUTCMonth();
+        var dEnd = new Date(max), yE = dEnd.getUTCFullYear(), mE = dEnd.getUTCMonth();
+        while((y < yE || (y === yE && m <= mE)) && buckets.length <= 40){
+          index[y + '-' + ('0' + (m + 1)).slice(-2)] = buckets.length;
+          buckets.push({key: y + '-' + ('0' + (m + 1)).slice(-2), n: 0});
+          m++; if(m > 11){ m = 0; y++; }
+        }
+      }
+      if(buckets.length < 3) return '';
+      times.forEach(function(ms){
+        var d = new Date(ms);
+        var k = weekly ? weekStart(ms) : (d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2));
+        var i = index[k];
+        if(i != null) buckets[i].n++;
+      });
+      var peak = Math.max.apply(null, buckets.map(function(b){ return b.n; }));
+      if(!peak) return '';
+
+      // Label every bucket when there is room, otherwise every other or every
+      // fourth, so the axis never becomes a smear of overlapping dates.
+      var step = buckets.length <= 10 ? 1 : (buckets.length <= 20 ? 2 : 4);
+      var cols = buckets.map(function(b, i){
+        var label = weekly ? shortDayLabel(b.key) : rdMonthLabel(b.key);
+        var pct = (b.n / peak) * 100;
+        return '<span class="sci-rh-col" title="' + esc(label) + ': ' + b.n + ' post' + (b.n === 1 ? '' : 's') + '">' +
+          '<span class="sci-rh-bars">' +
+            (b.n ? '<span class="sci-rh-bar" style="height:' + Math.max(pct, 4).toFixed(2) + '%"></span>'
+                 : '<span class="sci-rh-zero"></span>') +
+          '</span>' +
+          '<span class="sci-rh-lab">' + ((i % step === 0) ? esc(label) : '') + '</span></span>';
+      }).join('');
+      return '<div class="sci-rhythm">' +
+        '<div class="sci-rh-peak">peak ' + peak + ' post' + (peak === 1 ? '' : 's') + ' in a ' + (weekly ? 'week' : 'month') + '</div>' +
+        '<div class="sci-rh">' + cols + '</div></div>';
+    }
+
+    function shortDayLabel(ms){
+      var d = new Date(ms);
+      if(isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', timeZone: 'UTC'});
+    }
+
+    // The best posts regardless of platform, which is the comparison a reader
+    // makes first and no single platform pane can answer.
+    function renderTopPostsAnywhere(posts){
+      var top = (posts || []).slice()
+        .filter(function(p){ return interactionScore(p.metrics) > 0; })
+        .sort(function(a,b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })
+        .slice(0, 6);
+      if(top.length < 2) return '';
+      return '<div class="sci-postcard-grid">' +
+        top.map(function(p){ return renderPostCard(p, true); }).join('') + '</div>';
+    }
+
+    function crossPane(cross, postsById){
+      var claims = (cross.claims || []).length
+        ? '<div class="sci-claims">' + renderClaims(cross.claims, postsById) + '</div>' : '';
+      return '<div class="sci-cross-lede">One read across every platform at once, cited back to the individual posts it came from.</div>' +
+        renderSection('Content patterns', '◈', renderBulletList(cross.summary, 'sci-summary-list')) +
+        renderStrategy(cross.messaging_and_strategy) +
+        renderSection('Evidence from real posts', '◇', claims);
+    }
+
+    function platformPane(name, run, allPosts, postsById, entry, pr, synthState){
+      var meta = platformMeta(name), stats = platformStats(name, allPosts);
+      var isReddit = (name === 'reddit');
+      // On a platform we could not confidently identify, the handle, the
+      // "open profile" link and the vendor badge are all claims about an
+      // account we just said we do not have. They are suppressed rather than
+      // rendered against whatever half-resolved value is still on the row.
+      var live = !NO_ACTIVITY_STATUSES[pr.status];
+
+      var bits = [];
+      if(live && pr.handle) bits.push('<span class="sci-phero-handle">' + esc(pr.handle) + '</span>');
+      if(pr.post_count) bits.push('<span>' + pr.post_count + ' post' + (pr.post_count === 1 ? '' : 's') + ' collected</span>');
+      if(stats && stats.analyzed) bits.push('<span>' + stats.analyzed + ' creative' + (stats.analyzed === 1 ? '' : 's') + ' described</span>');
+      if(live && VENDOR_LABEL[pr.source_vendor]) bits.push('<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>');
+
+      var link = (live && pr.profile_url)
+        ? '<a class="sci-phero-go" href="' + esc(pr.profile_url) + '" target="_blank" rel="noopener">Open profile ' + VIEW_GLYPH + '</a>' : '';
+      var hero = '<div class="sci-phero">' +
+        '<span class="sci-phero-ic">' + meta.icon + '</span>' +
+        '<div class="sci-phero-txt"><h3>' + esc(platformLabel(name)) + '</h3>' +
+        (bits.length ? '<div class="sci-phero-meta">' + bits.join('') + '</div>' : '') + '</div>' + link + '</div>';
+
+      var body = '';
+      if(!stats){
+        if(isReddit){
+          // The one platform where "no company account" is the expected
+          // answer rather than a failure: almost no company posts as u/them.
+          // It gets a one-line note, not the full empty-state panel, because
+          // this pane is not empty -- the conversation analysis follows it.
+          body = '<div class="sci-pane-note">No company-owned Reddit account, which is normal. ' +
+            'Companies rarely post as u/them, and Reddit’s value here is the conversation about them, below.</div>';
+        } else {
+          body = paneEmpty(STATUS_LABEL[pr.status] || String(pr.status || '').replace(/_/g, ' '),
+            pr.status_detail || 'Nothing was collected for this platform on this run.');
+        }
+      } else {
+        body = platformTiles(name, stats) +
+          renderSection('Format mix', '▦', renderFormatMix(computeFormatMix(allPosts, name))) +
+          renderSection('Recurring creative themes', '✦', renderThemeChips(allPosts, name)) +
+          renderSection('Posts', '▣', renderPostsSection(name));
+        if(entry){
+          body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
+            renderStrategy(entry.messaging_and_strategy) +
+            renderSection('Evidence from real posts', '◇',
+              (entry.claims && entry.claims.length) ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '');
+        } else if(synthState){
+          body += '<div class="sci-pane-note">' + esc(synthState) + ' The posts and creative themes above were still collected.</div>';
+        }
+      }
+      return hero + body + (isReddit ? renderRedditPulse(run) : '');
+    }
+
+    function reportHead(run, allPosts, names, byName){
+      var statusCls = run.status === 'done' ? 'st-done' : (run.status === 'error' ? 'st-error' : 'st-running');
+      var siteUrl = run.company_url ? (/^https?:\/\//i.test(run.company_url) ? run.company_url : 'https://' + run.company_url) : null;
+      var live = names.filter(function(n){ return !NO_ACTIVITY_STATUSES[byName[n].status]; }).length;
+      var when = historyTimestamp(run.created_at);
+
+      var mono = '<div class="sci-rep-logo sci-rep-nologo"><span>' + esc(monogram(run.company_name)) + '</span></div>';
+      var logo = run.company_logo
+        ? '<div class="sci-rep-logo"><img src="' + esc(run.company_logo) + '" alt="" loading="lazy" ' +
+          'onerror="this.closest(\'.sci-rep-logo\').classList.add(\'sci-rep-nologo\');this.remove()">' +
+          '<span>' + esc(monogram(run.company_name)) + '</span></div>'
+        : mono;
+
+      var chips = '<span class="status-pill ' + statusCls + '"><span class="d"></span>' + esc(run.status) + '</span>' +
+        '<span class="sci-rep-chip">' + live + ' of ' + names.length + ' platforms live</span>' +
+        (when.short ? '<span class="sci-rep-chip" title="' + esc(when.full) + '">Analyzed ' + esc(when.short) + '</span>' : '');
+
+      var actions =
+        (siteUrl ? '<a class="sci-act" href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' + VIEW_GLYPH + ' ' + esc(run.company_url) + '</a>' : '') +
+        '<button type="button" class="sci-act" onclick="printReport()">⎙ Save as PDF</button>';
+
+      var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
+      var described = allPosts.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length;
+      var pulse = run.reddit_pulse || null;
+      var band = renderTiles([
+        {label: 'Posts analyzed', value: allPosts.length || null},
+        {label: 'Platforms live', value: names.length ? live : null, unit: '/' + names.length},
+        {label: 'Creative described', value: allPosts.length ? Math.round(described / allPosts.length * 100) : null, unit: '%',
+         note: described + ' of ' + allPosts.length + ' images and videos'},
+        {label: 'Video-led', value: allPosts.length ? Math.round(videoLike / allPosts.length * 100) : null, unit: '%',
+         note: 'of everything they published'},
+        {label: 'Reddit threads', value: (pulse && pulse.thread_count) ? fmtNum(pulse.thread_count) : null,
+         note: (pulse && pulse.subreddit_count) ? 'across ' + pulse.subreddit_count + ' subreddits' : null}
+      ], 'sci-tiles-band');
+
+      return '<button class="sci-drawer-close" onclick="closeReport()" aria-label="Close report">✕</button>' +
+        '<div class="sci-rep-head">' +
+          '<div class="sci-rep-id">' + logo +
+            '<div class="sci-rep-txt"><h3>' + esc(run.company_name) + '</h3>' +
+            '<div class="sci-rep-chips">' + chips + '</div></div>' +
+          '</div>' +
+          '<div class="sci-rep-actions">' + actions + '</div>' +
+        '</div>' +
+        (band ? '<div class="sci-rep-band">' + band + '</div>' : '');
+    }
+
+    function printReport(){
+      document.body.classList.add('sci-printing');
+      window.print();
+      setTimeout(function(){ document.body.classList.remove('sci-printing'); }, 400);
+    }
+
     function renderReport(run){
       CURRENT_RUN = run;
       POST_SORT = {};
       POST_SHOWALL = {};
       var postsById = {}, allPosts = run.posts || [];
       allPosts.forEach(function(p){ postsById[p.id] = p; });
+
       var synthesis = run.synthesis || null;
-      var platformsByName = {};
-      (run.platforms || []).forEach(function(p){ platformsByName[p.platform] = p; });
-      var statusCls = run.status === 'done' ? 'st-done' : (run.status === 'error' ? 'st-error' : 'st-running');
-      var siteUrl = run.company_url ? (/^https?:\/\//i.test(run.company_url) ? run.company_url : 'https://' + run.company_url) : null;
+      var synthOk = !!(synthesis && !synthesis.error);
+      var synthPlats = (synthOk && synthesis.platforms) || {};
+      var synthState = synthesis
+        ? (synthesis.error ? 'Synthesis is unavailable for this run (' + synthesis.error + ').' : '')
+        : 'Synthesis has not run yet for this analysis.';
 
-      var html = '<button class="sci-drawer-close" onclick="closeReport()">✕</button>' +
-        '<div class="sci-drawer-head">' +
-          '<div class="sci-drawer-mono">' + esc(monogram(run.company_name)) + '</div>' +
-          '<div style="min-width:0">' +
-            '<div class="sci-drawer-title">' + esc(run.company_name) + '</div>' +
-            '<div class="sci-drawer-meta">' +
-              '<span class="status-pill ' + statusCls + '"><span class="d"></span>' + esc(run.status) + '</span>' +
-              '<span>started ' + esc(run.created_at) + '</span>' +
-              (siteUrl ? '<a href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' + esc(run.company_url) + '</a>' : '') +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="sci-drawer-body">';
+      var byName = {};
+      (run.platforms || []).forEach(function(p){ byName[p.platform] = p; });
+      // Canonical order first, then anything this run turned up that is not in
+      // it, so a newly added platform can never be silently dropped from the
+      // report just because PLATFORM_ORDER is stale.
+      var names = PLATFORM_ORDER.filter(function(n){ return byName[n]; })
+        .concat(Object.keys(byName).filter(function(n){ return PLATFORM_ORDER.indexOf(n) < 0; }));
 
-      html += '<div class="sci-coverage">' + renderCoverage(run.platforms) + '</div>';
-      if(allPosts.length) html += renderOverview(run, allPosts);
+      var cross = synthOk ? synthesis.cross_platform : null;
+      var hasCross = !!(cross && (toPoints(cross.summary).length ||
+        toPoints(cross.messaging_and_strategy).length || (cross.claims || []).length));
 
-      if(run.status === 'running'){
-        html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress &mdash; leave this open, it keeps polling, or come back from History once it finishes.</div></div>';
+      var nav = '', panes = '';
+      function addPane(ns, label, content, platform){
+        panes += '<section class="sci-pane' + (panes ? '' : ' active') + '" data-ns="' + esc(ns) + '"' +
+          (platform ? ' data-platform="' + esc(platform) + '"' : '') + '>' +
+          '<h4 class="sci-pane-title">' + esc(label) + '</h4>' + content + '</section>';
       }
 
-      (run.platforms || []).forEach(function(p){
-        if(!NO_ACTIVITY_STATUSES[p.status]) return;
-        // Reddit is the one platform where "no company account" is the
-        // expected answer rather than a failure: almost no B2B company posts
-        // as u/them. Flagging that in the same alarm banner as a real scrape
-        // failure would read as broken, when the section that actually
-        // matters for Reddit is the conversation below.
-        if(p.platform === 'reddit' && p.status === 'handle_not_found'){
-          html += '<div class="sci-banner sci-banner-info"><span class="bic">◇</span><div>' +
-            '<b>reddit:</b> no company-owned account found, which is normal. ' +
-            'What Reddit says about this company is analysed further down.</div></div>';
-          return;
-        }
-        var cls = (p.status === 'low_activity') ? '' : ' sci-banner-none';
-        html += '<div class="sci-banner' + cls + '"><span class="bic">' + (p.status === 'low_activity' ? '◐' : '○') + '</span><div><b>' + esc(p.platform) + ':</b> ' +
-          esc(STATUS_LABEL[p.status] || p.status) + (p.status_detail ? ': ' + esc(p.status_detail) : '') + '</div></div>';
-      });
+      nav += navItem({ns: 'overview', label: 'Overview', icon: NAV_ICONS.overview, has: true, active: true});
+      addPane('overview', 'Overview', overviewPane(run, allPosts, names, byName));
 
-      // Every platform unresolved is the shape of the identify step
-      // itself failing (a broken vendor call), not seven independent "this
-      // company has no account here" verdicts -- surface the admin check.
-      if((run.platforms || []).length && (run.platforms || []).every(function(p){ return p.status === 'handle_not_found'; })){
-        html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once -- this usually means the identification step itself broke, not that none of these accounts exist.' +
-          sciIdentifyDiagControl() + '</div></div>';
+      if(hasCross){
+        nav += navItem({ns: 'cross', label: 'Cross-platform', icon: NAV_ICONS.cross, has: true});
+        addPane('cross', 'Cross-platform synthesis', crossPane(cross, postsById));
       }
 
-      if(!synthesis){
-        html += '<div class="sci-drawer-empty">Synthesis has not run yet for this analysis.</div>';
-      } else if(synthesis.error){
-        html += '<div class="sci-drawer-empty">Synthesis is unavailable for this run (' + esc(synthesis.error) + '). Per-platform posts and creative analysis are still collected above once this run has platform data.</div>';
-      } else {
-        Object.keys(synthesis.platforms || {}).forEach(function(platform){
-          var entry = synthesis.platforms[platform];
-          var pr = platformsByName[platform] || {};
-          var meta = platformMeta(platform);
-          var mix = computeFormatMix(allPosts, platform);
-          html += '<div class="sci-platform-section" id="sci-plat-' + esc(platform) + '" style="--pf-color:' + meta.color + '">' +
-            '<div class="sci-plat-head"><span class="sci-plat-ic">' + meta.icon + '</span><h3>' + esc(platform) + '</h3>' +
-            (pr.post_count ? '<span class="sci-plat-sub">' + pr.post_count + ' posts analyzed</span>' : '') +
-            (VENDOR_LABEL[pr.source_vendor] ? '<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>' : '') + '</div>' +
-            renderFormatMix(mix) +
-            renderThemeChips(allPosts, platform) +
-            renderSection('Top performing posts', '▣', renderPostsSection(platform)) +
-            renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
-            renderStrategy(entry.messaging_and_strategy) +
-            renderSection('Evidence from real posts', '◇', entry.claims && entry.claims.length ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '') +
-          '</div>';
+      if(names.length){
+        nav += '<div class="sci-nav-sep"></div><div class="sci-nav-cap">Platforms</div>';
+        names.forEach(function(n){
+          var pr = byName[n], meta = platformMeta(n);
+          var pulse = (n === 'reddit') ? run.reddit_pulse : null;
+          var has = !NO_ACTIVITY_STATUSES[pr.status] || !!(pulse && pulse.thread_count);
+          nav += navItem({ns: n, label: platformLabel(n), icon: meta.icon, platform: n,
+            count: pr.post_count || 0, has: has});
+          addPane(n, platformLabel(n), platformPane(n, run, allPosts, postsById, synthPlats[n], pr, synthState), n);
         });
-        if(synthesis.cross_platform && (toPoints(synthesis.cross_platform.summary).length || toPoints(synthesis.cross_platform.messaging_and_strategy).length || (synthesis.cross_platform.claims || []).length)){
-          var crossClaims = (synthesis.cross_platform.claims || []).length ?
-            '<div class="sci-claims">' + renderClaims(synthesis.cross_platform.claims, postsById) + '</div>' : '';
-          html += '<div class="sci-cross-section">' +
-            '<div class="sci-cross-head"><span class="sci-cross-dot"></span><h3>Cross-platform synthesis</h3></div>' +
-            renderSection('Content patterns', '◈', renderBulletList(synthesis.cross_platform.summary, 'sci-summary-list')) +
-            renderStrategy(synthesis.cross_platform.messaging_and_strategy) +
-            (crossClaims ?
-              '<button type="button" class="sci-cross-toggle" onclick="toggleCrossEvidence(this)">Show evidence from real posts ▾</button>' +
-              '<div class="sci-cross-more">' + renderSection('Evidence from real posts', '◇', crossClaims) + '</div>'
-              : '') +
-          '</div>';
-        }
       }
 
-      html += renderRedditPulse(run);
-
-      html += '</div>';
-
-      document.getElementById('drawerPanel').innerHTML = html;
+      document.getElementById('drawerPanel').innerHTML =
+        reportHead(run, allPosts, names, byName) +
+        '<div class="sci-shell">' +
+          '<nav class="sci-nav" aria-label="Report sections">' + nav + '</nav>' +
+          '<div class="sci-panes">' + panes + '</div>' +
+        '</div>';
       document.getElementById('drawerOverlay').classList.add('open');
       revealStatTiles();
-    }
-
-    function toggleCrossEvidence(btn){
-      var section = btn.closest('.sci-cross-section');
-      var expanded = section.classList.toggle('expanded');
-      btn.textContent = expanded ? 'Hide evidence ▴' : 'Show evidence from real posts ▾';
-    }
-
-    function revealStatTiles(){
-      document.querySelectorAll('#drawerPanel .sci-stat-tile').forEach(function(el, i){
-        setTimeout(function(){ el.classList.add('visible'); }, i * 70);
-      });
     }
 
     function closeReport(){
