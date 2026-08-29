@@ -802,3 +802,209 @@ def test_no_chart_paints_a_categorical_hue_inline():
     for style in got["styles"]:
         assert re.fullmatch(r"(--w|width|height):[\d.]+%?;?", style), (
             "charts may only inline geometry, found: %r" % style)
+
+
+# ── Links out ──────────────────────────────────────────────────────────────
+#
+# Every URL the report renders is one the collection returned. Nothing is
+# built from a handle, because "https://instagram.com/" + handle produces a
+# link indistinguishable from a real one that lands on a 404 or on somebody
+# else's account, and a wrong link costs more than an absent one.
+
+def _run_row(platform, **kw):
+    row = {"platform": platform, "status": "ok", "post_count": 3,
+           "handle": "@acme", "profile_url": "https://example.invalid/%s/acme" % platform}
+    row.update(kw)
+    return row
+
+
+def test_a_url_with_another_scheme_is_dropped_not_prefixed():
+    """company_url is free text a user typed. Prefixing "https://" onto
+    anything that is not already absolute would turn `javascript:alert(1)`
+    into a link that runs on click, so a foreign scheme is refused outright
+    and only a bare domain is completed."""
+    got = _run("""({
+      bare: absUrl('acme.com'),
+      path: absUrl('acme.com/social'),
+      https: absUrl('https://acme.com'),
+      http: absUrl('http://acme.com'),
+      padded: absUrl('  acme.com  '),
+      js: absUrl('javascript:alert(1)'),
+      jsCased: absUrl('JavaScript:alert(1)'),
+      data: absUrl('data:text/html,<b>x'),
+      blank: absUrl(''), nul: absUrl(null)
+    })""")
+    assert got["bare"] == "https://acme.com"
+    assert got["path"] == "https://acme.com/social"
+    assert got["https"] == "https://acme.com"
+    assert got["http"] == "http://acme.com"
+    assert got["padded"] == "https://acme.com"
+    for key in ("js", "jsCased", "data", "blank", "nul"):
+        assert got[key] is None, "%s should not have become a link: %r" % (key, got[key])
+
+
+def test_the_directory_lists_the_platforms_with_no_account_too():
+    """A directory that shows only the accounts that resolved reads as "they
+    are on two platforms", which is a different and unearned claim. The dead
+    ones are listed, carrying their reason, and are not anchors."""
+    probe = """
+      var run = {company_name: 'Acme', company_url: 'acme.com', platforms: [
+        %s,
+        %s,
+        {platform:'tiktok', status:'no_presence', post_count:0, handle:null, profile_url:null}
+      ]};
+      seedAccountUrls(run);
+      var html = renderAccounts(run);
+      ({cards: (html.match(/class="sci-acc[ "]/g)||[]).length,
+        off: (html.match(/sci-acc-off/g)||[]).length,
+        anchors: (html.match(/<a class="sci-acc/g)||[]).length,
+        names: (html.match(/sci-acc-n">([^<]*)</g)||[]),
+        html: html});
+    """ % (json.dumps(_run_row("instagram")),
+           json.dumps(_run_row("x", status="handle_not_found", post_count=0,
+                               handle=None, profile_url=None)))
+    got = _run(probe)
+    # site + instagram + x + tiktok
+    assert got["cards"] == 4
+    assert got["off"] == 2                      # x and tiktok
+    assert got["anchors"] == 2                  # site and instagram only
+    assert "No account found" in got["html"]
+    assert "example.invalid/instagram/acme" in got["html"]
+
+
+def test_a_platform_we_could_not_identify_leaks_no_url():
+    """handle_not_found means we do not have this account. A profile_url still
+    sitting on the row is a half-resolved guess, and every surface that could
+    render it -- the directory, the rail, a section chip -- must refuse it."""
+    probe = """
+      var run = {company_url: 'acme.com', platforms: [
+        {platform:'youtube', status:'handle_not_found', post_count: 0,
+         handle: '@maybe', profile_url: 'https://example.invalid/youtube/maybe'}
+      ]};
+      seedAccountUrls(run);
+      ({accounts: socialAccounts(run).map(function(a){ return [a.platform, a.url, a.handle]; }),
+        lookup: accountUrl('youtube'),
+        rail: renderSocialRail(run),
+        chip: sectionLink(profileLink('youtube')),
+        directory: renderAccounts(run)});
+    """
+    got = _run(probe)
+    assert got["accounts"] == [["youtube", None, None]]
+    assert got["lookup"] is None
+    assert got["rail"] == ""                    # nothing live, so no rail at all
+    assert got["chip"] == ""
+    assert "example.invalid/youtube/maybe" not in got["directory"]
+    assert "@maybe" not in got["directory"]
+
+
+def test_one_platforms_url_is_never_served_for_another():
+    probe = """
+      var run = {platforms: [%s, %s]};
+      seedAccountUrls(run);
+      ({ig: accountUrl('instagram'), li: accountUrl('linkedin'),
+        missing: accountUrl('tiktok'), chip: sectionLink(profileLink('tiktok'))});
+    """ % (json.dumps(_run_row("instagram")), json.dumps(_run_row("linkedin")))
+    got = _run(probe)
+    assert got["ig"] == "https://example.invalid/instagram/acme"
+    assert got["li"] == "https://example.invalid/linkedin/acme"
+    # An unseeded platform gets nothing, never the first entry in the map.
+    assert got["missing"] is None
+    assert got["chip"] == ""
+
+
+def test_a_section_chip_is_never_a_dead_link():
+    """The chip exists to go somewhere. A post with no post_url produces no
+    chip rather than one pointing at "#" -- which looks identical until it is
+    clicked, and then does nothing."""
+    got = _run("""
+      var withUrl = {platform:'x', post_url:'https://example.invalid/x/1',
+                     caption:'a real post', raw:{}, metrics:{likes:5}};
+      var without = {platform:'x', post_url: null, caption:'no link', raw:{}, metrics:{likes:5}};
+      ({ok: sectionLink(postLink(withUrl, 'Best post')),
+        // The factory's own contract, not just what the renderer does with it:
+        // a link object carrying no destination is a worse value to hand
+        // around than null, and sectionLink's href guard hides the difference.
+        builtOk: postLink(withUrl, 'Best post'),
+        built: postLink(without, 'Best post'),
+        builtNull: postLink(null, 'Best post'),
+        none: sectionLink(postLink(without, 'Best post')),
+        nullPost: sectionLink(postLink(null, 'Best post')),
+        noLink: sectionLink(null)});
+    """)
+    assert 'href="https://example.invalid/x/1"' in got["ok"]
+    assert "Best post" in got["ok"]
+    assert got["builtOk"]["href"] == "https://example.invalid/x/1"
+    assert got["built"] is None
+    assert got["builtNull"] is None
+    assert got["none"] == ""
+    assert got["nullPost"] == ""
+    assert got["noLink"] == ""
+
+
+def test_section_chips_point_at_the_post_each_section_is_about():
+    """The whole reason these are per-section is that they are not the profile
+    link eight times. Cadence goes to the newest post, format to a post of the
+    dominant format, response to the one that earned most."""
+    got = _run("""
+      var posts = [
+        {id:1, platform:'ig', post_type:'video', post_url:'u-video-old', caption:'v1',
+         raw:{}, metrics:{likes: 5}, posted_at:'2026-01-01T00:00:00Z'},
+        {id:2, platform:'ig', post_type:'image', post_url:'u-image-huge', caption:'i1',
+         raw:{}, metrics:{likes: 9000}, posted_at:'2026-02-01T00:00:00Z'},
+        {id:3, platform:'ig', post_type:'video', post_url:'u-video-new', caption:'v2',
+         raw:{}, metrics:{likes: 7}, posted_at:'2026-06-01T00:00:00Z'}
+      ];
+      ({newest: latestPost(posts, 'ig').post_url,
+        best: bestPost(posts, 'ig').post_url,
+        typical: dominantFormatPost(posts, 'ig').post_url,
+        otherPlatform: latestPost(posts, 'linkedin')});
+    """)
+    assert got["newest"] == "u-video-new"
+    assert got["best"] == "u-image-huge"
+    # Two videos to one image: the dominant format is video, and of the two
+    # videos it is the better-performing one that gets linked.
+    assert got["typical"] == "u-video-new"
+    assert got["otherPlatform"] is None
+
+
+def test_the_theme_chip_follows_the_theme_charts_own_rule():
+    """The chart drops themes seen once, so the chip must too -- otherwise the
+    section links to "an example of" a theme the chart itself refuses to draw,
+    and the example is the single post that coined it."""
+    got = _run("""
+      function post(id, subject, likes){
+        return {id: id, platform:'ig', post_type:'image', post_url:'u' + id, caption:'c',
+                raw:{}, metrics:{likes: likes}, posted_at:'2026-0' + id + '-01T00:00:00Z',
+                creative_analysis_status:'ok',
+                creative_analysis:{subject: subject, setting:'', style:'', tone:'',
+                                   format_technique:''}};
+      }
+      var repeated = [post(1,'server rack',10), post(2,'server rack',80), post(3,'a lone kite',5)];
+      var singles  = [post(1,'server rack',10), post(2,'a lone kite',5)];
+      ({repeated: themePost(repeated, 'ig'), singles: themePost(singles, 'ig')});
+    """)
+    assert got["repeated"]["theme"] == "server rack"
+    # Of the two posts carrying it, the stronger one is the example.
+    assert got["repeated"]["post"]["post_url"] == "u2"
+    assert got["singles"] is None
+
+
+def test_every_outbound_link_opens_in_a_new_tab_and_drops_the_opener():
+    """The report lives in a modal over a long-running analysis. A link that
+    navigates the tab away loses it, and target=_blank without rel=noopener
+    hands the destination a handle on this window."""
+    probe = """
+      var run = {company_name:'Acme', company_url:'acme.com', platforms: [%s]};
+      seedAccountUrls(run);
+      var html = renderSocialRail(run) + renderAccounts(run) +
+        renderPlatformCards(['instagram'], {instagram: %s}, []) +
+        sectionLink(profileLink('instagram')) +
+        sectionLink(siteLink(run));
+      var anchors = html.match(/<a [^>]*>/g) || [];
+      ({total: anchors.length,
+        bad: anchors.filter(function(a){
+          return !/target="_blank"/.test(a) || !/rel="noopener"/.test(a); })});
+    """ % (json.dumps(_run_row("instagram")), json.dumps(_run_row("instagram")))
+    got = _run(probe)
+    assert got["total"] >= 5, "the probe found almost no anchors, so it proves nothing"
+    assert got["bad"] == [], got["bad"]

@@ -1188,9 +1188,192 @@
       }), 'sci-rank-theme');
     }
 
-    function renderSection(label, glyph, innerHtml){
+    // ══ Links out ═════════════════════════════════════════════════════════
+    //
+    // Every URL in this report is one the collection actually returned: a
+    // platform row's profile_url, a post's post_url, the company's own site.
+    // None of them are built from a handle. "https://instagram.com/" + handle
+    // would produce links indistinguishable from real ones that land on a 404
+    // or, worse, on somebody else's account -- and a wrong link costs more
+    // than an absent one, because the reader has no way to tell it is wrong.
+    var GLOBE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8M12 3.6c2.1 2.3 3.2 5.3 3.2 8.4S14.1 18.1 12 20.4c-2.1-2.3-3.2-5.3-3.2-8.4S9.9 5.9 12 3.6z"/></svg>';
+
+    function absUrl(u){
+      var v = String(u == null ? '' : u).trim();
+      if(!v) return null;
+      if(/^https?:\/\//i.test(v)) return v;
+      // A bare domain typed into the form is still a destination. Anything
+      // carrying some other scheme (javascript:, data:) is not, and is dropped
+      // rather than prefixed into a link that would execute on click.
+      if(/^[a-z][a-z0-9+.-]*:/i.test(v)) return null;
+      return 'https://' + v;
+    }
+    function prettyUrl(u){
+      return String(u || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
+    }
+
+    // The account list for a run, in rail order, INCLUDING the platforms we
+    // found nothing on. A directory that quietly omits the four dead ones
+    // reads as "they are on three platforms", which is a different and
+    // unearned claim -- the absence is part of the footprint.
+    function socialAccounts(run){
+      var byName = {};
+      ((run && run.platforms) || []).forEach(function(p){ byName[p.platform] = p; });
+      var names = PLATFORM_ORDER.filter(function(n){ return byName[n]; })
+        .concat(Object.keys(byName).filter(function(n){ return PLATFORM_ORDER.indexOf(n) < 0; }));
+      return names.map(function(n){
+        var pr = byName[n], live = !NO_ACTIVITY_STATUSES[pr.status];
+        return {platform: n, label: platformLabel(n), icon: platformMeta(n).icon,
+          url: live ? absUrl(pr.profile_url) : null,
+          handle: live ? (pr.handle || null) : null,
+          posts: pr.post_count || 0,
+          reason: live ? null : (STATUS_SHORT[pr.status] || String(pr.status || '').replace(/_/g, ' '))};
+      });
+    }
+    // Resolved once per run, for the same reason format hues are: a section
+    // link deep in a pane should not have to re-walk run.platforms, and every
+    // link to a given platform must be the same URL.
+    var ACCOUNT_URL = {};
+    function seedAccountUrls(run){
+      ACCOUNT_URL = {};
+      socialAccounts(run).forEach(function(a){ if(a.url) ACCOUNT_URL[a.platform] = a.url; });
+    }
+    function accountUrl(platform){ return ACCOUNT_URL[platform] || null; }
+
+    // ── Section source links ──────────────────────────────────────────────
+    //
+    // Each section links to the specific thing it is describing, not to a
+    // generic "open profile" repeated eight times down a pane. The cadence
+    // chart goes to the most recent post, the format chart to a post in the
+    // dominant format, the engagement chart to the post that earned the most.
+    // Every one of them is dropped when its exemplar has no URL, so a chip is
+    // never decoration.
+    function linkablePosts(posts, platform){
+      return (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.post_url;
+      });
+    }
+    function latestPost(posts, platform){
+      return linkablePosts(posts, platform).filter(function(p){ return p.posted_at; })
+        .sort(function(a, b){ return new Date(b.posted_at) - new Date(a.posted_at); })[0] || null;
+    }
+    function bestPost(posts, platform){
+      return linkablePosts(posts, platform)
+        .sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0] || null;
+    }
+    function dominantFormatPost(posts, platform){
+      var pool = linkablePosts(posts, platform);
+      if(!pool.length) return null;
+      var counts = {};
+      pool.forEach(function(p){ var t = p.post_type || 'post'; counts[t] = (counts[t] || 0) + 1; });
+      var top = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })[0];
+      return pool.filter(function(p){ return (p.post_type || 'post') === top; })
+        .sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0] || null;
+    }
+    // Paired with the themes chart, so it uses the chart's own rule: a theme
+    // seen once is not a theme, and linking "an example of it" would point at
+    // the single post that coined it.
+    function themePost(posts, platform){
+      var counts = themeCounts(posts, platform);
+      var top = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })[0];
+      if(!top || counts[top] < 2) return null;
+      var p = linkablePosts(posts, platform).filter(function(q){
+        return q.creative_analysis_status === 'ok' && postThemeWords(q).indexOf(top) >= 0;
+      }).sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0];
+      return p ? {post: p, theme: top} : null;
+    }
+
+    function postLink(post, label){
+      if(!post || !post.post_url) return null;
+      return {href: post.post_url, label: label, platform: post.platform,
+        title: platformLabel(post.platform) + ': ' + postTitle(post)};
+    }
+    function profileLink(platform, label){
+      var u = accountUrl(platform);
+      if(!u) return null;
+      return {href: u, label: label || ('Open on ' + platformLabel(platform)),
+        platform: platform, title: prettyUrl(u)};
+    }
+    function siteLink(run, label){
+      var u = absUrl(run && run.company_url);
+      return u ? {href: u, label: label || prettyUrl(u), icon: GLOBE_ICON, title: u} : null;
+    }
+
+    function sectionLink(link){
+      if(!link || !link.href) return '';
+      var ic = link.icon || (link.platform ? platformMeta(link.platform).icon : '');
+      return '<a class="sci-seclink" href="' + esc(link.href) + '" target="_blank" rel="noopener"' +
+        (link.platform ? ' data-platform="' + esc(link.platform) + '"' : '') +
+        (link.title ? ' title="' + esc(link.title) + '"' : '') + '>' +
+        (ic ? '<i class="sci-seclink-ic">' + ic + '</i>' : '') +
+        '<b>' + esc(link.label) + '</b>' + VIEW_GLYPH + '</a>';
+    }
+
+    function renderSection(label, glyph, innerHtml, link){
       if(!innerHtml) return '';
-      return '<div class="sci-section"><div class="sci-section-label"><span>' + glyph + '</span>' + esc(label) + '</div>' + innerHtml + '</div>';
+      return '<div class="sci-section"><div class="sci-section-label"><span>' + glyph + '</span>' + esc(label) +
+        sectionLink(link) + '</div>' + innerHtml + '</div>';
+    }
+
+    // ── The account directory ─────────────────────────────────────────────
+    // Every way out of this report in one grid: the company's own site, each
+    // account we resolved, and the subreddit the conversation lives in. The
+    // platforms with nothing behind them are listed too, unclickable and
+    // carrying their reason, so the row of links is the whole footprint
+    // rather than the flattering half of it.
+    function accountCard(o){
+      var live = !!o.url, tag = live ? 'a' : 'div';
+      return '<' + tag + ' class="sci-acc' + (live ? '' : ' sci-acc-off') + '"' +
+        (o.platform ? ' data-platform="' + esc(o.platform) + '"' : '') +
+        (live ? ' href="' + esc(o.url) + '" target="_blank" rel="noopener" title="' + esc(o.url) + '"' : '') + '>' +
+        '<span class="sci-acc-ic">' + o.icon + '</span>' +
+        '<span class="sci-acc-txt">' +
+          '<span class="sci-acc-n">' + esc(o.name) + '</span>' +
+          (o.sub ? '<span class="sci-acc-s">' + esc(o.sub) + '</span>' : '') +
+          // The bare URL is printed, not just linked. On paper a link is a
+          // piece of text, and a card that only said "Instagram ↗" would be
+          // an instruction to click something that is not there.
+          (live ? '<span class="sci-acc-u">' + esc(prettyUrl(o.url)) + '</span>' : '') +
+        '</span>' +
+        (live ? '<span class="sci-acc-go">' + VIEW_GLYPH + '</span>' : '') +
+      '</' + tag + '>';
+    }
+    function renderAccounts(run){
+      var cards = [], site = absUrl(run.company_url);
+      if(site){
+        cards.push(accountCard({icon: GLOBE_ICON, name: 'Website',
+          sub: run.company_name || 'Owned site', url: site}));
+      }
+      socialAccounts(run).forEach(function(a){
+        cards.push(accountCard({platform: a.platform, icon: a.icon, name: a.label,
+          sub: a.url ? (a.handle || (a.posts ? a.posts + ' post' + (a.posts === 1 ? '' : 's') + ' collected' : 'Account found'))
+                     : a.reason,
+          url: a.url}));
+      });
+      var pulse = run.reddit_pulse || null;
+      var community = pulse && pulse.community ? absUrl(pulse.community.url) : null;
+      if(community){
+        cards.push(accountCard({platform: 'reddit', icon: platformMeta('reddit').icon,
+          name: pulse.community.name || 'Reddit community',
+          sub: fmtNum(pulse.community.subscribers || 0) + ' members · not a company account',
+          url: community}));
+      }
+      if(!cards.length) return '';
+      return '<div class="sci-accs">' + cards.join('') + '</div>';
+    }
+
+    // The header rail: every live account as one tap, always on screen while
+    // the report is. Icon-only, because it sits beside the company name and a
+    // row of six labelled buttons there would out-shout it.
+    function renderSocialRail(run){
+      var live = socialAccounts(run).filter(function(a){ return a.url; });
+      if(!live.length) return '';
+      return '<div class="sci-rail">' + live.map(function(a){
+        return '<a class="sci-rail-a" href="' + esc(a.url) + '" target="_blank" rel="noopener"' +
+          ' data-platform="' + esc(a.platform) + '"' +
+          ' title="' + esc(a.label + (a.handle ? ' · ' + a.handle : '')) + '"' +
+          ' aria-label="' + esc('Open ' + a.label + ' profile') + '">' + a.icon + '</a>';
+      }).join('') + '</div>';
     }
 
     function renderBulletList(points, cls){
@@ -1295,21 +1478,34 @@
     // Overview's platform grid doubles as the launcher: clicking a card is the
     // same as clicking its rail item, so the rail is discoverable from the
     // first screen rather than being the only way in.
+    //
+    // The card carries TWO destinations, which is why it is a wrapper holding
+    // a button and an anchor rather than one clickable element. Reading about
+    // a platform and going to the account are different intentions, and a
+    // single card that guesses between them gets one of them wrong every time.
+    // (An <a> cannot legally live inside a <button>, so the split is also the
+    // only markup that works.)
     function renderPlatformCards(names, byName, posts){
       return '<div class="sci-pcards">' + names.map(function(n){
         var pr = byName[n], meta = platformMeta(n), live = !NO_ACTIVITY_STATUSES[pr.status];
         var stats = platformStats(n, posts);
+        var url = live ? absUrl(pr.profile_url) : null;
         var line = live
           ? (pr.post_count || 0) + ' post' + ((pr.post_count === 1) ? '' : 's')
           : (n === 'reddit' ? 'Conversation only, no account'
                             : (STATUS_SHORT[pr.status] || String(pr.status || '').replace(/_/g, ' ')));
-        return '<button type="button" class="sci-pcard' + (live ? '' : ' sci-pcard-off') + '"' +
-          ' data-platform="' + esc(n) + '" onclick="switchPane(\'' + esc(n) + '\')">' +
-          '<span class="sci-pcard-ic">' + meta.icon + '</span>' +
-          '<span class="sci-pcard-body"><span class="sci-pcard-n">' + esc(platformLabel(n)) + '</span>' +
-          '<span class="sci-pcard-v">' + esc(line) + '</span></span>' +
-          (stats && stats.avgInteractions ? '<span class="sci-pcard-x">' + fmtNum(Math.round(stats.avgInteractions)) + ' avg</span>' : '') +
-        '</button>';
+        return '<div class="sci-pcard' + (live ? '' : ' sci-pcard-off') + '" data-platform="' + esc(n) + '">' +
+          '<button type="button" class="sci-pcard-main" onclick="switchPane(\'' + esc(n) + '\')">' +
+            '<span class="sci-pcard-ic">' + meta.icon + '</span>' +
+            '<span class="sci-pcard-body"><span class="sci-pcard-n">' + esc(platformLabel(n)) + '</span>' +
+            '<span class="sci-pcard-v">' + esc(line) + '</span></span>' +
+            (stats && stats.avgInteractions ? '<span class="sci-pcard-x">' + fmtNum(Math.round(stats.avgInteractions)) + ' avg</span>' : '') +
+          '</button>' +
+          (url ? '<a class="sci-pcard-go" href="' + esc(url) + '" target="_blank" rel="noopener"' +
+            ' title="' + esc((pr.handle ? pr.handle + ' · ' : '') + prettyUrl(url)) + '"' +
+            ' aria-label="' + esc('Open ' + platformLabel(n) + ' profile') + '">' +
+            VIEW_GLYPH + '</a>' : '') +
+        '</div>';
       }).join('') + '</div>';
     }
 
@@ -1644,14 +1840,31 @@
         html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once. That usually means the identification step itself broke, not that none of these accounts exist.' +
           sciIdentifyDiagControl() + '</div></div>';
       }
-      html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts));
-      html += renderSection('How the platforms compare', '⊞', renderScorecard(run));
+      // Each section carries a link to the exact thing it is talking about.
+      // They are computed here, not inside the renderers, so a section whose
+      // exemplar has no URL simply renders without a chip.
+      var newest = latestPost(allPosts), strongest = bestPost(allPosts);
+      var typical = dominantFormatPost(allPosts);
+      var busiest = names.slice().sort(function(a, b){
+        return (byName[b].post_count || 0) - (byName[a].post_count || 0); })[0];
+
+      html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts),
+        siteLink(run));
+      html += renderSection('How the platforms compare', '⊞', renderScorecard(run),
+        busiest ? profileLink(busiest, 'Busiest: ' + platformLabel(busiest)) : null);
       html += renderSection('Cadence and timing', '▨',
-        renderRhythm(allPosts, 'all') + renderClock(allPosts));
-      html += renderSection('What they publish, everywhere', '▦', renderFormatBlock(allPosts, null));
+        renderRhythm(allPosts, 'all') + renderClock(allPosts),
+        postLink(newest, 'Most recent post'));
+      html += renderSection('What they publish, everywhere', '▦', renderFormatBlock(allPosts, null),
+        typical ? postLink(typical, 'A typical ' + postFormatLabel(typical)) : null);
       html += renderSection('How the audience responds', '◍',
-        duo(renderEngageMix(allPosts, null), renderPerfSpread(allPosts, null)));
-      html += renderSection('Strongest posts anywhere', '★', renderTopPostsAnywhere(allPosts));
+        duo(renderEngageMix(allPosts, null), renderPerfSpread(allPosts, null)),
+        postLink(strongest, 'The post that earned most'));
+      html += renderSection('Strongest posts anywhere', '★', renderTopPostsAnywhere(allPosts),
+        strongest ? profileLink(strongest.platform,
+          'These live on ' + platformLabel(strongest.platform)) : null);
+      html += renderSection('Every account, in one place', '⁂', renderAccounts(run),
+        siteLink(run));
       if(!allPosts.length && run.status !== 'running'){
         html += paneEmpty('No posts were collected on this run',
           'Nothing was published in the window, or no collection vendor is connected for the platforms that were found. Each platform in the rail explains its own case.');
@@ -1963,13 +2176,18 @@
         top.map(function(p){ return renderPostCard(p, true); }).join('') + '</div>';
     }
 
-    function crossPane(cross, postsById){
+    function crossPane(cross, postsById, run){
       var claims = (cross.claims || []).length
         ? '<div class="sci-claims">' + renderClaims(cross.claims, postsById) + '</div>' : '';
       return '<div class="sci-cross-lede">One read across every platform at once, cited back to the individual posts it came from.</div>' +
-        renderSection('Content patterns', '◈', renderBulletList(cross.summary, 'sci-summary-list')) +
+        renderSection('Content patterns', '◈', renderBulletList(cross.summary, 'sci-summary-list'),
+          siteLink(run)) +
         renderStrategy(cross.messaging_and_strategy) +
-        renderSection('Evidence from real posts', '◇', claims);
+        // Evidence gets no chip on purpose. Every line inside it is already a
+        // link to the post it cites; a ninth link in the heading would point
+        // somewhere less specific than the eight below it.
+        renderSection('Evidence from real posts', '◇', claims) +
+        renderSection('Every account, in one place', '⁂', renderAccounts(run));
     }
 
     function platformPane(name, run, allPosts, postsById, entry, pr, synthState){
@@ -1982,13 +2200,26 @@
       var live = !NO_ACTIVITY_STATUSES[pr.status];
 
       var bits = [];
-      if(live && pr.handle) bits.push('<span class="sci-phero-handle">' + esc(pr.handle) + '</span>');
+      var profile = live ? absUrl(pr.profile_url) : null;
+      // The handle IS the account, so it is the link. It used to be inert text
+      // sitting six pixels from a button that went exactly where a reader
+      // clicking a handle expects to go.
+      if(live && pr.handle){
+        bits.push(profile
+          ? '<a class="sci-phero-handle" href="' + esc(profile) + '" target="_blank" rel="noopener">' + esc(pr.handle) + '</a>'
+          : '<span class="sci-phero-handle">' + esc(pr.handle) + '</span>');
+      }
       if(pr.post_count) bits.push('<span>' + pr.post_count + ' post' + (pr.post_count === 1 ? '' : 's') + ' collected</span>');
       if(stats && stats.analyzed) bits.push('<span>' + stats.analyzed + ' creative' + (stats.analyzed === 1 ? '' : 's') + ' described</span>');
       if(live && VENDOR_LABEL[pr.source_vendor]) bits.push('<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>');
 
-      var link = (live && pr.profile_url)
-        ? '<a class="sci-phero-go" href="' + esc(pr.profile_url) + '" target="_blank" rel="noopener">Open profile ' + VIEW_GLYPH + '</a>' : '';
+      // The URL is spelled out rather than hidden behind the word "profile":
+      // it is the one line of this pane a reader may want to copy, send on, or
+      // read off paper, where no link is clickable at all.
+      if(profile) bits.push('<span class="sci-phero-url">' + esc(prettyUrl(profile)) + '</span>');
+      var link = profile
+        ? '<a class="sci-phero-go" href="' + esc(profile) + '" target="_blank" rel="noopener">' +
+          '<i class="sci-phero-go-ic">' + meta.icon + '</i>Open profile ' + VIEW_GLYPH + '</a>' : '';
       var hero = '<div class="sci-phero">' +
         '<span class="sci-phero-ic">' + meta.icon + '</span>' +
         '<div class="sci-phero-txt"><h3>' + esc(platformLabel(name)) + '</h3>' +
@@ -2009,19 +2240,27 @@
         }
       } else {
         var own = allPosts.filter(function(p){ return p.platform === name; });
+        var newest = latestPost(own, name), strongest = bestPost(own, name);
+        var typical = dominantFormatPost(own, name), theme = themePost(allPosts, name);
         body = platformTiles(name, stats) +
           renderSection('Cadence and timing', '▨',
-            renderRhythm(own, name) + renderClock(own, {title: 'When they post here'})) +
-          renderSection('Format mix', '▦', renderFormatBlock(allPosts, name)) +
+            renderRhythm(own, name) + renderClock(own, {title: 'When they post here'}),
+            postLink(newest, 'Most recent post')) +
+          renderSection('Format mix', '▦', renderFormatBlock(allPosts, name),
+            typical ? postLink(typical, 'A typical ' + postFormatLabel(typical)) : null) +
           renderSection('How the audience responds', '◍',
-            duo(renderEngageMix(allPosts, name), renderPerfSpread(allPosts, name))) +
+            duo(renderEngageMix(allPosts, name), renderPerfSpread(allPosts, name)),
+            postLink(strongest, 'The post that earned most')) +
           renderSection('Recurring creative themes', '✦',
             chartCard({title: 'What the creative keeps showing',
               sub: 'Counted across every image and video we described on ' + platformLabel(name),
-              body: renderThemeChips(allPosts, name)})) +
-          renderSection('Posts', '▣', renderPostsSection(name));
+              body: renderThemeChips(allPosts, name)}),
+            theme ? postLink(theme.post, 'A post showing “' + theme.theme + '”') : null) +
+          renderSection('Posts', '▣', renderPostsSection(name),
+            profileLink(name, 'All of them on ' + platformLabel(name)));
         if(entry){
-          body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list')) +
+          body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list'),
+              profileLink(name)) +
             renderStrategy(entry.messaging_and_strategy) +
             renderSection('Evidence from real posts', '◇',
               (entry.claims && entry.claims.length) ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '');
@@ -2034,7 +2273,7 @@
 
     function reportHead(run, allPosts, names, byName){
       var statusCls = run.status === 'done' ? 'st-done' : (run.status === 'error' ? 'st-error' : 'st-running');
-      var siteUrl = run.company_url ? (/^https?:\/\//i.test(run.company_url) ? run.company_url : 'https://' + run.company_url) : null;
+      var siteUrl = absUrl(run.company_url);
       var live = names.filter(function(n){ return !NO_ACTIVITY_STATUSES[byName[n].status]; }).length;
       var when = historyTimestamp(run.created_at);
 
@@ -2049,8 +2288,9 @@
         '<span class="sci-rep-chip">' + live + ' of ' + names.length + ' platforms live</span>' +
         (when.short ? '<span class="sci-rep-chip" title="' + esc(when.full) + '">Analyzed ' + esc(when.short) + '</span>' : '');
 
-      var actions =
-        (siteUrl ? '<a class="sci-act" href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' + VIEW_GLYPH + ' ' + esc(run.company_url) + '</a>' : '') +
+      var actions = renderSocialRail(run) +
+        (siteUrl ? '<a class="sci-act" href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' +
+          '<i class="sci-act-ic">' + GLOBE_ICON + '</i>' + esc(prettyUrl(siteUrl)) + '</a>' : '') +
         '<button type="button" class="sci-act" onclick="printReport()">⎙ Save as PDF</button>';
 
       var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
@@ -2128,6 +2368,7 @@
       // array position. That is what stops "video" being orange on the
       // overview and cyan on LinkedIn just because LinkedIn posts fewer.
       seedFormatHues(allPosts);
+      seedAccountUrls(run);
 
       var synthesis = run.synthesis || null;
       var synthOk = !!(synthesis && !synthesis.error);
@@ -2160,7 +2401,7 @@
 
       if(hasCross){
         nav += navItem({ns: 'cross', label: 'Cross-platform', icon: NAV_ICONS.cross, has: true});
-        addPane('cross', 'Cross-platform synthesis', crossPane(cross, postsById));
+        addPane('cross', 'Cross-platform synthesis', crossPane(cross, postsById, run));
       }
 
       if(names.length){

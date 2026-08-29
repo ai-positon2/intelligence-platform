@@ -258,7 +258,16 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-rep-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 22px; font-weight: 700; color: #fbf4f2; line-height: 1.2; letter-spacing: -.015em; overflow-wrap: break-word; }
 .sci-rep-chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
 .sci-rep-chip { font-size: 11px; font-weight: 600; color: #a99fb0; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 10px; white-space: nowrap; }
-.sci-rep-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-right: 42px; }
+.sci-rep-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-right: 42px; }
+/* Every live account as one tap, always on screen while the report is.
+   Icon-only: it sits beside the company name, and six labelled buttons there
+   would out-shout the thing they belong to. */
+.sci-rail { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: var(--radius-pill, 80px); border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.035); }
+.sci-rail-a { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: color-mix(in srgb, var(--pf-color, #a99fb0) 74%, #ffffff); background: color-mix(in srgb, var(--pf-color, #8b86a0) 14%, transparent); transition: background .16s, transform .2s cubic-bezier(.34,1.56,.64,1); }
+.sci-rail-a svg { width: 15px; height: 15px; }
+.sci-rail-a:hover { background: color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); transform: translateY(-2px); }
+.sci-act-ic { display: inline-flex; width: 13px; height: 13px; flex-shrink: 0; }
+.sci-act-ic svg { width: 100%; height: 100%; }
 .sci-act { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm, 9px); border: 1px solid rgba(255,255,255,.11); background: rgba(255,255,255,.04); color: #b3a6b8; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s, border-color .15s, transform .15s; }
 .sci-act:hover { background: rgba(255,255,255,.09); color: #f3ecf5; border-color: rgba(251,146,60,.42); transform: translateY(-1px); }
 .sci-rep-band { padding: 0 30px 18px; border-bottom: 1px solid rgba(255,255,255,.07); flex-shrink: 0; }
@@ -280,6 +289,9 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-tile-word { font-size: 15.5px; line-height: 1.24; letter-spacing: -.01em; }
 .sci-tile-l { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); color: #8b7f92; margin-top: 8px; }
 .sci-tile-n { font-size: 10.5px; color: #857a8c; margin-top: 4px; line-height: 1.42; }
+/* The tile band used to butt straight into the next section label. At 10px
+   that read as tight; with a link chip on that row it reads as a collision. */
+.sci-tiles-plat { margin-bottom: 20px; }
 /* Inside a platform pane the headline number takes that platform's own hue,
    lightened toward white so it clears the body-text contrast floor on the
    dark ground (a raw #0a66c2 LinkedIn blue does not). */
@@ -337,15 +349,31 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-phero-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 20px; font-weight: 700; color: #fbf4f2; letter-spacing: -.015em; }
 .sci-phero-meta { display: flex; align-items: center; gap: 7px 12px; flex-wrap: wrap; margin-top: 6px; font-size: 11.5px; color: #877b8f; }
 .sci-phero-handle { font-weight: 600; color: color-mix(in srgb, var(--pf-color, #fdba74) 45%, #ffffff); }
-.sci-phero-go { flex-shrink: 0; font-size: 11.5px; font-weight: 700; text-decoration: none; white-space: nowrap; color: color-mix(in srgb, var(--pf-color, #fdba74) 65%, #ffffff); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 34%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent); border-radius: var(--radius-pill, 80px); padding: 8px 15px; transition: background .16s, transform .16s; }
+/* The handle IS the account, so it is the link. It used to be inert text six
+   pixels from a button that went exactly where clicking a handle implies. */
+a.sci-phero-handle { text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 42%, transparent); transition: color .16s, border-color .16s; }
+a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, #fb923c); }
+/* Spelled out rather than hidden behind the word "profile": this is the one
+   line of the pane a reader may want to copy, send on, or read off paper,
+   where no link is clickable at all. */
+.sci-phero-url { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: #948899; overflow-wrap: anywhere; }
+.sci-phero-go { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; text-decoration: none; white-space: nowrap; color: color-mix(in srgb, var(--pf-color, #fdba74) 65%, #ffffff); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 34%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent); border-radius: var(--radius-pill, 80px); padding: 8px 15px; transition: background .16s, transform .16s; }
 .sci-phero-go:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+.sci-phero-go-ic { display: inline-flex; width: 14px; height: 14px; flex-shrink: 0; }
+.sci-phero-go-ic svg { width: 100%; height: 100%; }
 .sci-plat-vendor { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #948899; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 9px; white-space: nowrap; }
 
 /* ── Overview: the platform grid, which doubles as the rail's launcher ───── */
-.sci-pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px,1fr)); gap: 10px; }
-.sci-pcard { display: flex; align-items: center; gap: 11px; text-align: left; padding: 12px 13px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); font-family: inherit; cursor: pointer; transition: border-color .2s, background .2s, transform .2s; }
+.sci-pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(206px,1fr)); gap: 10px; }
+/* Two destinations, so two controls. Reading about a platform and going to
+   the account are different intentions, and one card that guesses between
+   them gets one of them wrong every time. */
+.sci-pcard { display: flex; align-items: stretch; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); overflow: hidden; transition: border-color .2s, background .2s, transform .2s; }
 .sci-pcard:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 7%, transparent); }
-.sci-pcard-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #8b86a0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); }
+.sci-pcard-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px; text-align: left; padding: 12px 13px; border: none; background: none; font-family: inherit; color: inherit; cursor: pointer; }
+.sci-pcard-go { flex-shrink: 0; width: 36px; display: grid; place-items: center; text-decoration: none; font-size: 12px; color: #948899; border-left: 1px solid rgba(255,255,255,.07); transition: background .16s, color .16s; }
+.sci-pcard-go:hover { background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); color: #f6eff8; }
+.sci-pcard-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #8b86a0) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); }
 .sci-pcard-ic svg { width: 17px; height: 17px; }
 .sci-pcard-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .sci-pcard-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
@@ -353,6 +381,32 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 .sci-pcard-x { flex-shrink: 0; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--pf-color, #fdba74) 60%, #ffffff); }
 .sci-pcard-off { opacity: .5; }
 .sci-pcard-off:hover { opacity: .8; }
+
+/* ── The account directory ───────────────────────────────────────────────
+   Every way out of the report in one grid. The platforms with nothing behind
+   them are cards too -- unclickable, carrying their reason -- because a
+   directory that lists only the four accounts that resolved reads as "they
+   are on four platforms", which is a different and unearned claim. Those
+   cards dim through explicit colours rather than opacity: an opacity that
+   halves a card's contrast is invisible to a contrast checker, which is
+   exactly how unreadable text survives a green audit. */
+.sci-accs { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
+.sci-acc { position: relative; display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 64%); text-decoration: none; overflow: hidden; transition: transform .2s, border-color .2s; }
+.sci-acc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--pf-color, #fb923c); }
+.sci-acc:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); }
+.sci-acc-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); }
+.sci-acc-ic svg { width: 18px; height: 18px; }
+.sci-acc-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.sci-acc-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
+.sci-acc-s { font-size: 11px; color: #b3a6b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-acc-u { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: #948899; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-acc-go { flex-shrink: 0; font-size: 13px; color: color-mix(in srgb, var(--pf-color, #fdba74) 58%, #ffffff); transition: transform .2s; }
+.sci-acc:hover .sci-acc-go { transform: translate(2px, -2px); }
+.sci-acc-off { background: rgba(255,255,255,.022); }
+.sci-acc-off::before { background: #6b6272; }
+.sci-acc-off .sci-acc-ic { color: #948899; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
+.sci-acc-off .sci-acc-n { color: #b3a6b8; }
+.sci-acc-off .sci-acc-s { color: #948899; }
 
 /* ── Pane-level empty and degraded states ────────────────────────────────── */
 .sci-pane-empty { text-align: center; padding: 42px 26px; border-radius: var(--radius-lg, 16px); border: 1px dashed rgba(255,255,255,.13); background: rgba(255,255,255,.022); }
@@ -379,8 +433,22 @@ html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, 
 /* Small mono section labels -- structural dividers so a platform block reads
    as distinct sections rather than one continuous scroll of text. */
 .sci-section { margin-bottom: 18px; }
-.sci-section-label { display: flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #a99fb0; margin-bottom: 10px; }
-.sci-section-label span { font-size: 11px; color: #fdba74; }
+.sci-section-label { display: flex; align-items: center; min-height: 26px; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #a99fb0; margin-bottom: 10px; }
+/* Scoped to the glyph, not to every span in the row: the section's link chip
+   lives here too and must not inherit the glyph's size and orange. */
+.sci-section-label > span:first-child { font-size: 11px; color: #fdba74; }
+
+/* A section's own way out, right-aligned so the eye finds it in the same
+   place in every section, and set in sans sentence case so it reads as a
+   control rather than as more of the uppercase mono label beside it. Each one
+   points at the specific post the section is describing, so the label says
+   which post -- "Most recent" and "The post that earned most" go to different
+   places and a reader deciding whether to click deserves to know which. */
+.sci-seclink { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; text-decoration: none; font-family: var(--au-body, 'Space Grotesk', system-ui, sans-serif); font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #b3a6b8; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.035); border-radius: var(--radius-pill, 80px); padding: 4px 11px 4px 8px; transition: color .16s, border-color .16s, background .16s, transform .16s; }
+.sci-seclink b { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-seclink:hover { color: #f6eff8; transform: translateY(-1px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent); }
+.sci-seclink-ic { display: inline-flex; width: 13px; height: 13px; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 80%, #ffffff); }
+.sci-seclink-ic svg { width: 100%; height: 100%; }
 
 /* Content-patterns bullets -- replaces the old single prose paragraph. */
 .sci-summary-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -686,6 +754,12 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
   /* Tiles fill the column here rather than capping at 236px and leaving a
      dead strip down the right of a 390px screen. */
   .sci-tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .sci-accs { grid-template-columns: 1fr; }
+  /* The label wraps to two lines at this width, and a chip pinned right on
+     line one leaves the section name hanging alone under it. Below 640px the
+     chip drops onto its own line and packs left with the glyph. */
+  .sci-section-label { flex-wrap: wrap; }
+  .sci-seclink { margin-left: 0; max-width: 100%; }
   .sci-form { flex-direction: column; align-items: stretch; }
   .sci-btn { width: 100%; }
 }
@@ -730,6 +804,18 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
   .sci-mixseg, .sci-rank-fill, .sci-sc-bar, .sci-heat-c i, .sci-mk i {
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sci-fchips { display: none !important; }
+
+  /* The section chips go: on paper they name a destination without showing
+     one, which is an instruction to click something that is not there. The
+     account directory stays and carries the real URLs as text, so the printed
+     report is still a usable list of where these accounts are. */
+  .sci-seclink { display: none !important; }
+  .sci-accs { grid-template-columns: repeat(2, 1fr) !important; }
+  .sci-acc { break-inside: avoid; page-break-inside: avoid; background: none !important; border-color: #d8d2dc !important; }
+  .sci-acc::before { background: #c2410c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sci-acc-ic { color: #4a3f52 !important; background: none !important; border-color: #d8d2dc !important; }
+  .sci-acc-n { color: #1c1420 !important; }
+  .sci-acc-s, .sci-acc-u, .sci-acc-go, .sci-phero-url { color: #4a3f52 !important; }
 }
 
 /* ═══ LIGHT THEME ═══ */
@@ -794,6 +880,9 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-rep-txt h3 { color: #1c1420; }
 [data-theme="light"] .sci-rep-chip { color: #5c5163; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
 [data-theme="light"] .sci-rep-band { border-bottom-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-rail { border-color: rgba(18,26,54,.12); background: rgba(18,26,54,.03); }
+[data-theme="light"] .sci-rail-a { color: color-mix(in srgb, var(--pf-color, #6f6376) 76%, #140c18); background: color-mix(in srgb, var(--pf-color, #8b86a0) 11%, transparent); }
+[data-theme="light"] .sci-rail-a:hover { background: color-mix(in srgb, var(--pf-color, #c2410c) 22%, transparent); }
 [data-theme="light"] .sci-act { background: rgba(18,26,54,.035); border-color: rgba(18,26,54,.12); color: #5c5163; }
 [data-theme="light"] .sci-act:hover { background: rgba(18,26,54,.075); color: #1c1420; border-color: rgba(194,65,12,.4); }
 [data-theme="light"] .sci-tile { background: rgba(255,255,255,.68); border-color: rgba(18,26,54,.1); }
@@ -818,12 +907,28 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-phero-meta { color: #6f6376; }
 [data-theme="light"] .sci-phero-handle { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
 [data-theme="light"] .sci-phero-go { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-phero-url { color: #6f6376; }
 [data-theme="light"] .sci-plat-vendor { color: #6f6376; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
 
 [data-theme="light"] .sci-pcard { background: rgba(255,255,255,.66); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-pcard-ic { color: color-mix(in srgb, var(--pf-color, #6f6376) 76%, #140c18); }
 [data-theme="light"] .sci-pcard-n { color: #1c1420; }
 [data-theme="light"] .sci-pcard-v { color: #6f6376; }
 [data-theme="light"] .sci-pcard-x { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-pcard-go { color: #6f6376; border-left-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-pcard-go:hover { color: #1c1420; }
+
+[data-theme="light"] .sci-acc { background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #c2410c) 9%, transparent), rgba(255,255,255,.7) 64%); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-acc-ic { color: color-mix(in srgb, var(--pf-color, #c2410c) 76%, #140c18); background: color-mix(in srgb, var(--pf-color, #c2410c) 12%, transparent); border-color: color-mix(in srgb, var(--pf-color, #c2410c) 26%, transparent); }
+[data-theme="light"] .sci-acc-n { color: #1c1420; }
+[data-theme="light"] .sci-acc-s { color: #5c5163; }
+[data-theme="light"] .sci-acc-u { color: #6f6376; }
+[data-theme="light"] .sci-acc-go { color: color-mix(in srgb, var(--pf-color, #c2410c) 70%, #140c18); }
+[data-theme="light"] .sci-acc-off { background: rgba(18,26,54,.025); }
+[data-theme="light"] .sci-acc-off::before { background: #a99fb0; }
+[data-theme="light"] .sci-acc-off .sci-acc-ic { color: #6f6376; background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-acc-off .sci-acc-n { color: #40353f; }
+[data-theme="light"] .sci-acc-off .sci-acc-s { color: #6f6376; }
 
 [data-theme="light"] .sci-pane-empty { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.14); }
 [data-theme="light"] .sci-pane-empty-h { color: #241a28; }
@@ -832,7 +937,10 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 [data-theme="light"] .sci-cross-lede { color: #40353f; background: linear-gradient(120deg, rgba(251,146,60,.11), rgba(168,85,247,.08)); border-color: rgba(244,114,182,.26); }
 [data-theme="light"] .sci-theme-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); color: #443a4a; }
 [data-theme="light"] .sci-section-label { color: #6b5f72; }
-[data-theme="light"] .sci-section-label span { color: #c2410c; }
+[data-theme="light"] .sci-section-label > span:first-child { color: #c2410c; }
+[data-theme="light"] .sci-seclink { color: #5c5163; border-color: rgba(18,26,54,.13); background: rgba(18,26,54,.03); }
+[data-theme="light"] .sci-seclink:hover { color: #1c1420; background: color-mix(in srgb, var(--pf-color, #c2410c) 10%, transparent); }
+[data-theme="light"] .sci-seclink-ic { color: color-mix(in srgb, var(--pf-color, #c2410c) 74%, #140c18); }
 [data-theme="light"] .sci-summary-list li { color: #443a4a; }
 [data-theme="light"] .sci-strategy { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
 [data-theme="light"] .sci-strategy-label { color: #9333ea; }
