@@ -1618,6 +1618,19 @@ APP_AGENTS = [
         "tags": ["Social", "Vision", "AI"],
     },
     {
+        "slug": "event-conference-intelligence", "name": "Event & Conference Intelligence",
+        "tagline": "Field Marketing Intelligence",
+        "ac": "#38bdf8", "ac2": "#8b5cf6", "icon": _asvg("<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9.5h18M8 2.5v4M16 2.5v4\"/><circle cx=\"12\" cy=\"15\" r=\"2.2\"/>"),
+        "pill1": "Field Marketing Intelligence", "pill2": "Rosters + event selection",
+        "lead": ("Name an event and get the participant roster it publishes: exhibitors, sponsors, speakers and partners, each row saying which page it came from. Or describe an audience and get events ranked by how many of your own target accounts are actually in them."),
+        "trips": [
+            {"t": "What it does", "d": "Builds the roster an event publishes openly, then matches those organisations to real firmographics and named people. Events do not publish attendee lists, so it never claims to have one."},
+            {"t": "How it works", "d": "Resolves the event to one specific edition, reads its exhibitor, sponsor and speaker pages, and records every page it tried, including the ones it could not read, so a short roster is never mistaken for a complete one."},
+            {"t": "Best for", "d": "Field marketing and demand gen teams deciding which events to sponsor, and sales teams working a show they are already attending."},
+        ],
+        "tags": ["Events", "ABM", "Apollo"],
+    },
+    {
         "slug": "company-people-intelligence", "name": "Contact Finder",
         "tagline": "Apollo-Powered Lookup",
         "ac": "#7c83f5", "ac2": "#22d3ee", "icon": _asvg("<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m21 21-3.4-3.4\"/>"),
@@ -8032,6 +8045,31 @@ def _sci_identify_selftest() -> dict:
         return {"configured": False, "error": "%s: %s" % (type(e).__name__, str(e)[:300])}
 
 
+def _evi_resolve_selftest() -> dict:
+    """Prove Event & Conference Intelligence's resolve step end to end.
+
+    Runs the real Claude + web_search path against a large, easily verifiable
+    event, so an operator can tell apart the three failures that otherwise
+    look identical from the UI: no ANTHROPIC_API_KEY, every dated web_search
+    tool version retired, and the model replying with prose we cannot parse.
+    Matching the pattern next to it (sci-identify-check), and matching the
+    lesson that a bare except collapsing all three into one string is what
+    made two structurally different SCI bugs look the same."""
+    from tracker import event_intel_resolve
+    try:
+        return event_intel_resolve.probe()
+    except Exception as e:
+        return {"ok": False, "error": {"kind": "unexpected", "detail": str(e)[:400]}}
+
+
+@app.route("/p2/admin/external-usage/evi-resolve-check", methods=["POST"])
+@admin_required
+def admin_external_usage_evi_resolve_check():
+    """Run the event-resolution self-test. POST so no crawler or prefetch can
+    trigger it, matching the checks next to it."""
+    return jsonify(_evi_resolve_selftest())
+
+
 @app.route("/p2/admin/external-usage/sci-identify-check", methods=["POST"])
 @admin_required
 def admin_external_usage_sci_identify_check():
@@ -8398,6 +8436,164 @@ def social_creative_intelligence_run(run_id):
     run["platforms"] = sci_store.get_platform_runs(run_id)
     run["posts"] = sci_store.get_posts(run_id)
     return jsonify(run)
+
+
+# ── Event & Conference Intelligence ────────────────────────────
+# Two modes over one store. `lookup` names an event and gets back the roster
+# the event itself publishes; `discover` describes an audience and gets back
+# events ranked by how many of your own target accounts are in them.
+#
+# The one thing to preserve when touching any of this: the agent NEVER calls
+# a published participant list an attendee list. Events sell attendee lists
+# rather than publish them, so what is collected here is exhibitors, sponsors,
+# speakers and partners, each row carrying the role its source page gave it.
+# tracker/event_intel_store.ROLE_LABELS is the only place that wording lives,
+# and tests/test_event_intel_honesty.py fails if the report starts calling an
+# exhibitor an attendee.
+#
+# Company resolution is a separate, explicitly-triggered route because it is
+# the only step that spends Apollo credits (mixed_companies/search bills ~1
+# per call). Same rule Contact Finder arrived at over thirteen audit rounds:
+# only an explicit user action reaches a billed endpoint.
+
+@app.route("/p2/b2b-agents/event-conference-intelligence")
+@position2_required
+def event_conference_intelligence():
+    from tracker import event_intel_store
+    user = _get_user() or {}
+    email = (user.get("email") or "").lower()
+    return render_template("event_conference_intelligence.html", user=user,
+                           runs=event_intel_store.list_runs(email))
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/run", methods=["POST"])
+@position2_required
+def event_conference_intelligence_run():
+    from tracker import event_intel_pipeline, event_intel_store
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get("mode") or "lookup").strip().lower()
+    if mode not in ("lookup", "discover"):
+        return jsonify({"error": "Unknown mode."}), 400
+    query = str(payload.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "An event name is required." if mode == "lookup"
+                        else "An audience description is required."}), 400
+
+    # Free text straight from a form, capped before it reaches a model prompt
+    # and a TEXT column. Not a security boundary (both handle long input
+    # fine), just a refusal to store a pasted document as an event name.
+    query = query[:400]
+    icp_note = str(payload.get("icp_note") or "").strip()[:2000] or None
+    targets = [t.strip() for t in (payload.get("targets") or []) if str(t).strip()][:400]
+
+    email = (_get_user() or {}).get("email", "").lower()
+    run_id = event_intel_store.save_run(email, mode, query, icp_note)
+    if run_id is None:
+        return jsonify({"error": "Could not start the run. Storage is unavailable."}), 500
+
+    threading.Thread(
+        target=event_intel_pipeline.run_job,
+        args=(run_id, mode, query),
+        kwargs={"year_hint": str(payload.get("year") or "").strip()[:20] or None,
+                "region": str(payload.get("region") or "").strip()[:120] or None,
+                "targets": targets},
+        daemon=True,
+    ).start()
+    return jsonify({"run_id": run_id, "status": "running"})
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/status")
+@position2_required
+def event_conference_intelligence_status(run_id):
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    return jsonify({"run_id": run_id, "status": run["status"],
+                    "stage": run.get("stage"), "error": run.get("error"),
+                    "credits_spent": run.get("credits_spent", 0)})
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>")
+@position2_required
+def event_conference_intelligence_run_detail(run_id):
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    run["events"] = event_intel_store.get_events(run_id)
+    run["participants"] = event_intel_store.get_participants(run_id)
+    # Always sent, never conditionally. The list of pages that could NOT be
+    # read is what stops a short roster reading as a complete one, so it is
+    # not an optional extra the frontend can forget to ask for.
+    run["sources"] = event_intel_store.get_sources(run_id)
+    run["role_labels"] = event_intel_store.ROLE_LABELS
+    return jsonify(run)
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/resolve",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_resolve(run_id):
+    """The only billed route in this agent. Spends Apollo credits, so it is
+    never reached by the background pipeline and never by page load."""
+    from tracker import event_intel_pipeline
+    email = (_get_user() or {}).get("email", "").lower()
+    payload = request.get_json(silent=True) or {}
+    titles = [t.strip() for t in (payload.get("titles") or []) if str(t).strip()][:20]
+    result = event_intel_pipeline.resolve_run_companies(run_id, email, titles or None)
+    if result.get("error") == "not_found":
+        abort(404)
+    return jsonify(result)
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/export.csv")
+@position2_required
+def event_conference_intelligence_export(run_id):
+    """CSV of the roster. Every row carries the role and the source URL, so
+    the file cannot be mistaken for an attendee list once it leaves the page
+    that explains what it is. Audit round 5's finding was a file that did not
+    say what the screen said; this one carries the caveat with it."""
+    import csv
+    import io
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    rows = event_intel_store.get_participants(run_id)
+    labels = event_intel_store.ROLE_LABELS
+
+    buf = io.StringIO()
+    # csv.writer defaults to \r\n regardless of how the handle was opened,
+    # which is correct for CSV and is called out here so nobody "fixes" it.
+    w = csv.writer(buf)
+    w.writerow(["Organisation", "Domain", "Listed as", "Person", "Title",
+                "Tier", "Booth", "Apollo match", "Industry", "Employees",
+                "Source page"])
+    for r in rows:
+        ap = r.get("apollo") or {}
+        w.writerow([
+            r.get("org_name") or "", r.get("org_domain") or "",
+            labels.get(r.get("role"), r.get("role") or ""),
+            r.get("person_name") or "", r.get("person_title") or "",
+            r.get("tier") or "", r.get("booth") or "",
+            (ap.get("name") or "") if isinstance(ap, dict) else "",
+            (ap.get("industry") or "") if isinstance(ap, dict) else "",
+            (ap.get("employees") or "") if isinstance(ap, dict) else "",
+            r.get("source_url") or "",
+        ])
+    events = event_intel_store.get_events(run_id)
+    name = (events[0]["name"] if events else run.get("query")) or "event"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = \
+        'attachment; filename="%s-participants.csv"' % slug
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 # ── Contact Finder ────────────────────────────────────────────────────────────

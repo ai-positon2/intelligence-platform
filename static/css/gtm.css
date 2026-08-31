@@ -268,6 +268,17 @@
     }
     /* Orange -> pink -> purple: matches this agent's own ac/ac2 accent
        colors in app.py's APP_AGENTS entry. */
+    /* Sky -> indigo -> violet: the cool half of the wheel, since every warm
+       family is claimed (.c-sci orange, .c-adint amber, .c-gdsc lime), and
+       starting on sky rather than teal keeps it distinct from .c-lps. */
+    .c-evi {
+      --band: linear-gradient(90deg,#38bdf8,#6366f1,#8b5cf6);
+      --thumb: linear-gradient(135deg,#04101f 0%,#0b0d24 100%);
+      --icon-glow: rgba(99,102,241,0.5);
+      --card-border: rgba(99,102,241,0.35);
+      --card-glow: 0 0 40px rgba(99,102,241,0.10);
+      --arrow-color: #a5b4fc;
+    }
     .c-sci {
       --band: linear-gradient(90deg,#fb923c,#f472b6,#a855f7);
       --thumb: linear-gradient(135deg,#1f0f00 0%,#2a0a1a 100%);

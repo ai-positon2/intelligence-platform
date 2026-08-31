@@ -1,0 +1,438 @@
+/* event_conference_intelligence - page styles
+   Brand: sky -> indigo -> violet (#38bdf8 -> #6366f1 -> #8b5cf6), matching
+   this agent's dash-card (b2b_agents.html .c-evi) and its APP_AGENTS accent.
+   Deliberately cool: every warm family is already claimed (.c-sci orange,
+   .c-adint amber, .c-gdsc lime), and starting on sky rather than teal keeps
+   it apart from .c-lps.
+
+   Follows the same convention as gentle_dental_slot_checker.css and
+   social_creative_intelligence.css: this page defines its own .main/.card/
+   .topbar rather than assuming a shared base, because there isn't one. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Ground on html:root, not body. aurora-app.css loads AFTER this file and
+   carries body{background:transparent!important} plus html{background:#070912},
+   so a body background is discarded and a bare :root loses the later-wins
+   tiebreak. html:root scores 0,0,2 against that 0,0,1 and wins either way.
+   background-color is its own line after the gradient shorthand because a
+   shorthand listing only images resets background-color to transparent, and
+   without it macOS overscroll paints the browser's white canvas past the
+   document edge on a fast scroll. Both bugs are already documented in
+   [[feedback-platform-css-gotchas]]. */
+html:root {
+  background:
+    radial-gradient(ellipse 76% 46% at 12% -2%, rgba(56,189,248,.13) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 40% at 92% 44%, rgba(99,102,241,.12) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 55% at 50% 104%, rgba(49,26,120,.30) 0%, transparent 68%),
+    linear-gradient(160deg, #070c18 0%, #0a0d1e 44%, #080a16 100%);
+  background-color: #080a16;
+  background-attachment: fixed;
+}
+html:root[data-theme="light"] {
+  background:
+    radial-gradient(ellipse 76% 46% at 12% -2%, rgba(56,189,248,.16) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 40% at 92% 44%, rgba(99,102,241,.13) 0%, transparent 55%),
+    linear-gradient(160deg, #f6f8fd 0%, #eef2fb 50%, #f7f9fe 100%);
+  background-color: #f6f8fd;
+  background-attachment: fixed;
+}
+
+:root {
+  --evi-a1: #38bdf8;
+  --evi-a2: #6366f1;
+  --evi-a3: #8b5cf6;
+  --evi-ink: #e8ecf8;
+  --evi-ink-2: #a9b4d8;
+  --evi-ink-3: #808cb0;
+  --evi-line: rgba(255,255,255,.09);
+  --evi-line-2: rgba(255,255,255,.06);
+  --evi-panel: rgba(13,17,33,.72);
+  --evi-panel-2: rgba(18,23,42,.6);
+  --evi-ok: #4ade80;
+  --evi-warn: #fbbf24;
+  --evi-bad: #fb7185;
+}
+:root[data-theme="light"] {
+  --evi-ink: #131a2e;
+  --evi-ink-2: #4a5578;
+  --evi-ink-3: #5f6a88;
+  --evi-line: rgba(20,30,60,.12);
+  --evi-line-2: rgba(20,30,60,.07);
+  --evi-panel: rgba(255,255,255,.86);
+  --evi-panel-2: rgba(248,250,255,.8);
+  --evi-ok: #15803d;
+  --evi-warn: #a16207;
+  --evi-bad: #be123c;
+}
+
+body {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--evi-ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── chrome ─────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 26px; border-bottom: 1px solid var(--evi-line);
+  background: var(--evi-panel); backdrop-filter: blur(14px);
+  position: sticky; top: 0; z-index: 60;
+}
+.topbar .tl { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.topbar .bc { display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+  color: var(--evi-ink-3); min-width: 0; }
+.topbar .bc a { color: var(--evi-ink-2); text-decoration: none; }
+.topbar .bc a:hover { color: var(--evi-a1); }
+.topbar .bc-cur { color: var(--evi-ink); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-sep { color: var(--evi-ink-3); opacity: .6; }
+
+/* The user menu. Defined here rather than assumed from a shared sheet: these
+   classes come from the shared _admin_menu.html include, but no stylesheet
+   this page loads defines them, so without this block the dropdown renders
+   permanently open (it has no display:none to start from). Same reason
+   social_creative_intelligence.css carries its own copy. */
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.user-menu { position: relative; }
+.user-pill {
+  display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none;
+  background: rgba(255,255,255,.04); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-pill, 80px); padding: 4px 14px 4px 4px;
+  transition: background .15s, border-color .15s;
+}
+.user-pill:hover, .user-pill.open { background: rgba(255,255,255,.08);
+  border-color: rgba(99,102,241,.4); }
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a3));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 700; color: #05132a;
+}
+.user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-name { font-size: 13px; font-weight: 500; color: var(--evi-ink-2); }
+.pill-chevron { font-size: 10px; color: var(--evi-ink-3); margin-left: 2px;
+  transition: transform .2s; }
+.user-pill.open .pill-chevron { transform: rotate(180deg); }
+.user-dropdown {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0; width: 220px;
+  z-index: 9999; background: rgba(10,13,30,.97); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 12px); overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,.6); backdrop-filter: blur(20px);
+}
+.user-dropdown.open { display: block; }
+.dd-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--evi-line-2); }
+.dd-name { font-size: 13px; font-weight: 600; color: var(--evi-ink); margin-bottom: 2px; }
+.dd-email { font-size: 11.5px; color: var(--evi-ink-3); }
+.dd-items { padding: 6px; }
+.dd-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; width: 100%;
+  border-radius: var(--radius-sm, 8px); font-size: 13px; color: var(--evi-ink-2);
+  text-decoration: none; transition: background .12s, color .12s;
+}
+.dd-item:hover { background: rgba(255,255,255,.05); color: var(--evi-ink); }
+.dd-item-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.dd-divider { height: 1px; background: var(--evi-line-2); margin: 4px 6px; }
+.dd-item.danger:hover { background: rgba(239,68,68,.08); color: #f87171; }
+:root[data-theme="light"] .user-pill { background: rgba(18,26,54,.04); }
+:root[data-theme="light"] .user-dropdown { background: rgba(255,255,255,.98); }
+:root[data-theme="light"] .dd-item:hover { background: rgba(18,26,54,.05); }
+:root[data-theme="light"] .user-avatar { color: #fff; }
+
+.main { max-width: 1220px; margin: 0 auto; padding: 34px 26px 90px; }
+
+.ph { margin-bottom: 26px; }
+.ph .eyebrow {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 11px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--evi-ink-3);
+  font-weight: 600; margin-bottom: 12px;
+}
+.ph .eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--evi-a1); box-shadow: 0 0 10px var(--evi-a1);
+}
+.ph h1 {
+  font-family: 'Bricolage Grotesque', serif; font-size: clamp(28px, 4vw, 42px);
+  font-weight: 700; letter-spacing: -.02em; line-height: 1.08; margin-bottom: 12px;
+}
+.ph h1 em {
+  font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;
+  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a2) 55%, var(--evi-a3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ph p { color: var(--evi-ink-2); font-size: 14.5px; line-height: 1.65; max-width: 74ch; }
+
+/* ── cards + form ───────────────────────────────────────────────────── */
+.evi-card {
+  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-lg, 16px); overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0,0,0,.28);
+}
+.evi-card + .evi-card { margin-top: 20px; }
+.evi-card-pad { padding: 22px 24px; }
+
+.evi-modes { display: flex; gap: 6px; padding: 6px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  width: fit-content; margin-bottom: 20px; }
+.evi-mode {
+  appearance: none; border: 1px solid transparent; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--evi-ink-3);
+  padding: 8px 16px; border-radius: var(--radius-pill, 999px); transition: .18s;
+}
+.evi-mode[aria-selected="true"] {
+  color: #fff; border-color: rgba(99,102,241,.4);
+  background: linear-gradient(95deg, rgba(56,189,248,.22), rgba(139,92,246,.18));
+}
+:root[data-theme="light"] .evi-mode[aria-selected="true"] { color: #1b2440; }
+.evi-mode:hover { color: var(--evi-ink); }
+
+.evi-form { display: grid; gap: 14px; grid-template-columns: 1fr; }
+.evi-row { display: grid; gap: 14px; grid-template-columns: 2fr 1fr; }
+@media (max-width: 720px) { .evi-row { grid-template-columns: 1fr; } }
+.evi-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.evi-field label { font-size: 12px; font-weight: 600; color: var(--evi-ink-2); }
+.evi-field input, .evi-field textarea {
+  font: inherit; font-size: 14px; color: var(--evi-ink);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 10px); padding: 11px 13px; outline: none;
+  transition: border-color .18s, box-shadow .18s; width: 100%;
+}
+.evi-field textarea { min-height: 78px; resize: vertical; line-height: 1.55; }
+.evi-field input:focus, .evi-field textarea:focus {
+  border-color: rgba(99,102,241,.55); box-shadow: 0 0 0 3px rgba(99,102,241,.14);
+}
+.evi-field .hint { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+
+.evi-btn {
+  appearance: none; border: none; cursor: pointer; font: inherit;
+  font-size: 14px; font-weight: 600; color: #fff; padding: 12px 22px;
+  border-radius: var(--radius-md, 10px); justify-self: start;
+  background: linear-gradient(95deg, var(--evi-a1), var(--evi-a2) 60%, var(--evi-a3));
+  box-shadow: 0 8px 26px rgba(99,102,241,.3); transition: transform .18s, box-shadow .18s;
+}
+.evi-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(99,102,241,.4); }
+.evi-btn[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
+.evi-btn-ghost {
+  background: var(--evi-panel-2); color: var(--evi-ink-2);
+  border: 1px solid var(--evi-line); box-shadow: none;
+}
+.evi-btn-ghost:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+
+/* ── the coverage banner: the most important element on the page ─────── */
+.evi-coverage {
+  display: flex; gap: 13px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--radius-md, 10px);
+  background: linear-gradient(95deg, rgba(56,189,248,.10), rgba(139,92,246,.07));
+  border: 1px solid rgba(99,102,241,.26); margin-bottom: 18px;
+}
+.evi-coverage .ic { flex-shrink: 0; color: var(--evi-a1); margin-top: 1px; }
+.evi-coverage .tx { font-size: 12.8px; line-height: 1.6; color: var(--evi-ink-2); min-width: 0; }
+.evi-coverage .tx b { color: var(--evi-ink); font-weight: 600; }
+
+/* ── stats ──────────────────────────────────────────────────────────── */
+.evi-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.evi-stat {
+  padding: 14px 16px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-stat .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.evi-stat .l { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-stat.warn .v { color: var(--evi-warn); }
+
+/* ── roster ─────────────────────────────────────────────────────────── */
+.evi-rolebar { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 14px; }
+.evi-chip {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 13px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  color: var(--evi-ink-2); transition: .16s;
+}
+.evi-chip[aria-pressed="true"] {
+  color: #fff; border-color: rgba(99,102,241,.45);
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(139,92,246,.2));
+}
+:root[data-theme="light"] .evi-chip[aria-pressed="true"] { color: #1b2440; }
+.evi-chip .n { opacity: .65; font-weight: 500; margin-left: 5px; }
+
+.evi-tablewrap { overflow-x: auto; border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--evi-line-2); }
+table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+.evi-table th {
+  text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 600; padding: 11px 14px;
+  border-bottom: 1px solid var(--evi-line); background: var(--evi-panel-2);
+  position: sticky; top: 0;
+}
+.evi-table td { padding: 11px 14px; border-bottom: 1px solid var(--evi-line-2);
+  vertical-align: top; }
+.evi-table tr:last-child td { border-bottom: none; }
+.evi-table tbody tr:hover { background: rgba(99,102,241,.06); }
+.evi-org { font-weight: 600; color: var(--evi-ink); }
+.evi-dom { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 2px; }
+.evi-dom a { color: var(--evi-a1); text-decoration: none; }
+.evi-dom a:hover { text-decoration: underline; }
+
+/* Role pills. Colour separates them at a glance; the LABEL is what carries
+   the claim, and it comes from event_intel_store.ROLE_LABELS so there is one
+   place in the codebase that decides what a row is called. */
+.evi-role {
+  display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  white-space: nowrap;
+}
+.evi-role.r-exhibitor { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.3); }
+.evi-role.r-sponsor { background: rgba(139,92,246,.16); color: #c4b5fd; border: 1px solid rgba(139,92,246,.3); }
+.evi-role.r-speaker { background: rgba(74,222,128,.14); color: #86efac; border: 1px solid rgba(74,222,128,.28); }
+.evi-role.r-partner { background: rgba(251,191,36,.14); color: #fcd34d; border: 1px solid rgba(251,191,36,.28); }
+.evi-role.r-media { background: rgba(148,163,184,.16); color: #cbd5e1; border: 1px solid rgba(148,163,184,.3); }
+.evi-role.r-attendee_declared { background: rgba(244,114,182,.16); color: #f9a8d4; border: 1px solid rgba(244,114,182,.32); }
+:root[data-theme="light"] .evi-role.r-exhibitor { color: #0369a1; }
+:root[data-theme="light"] .evi-role.r-sponsor { color: #6d28d9; }
+:root[data-theme="light"] .evi-role.r-speaker { color: #15803d; }
+:root[data-theme="light"] .evi-role.r-partner { color: #a16207; }
+:root[data-theme="light"] .evi-role.r-media { color: #475569; }
+:root[data-theme="light"] .evi-role.r-attendee_declared { color: #be185d; }
+
+.evi-contacts { margin-top: 7px; display: flex; flex-direction: column; gap: 3px; }
+.evi-contact { font-size: 11.5px; color: var(--evi-ink-2); }
+.evi-contact .t { color: var(--evi-ink-3); }
+.evi-contact a { color: var(--evi-a1); text-decoration: none; }
+
+.evi-src-link { font-size: 11px; color: var(--evi-ink-3); text-decoration: none; }
+.evi-src-link:hover { color: var(--evi-a1); text-decoration: underline; }
+
+/* ── source ledger ──────────────────────────────────────────────────── */
+.evi-sources { display: flex; flex-direction: column; gap: 8px; }
+.evi-source {
+  display: flex; gap: 11px; align-items: flex-start; padding: 11px 13px;
+  border-radius: var(--radius-sm, 8px); background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2);
+}
+.evi-source .st {
+  flex-shrink: 0; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+}
+.evi-source .st.ok { background: rgba(74,222,128,.14); color: var(--evi-ok); }
+.evi-source .st.blocked { background: rgba(251,191,36,.14); color: var(--evi-warn); }
+.evi-source .st.not_found, .evi-source .st.error { background: rgba(251,113,133,.14); color: var(--evi-bad); }
+/* Column, not the default row: the URL and the outcome line are two separate
+   facts, and side by side they read as one run-on string. */
+.evi-source .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.evi-source .u { font-size: 12px; color: var(--evi-ink-2); word-break: break-all; }
+.evi-source .u a { color: var(--evi-ink-2); text-decoration: none; }
+.evi-source .u a:hover { color: var(--evi-a1); }
+.evi-source .n { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 3px; line-height: 1.5; }
+
+/* ── events (discover mode) ─────────────────────────────────────────── */
+.evi-events { display: grid; gap: 12px; }
+.evi-event {
+  padding: 16px 18px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-event .top { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+.evi-event .nm { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+.evi-event .meta { font-size: 12px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-event .why { font-size: 12.8px; color: var(--evi-ink-2); line-height: 1.6; margin-top: 9px; }
+.evi-fit {
+  flex-shrink: 0; text-align: right; font-size: 20px; font-weight: 700;
+  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-fit .fl { display: block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--evi-ink-3); -webkit-text-fill-color: var(--evi-ink-3); font-weight: 600; }
+.evi-overlap { margin-top: 10px; font-size: 12px; color: var(--evi-ink-2); }
+.evi-overlap b { color: var(--evi-a1); }
+
+/* ── history ────────────────────────────────────────────────────────── */
+.evi-runs { display: flex; flex-direction: column; gap: 8px; }
+.evi-run {
+  display: flex; align-items: center; gap: 13px; padding: 12px 14px;
+  border-radius: var(--radius-sm, 8px); background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2); cursor: pointer; transition: .16s;
+  text-align: left; width: 100%; font: inherit; color: inherit;
+}
+.evi-run:hover { border-color: rgba(99,102,241,.38); transform: translateX(2px); }
+.evi-run .q { font-weight: 600; font-size: 13.5px; min-width: 0; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi-run .sub { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 2px; }
+.evi-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px); flex-shrink: 0;
+}
+.evi-badge.complete { background: rgba(74,222,128,.14); color: var(--evi-ok); }
+.evi-badge.running { background: rgba(56,189,248,.14); color: var(--evi-a1); }
+.evi-badge.failed { background: rgba(251,113,133,.14); color: var(--evi-bad); }
+
+/* ── drawer ─────────────────────────────────────────────────────────── */
+.evi-scrim {
+  position: fixed; inset: 0; z-index: 200; background: rgba(3,6,18,.74);
+  backdrop-filter: blur(7px); display: none; padding: 3vh 3vw;
+}
+.evi-scrim.on { display: block; }
+.evi-drawer {
+  max-width: 1120px; margin: 0 auto; height: 94vh; display: flex; flex-direction: column;
+  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-lg, 16px); overflow: hidden;
+  box-shadow: 0 40px 120px rgba(0,0,0,.6);
+}
+:root[data-theme="light"] .evi-drawer { background: #fff; }
+.evi-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; border-bottom: 1px solid var(--evi-line); flex-shrink: 0;
+}
+.evi-drawer-head h2 { font-family: 'Bricolage Grotesque', serif; font-size: 21px;
+  font-weight: 700; letter-spacing: -.015em; }
+.evi-drawer-head .sub { font-size: 12.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-drawer-body { padding: 20px 22px 34px; overflow-y: auto; flex: 1; min-height: 0; }
+.evi-x {
+  appearance: none; border: 1px solid var(--evi-line); background: var(--evi-panel-2);
+  color: var(--evi-ink-2); cursor: pointer; font: inherit; font-size: 18px; line-height: 1;
+  width: 34px; height: 34px; border-radius: var(--radius-sm, 8px); flex-shrink: 0;
+}
+.evi-x:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+
+.evi-sec { margin-top: 26px; }
+.evi-sec:first-child { margin-top: 0; }
+.evi-sec h3 {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 700; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 9px;
+}
+.evi-sec h3::after { content: ""; flex: 1; height: 1px; background: var(--evi-line-2); }
+
+.evi-empty { padding: 30px; text-align: center; color: var(--evi-ink-3); font-size: 13px;
+  line-height: 1.6; }
+.evi-spinner {
+  width: 13px; height: 13px; border: 2px solid rgba(99,102,241,.25);
+  border-top-color: var(--evi-a2); border-radius: 50%; display: inline-block;
+  animation: evi-spin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes evi-spin { to { transform: rotate(360deg); } }
+.evi-running {
+  display: flex; align-items: center; gap: 11px; padding: 13px 15px;
+  border-radius: var(--radius-md, 10px); background: var(--evi-panel-2);
+  border: 1px solid rgba(99,102,241,.24); font-size: 13px; color: var(--evi-ink-2);
+  margin-top: 18px;
+}
+.evi-err {
+  padding: 13px 15px; border-radius: var(--radius-md, 10px); font-size: 13px;
+  background: rgba(251,113,133,.09); border: 1px solid rgba(251,113,133,.28);
+  color: var(--evi-ink-2); line-height: 1.6; margin-top: 16px;
+}
+
+/* Print: the roster travels, the chrome does not. The coverage banner is
+   kept deliberately, because a printed roster with the caveat stripped off
+   is exactly the artefact this agent exists to not produce. */
+@media print {
+  html:root, html:root[data-theme="light"] { background: #fff; }
+  .topbar, .evi-modes, .evi-btn, .evi-rolebar, .evi-x, #eviHistoryCard { display: none !important; }
+  .evi-scrim { position: static; background: none; backdrop-filter: none; padding: 0; display: block; }
+  .evi-drawer { height: auto; max-width: none; border: none; box-shadow: none; }
+  .evi-drawer-body { overflow: visible; }
+  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-event { background: #fff; border-color: #d8dde8; }
+  .evi-coverage { background: #f4f7ff; border-color: #b9c6ea; }
+  * { color: #10162a !important; }
+  .evi-table { min-width: 0; font-size: 11px; }
+  .evi-src-link::after { content: " (" attr(href) ")"; font-size: 9px; color: #5b6480 !important; }
+}

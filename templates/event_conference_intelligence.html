@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Event &amp; Conference Intelligence, Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=2">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Event &amp; Conference Intelligence</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
+      <h1>Know who is <em>in the room</em> before you book the booth.</h1>
+      <p>
+        Name an event and get the participant roster it publishes: exhibitors, sponsors,
+        speakers and partners, each row saying which page it came from. Or describe an
+        audience and get the events ranked by how many of your own target accounts turn up,
+        rather than by how many people attend.
+      </p>
+    </div>
+
+    <div class="evi-card">
+      <div class="evi-card-pad">
+        <div class="evi-modes" role="tablist" aria-label="Mode">
+          <button class="evi-mode" role="tab" id="modeLookup" aria-selected="true"
+                  onclick="setMode('lookup')">Look up an event</button>
+          <button class="evi-mode" role="tab" id="modeDiscover" aria-selected="false"
+                  onclick="setMode('discover')">Find events for an audience</button>
+        </div>
+
+        <form class="evi-form" id="eviForm" onsubmit="return startRun(event)">
+          <div id="lookupFields">
+            <div class="evi-row">
+              <div class="evi-field">
+                <label for="eventName">Event or conference name</label>
+                <input type="text" id="eventName" autocomplete="off"
+                       placeholder="e.g. SaaStr Annual, Web Summit, HIMSS" />
+              </div>
+              <div class="evi-field">
+                <label for="eventYear">Edition or year (optional)</label>
+                <input type="text" id="eventYear" placeholder="2026" autocomplete="off" />
+                <span class="hint">Left blank, it resolves the next upcoming edition.</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="discoverFields" style="display:none">
+            <div class="evi-row">
+              <div class="evi-field">
+                <label for="audience">Who are you trying to reach?</label>
+                <input type="text" id="audience" autocomplete="off"
+                       placeholder="e.g. VPs of Marketing at US healthcare SaaS companies" />
+              </div>
+              <div class="evi-field">
+                <label for="region">Region (optional)</label>
+                <input type="text" id="region" placeholder="North America" autocomplete="off" />
+              </div>
+            </div>
+            <div class="evi-field" style="margin-top:14px">
+              <label for="targets">Your target accounts (optional, one per line)</label>
+              <textarea id="targets" placeholder="acme.com&#10;Globex Industrial&#10;initech.co.uk"></textarea>
+              <span class="hint">
+                Domains match most reliably. Given these, events are ranked by how many of
+                them actually appear in the roster, which is a different question from how
+                big the event is.
+              </span>
+            </div>
+          </div>
+
+          <button type="submit" class="evi-btn" id="runBtn">Run →</button>
+        </form>
+
+        <div id="runningWrap" style="display:none">
+          <div class="evi-running">
+            <span class="evi-spinner"></span>
+            <span id="runningText">Working. This runs in the background, so you can leave
+              this page and find the result in History when it is done.</span>
+          </div>
+        </div>
+        <div id="formError" class="evi-err" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="evi-card" id="eviHistoryCard">
+      <div class="evi-card-pad">
+        <div class="evi-sec">
+          <h3>Your runs</h3>
+          <div class="evi-runs" id="runsList">
+            {% if runs %}
+              {% for r in runs %}
+              <button class="evi-run" onclick="openRun({{ r.id }})" type="button">
+                <span style="min-width:0;flex:1">
+                  <span class="q">{{ r.event_name or r.query }}</span>
+                  <span class="sub">
+                    {{ 'Event lookup' if r.mode == 'lookup' else 'Audience search' }}
+                    · {{ r.participant_count }} listed
+                    {%- if r.credits_spent %} · {{ r.credits_spent }} Apollo credit{{ '' if r.credits_spent == 1 else 's' }}{% endif %}
+                  </span>
+                </span>
+                <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+              </button>
+              {% endfor %}
+            {% else %}
+              <div class="evi-empty">No runs yet. Name an event above to build its roster.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="evi-scrim" id="drawer" onmousedown="if(event.target===this)closeDrawer()">
+    <div class="evi-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="evi-drawer-head">
+        <div style="min-width:0">
+          <h2 id="drawerTitle">Loading</h2>
+          <div class="sub" id="drawerSub"></div>
+        </div>
+        <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
+      </div>
+      <div class="evi-drawer-body" id="drawerBody"></div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var BASE = '/p2/b2b-agents/event-conference-intelligence';
+    var mode = 'lookup', poll = null, current = null, activeRoles = null;
+
+    function esc(s){
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    /* Every href rendered below goes through this. A roster is assembled from
+       third-party pages, so a URL in it is untrusted input: without an
+       explicit scheme allow-list, a `javascript:` value harvested from a page
+       becomes a live XSS sink the moment it is written into an href. Returns
+       null for anything that is not plain http(s), and callers render text
+       instead of a link. Same rule as the SCI report's absUrl(). */
+    function safeUrl(u){
+      if (!u) return null;
+      var s = String(u).trim();
+      if (!/^https?:\/\//i.test(s)) return null;
+      return s;
+    }
+
+    function setMode(m){
+      mode = m;
+      document.getElementById('modeLookup').setAttribute('aria-selected', m === 'lookup');
+      document.getElementById('modeDiscover').setAttribute('aria-selected', m === 'discover');
+      document.getElementById('lookupFields').style.display = m === 'lookup' ? '' : 'none';
+      document.getElementById('discoverFields').style.display = m === 'discover' ? '' : 'none';
+    }
+    window.setMode = setMode;
+
+    function showFormError(msg){
+      var el = document.getElementById('formError');
+      el.textContent = msg;
+      el.style.display = msg ? '' : 'none';
+    }
+
+    function startRun(e){
+      e.preventDefault();
+      showFormError('');
+      var body = { mode: mode };
+      if (mode === 'lookup') {
+        body.query = document.getElementById('eventName').value.trim();
+        body.year = document.getElementById('eventYear').value.trim();
+        if (!body.query) { showFormError('Enter an event name.'); return false; }
+      } else {
+        body.query = document.getElementById('audience').value.trim();
+        body.region = document.getElementById('region').value.trim();
+        body.targets = document.getElementById('targets').value
+          .split('\n').map(function(t){ return t.trim(); }).filter(Boolean);
+        if (!body.query) { showFormError('Describe the audience you want to reach.'); return false; }
+      }
+      var btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      document.getElementById('runningWrap').style.display = '';
+      document.getElementById('runningText').textContent = mode === 'lookup'
+        ? 'Resolving the event and reading the pages it publishes. This runs in the background, so you can leave this page.'
+        : 'Searching for events and sampling their rosters. This runs in the background, so you can leave this page.';
+
+      fetch(BASE + '/run', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+        .then(function(res){
+          if (!res.ok) { throw new Error(res.j.error || 'The run could not be started.'); }
+          watch(res.j.run_id);
+        })
+        .catch(function(err){
+          btn.disabled = false;
+          document.getElementById('runningWrap').style.display = 'none';
+          showFormError(err.message);
+        });
+      return false;
+    }
+    window.startRun = startRun;
+
+    var STAGES = {
+      resolving: 'Identifying the event and confirming which edition it is.',
+      discovering: 'Searching for events that gather this audience.',
+      harvesting: 'Reading the pages the event publishes its participants on.',
+      resolving_companies: 'Matching companies in Apollo.',
+      done: 'Finishing up.'
+    };
+
+    function watch(runId){
+      if (poll) clearInterval(poll);
+      poll = setInterval(function(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){ return r.json(); })
+          .then(function(s){
+            if (s.stage && STAGES[s.stage]) {
+              document.getElementById('runningText').textContent = STAGES[s.stage];
+            }
+            if (s.status === 'complete' || s.status === 'failed') {
+              clearInterval(poll); poll = null;
+              document.getElementById('runBtn').disabled = false;
+              document.getElementById('runningWrap').style.display = 'none';
+              openRun(runId);
+            }
+          }).catch(function(){});
+      }, 2500);
+    }
+
+    function openRun(runId){
+      document.getElementById('drawer').classList.add('on');
+      document.getElementById('drawerTitle').textContent = 'Loading';
+      document.getElementById('drawerSub').textContent = '';
+      document.getElementById('drawerBody').innerHTML =
+        '<div class="evi-empty"><span class="evi-spinner"></span></div>';
+      activeRoles = null;
+      fetch(BASE + '/runs/' + runId)
+        .then(function(r){ return r.json(); })
+        .then(function(run){ current = run; render(run); })
+        .catch(function(){
+          document.getElementById('drawerBody').innerHTML =
+            '<div class="evi-err">This run could not be loaded.</div>';
+        });
+    }
+    window.openRun = openRun;
+
+    function closeDrawer(){
+      document.getElementById('drawer').classList.remove('on');
+      current = null;
+    }
+    window.closeDrawer = closeDrawer;
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && document.getElementById('drawer').classList.contains('on')) {
+        closeDrawer();
+      }
+    });
+
+    function fmtDate(d){
+      if (!d) return '';
+      var p = String(d).slice(0, 10).split('-');
+      if (p.length !== 3) return String(d);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var mi = parseInt(p[1], 10) - 1;
+      return (months[mi] || p[1]) + ' ' + parseInt(p[2], 10) + ', ' + p[0];
+    }
+
+    function eventLine(ev){
+      var bits = [];
+      if (ev.edition) bits.push(esc(ev.edition));
+      var when = ev.starts_on ? fmtDate(ev.starts_on) +
+        (ev.ends_on && ev.ends_on !== ev.starts_on ? ' to ' + fmtDate(ev.ends_on) : '') : '';
+      if (when) bits.push(esc(when));
+      if (ev.location) bits.push(esc(ev.location));
+      if (ev.format) bits.push(esc(ev.format.replace('_', ' ')));
+      return bits.join(' · ');
+    }
+
+    /* The coverage banner. Deliberately built from the run's own numbers, and
+       deliberately not suppressible: a roster with the caveat stripped off is
+       exactly the artefact this agent exists to not produce. */
+    function coverage(run){
+      var s = run.summary || {};
+      var unread = s.sources_unreadable || 0;
+      var parts = [];
+      parts.push('<b>What this is.</b> ' + esc(s.roster_note ||
+        'This is what the event publishes openly, not its attendee list.'));
+      if (s.sources_tried) {
+        parts.push('Read ' + (s.sources_read || 0) + ' of ' + s.sources_tried +
+          ' published page' + (s.sources_tried === 1 ? '' : 's') + '.');
+      }
+      if (unread) {
+        parts.push('<b>' + unread + ' page' + (unread === 1 ? '' : 's') +
+          ' could not be read</b>, so this roster is incomplete by an unknown amount. ' +
+          'Every attempt is listed under Sources below.');
+      }
+      if (s.declared_attendees) {
+        parts.push(s.declared_attendees + ' row' + (s.declared_attendees === 1 ? '' : 's') +
+          ' came from someone publicly saying they are attending.');
+      }
+      return '<div class="evi-coverage">' +
+        '<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/>' +
+        '<path d="M12 16v-4M12 8h.01"/></svg></span>' +
+        '<span class="tx">' + parts.join(' ') + '</span></div>';
+    }
+
+    function stats(run){
+      var s = run.summary || {};
+      var cells = [
+        {v: s.participants || 0, l: 'Listed participants'},
+        {v: s.organisations || 0, l: 'Distinct organisations'},
+        {v: s.resolvable_domains || 0, l: 'With a published website'},
+        {v: s.sources_unreadable || 0, l: 'Pages unreadable', warn: (s.sources_unreadable || 0) > 0}
+      ];
+      if (run.credits_spent) cells.push({v: run.credits_spent, l: 'Apollo credits spent'});
+      return '<div class="evi-stats">' + cells.map(function(c){
+        return '<div class="evi-stat' + (c.warn ? ' warn' : '') + '">' +
+          '<div class="v">' + esc(c.v) + '</div><div class="l">' + esc(c.l) + '</div></div>';
+      }).join('') + '</div>';
+    }
+
+    function roleBar(run){
+      var counts = (run.summary || {}).by_role || {};
+      var labels = run.role_labels || {};
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      if (!keys.length) return '';
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      var chips = ['<button class="evi-chip" type="button" aria-pressed="' +
+        (activeRoles === null) + '" onclick="eviFilter(null)">All<span class="n">' +
+        total + '</span></button>'];
+      keys.forEach(function(k){
+        chips.push('<button class="evi-chip" type="button" aria-pressed="' +
+          (activeRoles === k) + '" onclick="eviFilter(\'' + esc(k) + '\')">' +
+          esc(labels[k] || k) + '<span class="n">' + counts[k] + '</span></button>');
+      });
+      return '<div class="evi-rolebar">' + chips.join('') + '</div>';
+    }
+
+    window.eviFilter = function(role){
+      activeRoles = role;
+      if (current) render(current);
+    };
+
+    function contactsHtml(p){
+      var ap = p.apollo || {};
+      var contacts = ap.contacts || [];
+      if (!contacts.length) return '';
+      return '<div class="evi-contacts">' + contacts.map(function(c){
+        var li = safeUrl(c.linkedin);
+        var nm = li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(c.name || 'View') + '</a>' : esc(c.name || '');
+        return '<div class="evi-contact">' + nm +
+          (c.title ? ' <span class="t">' + esc(c.title) + '</span>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    function rosterTable(run){
+      var labels = run.role_labels || {};
+      var rows = (run.participants || []).filter(function(p){
+        return activeRoles === null || p.role === activeRoles;
+      });
+      if (!rows.length) {
+        return '<div class="evi-empty">Nothing listed under this filter.</div>';
+      }
+      var body = rows.map(function(p){
+        var site = safeUrl(p.org_domain ? 'https://' + p.org_domain : null);
+        var src = safeUrl(p.source_url);
+        var ap = p.apollo || {};
+        var firmo = [];
+        if (ap.industry) firmo.push(esc(ap.industry));
+        if (ap.employees) firmo.push(esc(ap.employees) + ' staff');
+        if (ap.location) firmo.push(esc(ap.location));
+        return '<tr>' +
+          '<td><div class="evi-org">' + esc(p.org_name) + '</div>' +
+            (site ? '<div class="evi-dom"><a href="' + esc(site) +
+              '" target="_blank" rel="noopener noreferrer">' + esc(p.org_domain) + '</a></div>'
+             : '<div class="evi-dom">no website published</div>') +
+          '</td>' +
+          '<td><span class="evi-role r-' + esc(p.role) + '">' +
+            esc(labels[p.role] || p.role) + '</span>' +
+            (p.tier ? '<div class="evi-dom">' + esc(p.tier) + '</div>' : '') +
+            (p.booth ? '<div class="evi-dom">Booth ' + esc(p.booth) + '</div>' : '') +
+          '</td>' +
+          '<td>' + (p.person_name ? esc(p.person_name) : '') +
+            (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
+            contactsHtml(p) +
+          '</td>' +
+          '<td>' + (firmo.length ? firmo.join('<br>') :
+            (p.resolution === 'no_match' ? '<span class="evi-dom">no Apollo match</span>' :
+             '<span class="evi-dom">not looked up</span>')) + '</td>' +
+          '<td>' + (src ? '<a class="evi-src-link" href="' + esc(src) +
+            '" target="_blank" rel="noopener noreferrer">source</a>' : '') + '</td>' +
+          '</tr>';
+      }).join('');
+      return '<div class="evi-tablewrap"><table class="evi-table"><thead><tr>' +
+        '<th>Organisation</th><th>Listed as</th><th>Person</th>' +
+        '<th>Firmographics</th><th>From</th></tr></thead><tbody>' +
+        body + '</tbody></table></div>';
+    }
+
+    function sourcesHtml(run){
+      var srcs = run.sources || [];
+      if (!srcs.length) return '<div class="evi-empty">No pages were attempted.</div>';
+      return '<div class="evi-sources">' + srcs.map(function(s){
+        var u = safeUrl(s.url);
+        return '<div class="evi-source">' +
+          '<span class="st ' + esc(s.status) + '">' + esc(s.status.replace('_', ' ')) + '</span>' +
+          '<span class="body"><span class="u">' +
+            (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
+                 esc(s.url) + '</a>' : esc(s.url)) + '</span>' +
+          '<span class="n">' + esc(s.kind || '') +
+            (s.rows_found ? ' · ' + s.rows_found + ' listed' : '') +
+            (s.http_status ? ' · HTTP ' + s.http_status : '') +
+            (s.note ? ' · ' + esc(s.note) : '') + '</span></span></div>';
+      }).join('') + '</div>';
+    }
+
+    function eventsHtml(run){
+      var evs = run.events || [];
+      if (evs.length < 2) return '';
+      var overlap = (run.summary || {}).target_overlap || {};
+      return '<div class="evi-sec"><h3>Events found</h3><div class="evi-events">' +
+        evs.map(function(ev){
+          var hits = overlap[String(ev.id)] || [];
+          var site = safeUrl(ev.website);
+          return '<div class="evi-event"><div class="top"><div style="min-width:0">' +
+            '<div class="nm">' + (site ? '<a href="' + esc(site) +
+              '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">' +
+              esc(ev.name) + '</a>' : esc(ev.name)) + '</div>' +
+            '<div class="meta">' + eventLine(ev) +
+              (ev.stated_size ? ' · ' + esc(ev.stated_size) + ' (the event\'s own claim)' : '') +
+            '</div></div>' +
+            (ev.fit_score != null ? '<div class="evi-fit">' + esc(ev.fit_score) +
+              '<span class="fl">fit</span></div>' : '') +
+            '</div>' +
+            (ev.fit_reasoning ? '<div class="why">' + esc(ev.fit_reasoning) + '</div>' : '') +
+            (hits.length ? '<div class="evi-overlap"><b>' + hits.length +
+              '</b> of your target accounts are in this roster: ' +
+              esc(hits.slice(0, 8).join(', ')) +
+              (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>' : '') +
+            '</div>';
+        }).join('') + '</div></div>';
+    }
+
+    function resolveBar(run){
+      var s = run.summary || {};
+      var est = s.cost_estimate || {};
+      if (!est.domains) return '';
+      var already = (run.participants || []).some(function(p){
+        return p.resolution && p.resolution !== 'unresolved';
+      });
+      if (already) {
+        return '<div class="evi-sec"><h3>Company data</h3>' +
+          '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
+          'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
+          ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
+          'from Apollo\'s free people search; revealing email or phone is a separate, ' +
+          'billed action in Contact Finder.</div></div>';
+      }
+      return '<div class="evi-sec"><h3>Company data</h3>' +
+        '<div class="evi-coverage"><span class="ic">' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' +
+        '</span><span class="tx">' + esc(est.note || '') + '</span></div>' +
+        '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
+        'id="resolveBtn">Match ' + est.domains + ' compan' +
+        (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button></div>';
+    }
+
+    window.eviResolve = function(runId){
+      var btn = document.getElementById('resolveBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Matching...'; }
+      fetch(BASE + '/runs/' + runId + '/resolve', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+      }).then(function(r){ return r.json(); })
+        .then(function(){ openRun(runId); })
+        .catch(function(){
+          if (btn) { btn.disabled = false; btn.textContent = 'Match companies in Apollo'; }
+        });
+    };
+
+    function render(run){
+      var evs = run.events || [];
+      var ev = evs[0] || {};
+      var s = run.summary || {};
+      document.getElementById('drawerTitle').textContent =
+        (run.mode === 'discover' ? run.query : (ev.name || run.query));
+      document.getElementById('drawerSub').innerHTML =
+        run.mode === 'discover'
+          ? esc((s.discovered_events || evs.length) + ' events found' +
+                (s.harvested_events ? ', ' + s.harvested_events + ' rosters sampled' : ''))
+          : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(ev.organizer) : '');
+
+      var html = '';
+      if (run.status === 'failed') {
+        html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
+      }
+      if (run.status === 'running') {
+        html += '<div class="evi-running"><span class="evi-spinner"></span>' +
+          '<span>' + esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+      }
+      if (s.no_pages) {
+        html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+          esc(s.no_pages_note) + '</span></div>';
+      }
+      if ((run.participants || []).length || s.sources_tried) {
+        html += coverage(run);
+        html += stats(run);
+      }
+      html += eventsHtml(run);
+      if ((run.participants || []).length) {
+        html += '<div class="evi-sec"><h3>Roster</h3>' + roleBar(run) + rosterTable(run) +
+          '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+          '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
+          'href="' + BASE + '/runs/' + run.id + '/export.csv">Download CSV</a></div></div>';
+        html += resolveBar(run);
+      } else if (run.status === 'complete' && !s.no_pages && !s.no_events) {
+        html += '<div class="evi-empty">No participants were published on the pages that ' +
+          'could be read. Check Sources below to see what was tried.</div>';
+      }
+      if ((run.sources || []).length) {
+        html += '<div class="evi-sec"><h3>Sources (' + (run.sources || []).length +
+          ' page' + ((run.sources || []).length === 1 ? '' : 's') + ' attempted)</h3>' +
+          sourcesHtml(run) + '</div>';
+      }
+      document.getElementById('drawerBody').innerHTML = html ||
+        '<div class="evi-empty">Nothing to show for this run.</div>';
+    }
+  })();
+
+  /* 'open', not 'on': the stylesheet's .user-dropdown.open is what reveals it,
+     and the two must agree or the menu never opens. */
+  function toggleMenu(){
+    var pill = document.getElementById('userPill'), dd = document.getElementById('userDropdown');
+    pill.classList.toggle('open', !dd.classList.contains('open'));
+    dd.classList.toggle('open');
+  }
+  function closeUserMenu(){
+    document.getElementById('userPill').classList.remove('open');
+    document.getElementById('userDropdown').classList.remove('open');
+  }
+  document.addEventListener('click', function(e){
+    var m = document.getElementById('userMenu');
+    if (m && !m.contains(e.target)) closeUserMenu();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeUserMenu();
+  });
+  </script>
+
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Event & Conference Intelligence',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>
