@@ -1621,12 +1621,12 @@ APP_AGENTS = [
         "slug": "event-conference-intelligence", "name": "Event & Conference Intelligence",
         "tagline": "Field Marketing Intelligence",
         "ac": "#38bdf8", "ac2": "#8b5cf6", "icon": _asvg("<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9.5h18M8 2.5v4M16 2.5v4\"/><circle cx=\"12\" cy=\"15\" r=\"2.2\"/>"),
-        "pill1": "Field Marketing Intelligence", "pill2": "Rosters + event selection",
-        "lead": ("Name an event and get the participant roster it publishes: exhibitors, sponsors, speakers and partners, each row saying which page it came from. Or describe an audience and get events ranked by how many of your own target accounts are actually in them."),
+        "pill1": "Field Marketing Intelligence", "pill2": "Pick the events, then work them",
+        "lead": ("Score the whole calendar against one client's ICP and get a ranked shortlist with nothing padded in to fill it. Name an event and get the roster it publishes. Then take a roster you already have and turn it into one opener per company, with every draft that claims a conversation nobody recorded thrown away."),
         "trips": [
-            {"t": "What it does", "d": "Builds the roster an event publishes openly, then matches those organisations to real firmographics and named people. Events do not publish attendee lists, so it never claims to have one."},
-            {"t": "How it works", "d": "Resolves the event to one specific edition, reads its exhibitor, sponsor and speaker pages, and records every page it tried, including the ones it could not read, so a short roster is never mistaken for a complete one."},
-            {"t": "Best for", "d": "Field marketing and demand gen teams deciding which events to sponsor, and sales teams working a show they are already attending."},
+            {"t": "What it does", "d": "Four things in one place: scores candidate events out of 110 on relevance, decision-maker access and engagement, cutting everything under 70 rather than padding the list; builds the roster an event publishes openly; ranks events by how many of your own target accounts are in them; and drafts post-event outreach from a roster you already harvested."},
+            {"t": "How it works", "d": "Six event categories are searched separately so famous names cannot crowd out the vertical summits and free vendor days. Every score is recomputed from its own sub-scores at write time, so the headline can never disagree with the breakdown. Cost is shown beside each event and cannot reach the scoring function at all."},
+            {"t": "Best for", "d": "Field marketing and demand gen teams choosing where the budget goes, and sales teams following up the week after a show without inventing a booth conversation."},
         ],
         "tags": ["Events", "ABM", "Apollo"],
     },
@@ -8062,6 +8062,138 @@ def _evi_resolve_selftest() -> dict:
         return {"ok": False, "error": {"kind": "unexpected", "detail": str(e)[:400]}}
 
 
+def _evi_guardrail_selftest() -> dict:
+    """Prove the four refusals this agent's honesty rests on, in production.
+
+    Free and offline: no API key, no network, no credits. Every check here is
+    a rule that is only worth anything if it holds on the deployed code, and
+    a green test suite on a laptop is not evidence about Railway. It exercises
+    the real functions with inputs designed to break them, and reports what
+    each one did.
+
+    Deliberately reports what it could NOT check as well as what passed, so a
+    partially-working deployment cannot read as a clean one.
+    """
+    from tracker import event_intel_rubric as rubric
+    from tracker import event_intel_workroom as wr
+    checks, failures = [], []
+
+    def record(name, ok, detail):
+        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+        if not ok:
+            failures.append(name)
+
+    # 1. Cost can never reach a score.
+    try:
+        import inspect
+        sig = inspect.signature(rubric.score)
+        leaks = [p for p in sig.parameters.values()
+                 if p.kind == p.VAR_KEYWORD or "budget" in p.name or "cost" in p.name]
+        record("Budget cannot reach the rubric", not leaks,
+               "score%s" % sig if not leaks
+               else "score() would accept cost: %s" % [p.name for p in leaks])
+    except Exception as e:
+        record("Budget cannot reach the rubric", False, "check crashed: %s" % e)
+
+    # 2. A classification is never defaulted.
+    try:
+        rubric.orientation_for("not-a-real-classification")
+        record("An unknown classification is refused", False,
+               "orientation_for() returned instead of raising")
+    except ValueError:
+        record("An unknown classification is refused", True,
+               "orientation_for() raised, as it must")
+    except Exception as e:
+        record("An unknown classification is refused", False,
+               "raised the wrong error: %s" % type(e).__name__)
+
+    # 3. The matchmaking bonus needs evidence that survives the veto list.
+    try:
+        app_only = rubric.score(30, 30, 15, organizer_run=True,
+                                matchmaking_evidence="The event uses the Whova app.")
+        real = rubric.score(30, 30, 15, organizer_run=True,
+                            matchmaking_evidence="The organiser pre-schedules 1:1 "
+                                                 "hosted-buyer meetings.")
+        ok = app_only["matchmaking"] == 0 and real["matchmaking"] == 10
+        record("The +10 bonus needs a real programme, not a conference app", ok,
+               "conference app scored %d, organiser-run programme scored %d"
+               % (app_only["matchmaking"], real["matchmaking"]))
+    except Exception as e:
+        record("The +10 bonus needs a real programme, not a conference app",
+               False, "check crashed: %s" % e)
+
+    # 4. A fabricated booth conversation is thrown away.
+    try:
+        out = wr.enforce(
+            [{"org_name": "Acme", "person_name": "Dana",
+              "opener": "Great chatting at the booth, and as promised here is the deck.",
+              "role": "exhibitor"}],
+            event_class=wr.CLASS_EXHIBITED, notes={}, event_name="Test Expo",
+            client_name="Test")
+        row = out["rows"][0]
+        ok = (row["draft_status"] == wr.DRAFT_NO_EVIDENCE
+              and not wr.claims_contact(row["opener"] or ""))
+        record("A draft claiming a conversation nobody recorded is replaced", ok,
+               "status=%s, replacement claims contact: %s"
+               % (row["draft_status"], bool(wr.claims_contact(row["opener"] or ""))))
+    except Exception as e:
+        record("A draft claiming a conversation nobody recorded is replaced",
+               False, "check crashed: %s" % e)
+
+    # 5. Displacement language is refused on a competitor's event.
+    try:
+        out = wr.enforce(
+            [{"org_name": "Acme", "person_name": "Dana",
+              "opener": "Most teams switch once they outgrow it.", "role": "exhibitor"}],
+            event_class=wr.CLASS_COMPETITOR, notes={}, event_name="RivalCon",
+            client_name="Test")
+        row = out["rows"][0]
+        ok = (row["draft_status"] == wr.DRAFT_AGGRESSIVE
+              and not wr.is_aggressive(row["opener"] or ""))
+        record("Displacement language is refused on a competitor's event", ok,
+               "status=%s" % row["draft_status"])
+    except Exception as e:
+        record("Displacement language is refused on a competitor's event",
+               False, "check crashed: %s" % e)
+
+    # 6. A model-supplied total is recomputed rather than trusted.
+    try:
+        from tracker import event_intel_store
+        row = event_intel_store.normalise_candidate(
+            {"name": "Test", "category": rubric.CATEGORIES[0],
+             "relevance": 10, "dm_access": 10, "engagement": 5,
+             "total": 105, "tier": "P1"})
+        ok = row["total"] == 25 and row["tier"] == rubric.TIER_P3
+        record("A model-written total is recomputed at write time", ok,
+               "claimed 105/P1, stored %s/%s" % (row["total"], row["tier"]))
+    except Exception as e:
+        record("A model-written total is recomputed at write time", False,
+               "check crashed: %s" % e)
+
+    return {
+        "ok": not failures,
+        "checks": checks,
+        "passed": len(checks) - len(failures),
+        "total": len(checks),
+        "failures": failures,
+        "not_checked": [
+            "Whether ANTHROPIC_API_KEY, APOLLO_API_KEY and DATABASE_URL are set "
+            "and working. These checks are deliberately offline, so a green "
+            "result here says the rules hold, not that the agent can run.",
+            "Whether real event pages can be read. That needs a live harvest "
+            "and is what the resolve check next to this one covers.",
+        ],
+    }
+
+
+@app.route("/p2/admin/external-usage/evi-guardrail-check", methods=["POST"])
+@admin_required
+def admin_external_usage_evi_guardrail_check():
+    """Run the guardrail self-test. Free and offline: it proves the refusals
+    hold on the deployed code, which a passing suite on a laptop does not."""
+    return jsonify(_evi_guardrail_selftest())
+
+
 @app.route("/p2/admin/external-usage/evi-resolve-check", methods=["POST"])
 @admin_required
 def admin_external_usage_evi_resolve_check():
@@ -8459,25 +8591,139 @@ def social_creative_intelligence_run(run_id):
 @app.route("/p2/b2b-agents/event-conference-intelligence")
 @position2_required
 def event_conference_intelligence():
-    from tracker import event_intel_store
+    from tracker import event_intel_rubric, event_intel_store, event_intel_workroom
     user = _get_user() or {}
     email = (user.get("email") or "").lower()
+    # The four classifications are rendered as the choice they are, from the
+    # rubric's own vocabulary, so the page can never offer a fifth option the
+    # scorer would refuse.
+    classes = [{"key": k,
+                "label": event_intel_rubric.CLASSIFICATION_LABELS[k],
+                "where": event_intel_rubric.CLASSIFICATION_WHERE_BUYERS_ARE[k],
+                "orientation": event_intel_rubric.orientation_for(k)}
+               for k in event_intel_rubric.CLASSIFICATIONS]
     return render_template("event_conference_intelligence.html", user=user,
-                           runs=event_intel_store.list_runs(email))
+                           runs=event_intel_store.list_runs(email),
+                           profiles=event_intel_store.list_profiles(email),
+                           classifications=classes,
+                           categories=[
+                               {"key": c,
+                                "label": event_intel_rubric.CATEGORY_LABELS[c],
+                                "brief": event_intel_rubric.CATEGORY_BRIEF[c]}
+                               for c in event_intel_rubric.CATEGORIES],
+                           # Same discipline as the classifications above: the
+                           # five event classes are rendered from the play's own
+                           # table, so the page cannot offer a sixth that the
+                           # pipeline would refuse.
+                           event_classes=[
+                               dict(key=k, **event_intel_workroom.CLASS_PLAY[k])
+                               for k in event_intel_workroom.EVENT_CLASSES])
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/profiles",
+           methods=["GET", "POST"])
+@position2_required
+def event_conference_intelligence_profiles():
+    """The locked client profile: Step 0 (classification) plus Step 1 (intake).
+
+    The source skill puts a HARD STOP here, and so does this route. A bad or
+    missing classification is a 400 carrying the real reason, never a default,
+    because a default would silently score the opposite side of the floor and
+    nothing downstream would look wrong.
+    """
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    if request.method == "GET":
+        return jsonify({"profiles": event_intel_store.list_profiles(email)})
+    try:
+        profile_id = event_intel_store.save_profile(
+            email, request.get_json(silent=True) or {})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if profile_id is None:
+        return jsonify({"error": "Could not save the profile. Storage is "
+                                 "unavailable."}), 500
+    return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/profiles/<int:profile_id>",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_profile_update(profile_id):
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    try:
+        ok = event_intel_store.update_profile(
+            profile_id, email, request.get_json(silent=True) or {})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if not ok:
+        abort(404)
+    return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/run", methods=["POST"])
 @position2_required
 def event_conference_intelligence_run():
-    from tracker import event_intel_pipeline, event_intel_store
+    from tracker import event_intel_pipeline, event_intel_store, event_intel_workroom
     payload = request.get_json(silent=True) or {}
     mode = str(payload.get("mode") or "lookup").strip().lower()
-    if mode not in ("lookup", "discover"):
+    if mode not in ("lookup", "discover", "recommend", "workroom"):
         return jsonify({"error": "Unknown mode."}), 400
-    query = str(payload.get("query") or "").strip()
-    if not query:
-        return jsonify({"error": "An event name is required." if mode == "lookup"
-                        else "An audience description is required."}), 400
+
+    email = (_get_user() or {}).get("email", "").lower()
+
+    # Recommend mode carries its query on the profile, so it is validated
+    # first and separately: without a locked classification there is no way to
+    # know which side of the event floor to score, and defaulting one is the
+    # failure the whole rubric is built to avoid.
+    profile = None
+    if mode == "recommend":
+        try:
+            profile_id = int(payload.get("profile_id") or 0)
+        except (TypeError, ValueError):
+            profile_id = 0
+        profile = event_intel_store.get_profile(profile_id, email) if profile_id else None
+        if not profile:
+            return jsonify({"error": "Lock a client profile first. Which side "
+                                     "of the event floor gets scored depends on "
+                                     "it, and it is never assumed."}), 400
+        query = profile["client_name"]
+    elif mode == "workroom":
+        # Work-the-room has two hard stops of its own, and both are refusals
+        # rather than defaults. A guessed event class writes a competitor
+        # follow-up in the voice of an owned-event one, and a missing source
+        # run means there is no roster to work.
+        try:
+            source_run_id = int(payload.get("source_run_id") or 0)
+        except (TypeError, ValueError):
+            source_run_id = 0
+        source = event_intel_store.get_run(source_run_id, email) if source_run_id else None
+        if not source:
+            return jsonify({"error": "Pick a completed event roster to work "
+                                     "from. This play reads a roster you have "
+                                     "already harvested."}), 400
+        event_class = str(payload.get("event_class") or "").strip().lower()
+        if event_class not in event_intel_workroom.EVENT_CLASSES:
+            return jsonify({"error": "Say what your relationship to this event "
+                                     "was. Whether you had a booth decides the "
+                                     "whole play, and it is never assumed."}), 400
+        try:
+            profile_id = int(payload.get("profile_id") or 0)
+        except (TypeError, ValueError):
+            profile_id = 0
+        profile = event_intel_store.get_profile(profile_id, email) if profile_id else None
+        if not profile:
+            return jsonify({"error": "Lock a client profile first. There is no "
+                                     "way to qualify a roster to an ICP without "
+                                     "one."}), 400
+        events = event_intel_store.get_events(source_run_id)
+        query = (events[0]["name"] if events else source.get("query")) or "event"
+    else:
+        query = str(payload.get("query") or "").strip()
+        if not query:
+            return jsonify({"error": "An event name is required." if mode == "lookup"
+                            else "An audience description is required."}), 400
 
     # Free text straight from a form, capped before it reaches a model prompt
     # and a TEXT column. Not a security boundary (both handle long input
@@ -8486,8 +8732,10 @@ def event_conference_intelligence_run():
     icp_note = str(payload.get("icp_note") or "").strip()[:2000] or None
     targets = [t.strip() for t in (payload.get("targets") or []) if str(t).strip()][:400]
 
-    email = (_get_user() or {}).get("email", "").lower()
-    run_id = event_intel_store.save_run(email, mode, query, icp_note)
+    run_id = event_intel_store.save_run(email, mode, query, icp_note,
+                                        profile_id=(profile or {}).get("id"),
+                                        source_run_id=(source_run_id
+                                                       if mode == "workroom" else None))
     if run_id is None:
         return jsonify({"error": "Could not start the run. Storage is unavailable."}), 500
 
@@ -8496,7 +8744,15 @@ def event_conference_intelligence_run():
         args=(run_id, mode, query),
         kwargs={"year_hint": str(payload.get("year") or "").strip()[:20] or None,
                 "region": str(payload.get("region") or "").strip()[:120] or None,
-                "targets": targets},
+                "targets": targets,
+                "email": email,
+                "profile": profile,
+                "source_run_id": (source_run_id if mode == "workroom" else None),
+                "event_class": (event_class if mode == "workroom" else None),
+                "booth_notes": (str(payload.get("booth_notes") or "")[:8000]
+                                if mode == "workroom" else None),
+                "ends_on": (str(payload.get("ends_on") or "").strip()[:10] or None
+                            if mode == "workroom" else None)},
         daemon=True,
     ).start()
     return jsonify({"run_id": run_id, "status": "running"})
@@ -8530,6 +8786,12 @@ def event_conference_intelligence_run_detail(run_id):
     # not an optional extra the frontend can forget to ask for.
     run["sources"] = event_intel_store.get_sources(run_id)
     run["role_labels"] = event_intel_store.ROLE_LABELS
+    if run.get("mode") == "recommend":
+        run["candidates"] = event_intel_store.get_candidates(run_id)
+    if run.get("mode") == "workroom":
+        run["outreach"] = event_intel_store.get_outreach(run_id)
+    if run.get("profile_id"):
+        run["profile"] = event_intel_store.get_profile(run["profile_id"], email)
     return jsonify(run)
 
 
@@ -8547,6 +8809,167 @@ def event_conference_intelligence_resolve(run_id):
     if result.get("error") == "not_found":
         abort(404)
     return jsonify(result)
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/candidates.csv")
+@position2_required
+def event_conference_intelligence_candidates_csv(run_id):
+    """The ranked table as a file, with every sub-score in its own column.
+
+    The three sub-scores and their notes travel with the total, not just the
+    total, for the same reason the screen shows them: a number nobody can
+    check is an assertion. The excluded events are in the same file, marked,
+    so the file cannot be read as "these were the only events found".
+    """
+    import csv
+    import io
+    from tracker import event_intel_rubric, event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    rows = event_intel_store.get_candidates(run_id)
+    summary = run.get("summary") or {}
+    floor = event_intel_rubric.RANK_FLOOR
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Event", "Edition", "Tier", "Total /110", "On the list",
+                "Relevance /40", "Relevance reasoning",
+                "Decision-maker access /40", "DM access reasoning",
+                "Engagement /20", "Engagement reasoning",
+                "Matchmaking bonus", "Matchmaking decision",
+                "Discovery category", "Famous-event verdict", "Famous-event note",
+                "Starts", "Ends", "City", "Country",
+                "Published attendance (their claim)", "Published exhibitors",
+                "Cost (never scored)", "Not measured", "What it is",
+                "Why it matters to this client", "Website"])
+    for c in rows:
+        total = c.get("total")
+        w.writerow([
+            c.get("name") or "", c.get("edition") or "", c.get("tier") or "",
+            total if total is not None else "not scored",
+            "yes" if (total is not None and total >= floor) else "no",
+            c.get("relevance") if c.get("relevance") is not None else "",
+            c.get("relevance_note") or "",
+            c.get("dm_access") if c.get("dm_access") is not None else "",
+            c.get("dm_access_note") or "",
+            c.get("engagement") if c.get("engagement") is not None else "",
+            c.get("engagement_note") or "",
+            c.get("matchmaking") or 0, c.get("matchmaking_reason") or "",
+            event_intel_rubric.CATEGORY_LABELS.get(c.get("category"), c.get("category") or ""),
+            c.get("audit_verdict") or "", c.get("audit_note") or "",
+            c.get("starts_on") or "", c.get("ends_on") or "",
+            c.get("city") or "", c.get("country") or "",
+            c.get("attendees") or "", c.get("booths") or "",
+            c.get("cost_note") or "",
+            " ".join(c.get("gaps") or []),
+            c.get("description") or "", c.get("client_line") or "",
+            c.get("website") or "",
+        ])
+
+    client = (summary.get("title") or run.get("query") or "events")
+    slug = re.sub(r"[^a-z0-9]+", "-", client.lower()).strip("-")[:60] or "events"
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s-scored.csv"' % slug
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/outreach.csv")
+@position2_required
+def event_conference_intelligence_outreach_csv(run_id):
+    """The drafts as a file.
+
+    Every rewritten draft carries its status, its reason and the phrase that
+    triggered it into the file. A CSV that showed only the final opener would
+    be a laundered version of the screen: the reader would have no way to know
+    which lines were written by a model and thrown away, and this file is
+    exactly the artefact somebody pastes into a sequencer.
+    """
+    import csv
+    import io
+    from tracker import event_intel_store, event_intel_workroom
+    email = (_get_user() or {}).get("email", "").lower()
+    run = event_intel_store.get_run(run_id, email)
+    if not run:
+        abort(404)
+    rows = event_intel_store.get_outreach(run_id)
+    labels = event_intel_store.ROLE_LABELS
+    summary = run.get("summary") or {}
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Organisation", "Domain", "Listed as", "Person", "Title",
+                "ICP fit /100", "Why that fit", "Angle", "Opener",
+                "Draft status", "Why the draft was changed",
+                "Phrases that triggered the change", "Your booth note",
+                "Account guidance", "Event", "Your relationship to the event"])
+    for r in rows:
+        status = r.get("draft_status") or "ok"
+        w.writerow([
+            r.get("org_name") or "", r.get("org_domain") or "",
+            labels.get(r.get("role"), r.get("role") or ""),
+            r.get("person_name") or "", r.get("person_title") or "",
+            r.get("fit") if r.get("fit") is not None else "not qualified",
+            r.get("fit_note") or r.get("qualify_note") or "",
+            r.get("angle") or "", r.get("opener") or "",
+            "written as drafted" if status == "ok" else status,
+            r.get("draft_reason") or "",
+            "; ".join(r.get("draft_flagged") or []),
+            r.get("booth_note") or "", r.get("account_note") or "",
+            r.get("event_name") or "",
+            (event_intel_workroom.CLASS_PLAY.get(r.get("event_class")) or {})
+                .get("label", r.get("event_class") or ""),
+        ])
+    # The file leaves the page that explains what it is, so the caveat leaves
+    # with it. Same rule the roster export already follows.
+    w.writerow([])
+    w.writerow(["NOTE", summary.get("send_note") or
+                "Nothing here has been sent. These are drafts to read, edit and "
+                "send yourself."])
+    w.writerow(["NOTE", ((summary.get("repeats") or {}).get("crm_note")) or ""])
+    w.writerow(["NOTE", "Rows marked rewritten_no_booth_note had an opener that "
+                        "claimed a conversation nobody recorded. It was replaced."])
+
+    name = summary.get("event_name") or run.get("query") or "event"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60] or "event"
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = 'attachment; filename="%s-drafts.csv"' % slug
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/p2/b2b-agents/event-conference-intelligence/outcomes",
+           methods=["GET", "POST"])
+@position2_required
+def event_conference_intelligence_outcomes():
+    """What the user decided about an event.
+
+    Keyed on the event rather than the run, so the second time this agent
+    surfaces something already ruled on, it says so. This is the honest
+    substitute for the source skill's "read the reply-rate data after three to
+    five events" step: there is no sequencer wired to this platform, and the
+    one thing it can hold truthfully is the user's own decision in their own
+    words.
+    """
+    from tracker import event_intel_store
+    email = (_get_user() or {}).get("email", "").lower()
+    if request.method == "GET":
+        return jsonify({"outcomes": event_intel_store.get_outcomes(email)})
+    payload = request.get_json(silent=True) or {}
+    try:
+        ok = event_intel_store.save_outcome(
+            email, str(payload.get("event_name") or ""),
+            str(payload.get("decision") or ""), payload.get("note"),
+            payload.get("run_id"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if not ok:
+        return jsonify({"error": "Could not record that. Storage is unavailable."}), 500
+    return jsonify({"outcomes": event_intel_store.get_outcomes(email)})
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/runs/<int:run_id>/export.csv")

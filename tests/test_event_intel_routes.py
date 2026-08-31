@@ -28,6 +28,9 @@ ROUTES = [
     (BASE + "/runs/1", "GET"),
     (BASE + "/runs/1/resolve", "POST"),
     (BASE + "/runs/1/export.csv", "GET"),
+    (BASE + "/profiles", "GET"),
+    (BASE + "/profiles", "POST"),
+    (BASE + "/profiles/1", "POST"),
 ]
 
 
@@ -165,3 +168,68 @@ def test_the_csv_is_crlf_terminated():
     buf = io.StringIO()
     csv.writer(buf).writerow(["a", "b"])
     assert buf.getvalue().endswith("\r\n")
+
+
+# ── the locked profile, and the hard stop in front of recommend mode ──────
+
+def _p2(monkeypatch=None):
+    return _client("someone@position2.com")
+
+
+def test_recommend_without_a_profile_is_refused_with_the_real_reason():
+    """The source skill's HARD STOP. A default classification would score the
+    opposite side of the trade-show floor and nothing downstream would look
+    wrong, so the route refuses rather than assumes."""
+    r = _p2().post(BASE + "/run", json={"mode": "recommend"})
+    assert r.status_code == 400
+    assert "which side of the event floor" in r.get_json()["error"].lower()
+
+
+def test_recommend_with_an_unknown_profile_id_is_refused():
+    r = _p2().post(BASE + "/run", json={"mode": "recommend", "profile_id": 999999})
+    assert r.status_code == 400
+
+
+def test_an_unknown_mode_is_still_refused():
+    r = _p2().post(BASE + "/run", json={"mode": "attendees", "query": "x"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "Unknown mode."
+
+
+def test_recommend_is_an_accepted_mode(monkeypatch):
+    """Proved by how it fails: a mode the route did not know would come back
+    'Unknown mode', not a complaint about the profile."""
+    r = _p2().post(BASE + "/run", json={"mode": "recommend", "profile_id": 1})
+    assert r.get_json()["error"] != "Unknown mode."
+
+
+def test_a_profile_with_a_bad_classification_is_a_400_carrying_the_reason():
+    r = _p2().post(BASE + "/profiles",
+                   json={"client_name": "Northwind", "classification": "b2b"})
+    assert r.status_code == 400
+    assert "never inferred" in r.get_json()["error"]
+
+
+def test_a_profile_with_no_client_name_is_a_400():
+    from tracker import event_intel_rubric as rubric
+    r = _p2().post(BASE + "/profiles",
+                   json={"client_name": "  ",
+                         "classification": rubric.CLASS_B2B_TO_MARKETING})
+    assert r.status_code == 400
+    assert "too generic" in r.get_json()["error"]
+
+
+def test_profile_routes_are_position2_gated():
+    for path in (BASE + "/profiles", BASE + "/profiles/1"):
+        r = _client().post(path, json={})
+        assert r.status_code in (302, 401, 403), path
+
+
+def test_the_page_offers_exactly_the_four_classifications_the_rubric_knows():
+    """Rendered from the rubric's own vocabulary, so the form can never offer a
+    fifth option the scorer would refuse."""
+    from tracker import event_intel_rubric as rubric
+    html = _p2().get(BASE).get_data(as_text=True)
+    for key in rubric.CLASSIFICATIONS:
+        assert key in html, key
+    assert html.count('data-classification="') == len(rubric.CLASSIFICATIONS)

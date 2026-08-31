@@ -35,7 +35,7 @@ import requests
 
 from . import claude_websearch
 from .event_intel_store import (SOURCE_BLOCKED, SOURCE_ERROR, SOURCE_NOT_FOUND,
-                                SOURCE_OK, ROLES)
+                                SOURCE_OK, ROLES, VIA_PAGE)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,22 @@ _MAX_CHARS = 55_000
 # Below this much readable text, the page almost certainly rendered its list
 # client-side. Reported as blocked, never as "this event has no exhibitors".
 _MIN_USEFUL_CHARS = 400
+
+# How many pages of one paginated directory to follow. An exhibitor directory
+# is very often "Page 1 of 14", and reading only page one produced the single
+# largest undercount in the first version of this agent: a 40-row roster that
+# looked complete because nothing said otherwise. Bounded rather than
+# unbounded, and the ledger records where it stopped, so an incomplete read is
+# still a stated one.
+MAX_PAGES = 12
+
+# Mount points that mean the list is assembled in the browser. Checked against
+# the RAW markup, since the text flattener drops script tags by design.
+_SPA_MARKERS = (
+    '__next_data__', 'id="root"', "id='root'", 'id="__next"', "id='__next'",
+    'ng-app', 'ng-version', 'data-reactroot', 'id="app"', "id='app'",
+    'window.__nuxt__', 'v-cloak', 'data-svelte', 'wp-json/wp/v2',
+)
 
 _SKIP_TAGS = {"script", "style", "noscript", "svg", "head", "template", "iframe"}
 _BLOCK_TAGS = {"p", "div", "li", "tr", "br", "h1", "h2", "h3", "h4", "h5", "h6",
@@ -145,7 +161,7 @@ def fetch_page(url: str) -> dict:
     are 'we could not read this', which is what the report needs to say.
     """
     out = {"url": url, "status": SOURCE_ERROR, "http_status": None,
-           "text": "", "note": "", "truncated": False}
+           "text": "", "note": "", "truncated": False, "spa": None}
     try:
         r = requests.get(url, timeout=_TIMEOUT, stream=True, headers={
             "User-Agent": _UA,
@@ -190,11 +206,15 @@ def fetch_page(url: str) -> dict:
         r.close()
 
     text = html_to_linked_text(markup, url)
+    out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:
         out["status"] = SOURCE_BLOCKED
-        out["note"] = ("Returned only %d characters of readable text, so its list "
-                       "is almost certainly rendered by JavaScript after load."
-                       % len(text))
+        out["note"] = ("Returned only %d characters of readable text%s, so its "
+                       "list is rendered by JavaScript after load and a plain "
+                       "fetch cannot see it."
+                       % (len(text),
+                          " and carries a %s mount point" % out["spa"]
+                          if out["spa"] else ""))
         return out
 
     if len(text) > _MAX_CHARS:
@@ -205,6 +225,83 @@ def fetch_page(url: str) -> dict:
     out["status"] = SOURCE_OK
     out["text"] = text
     return out
+
+
+def client_render_marker(markup: str) -> str | None:
+    """The framework mount point this markup carries, if any.
+
+    Used for one purpose only: telling "this event lists no exhibitors" apart
+    from "this event's exhibitor list is built in the browser and we read the
+    empty shell around it". Those produce identical output today, and the
+    first is a fact about the event while the second is a hole in the read.
+
+    Deliberately NOT used on its own to reject a page. Plenty of
+    server-rendered sites mount a React widget somewhere; a marker only counts
+    against a page that also yielded nothing.
+    """
+    low = (markup or "").lower()
+    for marker in _SPA_MARKERS:
+        if marker in low:
+            return marker.strip('"\'').replace("id=", "").replace("_", "")
+    return None
+
+
+_PAGE_LINK = re.compile(r"\[(https?://[^\]\s]+)\]")
+_PAGE_PARAM = re.compile(
+    r"(?:^|[?&])(page|pg|p|paged|offset|start|from)=(\d+)\b", re.I)
+
+
+def next_page_links(text: str, current_url: str, limit: int = MAX_PAGES) -> list[str]:
+    """Later pages of the SAME paginated listing, in page order.
+
+    An exhibitor directory that says "1 2 3 ... 14" is the normal case, and
+    following it is the difference between a 40-row roster and a 300-row one.
+
+    Three restrictions, each of which exists because dropping it produced a
+    wrong roster in testing:
+
+      * Same host and same path. A `?page=2` on a different path is a
+        different listing, and merging it silently mixes two rosters.
+      * The pagination parameter must be the only thing that differs. A link
+        that also changes `?category=` is a filtered view, not the next page.
+      * Strictly greater page numbers only, so "Previous" and "1" do not send
+        the harvester round in a circle re-reading what it already has.
+    """
+    try:
+        cur = urlparse(current_url)
+    except Exception:
+        return []
+    cur_page = 1
+    m = _PAGE_PARAM.search(cur.query or "")
+    if m:
+        try:
+            cur_page = int(m.group(2))
+        except ValueError:
+            cur_page = 1
+
+    found: dict[int, str] = {}
+    for href in _PAGE_LINK.findall(text or ""):
+        try:
+            u = urlparse(href)
+        except Exception:
+            continue
+        if u.netloc.lower() != cur.netloc.lower() or u.path != cur.path:
+            continue
+        pm = _PAGE_PARAM.search(u.query or "")
+        if not pm:
+            continue
+        try:
+            n = int(pm.group(2))
+        except ValueError:
+            continue
+        if n <= cur_page:
+            continue
+        # Everything except the pagination parameter has to match, or this is
+        # a different slice of the directory rather than the next page of it.
+        if _PAGE_PARAM.sub("", u.query or "") != _PAGE_PARAM.sub("", cur.query or ""):
+            continue
+        found.setdefault(n, href)
+    return [found[n] for n in sorted(found)[:max(0, limit)]]
 
 
 _SYSTEM = (
@@ -341,15 +438,30 @@ def extract_participants(page_text: str, page_url: str, page_kind: str,
     return {"rows": rows, "note": str(parsed.get("note") or "")[:400], "error": None}
 
 
-def harvest_page(page: dict, event_name: str, event_host: str = "") -> dict:
-    """Fetch one page and extract it. Returns a dict carrying both the source
-    ledger entry and the rows, so a caller writes one and saves the other
-    without needing to know how either failed."""
+def harvest_page(page: dict, event_name: str, event_host: str = "",
+                 max_pages: int = MAX_PAGES) -> dict:
+    """Fetch one listing and extract it, following its pagination.
+
+    Returns the source ledger entry and the rows together, so a caller writes
+    one and saves the other without needing to know how either failed.
+
+    Two behaviours here that the first version of this agent got wrong:
+
+    Pagination is followed. Reading page one of a fourteen-page exhibitor
+    directory and reporting the result as the roster is an undercount with
+    nothing on screen to reveal it, which is the exact defect the source
+    ledger exists to prevent and which page-one-only reintroduced.
+
+    A page that yields nothing AND carries a browser-side mount point is
+    reported as unreadable, not as an event with no exhibitors. Those two
+    render identically and mean opposite things.
+    """
     url, kind = page["url"], page.get("kind") or "unknown"
     fetched = fetch_page(url)
     source = {"url": url, "kind": kind, "status": fetched["status"],
               "http_status": fetched["http_status"], "rows_found": 0,
-              "note": fetched["note"]}
+              "note": fetched["note"], "pages_read": 0, "pages_seen": 1,
+              "spa": fetched.get("spa")}
     if fetched["status"] != SOURCE_OK:
         return {"source": source, "rows": []}
 
@@ -360,12 +472,73 @@ def harvest_page(page: dict, event_name: str, event_host: str = "") -> dict:
                           % ext["error"]["detail"])[:500]
         return {"source": source, "rows": []}
 
-    rows = ext["rows"]
-    source["rows_found"] = len(rows)
+    rows = list(ext["rows"])
     notes = [n for n in (fetched["note"], ext.get("note")) if n]
-    source["note"] = " ".join(notes)[:500]
-    if not rows:
-        # Fetched fine, read fine, listed nobody. Distinct from blocked, and
-        # the distinction is the whole point of this ledger.
-        source["status"] = SOURCE_OK
-    return {"source": source, "rows": rows}
+    source["pages_read"] = 1
+
+    # Follow the rest of the listing. A page that fails mid-run stops the
+    # walk and says where it stopped, rather than silently returning what it
+    # happened to reach.
+    seen_urls = {url}
+    queue = next_page_links(fetched["text"], url, limit=max_pages - 1)
+    source["pages_seen"] = 1 + len(queue)
+    stopped = None
+    while queue and source["pages_read"] < max_pages:
+        nxt = queue.pop(0)
+        if nxt in seen_urls:
+            continue
+        seen_urls.add(nxt)
+        got = fetch_page(nxt)
+        if got["status"] != SOURCE_OK:
+            stopped = ("Stopped following this listing at page %d of %d: %s"
+                       % (source["pages_read"] + 1, source["pages_seen"],
+                          got["note"] or got["status"]))
+            break
+        sub = extract_participants(got["text"], nxt, kind, event_name, event_host)
+        if sub.get("error"):
+            stopped = ("Stopped following this listing at page %d of %d: the "
+                       "page was fetched but could not be read."
+                       % (source["pages_read"] + 1, source["pages_seen"]))
+            break
+        rows.extend(sub["rows"])
+        source["pages_read"] += 1
+        for extra in next_page_links(got["text"], nxt, limit=max_pages):
+            if extra not in seen_urls and extra not in queue:
+                queue.append(extra)
+                source["pages_seen"] += 1
+
+    if source["pages_read"] > 1:
+        notes.append("Followed %d of %d pages of this listing."
+                     % (source["pages_read"], source["pages_seen"]))
+    if stopped:
+        notes.append(stopped)
+    elif queue and source["pages_read"] >= max_pages:
+        notes.append("This listing has more pages than the %d-page limit, so "
+                     "it is incomplete." % max_pages)
+
+    # De-duplicate across pages. A directory that repeats a headline sponsor
+    # on every page would otherwise inflate the roster by the page count.
+    deduped, seen_rows = [], set()
+    for r in rows:
+        key = ((r.get("org_domain") or r.get("org_name") or "").lower(),
+               (r.get("person_name") or "").lower(), r.get("role"))
+        if key in seen_rows:
+            continue
+        seen_rows.add(key)
+        r.setdefault("provenance", VIA_PAGE)
+        deduped.append(r)
+    if len(deduped) < len(rows):
+        notes.append("%d duplicate rows across pages were merged."
+                     % (len(rows) - len(deduped)))
+
+    source["rows_found"] = len(deduped)
+    if not deduped and source["spa"]:
+        # Read fine, listed nobody, and the markup says the list is built in
+        # the browser. That is a hole in the read, not a fact about the event.
+        source["status"] = SOURCE_BLOCKED
+        notes.append("This page listed nobody and carries a %s mount point, so "
+                     "its list is built in the browser and a plain fetch cannot "
+                     "see it. This is not evidence the event has no %s."
+                     % (source["spa"], kind if kind != "unknown" else "participants"))
+    source["note"] = " ".join(notes)[:800]
+    return {"source": source, "rows": deduped}
