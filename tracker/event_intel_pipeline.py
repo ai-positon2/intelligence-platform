@@ -241,6 +241,11 @@ def _run_discover(run_id: int, audience: str, region: str | None,
     # a sample; harvesting eight full exhibitor directories to rank them would
     # cost minutes for information the fit score already carries.
     store.update_run(run_id, stage="harvesting")
+    # Which events were actually sampled. Without this, an event with no
+    # target-account hits is indistinguishable from one nobody looked at, and
+    # those mean opposite things: "none of your accounts are there" is a
+    # finding, "we did not read this roster" is a hole.
+    harvested: list[int] = []
     for event_id, event in saved[:DISCOVER_HARVEST_TOP]:
         if not event.get("website"):
             continue
@@ -248,13 +253,33 @@ def _run_discover(run_id: int, audience: str, region: str | None,
             "%s %s" % (event["name"], event.get("edition") or ""))
         if sub.get("ok") and sub.get("pages"):
             _harvest_event(run_id, event_id, sub["event"], sub["pages"])
+            harvested.append(event_id)
 
     summary = _summarise(run_id)
-    summary["harvested_events"] = min(len(saved), DISCOVER_HARVEST_TOP)
+    summary["harvested_events"] = len(harvested)
+    summary["harvested_event_ids"] = harvested
     summary["discovered_events"] = len(saved)
     summary["discover_note"] = found.get("note") or ""
     if targets:
-        summary["target_overlap"] = _target_overlap(run_id, targets)
+        overlap = _target_overlap(run_id, targets)
+        summary["target_overlap"] = overlap
+        # The mode's stated promise is that events are ranked by how many of
+        # YOUR accounts are in the roster, not by how big the event is. Until
+        # this existed the overlap was displayed and the order was untouched,
+        # so the promise on the form was not kept.
+        summary["event_order"] = [
+            eid for eid, _ in sorted(
+                saved,
+                key=lambda pair: (-len(overlap.get(str(pair[0])) or []),
+                                  -(pair[1].get("fit_score") or 0),
+                                  (pair[1].get("name") or "").lower()))]
+        summary["ranked_by"] = (
+            "Ranked by how many of your own target accounts appear in the "
+            "roster, then by fit. Only the %d best-fitting event%s had %s "
+            "roster read, so an event below that is unranked on overlap "
+            "rather than shown to have none."
+            % (len(harvested), "" if len(harvested) == 1 else "s",
+               "its" if len(harvested) == 1 else "their"))
     store.update_run(run_id, status="complete", stage="done", summary=summary)
 
 
@@ -332,6 +357,20 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     rows = store.get_candidates(run_id)
     cap = int(profile.get("max_events") or event_intel_rubric.DEFAULT_CAP)
     ranked = event_intel_rubric.rank(rows, cap=cap)
+    if ranked["committed_below_bar"]:
+        # Money already spent on an event that does not clear the bar is the
+        # most actionable single line this analysis produces, so it is said in
+        # the summary rather than left for the reader to notice a badge.
+        summary_note_committed = (
+            "%d event%s you are already committed to scored below 70 and %s "
+            "kept on the list anyway, marked: %s."
+            % (len(ranked["committed_below_bar"]),
+               "" if len(ranked["committed_below_bar"]) == 1 else "s",
+               "was" if len(ranked["committed_below_bar"]) == 1 else "were",
+               ", ".join("%s at %s" % (c["name"], c["total"])
+                         for c in ranked["committed_below_bar"])))
+    else:
+        summary_note_committed = None
 
     # What this user already decided about any of these. Attached, never used
     # to filter: a previously rejected event stays on the list carrying the
@@ -365,6 +404,8 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "unscored": [{"name": c.get("name"), "note": c.get("scoring_note")}
                      for c in scored["unscored"]],
         "orientation": profile.get("orientation"),
+        "committed_below_bar": ranked["committed_below_bar"],
+        "committed_note": summary_note_committed,
         "outcomes": {"counts": outcomes["counts"], "ruled_on": outcomes["ruled_on"],
                      "note": outcomes["note"], "by_name": outcomes["by_name"],
                      "labels": store.DECISION_LABELS},

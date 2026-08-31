@@ -415,29 +415,46 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP) -> dict:
     scored = sorted((c for c in candidates or []),
                     key=lambda c: (-(c.get("total") or 0),
                                    (c.get("name") or "").lower()))
-    kept, excluded = [], []
+    kept, excluded, below = [], [], []
     for c in scored:
         if (c.get("total") or 0) >= RANK_FLOOR:
             kept.append(c)
+        elif c.get("committed"):
+            # An event the client has already committed to is kept whatever it
+            # scores. Cutting it would hide the single most actionable thing
+            # this analysis can say: that money is already spent on an event
+            # that does not clear the bar. It is marked, never quietly mixed
+            # in with the events that earned their place.
+            kept.append(c)
+            below.append({"name": c.get("name"), "total": c.get("total") or 0})
         else:
             excluded.append({"name": c.get("name"), "total": c.get("total") or 0,
                              "tier": TIER_P3,
                              "category": c.get("category")})
     over_cap = []
     if cap and len(kept) > cap:
+        # The cap never drops a committed event. Being pushed off the end of a
+        # list by length is not a judgement, and this one has already been paid
+        # for.
+        head = kept[:cap]
+        tail = kept[cap:]
+        rescued = [c for c in tail if c.get("committed")]
         over_cap = [{"name": c.get("name"), "total": c.get("total") or 0}
-                    for c in kept[cap:]]
-        kept = kept[:cap]
+                    for c in tail if not c.get("committed")]
+        kept = head + rescued
     return {
         "kept": kept,
         "excluded": excluded,
         "over_cap": over_cap,
+        # Committed events that did not clear the bar on their own merits.
+        "committed_below_bar": below,
         "counts": {
             "kept": len(kept),
             TIER_P1: sum(1 for c in kept if c.get("tier") == TIER_P1),
             TIER_P2: sum(1 for c in kept if c.get("tier") == TIER_P2),
             "excluded": len(excluded),
             "over_cap": len(over_cap),
+            "committed_below_bar": len(below),
         },
     }
 

@@ -66,7 +66,7 @@ def _fmt_where(c: dict) -> str:
 def assumptions(*, shortfall: list, audit: dict, generic: dict,
                 candidates: list, scoring_errors: list,
                 interchangeable: list, banned: list, thin: list,
-                unscored: list) -> list[str]:
+                unscored: list, over_cap: list | None = None) -> list[str]:
     """Element 4. Everything this run could not establish, stated plainly.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -91,17 +91,36 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
                          for s in empty)))
 
     if audit and audit.get("error"):
+        # Covers both kinds of failure: the call never happened, and the call
+        # happened but produced nothing usable. "Did not run" was false for
+        # the second.
         out.append(
-            "The famous-event audit did not run (%s), so any marquee event "
-            "below has not been weighed against a more targeted alternative "
-            "and may be there out of habit." % audit["error"])
+            "The famous-event audit produced no usable result (%s), so any "
+            "marquee event below has not been weighed against a more targeted "
+            "alternative and may be there out of habit." % audit["error"])
     elif audit and audit.get("checked"):
-        cut = len(audit.get("cut") or [])
-        out.append(
-            "%d marquee event%s were audited against a named, more targeted "
-            "alternative; %d %s cut."
-            % (audit["checked"], "" if audit["checked"] == 1 else "s",
-               cut, "was" if cut == 1 else "were"))
+        cut = audit.get("cut") or []
+        n = audit["checked"]
+        # Cut events are NAMED. A count on its own leaves the reader unable to
+        # tell which marquee event they were expecting to see and did not get,
+        # which is the one question a cut list has to answer.
+        weighed = [c for c in cut if not c.get("no_verdict")]
+        skipped = [c for c in cut if c.get("no_verdict")]
+        line = ("%d marquee event%s %s audited against a named, more targeted "
+                "alternative; %d %s cut."
+                % (n, "" if n == 1 else "s", "was" if n == 1 else "were",
+                   len(cut), "was" if len(cut) == 1 else "were"))
+        if weighed:
+            line += " Cut after weighing: %s." % ", ".join(
+                str(c.get("name")) for c in weighed if c.get("name"))
+        if skipped:
+            # A different fact from "we compared it and it lost", and the
+            # report has to keep them apart.
+            line += (" Cut because the audit returned no verdict for %s, so %s "
+                     "never weighed against anything."
+                     % (", ".join(str(c.get("name")) for c in skipped if c.get("name")),
+                        "it was" if len(skipped) == 1 else "they were"))
+        out.append(line)
 
     if generic:
         if not generic.get("measured"):
@@ -161,6 +180,22 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
             "row itself so a score built on partial information is visible as "
             "such." % (len(gapped), "" if len(gapped) == 1 else "s"))
 
+    # Events that cleared the bar and were dropped only because the list has a
+    # maximum length. rank() computes this precisely so it can be said; a list
+    # truncated in silence reads as "nothing else qualified", which is a
+    # different and false claim.
+    if over_cap:
+        names = [str(c.get("name")) for c in over_cap if c.get("name")]
+        out.append(
+            "%d further event%s scored above the bar but fell outside the "
+            "maximum list length, so %s not shown: %s. Raise the maximum on "
+            "the client profile to see %s."
+            % (len(over_cap), "" if len(over_cap) == 1 else "s",
+               "it is" if len(over_cap) == 1 else "they are",
+               ", ".join(names[:12]) + (" and %d more" % (len(names) - 12)
+                                        if len(names) > 12 else ""),
+               "it" if len(over_cap) == 1 else "them"))
+
     if not out:
         out.append("Nothing material was left unmeasured on this run.")
     return out
@@ -207,7 +242,9 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
         "methodology": rubric.methodology_note(p["classification"])
         if p.get("classification") in rubric.CLASSIFICATIONS else "",
         # 4. Assumptions and notes.
-        "assumptions": assumptions(candidates=(ranked or {}).get("kept") or [], **kw),
+        "assumptions": assumptions(candidates=(ranked or {}).get("kept") or [],
+                                   over_cap=(ranked or {}).get("over_cap") or [],
+                                   **kw),
         # 5. Top five must-attend.
         "top_five": top_five((ranked or {}).get("kept") or []),
         "counts": counts,

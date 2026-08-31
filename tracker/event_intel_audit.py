@@ -163,6 +163,19 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
         out["verdicts"][key] = rec
         (out["kept"] if verdict == VERDICT_KEPT else out["cut"]).append(
             {"name": str(a.get("name") or "")[:250], **rec})
+
+    # A call that succeeded, was given famous events, and yielded not one
+    # usable verdict has audited nothing: it is a parse or shape failure
+    # wearing a success. Reported as a failed audit, because the alternative
+    # is cutting every marquee event on the strength of a reply nobody could
+    # read, which is the same silent wrong answer this module already refuses
+    # to give on a transport error.
+    if not out["verdicts"]:
+        out["error"] = (
+            "the call succeeded but returned no usable verdict for %s, so "
+            "nothing was actually weighed"
+            % ("the one marquee event it was given" if len(famous) == 1
+               else "any of the %d marquee events it was given" % len(famous)))
     return out
 
 
@@ -199,6 +212,16 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
             c["audit_note"] = ("Cut: the famous-event audit returned no verdict "
                                "for this event, so it was never weighed against "
                                "a more targeted alternative.")
+            # Recorded, not merely dropped. Writing the reason onto a row that
+            # is then discarded means the reason is never stored and the event
+            # leaves the report without appearing in any list, while the
+            # summary's cut count stays at zero. A vanished event with a
+            # confident "0 were cut" beside it is the worst output this step
+            # can produce.
+            audit.setdefault("cut", []).append(
+                {"name": c.get("name"), "verdict": VERDICT_CUT,
+                 "alternative": None, "why": c["audit_note"],
+                 "no_verdict": True})
             continue
         c["audit_verdict"] = v["verdict"]
         note = v["why"]

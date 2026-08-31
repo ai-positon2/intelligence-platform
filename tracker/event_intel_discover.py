@@ -138,6 +138,12 @@ def profile_brief(profile: dict) -> str:
         if p.get(key):
             lines.append("%s: %s" % (label, p[key]))
     lines.append("Time window: the next %s months" % (p.get("window_months") or 12))
+    if p.get("force_include"):
+        lines.append("The client is ALREADY COMMITTED to these events. Return "
+                     "them if they fall in your category so they can be scored "
+                     "alongside the rest; the client needs to know what their "
+                     "committed events are worth, not to have them left out: %s"
+                     % p["force_include"])
     if p.get("force_exclude"):
         lines.append("Do NOT return these (already attended, known duds, "
                      "disqualified): %s" % p["force_exclude"])
@@ -197,7 +203,28 @@ def _excluded(name: str, force_exclude: str | None) -> bool:
     return False
 
 
-def merge(by_category: dict, force_exclude: str | None = None) -> list[dict]:
+def committed_keys(force_include: str | None) -> set:
+    """The name keys of events the client has already committed to."""
+    out = set()
+    for line in re.split(r"[\n,;]+", str(force_include or "")):
+        k = name_key(line)
+        if k:
+            out.add(k)
+    return out
+
+
+def is_committed(name: str, keys: set) -> bool:
+    """Same containment match force-exclude uses, so "Money20/20" written on
+    the profile matches "Money20/20 USA 2026" coming back from a search, and
+    "SaaStr" matches "SaaStr Annual"."""
+    key = name_key(name)
+    if not key:
+        return False
+    return any(k in key or key in k for k in (keys or set()))
+
+
+def merge(by_category: dict, force_exclude: str | None = None,
+          force_include: str | None = None) -> list[dict]:
     """Flatten the six category results into one deduped candidate list.
 
     First find wins, and the order is CATEGORIES order, which deliberately
@@ -208,6 +235,7 @@ def merge(by_category: dict, force_exclude: str | None = None) -> list[dict]:
     out: list[dict] = []
     seen_names: set[str] = set()
     seen_hosts: set[str] = set()
+    committed = committed_keys(force_include)
     for cat in rubric.CATEGORIES:
         for ev in (by_category.get(cat) or []):
             nk = name_key(ev.get("name") or "")
@@ -221,6 +249,11 @@ def merge(by_category: dict, force_exclude: str | None = None) -> list[dict]:
             seen_names.add(nk)
             if hk:
                 seen_hosts.add(hk)
+            # Set here, in code, from the user's own profile. A model that
+            # returns committed:true for an event nobody committed to must not
+            # be able to promote itself past the floor.
+            ev = dict(ev)
+            ev["committed"] = is_committed(ev.get("name") or "", committed)
             out.append(ev)
     return out
 
@@ -361,7 +394,8 @@ def discover(profile: dict) -> dict:
             else (st.get("note") or "This category returned nothing for this client.")
         shortfall.append(s)
 
-    candidates = merge(by_category, (profile or {}).get("force_exclude"))
+    candidates = merge(by_category, (profile or {}).get("force_exclude"),
+                       (profile or {}).get("force_include"))
     ran = sum(1 for s in statuses.values() if s["status"] != STATUS_ERROR)
     return {
         "candidates": candidates,

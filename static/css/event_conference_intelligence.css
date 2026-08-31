@@ -964,3 +964,39 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(139,92,246,.2));
 }
 :root[data-theme="light"] .evi-dec .dbtn.on { color: #1b2440; }
+
+/* The budget the user recorded. Deliberately in the summary block and never
+   beside a score: a number placed next to a score is a number that starts
+   moving it. */
+.evi-exec .ex-budget {
+  margin-top: 12px; padding: 11px 14px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-line-2); border: 1px dashed var(--evi-line);
+  font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-budget b { color: var(--evi-ink); }
+.evi-exec .ex-budget i { font-style: normal; color: var(--evi-ink-3); }
+
+/* "We read this and found none" against "we did not read this". Coloured
+   apart because they look identical in words and mean opposite things. */
+.evi-overlap.none { border-left-color: var(--evi-ink-3); color: var(--evi-ink-3); }
+.evi-overlap.unknown {
+  border-left-color: var(--evi-warn); color: var(--evi-ink-2);
+  background: rgba(251,191,36,.07);
+}
+
+/* An event the client has already paid for. Marked wherever it appears, so it
+   is never read as an event that earned its place on the list. */
+.evi-cand .cn .cmt {
+  flex-shrink: 0; font-size: 9.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(251,191,36,.15); color: var(--evi-warn);
+  border: 1px solid rgba(251,191,36,.3); white-space: nowrap;
+}
+.evi-exec .ex-committed {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md, 10px);
+  background: rgba(251,191,36,.09); border: 1px solid rgba(251,191,36,.26);
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2);
+}
+/* The user's own note can end without punctuation, so the caveat gets its own
+   line rather than running on from whatever they typed. */
+.evi-exec .ex-budget i { display: block; margin-top: 4px; }
