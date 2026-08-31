@@ -251,6 +251,7 @@ def _ensure_tables(conn) -> None:
                 booths TEXT,
                 category VARCHAR(32) NOT NULL,
                 famous BOOLEAN NOT NULL DEFAULT FALSE,
+                committed BOOLEAN NOT NULL DEFAULT FALSE,
                 audit_verdict VARCHAR(16),
                 audit_note TEXT,
                 relevance INTEGER,
@@ -345,6 +346,8 @@ def _ensure_tables(conn) -> None:
         # rows get the default: they were all read from a page.
         cur.execute("ALTER TABLE evi_participants ADD COLUMN IF NOT EXISTS "
                     "provenance VARCHAR(12) NOT NULL DEFAULT 'page'")
+        cur.execute("ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS "
+                    "committed BOOLEAN NOT NULL DEFAULT FALSE")
     conn.commit()
     _TABLES_READY = True
 
@@ -867,7 +870,7 @@ _CANDIDATE_FIELDS = (
     "relevance", "relevance_note", "dm_access", "dm_access_note",
     "engagement", "engagement_note", "matchmaking", "matchmaking_evidence",
     "matchmaking_reason", "total", "tier", "description", "client_line",
-    "cost_note", "confidence", "gaps", "sources")
+    "cost_note", "confidence", "committed", "gaps", "sources")
 
 
 def normalise_candidate(raw: dict) -> dict | None:
@@ -950,6 +953,9 @@ def normalise_candidate(raw: dict) -> dict | None:
         # Budget rides along as a note and is never read by the rubric. The
         # rubric's score() has no parameter that could accept it.
         "cost_note": _txt("cost_note", 400),
+        # Carried through so ranking can read it back. Set in code from the
+        # profile at discovery, never taken from a model's own claim.
+        "committed": bool(r.get("committed")),
         "confidence": (str(r.get("confidence") or "medium").strip().lower()[:10]),
         "gaps": rubric.gaps_for(r),
         "sources": [u for u in (r.get("sources") or [])

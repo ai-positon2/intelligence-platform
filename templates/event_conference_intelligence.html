@@ -151,6 +151,16 @@
               </div>
               <div class="evi-row" style="margin-top:14px">
                 <div class="evi-field">
+                  <label for="forceInclude">Already committed to these</label>
+                  <textarea id="forceInclude" placeholder="Money20/20&#10;SaaStr Annual"></textarea>
+                  <span class="hint">
+                    Scored alongside everything else and kept on the list whatever
+                    they score, marked. If something you have already paid for does
+                    not clear the bar, that is the most useful thing this can tell
+                    you, so it is never quietly dropped.
+                  </span>
+                </div>
+                <div class="evi-field">
                   <label for="forceExclude">Do not suggest these</label>
                   <textarea id="forceExclude" placeholder="Dreamforce&#10;CES"></textarea>
                   <span class="hint">Already attended, known duds, or disqualified.</span>
@@ -448,6 +458,7 @@
         sales_cycle: document.getElementById('salesCycle').value.trim(),
         geo_scope: document.getElementById('geoScope').value.trim(),
         window_months: document.getElementById('windowMonths').value.trim(),
+        force_include: document.getElementById('forceInclude').value.trim(),
         force_exclude: document.getElementById('forceExclude').value.trim(),
         budget_note: document.getElementById('budgetNote').value.trim()
       };
@@ -792,10 +803,34 @@
     }
 
     function eventsHtml(run){
-      var evs = run.events || [];
+      var evs = (run.events || []).slice();
       if (evs.length < 2) return '';
-      var overlap = (run.summary || {}).target_overlap || {};
-      return '<div class="evi-sec"><h3>Events found</h3><div class="evi-events">' +
+      var sm = run.summary || {};
+      var overlap = sm.target_overlap || {};
+      // Render in the order the pipeline ranked, so the list on screen is the
+      // one the form promised: ordered by how many of YOUR accounts are in
+      // each roster, not by discovery order.
+      var order = sm.event_order || null;
+      if (order && order.length) {
+        var pos = {};
+        order.forEach(function(id, i){ pos[String(id)] = i; });
+        evs.sort(function(a, b){
+          var pa = pos[String(a.id)], pb = pos[String(b.id)];
+          if (pa == null && pb == null) return 0;
+          if (pa == null) return 1;
+          if (pb == null) return -1;
+          return pa - pb;
+        });
+      }
+      // Which rosters were actually read. An event nobody sampled must never
+      // render the same as one sampled and found to contain none of your
+      // accounts.
+      var sampled = {};
+      (sm.harvested_event_ids || []).forEach(function(id){ sampled[String(id)] = 1; });
+      var knowSampled = (sm.harvested_event_ids || []).length > 0;
+      return '<div class="evi-sec"><h3>Events found</h3>' +
+        (sm.ranked_by ? '<div class="evi-note">' + esc(sm.ranked_by) + '</div>' : '') +
+        '<div class="evi-events">' +
         evs.map(function(ev){
           var hits = overlap[String(ev.id)] || [];
           var site = safeUrl(ev.website);
@@ -810,10 +845,19 @@
               '<span class="fl">fit</span></div>' : '') +
             '</div>' +
             (ev.fit_reasoning ? '<div class="why">' + esc(ev.fit_reasoning) + '</div>' : '') +
-            (hits.length ? '<div class="evi-overlap"><b>' + hits.length +
-              '</b> of your target accounts are in this roster: ' +
-              esc(hits.slice(0, 8).join(', ')) +
-              (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>' : '') +
+            (hits.length
+              ? '<div class="evi-overlap"><b>' + hits.length +
+                '</b> of your target accounts are in this roster: ' +
+                esc(hits.slice(0, 8).join(', ')) +
+                (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>'
+              : (knowSampled
+                  ? (sampled[String(ev.id)]
+                      ? '<div class="evi-overlap none">This roster was read and ' +
+                        'none of your target accounts are on it.</div>'
+                      : '<div class="evi-overlap unknown">This roster was not read, ' +
+                        'so whether your target accounts are on it is unknown. ' +
+                        'Only the best-fitting few are sampled.</div>')
+                  : '')) +
             '</div>';
         }).join('') + '</div></div>';
     }
@@ -882,6 +926,7 @@
         '<div class="ct">' +
           '<div class="cn">' +
             '<span class="tier">' + esc(c.tier || '') + '</span>' +
+            (c.committed ? '<span class="cmt">already committed</span>' : '') +
             (site ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' +
                     esc(c.name) + '</a>' : esc(c.name)) +
             (c.edition ? ' <span class="ed">' + esc(c.edition) + '</span>' : '') +
@@ -999,9 +1044,19 @@
         return '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
           esc(s.note) + '</span></div>' + coverageHtml(s);
       }
-      var kept = cands.filter(function(c){ return c.tier !== 'P3'; })
-                      .slice(0, (run.profile || {}).max_events || 15);
-      var counts = s.counts || {};
+      var counts0 = s.counts || {};
+      // One authority for how long the list is. The summary's count comes from
+      // rank(); a second client-side slice using a defaulted max_events can
+      // disagree with the number printed directly above it.
+      var keepN = counts0.kept != null ? counts0.kept
+                : ((run.profile || {}).max_events || 15);
+      // A committed event below the bar is P3 by definition, and showing it is
+      // the entire point. Filtering P3 unconditionally hid the one row this
+      // feature exists to surface.
+      var kept = cands.filter(function(c){
+        return c.tier !== 'P3' || c.committed;
+      }).slice(0, keepN);
+      var counts = counts0;
       var outc = s.outcomes || {};
       var byName = outc.by_name || {};
       var decLabels = outc.labels || {};
@@ -1013,6 +1068,16 @@
         (s.where_buyers ? '<div class="ex-where"><b>' +
           esc(s.classification_label || '') + '.</b> ' + esc(s.where_buyers) +
           '</div>' : '') +
+        /* The budget the user recorded. Shown because the field promises it
+           is, and shown HERE rather than beside a score, because putting a
+           number next to a score is how it starts influencing one. */
+        ((run.profile || {}).budget_note
+          ? '<div class="ex-budget"><b>Budget you recorded.</b> ' +
+            esc(run.profile.budget_note) +
+            '<i>Never used to score an event. Each event\'s own published ' +
+            'cost is under "Why these scores".</i></div>' : '') +
+        (s.committed_note ? '<div class="ex-committed">' +
+          esc(s.committed_note) + '</div>' : '') +
         '<div class="ex-counts">' +
           '<span><b>' + (counts.P1 || 0) + '</b> must-attend</span>' +
           '<span><b>' + (counts.P2 || 0) + '</b> strong</span>' +
@@ -1203,6 +1268,13 @@
         esc(s.send_note || '') + ' ' + esc((s.repeats || {}).crm_note || '') +
         '</span></div>';
 
+      if ((s.qualify_errors || []).length) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
+          '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
+          esc(s.qualify_errors.join(' ')) +
+          ' Companies below marked &ldquo;not qualified&rdquo; may be a ' +
+          'failure to look rather than a judgement about them.</span></div>';
+      }
       if (s.rewritten_count) {
         html += '<div class="evi-sec"><h3>What was thrown away</h3>' +
           '<div class="evi-note">' + esc(s.rewritten_count) + ' draft' +
