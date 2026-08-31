@@ -416,6 +416,25 @@
     }
     window.onProfilePick = onProfilePick;
 
+    /* Both radiogroups render their first card with aria-checked="true", so on
+       load the page SHOWS a selection that the script does not have. Saving
+       then fails on a classification the user can see is highlighted. Read the
+       checked card back rather than trusting a variable nothing has set. */
+    function checkedValue(attr){
+      var on = document.querySelector('[' + attr + '][aria-checked="true"]')
+            || document.querySelector('[' + attr + ']');
+      return on ? on.getAttribute(attr) : null;
+    }
+
+    function initForm(){
+      pickedClass = pickedClass || checkedValue('data-classification');
+      pickedEventClass = pickedEventClass || checkedValue('data-eventclass');
+      // Runs unconditionally: with no saved profiles the select's only option
+      // is "new" and `change` never fires, so this is the only thing that
+      // opens the intake form.
+      onProfilePick();
+    }
+
     function saveProfile(){
       var err = document.getElementById('profileError');
       err.style.display = 'none';
@@ -470,8 +489,15 @@
       if (mode === 'recommend') {
         var pid = document.getElementById('profilePick').value;
         if (!pid || pid === 'new') {
-          showFormError('Lock a client profile first. Which side of the event ' +
-                        'floor gets scored depends on it, and it is never assumed.');
+          // The form is already open (initForm on load, and the select's own
+          // change handler after that), so this puts the cursor in it. A
+          // refusal that does not show the way out is a dead end with a
+          // paragraph attached.
+          var name = document.getElementById('clientName');
+          if (name) { name.focus(); name.scrollIntoView({block: 'center'}); }
+          showFormError('Fill in the client profile below and press "Lock this ' +
+                        'profile" first. Which side of the event floor gets ' +
+                        'scored depends on it, and it is never assumed.');
           return false;
         }
         body.profile_id = parseInt(pid, 10);
@@ -486,9 +512,7 @@
           showFormError('Lock a client profile first. There is no way to qualify a ' +
                         'roster to an ICP without one.'); return false;
         }
-        var ec = pickedEventClass || (document.querySelector('[data-eventclass]') || {})
-                   .getAttribute && document.querySelector('[data-eventclass]')
-                   .getAttribute('data-eventclass');
+        var ec = pickedEventClass || checkedValue('data-eventclass');
         if (!ec) {
           showFormError('Say what your relationship to this event was.'); return false;
         }
@@ -1284,6 +1308,12 @@
       }
       document.getElementById('drawerBody').innerHTML = html ||
         '<div class="evi-empty">Nothing to show for this run.</div>';
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initForm);
+    } else {
+      initForm();
     }
   })();
 
