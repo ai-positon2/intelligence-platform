@@ -908,9 +908,15 @@
     // Points are pre-bucketed by the caller; empty buckets arrive as zeros and
     // are plotted as zeros. Dropping them would draw a straight line over a
     // silence, and a silence in a publishing calendar is the finding.
+    // Gradients and patterns are referenced by id, and one pane can draw several
+    // trends. A shared id means the second chart silently repaints the first,
+    // so every chart stamps its own.
+    var SVG_UID = 0;
+
     function trendSvg(pts, o){
       o = o || {};
       if(!pts || pts.length < 2) return '';
+      var uid = 'sci-t' + (++SVG_UID);
       var W = 960, H = 210, PL = 46, PR = 12, PT = 12, PB = 26;
       var iw = W - PL - PR, ih = H - PT - PB, base = PT + ih;
       var raw = Math.max.apply(null, pts.map(function(p){ return p.value; }));
@@ -918,6 +924,7 @@
       var top = niceMax(raw);
       var X = function(i){ return PL + iw * i / (pts.length - 1); };
       var Y = function(v){ return base - (v / top) * ih; };
+      var last = pts.length - 1;
 
       // Three gridlines, unless the midpoint would print the same number as a
       // neighbour. On a chart whose peak is 1 post a week, [0, 0.5, 1] renders
@@ -936,10 +943,21 @@
           esc(fmtNum(Math.round(v))) + '</text>';
       });
 
-      var line = pts.map(function(p, i){
-        return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.value).toFixed(1);
-      }).join(' ');
-      var area = line + ' L' + X(pts.length - 1).toFixed(1) + ' ' + base + ' L' + X(0).toFixed(1) + ' ' + base + ' Z';
+      // The final bucket is the week or month we are standing in, and it has not
+      // finished happening. Drawn solid it reads as a collapse in output, so the
+      // last leg is dashed. Every period behind it is closed and stays solid.
+      var solidTo = (o.partial && pts.length > 2) ? last - 1 : last;
+      var seg = function(a, b){
+        var d = '';
+        for(var i = a; i <= b; i++){
+          d += (i === a ? 'M' : 'L') + X(i).toFixed(1) + ' ' + Y(pts[i].value).toFixed(1) + ' ';
+        }
+        return d.trim();
+      };
+      var line = seg(0, solidTo);
+      var tail = solidTo < last ? seg(solidTo, last) : '';
+      var area = seg(0, last) + ' L' + X(last).toFixed(1) + ' ' + base +
+        ' L' + X(0).toFixed(1) + ' ' + base + ' Z';
 
       var step = pts.length <= 8 ? 1 : (pts.length <= 16 ? 2 : Math.ceil(pts.length / 8));
       var labels = pts.map(function(p, i){
@@ -952,8 +970,24 @@
       // Marks stay visible only while there is room for them; past ~40 buckets
       // a dot per point is a smear, and the hover layer carries the detail.
       var dots = pts.length <= 30 ? pts.map(function(p, i){
-        return '<circle class="sci-tr-pt" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="2.6"/>';
+        return '<circle class="sci-tr-pt" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="3.1"/>';
       }).join('') : '';
+
+      // The series' own average, so a bucket can be read against this company's
+      // normal rather than against nothing. Suppressed on short series, where
+      // "the average of three numbers" is not a baseline, and when it would land
+      // on the top gridline and print two labels over each other.
+      var avg = '';
+      if(pts.length >= 4){
+        var mean = pts.reduce(function(a, p){ return a + p.value; }, 0) / pts.length;
+        if(mean > 0 && mean < top * 0.93){
+          var ay = Y(mean);
+          avg = '<line class="sci-tr-avg" x1="' + PL + '" y1="' + ay.toFixed(1) + '" x2="' + (PL + iw) +
+              '" y2="' + ay.toFixed(1) + '"/>' +
+            '<text class="sci-tr-avgl" x="' + (PL + iw) + '" y="' + (ay - 5).toFixed(1) +
+              '" text-anchor="end">avg ' + esc(fmtNum(Math.round(mean))) + '</text>';
+        }
+      }
 
       // A full-height invisible column per point: the hit target is the whole
       // band, not the 3px mark, so the crosshair is catchable with a real hand.
@@ -967,11 +1001,34 @@
         '</g>';
       }).join('');
 
+      // The fill fades toward the baseline instead of sitting as one flat tint,
+      // and the plot floor carries a dot grid that fades out at both edges, so
+      // the series is bounded by its own data rather than by a drawn box. The
+      // colour lives in the stops, not on the path: a CSS `fill` on .sci-tr-area
+      // would beat the paint-server reference in the markup.
+      var defs = '<defs>' +
+        '<linearGradient id="' + uid + '-fill" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop class="sci-tr-g0" offset="0"/><stop class="sci-tr-g1" offset="1"/>' +
+        '</linearGradient>' +
+        '<pattern id="' + uid + '-dots" width="13" height="13" patternUnits="userSpaceOnUse">' +
+          '<circle class="sci-tr-dg" cx="1.3" cy="1.3" r="1.05"/></pattern>' +
+        '<linearGradient id="' + uid + '-edge" x1="0" y1="0" x2="1" y2="0">' +
+          '<stop offset="0" stop-color="#000000"/><stop offset="0.1" stop-color="#ffffff"/>' +
+          '<stop offset="0.9" stop-color="#ffffff"/><stop offset="1" stop-color="#000000"/>' +
+        '</linearGradient>' +
+        '<mask id="' + uid + '-edgem"><rect x="' + PL + '" y="' + PT + '" width="' + iw +
+          '" height="' + ih + '" fill="url(#' + uid + '-edge)"/></mask>' +
+      '</defs>';
+
       return '<div class="sci-tr-wrap"><svg class="sci-tr" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
         'aria-label="' + esc(o.aria || 'Trend chart') + '">' +
-        grid +
-        '<path class="sci-tr-area" d="' + area + '"/>' +
+        defs +
+        '<rect class="sci-tr-bg" x="' + PL + '" y="' + PT + '" width="' + iw + '" height="' + ih +
+          '" fill="url(#' + uid + '-dots)" mask="url(#' + uid + '-edgem)"/>' +
+        grid + avg +
+        '<path class="sci-tr-area" d="' + area + '" fill="url(#' + uid + '-fill)"/>' +
         '<path class="sci-tr-line" d="' + line + '" pathLength="1"/>' +
+        (tail ? '<path class="sci-tr-tail" d="' + tail + '"/>' : '') +
         dots + labels + hits +
       '</svg></div>';
     }
@@ -1079,6 +1136,101 @@
       return '<div class="sci-heat">' + head + body +
         '<div class="sci-heat-legend"><span>' + esc(o.low || 'quiet') + '</span>' + scale +
         '<span>' + esc(o.high || 'busiest') + '</span></div></div>';
+    }
+
+    // ── Radar: several entities compared on the same handful of measures ─────
+    // Each axis is scaled to its OWN peak, because posts-per-week and average
+    // interactions share no unit and never will. That makes the polygon a
+    // profile rather than a size: a wide shape means "leads on most of these",
+    // never "is bigger". The note under the chart says so, because a radar that
+    // does not say it is inviting exactly the wrong read.
+    //
+    // The caller is responsible for only passing measures that EVERY series
+    // reports. A platform that does not publish view counts would otherwise be
+    // drawn sitting at zero views, which is a different claim entirely.
+    //
+    // Two or three profiles overlay cleanly and comparing them directly is the
+    // whole point. Past that they stop being readable as separate shapes, so
+    // the same data becomes small multiples: one plot each, same axes, same
+    // scale, with the group average ghosted behind every one of them.
+    function radarPlot(shapes, axes, g){
+      var k = axes.length;
+      var ang = function(i){ return -Math.PI / 2 + i * 2 * Math.PI / k; };
+      var pt = function(i, f){
+        return [g.cx + Math.cos(ang(i)) * g.R * f, g.cy + Math.sin(ang(i)) * g.R * f];
+      };
+      var ptsAttr = function(list){
+        return list.map(function(p){ return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+      };
+      var ringAt = function(f){ return ptsAttr(axes.map(function(_, i){ return pt(i, f); })); };
+
+      var rings = g.rings.map(function(f){
+        return '<polygon class="sci-rd-ring' + (f === 1 ? ' sci-rd-edge' : '') + '" points="' + ringAt(f) + '"/>';
+      }).join('');
+      var spokes = axes.map(function(_, i){
+        var p = pt(i, 1);
+        return '<line class="sci-rd-spoke" x1="' + g.cx + '" y1="' + g.cy + '" x2="' +
+          p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>';
+      }).join('');
+      // Anchored by which side of the circle the axis sits on, so a label never
+      // runs back across its own spoke.
+      var labels = !g.labels ? '' : axes.map(function(a, i){
+        var p = pt(i, 1.17), c = Math.cos(ang(i));
+        var anchor = Math.abs(c) < 0.25 ? 'middle' : (c > 0 ? 'start' : 'end');
+        return '<text class="sci-rd-ax" x="' + p[0].toFixed(1) + '" y="' + (p[1] + 3.5).toFixed(1) +
+          '" text-anchor="' + anchor + '">' + esc(a.label) + '</text>';
+      }).join('');
+
+      var ghost = !g.ghost ? '' :
+        '<polygon class="sci-rd-ghost" points="' +
+          ptsAttr(axes.map(function(_, i){ return pt(i, Math.max(g.ghost[i], 0.025)); })) + '"/>';
+
+      // A vertex is never plotted at the exact centre: several series all
+      // bottoming out on one axis would collapse into one unhittable dot.
+      var drawn = shapes.map(function(sr){
+        var vs = axes.map(function(_, i){ return pt(i, Math.max(sr.values[i], 0.025)); });
+        var dots = vs.map(function(p, i){
+          return '<circle class="sci-rd-pt" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) +
+            '" r="' + (g.dot || 3.4) + '" data-tip="' + tipHtml(sr.label, [
+              [axes[i].label, sr.display[i]],
+              ['Share of the best here', Math.round(sr.values[i] * 100) + '%']]) + '"/>';
+        }).join('');
+        return '<g class="sci-rd-s" data-platform="' + esc(sr.key) + '" data-hi="' + esc(sr.key) + '">' +
+          '<polygon class="sci-rd-poly" points="' + ptsAttr(vs) + '"/>' + dots + '</g>';
+      }).join('');
+
+      return '<svg class="sci-rd" viewBox="0 0 ' + g.W + ' ' + g.H + '" role="img" aria-label="' +
+        esc(g.aria || 'Profile') + '">' + rings + spokes + labels + ghost +
+        '<g class="sci-rd-shapes">' + drawn + '</g></svg>';
+    }
+
+    function radarSvg(series, axes, o){
+      o = o || {};
+      if(axes.length < 3 || series.length < 2) return '';
+
+      // Small multiples past three profiles. Same axes, same scale, one plot
+      // each, so the tiles are comparable to each other and not just internally.
+      if(series.length > 3){
+        var avg = axes.map(function(_, i){
+          return series.reduce(function(a, sr){ return a + sr.values[i]; }, 0) / series.length;
+        });
+        return '<div class="sci-rd-grid">' + series.map(function(sr){
+          return '<div class="sci-rd-tile" data-platform="' + esc(sr.key) + '">' +
+            radarPlot([sr], axes, {W: 384, H: 232, cx: 192, cy: 112, R: 70, rings: [0.5, 1],
+              labels: true, ghost: avg, dot: 3, aria: sr.label + ' profile'}) +
+            '<div class="sci-rd-cap"><i class="sci-rd-sw"></i>' + esc(sr.label) + '</div></div>';
+        }).join('') + '</div>';
+      }
+
+      var key = series.map(function(sr){
+        return '<span class="sci-mk" data-hi="' + esc(sr.key) + '" data-platform="' + esc(sr.key) + '">' +
+          '<i class="sci-rd-sw"></i>' + esc(sr.label) + '</span>';
+      }).join('');
+      return '<div class="sci-rd-wrap">' +
+        radarPlot(series, axes, {W: 460, H: 340, cx: 230, cy: 170, R: 104,
+          rings: [0.25, 0.5, 0.75, 1], labels: true,
+          aria: o.aria || 'Platform comparison'}) +
+        '<div class="sci-mixkey sci-mixkey-col sci-rd-key">' + key + '</div></div>';
     }
 
     // ── Format mix, now with what each format actually earns ─────────────────
@@ -1828,6 +1980,32 @@
         .forEach(function(el, i){ setTimeout(function(){ el.classList.add('drawn'); }, 60 + i * 90); });
     }
 
+    // ── While a run is still collecting ──────────────────────────────────────
+    // There is nothing to plot yet, and an empty panel reads as "finished, found
+    // nothing". These are placeholders for the charts that are coming, with a
+    // sweep travelling across them, so the panel reads as working. They are
+    // marked drawn on arrival: revealCharts only animates charts that hold data.
+    function skeletonChart(title, kind){
+      // The placeholder takes the shape of the thing it is standing in for: a
+      // curve where a curve is coming, stacked rows where a table is. A generic
+      // grey box would say "loading" without saying loading what.
+      var plot = kind === 'rows'
+        ? [0, 1, 2, 3, 4].map(function(i){
+            return '<span class="sci-skel-row"><i class="sci-skel-ic"></i>' +
+              '<i class="sci-skel-n"></i><i class="sci-skel-t" style="--w:' +
+              (44 + ((i * 37) % 48)) + '%"></i></span>';
+          }).join('')
+        : '<svg class="sci-skel-svg" viewBox="0 0 960 150" preserveAspectRatio="none" aria-hidden="true">' +
+            '<path d="M0 116 C 130 94, 190 44, 300 60 C 410 76, 470 126, 590 106 ' +
+            'C 700 88, 770 32, 960 50 L960 150 L0 150 Z"/></svg>';
+      return '<div class="sci-chart sci-chart-skel drawn">' +
+        '<div class="sci-chart-head"><div class="sci-chart-ht">' +
+          '<h5>' + esc(title) + '</h5><p>Waiting on collected posts</p></div></div>' +
+        '<div class="sci-skel-plot sci-skel-' + kind + '" aria-hidden="true">' + plot +
+          '<span class="sci-skel-sweep"></span></div>' +
+        '<div class="sci-chart-note">Still collecting</div></div>';
+    }
+
     function overviewPane(run, allPosts, names, byName){
       var html = '';
       if(run.status === 'running'){
@@ -1848,6 +2026,10 @@
       var busiest = names.slice().sort(function(a, b){
         return (byName[b].post_count || 0) - (byName[a].post_count || 0); })[0];
 
+      if(run.status === 'running' && !allPosts.length){
+        html += renderSection('Coming next', '◴',
+          duo(skeletonChart('Publishing rhythm', 'area'), skeletonChart('Platform scorecard', 'rows')));
+      }
       html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts),
         siteLink(run));
       html += renderSection('How the platforms compare', '⊞', renderScorecard(run),
@@ -1930,7 +2112,18 @@
         buckets[i].inter += interactionScore(p.metrics);
         if(p.metrics && typeof p.metrics.views === 'number') buckets[i].views += p.metrics.views;
       });
-      return {buckets: buckets, weekly: weekly, spanDays: spanDays};
+      // Buckets run to the period holding the newest post, which is usually the
+      // period we are standing in -- and that one is not over. Saying so lets
+      // the chart draw its last leg dashed instead of reporting a cliff that is
+      // really just "the week isn't finished".
+      var lastKey = buckets[buckets.length - 1].key, endMs;
+      if(weekly){
+        endMs = lastKey + 7 * 86400000;
+      } else {
+        var kp = String(lastKey).split('-');
+        endMs = Date.UTC(Number(kp[0]), Number(kp[1]), 1);
+      }
+      return {buckets: buckets, weekly: weekly, spanDays: spanDays, partial: Date.now() < endMs};
     }
 
     var TREND_METRICS = [
@@ -1973,7 +2166,8 @@
             ['Interactions', fmtFullNum(Math.round(bk.inter))]
           ].concat(bk.views ? [['Views', fmtFullNum(Math.round(bk.views))]] : []))};
       });
-      var svg = trendSvg(pts, {aria: metric.label + ' per ' + (b.weekly ? 'week' : 'month')});
+      var svg = trendSvg(pts, {aria: metric.label + ' per ' + (b.weekly ? 'week' : 'month'),
+        partial: b.partial});
       if(!svg) return '';
       var peak = Math.max.apply(null, pts.map(function(p){ return p.value; }));
       var quiet = pts.filter(function(p){ return !p.value; }).length;
@@ -1986,7 +2180,8 @@
         note: 'Peak ' + fmtNum(Math.round(peak)) + ' ' +
           (peak === 1 ? metric.unit.toLowerCase().replace(/s$/, '') : metric.unit.toLowerCase()) +
           ' in one ' + (b.weekly ? 'week' : 'month') +
-          (quiet ? ' · ' + quiet + ' ' + (b.weekly ? 'week' : 'month') + (quiet === 1 ? '' : 's') + ' with nothing published' : '')
+          (quiet ? ' · ' + quiet + ' ' + (b.weekly ? 'week' : 'month') + (quiet === 1 ? '' : 's') + ' with nothing published' : '') +
+          (b.partial ? ' · the last ' + (b.weekly ? 'week' : 'month') + ' is still running, so its leg is drawn dashed' : '')
       });
     }
 
@@ -2056,6 +2251,15 @@
       {k: 'perWeek',         label: 'Posts / week', fmt: function(v){ return v.toFixed(1); }},
       {k: 'bestScore',       label: 'Best post',   fmt: function(v){ return fmtNum(v); }}
     ];
+    // The table is canonical and stays the default. The radar is offered beside
+    // it as a second reading of the same numbers, never as a replacement.
+    var SCORE_VIEW = 'table';
+    function setScoreView(v){
+      SCORE_VIEW = v;
+      var el = document.getElementById('sci-scorecard');
+      if(el && CURRENT_RUN) el.outerHTML = renderScorecard(CURRENT_RUN);
+      revealCharts();
+    }
     function setScoreSort(key){
       if(SCORE_SORT.key === key) SCORE_SORT.dir = -SCORE_SORT.dir;
       else { SCORE_SORT.key = key; SCORE_SORT.dir = -1; }
@@ -2084,7 +2288,7 @@
             '<span class="sci-sc-arrow">' + (c.k === sortKey ? (dir < 0 ? '▾' : '▴') : '') + '</span></button>';
         }).join('') + '</div>';
 
-      var body = rows.map(function(r){
+      var tableRows = rows.map(function(r){
         var meta = platformMeta(r.platform);
         return '<button type="button" class="sci-sc-row sci-sc-body" data-platform="' + esc(r.platform) + '"' +
           ' onclick="switchPane(\'' + esc(r.platform) + '\')">' +
@@ -2103,10 +2307,41 @@
           }).join('') + '</button>';
       }).join('');
 
-      return chartCard({id: 'sci-scorecard', cls: 'sci-chart-wide',
-        title: 'Platform scorecard', sub: 'Sort by any column. Each bar is measured against that column.',
-        body: '<div class="sci-sc">' + head + body + '</div>',
-        note: 'A dash means the platform does not report that number, not that it is zero.'});
+      // Only measures every compared platform actually reports can become radar
+      // axes. Plotting a platform at zero on a metric it simply does not publish
+      // would draw a company as silent where it is only unmeasured.
+      var radarCols = SCORE_COLS.filter(function(c){
+        return maxes[c.k] > 0 && rows.every(function(r){ return r.s[c.k] != null; });
+      });
+      var canShape = radarCols.length >= 3;
+      var view = canShape ? SCORE_VIEW : 'table';
+
+      var body = view === 'shape'
+        ? radarSvg(rows.map(function(r){
+            return {key: r.platform, label: platformLabel(r.platform),
+              values: radarCols.map(function(c){ return maxes[c.k] ? (r.s[c.k] || 0) / maxes[c.k] : 0; }),
+              display: radarCols.map(function(c){ return c.fmt(r.s[c.k]); })};
+          }), radarCols.map(function(c){ return {label: c.label}; }),
+          {aria: 'Each platform profiled across ' + radarCols.length + ' measures'})
+        : '<div class="sci-sc">' + head + tableRows + '</div>';
+      if(!body) return '';
+
+      // sci-chart-wide is the table's: it turns on horizontal scrolling and, on
+      // a narrow screen, a fade down the right edge that says "there is more
+      // over here". The radar always fits, so on it that fade would be pointing
+      // at nothing.
+      return chartCard({id: 'sci-scorecard', cls: view === 'shape' ? '' : 'sci-chart-wide',
+        title: 'Platform scorecard',
+        sub: view === 'shape'
+          ? 'The same numbers as a profile per platform.'
+          : 'Sort by any column. Each bar is measured against that column.',
+        controls: canShape ? segControl([{k: 'table', label: 'Table'}, {k: 'shape', label: 'Shape'}],
+          view, 'setScoreView') : '',
+        body: body,
+        note: view === 'shape'
+          ? 'Every axis is scaled to whichever platform leads on that measure, so a wide shape means "ahead on most of these", not "bigger". Only measures all of these platforms report are drawn.' +
+            (rows.length > 3 ? ' The dotted outline behind each profile is the average of all ' + rows.length + '.' : '')
+          : 'A dash means the platform does not report that number, not that it is zero.'});
     }
 
     // ── Engagement composition ───────────────────────────────────────────────

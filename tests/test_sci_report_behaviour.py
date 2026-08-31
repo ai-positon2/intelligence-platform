@@ -1008,3 +1008,171 @@ def test_every_outbound_link_opens_in_a_new_tab_and_drops_the_opener():
     got = _run(probe)
     assert got["total"] >= 5, "the probe found almost no anchors, so it proves nothing"
     assert got["bad"] == [], got["bad"]
+
+
+# ── The period that has not finished happening ─────────────────────────────
+#
+# Buckets run to the week or month holding the newest post, which is usually
+# the one we are standing in. Drawn solid, that half-finished bucket reads as
+# a collapse in output when it is only Tuesday.
+
+def test_a_bucket_still_in_progress_is_reported_as_partial():
+    probe = """
+      var DAY = 86400000, now = Date.now();
+      function at(daysAgo){
+        return {platform:'x', post_type:'image', metrics:{likes:5},
+                posted_at: new Date(now - daysAgo * DAY).toISOString()};
+      }
+      // Both series are the same shape and the same length. The only
+      // difference is whether the last one landed inside the current week.
+      ({open: bucketPosts([40,32,24,16,8,0].map(at)).partial,
+        closed: bucketPosts([72,64,56,48,40,32].map(at)).partial})
+    """
+    got = _run(probe)
+    assert got["open"] is True, "a series running up to today reported its last week as finished"
+    assert got["closed"] is False, "a series that stopped a month ago claimed to be mid-week"
+
+
+def test_only_the_unfinished_leg_is_dashed_and_only_when_it_is_unfinished():
+    """The dashed tail is a claim about one period. If it swallowed a closed
+    period too, the chart would disown a week that really did happen."""
+    probe = """
+      var pts = [3, 5, 4, 6, 2].map(function(v, i){
+        return {label: 'w' + i, value: v, tip: ''};
+      });
+      function d(svg, cls){
+        var m = svg.match(new RegExp('class="' + cls + '" d="([^"]+)"'));
+        return m ? m[1] : null;
+      }
+      var open = trendSvg(pts, {partial: true}), closed = trendSvg(pts, {partial: false});
+      function verts(p){ return p == null ? null : p.split(/(?=[ML])/).length; }
+      ({openLine: verts(d(open, 'sci-tr-line')), openTail: verts(d(open, 'sci-tr-tail')),
+        closedLine: verts(d(closed, 'sci-tr-line')), closedTail: d(closed, 'sci-tr-tail')})
+    """
+    got = _run(probe)
+    # Five points: solid through the first four, dashed across the last leg,
+    # and the two share the vertex so no gap opens between them.
+    assert got["openLine"] == 4
+    assert got["openTail"] == 2
+    # Nothing partial: one unbroken line over all five, and no tail at all.
+    assert got["closedLine"] == 5
+    assert got["closedTail"] is None
+
+
+def test_two_trends_on_one_page_do_not_share_gradient_ids():
+    """The fill and the dot floor are referenced by id. A shared id means the
+    second chart on a pane silently repaints the first, which is invisible
+    until two charts with different hues sit next to each other."""
+    probe = """
+      var pts = [1, 2, 3].map(function(v, i){ return {label: 'w' + i, value: v, tip: ''}; });
+      function ids(svg){ return (svg.match(/id="[^"]+"/g) || []); }
+      var a = ids(trendSvg(pts, {})), b = ids(trendSvg(pts, {}));
+      ({a: a, shared: a.filter(function(x){ return b.indexOf(x) >= 0; })})
+    """
+    got = _run(probe)
+    assert len(got["a"]) >= 3, "the trend defines almost no ids, so this proves nothing"
+    assert got["shared"] == [], got["shared"]
+
+
+# ── Radar ──────────────────────────────────────────────────────────────────
+
+def _series(key, *values):
+    return {"key": key, "label": key.title(), "values": list(values),
+            "display": [str(v) for v in values]}
+
+
+def test_a_radar_needs_something_to_compare_and_an_area_to_compare_it_on():
+    """Two axes is not a shape, it is a line with a fold in it, and one series
+    on a normalised radar is a polygon touching every edge that says nothing."""
+    probe = """
+      var three = [{label:'A'},{label:'B'},{label:'C'}];
+      ({oneSeries: radarSvg([%s], three, {}),
+        twoAxes: radarSvg([%s, %s], [{label:'A'},{label:'B'}], {}),
+        ok: radarSvg([%s, %s], three, {}).indexOf('sci-rd-poly') >= 0})
+    """ % (json.dumps(_series("a", 1, 1, 1)), json.dumps(_series("a", 1, .5, .2)),
+           json.dumps(_series("b", .3, 1, .6)), json.dumps(_series("a", 1, .5, .2)),
+           json.dumps(_series("b", .3, 1, .6)))
+    got = _run(probe)
+    assert got["oneSeries"] == ""
+    assert got["twoAxes"] == ""
+    assert got["ok"] is True
+
+
+def test_past_three_profiles_the_radar_becomes_small_multiples():
+    """Overlaid, four or more translucent polygons stop being separable. The
+    same numbers become one plot each, on the same axes and the same scale."""
+    probe = """
+      var axes = [{label:'A'},{label:'B'},{label:'C'}];
+      function mk(n){
+        var out = [];
+        for(var i = 0; i < n; i++){
+          out.push({key: 'p' + i, label: 'P' + i, values: [.2 + i * .1, .5, .9 - i * .1],
+                    display: ['x', 'y', 'z']});
+        }
+        return out;
+      }
+      function count(s, re){ return (s.match(re) || []).length; }
+      var three = radarSvg(mk(3), axes, {}), four = radarSvg(mk(4), axes, {});
+      ({threeOverlaid: count(three, /class="sci-rd-wrap"/g), threeTiles: count(three, /sci-rd-tile/g),
+        fourTiles: count(four, /class="sci-rd-tile"/g), fourGrids: count(four, /class="sci-rd-grid"/g),
+        threeGhosts: count(three, /sci-rd-ghost/g), fourGhosts: count(four, /sci-rd-ghost/g)})
+    """
+    got = _run(probe)
+    assert got["threeOverlaid"] == 1 and got["threeTiles"] == 0
+    assert got["fourTiles"] == 4 and got["fourGrids"] == 1
+    # The group average is the reference a lone tile is read against. Overlaid,
+    # the other polygons already are that reference, so it would be clutter.
+    assert got["threeGhosts"] == 0
+    assert got["fourGhosts"] == 4
+
+
+def test_a_series_at_the_bottom_of_every_axis_is_still_a_hittable_shape():
+    """Plotted honestly at zero, every vertex lands on the centre and several
+    such series collapse into one dot nobody can hover or tell apart."""
+    probe = """
+      var axes = [{label:'A'},{label:'B'},{label:'C'}];
+      var svg = radarSvg([%s, %s], axes, {});
+      var polys = svg.match(/class="sci-rd-poly" points="([^"]+)"/g) || [];
+      var zero = polys[0].match(/points="([^"]+)"/)[1].split(' ');
+      ({polys: polys.length, distinct: zero.filter(function(v, i, s){ return s.indexOf(v) === i; }).length,
+        dots: (svg.match(/class="sci-rd-pt"/g) || []).length})
+    """ % (json.dumps(_series("floor", 0, 0, 0)), json.dumps(_series("peak", 1, 1, 1)))
+    got = _run(probe)
+    assert got["polys"] == 2
+    assert got["distinct"] == 3, "the all-zero series collapsed into a single point"
+    # Every vertex of every series keeps its own hit target and its own value.
+    assert got["dots"] == 6
+
+
+def test_the_radar_only_draws_measures_every_platform_reports():
+    """A platform that does not publish view counts is unmeasured, not silent.
+    Plotting it at zero views would be a different claim entirely, so the axis
+    goes for everybody rather than the platform being libelled on it."""
+    probe = """
+      var run = {status:'done', platforms: [
+        {platform:'youtube', status:'ok', post_count:3},
+        {platform:'linkedin', status:'ok', post_count:3}], posts: []};
+      var DAY = 86400000, now = Date.now();
+      ['youtube', 'linkedin'].forEach(function(pf){
+        for(var i = 0; i < 3; i++){
+          var m = {likes: 10, comments: 1};
+          // Only YouTube reports views.
+          if(pf === 'youtube') m.views = 900;
+          run.posts.push({id: pf + i, platform: pf, post_type: 'video', post_url: 'https://e.invalid/' + pf + i,
+            posted_at: new Date(now - (i * 9 + 4) * DAY).toISOString(), metrics: m,
+            media_urls: [], raw: {}, caption: 'c'});
+        }
+      });
+      CURRENT_RUN = run;
+      SCORE_VIEW = 'shape';
+      var html = renderScorecard(run);
+      ({axes: (html.match(/class="sci-rd-ax"[^>]*>([^<]+)</g) || []).map(function(s){
+          return s.replace(/.*>/, '').slice(0, -1); })})
+    """
+    got = _run(probe)
+    axes = got["axes"]
+    # Four axes are drawn once per plot; with two platforms it is one overlaid
+    # plot, so each label appears exactly once.
+    assert "Avg views" not in axes, "views became an axis although LinkedIn reports none: %r" % (axes,)
+    assert "Avg interactions" in axes and "Posts" in axes
+    assert len(axes) >= 3, "fewer than three axes survived, so the radar should not have drawn: %r" % (axes,)

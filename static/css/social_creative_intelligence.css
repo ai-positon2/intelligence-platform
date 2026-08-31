@@ -553,7 +553,7 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
    than picked by eye; the dark steps measure under 3:1 on paper, so light
    mode re-steps every one of them (see the LIGHT THEME block). Because they
    live here and not in an inline style, that override is actually reachable. */
-.sci-chart, .sci-hi-scope { --chart-c: var(--pf-color, #fb923c); }
+.sci-chart, .sci-hi-scope { --chart-c: var(--pf-color, #fb923c); --sci-plot-ink: #150e1b; }
 
 .sci-c0 { --c: #fb923c; }
 .sci-c1 { --c: #67e8f9; }
@@ -595,9 +595,26 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 .sci-chart.drawn { opacity: 1; transform: none; }
 .sci-chart .sci-tr-line { stroke-dasharray: 1; stroke-dashoffset: 1; }
 .sci-chart.drawn .sci-tr-line { transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1) .1s; stroke-dashoffset: 0; }
-.sci-chart .sci-tr-area, .sci-chart .sci-tr-pt { opacity: 0; }
+.sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-tr-bg,
+.sci-chart .sci-tr-tail, .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl { opacity: 0; }
+.sci-chart.drawn .sci-tr-bg { opacity: 1; transition: opacity .6s ease .05s; }
 .sci-chart.drawn .sci-tr-area { opacity: 1; transition: opacity .7s ease .35s; }
 .sci-chart.drawn .sci-tr-pt { opacity: 1; transition: opacity .4s ease .75s; }
+/* The baseline and the unfinished period arrive last, after the series they
+   annotate has finished drawing itself. */
+.sci-chart.drawn .sci-tr-avg, .sci-chart.drawn .sci-tr-avgl { opacity: 1; transition: opacity .5s ease .8s; }
+.sci-chart.drawn .sci-tr-tail { opacity: .66; transition: opacity .45s ease .95s; }
+/* The radar grows out of its own centre. transform-box makes the origin the
+   viewBox centre rather than each polygon's own bounding box, which is what
+   keeps the shapes growing together instead of each from its own middle. */
+.sci-chart .sci-rd-shapes { opacity: 0; transform: scale(.76); transform-box: view-box; transform-origin: 50% 50%; }
+.sci-chart.drawn .sci-rd-shapes { opacity: 1; transform: scale(1);
+  transition: opacity .5s ease .12s, transform .72s cubic-bezier(.22,1,.36,1) .12s; }
+.sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+.sci-chart .sci-rd-ghost { opacity: 0; }
+.sci-chart.drawn .sci-rd-ring, .sci-chart.drawn .sci-rd-spoke,
+.sci-chart.drawn .sci-rd-ax { opacity: 1; transition: opacity .45s ease; }
+.sci-chart.drawn .sci-rd-ghost { opacity: 1; transition: opacity .5s ease .55s; }
 /* Widths ride on --w, not on the width property itself. A bar whose inline
    style set width directly would beat any rule trying to grow it from zero,
    which is how a "0 !important" starting state silently becomes permanent. */
@@ -612,9 +629,21 @@ a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, 
 .sci-tr { display: block; width: 100%; height: auto; overflow: visible; }
 .sci-tr-grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
 .sci-tr-axis, .sci-tr-lab { fill: #857a8c; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-variant-numeric: tabular-nums; }
-.sci-tr-area { fill: color-mix(in srgb, var(--chart-c) 17%, transparent); }
+/* The fill is a gradient referenced from the markup. Setting `fill` here would
+   beat that reference, so the colour lives in the stops instead. */
+.sci-tr-g0 { stop-color: var(--chart-c); stop-opacity: .34; }
+.sci-tr-g1 { stop-color: var(--chart-c); stop-opacity: .02; }
+/* A dot floor under the plot, faded out at both edges, so the series is bounded
+   by its own data rather than by a drawn box. */
+.sci-tr-dg { fill: rgba(255,255,255,.13); }
 .sci-tr-line { fill: none; stroke: var(--chart-c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.sci-tr-pt { fill: var(--chart-c); }
+/* The period we are standing in, which has not finished happening yet. */
+.sci-tr-tail { fill: none; stroke: var(--chart-c); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 4 4.5; }
+/* Ring marks, not filled dots: an open centre keeps the point readable where
+   the series doubles back over itself. */
+.sci-tr-pt { fill: var(--sci-plot-ink, #150e1b); stroke: var(--chart-c); stroke-width: 1.8; }
+.sci-tr-avg { stroke: rgba(255,255,255,.42); stroke-width: 1; stroke-dasharray: 2 4; }
+.sci-tr-avgl { fill: #948899; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; letter-spacing: .04em; }
 .sci-tr-hit { fill: transparent; }
 .sci-tr-cross { stroke: color-mix(in srgb, var(--chart-c) 62%, #ffffff); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
 .sci-tr-dot { fill: color-mix(in srgb, var(--chart-c) 55%, #ffffff); stroke: rgba(15,10,20,.9); stroke-width: 2; opacity: 0; }
@@ -638,6 +667,58 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 .sci-mix { display: flex; flex-direction: column; gap: 12px; }
 .sci-mixbar { display: flex; height: 12px; border-radius: var(--radius-pill, 80px); overflow: hidden; background: rgba(255,255,255,.055); gap: 2px; }
 .sci-mixseg { display: block; height: 100%; background: var(--c); border-radius: 2px; }
+/* ── Radar: one profile per platform, over shared measures ─────────────────
+   Stroke-forward on purpose. Five translucent fills stacked on one another
+   turn into a single muddy blob in which no series is readable, so the fill is
+   only enough to give each shape a body and the 2px stroke carries identity. */
+.sci-rd-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+.sci-rd { display: block; width: 100%; height: auto; max-height: 330px; overflow: hidden; }
+.sci-rd-ring { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sci-rd-edge { stroke: rgba(255,255,255,.15); }
+.sci-rd-spoke { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sci-rd-ax { fill: #9c8fa3; font-family: var(--au-body, 'Space Grotesk', system-ui, sans-serif); font-size: 10.5px; font-weight: 600; }
+.sci-rd-poly { fill: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent);
+  stroke: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); stroke-width: 2; stroke-linejoin: round; }
+.sci-rd-pt { fill: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); stroke: var(--sci-plot-ink, #150e1b); stroke-width: 1.6; }
+.sci-rd-key { gap: 9px; }
+/* Small multiples. One profile per tile, same axes and same scale in every
+   one, so the tiles compare to each other and not only to themselves. */
+.sci-rd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(252px, 1fr)); gap: 4px 14px; }
+.sci-rd-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.sci-rd-tile .sci-rd { max-height: 230px; }
+/* The axis names shrink with the tile, so they get their own smaller step
+   rather than inheriting the standalone chart's. */
+.sci-rd-tile .sci-rd-ax { font-size: 12px; }
+.sci-rd-cap { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #cdc1d3; }
+/* The group average, ghosted behind each profile so a tile can be read against
+   its peers without looking away from it. */
+.sci-rd-ghost { fill: none; stroke: rgba(255,255,255,.44); stroke-width: 1.4; stroke-dasharray: 3 3.5; stroke-linejoin: round; }
+.sci-rd-sw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); }
+
+/* ── Loading skeletons ────────────────────────────────────────────────────
+   Only ever shown while a run is still collecting. The sweep is what separates
+   "working" from "finished and empty"; without it a grey box is a dead end. */
+.sci-chart-skel .sci-chart-head { margin-bottom: 15px; }
+.sci-skel-plot { position: relative; overflow: hidden; height: 150px; border-radius: var(--radius-md, 12px);
+  background-color: rgba(255,255,255,.022);
+  background-image: radial-gradient(rgba(255,255,255,.12) 1px, transparent 1px);
+  background-size: 13px 13px; }
+/* Deliberately close to colourless. A placeholder painted in the report's own
+   accent at full strength is a chart you can screenshot and quote, and these
+   numbers do not exist yet. */
+.sci-skel-rows { display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 14px 16px; }
+.sci-skel-row { display: flex; align-items: center; gap: 10px; }
+.sci-skel-ic { width: 15px; height: 15px; border-radius: 5px; flex-shrink: 0; background: rgba(255,255,255,.09); }
+.sci-skel-n { width: 62px; height: 8px; border-radius: 80px; flex-shrink: 0; background: rgba(255,255,255,.07); }
+.sci-skel-t { height: 8px; border-radius: 80px; width: var(--w, 60%); background: rgba(255,255,255,.05); }
+.sci-skel-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sci-skel-svg path { fill: rgba(251,146,60,.055); stroke: rgba(251,146,60,.2); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.sci-skel-sweep { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.1) 50%, transparent 62%);
+  transform: translateX(-100%); animation: sci-sweep 1.9s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes sci-sweep { to { transform: translateX(100%); } }
+
 .sci-mixkey { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .sci-mixkey-col { flex-direction: column; gap: 7px; }
 .sci-mk { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #b3a7ba; text-transform: capitalize; }
@@ -718,8 +799,16 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 @media (prefers-reduced-motion: reduce) {
   .sci-chart, .sci-chart.drawn { opacity: 1; transform: none; transition: none; }
   .sci-chart .sci-tr-line, .sci-chart.drawn .sci-tr-line { stroke-dasharray: none; stroke-dashoffset: 0; transition: none; }
-  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc { opacity: 1; transition: none; }
+  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc,
+  .sci-chart .sci-tr-bg, .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl,
+  .sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+  .sci-chart .sci-rd-ghost { opacity: 1; transition: none; }
+  .sci-chart .sci-tr-tail { opacity: .66; transition: none; }
   .sci-chart .sci-rank-fill, .sci-chart .sci-mixseg, .sci-chart .sci-sc-bar { width: var(--w, 0); transition: none; }
+  .sci-chart .sci-rd-shapes, .sci-chart.drawn .sci-rd-shapes { opacity: 1; transform: none; transition: none; }
+  /* The sweep is the only thing saying "still working", so it is slowed and
+     softened rather than removed: a motionless skeleton reads as a stall. */
+  .sci-skel-sweep { animation-duration: 4.5s; animation-timing-function: ease-in-out; }
 }
 
 /* Below the rail's own width the two columns stop being two columns: the rail
@@ -755,6 +844,12 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
      dead strip down the right of a 390px screen. */
   .sci-tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .sci-accs { grid-template-columns: 1fr; }
+  /* Side by side, the key would squeeze the polygon into a sliver. Under this
+     width it goes below the plot and packs across instead of down. */
+  .sci-rd-wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sci-rd-key { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
+  /* Two tiles across at 390px would put five axis labels into 90px each. */
+  .sci-rd-grid { grid-template-columns: minmax(0, 1fr); }
   /* The label wraps to two lines at this width, and a chip pinned right on
      line one leaves the section name hanging alone under it. Below 640px the
      chip drops onto its own line and packs left with the glyph. */
@@ -789,7 +884,26 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
   .sci-tip { display: none !important; }
   .sci-chart { opacity: 1 !important; transform: none !important; break-inside: avoid; page-break-inside: avoid; background: none !important; border-color: #d8d2dc !important; --chart-c: var(--pf-color, #c2410c); }
   .sci-chart .sci-tr-line { stroke-dasharray: none !important; stroke-dashoffset: 0 !important; }
-  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc { opacity: 1 !important; }
+  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc,
+  .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl, .sci-chart .sci-tr-tail,
+  .sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+  .sci-chart .sci-rd-ghost { opacity: 1 !important; }
+  .sci-chart .sci-rd-shapes { opacity: 1 !important; transform: none !important; }
+  /* The dot floor is a screen texture. On paper it prints as a grey haze under
+     the series and costs ink for nothing. */
+  .sci-tr-bg { display: none !important; }
+  .sci-tr-g0 { stop-opacity: .3 !important; }
+  .sci-tr-g1 { stop-opacity: .04 !important; }
+  .sci-tr-avg { stroke: rgba(0,0,0,.32) !important; }
+  .sci-tr-avgl, .sci-rd-ax { fill: #4a3f52 !important; }
+  .sci-tr-pt, .sci-rd-pt { stroke: #ffffff !important; }
+  .sci-rd-ring, .sci-rd-spoke { stroke: #ddd7e0 !important; }
+  .sci-rd-ghost { stroke: #b7afbd !important; }
+  .sci-rd-cap { color: #1c1420 !important; }
+  .sci-rd-tile { break-inside: avoid; page-break-inside: avoid; }
+  .sci-rd-edge { stroke: #c9c2ce !important; }
+  /* Nothing to print: a skeleton is a statement about a run still in flight. */
+  .sci-chart-skel { display: none !important; }
   .sci-chart .sci-rank-fill, .sci-chart .sci-mixseg, .sci-chart .sci-sc-bar { width: var(--w, 0) !important; }
   .sci-chart-ht h5, .sci-mk b, .sci-dn-v, .sci-sc-name, .sci-sc-v { color: #1c1420 !important; }
   .sci-chart-ht p, .sci-chart-note, .sci-rank-l, .sci-rank-v, .sci-mk,
@@ -801,7 +915,7 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
   .sci-c3 { --c: #16a34a; } .sci-c4 { --c: #6b21a8; } .sci-c5 { --c: #a16207; }
   /* Backgrounds are what a bar chart IS. Without this most browsers strip
      every fill and print six identically empty segments. */
-  .sci-mixseg, .sci-rank-fill, .sci-sc-bar, .sci-heat-c i, .sci-mk i {
+  .sci-mixseg, .sci-rank-fill, .sci-sc-bar, .sci-heat-c i, .sci-mk i, .sci-rd-sw {
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sci-fchips { display: none !important; }
 
@@ -1191,7 +1305,7 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
    chosen against a near-black panel and sits between 1.4:1 and 2.6:1 on
    paper -- legible as a mark, invisible as a distinction. The overview's own
    accent moves with them. */
-[data-theme="light"] .sci-chart, [data-theme="light"] .sci-hi-scope { --chart-c: var(--pf-color, #c2410c); }
+[data-theme="light"] .sci-chart, [data-theme="light"] .sci-hi-scope { --chart-c: var(--pf-color, #c2410c); --sci-plot-ink: #ffffff; }
 [data-theme="light"] .sci-c0 { --c: #c2410c; }
 [data-theme="light"] .sci-c1 { --c: #0891b2; }
 [data-theme="light"] .sci-c2 { --c: #9d174d; }
@@ -1211,7 +1325,34 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 
 [data-theme="light"] .sci-tr-grid { stroke: rgba(18,26,54,.1); }
 [data-theme="light"] .sci-tr-axis, [data-theme="light"] .sci-tr-lab { fill: #6a5f72; }
-[data-theme="light"] .sci-tr-area { fill: color-mix(in srgb, var(--chart-c) 15%, transparent); }
+[data-theme="light"] .sci-tr-g0 { stop-opacity: .3; }
+[data-theme="light"] .sci-tr-g1 { stop-opacity: .03; }
+[data-theme="light"] .sci-tr-dg { fill: rgba(18,26,54,.14); }
+[data-theme="light"] .sci-tr-avg { stroke: rgba(18,26,54,.52); }
+[data-theme="light"] .sci-tr-avgl { fill: #6a5f72; }
+[data-theme="light"] .sci-tr-pt { stroke-width: 2; }
+
+/* Radar. The dark steps lighten each brand hue toward white to lift it off a
+   near-black panel; on white that same step is the one that disappears, so
+   every one of them is re-mixed toward ink instead. */
+[data-theme="light"] .sci-rd-ring { stroke: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rd-edge { stroke: rgba(18,26,54,.2); }
+[data-theme="light"] .sci-rd-spoke { stroke: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rd-ax { fill: #5f5468; }
+[data-theme="light"] .sci-rd-poly { fill: color-mix(in srgb, var(--pf-color, #c2410c) 14%, transparent);
+  stroke: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); }
+[data-theme="light"] .sci-rd-pt { fill: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); stroke: #ffffff; }
+[data-theme="light"] .sci-rd-sw { background: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); }
+[data-theme="light"] .sci-rd-ghost { stroke: rgba(18,26,54,.56); }
+[data-theme="light"] .sci-rd-cap { color: #443a4b; }
+
+[data-theme="light"] .sci-skel-plot { background-color: rgba(18,26,54,.028);
+  background-image: radial-gradient(rgba(18,26,54,.12) 1px, transparent 1px); }
+[data-theme="light"] .sci-skel-ic { background: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-skel-n { background: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-skel-t { background: rgba(18,26,54,.06); }
+[data-theme="light"] .sci-skel-svg path { fill: rgba(194,65,12,.06); stroke: rgba(194,65,12,.24); }
+[data-theme="light"] .sci-skel-sweep { background: linear-gradient(105deg, transparent 38%, rgba(18,26,54,.07) 50%, transparent 62%); }
 [data-theme="light"] .sci-tr-cross { stroke: color-mix(in srgb, var(--chart-c) 70%, #140c18); }
 [data-theme="light"] .sci-tr-dot { fill: color-mix(in srgb, var(--chart-c) 78%, #140c18); stroke: #ffffff; }
 
