@@ -27,10 +27,14 @@ import pytest
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test")
+
+import app as appmod  # noqa: E402
 from tracker import event_intel_harvest as harvest  # noqa: E402
 from tracker import event_intel_store as store  # noqa: E402
 
-_TEMPLATE = os.path.join(_ROOT, "templates", "event_conference_intelligence.html")
+_PAGE = "/p2/b2b-agents/event-conference-intelligence"
 
 
 def _node_available():
@@ -41,10 +45,27 @@ def _node_available():
         return False
 
 
+def _rendered_page():
+    """The page as Flask actually serves it.
+
+    Read through the route rather than off disk, because the script block now
+    carries server-injected data (the rubric's category labels) and the raw
+    template is therefore not valid JavaScript. Executing the raw file would
+    test a bundle that is never shipped, and would have started failing here
+    for a reason unrelated to anything this file asserts.
+    """
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "harness@position2.com", "name": "T"}
+    resp = c.get(_PAGE)
+    assert resp.status_code == 200, "the page did not render (%s)" % resp.status_code
+    return resp.get_data(as_text=True)
+
+
 def _page_script():
     """The page's first inline script block, which is the report renderer."""
-    src = open(_TEMPLATE, encoding="utf-8").read()
-    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", src, re.S)
+    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
+                        _rendered_page(), re.S)
     assert blocks, "the page has no inline script"
     return blocks[0]
 
@@ -187,7 +208,7 @@ def test_the_page_never_promises_an_attendee_list():
     a negation. Phrases that cannot be honest in any context are banned
     outright.
     """
-    body = open(_TEMPLATE, encoding="utf-8").read().lower()
+    body = _rendered_page().lower()
     for phrase in ("list of attendees", "full attendee", "everyone attending",
                    "all attendees", "complete attendee"):
         assert phrase not in body, "the page copy promises %r" % phrase

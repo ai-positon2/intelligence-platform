@@ -436,3 +436,531 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   .evi-table { min-width: 0; font-size: 11px; }
   .evi-src-link::after { content: " (" attr(href) ")"; font-size: 9px; color: #5b6480 !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   The recommendation report and the work-the-room play.
+
+   One rule governs everything below: the honest caveat has to be as
+   beautiful as the headline, or nobody reads it. An agent whose whole value
+   is that it says what it could not measure cannot render those sentences as
+   small grey afterthoughts under a confident number. So the coverage
+   shortfall, the refused bonus, the rewritten draft and the cut tail all get
+   real design, and the scores they qualify sit next to them rather than
+   above them.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── the executive summary ──────────────────────────────────────────── */
+.evi-exec {
+  position: relative; overflow: hidden;
+  padding: 26px 26px 22px; margin-bottom: 26px;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid rgba(99,102,241,.24);
+  background:
+    radial-gradient(ellipse 70% 120% at 6% 0%, rgba(56,189,248,.13), transparent 62%),
+    radial-gradient(ellipse 60% 130% at 96% 100%, rgba(139,92,246,.12), transparent 60%),
+    var(--evi-panel-2);
+}
+/* A hairline of the brand gradient along the top edge. One decorative
+   element on the page, on the one block that earns it. */
+.evi-exec::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(95deg, var(--evi-a1), var(--evi-a2) 55%, var(--evi-a3));
+  opacity: .85;
+}
+.evi-exec .ex-eyebrow {
+  font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-a1); margin-bottom: 10px;
+}
+.evi-exec .ex-title {
+  font-family: 'Bricolage Grotesque', serif; font-size: clamp(21px, 2.6vw, 28px);
+  font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin-bottom: 12px;
+}
+.evi-exec .ex-profile {
+  font-size: 14.5px; line-height: 1.65; color: var(--evi-ink-2); max-width: 72ch;
+}
+.evi-exec .ex-where {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md, 10px);
+  background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.2);
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-where b { color: var(--evi-ink); }
+.evi-exec .ex-counts {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+}
+.evi-exec .ex-counts span {
+  display: inline-flex; align-items: baseline; gap: 7px;
+  padding: 9px 14px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  font-size: 12.5px; color: var(--evi-ink-3);
+}
+.evi-exec .ex-counts b {
+  font-size: 17px; font-weight: 700; color: var(--evi-ink); letter-spacing: -.02em;
+}
+.evi-exec .ex-method { margin-top: 16px; }
+.evi-exec .ex-method summary,
+.evi-cand .cwhy summary {
+  cursor: pointer; font-size: 12px; font-weight: 600; color: var(--evi-a1);
+  list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 0; user-select: none;
+}
+.evi-exec .ex-method summary::-webkit-details-marker,
+.evi-cand .cwhy summary::-webkit-details-marker { display: none; }
+.evi-exec .ex-method summary::before,
+.evi-cand .cwhy summary::before {
+  content: "▸"; font-size: 10px; transition: transform .18s;
+}
+.evi-exec .ex-method[open] summary::before,
+.evi-cand .cwhy[open] summary::before { transform: rotate(90deg); }
+.evi-exec .ex-method p {
+  font-size: 12.8px; line-height: 1.65; color: var(--evi-ink-3);
+  margin-top: 8px; max-width: 74ch;
+}
+
+/* Assumptions. Given the same weight as the counts above them on purpose:
+   this is the block that says what the analysis could not see. */
+.evi-exec .ex-assume {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-exec .ex-assume h4 {
+  font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); margin-bottom: 10px;
+}
+.evi-exec .ex-assume ul { list-style: none; display: grid; gap: 8px; }
+.evi-exec .ex-assume li {
+  position: relative; padding-left: 18px; font-size: 12.8px;
+  line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-assume li::before {
+  content: ""; position: absolute; left: 0; top: 8px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--evi-warn); opacity: .8;
+}
+
+/* ── top five ───────────────────────────────────────────────────────── */
+.evi-top { list-style: none; counter-reset: top; display: grid; gap: 10px; }
+.evi-top li {
+  counter-increment: top; position: relative;
+  padding: 15px 18px 15px 52px; border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s, transform .18s;
+}
+.evi-top li:hover { border-color: rgba(99,102,241,.3); transform: translateX(2px); }
+.evi-top li::before {
+  content: counter(top); position: absolute; left: 16px; top: 15px;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a2));
+}
+.evi-top .tn {
+  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+}
+.evi-top .ts {
+  flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--evi-a1);
+  font-variant-numeric: tabular-nums;
+}
+.evi-top .tm { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 3px; }
+.evi-top .tc {
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2); margin-top: 8px;
+}
+
+/* ── a scored candidate ─────────────────────────────────────────────── */
+.evi-cands { display: grid; gap: 14px; }
+.evi-cand {
+  position: relative; padding: 18px 20px 16px 22px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s, box-shadow .18s;
+}
+.evi-cand:hover { border-color: rgba(99,102,241,.28); box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+/* Tier as a spine down the left edge rather than only a badge. The tier is
+   the single most consequential number here and it should be readable while
+   scrolling past at speed. */
+.evi-cand::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: var(--radius-md, 12px) 0 0 var(--radius-md, 12px);
+}
+.evi-cand.t-P1::before { background: linear-gradient(180deg, var(--evi-a1), var(--evi-a2)); }
+.evi-cand.t-P2::before { background: rgba(139,92,246,.5); }
+.evi-cand.t-P3::before { background: var(--evi-line); }
+
+.evi-cand .ct { display: flex; flex-direction: column; gap: 4px; }
+.evi-cand .cn {
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  font-size: 16px; font-weight: 600; letter-spacing: -.015em;
+}
+.evi-cand .cn a { color: var(--evi-ink); text-decoration: none; }
+.evi-cand .cn a:hover { color: var(--evi-a1); }
+.evi-cand .cn .tier {
+  flex-shrink: 0; font-size: 10px; font-weight: 800; letter-spacing: .06em;
+  padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.16); color: var(--evi-ink-3);
+  border: 1px solid var(--evi-line);
+}
+.evi-cand.t-P1 .cn .tier {
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(99,102,241,.22));
+  color: #7dd3fc; border-color: rgba(56,189,248,.36);
+}
+.evi-cand.t-P2 .cn .tier {
+  background: rgba(139,92,246,.16); color: #c4b5fd; border-color: rgba(139,92,246,.3);
+}
+:root[data-theme="light"] .evi-cand.t-P1 .cn .tier { color: #0369a1; }
+:root[data-theme="light"] .evi-cand.t-P2 .cn .tier { color: #6d28d9; }
+.evi-cand .cn .ed { font-size: 12px; font-weight: 500; color: var(--evi-ink-3); }
+.evi-cand .cm { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
+
+/* The score block. Three bars and the refused-or-granted bonus, never just a
+   total: the breakdown IS the audit trail, and hiding it behind a disclosure
+   would make the headline the only thing anyone reads. */
+.evi-cand .cscore {
+  display: grid; gap: 9px; margin: 14px 0 12px;
+  grid-template-columns: auto 1fr; align-items: start;
+  padding: 13px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line-2);
+}
+.evi-cand .cscore .tot {
+  grid-row: 1 / span 4; align-self: center;
+  font-family: 'Bricolage Grotesque', serif;
+  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  padding-right: 18px; margin-right: 4px; border-right: 1px solid var(--evi-line-2);
+  font-variant-numeric: tabular-nums; min-width: 92px;
+}
+.evi-cand.t-P1 .cscore .tot {
+  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-cand .cscore .tot span {
+  display: block; font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 600; color: var(--evi-ink-3);
+  -webkit-text-fill-color: var(--evi-ink-3); letter-spacing: 0; margin-top: 3px;
+}
+
+.evi-sub { display: grid; gap: 4px; }
+.evi-sub .sl {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; color: var(--evi-ink-3); font-weight: 500;
+}
+.evi-sub .sl b {
+  font-size: 12px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.evi-sub .sl i { font-style: normal; font-weight: 500; color: var(--evi-ink-3); }
+.evi-sub .st {
+  height: 5px; border-radius: 3px; overflow: hidden;
+  background: var(--evi-line-2);
+}
+.evi-sub .st span {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2));
+  transition: width .5s cubic-bezier(.22,.9,.3,1);
+}
+
+/* The matchmaking bonus, granted or refused. A refusal states its reason on
+   screen, because "+10 was not applied" without a why is indistinguishable
+   from a bug. */
+.evi-cand .mm {
+  grid-column: 2; font-size: 11px; line-height: 1.5; color: var(--evi-ink-3);
+  padding: 7px 10px; border-radius: var(--radius-sm, 8px);
+  background: var(--evi-line-2); border: 1px solid transparent;
+}
+.evi-cand .mm.on {
+  color: var(--evi-ok); background: rgba(74,222,128,.1);
+  border-color: rgba(74,222,128,.24); font-weight: 600;
+}
+.evi-cand .mm span {
+  display: block; font-weight: 400; color: var(--evi-ink-3); margin-top: 3px;
+}
+.evi-cand .cd {
+  font-size: 13.5px; line-height: 1.65; color: var(--evi-ink-2); max-width: 76ch;
+}
+.evi-cand .cd b { color: var(--evi-ink); font-weight: 600; }
+.evi-cand .cwhy { margin-top: 10px; }
+.evi-cand .cwhy p {
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3);
+  margin-top: 7px; max-width: 78ch;
+}
+.evi-cand .cwhy p b { color: var(--evi-ink-2); }
+.evi-cand .cwhy .gaps b { color: var(--evi-warn); }
+
+/* ── category coverage ──────────────────────────────────────────────── */
+.evi-shortfall { display: grid; gap: 8px; }
+.evi-shortfall .sf {
+  display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: 4px 14px;
+  padding: 12px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  border-left: 3px solid var(--evi-line);
+}
+.evi-shortfall .sf.empty { border-left-color: var(--evi-warn); }
+/* A failed search is a hole in the analysis, not a finding about the market,
+   and it is coloured as the more serious of the two. */
+.evi-shortfall .sf.error { border-left-color: var(--evi-bad); }
+.evi-shortfall .k { font-size: 13px; font-weight: 600; color: var(--evi-ink); }
+.evi-shortfall .v {
+  font-size: 12px; font-weight: 700; color: var(--evi-ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.evi-shortfall .w {
+  grid-column: 1 / -1; font-size: 12px; line-height: 1.55; color: var(--evi-ink-3);
+}
+.evi-shortfall .sf.error .w b { color: var(--evi-bad); }
+
+/* ── the cut list ───────────────────────────────────────────────────── */
+.evi-cut { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.evi-cut .cutp {
+  display: inline-flex; align-items: baseline; gap: 7px;
+  padding: 6px 11px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  font-size: 12px; color: var(--evi-ink-3);
+}
+.evi-cut .cutp b {
+  font-size: 11px; font-weight: 700; color: var(--evi-ink-2);
+  font-variant-numeric: tabular-nums; opacity: .8;
+}
+.evi-note {
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3);
+  max-width: 80ch; margin-bottom: 4px;
+}
+
+/* ── the classification / event-class picker ────────────────────────── */
+.evi-classes {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(216px, 1fr));
+}
+.evi-class {
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 14px 15px; border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.evi-class:hover { border-color: rgba(99,102,241,.35); transform: translateY(-1px); }
+.evi-class[aria-checked="true"] {
+  border-color: rgba(99,102,241,.55);
+  background: linear-gradient(140deg, rgba(56,189,248,.14), rgba(139,92,246,.1));
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+}
+.evi-class .cl { font-size: 13.5px; font-weight: 600; color: var(--evi-ink); }
+.evi-class .cw { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3); }
+.evi-class .co {
+  align-self: flex-start; margin-top: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.14); color: var(--evi-ink-3);
+}
+.evi-class[aria-checked="true"] .co {
+  background: rgba(56,189,248,.18); color: var(--evi-a1);
+}
+.evi-eclasses { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.evi-field select {
+  font: inherit; font-size: 14px; color: var(--evi-ink);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 10px); padding: 11px 13px; outline: none;
+  width: 100%; cursor: pointer; transition: border-color .18s, box-shadow .18s;
+}
+.evi-field select:focus {
+  border-color: rgba(99,102,241,.55); box-shadow: 0 0 0 3px rgba(99,102,241,.14);
+}
+.evi-field input[type="date"] { color-scheme: dark; }
+:root[data-theme="light"] .evi-field input[type="date"] { color-scheme: light; }
+
+/* ── work the room ──────────────────────────────────────────────────── */
+
+/* The follow-up window. Loud on purpose: the play is built around 48 to 72
+   hours, and a user who believes they are inside it when they are not will
+   send an opener whose whole premise is stale. */
+.evi-window {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 15px 18px; margin-bottom: 18px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--evi-line); border-left-width: 3px;
+  background: var(--evi-panel-2);
+}
+.evi-window .wt {
+  font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; color: var(--evi-ink);
+}
+.evi-window .wn { font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-2); }
+.evi-window.ok { border-left-color: var(--evi-ok);
+  background: linear-gradient(95deg, rgba(74,222,128,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.ok .wt { color: var(--evi-ok); }
+.evi-window.warn { border-left-color: var(--evi-warn);
+  background: linear-gradient(95deg, rgba(251,191,36,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.warn .wt { color: var(--evi-warn); }
+.evi-window.bad { border-left-color: var(--evi-bad);
+  background: linear-gradient(95deg, rgba(251,113,133,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.bad .wt { color: var(--evi-bad); }
+.evi-window.idle { border-left-color: var(--evi-line); }
+
+/* The declared event class and the play that follows from it. */
+.evi-play {
+  padding: 16px 18px; margin-bottom: 18px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(99,102,241,.22);
+  background:
+    radial-gradient(ellipse 60% 140% at 4% 0%, rgba(56,189,248,.1), transparent 60%),
+    var(--evi-panel-2);
+}
+.evi-play .pl {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 15px; font-weight: 700; letter-spacing: -.015em; color: var(--evi-ink);
+}
+.evi-play .ps {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: var(--radius-pill, 999px);
+  background: rgba(56,189,248,.16); color: var(--evi-a1);
+  border: 1px solid rgba(56,189,248,.28);
+}
+.evi-play .pw { font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 7px; }
+.evi-play .pp { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
+.evi-play .pp b { color: var(--evi-ink); }
+
+.evi-coverage.warn {
+  background: linear-gradient(95deg, rgba(251,191,36,.1), rgba(251,113,133,.06));
+  border-color: rgba(251,191,36,.3);
+}
+.evi-coverage.warn .ic { color: var(--evi-warn); font-weight: 800; }
+
+/* One company, one draft. */
+.evi-outs { display: grid; gap: 12px; }
+.evi-out {
+  position: relative; padding: 16px 18px 15px 20px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s;
+}
+.evi-out:hover { border-color: rgba(99,102,241,.26); }
+.evi-out::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: var(--radius-md, 12px) 0 0 var(--radius-md, 12px);
+  background: var(--evi-line);
+}
+.evi-out.s-ok::before { background: linear-gradient(180deg, var(--evi-a1), var(--evi-a2)); }
+/* A rewritten draft is marked at the spine, not only in the footnote. The
+   whole point is that it cannot be skimmed past. */
+.evi-out.s-rewritten_no_booth_note::before,
+.evi-out.s-rewritten_aggressive::before { background: var(--evi-bad); }
+.evi-out.s-account_play::before { background: var(--evi-warn); }
+
+.evi-out .ot {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+}
+.evi-out .on {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-width: 0;
+  font-size: 15px; font-weight: 600; letter-spacing: -.015em; color: var(--evi-ink);
+}
+.evi-out .orl {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.14); color: var(--evi-ink-3);
+  border: 1px solid var(--evi-line-2); white-space: nowrap;
+}
+.evi-out .ofit {
+  flex-shrink: 0; text-align: right; font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--evi-ink-3); font-weight: 600;
+}
+.evi-out .ofit span {
+  display: block; font-family: 'Bricolage Grotesque', serif;
+  font-size: 22px; font-weight: 700; letter-spacing: -.03em; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums; text-transform: none;
+}
+.evi-out .op { font-size: 12.5px; color: var(--evi-ink-2); margin-top: 4px; }
+.evi-out .ofn { font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 8px; }
+.evi-out .oa { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
+.evi-out .oa b { color: var(--evi-ink); font-weight: 600; }
+
+/* The booth note the user wrote. Rendered as a quotation from them, because
+   it is the only thing on the card that licenses a draft to claim a
+   conversation, and it should be obvious which cards have one. */
+.evi-out .obn {
+  margin-top: 11px; padding: 10px 13px; border-radius: var(--radius-sm, 8px);
+  border-left: 2px solid var(--evi-ok); background: rgba(74,222,128,.07);
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-out .obn b { color: var(--evi-ok); font-weight: 700; }
+
+.evi-out .oo {
+  margin-top: 12px; padding: 13px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line-2);
+}
+.evi-out .ool {
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); margin-bottom: 7px;
+}
+.evi-out .oo p {
+  font-size: 13.5px; line-height: 1.7; color: var(--evi-ink);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Why a draft was thrown away. Same visual weight as the opener above it:
+   a rewrite the reader skims past is a silent edit with extra steps. */
+.evi-out .ow {
+  margin-top: 11px; padding: 11px 14px; border-radius: var(--radius-sm, 8px);
+  background: rgba(251,113,133,.07); border: 1px solid rgba(251,113,133,.22);
+}
+.evi-out.s-account_play .ow {
+  background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.24);
+}
+.evi-out.s-ok .ow {
+  background: var(--evi-line-2); border-color: transparent;
+}
+.evi-out .owt {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--evi-bad); margin-bottom: 5px;
+}
+.evi-out.s-account_play .owt { color: var(--evi-warn); }
+.evi-out .own { font-size: 12.2px; line-height: 1.6; color: var(--evi-ink-2); }
+.evi-out .owf { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.evi-out .owf code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(251,113,133,.12); color: var(--evi-bad);
+  border: 1px solid rgba(251,113,133,.24);
+}
+
+/* Provenance, on a roster row that was recovered by search rather than read
+   from the event's own page. A weaker grade of evidence, marked as one. */
+.evi-prov {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: var(--radius-xs, 5px);
+  margin-left: 6px; white-space: nowrap;
+  background: rgba(251,191,36,.13); color: var(--evi-warn);
+  border: 1px solid rgba(251,191,36,.26);
+}
+.evi-source.recovered .st { color: var(--evi-warn); }
+
+@media (max-width: 640px) {
+  .evi-cand .cscore { grid-template-columns: 1fr; }
+  .evi-cand .cscore .tot {
+    grid-row: auto; border-right: none; padding-right: 0; margin-right: 0;
+    border-bottom: 1px solid var(--evi-line-2); padding-bottom: 10px; min-width: 0;
+  }
+  .evi-cand .mm { grid-column: 1; }
+  .evi-out .ot { flex-direction: column; }
+  .evi-out .ofit { text-align: left; }
+}
+.evi-field select option[disabled] { color: var(--evi-ink-3); }
+.evi-field select:has(option[disabled]:checked) { color: var(--evi-ink-3); font-style: italic; }
+
+/* What you decided about an event last time, and the control to change it. */
+.evi-dec {
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--evi-line-2);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  justify-content: space-between;
+}
+.evi-dec .dp {
+  font-size: 12px; line-height: 1.55; color: var(--evi-ink-3); min-width: 0; flex: 1;
+}
+.evi-dec .dp b { color: var(--evi-warn); font-weight: 700; }
+.evi-dec .db { display: flex; gap: 6px; flex-wrap: wrap; }
+.evi-dec .dbtn {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  color: var(--evi-ink-3); transition: .16s; white-space: nowrap;
+}
+.evi-dec .dbtn:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+.evi-dec .dbtn.on {
+  color: #fff; border-color: rgba(99,102,241,.5);
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(139,92,246,.2));
+}
+:root[data-theme="light"] .evi-dec .dbtn.on { color: #1b2440; }
