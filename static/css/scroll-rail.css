@@ -1,0 +1,100 @@
+/* ── Scroll rail ────────────────────────────────────────────────────────────
+   gtm.css zeroes the native scrollbar on everything it touches, so on this
+   page a mouse user gets no sense of how far the page runs and nothing to
+   drag. This puts that back as a hairline down the right edge: an indicator
+   first, and a scrubber for anyone who grabs it.
+
+   It is an overlay, never a gutter. The page reserves no scrollbar width, so
+   anything taking layout space here would reflow the whole card grid.
+
+   Deliberately NOT display:none in its off state. The script sizes the thumb
+   from the rail's own clientHeight, and an undisplayed rail measures zero,
+   which would leave it permanently off with no way back. */
+.p2-rail {
+  position: fixed;
+  top: 74px;            /* clear of the fixed topbar */
+  right: 9px;
+  bottom: 20px;
+  width: 13px;          /* the grab zone; the drawn line is far narrower */
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .34s ease;
+}
+.p2-rail.on { opacity: 1; pointer-events: auto; }
+/* Quiet while nothing is happening, back the moment it is touched. Not quieter
+   than this: measured against the page behind it, .34 put the resting thumb at
+   1.96:1, and a scroll indicator nobody can see is not indicating anything. */
+.p2-rail.on.idle { opacity: .62; }
+.p2-rail.on:hover, .p2-rail.on.drag { opacity: 1; }
+
+/* The track: a hairline, until you go near it. */
+.p2-rail::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 2px; margin-left: -1px;
+  border-radius: var(--radius-pill, 80px);
+  background: rgba(255,255,255,.08);
+  transition: width .18s ease, margin-left .18s ease, background .18s ease;
+}
+.p2-rail.on:hover::before, .p2-rail.on.drag::before {
+  width: 4px; margin-left: -2px; background: rgba(255,255,255,.14);
+}
+
+/* The thumb carries the page's own gradient, top to bottom, so the rail reads
+   as part of the same surface as the cards rather than a browser control.
+   Height and position ride on custom properties the script sets; transform is
+   deliberately untransitioned, because the thumb has to track the scroll
+   exactly rather than easing along behind it. */
+.p2-rail-thumb {
+  position: absolute;
+  top: 0; left: 50%;
+  width: 3px; margin-left: -1.5px;
+  height: var(--h, 48px);
+  transform: translateY(var(--y, 0px));
+  border-radius: var(--radius-pill, 80px);
+  background: linear-gradient(180deg,
+    var(--au-brand, #4cbf92), var(--au-brand2, #6ea8ff) 55%, var(--au-brand3, #9b87fd));
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--au-brand2, #6ea8ff) 55%, transparent);
+  cursor: grab;
+  touch-action: none;   /* the drag is ours, not the page's */
+  transition: width .18s ease, margin-left .18s ease, box-shadow .18s ease;
+}
+.p2-rail.on:hover .p2-rail-thumb, .p2-rail.on.drag .p2-rail-thumb {
+  width: 5px; margin-left: -2.5px;
+  box-shadow: 0 0 18px -2px color-mix(in srgb, var(--au-brand2, #6ea8ff) 85%, transparent);
+}
+.p2-rail.on.drag .p2-rail-thumb { cursor: grabbing; }
+
+/* ── Light theme ───────────────────────────────────────────────────────────
+   The dark steps are lifted off a near-black page. On #eef1f8 those same
+   greens and blues are the ones that vanish, so all three are re-stepped
+   darker rather than reused. */
+[data-theme="light"] .p2-rail::before { background: rgba(18,26,54,.11); }
+[data-theme="light"] .p2-rail.on:hover::before,
+[data-theme="light"] .p2-rail.on.drag::before { background: rgba(18,26,54,.18); }
+[data-theme="light"] .p2-rail-thumb {
+  background: linear-gradient(180deg, #15654a, #2558a8 55%, #5334b8);
+  box-shadow: 0 0 10px -3px rgba(37,88,168,.45);
+}
+/* A translucent mark washes out far faster on a bright page than on a dark
+   one, so light mode rests less faded rather than reusing dark's number. */
+[data-theme="light"] .p2-rail.on.idle { opacity: .74; }
+[data-theme="light"] .p2-rail.on:hover .p2-rail-thumb,
+[data-theme="light"] .p2-rail.on.drag .p2-rail-thumb {
+  box-shadow: 0 0 16px -3px rgba(37,88,168,.58);
+}
+
+/* A 13px drag target is not a touch target, and a phone already draws its own
+   scroll indicator. */
+@media (pointer: coarse) { .p2-rail { display: none; } }
+
+/* Motion here is an affordance, not information. Anyone who asked for less of
+   it keeps the rail at full strength instead of watching it breathe. */
+@media (prefers-reduced-motion: reduce) {
+  .p2-rail, .p2-rail::before, .p2-rail-thumb { transition: none; }
+  .p2-rail.on.idle { opacity: 1; }
+}
+
+@media print { .p2-rail { display: none !important; } }
