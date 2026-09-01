@@ -1177,12 +1177,27 @@ window.cpiSetView = function(view){
   document.querySelectorAll("#cpiViewToggle button").forEach(function(b){
     b.classList.toggle("on", b.getAttribute("data-view")===STATE.view);
   });
-  /* The table takes the whole width and the chat moves below it. Done here
-     rather than in renderResults so the layout follows the CHOSEN view even
-     before a search has run. */
-  var lay=document.querySelector(".cpi-layout");
-  if(lay) lay.classList.toggle("wide", STATE.view==="table");
   if(STATE.results.length) renderResults();
+};
+
+/* Picking the table used to drop the chat below the results, and because the
+   view is remembered, one visit in table view left the page stacked on every
+   visit after it. The room a table wants is a real need, but tying it to the
+   view made the choice invisible: nothing on the page said the layout would
+   move, or how to move it back. It is now its own control, on the panel it
+   actually hides. */
+window.cpiToggleChat = function(tuck){
+  var lay=document.querySelector(".cpi-layout");
+  if(!lay) return;
+  var tucked = typeof tuck==="boolean" ? tuck : !lay.classList.contains("chat-tucked");
+  lay.classList.toggle("chat-tucked", tucked);
+  try{ localStorage.setItem("cpi-chat-tucked", tucked ? "1" : "0"); }catch(e){}
+  var btn=document.getElementById("cpiChatTuck");
+  if(btn){
+    btn.setAttribute("aria-expanded", tucked ? "false" : "true");
+    btn.setAttribute("aria-label", tucked ? "Show the assistant" : "Hide the assistant");
+    btn.title = tucked ? "Show the assistant" : "Hide the assistant";
+  }
 };
 
 /* Apollo returns some titles with the same role stated twice, joined by a comma,
@@ -3031,5 +3046,10 @@ loadList().catch(function(){ /* the badge is optional */ });
 /* Reflect the remembered layout on the toggle before any results exist, so the
    control never disagrees with the view the first search will render in. */
 window.cpiSetView(STATE.view);
+/* Same defensive read as the view preference above: an unreadable preference
+   is a reason to show the assistant, never to break the page. */
+window.cpiToggleChat((function(){
+  try{ return localStorage.getItem("cpi-chat-tucked")==="1"; }catch(e){ return false; }
+})());
 
 })();
