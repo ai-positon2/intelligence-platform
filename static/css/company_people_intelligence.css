@@ -93,11 +93,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 @media (prefers-reduced-motion:reduce){.cpi-aurora .b{animation:none}}
 
 /* ── Split-pane layout ── */
-/* The page-level column split takes the shared gutter, like the equivalent
-   grid on the other agent pages. It was a hand-typed number, so the gap
-   between this page's two columns did not move with the viewport the way the
-   page margin around them did. */
-.cpi-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.85fr);gap:var(--gutter);align-items:start}
+/* Held at 22px on purpose, not an oversight. The shared --gutter would be the
+   consistent choice and is what the equivalent grid on the other agent pages
+   takes, but at 1512 it widens this gap to 32px, which costs the filter column
+   10px and reflows the seniority chips from 9 + 2 to 8 + 3. Not worth a visible
+   change to this page. Revisit if the filter panel is ever reworked. */
+.cpi-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.85fr);gap:22px;align-items:start}
 @media (max-width:1080px){.cpi-layout{grid-template-columns:1fr}}
 
 /* ── Entity toggle (People / Companies) ── */
