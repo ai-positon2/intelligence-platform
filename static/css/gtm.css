@@ -403,3 +403,14 @@ html.lenis,html.lenis body{height:auto}
 [data-theme="light"] .card-thumb{background:linear-gradient(160deg,#f3f5fb,#e9edf7) !important}
 [data-theme="light"] .card-footer{border-color:rgba(18,26,54,.08) !important}
 [data-theme="light"] .card-tags .tag,[data-theme="light"] .tag,[data-theme="light"] .chip{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#4d5680 !important}
+
+/* The full trail does not fit a 62px bar on a phone: it wrapped and pushed the
+   account pill past the right edge (6px of overflow at 390px). The ancestors are
+   what a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. Same rule as event_conference_intelligence.css. */
+@media (max-width:640px){
+  .topbar .breadcrumb .bc-link,.topbar .breadcrumb .bc-sep{display:none}
+  .topbar .breadcrumb{min-width:0}
+  .topbar .topbar-left{min-width:0}
+  .topbar .breadcrumb .bc-cur{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

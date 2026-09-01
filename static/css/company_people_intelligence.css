@@ -14,7 +14,11 @@ html,body{scrollbar-width:none;-ms-overflow-style:none}
 html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 
 /* ── Topbar (proven pattern, matches linkedin.css) ── */
-.topbar{position:relative;z-index:10;height:62px;padding:0 32px;
+/* Full-width bar, so it takes --bleed rather than a flat number: below --maxw
+   that equals --margin, above it grows by the centering offset, which is what
+   lines the bar's contents up with the container beneath it. On a flat 32px the
+   logo sat 88px inboard of the content it sits above. */
+.topbar{position:relative;z-index:10;height:62px;padding:0 var(--bleed);
   display:flex;align-items:center;justify-content:space-between;
   background:rgba(6,7,15,0.75);backdrop-filter:blur(20px);
   border-bottom:1px solid rgba(255,255,255,0.06)}
@@ -89,7 +93,11 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 @media (prefers-reduced-motion:reduce){.cpi-aurora .b{animation:none}}
 
 /* ── Split-pane layout ── */
-.cpi-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.85fr);gap:22px;align-items:start}
+/* The page-level column split takes the shared gutter, like the equivalent
+   grid on the other agent pages. It was a hand-typed number, so the gap
+   between this page's two columns did not move with the viewport the way the
+   page margin around them did. */
+.cpi-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.85fr);gap:var(--gutter);align-items:start}
 @media (max-width:1080px){.cpi-layout{grid-template-columns:1fr}}
 
 /* ── Entity toggle (People / Companies) ── */
@@ -1033,3 +1041,14 @@ a.cpi-td-co:hover{color:#c2c6fb}
 .cpi-layout.wide{grid-template-columns:minmax(0,1fr)}
 /* Full-bleed the chat would stretch its bubbles to an unreadable line length. */
 .cpi-layout.wide .cpi-chat{max-width:760px}
+
+/* The full trail does not fit a 62px bar on a phone: it wrapped and pushed the
+   account pill past the right edge (81px of overflow at 390px). The ancestors are
+   what a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. Same rule as event_conference_intelligence.css. */
+@media (max-width:640px){
+  .topbar .tb-bc-link,.topbar .tb-bc-sep,.topbar .tb-brand-name{display:none}
+  .topbar .tb-breadcrumb{margin-left:12px;padding-left:0;border-left:none;min-width:0}
+  .topbar .topbar-left{min-width:0;gap:0}
+  .topbar .tb-bc-cur{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

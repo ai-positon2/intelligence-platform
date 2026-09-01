@@ -17,7 +17,16 @@
 
     /* ── Topbar ── */
     .topbar {
-      height: 56px; padding: 0 var(--margin-app); flex-shrink: 0;
+      /* 62px is the bar height every other agent page uses, so navigating
+         between agents does not shift the chrome. Purely cosmetic here: the
+         body is a flex column and .iframe-wrap takes flex:1, so the frame
+         absorbs the change.
+         The padding stays --margin-app rather than the --bleed the other bars
+         take. Those align a full-width bar with a --maxw-capped container;
+         this page has no container, it is a full-bleed iframe, and --bleed
+         would inset the bar by a centering offset for a box that is not there
+         (520px at 2560px wide). */
+      height: 62px; padding: 0 var(--margin-app); flex-shrink: 0;
       display: flex; align-items: center; justify-content: space-between;
       background: rgba(6,7,15,0.95); backdrop-filter: blur(20px);
       border-bottom: 1px solid rgba(255,255,255,0.07);
