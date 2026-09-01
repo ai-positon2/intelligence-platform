@@ -1,29 +1,28 @@
-# Intelligence by Position2 - Full Context (v27 - August 2026)
+# Intelligence by Position2 - Full Context (v28 - September 2026)
 
-Paste this entire file at the start of a new chat to give the assistant full context on this platform. **v27 supersedes all earlier context files (v1-v26)** - older versions are stale; ignore any pasted copy, and if `CONTEXT_FOR_NEW_CHAT_V26.md` (or older) still exists in the repo root, delete it as part of landing this file per the standing one-canonical-file convention.
+Paste this entire file at the start of a new chat to give the assistant full context on this platform. **v28 supersedes all earlier context files (v1-v27)** - older versions are stale; ignore any pasted copy, and if `CONTEXT_FOR_NEW_CHAT_V27.md` (or older) still exists in the repo root, delete it as part of landing this file per the standing one-canonical-file convention.
 
-**Latest `main` HEAD at the end of this cycle: `c1d5e1c`** (always `git pull` to confirm; Railway auto-deploys every push). `app.py` is **17,243 lines / 186 `@app.route` decorator lines** (212 total registered URL rules including loop-registered `add_url_rule` families and multi-decorator legacy redirects), up from 17,221 / 185 / 211 at v26. The test suite is now **98 files, 2,292 tests, all passing** (`PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q`), up from 94 files / 2,136 tests at v26. **30 routes carry `@admin_required`.**
+**Latest `main` HEAD at the end of this cycle: `587635d`** (always `git pull` to confirm; Railway auto-deploys every push). `app.py` is **17,879 lines / 199 `@app.route` decorator lines** (225 total registered URL rules including loop-registered `add_url_rule` families and multi-decorator legacy redirects), up from 17,243 / 186 / 212 at v27. The test suite is now **113 files, 2,838 tests, all passing** (`PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q`), up from 98 files / 2,292 tests at v27. **32 routes carry `@admin_required`.**
 
-**What kind of cycle this was:** v26 closed a cycle of *building agents*. v27 closes a cycle of *finishing one*. Almost everything below is the Social Creative Intelligence Analyst going from "works" to "is worth reading": its report was rebuilt from one long scroll into a rail of per-platform panes, given a real chart layer, given a link out of every section to the exact thing that section describes, and then given a second, borrowed chart vocabulary. Two things outside SCI: a new admin, and a scroll affordance for `/p2/b2b-agents`. **Unipile is still inert and still blocked on the same two operator actions it was blocked on at v26** - see OPEN ITEMS, which now also records *where* to connect the account from, and why it is not our own button.
+**What kind of cycle this was:** v27 finished an agent. v28 built one, then went back over the pages already shipped and made them look like one product. Three threads. A **tenth B2B agent**, Event & Conference Intelligence: built, rejected outright by the user, rebuilt from the gtm-skills source plays, then audited field by field and redesigned twice. A **platform-wide layout pass** putting every agent page on the same responsive grid, with a test that fails when one drifts off it. And **Unipile going from inert to live for LinkedIn**, which is the first time this platform has read a real company's real LinkedIn posts.
+
+The single most transferable lesson of the cycle is in that last thread. Every Unipile route the client shipped with at v27 was a wrong guess, written from the vendor's docs and from a probe run against the wrong host. Three separate assumptions died on contact with the live API, and one of them (where an account's real status lives) would have made every collection fail while the admin panel said "connected". **Probe the live thing before writing anything down about it, and treat a vendor's own documentation as a hint.**
 
 ---
 
-## WHAT V27 ADDS ON TOP OF V26 (this cycle's work)
+## WHAT V28 ADDS ON TOP OF V27 (this cycle's work)
 
-Ten threads, in the order they shipped. Threads 1-8 are all the SCI report:
+Eleven commits in three threads, in the order they shipped.
 
-1. **Richer post cards** (`0d717ce`) - top-left format badge, icon metrics, a View link, Top/Recent sort.
-2. **The third and last SCI identify bug** (`3a68e37`). The first two (a sunset `web_search` tool version, then a blocking-call timeout) are documented in the SCI section below. This one: Anthropic's `web_search` tool **splits its reply into several citation-bearing text blocks**, and the code read `content[-1]`, so it parsed only the last fragment of the answer. Fixed by joining every text block. Recorded permanently as `[[reference-anthropic-web-search-blocks]]` because it will bite any future feature using that tool.
-3. **YouTube made independent, verified, and deep** (`de6d5a5`, `fe15fef`) - YouTube is the only one of the seven platforms with a sanctioned public search API, so it no longer depends on the identify step at all: `resolve_company_channel()` resolves a bare company NAME directly. Two hard-won details: `search` returns a **confident false match** for plausible-sounding channel names, so the title is verified rather than trusted; and `forHandle` costs **1 quota unit against `search`'s 100**, so it is preferred wherever a handle exists. Collection also went from a 20-post slice to real depth.
-4. **Reddit added as a 7th surface** (`7ee6a25`) - deliberately **not** a company account. It is a brand-conversation read: what people say *about* the company, with sentiment, subreddits, recurring themes, competitor mentions, top threads and a timeline. Credentials are still unset; the whole surface is inert until they are.
-5. **The report rebuilt from one long scroll into a rail of platform panes** (`e95a93e`) - an overview pane, a cross-platform pane, then one pane per platform, each independently rendered.
-6. **Every pane given real charts** (`c40c88b`) - a shared primitive set (trend, ranked bars, 100% mix bar, donut, heat grid) plus one delegated tooltip/highlight layer for the whole page, so hovering a legend row dims everything in that chart that is not it.
-7. **A link out of every section** (`7743e4f`) - each section carries a chip pointing at the exact post or profile it is about (cadence -> most recent post, response -> best post, themes -> a post carrying the top theme), never a repeated generic profile link. Plus an account directory that **also lists the platforms with no account**, greyed and carrying their reason, because a directory of only the resolved accounts reads as "they are on four platforms". **No URL is ever built from a handle** - `"https://instagram.com/" + handle` produces links indistinguishable from real ones that land on a 404 or somebody else's account.
-8. **A borrowed chart vocabulary** (`c1ba1f9`), from bklit.com's component gallery, rebuilt in the report's own idiom (theirs is React/visx and monochrome; this is vanilla JS and brand-hued per platform). Three of the four carry a reading the report could not make before: a **radar** view on the platform scorecard (becoming **small multiples past three platforms**, with the group average ghosted behind each tile); a **dashed tail** on the publishing-rhythm trend, because the last bucket is the week we are standing in and drawing it solid read as a collapse in output; and the **series' own average** as a labelled dashed rule. The fourth is texture: gradient fill fading at the baseline, a dot floor that fades at both edges, ring marks. Plus loading skeletons shaped like what is coming, kept nearly colourless so a placeholder is never mistaken for data.
-9. **`sangeeta@position2.com` added as an admin** (`855a0bb`), plus `tests/test_admin_access.py` - an **AST-driven** sweep that parses `app.py` for `@admin_required` decorators, maps them to `app.url_map` rules, and exercises all 30. `@wraps` makes a decorated view indistinguishable from an undecorated one at runtime, which is why it parses the source rather than introspecting. It asserts both directions: no Position2 non-admin gets in, and **nothing under `/p2/admin/` escapes the gate** (a route that *loses* its decorator vanishes from the forward sweep rather than failing in it).
-10. **A scroll rail for `/p2/b2b-agents`** (`c1d5e1c`) - see SHARED UI CONVENTIONS below.
+**Thread 1, the tenth agent (`5bc89da`, `b9fb771`, `18adf08`, `76b5715`, `5fc90dc`, `cccc4b2`)** - Event & Conference Intelligence, its own full section below. Worth reading even if you never touch this agent, because the shape of the cycle is instructive: v1 (`5bc89da`) was built from the agent's own description and was **rejected outright** ("the output and the look and feel and everything is shit"). The root cause was not effort, it was that the two `gtm-skills` source plays this agent was supposed to implement had never been read. The rebuild (`b9fb771`) reads them and turns their load-bearing rules into **things the code refuses**, which is the whole difference between a play a human runs in a chat and one a platform can be trusted to run unattended. Then `18adf08` fixed a first-run dead end reported from the live page, `76b5715` traced all 20 form controls end to end with unique sentinels and found seven things the page promised and did not do, and `5fc90dc` + `cccc4b2` rebuilt the page twice.
 
-Plus this context-file refresh itself (v26 -> v27), on explicit user request.
+**Thread 2, the shared grid (`b151ab0`, `fcc0c39`, `bf0968d`)** - reported as "too broad, no spacing at the sides" on one page, and it turned out three pages had the same defect in different amounts. `static/css/grid-tokens.css` was **linked from pages that never read it**: they hand-typed `padding: 34px 30px` and capped at 1440px while their siblings used `var(--margin)`. Now every agent page's container takes the margin token, every top bar takes `--bleed` so the logo lines up with the content beneath it, and every bar is 62px. `tests/test_agent_page_grid.py` (31 checks over ten stylesheets) is the guard, because **this regression is invisible on the page it happens to and only shows up beside a sibling**, which is why it survived this long. `bf0968d` then reverted one part of it: Contact Finder's column gap went back to 22px, held with a comment, because the token widened it to 32px and cost the filter column 10px on the page about to go to external clients.
+
+**Thread 3, Unipile made real (`9ae0b54`, `54faee4`)** - the user supplied a working DSN and API key, and everything in the v27 client turned out to be wrong. Rewritten against live 200s. LinkedIn company posts now collect through a real authenticated account. Then `54faee4` added the guard that a carelessly-picked handle exposed: a wrong-but-real company page returns an empty list perfectly cleanly, and "this company posts nothing" is a very different claim from "we read the wrong page".
+
+**Plus `587635d`** - Contact Finder's results and assistant were stacking vertically for anyone who had ever chosen the List view, permanently, because the view is remembered. Its own section below.
+
+Plus this context-file refresh itself (v27 -> v28), on explicit user request.
 
 ---
 
@@ -36,7 +35,7 @@ Plus this context-file refresh itself (v26 -> v27), on explicit user request.
 - **GitHub (embedded SEO tools, React/Vite, SEPARATE Railway service):** `https://github.com/ai-positon2/seo-apps` -> `https://seo-apps-production-37a6.up.railway.app`
 - **Third-party agent frontend (NOT our code, NOT our repo):** `https://watchtower-by-position2.vercel.app`. The user builds these on an unrelated AI app-builder platform; we only receive and iframe the public URL, plus a `postMessage` run-signal snippet the user deployed into it. This backs **LinkedIn Social Researcher** (the old, external, currently-hidden agent - see its own section below), not the new native LinkedIn Strategy Researcher.
 - **Hosting:** Railway, auto-deploys on every push to `main` (~60-100s for the Flask app via NIXPACKS/`gunicorn app:app`; a few minutes for `seo-apps`). HTML/CSS/JS goes live on push.
-- **Admins (`ADMIN_EMAILS`):** `krishna.ladha@`, `sudheer.d@`, `reporting@`, `sparikh@`, `abhilash.dg@`, `pushpendra.k@`, `sangeeta@` (all `position2.com`); `sangeeta@` added this cycle. `tests/test_admin_access.py` proves the claim below rather than restating it: it AST-parses every `@admin_required` view, sweeps all 30 routes, and checks that the nine pre-rename `/p2/admin/*` URLs are bare 301s onto gated pages. **This set is the ONLY place admin access is defined.** `admin_required` gates every `/p2/admin/*` route off it, the template context processor derives `is_admin` from it, and `/api/whoami` returns `is_admin` from it so client-rendered surfaces read the same flag. Add a person here and nowhere else.
+- **Admins (`ADMIN_EMAILS`):** `krishna.ladha@`, `sudheer.d@`, `reporting@`, `sparikh@`, `abhilash.dg@`, `pushpendra.k@`, `sangeeta@` (all `position2.com`); `sangeeta@` added in the v27 cycle, unchanged since. `tests/test_admin_access.py` proves the claim below rather than restating it: it AST-parses every `@admin_required` view, sweeps all 32 routes, and checks that the nine pre-rename `/p2/admin/*` URLs are bare 301s onto gated pages. **This set is the ONLY place admin access is defined.** `admin_required` gates every `/p2/admin/*` route off it, the template context processor derives `is_admin` from it, and `/api/whoami` returns `is_admin` from it so client-rendered surfaces read the same flag. Add a person here and nowhere else.
 
 ### FOUR SURFACES + TWO-TIER AUTH (the biggest structural fact)
 
@@ -78,6 +77,101 @@ Renamed from "Company/Signal Tracker" a cycle ago: display text first (`280bb6c`
 
 ---
 
+## EVENT & CONFERENCE INTELLIGENCE (the 10th B2B agent, built this cycle)
+
+**Route base:** `/p2/b2b-agents/event-conference-intelligence`, staff-only (`@position2_required`), 13 routes. Page `templates/event_conference_intelligence.html` (~1,580 lines, report logic inline as JS) + `static/css/event_conference_intelligence.css` (~1,340 lines). Domain in `tracker/event_intel_*.py` (13 modules: `store`, `rubric`, `harvest`, `recover`, `resolve`, `enrich`, `discover`, `audit`, `scorer`, `report`, `workroom`, `pipeline`). Postgres tables `evi_events`, `evi_participants`, `evi_sources`, `evi_runs`, plus `evi_profiles`, `evi_candidates`, `evi_outreach`, `evi_outcomes`.
+
+**Four modes over one store:**
+
+| Mode | What it answers | Source play |
+|---|---|---|
+| `lookup` | name an event, get the participant roster it publishes | native |
+| `discover` | describe an audience, get events ranked by how many of your own target accounts are actually in them | native |
+| `recommend` | score a calendar of events and say which to attend | gtm-skills `conference-recommendation` |
+| `workroom` | post-event follow-up: who to talk to and what to say | gtm-skills `event-radar` |
+
+### The constraint the whole agent is built around
+
+**Events sell attendee lists, they do not publish them.** So what this collects is exhibitors, sponsors, speakers and partners, each row carrying the role its own source page gave it. `event_intel_store.ROLE_LABELS` is the single place that decides what a row is called, and **exactly one role is allowed to use the word "attending"**: `ROLE_ATTENDEE_DECLARED`, "Publicly said they are attending", which comes from a person publicly saying so. Everything else is labelled Exhibitor / Sponsor / Speaker / Partner / Media. A roster that calls an exhibitor an attendee is the same defect the thirteen Contact Finder audit rounds kept finding, in a new costume.
+
+`evi_sources` is why the schema has four tables rather than three. **A roster assembled from four of an event's seven pages looks identical to a complete one, only shorter.** Recording every page tried, including the ones that 403'd or came back as a JavaScript shell, is what lets the report say "2 pages could not be read" instead of quietly understating an event. Render `evi_sources` unconditionally; it is not a debug panel.
+
+### The rules the code REFUSES to break (this is the point of the agent)
+
+gtm-skills plays are prompts a human runs in a chat, so every rule in them is a **request**. The rebuild turns the load-bearing ones into **refusals**. That is what makes this better than the source rather than equal to it:
+
+- **`rubric.score()` has no budget parameter and no `**kwargs`.** Cost cannot reach a score even by accident. A test asserts the signature. Cost travels beside a candidate and renders next to the score, never inside it.
+- **The +10 organizer-matchmaking bonus needs two independent gates:** the model's `organizer_run` flag AND evidence text surviving a veto list (Whova, Brella, Swapcard, networking lounges, "pre-booking encouraged" are apps and lounges, not programmes). Either gate alone is bypassable by an agreeable model. **A refused bonus states its reason on screen.**
+- **`orientation_for()` and `workroom.play_for()` RAISE on unknown input.** A default would silently score the opposite side of the trade-show floor, or write a competitor follow-up in an owned-event voice, and nothing downstream would look wrong.
+- **The six discovery categories are searched SEPARATELY**, so a model cannot fill the quota out of category one and relabel a flagship. `empty` (a real market finding) and `error` (a hole in the analysis) stay distinct and are never collapsed.
+- **Totals are recomputed from their own sub-scores at write time** (`normalise_candidate`), so the headline can never contradict the bars.
+- **A famous-event verdict of "kept" with no named alternative is downgraded to a cut**, because the comparison that step requires never actually happened.
+- **The workroom booth rule:** a draft opener may reference a conversation ONLY where the USER wrote a note about that specific company. `enforce()` throws away any draft claiming one, replaces it, and **shows both the offending phrase and the reason**. This is the rule a model breaks most eagerly, and it applies to every event class: the class does not create the evidence, the note does.
+- **Displacement language is refused on a competitor's event.** A roster row with nobody named gets an account play, never a message addressed to a person who was never identified.
+- **The non-ICP tail is cut and COUNTED**, because event-radar's own warning is that conferences attract everyone.
+- **The missing CRM is reported as missing.** No CRM is wired. In its place the agent surfaces companies seen on the floor at this user's own earlier events, which is a real signal Postgres can answer and a prompt cannot. The cross-client check is measured against real prior runs, never imagined.
+- **The executive summary is assembled in code**, with no model call.
+
+### The rubric (verbatim from the source skill, implemented in `event_intel_rubric.py`)
+
+```
+Relevance                     /40   how closely composition matches ICP
+Decision-maker accessibility  /40   density of buyers AND structural reach
+Engagement mode               /20   buying mindset vs learning mindset
++ organizer-run matchmaking   +10   bonus, total out of 110
+
+P1  >= 80   must-attend
+P2  70-79   strong
+P3  <  70   EXCLUDED from the ranked list, no padding
+```
+
+The module is pure: no I/O, no model calls, no imports from the rest of the package. The page reads these numbers from the module at render time rather than typing them, so a reweighting moves the page.
+
+### Cost model (differs from Contact Finder, and the v27 doc had it wrong)
+
+**Apollo's `mixed_companies/search` bills per CALL**, not per record and not free. `mixed_people/api_search` does not bill. So:
+
+- **Harvesting is free and automatic.** Company resolution is a **separate, explicitly-triggered route** that states its ceiling before spending.
+- Resolution **batches by domain**, so 60 exhibitors cost 3 credits rather than 60.
+- Harvesting therefore works hard to keep each exhibitor's **published link**: a domain is exact where a fuzzy name match is not, and deriving a domain from a company name is the defect already logged against `_cpi_probe_company_free`.
+- **A participant with no published link is reported unresolved, never guessed.**
+
+### The two harvest defects that made v1's roster unusable
+
+1. **Pagination was not followed.** Reading page one of a fourteen-page exhibitor directory and calling it the roster is an undercount with nothing on screen to reveal it. `harvest_page` now follows `next_page_links` (same host and path, pagination param only, forward only).
+2. **A page yielding nobody while carrying a browser-side mount point was reported as "this event has no exhibitors".** An unread page and an empty page render identically and mean opposite things. Such a page is now `blocked`, and gets a second read path: `event_intel_recover.recover_page` searches for the listing and stores it at its own evidence grade (source status `recovered`, row `provenance=search`). **A recovery that ran zero searches is discarded outright** as a recollection rather than a read.
+
+### `tracker/claude_websearch.py`
+
+Factors out the `web_search` plumbing `sci_identify` learned the hard way: dated tool versions with an ordered fallback, "version rejected" told apart from "bad minute", streamed rather than blocking, and **every text block joined rather than `content[-1]`** (see `[[reference-anthropic-web-search-blocks]]`). `sci_identify` deliberately keeps its own copy for now: it is twice-debugged in production and this module has no production mileage yet.
+
+### The field-by-field audit (`76b5715`) and why it is the model for auditing any page here
+
+Every one of the 20 form controls was traced from the DOM through the route, the store, the prompts and the report **with a unique sentinel in each field**, rather than by reading the code. Seven fields or claims did not survive the trip, and **all seven passed the entire suite**, because no test covered the path. Four were the same defect the agent exists to prevent, something disappearing with a confident number beside it:
+
+- A marquee event the auditor returned no verdict for was cut, its explanation written onto a row that was then discarded, so it appeared in no list while the summary said "0 were cut".
+- An audit call that succeeded but yielded no readable verdict for ANY famous event cut every flagship silently. That is a parse failure wearing a success; it now reports a failed audit and cuts nobody.
+- Events scoring above 70 but falling outside `max_events` simply vanished. `rank()` computes `over_cap` precisely so this can be said, and nothing said it.
+- Discover mode's form promises events "ranked by how many of your own target accounts turn up", and they were rendered in discovery order. Now ordered by overlap, and because only the best-fitting few rosters are sampled, **an unread roster says so** instead of looking identical to one containing none of your accounts.
+
+Two more were fields collected and thrown away (`budget_note`, stored and rendered nowhere while its own hint said "Shown beside each event"; `force_include`, a dead column now wired as "already committed to these"). The seventh was the string "1 marquee event were audited".
+
+### Page design (`5fc90dc`, then `cccc4b2`)
+
+The page first read as "a form on a flat panel" beside Contact Finder and SCI. `5fc90dc` drew the scoring model in the hero as bars to scale, grouped the intake into five labelled steps, and put a sticky rail beside the form carrying run history and spend. `cccc4b2` then removed the scoring card at the user's request and **gave the weight to the four play cards** instead, since they decide what every field below them means: each with its own hue set once per card as `--p1`/`--p2` and used by icon, lit edge, border, glow and action label; a ghosted step number 01 to 04; and the action spelled out along the bottom edge. **`data-action` is now the only place a play's action wording lives** and `setMode` reads the label off the selected card, because the second table it used to keep had already drifted (two modes showed a bare "Run").
+
+**Class-name collision worth remembering:** `.evi-play` was simultaneously the hero play card and the workroom report's play block, so every rule written for one landed on the other. The report's is now `.evi-classplay` and a test asserts the two never share a class again.
+
+### Admin self-tests
+
+`POST /p2/admin/external-usage/evi-guardrail-check` (offline, free, proves the six refusals hold **on the deployed code** and states what it could NOT check) and `POST /p2/admin/external-usage/evi-resolve-check`.
+
+### Open on this agent
+
+**It has never been run against a real event with live keys.** The harvest hit rate and the search-recovery hit rate are both unmeasured in production.
+
+---
+
 ## CONTACT FINDER (the biggest feature by audit depth)
 
 **Route base:** `/p2/b2b-agents/company-people-intelligence` (slug/file/JS/CSS names all still say `company_people_intelligence` from before the display-name rename). Staff-only (`@position2_required`). **The user plans to open this to external paying clients "soon" - the last full audit cycle (pre-v25) was explicitly framed as pre-launch hardening.**
@@ -114,6 +208,19 @@ Apollo's **search** endpoints are free; only **enrichment** spends credits from 
 
 **Also added pre-v25:** Claude as a second opinion on the NLP intent parser (`3256bac`) - critique-and-correct over OpenAI's extraction, wired into both Fill-filters and chat. **Ships inert: `ANTHROPIC_API_KEY` was not set at the time** - check current status in the ENVIRONMENT VARIABLES section below, since other features have since started depending on the same key.
 
+### The layout fix (`587635d`) and the test weakness it exposed
+
+Reported as "why are these two sections above and below and not side by side". **Not a CSS bug.** `window.cpiSetView` added a `wide` class to `.cpi-layout` whenever the table view was chosen, which deliberately dropped the assistant below the results, and the view is persisted in `localStorage["cpi-view"]`. So **one visit in List view left the page stacked on every visit after it**, with nothing on screen saying why or how to undo it, while the page's own empty state still read "ask the assistant on the right".
+
+The old rule was not arbitrary (a table squeezed beside a fixed rail does get cramped), so the capability was kept and made explicit rather than removed: `cpiToggleChat()` is a chevron in the assistant's header that tucks the rail to a 54px strip, remembered in `localStorage["cpi-chat-tucked"]`, offered only above the 1080px breakpoint since below it the two are already one column. The rail is clamped to `clamp(340px,26vw,440px)` so extra viewport width feeds the results column alone (past ~440px a chat bubble's line length stops being readable). At 1512px that is 857px of results, or 1196px tucked.
+
+Two things fixed while in the header: it was a wrapping flex row where the credits notice, List and History each carried their own `margin-left:auto`, which works only while everything happens to fit (at 1512 without the credits pill, History dropped to a third line against the left margin). It is now `.page-hdr-meta` + `.page-hdr-actions`. And `.cpi-empty` got a min-height, because a 130px box beside a rail nearly the height of the window reads as a hole in the page rather than a results area waiting for a search.
+
+**Two test lessons, both general:**
+
+- The existing `tests/test_cpi_table_view.py` drives the page's real JS in node and passed through all of this, because **its DOM shim answers `document.querySelector()` with `null` for everything**. The damaging line ran `if(lay)` and did nothing. A shim that cannot return an element cannot see what a function does to one. The new `tests/test_cpi_layout.py` resolves `.cpi-layout` for real.
+- A CSS assertion helper that reads only the **first** matching rule for a selector is checking the losing declaration. Appending a later `.page-hdr-credits{margin-left:auto}` sailed straight past it. `_bodies()` reads every rule for the selector, which is the only reading the cascade makes true.
+
 ### Known open items inside Contact Finder
 
 - Verify current `ANTHROPIC_API_KEY` status (was unset as of the Claude cross-check shipping; multiple other features now share it - see below).
@@ -136,6 +243,13 @@ cd <repo> && PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q
 - **A mutation test needs fixture data where the buggy and fixed computation would actually diverge.**
 - **Text assertions on a JS bundle cannot distinguish a working guard from a disabled one.** Several tests shim `document`/`window`/`fetch`, `eval` the real bundle/inline scripts in node, and assert on the HTML/requests actually produced. Skips (not fails) when node is unavailable.
 - **Live-verifying a UI change needs a temporary, fully-removed preview route** (or a standalone preview script that monkeypatches the store layer with synthetic data and runs the real Flask app on a scratch port) - screenshot in both dark and light theme via the Browser pane, then confirm `git diff --stat app.py` shows zero changes before committing anything permanent.
+- **A DOM shim that answers `document.querySelector()` with `null` cannot see what a function does to the element it would have returned.** This is exactly how Contact Finder's stacking bug survived a node-executing test that passed on every run. If a test drives real page JS, the shim has to resolve the selectors the page actually queries.
+- **A CSS assertion that reads only the first matching rule for a selector is checking the losing declaration.** The whole point of the cascade is that the last one wins, so a later override sails past it. Read every rule for the selector.
+- **A test asserting "the page shows 70" cannot tell a rendered rubric value from a literal 70 that happens to match.** Monkeypatch the module and require the page to move with it.
+- **A mutant that changes nothing is a finding, not a pass.** A rule stated twice cannot be tested, and both times that showed up this cycle the duplicate line was genuinely dead and got deleted.
+- **UNAPPLIED mutants score as MISSES, never as passes.** An anchor whose indentation no longer matches the source silently applies nothing, and the gate reports success. Check the applied count, not just the killed count.
+- **A `timeout`-killed mutation run leaves the mutant on disk.** The `finally` restore does not survive SIGTERM. Always grep for sentinels after an interrupted gate; this silently removed a source line once this cycle.
+- **A colour checker that only parses `rgba()` silently exempts every `color-mix()` value.** Self-test the parser against the syntax the page actually uses; an rgba-only one reported three false failures here.
 - Do not write change-detector tests. If a mutant is unreachable in practice, say so in the commit message instead of pinning it.
 
 ---
@@ -207,9 +321,9 @@ Two hard-won points that generalise: **validate response shape, not just HTTP st
 
 **Vendors, two now, additive not exclusive:**
 - **Apify** (`tracker/apify_transport.py` + per-platform `sci_source_<platform>.py` adapters) - actor-based scraping for Facebook/TikTok/X, and a fallback path for Instagram. `APIFY_API_TOKEN` **has never actually been set in production** - confirmed via a dedicated Apify pricing/tier research pass this cycle finding zero existing spend anywhere. LinkedIn is **feature-flagged off by design** via Apify (`SCI_APIFY_LINKEDIN_ACTOR_ID` has no default; unset means the pipeline never even calls Apify for it) - LinkedIn is the platform most exposed to scraping-detection/ToS enforcement.
-- **Unipile** (`tracker/unipile_client.py` + `tracker/unipile_transport.py` + `sci_source_linkedin_unipile.py`/`sci_source_instagram_unipile.py`, added this session) - a fundamentally different model: connects one real, authenticated account per platform via a hosted-auth link a human clicks through, then acts through that account. LinkedIn and Instagram now try a connected Unipile account **first**, falling back to the pre-existing Apify path unchanged if none is connected - purely additive, zero behavior change wherever Unipile isn't configured. **No local table tracks which account is connected** (deliberately - `unipile_client.list_accounts()` is queried live every time, the same reasoning that prevents Arena's LinkedIn-connection-lapsing problem, described above in the LPS section, from being invisible here too). New `sci_platform_runs.source_vendor` column + a "via Unipile"/"via Apify" badge per platform section in the report makes which vendor served which platform visible.
+- **Unipile** (`tracker/unipile_client.py` + `tracker/unipile_transport.py` + `sci_source_linkedin_unipile.py`/`sci_source_instagram_unipile.py`) - a fundamentally different model: connects one real, authenticated account per platform via a hosted-auth link a human clicks through, then acts through that account. **LIVE for LinkedIn as of this cycle** (`9ae0b54`), and the workspace currently holds 17 LinkedIn accounts, 11 of them working. LinkedIn and Instagram try a connected Unipile account **first**, falling back to the pre-existing Apify path unchanged if none is connected: purely additive, zero behavior change wherever Unipile isn't configured. **No local table tracks which account is connected** (deliberately - `unipile_client.list_accounts()` is queried live every time, the same reasoning that prevents Arena's LinkedIn-connection-lapsing problem, described above in the LPS section, from being invisible here too). `sci_platform_runs.source_vendor` + a "via Unipile"/"via Apify" badge per platform section makes which vendor served which platform visible. See the dedicated Unipile subsection below.
 
-**Data model** (`tracker/sci_store.py`, Postgres): `sci_runs` (one row per analysis), `sci_platform_runs` (one row per platform per run, own status so one platform failing doesn't blank the others; `source_vendor` column added this session), `sci_posts` (one row per scraped post, creative_analysis JSONB attached once complete), `sci_spend_log` (schema exists, not yet enforced against a cap - future phase).
+**Data model** (`tracker/sci_store.py`, Postgres): `sci_runs` (one row per analysis), `sci_platform_runs` (one row per platform per run, own status so one platform failing doesn't blank the others; `source_vendor` column added in the v27 cycle), `sci_posts` (one row per scraped post, creative_analysis JSONB attached once complete), `sci_spend_log` (schema exists, not yet enforced against a cap - future phase).
 
 **Reddit, the 7th surface** (`tracker/sci_reddit_client.py`, `sci_reddit_pulse.py`): deliberately **not** a company account. It answers "what are people saying about this company", via app-only OAuth (Reddit's unauthenticated `.json` endpoints now 403 with an HTML block page even from a residential IP, so there is no unauthenticated fallback). Renders as sentiment, subreddits, recurring themes, competitor mentions, top threads and a timeline. A community found for the brand appears in the account directory explicitly labelled "not a company account". **Currently inert: `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` are unset**, and the normalizer is fixture-proven only.
 
@@ -236,9 +350,35 @@ Chart rules that are load-bearing and easy to undo by accident:
 - **Report was "wall of text" with broken video thumbnails:** `media_urls[0]` for a video post is the playable file, never a displayable image - every `<img>` silently 404'd via its own onerror handler. Fixed with a client-side `postThumbnail()` resolver reading each platform's real cover image out of the post's raw payload, plus converting synthesis prose from single paragraphs to short bullet lists with citations moved out of inline text into real linked post cards.
 - **A copy-pasted broken-image-fallback bug, 4 times in one file:** every `onerror` handler called `.remove()` before `.closest(...)`, so `closest()` always failed on the now-detached node - silent (no visible error) because nothing had ever tested a real reachable-but-broken image URL until logos were added. Fixed by reordering all four call sites.
 
-**Known-open items (unchanged since v26 - every one is an operator action, not code):** `UNIPILE_DSN` is not set to the account's real dashboard-issued host, so the key 401s against the shared gateway; no LinkedIn/Instagram account has been connected through Unipile yet; the exact live v2 posts-endpoint response shape is unconfirmed against a real connected account (built defensively, flagged in the client's own docstring); `APIFY_API_TOKEN` still not set, so Facebook/TikTok/X collection is fully inert; Reddit's credentials are unset. **The failure mode is silent by design:** Unipile unavailable -> fall through to Apify -> no Apify token -> that platform ends as `scrape_failed`. Nothing errors; those platforms simply show no collected posts, which is easy to misread as "this company posts nothing there".
+**Known-open items:** `APIFY_API_TOKEN` still not set, so Facebook/TikTok/X collection is fully inert; `YOUTUBE_API_KEY` not set; Reddit's credentials unset; Instagram through Unipile unverified. **The failure mode is silent by design:** Unipile unavailable -> fall through to Apify -> no Apify token -> that platform ends as `scrape_failed`. Nothing errors; those platforms simply show no collected posts, which is easy to misread as "this company posts nothing there". LinkedIn is the one platform where that chain now terminates in a real read.
 
-**Env vars:** `APIFY_API_TOKEN` (opt, NOT SET), `YOUTUBE_API_KEY` (opt, NOT SET), `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`/`REDDIT_USER_AGENT` (opt, NOT SET - see the Reddit entry under ENVIRONMENT VARIABLES), `SCI_APIFY_<PLATFORM>_ACTOR_ID` x5 (opt overrides; LinkedIn's has no default, load-bearing differently from the rest), `UNIPILE_API_KEY` (**set**, but not yet authenticating - see above), `UNIPILE_DSN` (opt, NOT SET, almost certainly required). Reuses the platform's existing `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` and `OPENAI_API_KEY` (Whisper) - no new AI vendor account needed.
+---
+
+### UNIPILE IS NOW LIVE FOR LINKEDIN (`9ae0b54`, `54faee4`) - the biggest correction in this cycle
+
+At v27 this integration was inert and every route in it was a guess. The user supplied a working DSN (`api27.unipile.com:15703`) and API key, and **the client was rewritten wholesale against live responses**. LinkedIn company posts now collect through a real authenticated account. What was wrong, in the order it was found, because each one is a general lesson:
+
+1. **The path prefix.** `unipile_client` shipped with `/v2/...` everywhere. The live API is **`/api/v1`**; `/v2` and bare `/v1` both 404. The v27 doc confidently recorded "the docs say `/api/v1`, the live API is already on `/v2`" and had it exactly backwards, because that probe was run against the shared `api.unipile.com` gateway, **which is a different service**. A key is valid only against its own DSN.
+2. **Where an account's status lives.** `acct.get("status")` returns `None` for every live account. The real usability is at **`sources[].status`**. This mattered enormously: of the 17 accounts in the workspace, **6 were `CREDENTIALS` (signed out) and the FIRST listed account was one of them**, so `accounts[0]` would have failed every single collection while the admin panel cheerfully said "connected". `account_status()` / `is_connected()` / `connected_only=True` exist for exactly this.
+3. **The hosted-auth link requires `expiresOn`.** Every Connect button was returning 400. And the field wants a specific millisecond-precision-with-`Z` format that `isoformat()` does not produce, so `_expires_on()` builds it by hand.
+4. **The posts endpoint rejects vanity slugs.** It wants the numeric company id, so `resolve_company_page` / `get_company` resolve first.
+5. **The last page still returns a cursor.** Paging on "cursor is present" never terminates; page emptiness is the terminator.
+
+**The wrong-company-page trap (`54faee4`), found by actually running the thing.** `@notion` resolves to a real, live LinkedIn page belonging to a 39-person consultancy, which returns an empty post list perfectly cleanly and lands as `no_presence`. **Both pages are literally named "Notion"**, so a name check alone confirms the impostor. Only the `website` field separates them. `verify_company_page()` therefore returns one of `domain` / `name` / `none` / `mismatch`:
+
+- domains agree (by suffix containment, so `www.acme.com` and `shop.acme.com` match but `acme.co.uk` and `rival.co.uk` do not) -> `domain`, silent.
+- domains present and disagree -> `mismatch` only if the names ALSO disagree, so a legitimately different domain does not cause a false rejection.
+- no domain to compare -> falls back to the name.
+
+A mismatch raises **`CompanyMismatch`, deliberately NOT a subclass of `UnipileTransportError`**, so a wrong handle is never retried through Apify as though it were a transport failure. Anything short of `domain` verification attaches a note that the report prints: "Read linkedin.com/company/x (Name, N followers, no website listed), which has no posts. That page could not be confirmed as this company's own, so this may be the wrong page rather than an empty one."
+
+**Judgement calls made and worth preserving:** `posted_at` is read only from `parsed_datetime`/`posted_at`, never the relative `date` string; `_media_urls` orders video URLs first, then images, then `article.picture_url`; `_usable_attachments` drops `unavailable:true` entries; `_metrics` omits a falsy `impressions_counter` but preserves a genuine zero likes/comments/shares, because "nobody engaged" is data and "not reported" is not.
+
+**Instagram through Unipile is still unverified.** All 17 accounts in the workspace are LinkedIn, so `sci_source_instagram_unipile.py`'s field names remain docs-derived guesses and are marked as such in the module. Connect an Instagram account through the Data sources panel, then check `normalize()` against one live response before trusting it.
+
+**The Data sources panel** now reports both numbers: "11 accounts working, 6 need reconnecting" / "3 accounts signed out + Reconnect" / "Connect". Listed and working are genuinely different facts and the panel used to conflate them.
+
+**Env vars:** `APIFY_API_TOKEN` (opt, NOT SET), `YOUTUBE_API_KEY` (opt, NOT SET), `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`/`REDDIT_USER_AGENT` (opt, NOT SET), `SCI_APIFY_<PLATFORM>_ACTOR_ID` x5 (opt overrides; LinkedIn's has no default, load-bearing differently from the rest), `UNIPILE_API_KEY` (**set and working**), `UNIPILE_DSN` (**set and working**, `https://api27.unipile.com:15703`). Reuses the platform's existing `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` and `OPENAI_API_KEY` (Whisper) - no new AI vendor account needed.
 
 ---
 
@@ -319,7 +459,7 @@ Route `/p2/b2b-agents/linkedin-intelligence`. Renders `templates/linkedin_scrape
 
 ```
 intelligence-platform/
-├── app.py                ← Flask server (~17,221 lines, 185 route decorator lines / 211
+├── app.py                ← Flask server (~17,879 lines, 199 route decorator lines / 225
 │                            registered rules): auth (3 decorators + client gate), all 4
 │                            surfaces, AGENTS/APP_AGENTS/SIGNALS/INDUSTRIES/CLIENTS/ACCOUNTS
 │                            registries, HIDDEN_AGENT_SLUGS, OpenAI (Vimi x2 + Contact
@@ -344,12 +484,16 @@ intelligence-platform/
 │       source_instagram_unipile/linkedin_unipile) + tracker/apify_transport.py +
 │       tracker/unipile_client.py + tracker/unipile_transport.py
 │                                      ← Social Creative Intelligence Analyst, both vendors
-│                                      (new this cycle; Unipile added this session)
+│                                      (built in the v26 cycle; Unipile made live in v28)
+├── tracker/event_intel_*.py (store, rubric, harvest, recover, resolve, enrich, discover,
+│       audit, scorer, report, workroom, pipeline) + tracker/claude_websearch.py
+│                                      ← Event & Conference Intelligence (new this cycle)
 ├── tracker/job_change_parser.py, tracker/job_change_store.py ← Job Change Alert
 ├── scripts/sync_job_change_alerts.py, scripts/import_job_change_tracked_snapshot.py,
 │       scripts/import_slot_checker_snapshot.py ← subprocess-only scripts, never imported
-├── tests/                ← 94 files, 2,136 tests. test_cpi_*.py, test_job_change_*.py,
-│                            test_sci_*.py, test_unipile_*.py, one per audit/feature.
+├── tests/                ← 113 files, 2,838 tests. test_cpi_*.py, test_job_change_*.py,
+│                            test_sci_*.py, test_unipile_*.py, test_event_intel_*.py,
+│                            test_agent_page_grid.py, one per audit/feature.
 ├── visitor_intelligence/ ← de-anon engine: resolver.py, pipeline.py, identity_graph.py.
 ├── tracker/              ← signal pipeline pkg (news_client, news_relevance, signal_score,
 │                            dashboard_builder [build_dashboard(), takes hiring_opts],
@@ -362,16 +506,17 @@ intelligence-platform/
 │   ├── css/ (ds-tokens, ds-components, gtm, hub, seo, linkedin, admin, aurora-app,
 │   │        grid-tokens, client-portal, company_people_intelligence, job_change_alert,
 │   │        linkedin_playbook_studio, gentle_dental_slot_checker, social_creative_
-│   │        intelligence.css - the last 4 new this cycle)
+│   │        intelligence, event_conference_intelligence.css - the last one new this cycle)
 │   └── js/ (theme, linkedin, visitor_track, pfx_bg, aurora, anonymous_visitors,
-│           company_people_intelligence.js)
+│           company_people_intelligence.js, scroll-rail.js)
 ├── templates/
 │   ├── agents.html          ← THE SINGLE SHARED MARKETING TEMPLATE, {% if page %} variants
 │   ├── app.html, app_base.html, app_embed.html, app_history*.html, app_settings.html
 │   ├── hub.html, b2b_agents.html, seo.html, accounts.html, embed.html, context.html, 403.html
 │   ├── company_people_intelligence.html   ← Contact Finder
 │   ├── job_change_alert.html, linkedin_playbook_studio.html, gentle_dental_slot_checker.html,
-│   │       social_creative_intelligence.html   ← all new this cycle
+│   │       social_creative_intelligence.html, event_conference_intelligence.html
+│   │       ← the last one new this cycle
 │   ├── linkedin_scraper.html   ← serves BOTH internal and client LinkedIn dashboards
 │   ├── admin_usage.html, admin_visitors.html, admin_members.html, admin_agent_runs.html,
 │   │        admin_requests.html, admin_external_usage.html, admin_client_usage.html,
@@ -391,7 +536,7 @@ intelligence-platform/
 
 - **Code/UI** push to `main` -> Railway redeploys (~60-100s). No hot reload locally.
 - **Google Sheets** is the primary store for internal analytics AND for Gentle Dental Slot Checker's live availability data. Job Change Alert's tracked-roster sheet is currently blocked (Workspace DLP) and falls back to a committed snapshot.
-- **Postgres** (`DATABASE_URL`): `agent_run_history`, `cpi_search_history`, Contact Finder's persistent caches, `lps_runs`/`lps_playbooks` (LPS), `sci_runs`/`sci_platform_runs`/`sci_posts`/`sci_spend_log` (SCI).
+- **Postgres** (`DATABASE_URL`): `agent_run_history`, `cpi_search_history`, Contact Finder's persistent caches, `lps_runs`/`lps_playbooks` (LPS), `sci_runs`/`sci_platform_runs`/`sci_posts`/`sci_spend_log` (SCI), `evi_events`/`evi_participants`/`evi_sources`/`evi_runs`/`evi_profiles`/`evi_candidates`/`evi_outreach`/`evi_outcomes` (Event & Conference Intelligence).
 - **SQLite** (committed): `data/tracker.db` (Healthcare), `data/tracker_csg_v2.db` (CSG), `data/tracker_northstar.db` (NorthStar), `data/job_change_alerts.db`. **Gitignored, real PII, NEVER commit: `data/identity_graph.db`.**
 
 ---
@@ -403,13 +548,45 @@ intelligence-platform/
 - **`p2_vid` stitching:** Page Views and both login tabs carry a visitor-id column.
 - **Surface 2, `/app`:** shell `app_base.html`, `APP_AGENTS` cards (minus `HIDDEN_AGENT_SLUGS`), a few wired to live seo-apps tools plus LinkedIn Social Researcher (currently hidden), the rest request-access-only.
 - **Surface 1, public site:** one template `agents.html`, `{% if page %}` chain.
-- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (Contact Finder, Job Change Alert, LinkedIn Strategy Researcher [native], Gentle Dental Slot Checker, Social Creative Intelligence Analyst, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-social-researcher), `/p2/seo` + tools (16), `/p2/abm-signal-tracker/accounts` + signal trackers, `/p2/playbook`, admin dashboards.
+- **Surface 3, `/p2/*`:** `/p2/hub`, `/p2/b2b-agents` (Contact Finder, Job Change Alert, LinkedIn Strategy Researcher [native], Gentle Dental Slot Checker, Social Creative Intelligence Analyst, Event & Conference Intelligence, sentiment-pulse MOCK data, ad-intelligence React app, linkedin-intelligence, linkedin-social-researcher), `/p2/seo` + tools (16), `/p2/abm-signal-tracker/accounts` + signal trackers, `/p2/playbook`, admin dashboards.
 
 **Agent roster hazard, worse than ever now:** the roster exists in **three independent lists** (`AGENTS`, `APP_AGENTS`, and a JS array in `templates/context.html`), plus the internal SEO Suite tools list, plus `HIDDEN_AGENT_SLUGS`, plus now FOUR agents this cycle alone (Job Change Alert, LPS, Gentle Dental, SCI) each with their own hand-written `b2b_agents.html` card and command-palette entry that derives from none of the above. **Nothing derives one from another.**
 
 ---
 
-## SHARED UI CONVENTIONS (and the /p2/b2b-agents scroll rail)
+## SHARED UI CONVENTIONS (the grid, and the /p2/b2b-agents scroll rail)
+
+### THE SHARED RESPONSIVE GRID (`b151ab0`, `fcc0c39`, `bf0968d`) - read this before styling any agent page
+
+`static/css/grid-tokens.css` defines the platform's page geometry as custom properties only, no element rules, so it can be added to any page without restyling it:
+
+```
+--margin  20 -> 32 (428) -> 48 (768) -> 80 (1280) -> 120 (1440) -> 160 (1728) -> 200 (1920)
+--gutter  16 -> 24 (768) -> 32 (1440) -> 40 (1728) -> 48 (1920)
+--maxw    1920px
+--bleed   max(--margin, (100vw - --maxw)/2 + --margin)   /* side padding for a full-width bar */
+```
+
+**The defect this cycle found:** the file was *linked* from pages that never *read* it. Event & Conference Intelligence hand-typed `padding: 34px 30px` and capped at 1440px, so on a laptop it ran nearly edge to edge while every sibling kept a real margin. Contact Finder and LinkedIn Intelligence had `.topbar{padding:0 32px}` while their content sat at `var(--margin)`, so at 1512 **the logo was 88px inboard of the content it sits above**. And the account pill was pushed off the right edge on a phone by up to 104px.
+
+**The shape every agent page now uses:**
+
+- `.main { max-width: 1320px; padding: 36px var(--margin) 72px }` (or that page's own cap; 1320 is the top of the existing band)
+- `.topbar { height: 62px; padding: 0 var(--bleed) }` so the bar lines up with the centered container
+- page-level column grids take `var(--gutter)`
+- below 640px the breadcrumb's ancestors hide and the current page ellipsises
+
+**`tests/test_agent_page_grid.py`** is the guard: 31 checks over all ten agent stylesheets asserting the container takes the margin token, the bar takes `--bleed`, and every bar is 62px. **This regression is invisible on the page it happens to and only shows up beside a sibling**, which is exactly why it survived so long, and exactly why it needs a test rather than an eye.
+
+**Deliberately NOT converted, do not "fix" these:**
+
+- **Hub.** It looks like the same defect (content at 24px, no cap) but it is a centered full-bleed splash with an edge-to-edge starfield and marquee, not a left-aligned content page.
+- **`embed.html`** keeps `--margin-app`, not `--bleed`. `--bleed` aligns a bar with a `--maxw`-capped container; that page is a full-screen iframe with no container, so `--bleed` would inset its bar 520px at 2560px wide.
+- **The 35 `auto-fit` grids** across these pages. `auto-fit` is correct for an open-ended list. It was only wrong on Event Intelligence's two radiogroups, where a fixed set of four meant to read as one choice was being dealt 3 + 1 with a hole in the row.
+- **Contact Finder's column gap**, held at 22px with a comment saying so. `--gutter` widened it to 32px at 1512, taking 10px off the filter column and reflowing the seniority chips from 9 + 2 to 8 + 3. Consistent, but a visible cost with no visible benefit on the page about to go to external clients.
+- **The `--fs-` type scale.** No agent page uses it; converting one would make it the odd page out rather than a consistent one.
+
+### The scroll rail
 
 **`static/css/gtm.css` zeroes the native scrollbar on everything it touches** (`*::-webkit-scrollbar{width:0!important;display:none!important}` plus `scrollbar-width:none`). That is a deliberate look, but it means pages using it have no scroll affordance at all: nothing showing how far the page runs, and nothing to drag. `/p2/b2b-agents` is roughly two screens of agent cards with no indicator.
 
@@ -434,7 +611,7 @@ Details that are load-bearing:
 
 ## ENVIRONMENT VARIABLES
 
-**Railway:** `DATABASE_URL`, `GH_DISPATCH_TOKEN`, `GMAIL_SENDER`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_SA_JSON` (Sheets read - internal analytics AND Gentle Dental Slot Checker), `LOGIN_LOG_SHEET_ID`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_INSIGHTS_MODEL`, `SECRET_KEY`/`FLASK_SECRET_KEY` (confirmed set to a strong value), `SERP_PLATFORM_TOKEN`, `SLACK_BOT_TOKEN` (post-only scope confirmed; read-scope for `#job_change_alert_apollo` history unverified), `SLACK_CHANNEL_ID`, `SLACK_WEBHOOK_URL`, `DEMO_REQUEST_SHEET_ID`, `ANON_VISITORS_SHEET_ID`, `AD_INTEL_SHEET_ID`, `DEMO_NOTIFY_EMAIL`, `IPINFO_TOKEN` (opt), `IDENTIFY_TOKEN` (opt), **`APOLLO_API_KEY` (Contact Finder + de-anon + person enrichment + SCI's own company search all depend on this one shared key/pool)**, **`ARENA_API_KEY` (LinkedIn Strategy Researcher's entire vendor backend depends on this - was missing from prior context-file revisions despite being load-bearing since before v25)**, **`ANTHROPIC_API_KEY` (shared across MANY features now: Contact Finder's Claude cross-check, LPS's AI Insights, Gentle Dental's AI Insights, and ALL of SCI's identify/vision/synthesis calls - verify current Railway status, it was unset as of Contact Finder's cross-check shipping but SCI's identify step has since been confirmed working in production, meaning it likely IS set now; don't assume either way without checking)**, `ANTHROPIC_MODEL` (opt, defaults to `claude-sonnet-5`), `VI_ENRICH_ON_VIEW` (opt), `VI_COOP_FILE` (opt), `VI_GRAPH_DB` (opt), `SMTP_*` (unusable on Railway).
+**Railway:** `DATABASE_URL`, `GH_DISPATCH_TOKEN`, `GMAIL_SENDER`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_SA_JSON` (Sheets read - internal analytics AND Gentle Dental Slot Checker), `LOGIN_LOG_SHEET_ID`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_INSIGHTS_MODEL`, `SECRET_KEY`/`FLASK_SECRET_KEY` (confirmed set to a strong value), `SERP_PLATFORM_TOKEN`, `SLACK_BOT_TOKEN` (post-only scope confirmed; read-scope for `#job_change_alert_apollo` history unverified), `SLACK_CHANNEL_ID`, `SLACK_WEBHOOK_URL`, `DEMO_REQUEST_SHEET_ID`, `ANON_VISITORS_SHEET_ID`, `AD_INTEL_SHEET_ID`, `DEMO_NOTIFY_EMAIL`, `IPINFO_TOKEN` (opt), `IDENTIFY_TOKEN` (opt), **`APOLLO_API_KEY` (Contact Finder + de-anon + person enrichment + SCI's own company search all depend on this one shared key/pool)**, **`ARENA_API_KEY` (LinkedIn Strategy Researcher's entire vendor backend depends on this - was missing from prior context-file revisions despite being load-bearing since before v25)**, **`ANTHROPIC_API_KEY` (shared across MANY features now: Contact Finder's Claude cross-check, LPS's AI Insights, Gentle Dental's AI Insights, and ALL of SCI's identify/vision/synthesis calls - **confirmed SET on Railway** as of 2026-08-21, so the Claude cross-check in Contact Finder is live, not inert)**, `ANTHROPIC_MODEL` (opt, defaults to `claude-sonnet-5`), `VI_ENRICH_ON_VIEW` (opt), `VI_COOP_FILE` (opt), `VI_GRAPH_DB` (opt), `SMTP_*` (unusable on Railway).
 
 **GitHub Actions secrets (separate store from Railway):** `CONFIG_YAML`, `GOOGLE_SERVICE_ACCOUNT_JSON`, and `SLACK_BOT_TOKEN` needs adding here too for the Job Change Alert sync workflow.
 
@@ -442,11 +619,15 @@ Details that are load-bearing:
 
 **Social Creative Intelligence Analyst - Reddit (7th platform):** `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` (opt, **NOT SET** - both required; create a *script* app at https://www.reddit.com/prefs/apps), `REDDIT_USER_AGENT` (opt, has a sane default - Reddit throttles and blocks generic User-Agents much harder than well-identified ones, so set a unique descriptive string). Verified live while building: Reddit's unauthenticated `.json` endpoints (`/search.json`, `/user/<n>/submitted.json`, `/r/<n>/about.json`) now return **403 with an HTML block page** even from a residential IP, so there is no unauthenticated fallback and the app-only OAuth path is the only one that can work. The token endpoint answered bogus credentials with a clean `401 {"message": "Unauthorized"}`, so the route is real and only credentials are missing. Admin self-test: `POST /p2/admin/external-usage/sci-reddit-check` (distinguishes "token minted" from "authenticated read succeeded", which are genuinely different failures here). Reuses `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` for the conversation analysis.
 
-**Social Creative Intelligence Analyst - Unipile (unchanged since v26, still inert):** `UNIPILE_API_KEY` (**set on Railway**, but authenticates against NEITHER the shared `api.unipile.com` gateway nor any account-specific host yet configured - a live curl test got `401 invalid_credentials`; header `X-API-KEY` and the `/v2/accounts` + `/v2/hosted/accounts/link` routes were all confirmed real, so this reads as right key / wrong host), `UNIPILE_DSN` (opt, **NOT SET** - Unipile issues each account its own dashboard-issued host, `https://apiNN.unipile.com:PORT`; this is the actual blocker). No LinkedIn/Instagram account is connected yet either way.
+**Social Creative Intelligence Analyst - Unipile (LIVE as of this cycle):** `UNIPILE_API_KEY` (**set on Railway and working**) and `UNIPILE_DSN` (**set on Railway and working**, `https://api27.unipile.com:15703`). Both are required together: **a key is valid only against its own DSN**, and authenticating the same key against the shared `api.unipile.com` gateway returns `401 invalid_credentials`, which is what made v26 and v27 read this as a bad key. The live API is at **`/api/v1`**, not `/v2` (the v27 doc had this backwards). Header is `X-API-KEY`.
 
-**Where to connect the account from, and why not our own button:** `unipile_client.list_accounts()` calls `GET /v2/accounts`, which returns every account connected to the Unipile **workspace** - nothing filters by who initiated the connection, so an account connected from **Unipile's own dashboard is indistinguishable to us** from one connected through our button. Connect the first one from their dashboard. Our `POST /p2/admin/external-usage/unipile-connect` has two problems for a first attempt: its request body was written from Unipile's (confirmed-stale) `/api/v1/...` docs and has never returned a 200, and it calls Unipile *through* `UNIPILE_DSN`, so while the DSN is wrong it 401s like everything else - it cannot be used to fix the problem that blocks it. Once a DSN works, the button becomes a convenience for reconnections and should be verified then.
+**Reading account status:** `GET /api/v1/accounts` returns every account connected to the Unipile **workspace**, with no top-level `status` field. Real usability lives at **`sources[].status`**, where `OK` means working and `CREDENTIALS` means signed out. As measured while building: **17 accounts, all LinkedIn, 11 working and 6 signed out**, and the first account in the list was one of the signed-out ones. Always filter with `connected_only=True`; never take `accounts[0]`.
 
-**Order of operations:** (1) connect LinkedIn/Instagram in the Unipile dashboard, (2) copy the DSN from that dashboard, (3) set `UNIPILE_DSN` on Railway, (4) run `POST /p2/admin/external-usage/unipile-check` (or the SCI Data Sources panel button) - it is free and reports `configured`, the `dsn` in use, and the exact error. `ok: true` with accounts listed by platform means key, host and account are all correct and everything remaining is a code problem.
+**Connecting an account:** `POST /api/v1/hosted/accounts/link` with `{"type":"create","providers":[...],"api_url":<dsn>,"expiresOn":<ms-precision UTC + "Z">}`. `expiresOn` is **required** and its regex rejects `datetime.isoformat()` output, which is why `_expires_on()` formats it by hand. Nothing in this codebase can complete the resulting login on someone's behalf; a human clicks it through. An account connected from Unipile's own dashboard is indistinguishable to us from one connected through our button, so either route is fine.
+
+**Admin self-test:** `POST /p2/admin/external-usage/unipile-check` (free) reports `configured`, the `dsn` in use, per-account `{id, name, platform, status, connected}`, and both `by_platform` (listed) and `connected_by_platform` (actually usable). The SCI Data sources panel is the same data with a Connect/Reconnect button.
+
+**Operational risk, unchanged and worth restating:** whichever account is connected inherits the exact risk that already breaks LPS. A connected LinkedIn account lapses periodically and collection silently stops working. It should belong to someone who will notice. Unipile flags roughly 100 lookups per account per day as automation; every collection currently runs through the same first healthy account, so spreading load across the 11 available would be cheap insurance at higher volume (noted, not built).
 
 ---
 
@@ -455,7 +636,7 @@ Details that are load-bearing:
 1. **Clone fresh into the bash sandbox each session.** Sandbox network: `git` over `github.com` works; most external APIs are blocked, though outbound HTTPS to arbitrary hosts (e.g. `curl`-ing a vendor API directly to verify auth/routes) has worked when tried. WebSearch/WebFetch work.
 2. Edit via file-edit tools or Python string-replace scripts (assert exactly-one match).
 3. **Validate before every push, in this order:**
-   - `PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q` (must be 2,136+ passing)
+   - `PYTHONDONTWRITEBYTECODE=1 python3 -B -m pytest tests/ -q` (must be 2,838+ passing)
    - **mutation-test the actual fix** with genuinely distinguishing data, break each fixed line, confirm a test dies, restore
    - `python3 -c "import ast; ast.parse(open('app.py').read())"` (and any other changed `.py`)
    - import the app to catch route collisions
@@ -471,7 +652,13 @@ Details that are load-bearing:
 10. **When a persisted spreadsheet cannot be shared with a service account due to an org sharing policy, a manual, re-runnable `.xlsx` import script the fetcher falls back to (per-list, not all-or-nothing) is a legitimate stopgap** - self-heals to live data the moment real access is fixed.
 11. **A bare `except Exception` that collapses every failure into one generic message hides the fact that two structurally different bugs can produce the identical symptom** - this cost a full extra diagnosis round for SCI's identify step this cycle. Prefer typed/classified errors from day one on any new vendor integration.
 12. **When a design change (e.g. a color palette) gets reverted by explicit user feedback ("this looks terrible"), revert to the exact prior state via `git revert`, don't hand-retype values** - guarantees byte-for-byte restoration with zero transcription risk.
-13. **A vendor's OWN documentation can lag its live API** - Unipile's docs described `/api/v1/...` paths; the live API was already on `/v2/...`. Confirm exact endpoint behavior against a real response (even an authenticated-but-error one, since route-exists-vs-doesn't is often distinguishable from the error type alone) before hardcoding a vendor's documented path as gospel.
+14. **Probe a live vendor API before writing a single route down, and probe it against the right host.** Every Unipile route in this codebase at v27 was wrong, including the ones a previous session had "confirmed", because that confirmation was run against the shared gateway rather than the workspace's own DSN. A vendor's own documentation lags its live API in both directions.
+15. **When a vendor returns a list of connected things, find out where the real status lives before trusting the obvious field.** Unipile's accounts carry no top-level `status`; it is at `sources[].status`, and reading the obvious field would have made every collection fail while the admin panel said "connected".
+16. **An empty result from a real, live, wrong record is the most dangerous shape there is.** A wrong-but-real LinkedIn company page returns zero posts perfectly cleanly. Verify identity before reporting absence, and say on screen which one you could not confirm.
+17. **When a UI capability is tied to some other setting (a view, a mode, a filter), and that setting is persisted, the coupling becomes permanent and invisible.** Give the capability its own control instead. Contact Finder's stacking is the case study.
+18. **A layout regression that is invisible on its own page and only shows up beside a sibling needs a test, not an eye.** `tests/test_agent_page_grid.py` exists for exactly this class of defect.
+19. **Read the source play before implementing an agent that claims to implement it.** The Event & Conference Intelligence v1 was rejected outright, and the root cause was that the two `gtm-skills` plays it was built from had never been opened. When a play states a rule, make the code refuse it rather than asking a model to honour it.
+13. **A vendor's OWN documentation can lag its live API, and so can your own notes about it.** v27 recorded that Unipile's docs said `/api/v1/...` while the live API was on `/v2/...`. The live API is on `/api/v1`, and that note was written from a probe against the wrong host. Confirm exact endpoint behavior against a real response, from the right base URL, before hardcoding anything.
 
 ### Gotchas (unchanged, still true)
 
@@ -488,33 +675,35 @@ Details that are load-bearing:
 
 ## OPEN ITEMS / TODO
 
-1. **Rotate the GitHub token.** Pasted into chat each session; flag every session.
-2. **Restore LinkedIn Social Researcher** (the old external tool) to the listings when the owner asks - checklist above and in `[[project-lsr-hidden]]`.
-3. **Verify `ANTHROPIC_API_KEY`'s current Railway status** - genuinely unclear as of this writing whether it's set (SCI's identify step works in production, suggesting yes; Contact Finder's cross-check shipped when it was unset). Check directly before assuming either way; multiple features now depend on it.
-4. **Set `UNIPILE_DSN`** to the account's real dashboard-issued host, and **connect a real LinkedIn/Instagram account from the Unipile dashboard** (not our own Connect button - see the Unipile entry under ENVIRONMENT VARIABLES for why). Unipile is fully inert until both are done, and its failure is silent. **Also a people decision, not just a config one:** whichever account gets connected inherits the exact operational risk that already breaks LPS (item 22) - Arena's connected LinkedIn account lapses periodically and search silently stops working. It should belong to someone who will notice and reconnect. Unipile additionally flags roughly 100 lookups per account per day as automation.
-5. **Set `APIFY_API_TOKEN`** (never has been) - Facebook/TikTok/X collection for SCI is fully inert without it.
-6. **Fix `SLACK_BOT_TOKEN`'s scope/membership for `#job_change_alert_apollo`**, and add it as a GitHub Actions repo secret.
-7. **Fix the Job Change Alert tracked-roster Google Sheet's sharing policy block.**
-8. **Fix `scripts/import_slot_checker_snapshot.py`'s stale docstring** (claims the live sheet can't be read - it can, as of this feature's build).
-9. **Wire an admin self-test route for `slot_checker_insights.probe()`**, matching the pattern every other AI-layer feature already has.
-10. **Contact Finder's chat path has never run against live OpenAI + Apollo keys end to end.**
-11. **Contact Finder residuals:** 120-row history cap truncates paged searches; zero-result searches never saved to history; `_cpi_probe_company_free` guesses only `.com`.
-12. **Contact Finder's external client launch** is planned but not scheduled - the shared-credit-pool/`/credits`-aggregate exposure needs a decision once real external auth is designed.
-13. **Hardcoded counts still in the codebase:** `ACCOUNTS["healthcare"]["description"]`'s "1,251", four places in `templates/agents.html`.
-14. **Signal refresh secrets (blocking Healthcare refresh):** set GitHub Actions `CONFIG_YAML` + `GOOGLE_SERVICE_ACCOUNT_JSON`.
-15. **Agent roster will drift again**, now across even more mechanisms than v25 flagged. Consider deriving them if the roster changes materially again.
-16. **Fully connect the `/app` "Competitor Analysis" placeholder** once the live SEO Studio tool's per-client data scoping is addressed.
-17. **NorthStar client-side portal adoption is minimal.** A relationship conversation, not a code fix.
-18. **`data/identity_graph.db` is on Railway's ephemeral disk.** Move to a persistent volume or Postgres.
-19. **Cold-visitor identification** needs a licensed identity feed. Plug point ready.
-20. **ABM Signal Tracker maintenance mode:** periodically prune `data/northstar_signals_manual.json` by `signal_date` and re-run `seed_northstar_signals.py --prune`.
-21. **An open, unverified accuracy question for Job Change Alert:** a third-party Coresignal-backed skill (Swan) reportedly catches job changes Apollo's own alert misses.
-22. **LPS's Arena-connected LinkedIn account will lapse again** - this is a recurring operational risk (see the LPS section above), not a one-time fix; the error message now names it directly when it happens.
-23. **SCI's exact live Unipile posts-endpoint response shape needs confirming** against a real connected account once one exists. `unipile_client._POSTS_PATH` (`/v2/users/{identifier}/posts`) is a best-effort v1-to-v2 mapping and its response envelope is a guess; `accounts_by_platform` checks both `type` and `provider` for the same reason. All 43 Unipile tests pass, but every one is against a fake response - they prove the client handles shapes correctly, not that it talks to Unipile. Blocked behind item 4.
-25. **Set `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET`** - SCI's 7th surface is fully inert without them, and `sci_reddit_client.normalize()` is fixture-proven only. The user explicitly paused this work ("leave reddit for a while"); do not resume unasked.
-26. **Rotate the YouTube API key.** A live key was pasted into chat in an earlier session and is in that durable transcript. It lives in `intelligence-platform/.env` (gitignored, `chmod 600`). Standing recommendation, unactioned.
+1. **Rotate the GitHub token.** Pasted into chat each session; flag every session. Eleven pushes were made against the current one this cycle.
+2. **Rotate the Unipile API key.** It was pasted into chat this cycle and reused, so it lives in a durable transcript. Same standing as item 3.
+3. **Rotate the YouTube API key.** A live key was pasted into chat in an earlier session. It lives in `intelligence-platform/.env` (gitignored, `chmod 600`). Standing recommendation, unactioned.
+4. **Event & Conference Intelligence has never been run against a real event with live keys.** The harvest hit rate and the search-recovery hit rate are both unmeasured in production. This is the single largest unknown on the newest agent.
+5. **Verify Instagram through Unipile.** All 17 workspace accounts are LinkedIn, so `sci_source_instagram_unipile.py`'s field names are docs-derived guesses. Connect an Instagram account through the Data sources panel, then check `normalize()` against one live response.
+6. **Confirm the Data sources panel reads "11 accounts working, 6 need reconnecting"** in production. The admin routes are auth-gated, so the Railway env vars could not be verified from the sandbox; the user set them and reported success, and the client was verified against the live API directly.
+7. **Restore LinkedIn Social Researcher** (the old external tool) to the listings when the owner asks - checklist in `[[project-lsr-hidden]]`.
+8. **Set `APIFY_API_TOKEN`** (never has been) - Facebook/TikTok/X collection for SCI is fully inert without it.
+9. **Fix `SLACK_BOT_TOKEN`'s scope/membership for `#job_change_alert_apollo`**, and add it as a GitHub Actions repo secret.
+10. **Fix the Job Change Alert tracked-roster Google Sheet's sharing policy block.**
+11. **Fix `scripts/import_slot_checker_snapshot.py`'s stale docstring** (claims the live sheet can't be read - it can).
+12. **Wire an admin self-test route for `slot_checker_insights.probe()`**, matching the pattern every other AI-layer feature already has.
+13. **Contact Finder's chat path has never run against live OpenAI + Apollo keys end to end.**
+14. **Contact Finder residuals:** 120-row history cap truncates paged searches; zero-result searches never saved to history; `_cpi_probe_company_free` guesses only `.com`.
+15. **Contact Finder's external client launch** is planned but not scheduled - the shared-credit-pool/`/credits`-aggregate exposure needs a decision once real external auth is designed.
+16. **Hardcoded counts still in the codebase:** `ACCOUNTS["healthcare"]["description"]`'s "1,251", four places in `templates/agents.html`.
+17. **Signal refresh secrets (blocking Healthcare refresh):** set GitHub Actions `CONFIG_YAML` + `GOOGLE_SERVICE_ACCOUNT_JSON`.
+18. **Agent roster will drift again.** It now lives in `AGENTS`, `APP_AGENTS`, a JS array in `templates/context.html`, the SEO Suite tools list, `HIDDEN_AGENT_SLUGS`, and five hand-written `b2b_agents.html` cards with their own command-palette entries. **Nothing derives one from another.** Consider deriving them if the roster changes materially again.
+19. **Fully connect the `/app` "Competitor Analysis" placeholder** once the live SEO Studio tool's per-client data scoping is addressed.
+20. **NorthStar client-side portal adoption is minimal.** A relationship conversation, not a code fix.
+21. **`data/identity_graph.db` is on Railway's ephemeral disk.** Move to a persistent volume or Postgres.
+22. **Cold-visitor identification** needs a licensed identity feed. Plug point ready.
+23. **ABM Signal Tracker maintenance mode:** periodically prune `data/northstar_signals_manual.json` by `signal_date` and re-run `seed_northstar_signals.py --prune`.
+24. **An open, unverified accuracy question for Job Change Alert:** a third-party Coresignal-backed skill (Swan) reportedly catches job changes Apollo's own alert misses.
+25. **LPS's Arena-connected LinkedIn account will lapse again**, and now so can the Unipile one. Recurring operational risk, not a one-time fix; the error messages name it directly when it happens.
+26. **Set `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET`** - SCI's 7th surface is fully inert without them, and `sci_reddit_client.normalize()` is fixture-proven only. **The user explicitly paused this work ("leave reddit for a while"); do not resume unasked.**
 27. **The bklit-derived chart layer has one deliberate open judgement:** the radar is offered as a secondary "Shape" view with the table as default, because radar area genuinely invites a wrong read. If it ever becomes the default, the note under it stops being enough.
-24. **Advisory security/design audit (do not start without an explicit ask):** fail-closed `SECRET_KEY`/`GOOGLE_CLIENT_ID`, cookie flags, HSTS/security headers, CSRF, rate limiting, SSRF/`X-Forwarded-For` hardening; CSS token convergence, accessibility.
+28. **Spread Unipile collection across the connected accounts** rather than always using the first healthy one. Cheap insurance against the ~100-lookups-per-account-per-day guidance at higher volume. Noted, not requested.
+29. **Advisory security/design audit (do not start without an explicit ask):** fail-closed `SECRET_KEY`/`GOOGLE_CLIENT_ID`, cookie flags, HSTS/security headers, CSRF, rate limiting, SSRF/`X-Forwarded-For` hardening; CSS token convergence, accessibility.
 
 ---
 
