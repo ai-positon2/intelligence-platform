@@ -240,6 +240,16 @@
       --card-glow: 0 0 40px rgba(168,85,247,0.12);
       --arrow-color: #c084fc;
     }
+    /* Indigo -> sky -> cyan: this agent's own ac/ac2 accent colors from
+       app.py's APP_AGENTS entry (#7c83f5 -> #22d3ee). */
+    .c-cpi {
+      --band: linear-gradient(90deg,#7c83f5,#38bdf8,#22d3ee);
+      --thumb: linear-gradient(135deg,#100b30 0%,#062230 100%);
+      --icon-glow: rgba(34,211,238,0.5);
+      --card-border: rgba(124,131,245,0.35);
+      --card-glow: 0 0 40px rgba(34,211,238,0.10);
+      --arrow-color: #7dd3fc;
+    }
     .c-job {
       --band: linear-gradient(90deg,#ec4899,#f43f5e,#fb923c);
       --thumb: linear-gradient(135deg,#1f0015 0%,#2d0a1a 100%);
