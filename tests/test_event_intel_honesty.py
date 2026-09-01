@@ -111,7 +111,11 @@ function __el(id){
 var document = {
   getElementById: __el,
   addEventListener: function(){},
-  querySelector: function(){ return null; }
+  querySelector: function(){ return null; },
+  // The page reads the profile-summary blocks back by attribute on load. A
+  // shim missing a method the page really calls fails the run for a reason
+  // that has nothing to do with what these tests are checking.
+  querySelectorAll: function(){ return []; }
 };
 var window = {};
 var fetch = function(){ return {then: function(){ return {then: function(){ return {catch: function(){}}; }, catch: function(){}}; }, catch: function(){}}; };
