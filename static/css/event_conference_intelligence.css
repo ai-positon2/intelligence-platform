@@ -81,7 +81,8 @@ body {
 /* ── chrome ─────────────────────────────────────────────────────────── */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 26px; border-bottom: 1px solid var(--evi-line);
+  height: 62px; padding: 0 var(--bleed);
+  border-bottom: 1px solid var(--evi-line);
   background: var(--evi-panel); backdrop-filter: blur(14px);
   position: sticky; top: 0; z-index: 60;
 }
@@ -93,6 +94,15 @@ body {
 .topbar .bc-cur { color: var(--evi-ink); font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bc-sep { color: var(--evi-ink-3); opacity: .6; }
+/* On a phone the full trail does not fit a 62px bar: it wraps to several
+   lines and pushes the account pill off the right edge. The ancestors are the
+   part a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. */
+@media (max-width: 640px) {
+  .topbar .bc a, .topbar .bc .bc-sep { display: none; }
+  .topbar .tl { gap: 12px; min-width: 0; }
+  .topbar .bc { min-width: 0; }
+}
 
 /* The user menu. Defined here rather than assumed from a shared sheet: these
    classes come from the shared _admin_menu.html include, but no stylesheet
@@ -145,8 +155,11 @@ body {
 :root[data-theme="light"] .dd-item:hover { background: rgba(18,26,54,.05); }
 :root[data-theme="light"] .user-avatar { color: #fff; }
 
-.main { max-width: 1440px; margin: 0 auto; padding: 34px 30px 90px;
-  position: relative; z-index: 1; }
+.main {
+  position: relative; z-index: 1; width: 100%;
+  max-width: 1320px; margin: 0 auto;
+  padding: 36px var(--margin) 72px;
+}
 
 /* The dot grid. `.bg-grid` was already in the markup with nothing styling it,
    so the page rendered on flat colour. Masked to a soft ellipse so the texture
@@ -165,10 +178,11 @@ body {
 
 /* ── hero ───────────────────────────────────────────────────────────── */
 .evi-hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 46px; align-items: start; margin-bottom: 30px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px;
+  gap: calc(var(--gutter) * 1.5); align-items: start;
+  margin-bottom: calc(var(--gutter) + 8px);
 }
-@media (max-width: 1180px) { .evi-hero { grid-template-columns: 1fr; gap: 28px; } }
+@media (max-width: 1100px) { .evi-hero { grid-template-columns: 1fr; gap: var(--gutter); } }
 
 .ph { margin-bottom: 0; }
 .ph .eyebrow {
@@ -254,13 +268,13 @@ body {
 
 /* ── page layout: form beside a sticky rail ─────────────────────────── */
 .evi-layout {
-  display: grid; grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 20px; align-items: start;
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--gutter); align-items: start;
 }
-@media (max-width: 1180px) { .evi-layout { grid-template-columns: 1fr; } }
-.evi-rail { display: flex; flex-direction: column; gap: 16px;
-  position: sticky; top: 88px; }
-@media (max-width: 1180px) { .evi-rail { position: static; } }
+@media (max-width: 1100px) { .evi-layout { grid-template-columns: 1fr; } }
+.evi-rail { display: flex; flex-direction: column; gap: var(--gutter);
+  position: sticky; top: calc(62px + var(--gutter)); }
+@media (max-width: 1100px) { .evi-rail { position: static; } }
 .evi-rail .evi-card + .evi-card { margin-top: 0; }
 .evi-rail .evi-card-pad { padding: 18px 18px 16px; }
 
@@ -274,9 +288,9 @@ body {
 /* ── the four plays ─────────────────────────────────────────────────── */
 .evi-plays {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px; margin-bottom: 20px;
+  gap: var(--gutter); margin-bottom: var(--gutter);
 }
-@media (max-width: 1180px) { .evi-plays { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .evi-plays { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .evi-plays { grid-template-columns: 1fr; } }
 .evi-play {
   position: relative; overflow: hidden; appearance: none; cursor: pointer;
@@ -938,8 +952,9 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 /* ── the classification / event-class picker ────────────────────────── */
 .evi-classes {
   display: grid; gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(216px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+@media (max-width: 620px) { .evi-classes { grid-template-columns: 1fr; } }
 .evi-class {
   appearance: none; cursor: pointer; font: inherit; text-align: left;
   display: flex; flex-direction: column; gap: 5px;
@@ -965,10 +980,10 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 .evi-class[aria-checked="true"] .co {
   background: rgba(56,189,248,.18); color: var(--evi-a1);
 }
-/* Five classes, so auto-fit left one card stranded on a second row. They are
-   a single choice and read as one when they sit on one line. */
-.evi-eclasses { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-@media (max-width: 1340px) { .evi-eclasses { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Five classes. Beside the rail the form column is not wide enough for five
+   readable cards, so they run 3 + 2 rather than being squeezed onto one line
+   or dealt 4 + 1 with a hole in the row. */
+.evi-eclasses { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 820px) { .evi-eclasses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .evi-eclasses { grid-template-columns: 1fr; } }
 .evi-field select {
