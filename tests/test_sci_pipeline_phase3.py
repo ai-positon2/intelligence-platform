@@ -63,7 +63,7 @@ def test_the_full_job_runs_synthesis_after_every_platform_and_before_done(monkey
         "instagram": {"handle": "acme", "confidence": "high", "profile_url": None, "reasoning": ""},
     })
     monkeypatch.setattr(sci_pipeline, "run_platform_collection",
-                        lambda run_id, platform, handle: order.append(("collect", platform)))
+                        lambda run_id, platform, handle, **kw: order.append(("collect", platform)))
     monkeypatch.setattr(sci_pipeline, "run_platform_creative_analysis",
                         lambda run_id, platform: order.append(("analyze", platform)))
     monkeypatch.setattr(sci_pipeline, "run_reddit_pulse",
@@ -96,7 +96,7 @@ def test_the_full_job_still_reaches_synthesis_when_a_platform_errors(monkeypatch
         "instagram": {"handle": "acme", "confidence": "high", "profile_url": None, "reasoning": ""},
     })
 
-    def failing_collection(run_id, platform, handle):
+    def failing_collection(run_id, platform, handle, **kw):
         raise RuntimeError("actor blocked")
     monkeypatch.setattr(sci_pipeline, "run_platform_collection", failing_collection)
     monkeypatch.setattr(sci_pipeline, "run_platform_creative_analysis", lambda run_id, platform: None)

@@ -299,7 +299,7 @@ def test_one_platform_failing_does_not_stop_the_others_from_completing(monkeypat
         "facebook": {"handle": None, "confidence": "none", "profile_url": None, "reasoning": "not found"},
     })
 
-    def fake_collection(run_id, platform, handle):
+    def fake_collection(run_id, platform, handle, **kw):
         calls.append(("collect", platform))
         if platform == "instagram":
             raise RuntimeError("actor blocked")

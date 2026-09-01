@@ -200,7 +200,30 @@ _APIFY_COLLECTORS = {
 }
 
 
-def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
+def _collection_note(status: str, note: dict | None) -> str | None:
+    """What to say about which page was read, or None to say nothing.
+
+    Only two situations are worth a reader's attention. A page confirmed by
+    its own website needs no caption. An unconfirmed page that produced posts
+    is recorded but stays quiet, since the posts themselves are the evidence
+    a person will judge. The case that must never pass silently is an
+    unconfirmed page that produced NOTHING: rendered bare, that reads as
+    "this company does not post on LinkedIn", which is a claim about the
+    company rather than what it really is, a claim about a page we are not
+    sure is theirs."""
+    from tracker import sci_source_linkedin_unipile as ln
+    if not note or note.get("verification") == ln.VERIFIED_DOMAIN:
+        return None
+    if status == "no_presence":
+        return ("Read %s, which has no posts. That page could not be confirmed as this "
+                "company's own, so this may be the wrong page rather than an empty one."
+                % note["page"])
+    return "Read %s." % note["page"]
+
+
+def run_platform_collection(run_id: int, platform: str, handle: str,
+                            company_name: str | None = None,
+                            company_url: str | None = None) -> None:
     """Step 2 for one platform. Always terminates that platform's
     sci_platform_runs.status -- ok / low_activity / no_presence /
     scrape_failed -- and never raises past this function; the caller
@@ -209,13 +232,17 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
     from tracker import sci_store
 
     sci_store.upsert_platform_run(run_id, platform, status="collecting")
+    # Which LinkedIn page the posts came from, and how well it was
+    # corroborated as this company. None for every other platform, and for
+    # LinkedIn served by Apify, which cannot report one.
+    note = None
     try:
         if platform == "youtube":
             posts, vendor = _collect_youtube(handle)
         elif platform == "reddit":
             posts, vendor = _collect_reddit(handle)
         elif platform == "linkedin":
-            posts, vendor = _collect_linkedin(handle)
+            posts, vendor, note = _collect_linkedin(handle, company_name, company_url)
         elif platform == "instagram":
             posts, vendor = _collect_instagram(handle)
         elif platform in _APIFY_COLLECTORS:
@@ -245,7 +272,8 @@ def run_platform_collection(run_id: int, platform: str, handle: str) -> None:
         run_id, platform, status=status, post_count=written,
         last_post_at=max(dated) if dated else None,
         collected_at=datetime.now(timezone.utc).isoformat(),
-        source_vendor=vendor)
+        source_vendor=vendor,
+        status_detail=_collection_note(status, note))
 
 
 def _collect_via_apify(platform: str, handle: str) -> tuple[list[dict], str]:
@@ -257,7 +285,8 @@ def _collect_via_apify(platform: str, handle: str) -> tuple[list[dict], str]:
     return module.collect(handle, token, strict=True), "apify"
 
 
-def _collect_linkedin(handle: str) -> tuple[list[dict], str]:
+def _collect_linkedin(handle: str, company_name: str | None = None,
+                     company_url: str | None = None) -> tuple[list[dict], str, dict | None]:
     """Unipile-first, Apify-fallback, in that order -- a connected Unipile
     account is a real authenticated LinkedIn session, not a scraper actor
     fighting LinkedIn's own detection, so it's tried first whenever one is
@@ -273,7 +302,16 @@ def _collect_linkedin(handle: str) -> tuple[list[dict], str]:
     if unipile_client.is_available("linkedin"):
         from tracker import sci_source_linkedin_unipile
         try:
-            return sci_source_linkedin_unipile.collect(handle, strict=True), "unipile"
+            posts, note = sci_source_linkedin_unipile.collect_with_page(
+                handle, strict=True, company_name=company_name, company_url=company_url)
+            return posts, "unipile", note
+        except sci_source_linkedin_unipile.CompanyMismatch:
+            # Deliberately not caught by the fallback below. Every other
+            # failure here is "this vendor could not answer", which another
+            # vendor might; a handle pointing at the wrong company points
+            # there just as squarely through Apify, so retrying would turn a
+            # caught mistake into a confidently wrong report.
+            raise
         except Exception as e:
             logger.warning("sci_pipeline: Unipile LinkedIn collection failed for %r, "
                            "falling back to Apify: %s", handle, e)
@@ -286,7 +324,7 @@ def _collect_linkedin(handle: str) -> tuple[list[dict], str]:
     token = os.environ.get("APIFY_API_TOKEN", "")
     if not token:
         raise RuntimeError("APIFY_API_TOKEN is not configured on this deployment.")
-    return sci_source_linkedin.collect(handle, token, strict=True), "apify"
+    return sci_source_linkedin.collect(handle, token, strict=True), "apify", None
 
 
 def _collect_instagram(handle: str) -> tuple[list[dict], str]:
@@ -482,7 +520,8 @@ def _sci_run_analysis_job(run_id: int, email: str, company_name: str, company_ur
             if entry.get("confidence") not in _USABLE_CONFIDENCE or not entry.get("handle"):
                 continue
             try:
-                run_platform_collection(run_id, platform, entry["handle"])
+                run_platform_collection(run_id, platform, entry["handle"],
+                                        company_name=company_name, company_url=company_url)
                 run_platform_creative_analysis(run_id, platform)
             except Exception as e:
                 logger.warning("sci_pipeline: platform %s failed entirely for run %s: %s", platform, run_id, e)
