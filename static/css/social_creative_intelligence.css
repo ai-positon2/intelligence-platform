@@ -1411,3 +1411,14 @@ a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
 @media (max-width: 700px) {
   [data-theme="light"] .sci-chart-wide::after { background: linear-gradient(90deg, rgba(252,252,254,0), rgba(252,252,254,.95)); }
 }
+
+/* The full trail does not fit a 62px bar on a phone: it wrapped and pushed the
+   account pill past the right edge (22px, and a line box taller than the bar of overflow at 390px). The ancestors are
+   what a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. Same rule as event_conference_intelligence.css. */
+@media (max-width: 640px) {
+  .topbar .bc a, .topbar .bc .bc-sep { display: none; }
+  .topbar .bc { margin-left: 12px; padding-left: 0; border-left: none; min-width: 0; }
+  .topbar .tl { min-width: 0; }
+  .topbar .bc-cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
