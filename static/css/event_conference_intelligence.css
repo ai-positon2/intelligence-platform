@@ -42,6 +42,8 @@ html:root[data-theme="light"] {
   --evi-a1: #38bdf8;
   --evi-a2: #6366f1;
   --evi-a3: #8b5cf6;
+  /* Gradient-on-text stops. Same as the accents in dark, overridden in light. */
+  --evi-g1: #38bdf8; --evi-g2: #6366f1; --evi-g3: #8b5cf6;
   --evi-ink: #e8ecf8;
   --evi-ink-2: #a9b4d8;
   --evi-ink-3: #808cb0;
@@ -54,6 +56,9 @@ html:root[data-theme="light"] {
   --evi-bad: #fb7185;
 }
 :root[data-theme="light"] {
+  /* Deeper stops for anything that paints the accent gradient onto text.
+     The dark-theme sky/violet washes out to near-invisible on a white ground. */
+  --evi-g1: #0284c7; --evi-g2: #4f46e5; --evi-g3: #7c3aed;
   --evi-ink: #131a2e;
   --evi-ink-2: #4a5578;
   --evi-ink-3: #5f6a88;
@@ -140,13 +145,39 @@ body {
 :root[data-theme="light"] .dd-item:hover { background: rgba(18,26,54,.05); }
 :root[data-theme="light"] .user-avatar { color: #fff; }
 
-.main { max-width: 1220px; margin: 0 auto; padding: 34px 26px 90px; }
+.main { max-width: 1440px; margin: 0 auto; padding: 34px 30px 90px;
+  position: relative; z-index: 1; }
 
-.ph { margin-bottom: 26px; }
+/* The dot grid. `.bg-grid` was already in the markup with nothing styling it,
+   so the page rendered on flat colour. Masked to a soft ellipse so the texture
+   reads under the hero and fades out before the fold rather than tiling to the
+   bottom of a long report. */
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(124,160,255,.16) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(ellipse 90% 62% at 50% 6%, #000 8%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 6%, #000 8%, transparent 78%);
+}
+:root[data-theme="light"] .bg-grid {
+  background-image: radial-gradient(circle, rgba(40,60,130,.14) 1px, transparent 1px);
+}
+
+/* ── hero ───────────────────────────────────────────────────────────── */
+.evi-hero {
+  display: grid; grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 46px; align-items: start; margin-bottom: 30px;
+}
+@media (max-width: 1180px) { .evi-hero { grid-template-columns: 1fr; gap: 28px; } }
+
+.ph { margin-bottom: 0; }
 .ph .eyebrow {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 11px;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--evi-ink-3);
-  font-weight: 600; margin-bottom: 12px;
+  display: inline-flex; align-items: center; gap: 9px; font-size: 10.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--evi-ink-2);
+  font-weight: 600; margin-bottom: 16px; padding: 6px 14px 6px 11px;
+  border-radius: var(--radius-pill, 80px);
+  background: linear-gradient(95deg, rgba(56,189,248,.10), rgba(139,92,246,.08));
+  border: 1px solid rgba(99,102,241,.24);
 }
 .ph .eyebrow .dot {
   width: 6px; height: 6px; border-radius: 50%;
@@ -158,34 +189,171 @@ body {
 }
 .ph h1 em {
   font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;
-  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a2) 55%, var(--evi-a3));
+  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g2) 55%, var(--evi-g3));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.ph p { color: var(--evi-ink-2); font-size: 14.5px; line-height: 1.65; max-width: 74ch; }
+.ph h1 { margin-bottom: 16px; }
+.ph p { color: var(--evi-ink-2); font-size: 15px; line-height: 1.7; max-width: 62ch; }
+
+/* ── the scoring model card ─────────────────────────────────────────── */
+.evi-rubric {
+  position: relative; overflow: hidden; padding: 20px 22px 18px;
+  border-radius: var(--radius-lg, 16px); border: 1px solid var(--evi-line);
+  background:
+    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(139,92,246,.10), transparent 62%),
+    var(--evi-panel);
+  box-shadow: 0 20px 60px rgba(0,0,0,.32);
+}
+/* The accent hairline the other agent pages carry along the top edge of a
+   panel. One rule, not a pseudo-element per card. */
+.evi-rubric::before, .evi-card-main::before, .evi-play[aria-selected="true"]::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2) 52%, var(--evi-a3));
+  opacity: .85;
+}
+.rb-head { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px; }
+.rb-eye { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); }
+.rb-total { font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px;
+  font-weight: 700; letter-spacing: -.02em; line-height: 1;
+  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g3));
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rb-total i { font-style: normal; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--evi-ink-3);
+  -webkit-text-fill-color: var(--evi-ink-3); margin-left: 5px; }
+
+.rb-rows { display: flex; flex-direction: column; gap: 11px; }
+.rb-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  align-items: baseline; }
+.rb-l { font-size: 12.5px; color: var(--evi-ink-2); }
+.rb-w { font-size: 12.5px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums; }
+.rb-t { grid-column: 1 / -1; height: 5px; border-radius: 3px; margin-top: 3px;
+  background: rgba(255,255,255,.06); overflow: hidden; }
+:root[data-theme="light"] .rb-t { background: rgba(20,30,60,.09); }
+.rb-t span { display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2)); }
+.rb-row.bonus .rb-l, .rb-row.bonus .rb-w { color: var(--evi-ok); }
+.rb-row.bonus .rb-t span {
+  background: linear-gradient(90deg, rgba(74,222,128,.85), rgba(74,222,128,.45));
+}
+
+.rb-note { font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
+  margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--evi-line-2); }
+.rb-floor { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.rb-tier {
+  display: inline-flex; align-items: baseline; gap: 6px; font-size: 10.5px;
+  color: var(--evi-ink-3); padding: 5px 10px; border-radius: var(--radius-pill, 80px);
+  border: 1px solid var(--evi-line); background: var(--evi-panel-2);
+}
+.rb-tier b { font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.rb-tier.t1 b { color: var(--evi-a1); }
+.rb-tier.t2 b { color: var(--evi-a3); }
+.rb-tier.t3 b { color: var(--evi-ink-3); }
+
+/* ── page layout: form beside a sticky rail ─────────────────────────── */
+.evi-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 20px; align-items: start;
+}
+@media (max-width: 1180px) { .evi-layout { grid-template-columns: 1fr; } }
+.evi-rail { display: flex; flex-direction: column; gap: 16px;
+  position: sticky; top: 88px; }
+@media (max-width: 1180px) { .evi-rail { position: static; } }
+.evi-rail .evi-card + .evi-card { margin-top: 0; }
+.evi-rail .evi-card-pad { padding: 18px 18px 16px; }
+
+.evi-cost { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.evi-cost li { font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
+  padding-left: 14px; position: relative; }
+.evi-cost li::before { content: ""; position: absolute; left: 0; top: 6px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--evi-a2); opacity: .7; }
+.evi-cost li b { color: var(--evi-ink-2); font-weight: 600; }
+
+/* ── the four plays ─────────────────────────────────────────────────── */
+.evi-plays {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+@media (max-width: 1180px) { .evi-plays { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .evi-plays { grid-template-columns: 1fr; } }
+.evi-play {
+  position: relative; overflow: hidden; appearance: none; cursor: pointer;
+  font: inherit; text-align: left; display: flex; flex-direction: column;
+  gap: 9px; padding: 17px 17px 16px;
+  border-radius: var(--radius-lg, 16px); border: 1px solid var(--evi-line);
+  background: var(--evi-panel);
+  transition: border-color .2s, background .2s, transform .2s, box-shadow .2s;
+}
+.evi-play:hover { transform: translateY(-2px); border-color: rgba(99,102,241,.34);
+  box-shadow: 0 16px 40px rgba(0,0,0,.3); }
+.evi-play .pi {
+  width: 34px; height: 34px; border-radius: var(--radius-md, 12px);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--evi-ink-3); background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2); transition: .2s;
+}
+.evi-play .pi svg { width: 18px; height: 18px; }
+.evi-play .pn { font-size: 14px; font-weight: 600; color: var(--evi-ink-2);
+  letter-spacing: -.01em; transition: color .2s; }
+.evi-play .pd { font-size: 11.8px; line-height: 1.55; color: var(--evi-ink-3); }
+.evi-play[aria-selected="true"] {
+  border-color: rgba(99,102,241,.46);
+  background:
+    radial-gradient(ellipse 120% 130% at 0% 0%, rgba(56,189,248,.13), transparent 60%),
+    linear-gradient(150deg, rgba(99,102,241,.13), rgba(139,92,246,.07));
+  box-shadow: 0 14px 44px rgba(56,110,246,.18);
+}
+.evi-play[aria-selected="true"] .pn { color: var(--evi-ink); }
+.evi-play[aria-selected="true"] .pi {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a2) 60%, var(--evi-a3));
+  box-shadow: 0 6px 18px rgba(99,102,241,.4);
+}
+:root[data-theme="light"] .evi-play[aria-selected="true"] .pi { color: #fff; }
+.evi-play:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+
+/* ── field groups ───────────────────────────────────────────────────── */
+/* Each mode's field container is a grid so the gap between a group heading and
+   the fields under it comes from one rule. These were plain blocks relying on
+   a `style="margin-top:14px"` on every second row, which is what let a heading
+   land flush against the label beneath it. */
+#recommendFields, #profileForm, #lookupFields, #discoverFields, #workroomFields {
+  display: grid; gap: 15px; align-content: start;
+}
+.evi-group { display: flex; flex-direction: column; gap: 4px;
+  margin-top: 9px; padding-top: 19px; border-top: 1px solid var(--evi-line-2); }
+#profileForm > .evi-group:first-child {
+  margin-top: 0; padding-top: 0; border-top: none;
+}
+.evi-group .gh {
+  display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .11em; text-transform: uppercase; color: var(--evi-ink-2);
+  padding-left: 10px; position: relative;
+}
+/* The tick bar Contact Finder uses on its group labels, so a reader can see
+   where one group of fields stops and the next begins. */
+.evi-group .gh::before {
+  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 12px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--evi-a1), var(--evi-a3));
+}
+.evi-group .gs { font-size: 11.5px; color: var(--evi-ink-3); padding-left: 10px; }
+.evi-row.evi-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .evi-row.evi-row-3 { grid-template-columns: 1fr; } }
 
 /* ── cards + form ───────────────────────────────────────────────────── */
 .evi-card {
-  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  position: relative; background: var(--evi-panel); border: 1px solid var(--evi-line);
   border-radius: var(--radius-lg, 16px); overflow: hidden;
   box-shadow: 0 18px 60px rgba(0,0,0,.28);
 }
+.evi-card-main { background:
+  radial-gradient(ellipse 90% 60% at 0% 0%, rgba(56,189,248,.06), transparent 58%),
+  var(--evi-panel); }
 .evi-card + .evi-card { margin-top: 20px; }
-.evi-card-pad { padding: 22px 24px; }
-
-.evi-modes { display: flex; gap: 6px; padding: 6px; border-radius: var(--radius-pill, 999px);
-  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
-  width: fit-content; margin-bottom: 20px; }
-.evi-mode {
-  appearance: none; border: 1px solid transparent; background: none; cursor: pointer;
-  font: inherit; font-size: 13px; font-weight: 600; color: var(--evi-ink-3);
-  padding: 8px 16px; border-radius: var(--radius-pill, 999px); transition: .18s;
-}
-.evi-mode[aria-selected="true"] {
-  color: #fff; border-color: rgba(99,102,241,.4);
-  background: linear-gradient(95deg, rgba(56,189,248,.22), rgba(139,92,246,.18));
-}
-:root[data-theme="light"] .evi-mode[aria-selected="true"] { color: #1b2440; }
-.evi-mode:hover { color: var(--evi-ink); }
+.evi-card-pad { padding: 24px 26px; }
 
 .evi-form { display: grid; gap: 14px; grid-template-columns: 1fr; }
 .evi-row { display: grid; gap: 14px; grid-template-columns: 2fr 1fr; }
@@ -206,12 +374,20 @@ body {
 
 .evi-btn {
   appearance: none; border: none; cursor: pointer; font: inherit;
-  font-size: 14px; font-weight: 600; color: #fff; padding: 12px 22px;
-  border-radius: var(--radius-md, 10px); justify-self: start;
+  font-size: 14.5px; font-weight: 600; color: #fff; padding: 14px 30px;
+  border-radius: var(--radius-pill, 80px); justify-self: start;
   background: linear-gradient(95deg, var(--evi-a1), var(--evi-a2) 60%, var(--evi-a3));
-  box-shadow: 0 8px 26px rgba(99,102,241,.3); transition: transform .18s, box-shadow .18s;
+  box-shadow: 0 10px 30px rgba(99,102,241,.34); transition: transform .18s, box-shadow .18s;
 }
-.evi-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(99,102,241,.4); }
+.evi-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 40px rgba(99,102,241,.46); }
+.evi-btn-ghost { border-radius: var(--radius-md, 12px); padding: 11px 20px;
+  font-size: 13.5px; }
+.evi-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+  margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-actions-note { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  max-width: 34ch; }
 .evi-btn[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
 .evi-btn-ghost {
   background: var(--evi-panel-2); color: var(--evi-ink-2);
@@ -346,16 +522,32 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 
 /* ── history ────────────────────────────────────────────────────────── */
 .evi-runs { display: flex; flex-direction: column; gap: 8px; }
+/* In the rail these are 300px wide, so the title and its meta line each get a
+   row of their own and the status sits at the top right. Laid out on one flex
+   line they wrapped mid-phrase and left the badge floating. */
 .evi-run {
-  display: flex; align-items: center; gap: 13px; padding: 12px 14px;
-  border-radius: var(--radius-sm, 8px); background: var(--evi-panel-2);
+  position: relative; display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 12px 11px 15px;
+  border-radius: var(--radius-md, 12px); background: var(--evi-panel-2);
   border: 1px solid var(--evi-line-2); cursor: pointer; transition: .16s;
   text-align: left; width: 100%; font: inherit; color: inherit;
 }
-.evi-run:hover { border-color: rgba(99,102,241,.38); transform: translateX(2px); }
-.evi-run .q { font-weight: 600; font-size: 13.5px; min-width: 0; flex: 1;
+/* A colour spine per play, so the four kinds of run are told apart down the
+   list without reading each label. */
+.evi-run::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--evi-ink-3); opacity: .45;
+}
+.evi-run.m-recommend::before { background: var(--evi-a2); opacity: .9; }
+.evi-run.m-lookup::before { background: var(--evi-a1); opacity: .9; }
+.evi-run.m-discover::before { background: var(--evi-a3); opacity: .9; }
+.evi-run.m-workroom::before { background: var(--evi-ok); opacity: .8; }
+.evi-run:hover { border-color: rgba(99,102,241,.38); background: rgba(99,102,241,.07); }
+.evi-run .rl { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.evi-run .q { font-weight: 600; font-size: 13px; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.evi-run .sub { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 2px; }
+.evi-run .sub { font-size: 11px; color: var(--evi-ink-3); line-height: 1.45; }
+.evi-run .sub .k { color: var(--evi-ink-2); font-weight: 600; }
 .evi-badge {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   padding: 3px 8px; border-radius: var(--radius-xs, 5px); flex-shrink: 0;
@@ -484,18 +676,37 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   font-size: 13px; line-height: 1.6; color: var(--evi-ink-2);
 }
 .evi-exec .ex-where b { color: var(--evi-ink); }
+/* The result of the whole run, in three numbers. These were small outline
+   pills sitting under a paragraph, which is not the weight they carry. */
 .evi-exec .ex-counts {
-  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+  display: grid; gap: 10px; margin-top: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 .evi-exec .ex-counts span {
-  display: inline-flex; align-items: baseline; gap: 7px;
-  padding: 9px 14px; border-radius: var(--radius-pill, 999px);
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  gap: 2px; padding: 14px 16px 13px; border-radius: var(--radius-md, 12px);
   background: var(--evi-panel); border: 1px solid var(--evi-line);
-  font-size: 12.5px; color: var(--evi-ink-3);
+  font-size: 12px; color: var(--evi-ink-3);
 }
+.evi-exec .ex-counts span::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--evi-ink-3); opacity: .5;
+}
+.evi-exec .ex-counts .c-p1::before { background: var(--evi-a1); opacity: 1; }
+.evi-exec .ex-counts .c-p2::before { background: var(--evi-a3); opacity: 1; }
 .evi-exec .ex-counts b {
-  font-size: 17px; font-weight: 700; color: var(--evi-ink); letter-spacing: -.02em;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 30px; font-weight: 700; color: var(--evi-ink);
+  letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums;
 }
+.evi-exec .ex-counts .c-p1 b { color: var(--evi-a1); }
+.evi-exec .ex-counts .c-p2 b { color: var(--evi-a3); }
+.evi-exec .ex-counts i {
+  font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ink-3); opacity: .8; margin-top: 3px;
+}
+:root[data-theme="light"] .evi-exec .ex-counts .c-p1 b { color: var(--evi-g1); }
+:root[data-theme="light"] .evi-exec .ex-counts .c-p2 b { color: var(--evi-g3); }
 .evi-exec .ex-method { margin-top: 16px; }
 .evi-exec .ex-method summary,
 .evi-cand .cwhy summary {
@@ -654,6 +865,8 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   display: block; height: 100%; border-radius: 3px;
   background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2));
   transition: width .5s cubic-bezier(.22,.9,.3,1);
+  /* banded below: a fill that is the same colour at 90% of the max and at 20%
+     of it tells the reader nothing the number did not already say */
 }
 
 /* The matchmaking bonus, granted or refused. A refusal states its reason on
@@ -741,9 +954,10 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   box-shadow: 0 0 0 3px rgba(99,102,241,.12);
 }
 .evi-class .cl { font-size: 13.5px; font-weight: 600; color: var(--evi-ink); }
-.evi-class .cw { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3); }
+.evi-class .cw { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  margin-bottom: 9px; }
 .evi-class .co {
-  align-self: flex-start; margin-top: 3px;
+  align-self: flex-start; margin-top: auto; padding-top: 0;
   font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   padding: 3px 8px; border-radius: var(--radius-xs, 5px);
   background: rgba(148,163,184,.14); color: var(--evi-ink-3);
@@ -751,7 +965,12 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 .evi-class[aria-checked="true"] .co {
   background: rgba(56,189,248,.18); color: var(--evi-a1);
 }
-.evi-eclasses { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* Five classes, so auto-fit left one card stranded on a second row. They are
+   a single choice and read as one when they sit on one line. */
+.evi-eclasses { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1340px) { .evi-eclasses { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 820px) { .evi-eclasses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .evi-eclasses { grid-template-columns: 1fr; } }
 .evi-field select {
   font: inherit; font-size: 14px; color: var(--evi-ink);
   background: var(--evi-panel-2); border: 1px solid var(--evi-line);
@@ -1000,3 +1219,54 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 /* The user's own note can end without punctuation, so the caveat gets its own
    line rather than running on from whatever they typed. */
 .evi-exec .ex-budget i { display: block; margin-top: 4px; }
+
+/* ── the locked profile, restated ───────────────────────────────────── */
+.evi-psum {
+  margin-top: 16px; padding: 16px 18px; border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--evi-line); background:
+    radial-gradient(ellipse 100% 120% at 0% 0%, rgba(56,189,248,.07), transparent 60%),
+    var(--evi-panel-2);
+}
+.evi-psum[hidden] { display: none; }
+.ps-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px;
+  margin-bottom: 10px; }
+.ps-name { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+.ps-site { font-size: 11.5px; color: var(--evi-ink-3); word-break: break-all; }
+.ps-lock {
+  margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ok); padding: 3px 9px;
+  border-radius: var(--radius-pill, 80px); background: rgba(74,222,128,.12);
+  border: 1px solid rgba(74,222,128,.26); flex-shrink: 0;
+}
+.ps-class { font-size: 12.5px; line-height: 1.55; color: var(--evi-ink-3);
+  padding-bottom: 12px; border-bottom: 1px solid var(--evi-line-2); }
+.ps-class b { color: var(--evi-ink-2); font-weight: 600; }
+.ps-or {
+  display: inline-block; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--evi-a1);
+  padding: 3px 8px; border-radius: var(--radius-xs, 4px);
+  background: rgba(56,189,248,.12); border: 1px solid rgba(56,189,248,.24);
+}
+.ps-grid { display: grid; gap: 10px 22px; margin-top: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.ps-grid dt { font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ink-3); margin-bottom: 3px; }
+.ps-grid dd { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.45; }
+.ps-standing { margin-top: 13px; padding-top: 12px;
+  border-top: 1px solid var(--evi-line-2);
+  display: flex; flex-direction: column; gap: 7px; }
+.ps-standing p { font-size: 11.8px; line-height: 1.55; color: var(--evi-ink-2); }
+.ps-standing b { color: var(--evi-ink); font-weight: 600; }
+.ps-standing i { font-style: normal; color: var(--evi-ink-3); display: block;
+  font-size: 11px; margin-top: 2px; }
+
+/* Score strength bands. Set on the bar by its own percentage of the maximum,
+   so a weak dimension is legible as weak at a glance rather than only after
+   reading two numbers at the end of the row. */
+.evi-sub.s-mid .st span {
+  background: linear-gradient(90deg, rgba(56,189,248,.72), rgba(99,102,241,.62));
+}
+.evi-sub.s-lo .st span {
+  background: linear-gradient(90deg, rgba(245,166,35,.85), rgba(245,166,35,.55));
+}
+.evi-sub.s-lo .sl b { color: var(--evi-warn); }

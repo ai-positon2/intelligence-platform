@@ -8617,7 +8617,24 @@ def event_conference_intelligence():
                            # pipeline would refuse.
                            event_classes=[
                                dict(key=k, **event_intel_workroom.CLASS_PLAY[k])
-                               for k in event_intel_workroom.EVENT_CLASSES])
+                               for k in event_intel_workroom.EVENT_CLASSES],
+                           # The scoring model drawn on the page comes off the
+                           # rubric module for the same reason the lists above
+                           # do. A weight typed into the template is a number
+                           # that can drift away from the one that actually
+                           # scores an event, and a page explaining a rubric it
+                           # no longer uses is worse than one explaining none.
+                           rubric={
+                               "total": event_intel_rubric.TOTAL_MAX,
+                               "bonus": event_intel_rubric.MATCHMAKING_BONUS,
+                               "floor": event_intel_rubric.RANK_FLOOR,
+                               "p1": event_intel_rubric.TIER_MIN[
+                                   event_intel_rubric.TIER_P1],
+                               "dimensions": [
+                                   {"key": d,
+                                    "label": event_intel_rubric.DIMENSION_LABELS[d],
+                                    "max": event_intel_rubric.DIMENSION_MAX[d]}
+                                   for d in event_intel_rubric.DIMENSIONS]})
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/profiles",

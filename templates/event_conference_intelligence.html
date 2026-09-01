@@ -48,40 +48,134 @@
   </div>
 
   <div class="main">
-    <div class="ph">
-      <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
-      <h1>Know who is <em>in the room</em> before you book the booth.</h1>
-      <p>
-        Score the calendar against one client&rsquo;s ICP and get a shortlist that is
-        cut rather than padded. Name an event and get the roster it publishes:
-        exhibitors, sponsors, speakers and partners, each row saying which page it came
-        from. Describe an audience and get events ranked by how many of your own target
-        accounts turn up, rather than by how many people do. Then work a roster you
-        already have into one opener per company, with every draft that claims a
-        conversation nobody recorded thrown away and the reason shown.
-      </p>
+    <div class="evi-hero">
+      <div class="ph">
+        <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
+        <h1>Know who is <em>in the room</em> before you book the booth.</h1>
+        <p>
+          Four plays over one event calendar: score it against a client&rsquo;s ICP,
+          pull the roster an event actually publishes, rank events by how many of
+          your own target accounts turn up, and work a roster you already have
+          into openers. Every list is cut rather than padded, and every row says
+          where it came from.
+        </p>
+      </div>
+
+      <!-- The scoring model, drawn from the rubric the scorer really uses. It
+           sits in the hero because it is this agent's whole argument: a number
+           out of 110 with a hard floor under it, and a bonus that two gates
+           have to agree on. Weights and thresholds are server-rendered, never
+           typed here, so this picture cannot drift from the scoring. -->
+      <aside class="evi-rubric" aria-label="How events are scored">
+        <div class="rb-head">
+          <span class="rb-eye">The scoring model</span>
+          <span class="rb-total">{{ rubric.total }}<i>max</i></span>
+        </div>
+        <div class="rb-rows">
+          {% for d in rubric.dimensions %}
+          <div class="rb-row">
+            <span class="rb-l">{{ d.label }}</span>
+            <span class="rb-w">{{ d.max }}</span>
+            <div class="rb-t" aria-hidden="true">
+              <span style="width:{{ (d.max * 100 / rubric.total)|round(1) }}%"></span>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="rb-row bonus">
+            <span class="rb-l">Organizer-run matchmaking</span>
+            <span class="rb-w">+{{ rubric.bonus }}</span>
+            <div class="rb-t" aria-hidden="true">
+              <span style="width:{{ (rubric.bonus * 100 / rubric.total)|round(1) }}%"></span>
+            </div>
+          </div>
+        </div>
+        <p class="rb-note">
+          The bonus needs the organizer&rsquo;s own programme. A self-serve
+          booking app such as Whova or Brella does not earn it.
+        </p>
+        <div class="rb-floor">
+          <span class="rb-tier t1"><b>P1</b>{{ rubric.p1 }} and up</span>
+          <span class="rb-tier t2"><b>P2</b>{{ rubric.floor }} to {{ rubric.p1 - 1 }}</span>
+          <span class="rb-tier t3"><b>Cut</b>under {{ rubric.floor }}</span>
+        </div>
+      </aside>
     </div>
 
-    <div class="evi-card">
-      <div class="evi-card-pad">
-        <div class="evi-modes" role="tablist" aria-label="Mode">
-          <button class="evi-mode" role="tab" id="modeRecommend" aria-selected="true"
-                  onclick="setMode('recommend')">Which events to attend</button>
-          <button class="evi-mode" role="tab" id="modeLookup" aria-selected="false"
-                  onclick="setMode('lookup')">Who is on the roster</button>
-          <button class="evi-mode" role="tab" id="modeDiscover" aria-selected="false"
-                  onclick="setMode('discover')">Find events for an audience</button>
-          <button class="evi-mode" role="tab" id="modeWorkroom" aria-selected="false"
-                  onclick="setMode('workroom')">Work the room</button>
-        </div>
+    <!-- The four plays. These were a row of text pills, which made the
+             single most important structural choice on the page the least
+             visible thing on it. Each is now a card that says what the play
+             does, so the mode is chosen on what it produces rather than on a
+             two-word label. Ids, roles and aria-selected are unchanged: the
+             script still drives these as tabs. -->
+        <div class="evi-plays" role="tablist" aria-label="Mode">
+          <button class="evi-play" role="tab" id="modeRecommend" aria-selected="true"
+                  onclick="setMode('recommend')">
+            <span class="pi" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
+                <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/>
+              </svg>
+            </span>
+            <span class="pn">Which events to attend</span>
+            <span class="pd">Score a whole calendar against one client&rsquo;s ICP
+              and cut everything under the bar.</span>
+          </button>
+          <button class="evi-play" role="tab" id="modeLookup" aria-selected="false"
+                  onclick="setMode('lookup')">
+            <span class="pi" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 5.5h10M4 12h10M4 18.5h7"/>
+                <circle cx="18.5" cy="17" r="3"/><path d="M20.8 19.4L23 21.5"/>
+              </svg>
+            </span>
+            <span class="pn">Who is on the roster</span>
+            <span class="pd">Name an event and get the exhibitors, sponsors,
+              speakers and partners it publishes.</span>
+          </button>
+          <button class="evi-play" role="tab" id="modeDiscover" aria-selected="false"
+                  onclick="setMode('discover')">
+            <span class="pi" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7.5"/><path d="M3.5 11h15M11 3.5c4 4.6 4 10.4 0 15
+                  c-4-4.6-4-10.4 0-15z"/><path d="M16.5 16.5L21 21"/>
+              </svg>
+            </span>
+            <span class="pn">Find events for an audience</span>
+            <span class="pd">Rank events by how many of your target accounts turn
+              up, not by how many people do.</span>
+          </button>
+          <button class="evi-play" role="tab" id="modeWorkroom" aria-selected="false"
+                  onclick="setMode('workroom')">
+            <span class="pi" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3.5 6.5a2 2 0 012-2h13a2 2 0 012 2v8a2 2 0 01-2 2H9l-4.5 3.5v-3.5
+                  a1 1 0 00-1-1z"/><path d="M8 9h8M8 12.5h5"/>
+              </svg>
+            </span>
+            <span class="pn">Work the room</span>
+            <span class="pd">Turn a roster you already have into one opener per
+              company, inside the 48 hour window.</span>
+          </button>
+    </div>
 
+    <div class="evi-layout">
+      <div class="evi-card evi-card-main">
+        <div class="evi-card-pad">
         <form class="evi-form" id="eviForm" onsubmit="return startRun(event)">
           <div id="recommendFields">
             <div class="evi-field">
               <label for="profilePick">Client profile</label>
+              {# The stored value is an enum key. Printing it raw put
+                 "b2b_to_marketing" in front of the user; the readable label is
+                 already on the classifications list the route sends. #}
               <select id="profilePick" onchange="onProfilePick()">
                 {% for p in profiles %}
-                <option value="{{ p.id }}">{{ p.client_name }} &middot; {{ p.classification }}</option>
+                {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
+                <option value="{{ p.id }}">{{ p.client_name }} &middot; {{ cl.label if cl else p.classification }}</option>
                 {% endfor %}
                 <option value="new">+ Lock a new client profile</option>
               </select>
@@ -91,8 +185,55 @@
               </span>
             </div>
 
+            <!-- What a locked profile actually says. Choosing a saved profile
+                 used to hide the intake form and show nothing in its place, so
+                 the terms every score is about to be measured against were
+                 off screen. These are the stored values, not a restatement. -->
+            {% for p in profiles %}
+            {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
+            <div class="evi-psum" data-profile="{{ p.id }}" hidden>
+              <div class="ps-head">
+                <span class="ps-name">{{ p.client_name }}</span>
+                {% if p.client_site %}<span class="ps-site">{{ p.client_site }}</span>{% endif %}
+                {% if cl %}<span class="ps-or">{{ cl.orientation }}-driven</span>{% endif %}
+                <span class="ps-lock">Locked</span>
+              </div>
+              {% if cl %}
+              <div class="ps-class"><b>{{ cl.label }}.</b> {{ cl.where }}</div>
+              {% endif %}
+              <dl class="ps-grid">
+                {% for lbl, val in [
+                     ('Buyer roles', p.buyer_roles), ('Verticals', p.verticals),
+                     ('Deal size', p.acv_band), ('Sales cycle', p.sales_cycle),
+                     ('Geography', p.geo_scope),
+                     ('Window', (p.window_months ~ ' months') if p.window_months else None),
+                     ('Max listed', p.max_events)] %}
+                {% if val %}<div><dt>{{ lbl }}</dt><dd>{{ val }}</dd></div>{% endif %}
+                {% endfor %}
+              </dl>
+              {% if p.force_include or p.force_exclude or p.budget_note %}
+              <div class="ps-standing">
+                {% if p.force_include %}
+                <p><b>Already committed.</b> {{ p.force_include | replace('\n', ', ') }}
+                  <i>Kept on the list whatever it scores, and marked.</i></p>
+                {% endif %}
+                {% if p.force_exclude %}
+                <p><b>Never suggest.</b> {{ p.force_exclude | replace('\n', ', ') }}</p>
+                {% endif %}
+                {% if p.budget_note %}
+                <p><b>Budget.</b> {{ p.budget_note }}
+                  <i>Shown beside events, never used to score one.</i></p>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+
             <div id="profileForm" style="display:none">
-              <div class="evi-field" style="margin-top:18px">
+              <div class="evi-group">
+                <span class="gh">Step 1 &middot; Which side of the floor</span>
+              </div>
+              <div class="evi-field">
                 <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
                 <div class="evi-classes" role="radiogroup" aria-label="Classification">
                   {% for c in classifications %}
@@ -107,7 +248,10 @@
                   {% endfor %}
                 </div>
               </div>
-              <div class="evi-row" style="margin-top:14px">
+              <div class="evi-group">
+                <span class="gh">Step 2 &middot; Who the client is</span>
+              </div>
+              <div class="evi-row">
                 <div class="evi-field">
                   <label for="clientName">Client name</label>
                   <input type="text" id="clientName" autocomplete="off"
@@ -119,7 +263,10 @@
                          placeholder="https://northwind.example" />
                 </div>
               </div>
-              <div class="evi-row" style="margin-top:14px">
+              <div class="evi-group">
+                <span class="gh">Step 3 &middot; Who they sell to</span>
+              </div>
+              <div class="evi-row">
                 <div class="evi-field">
                   <label for="buyerRoles">Buyer roles</label>
                   <input type="text" id="buyerRoles" placeholder="VP Marketing, CMO, Head of Growth" />
@@ -129,7 +276,7 @@
                   <input type="text" id="verticals" placeholder="fintech, insurtech" />
                 </div>
               </div>
-              <div class="evi-row" style="margin-top:14px">
+              <div class="evi-row">
                 <div class="evi-field">
                   <label for="acvBand">Deal size</label>
                   <input type="text" id="acvBand" placeholder="$40k to $120k" />
@@ -139,7 +286,10 @@
                   <input type="text" id="salesCycle" placeholder="3 to 6 months" />
                 </div>
               </div>
-              <div class="evi-row" style="margin-top:14px">
+              <div class="evi-group">
+                <span class="gh">Step 4 &middot; How far to look</span>
+              </div>
+              <div class="evi-row">
                 <div class="evi-field">
                   <label for="geoScope">Geographic scope</label>
                   <input type="text" id="geoScope" placeholder="North America and UK" />
@@ -149,7 +299,11 @@
                   <input type="text" id="windowMonths" placeholder="12" />
                 </div>
               </div>
-              <div class="evi-row" style="margin-top:14px">
+              <div class="evi-group">
+                <span class="gh">Step 5 &middot; Standing instructions</span>
+                <span class="gs">Carried into every run on this profile.</span>
+              </div>
+              <div class="evi-row evi-row-3">
                 <div class="evi-field">
                   <label for="forceInclude">Already committed to these</label>
                   <textarea id="forceInclude" placeholder="Money20/20&#10;SaaStr Annual"></textarea>
@@ -297,45 +451,84 @@
             </div>
           </div>
 
-          <button type="submit" class="evi-btn" id="runBtn">Run →</button>
+          <!-- The run sits in its own footer strip rather than loose under the
+               last field, so a long intake form has a visible end to it. -->
+          <div class="evi-actions">
+            <button type="submit" class="evi-btn" id="runBtn">Run →</button>
+            <span class="evi-actions-note">Runs in the background. You can leave
+              this page and pick the result up under Your runs.</span>
+          </div>
         </form>
 
-        <div id="runningWrap" style="display:none">
-          <div class="evi-running">
-            <span class="evi-spinner"></span>
-            <span id="runningText">Working. This runs in the background, so you can leave
-              this page and find the result in History when it is done.</span>
+          <div id="runningWrap" style="display:none">
+            <div class="evi-running">
+              <span class="evi-spinner"></span>
+              <span id="runningText">Working. This runs in the background, so you can leave
+                this page and find the result in History when it is done.</span>
+            </div>
           </div>
+          <div id="formError" class="evi-err" style="display:none"></div>
         </div>
-        <div id="formError" class="evi-err" style="display:none"></div>
       </div>
-    </div>
 
-    <div class="evi-card" id="eviHistoryCard">
-      <div class="evi-card-pad">
-        <div class="evi-sec">
-          <h3>Your runs</h3>
-          <div class="evi-runs" id="runsList">
-            {% if runs %}
-              {% for r in runs %}
-              <button class="evi-run" onclick="openRun({{ r.id }})" type="button">
-                <span style="min-width:0;flex:1">
-                  <span class="q">{{ r.event_name or r.query }}</span>
-                  <span class="sub">
-                    {{ 'Event lookup' if r.mode == 'lookup' else 'Audience search' }}
-                    · {{ r.participant_count }} listed
-                    {%- if r.credits_spent %} · {{ r.credits_spent }} Apollo credit{{ '' if r.credits_spent == 1 else 's' }}{% endif %}
-                  </span>
-                </span>
-                <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
-              </button>
-              {% endfor %}
-            {% else %}
-              <div class="evi-empty">No runs yet. Name an event above to build its roster.</div>
-            {% endif %}
+      <aside class="evi-rail">
+        <div class="evi-card" id="eviHistoryCard">
+          <div class="evi-card-pad">
+            <div class="evi-sec">
+              <h3>Your runs</h3>
+              <div class="evi-runs" id="runsList">
+                {% if runs %}
+                  {% for r in runs %}
+                  {# Each of the four plays produces a different kind of run, so
+                     each says what it actually was. The old line read every
+                     non-lookup run as an "audience search", which called a
+                     scored calendar and a set of drafted openers the same
+                     thing, and printed "0 listed" beside both. #}
+                  {% set kinds = {'recommend': 'Scored calendar',
+                                  'lookup': 'Event roster',
+                                  'discover': 'Audience search',
+                                  'workroom': 'Room worked'} %}
+                  <button class="evi-run m-{{ r.mode }}" type="button"
+                          onclick="openRun({{ r.id }})">
+                    <span class="rl">
+                      <span class="q">{{ r.event_name or r.query }}</span>
+                      <span class="sub">
+                        <span class="k">{{ kinds.get(r.mode, r.mode) }}</span>
+                        {%- if r.participant_count %} · {{ r.participant_count }} listed{% endif %}
+                        {%- if r.credits_spent %} · {{ r.credits_spent }} Apollo credit{{ '' if r.credits_spent == 1 else 's' }}{% endif %}
+                      </span>
+                    </span>
+                    <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+                  </button>
+                  {% endfor %}
+                {% else %}
+                  <div class="evi-empty">No runs yet. Pick a play above and run it.</div>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+        <!-- What a run costs, stated before it is started rather than after.
+             Only company resolution reaches a billed endpoint, and it is a
+             separate button inside a finished roster, so nothing on this form
+             can spend a credit. -->
+        <div class="evi-card evi-costcard">
+          <div class="evi-card-pad">
+            <div class="evi-sec">
+              <h3>What a run spends</h3>
+              <ul class="evi-cost">
+                <li><b>Nothing here.</b> Scoring, roster harvesting and openers
+                  read public pages and cost no Apollo credits.</li>
+                <li><b>Matching companies in Apollo</b> is the only billed step,
+                  about 1 credit per request of up to 25 domains, and it is a
+                  button inside a finished roster.</li>
+                <li><b>Finding people</b> at companies already matched is free.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -423,6 +616,12 @@
     function onProfilePick(){
       var v = document.getElementById('profilePick').value;
       document.getElementById('profileForm').style.display = v === 'new' ? '' : 'none';
+      // Show the terms of the profile that is actually selected, and only
+      // that one.
+      var sums = document.querySelectorAll('[data-profile]');
+      for (var i = 0; i < sums.length; i++) {
+        sums[i].hidden = sums[i].getAttribute('data-profile') !== v;
+      }
     }
     window.onProfilePick = onProfilePick;
 
@@ -443,6 +642,10 @@
       // is "new" and `change` never fires, so this is the only thing that
       // opens the intake form.
       onProfilePick();
+      // The play card that renders as selected and the label on the button
+      // that runs it are the same fact. Left to the template alone the card
+      // said "Which events to attend" while the button said "Run".
+      setMode(mode);
     }
 
     function saveProfile(){
@@ -908,7 +1111,8 @@
 
     function bar(label, value, max){
       var pct = max ? Math.round((value / max) * 100) : 0;
-      return '<div class="evi-sub">' +
+      var band = pct >= 75 ? 's-hi' : pct >= 50 ? 's-mid' : 's-lo';
+      return '<div class="evi-sub ' + band + '">' +
         '<div class="sl">' + esc(label) + '<b>' + esc(value) + '<i>/' + max + '</i></b></div>' +
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
@@ -1003,6 +1207,10 @@
 
     var SUB_LABELS = {relevance: 'Relevance', dm_access: 'Decision-maker access',
                       engagement: 'Engagement mode'};
+    /* Rendered from the rubric rather than typed, on the same grounds as the
+       label tables around it: the number the report prints as the bar and the
+       number the scorer cuts on have to be the same one. */
+    var RANK_FLOOR = {{ rubric.floor }};
     var CATEGORY_LABELS = {
       {%- for c in categories %}
       '{{ c.key }}': '{{ c.label }}'{{ ',' if not loop.last }}
@@ -1079,9 +1287,10 @@
         (s.committed_note ? '<div class="ex-committed">' +
           esc(s.committed_note) + '</div>' : '') +
         '<div class="ex-counts">' +
-          '<span><b>' + (counts.P1 || 0) + '</b> must-attend</span>' +
-          '<span><b>' + (counts.P2 || 0) + '</b> strong</span>' +
-          '<span><b>' + (counts.excluded || 0) + '</b> scored below 70 and cut</span>' +
+          '<span class="c-p1"><b>' + (counts.P1 || 0) + '</b>must-attend<i>P1</i></span>' +
+          '<span class="c-p2"><b>' + (counts.P2 || 0) + '</b>strong<i>P2</i></span>' +
+          '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
+            '<i>below ' + RANK_FLOOR + '</i></span>' +
         '</div>' +
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
@@ -1105,7 +1314,7 @@
         (kept.length
           ? '<div class="evi-cands">' + kept.map(function(c){
               return candidateRow(c, byName[c.name], decLabels); }).join('') + '</div>'
-          : '<div class="evi-empty">Nothing cleared 70. That is the answer, not a ' +
+          : '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + '. That is the answer, not a ' +
             'failure: the list is not padded to a target count.</div>') +
         (outc.note ? '<div class="evi-note" style="margin-top:12px">' +
           esc(outc.note) + '</div>' : '') +
@@ -1116,7 +1325,7 @@
 
       if ((s.excluded || []).length) {
         html += '<div class="evi-sec"><h3>Scored and cut</h3>' +
-          '<div class="evi-note">Below 70. Shown so that "nothing else was found" ' +
+          '<div class="evi-note">Below ' + RANK_FLOOR + '. Shown so that "nothing else was found" ' +
           'and "more were found and none cleared the bar" are not the same picture.' +
           '</div><div class="evi-cut">' + s.excluded.map(function(e){
             return '<span class="cutp">' + esc(e.name) + '<b>' + esc(e.total) +
