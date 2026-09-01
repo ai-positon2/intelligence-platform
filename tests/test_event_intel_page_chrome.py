@@ -357,3 +357,96 @@ def test_locking_a_new_profile_shows_no_saved_terms():
     out = _exec("console.log(JSON.stringify({shown: __sums.filter(function(s){"
                 "return !s.hidden;}).length}));")
     assert out["shown"] == 0
+
+
+# ── the shared responsive grid ───────────────────────────────────────────
+#
+# grid-tokens.css defines Arena's page side-margin and column gutter, and every
+# other agent page reads them. This one loaded the sheet and then hand-typed its
+# own padding, so it ran nearly edge to edge on a laptop while its neighbours
+# kept a margin. These tests fail if a raw px value creeps back in, because the
+# regression is invisible in a screenshot of a single page: it only shows up
+# next to a sibling.
+
+_CSS = "static/css/event_conference_intelligence.css"
+
+
+def _css():
+    with open(_CSS, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _rule(css, selector):
+    """The base rule for `selector`, not a media-query override of it.
+
+    Comments are stripped first: several of these rules are introduced by a
+    banner comment, which otherwise sits between the previous `}` and the
+    selector. The opening delimiter excludes `{`, so a rule nested inside an
+    `@media` block is never what comes back.
+    """
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    m = re.search(r"(?:^|[};])\s*%s\s*\{([^{}]*)\}" % re.escape(selector),
+                  css, re.S)
+    assert m, "no base %s rule in %s" % (selector, _CSS)
+    return m.group(1)
+
+
+def test_the_page_loads_the_shared_grid_tokens():
+    """`var(--margin)` with no sheet defining it makes the whole padding
+    declaration invalid, which silently computes to zero."""
+    html = _page()
+    assert "grid-tokens.css" in html, (
+        "the page uses the grid tokens but does not load the sheet that defines them")
+
+
+def test_the_content_container_takes_its_side_margin_from_the_token():
+    body = _rule(_css(), ".main")
+    pad = re.search(r"padding:([^;]+);", body)
+    assert pad, ".main sets no padding"
+    assert "var(--margin)" in pad.group(1), (
+        ".main hand-types its side padding instead of taking the responsive "
+        "margin every other agent page uses: %r" % pad.group(1).strip())
+
+
+def test_the_content_container_is_capped_in_the_same_band_as_its_siblings():
+    """Uncapped, or capped far wider than the family, is the "too broad" the
+    redesign was reported for."""
+    body = _rule(_css(), ".main")
+    m = re.search(r"max-width:\s*(\d+)px", body)
+    assert m, ".main sets no max-width, so it runs to the full viewport"
+    assert 1150 <= int(m.group(1)) <= 1340, (
+        ".main caps at %spx, outside the 1180 to 1320 band the other agent "
+        "pages use" % m.group(1))
+
+
+def test_the_topbar_bleeds_with_the_shared_offset():
+    body = _rule(_css(), ".topbar")
+    pad = re.search(r"padding:([^;]+);", body)
+    assert pad and "var(--bleed)" in pad.group(1), (
+        "the topbar does not use --bleed, so it will not line up with the "
+        "content container: %r" % (pad and pad.group(1).strip()))
+
+
+def test_the_page_level_column_grids_share_one_gutter():
+    """Three column grids with three separately-chosen gaps drift apart."""
+    css = _css()
+    for sel in (".evi-hero", ".evi-layout", ".evi-plays"):
+        body = _rule(css, sel)
+        gap = re.search(r"gap:([^;]+);", body)
+        assert gap, "%s sets no gap" % sel
+        assert "var(--gutter)" in gap.group(1), (
+            "%s hand-types its gap rather than using the shared gutter: %r"
+            % (sel, gap.group(1).strip()))
+
+
+def test_the_choice_grids_are_not_left_to_auto_fit():
+    """auto-fit picks its column count off whatever width the container
+    happens to have, which dealt four cards as 3 + 1 and five as 4 + 1."""
+    css = _css()
+    for sel in (".evi-classes", ".evi-eclasses"):
+        body = _rule(css, sel)
+        cols = re.search(r"grid-template-columns:([^;]+);", body)
+        assert cols, "%s sets no columns" % sel
+        assert "auto-fit" not in cols.group(1) and "auto-fill" not in cols.group(1), (
+            "%s is back on auto-fit, so its cards can strand on a second row: %r"
+            % (sel, cols.group(1).strip()))
