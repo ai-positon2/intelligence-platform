@@ -36,52 +36,17 @@ def _page(monkeypatch=None):
     return resp.get_data(as_text=True)
 
 
-# ── the scoring model on the page is the rubric's own ────────────────────
-
-def test_every_dimension_weight_on_the_page_comes_from_the_rubric():
-    html = _page()
-    for key, mx in rubric.DIMENSION_MAX.items():
-        label = rubric.DIMENSION_LABELS[key]
-        assert label in html, "the scoring model does not name %r" % label
-        # The weight is rendered in its own <span class="rb-w">, so a stray
-        # "40" elsewhere on the page cannot satisfy this.
-        assert re.search(r'<span class="rb-w">%d</span>' % mx, html), (
-            "the page does not show %s as %d, which is what the rubric scores it out of"
-            % (label, mx))
-
-
-def test_the_bonus_and_the_total_on_the_page_are_the_rubric_s():
-    html = _page()
-    assert '<span class="rb-w">+%d</span>' % rubric.MATCHMAKING_BONUS in html
-    assert re.search(r'<span class="rb-total">%d<i>' % rubric.TOTAL_MAX, html), (
-        "the page does not show %d as the maximum" % rubric.TOTAL_MAX)
-
-
-def test_the_tier_thresholds_on_the_page_are_the_rubric_s():
-    html = _page()
-    p1 = rubric.TIER_MIN[rubric.TIER_P1]
-    floor = rubric.RANK_FLOOR
-    assert "<b>P1</b>%d and up" % p1 in html
-    assert "<b>P2</b>%d to %d" % (floor, p1 - 1) in html
-    assert "<b>Cut</b>under %d" % floor in html
-
-
-def test_the_bar_widths_are_the_weights_as_a_share_of_the_total():
-    """A picture of a rubric that is not to scale is worse than no picture:
-    it says 40 and draws it the same length as 20."""
-    html = _page()
-    for key, mx in rubric.DIMENSION_MAX.items():
-        pct = round(mx * 100 / rubric.TOTAL_MAX, 1)
-        assert "width:%s%%" % pct in html, (
-            "%s is weighted %d of %d but no bar is drawn at %s%% of the track"
-            % (rubric.DIMENSION_LABELS[key], mx, rubric.TOTAL_MAX, pct))
-
+# ── the rubric still reaches the report ─────────────────────────────────
+#
+# The scoring-model card was removed from the hero at the user's request, so
+# the tests that asserted its weights, bars and tier bands went with it. The
+# floor still reaches the page, because the report prints it, and it is still
+# read from the module rather than typed.
 
 def test_the_report_cuts_at_the_rubric_s_floor_rather_than_a_typed_number():
     html = _page()
     assert "var RANK_FLOOR = %d;" % rubric.RANK_FLOOR in html, (
         "the report script does not take the floor from the rubric")
-    # And nothing left behind hardcoding it.
     script = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)[0]
     for stale in ("Nothing cleared 70", "Below 70."):
         assert stale not in script, (
@@ -89,44 +54,20 @@ def test_the_report_cuts_at_the_rubric_s_floor_rather_than_a_typed_number():
             "the floor moves" % stale)
 
 
-# The tests above compare the page against the rubric's CURRENT numbers, which
-# a literal equal to today's value satisfies just as well as a real read. These
-# move the module and require the page to move with it. That is the property
-# being claimed, and it is the one a typed number fails.
-
-def test_moving_the_floor_moves_every_place_the_page_prints_it(monkeypatch):
+def test_moving_the_floor_moves_what_the_report_cuts_at(monkeypatch):
+    """Comparing against the rubric's CURRENT value passes just as well for a
+    literal 70. Move the module and require the page to follow."""
     monkeypatch.setattr(rubric, "RANK_FLOOR", 64)
     html = _page()
     assert "var RANK_FLOOR = 64;" in html, "the report still cuts at a typed number"
-    assert "<b>Cut</b>under 64" in html, "the scoring card still shows a typed floor"
 
 
-def test_moving_the_tiers_moves_the_bands_drawn_on_the_page(monkeypatch):
-    monkeypatch.setattr(rubric, "TIER_MIN", {rubric.TIER_P1: 85, rubric.TIER_P2: 64})
-    monkeypatch.setattr(rubric, "RANK_FLOOR", 64)
+def test_the_scoring_model_card_is_gone_from_the_hero():
+    """Removed deliberately. If it comes back it needs its guards back with
+    it, because its numbers can drift from the rubric that does the scoring."""
     html = _page()
-    assert "<b>P1</b>85 and up" in html
-    assert "<b>P2</b>64 to 84" in html
-
-
-def test_reweighting_a_dimension_reweights_the_page(monkeypatch):
-    monkeypatch.setattr(rubric, "DIMENSION_MAX",
-                        {"relevance": 30, "dm_access": 45, "engagement": 25})
-    monkeypatch.setattr(rubric, "TOTAL_MAX", 110)
-    html = _page()
-    for mx in (30, 45, 25):
-        assert '<span class="rb-w">%d</span>' % mx in html, (
-            "the card does not show the reweighted %d" % mx)
-    assert "width:40.9%" in html, "the bars are not redrawn to the new weights"
-
-
-def test_changing_the_bonus_changes_the_card(monkeypatch):
-    monkeypatch.setattr(rubric, "MATCHMAKING_BONUS", 15)
-    monkeypatch.setattr(rubric, "TOTAL_MAX", 115)
-    html = _page()
-    assert '<span class="rb-w">+15</span>' in html
-    assert '<span class="rb-total">115<i>' in html
-
+    for gone in ('class="evi-rubric"', 'class="rb-total"', 'class="rb-tier'):
+        assert gone not in html, "%s is back on the page without its guard" % gone
 
 # ── the four plays ───────────────────────────────────────────────────────
 
@@ -134,7 +75,7 @@ def test_each_play_says_what_it_produces():
     """The mode was a two-word pill. Each card now carries a description, and
     an empty one would render as a card that explains nothing."""
     html = _page()
-    cards = re.findall(r'<button class="evi-play".*?</button>', html, re.S)
+    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
     assert len(cards) == 4, "expected four plays, found %d" % len(cards)
     seen = set()
     for card in cards:
@@ -149,7 +90,7 @@ def test_each_play_says_what_it_produces():
 
 def test_every_play_has_an_icon():
     html = _page()
-    cards = re.findall(r'<button class="evi-play".*?</button>', html, re.S)
+    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
     for card in cards:
         name = re.search(r'<span class="pn">(.*?)</span>', card, re.S)
         icon = re.search(r'<span class="pi".*?</span>', card, re.S)
@@ -159,6 +100,68 @@ def test_every_play_has_an_icon():
         # An svg with nothing drawn in it is an empty box, not an icon.
         assert re.search(r"<(path|rect|circle|line|polyline)\b", icon.group(0)), (
             "the %r card's icon draws nothing" % (name and name.group(1)))
+
+
+def test_every_play_carries_a_step_number_and_the_action_it_runs():
+    """The cards are the page's primary control. Each one states the play, what
+    it produces, and the action it will run, so the choice is made on the card
+    rather than by pressing the button to find out."""
+    html = _page()
+    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
+    assert len(cards) == 4
+    nums, actions = [], []
+    for card in cards:
+        num = re.search(r'<span class="pnum"[^>]*>(\d+)</span>', card)
+        assert num, "a play card has no step number"
+        nums.append(num.group(1))
+        attr = re.search(r'data-action="([^"]+)"', card)
+        go = re.search(r'<span class="pgo"[^>]*>(.*?)<i>', card, re.S)
+        assert attr, "a play card has no data-action"
+        assert go, "a play card does not show the action it runs"
+        assert go.group(1).strip() == attr.group(1), (
+            "the card shows %r but would run %r" % (go.group(1).strip(), attr.group(1)))
+        actions.append(attr.group(1))
+    assert nums == ["01", "02", "03", "04"], "the plays are not numbered in order: %s" % nums
+    assert len(set(actions)) >= 3, (
+        "the plays barely distinguish their actions: %s" % actions)
+
+
+def test_no_play_falls_back_to_a_generic_run_label():
+    """Two of the four modes used to show a bare "Run", which told the user
+    nothing about what pressing it would do."""
+    html = _page()
+    for card in re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S):
+        act = re.search(r'data-action="([^"]+)"', card).group(1)
+        assert act.strip().lower() != "run", "a play still runs under a bare 'Run'"
+        assert len(act.split()) >= 2, "%r does not say what it does" % act
+
+
+def test_the_mode_cards_do_not_share_a_class_with_the_report_s_play_block():
+    """Both were called .evi-play. Every rule written for the hero cards was
+    landing on the workroom report's play block and the other way round, which
+    is invisible until one of them is restyled and the other moves with it."""
+    html = _page()
+    card_classes = set()
+    for card in re.findall(r'<button class="(evi-play[^"]*)"', html):
+        card_classes.update(card.split())
+    assert card_classes, "no mode cards found"
+    script = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)[0]
+    rendered = set()
+    for cls in re.findall(r"""<div class=\\?["']([a-z0-9 _-]+)""", script):
+        rendered.update(cls.split())
+    overlap = card_classes & rendered
+    assert not overlap, (
+        "the mode cards and the report share %s, so their styles run together"
+        % sorted(overlap))
+
+
+def test_each_play_has_its_own_accent_class():
+    """The cards are told apart by hue as well as by wording; a shared class
+    would paint all four the same."""
+    html = _page()
+    hues = re.findall(r'<button class="evi-play (p-\w+)"', html)
+    assert len(hues) == 4 and len(set(hues)) == 4, (
+        "the four plays do not each carry their own accent class: %s" % hues)
 
 
 # ── the saved-profile row ────────────────────────────────────────────────
@@ -257,8 +260,8 @@ var __els = {
   runningText: __node({id: 'runningText'}),
   sourceRun: __node({id: 'sourceRun', value: ''}),
   wrProfile: __node({id: 'wrProfile', value: ''}),
-  modeRecommend: __node({id: 'modeRecommend'}), modeLookup: __node({id: 'modeLookup'}),
-  modeDiscover: __node({id: 'modeDiscover'}), modeWorkroom: __node({id: 'modeWorkroom'}),
+  modeRecommend: __node(PLAY_ATTRS.recommend), modeLookup: __node(PLAY_ATTRS.lookup),
+  modeDiscover: __node(PLAY_ATTRS.discover), modeWorkroom: __node(PLAY_ATTRS.workroom),
   recommendFields: __node({id: 'recommendFields'}),
   lookupFields: __node({id: 'lookupFields'}),
   discoverFields: __node({id: 'discoverFields'}),
@@ -309,7 +312,18 @@ def _exec(probe, pick="new", profile_ids=("3", "4")):
     assert _IIFE_CLOSE in script, "the page's IIFE no longer closes as expected"
     at = script.index(_IIFE_CLOSE)
     script = script[:at] + "\n" + probe + script[at:]
-    shim = (_SHIM.replace("PICK", json.dumps(pick))
+    # The play cards' data-action read straight off the rendered page: a shim
+    # carrying its own copy could pass while the markup said something else.
+    attrs = {}
+    for card in re.findall(r'<button class="evi-play[^"]*".*?>', html, re.S):
+        key = re.search(r'data-play="([^"]+)"', card)
+        act = re.search(r'data-action="([^"]+)"', card)
+        eid = re.search(r'id="([^"]+)"', card)
+        assert key and act and eid, "a play card is missing data-play/data-action/id"
+        attrs[key.group(1)] = {"id": eid.group(1), "data-action": act.group(1)}
+    assert len(attrs) == 4, "expected four play cards, found %d" % len(attrs)
+    shim = (_SHIM.replace("PLAY_ATTRS", json.dumps(attrs))
+                 .replace("PICK", json.dumps(pick))
                  .replace("PROFILE_IDS", json.dumps(list(profile_ids)))
                  .replace("CLASS_KEYS", json.dumps(list(rubric.CLASSIFICATIONS)))
                  .replace("EVENT_KEYS", json.dumps(
@@ -339,6 +353,32 @@ def test_the_button_label_follows_the_play():
     out = _exec("setMode('workroom');console.log(JSON.stringify({"
                 "label: document.getElementById('runBtn').textContent}));")
     assert "room" in out["label"].lower(), out["label"]
+
+
+@pytestmark_node
+def test_the_button_label_is_read_off_the_selected_card():
+    """One copy of a play's action wording, on the card. Change the card and
+    the button has to follow, or the two can promise different things."""
+    out = _exec("document.getElementById('modeDiscover')"
+                ".setAttribute('data-action', 'Sweep the calendar');"
+                "setMode('discover');console.log(JSON.stringify({"
+                "label: document.getElementById('runBtn').textContent}));")
+    assert out["label"].startswith("Sweep the calendar"), (
+        "the button kept its own copy of the label: %r" % out["label"])
+
+
+@pytestmark_node
+def test_every_play_s_button_label_matches_its_card():
+    out = _exec("var o={};['recommend','lookup','discover','workroom']"
+                ".forEach(function(m){setMode(m);"
+                "o[m]=document.getElementById('runBtn').textContent;});"
+                "console.log(JSON.stringify(o));")
+    html = _page()
+    for card in re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S):
+        key = re.search(r'data-play="([^"]+)"', card).group(1)
+        act = re.search(r'data-action="([^"]+)"', card).group(1)
+        assert out[key].startswith(act), (
+            "the %s card says %r but its button says %r" % (key, act, out[key]))
 
 
 @pytestmark_node
@@ -430,7 +470,9 @@ def test_the_topbar_bleeds_with_the_shared_offset():
 def test_the_page_level_column_grids_share_one_gutter():
     """Three column grids with three separately-chosen gaps drift apart."""
     css = _css()
-    for sel in (".evi-hero", ".evi-layout", ".evi-plays"):
+    # .evi-hero is a single block since the scoring card was removed; the
+    # two grids that still split the page into columns are these.
+    for sel in (".evi-layout", ".evi-plays"):
         body = _rule(css, sel)
         gap = re.search(r"gap:([^;]+);", body)
         assert gap, "%s sets no gap" % sel

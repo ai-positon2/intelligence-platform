@@ -105,7 +105,15 @@ function __el(id){
     set textContent(v){ __html[id] = v; },
     get textContent(){ return __html[id] || ''; },
     style: {}, classList: {add:function(){},remove:function(){},contains:function(){return false;}},
-    setAttribute: function(){}, disabled: false, value: ''
+    // The page reads a play's action wording back off the card that carries
+    // it. A shim missing a method the page really calls fails the run for a
+    // reason that has nothing to do with what these tests check.
+    _attrs: {},
+    setAttribute: function(k, v){ this._attrs[k] = String(v); },
+    getAttribute: function(k){
+      return this._attrs[k] === undefined ? null : this._attrs[k];
+    },
+    disabled: false, value: ''
   };
 }
 var document = {
