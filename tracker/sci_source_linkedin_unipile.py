@@ -36,12 +36,34 @@ from __future__ import annotations
 
 import logging
 import re
+from urllib.parse import urlparse
 
-from tracker import unipile_client, unipile_transport
+from tracker import sci_name_match, unipile_client, unipile_transport
 
 logger = logging.getLogger(__name__)
 
 PLATFORM = "linkedin"
+
+# How well the page we landed on is corroborated as the company being
+# researched. LinkedIn hands out one vanity slug per page and reuses names
+# freely, so "the slug resolved" is not the same claim as "this is them":
+# /company/notion is a 39-person IT consultancy with no posts, while Notion
+# Labs is /company/notionhq. Both are called "Notion", both resolve, and one
+# of them answers with an empty list that reads as "they post nothing".
+VERIFIED_DOMAIN = "domain"      # the page's own website is the company's
+VERIFIED_NAME = "name"          # the names agree, nothing corroborates further
+VERIFIED_NONE = "none"          # nothing to check against
+VERIFIED_MISMATCH = "mismatch"  # positive evidence this is a different company
+
+
+class CompanyMismatch(Exception):
+    """The resolved LinkedIn page belongs to someone else.
+
+    Raised rather than returned, and deliberately NOT a
+    UnipileTransportError: a transport failure is worth retrying through the
+    other vendor, whereas a wrong handle produces exactly the same wrong page
+    on any vendor, so sci_pipeline lets this one through instead of falling
+    back to Apify with it."""
 
 # /company/, /showcase/ and /school/ are all company-shaped pages on
 # LinkedIn and all resolve through the same endpoint.
@@ -166,6 +188,71 @@ def normalize(raw_items: list[dict]) -> list[dict]:
     return out
 
 
+def _host(url: str) -> str:
+    """A URL's bare host, lowercased, without a leading www."""
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "https://" + raw
+    host = (urlparse(raw).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _same_site(a: str, b: str) -> bool:
+    """Whether two hosts belong to the same site.
+
+    Suffix containment rather than "compare the last two labels": the latter
+    reads acme.co.uk and rival.co.uk as the same site, which is a false
+    confirmation in exactly the case this check exists to prevent. This
+    accepts blog.hubspot.com against hubspot.com and nothing looser."""
+    if not a or not b:
+        return False
+    return a == b or a.endswith("." + b) or b.endswith("." + a)
+
+
+def verify_company_page(page: dict, company_name: str | None,
+                        company_url: str | None) -> str:
+    """How well `page` is corroborated as the company being researched.
+
+    The website is the decisive signal and the name is the weak one, which is
+    the opposite of what it looks like: two unrelated companies share a name
+    routinely, and the impostor page that prompted this check shares one
+    exactly. A differing domain is only treated as proof of a mismatch when
+    the name disagrees too, because a real company's LinkedIn page listing a
+    parent or campaign domain is ordinary."""
+    page_site = _host((page or {}).get("website") or "")
+    company_site = _host(company_url or "")
+    page_name = (page or {}).get("name") or ""
+    names_agree = bool(company_name and page_name
+                       and sci_name_match.plausible_match(company_name, page_name))
+
+    if page_site and company_site:
+        if _same_site(page_site, company_site):
+            return VERIFIED_DOMAIN
+        return VERIFIED_NAME if names_agree else VERIFIED_MISMATCH
+    if not company_name:
+        return VERIFIED_NONE
+    return VERIFIED_NAME if names_agree else VERIFIED_MISMATCH
+
+
+def describe_company_page(page: dict) -> str:
+    """The page we actually read, in the words a reader needs to recognise a
+    wrong one on sight. Follower count earns its place here: it is not
+    evidence on its own, but 882 followers under a household name is the
+    thing a person spots instantly."""
+    page = page or {}
+    slug = page.get("public_identifier") or page.get("id") or "?"
+    bits = []
+    if page.get("name"):
+        bits.append(str(page["name"]))
+    followers = page.get("followers_count")
+    if isinstance(followers, int):
+        bits.append("{:,} followers".format(followers))
+    bits.append(str(page["website"]) if page.get("website") else "no website listed")
+    return "linkedin.com/company/%s (%s)" % (slug, ", ".join(bits))
+
+
 def resolve_identifier(handle: str, account_id: str) -> str:
     """The numeric company id the posts endpoint requires.
 
@@ -175,33 +262,72 @@ def resolve_identifier(handle: str, account_id: str) -> str:
     than in unipile_transport because it is LinkedIn-specific -- the
     transport stays identifier-agnostic so the Instagram adapter can keep
     passing a username straight through."""
+    page = resolve_company_page(handle, account_id)
+    return str(page["id"])
+
+
+def resolve_company_page(handle: str, account_id: str) -> dict:
+    """The company page `handle` names, as a full profile rather than just an
+    id, so the caller can check WHICH page it got. A numeric handle skips the
+    lookup and carries only its id, which is also all a numeric handle can
+    ever be checked against."""
     slug = company_slug(handle)
     if _NUMERIC.match(slug):
-        return slug
+        return {"id": slug, "public_identifier": slug}
     company, err = unipile_client.get_company(slug, account_id)
     if err is not None:
         raise unipile_transport.UnipileTransportError(
             "Could not resolve LinkedIn company %r: %s" % (slug, unipile_client.describe_error(err)))
-    return str(company["id"])
+    return company
 
 
-def collect(handle: str, max_posts: int = 40, strict: bool = True) -> list[dict]:
-    """Only ever called by sci_pipeline after it has confirmed a LinkedIn
-    account is connected (see sci_pipeline._collect_linkedin)."""
+def collect_with_page(handle: str, max_posts: int = 40, strict: bool = True,
+                      company_name: str | None = None,
+                      company_url: str | None = None) -> tuple[list[dict], dict | None]:
+    """Posts, plus a note recording which LinkedIn page they came from and how
+    well that page was corroborated.
+
+    The note is the whole point of this variant. An empty post list means two
+    completely different things depending on it: "this company does not post
+    on LinkedIn", or "we read some other company's page". Nothing downstream
+    can tell those apart without being told which page was read."""
     account_id = unipile_transport.account_for_platform(PLATFORM)
     if not account_id:
         if strict:
             raise unipile_transport.UnipileTransportError(
                 "No working Unipile account is connected for LinkedIn.")
-        return []
+        return [], None
     try:
-        identifier = resolve_identifier(handle, account_id)
+        page = resolve_company_page(handle, account_id)
+    except CompanyMismatch:
+        raise
     except Exception as e:
         logger.warning("sci_source_linkedin_unipile: identifier resolution failed for %r: %s", handle, e)
         if strict:
             raise
-        return []
+        return [], None
+
+    verification = verify_company_page(page, company_name, company_url)
+    note = {"verification": verification, "page": describe_company_page(page),
+            "public_identifier": page.get("public_identifier"),
+            "page_name": page.get("name"), "website": page.get("website"),
+            "followers": page.get("followers_count")}
+    if verification == VERIFIED_MISMATCH:
+        raise CompanyMismatch(
+            "%s does not look like %s: the page reads %s. Nothing was collected from it, "
+            "because reading the wrong company's posts is worse than reading none."
+            % (company_slug(handle), company_name or "this company", note["page"]))
+
     raw_items = unipile_transport.fetch_posts(
-        identifier, PLATFORM, is_company=True, max_posts=max_posts, strict=strict,
+        str(page["id"]), PLATFORM, is_company=True, max_posts=max_posts, strict=strict,
         account_id=account_id)
-    return normalize(raw_items)
+    return normalize(raw_items), note
+
+
+def collect(handle: str, max_posts: int = 40, strict: bool = True,
+            company_name: str | None = None, company_url: str | None = None) -> list[dict]:
+    """Only ever called by sci_pipeline after it has confirmed a LinkedIn
+    account is connected (see sci_pipeline._collect_linkedin). Posts only;
+    use collect_with_page when the caller can act on which page was read."""
+    return collect_with_page(handle, max_posts=max_posts, strict=strict,
+                             company_name=company_name, company_url=company_url)[0]

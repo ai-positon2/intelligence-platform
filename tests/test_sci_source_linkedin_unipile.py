@@ -253,3 +253,132 @@ def test_collect_degrades_to_empty_when_not_strict(mock_account, mock_company):
     mock_account.return_value = None
     assert src.collect("position2", strict=False) == []
     assert mock_company.call_count == 0
+
+
+# ── Which page did we actually read? ─────────────────────────────────────
+# LinkedIn hands out one vanity slug per page and reuses names freely.
+# /company/notion is a 39-person IT consultancy with no posts and no website;
+# Notion Labs is /company/notionhq. Both are called "Notion", both resolve
+# cleanly, and the wrong one answers with an empty list that reads as "this
+# company does not post on LinkedIn". Both pages below are real.
+
+_IMPOSTOR = {"id": "120213", "public_identifier": "notion", "name": "Notion",
+             "followers_count": 882, "employee_count": 39}
+_REAL = {"id": "30898036", "public_identifier": "notionhq", "name": "Notion",
+         "website": "https://notion.com", "followers_count": 1107455}
+
+
+def test_a_matching_name_is_not_enough_to_confirm_a_page():
+    """The two pages share a name exactly, so a name check alone confirms the
+    impostor. Only the website separates them, which is why the domain is the
+    decisive signal here and the name is the weak one."""
+    assert src.verify_company_page(_REAL, "Notion", "https://notion.com") == src.VERIFIED_DOMAIN
+    assert src.verify_company_page(_IMPOSTOR, "Notion", "https://notion.com") == src.VERIFIED_NAME
+
+
+def test_a_site_confirms_across_subdomains_and_schemes():
+    """A company's own URL is whatever someone typed into the form: a blog
+    subdomain, http, a trailing www. None of those make it a different site."""
+    page = {"name": "HubSpot", "website": "https://hubspot.com"}
+    for url in ("https://blog.hubspot.com", "http://www.hubspot.com",
+                "hubspot.com", "https://hubspot.com/pricing"):
+        assert src.verify_company_page(page, "HubSpot", url) == src.VERIFIED_DOMAIN, url
+
+
+def test_a_www_url_still_matches_a_page_listing_a_different_subdomain():
+    """Two subdomains of one site are not suffixes of each other, so the www
+    has to come off before they are compared: a form filled in as
+    www.acme.com against a page listing shop.acme.com is the same company."""
+    page = {"name": "Acme Corp", "website": "https://shop.acme.com"}
+    assert src.verify_company_page(page, "Acme Corp", "https://www.acme.com") == src.VERIFIED_DOMAIN
+
+
+def test_two_different_companies_on_a_multi_part_suffix_are_not_the_same_site():
+    """Comparing the last two labels would read acme.co.uk and rival.co.uk as
+    one site, which is a false confirmation in exactly the case this check
+    exists to catch."""
+    page = {"name": "Rival Ltd", "website": "https://rival.co.uk"}
+    assert src.verify_company_page(page, "Acme Ltd", "https://acme.co.uk") == src.VERIFIED_MISMATCH
+
+
+def test_a_different_domain_alone_is_not_called_a_mismatch():
+    """A real company page listing a parent, group or campaign domain is
+    ordinary. Rejecting on the domain alone would fail live runs, so the name
+    has to disagree too before this refuses to collect."""
+    page = {"name": "Acme Corp", "website": "https://acme-group.com"}
+    assert src.verify_company_page(page, "Acme Corp", "https://acme.com") == src.VERIFIED_NAME
+
+
+def test_a_page_with_no_website_falls_back_to_the_name():
+    assert src.verify_company_page({"name": "Acme Corp"}, "Acme Corp", "https://acme.com") == src.VERIFIED_NAME
+    assert src.verify_company_page({"name": "Zeta Ltd"}, "Acme Corp", "https://acme.com") == src.VERIFIED_MISMATCH
+
+
+def test_nothing_to_check_against_is_reported_as_such_not_as_confirmed():
+    """A run with no company name cannot verify anything. Reporting that as
+    verified would silence the warning on exactly the runs least able to
+    afford it."""
+    assert src.verify_company_page(_REAL, None, None) == src.VERIFIED_NONE
+
+
+def test_the_page_description_names_what_a_person_needs_to_spot_a_wrong_one():
+    described = src.describe_company_page(_IMPOSTOR)
+    assert "linkedin.com/company/notion" in described
+    assert "882 followers" in described
+    assert "no website listed" in described
+
+
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.fetch_posts")
+@patch("tracker.sci_source_linkedin_unipile.unipile_client.get_company")
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.account_for_platform")
+def test_a_wrong_company_page_is_refused_before_a_single_post_is_read(
+        mock_account, mock_company, mock_fetch):
+    mock_account.return_value = "acct-1"
+    mock_company.return_value = ({"id": "999", "public_identifier": "stripe", "name": "Stripe",
+                                  "website": "https://stripe.com", "followers_count": 1671976}, None)
+    try:
+        src.collect_with_page("stripe", company_name="Acme Dental Group",
+                              company_url="https://acmedental.com")
+        assert False, "expected CompanyMismatch"
+    except src.CompanyMismatch as e:
+        assert "Acme Dental Group" in str(e)
+        assert "linkedin.com/company/stripe" in str(e)
+    assert mock_fetch.call_count == 0
+
+
+def test_a_company_mismatch_is_not_a_transport_error():
+    """sci_pipeline retries a transport error through the other vendor. A
+    wrong handle points at the same wrong page on any vendor, so this must
+    not be catchable as one."""
+    assert not issubclass(src.CompanyMismatch, unipile_transport.UnipileTransportError)
+
+
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.fetch_posts")
+@patch("tracker.sci_source_linkedin_unipile.unipile_client.get_company")
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.account_for_platform")
+def test_an_unconfirmed_page_still_collects_and_says_which_page_it_was(
+        mock_account, mock_company, mock_fetch):
+    """Unconfirmed is not rejected: most real runs land here. The note is what
+    lets the caller describe an empty result honestly."""
+    mock_account.return_value = "acct-1"
+    mock_company.return_value = (_IMPOSTOR, None)
+    mock_fetch.return_value = []
+    posts, note = src.collect_with_page("notion", company_name="Notion",
+                                        company_url="https://notion.com")
+    assert posts == []
+    assert note["verification"] == src.VERIFIED_NAME
+    assert "linkedin.com/company/notion" in note["page"]
+
+
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.fetch_posts")
+@patch("tracker.sci_source_linkedin_unipile.unipile_client.get_company")
+@patch("tracker.sci_source_linkedin_unipile.unipile_transport.account_for_platform")
+def test_posts_are_always_fetched_from_the_page_that_was_verified(
+        mock_account, mock_company, mock_fetch):
+    """Verifying one page and then fetching another would make the check
+    decorative."""
+    mock_account.return_value = "acct-1"
+    mock_company.return_value = (_REAL, None)
+    mock_fetch.return_value = []
+    src.collect_with_page("notionhq", company_name="Notion", company_url="https://notion.com")
+    assert mock_fetch.call_args.args[0] == "30898036"
