@@ -59,29 +59,40 @@
     <div>
       <div class="page-hdr-title">Contact Finder</div>
     </div>
-    {# Was "People search is free". It no longer is, quite: finding the people
-       still costs nothing, but describing employers the 30-day cache has not seen
-       before spends one credit for the whole page. Better to say so here than to
-       have someone discover it from the balance.
-       The chat is on this list now too. An industry or a size is a constraint on
-       the EMPLOYER, and it cannot be honored without the employer's own record, so
-       a question like "CMOs at healthcare companies over 200 people" settles the
-       companies first with one paid search. A question about a named company, or
-       about people alone, still costs nothing. #}
-    <div class="page-hdr-credits"><span class="d"></span>Finding people is free &middot; describing their companies is optional and costs 1 credit per page, cached 30 days &middot; Company search, Enrich, and a chat question filtered by industry, size or HQ each spend 1 credit</div>
-    {# What this tool has spent from the shared pool. Not a balance: no endpoint
-       this app can reach reports the account total, and the same key also funds
-       the de-anon engine and External Usage, so a number called "remaining"
-       would be a guess. Hidden entirely when Postgres is absent. #}
-    <div class="page-hdr-spend" id="cpiSpend" style="display:none"></div>
-    <button class="page-hdr-hist-btn" id="cpiListBtn" onclick="cpiOpenList()">
-      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-      List <span class="cpi-list-n" id="cpiListN" style="display:none">0</span>
-    </button>
-    <button class="page-hdr-hist-btn" onclick="cpiOpenHistory()">
-      <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
-      History
-    </button>
+    {# The notice and the actions share one row of their own rather than
+       wrapping out of the title row item by item. They used to be siblings of
+       the title in a wrapping flex row, each carrying its own margin-left:auto,
+       which fits only while everything happens to fit: at 1512px the notice
+       took the row, List followed it, and History dropped alone onto a third
+       line hard against the left margin. Grouping them makes the arrangement
+       the same at every width instead of a coincidence at some of them. #}
+    <div class="page-hdr-meta">
+      {# Was "People search is free". It no longer is, quite: finding the people
+         still costs nothing, but describing employers the 30-day cache has not seen
+         before spends one credit for the whole page. Better to say so here than to
+         have someone discover it from the balance.
+         The chat is on this list now too. An industry or a size is a constraint on
+         the EMPLOYER, and it cannot be honored without the employer's own record, so
+         a question like "CMOs at healthcare companies over 200 people" settles the
+         companies first with one paid search. A question about a named company, or
+         about people alone, still costs nothing. #}
+      <div class="page-hdr-credits"><span class="d"></span>Finding people is free &middot; describing their companies is optional and costs 1 credit per page, cached 30 days &middot; Company search, Enrich, and a chat question filtered by industry, size or HQ each spend 1 credit</div>
+      <div class="page-hdr-actions">
+        {# What this tool has spent from the shared pool. Not a balance: no endpoint
+           this app can reach reports the account total, and the same key also funds
+           the de-anon engine and External Usage, so a number called "remaining"
+           would be a guess. Hidden entirely when Postgres is absent. #}
+        <div class="page-hdr-spend" id="cpiSpend" style="display:none"></div>
+        <button class="page-hdr-hist-btn" id="cpiListBtn" onclick="cpiOpenList()">
+          <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          List <span class="cpi-list-n" id="cpiListN" style="display:none">0</span>
+        </button>
+        <button class="page-hdr-hist-btn" onclick="cpiOpenHistory()">
+          <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+          History
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="cpi-layout">
@@ -554,8 +565,18 @@
     <div class="cpi-chat">
       <div class="cpi-chat-hdr">
         <div class="cpi-chat-hdr-ic"><img src="/static/logo-mark.svg?v=1" alt="Arena"></div>
-        <div><b>Contact Finder</b></div>
+        <div class="cpi-chat-hdr-name"><b>Contact Finder</b></div>
         <span class="cpi-chat-live"><i></i>Live</span>
+        {# The table wants room and the assistant is what it competes with, so
+           the control that gives it that room lives here, on the panel being
+           moved, rather than being an invisible side effect of choosing a
+           view. Collapsed it stays a visible rail: a panel that vanishes with
+           no way back is how the stacked layout became permanent. #}
+        <button type="button" class="cpi-chat-tuck" id="cpiChatTuck" onclick="cpiToggleChat()"
+                aria-expanded="true" aria-label="Hide the assistant" title="Hide the assistant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
       </div>
       <div class="cpi-chat-body" id="cpiChatBody">
         <div class="cpi-msg assistant">

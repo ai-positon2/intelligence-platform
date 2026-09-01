@@ -64,7 +64,12 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   border:1px solid rgba(124,131,245,0.3);display:flex;align-items:center;justify-content:center;font-size:19px}
 .page-hdr-title{font-size:25px;font-weight:700;color:var(--tx);letter-spacing:var(--ls-tight)}
 .page-hdr-sub{font-size:13px;color:var(--tx2);margin-top:3px}
-.page-hdr-credits{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:11.5px;color:var(--tx3);
+/* One row for the notice and the actions, so the arrangement is the same at
+   every width rather than whatever the wrap happens to produce. The notice
+   gives up its width first; the actions never split. */
+.page-hdr-meta{flex-basis:100%;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.page-hdr-actions{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none}
+.page-hdr-credits{display:flex;align-items:center;gap:7px;flex:1 1 460px;min-width:0;font-size:11.5px;color:var(--tx3);
   background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:var(--radius-pill);padding:7px 13px}
 .page-hdr-credits .d{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
 /* Lives in the page header, not the results toolbar, so it stays reachable even
@@ -98,7 +103,13 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
    takes, but at 1512 it widens this gap to 32px, which costs the filter column
    10px and reflows the seniority chips from 9 + 2 to 8 + 3. Not worth a visible
    change to this page. Revisit if the filter panel is ever reworked. */
-.cpi-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(340px,.85fr);gap:22px;align-items:start}
+/* The assistant is a rail, not a proportional half: past about 440px its
+   bubbles get a line length nobody reads, and every pixel beyond that is
+   worth more to the results table beside it. So it grows with the page
+   only until it is comfortable, and a wider window then feeds the results
+   column alone. */
+.cpi-layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(340px,26vw,440px);
+  gap:22px;align-items:start}
 @media (max-width:1080px){.cpi-layout{grid-template-columns:1fr}}
 
 /* ── Entity toggle (People / Companies) ── */
@@ -268,8 +279,11 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
   transition:.16s;white-space:nowrap}
 .cpi-enrich-btn:hover{border-color:rgba(124,131,245,.7);transform:translateY(-1px)}
 
-.cpi-empty,.cpi-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  padding:60px 20px;color:var(--tx2);font-size:13px;text-align:center;
+/* min-height, not more padding: this panel stands beside a chat rail that is
+   nearly the height of the window, and a 130px box against it reads as a gap
+   in the page rather than as the results area waiting for a search. */
+.cpi-empty,.cpi-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  min-height:min(340px,46vh);padding:48px 24px;color:var(--tx2);font-size:13px;text-align:center;
   background:rgba(255,255,255,.02);border:1px dashed var(--b1);border-radius:var(--radius-lg)}
 .cpi-empty svg,.cpi-loading svg{width:36px;height:36px;stroke:var(--tx3);opacity:.7}
 .cpi-loading .sp{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.15);
@@ -813,7 +827,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none}
 
 /* What this tool has spent. Sits in the header beside History and stays quiet:
    it is a standing fact, not an alert, so it must not compete with the title. */
-.page-hdr-spend{margin-left:auto;font-size:11.5px;color:var(--tx3);white-space:nowrap;
+.page-hdr-spend{font-size:11.5px;color:var(--tx3);white-space:nowrap;
   padding:5px 11px;border:1px solid var(--b1);border-radius:var(--radius-pill);
   background:rgba(255,255,255,.03)}
 .page-hdr-spend b{color:var(--tx2);font-weight:700}
@@ -1034,14 +1048,37 @@ a.cpi-td-co:hover{color:#c2c6fb}
    is one mechanism rather than two, and it never silently drops a field the
    reader might be looking for. */
 
-/* Table view gives the results the full width and moves the chat beneath them.
-   A table competing with a 390px chat panel gets ~700px for eight columns, which
-   is how every cell ends up an ellipsis. Cards are the reading layout and belong
-   beside the assistant; the table is the comparing layout and wants the room.
-   One click back to Cards restores the side-by-side, so nothing is lost. */
-.cpi-layout.wide{grid-template-columns:minmax(0,1fr)}
-/* Full-bleed the chat would stretch its bubbles to an unreadable line length. */
-.cpi-layout.wide .cpi-chat{max-width:760px}
+/* ── Tucking the assistant away ──────────────────────────────────────────
+   A table wants room, which is a real need and the reason the layout used to
+   stack in table view. It is now asked for rather than assumed: the rail
+   collapses to a 54px strip that still shows the Arena mark and the chevron
+   that brings it back, so the results get the width without the assistant
+   ever disappearing. Only above the stacking breakpoint, since below it the
+   two are already one column and there is nothing to reclaim. */
+@media (min-width:1081px){
+  .cpi-layout.chat-tucked{grid-template-columns:minmax(0,1fr) 54px}
+  .cpi-layout.chat-tucked .cpi-chat{height:auto;min-height:0}
+  .cpi-layout.chat-tucked .cpi-chat-hdr{flex-direction:column;gap:14px;padding:13px 0;border-bottom:0}
+  .cpi-layout.chat-tucked .cpi-chat-hdr-name,
+  .cpi-layout.chat-tucked .cpi-chat-live,
+  .cpi-layout.chat-tucked .cpi-chat-body,
+  .cpi-layout.chat-tucked .cpi-chat-input-row{display:none}
+  .cpi-layout.chat-tucked .cpi-chat-tuck{margin:0;transform:rotate(180deg)}
+}
+
+/* The control itself. Sized to the 44px touch target the rest of the platform
+   uses, with the icon inside it smaller than the hit area. */
+.cpi-chat-tuck{margin-left:auto;flex:none;display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;padding:0;border:1px solid var(--b1);border-radius:9px;cursor:pointer;
+  background:rgba(255,255,255,.04);color:var(--tx3);transition:background .16s,color .16s,border-color .16s}
+.cpi-chat-tuck svg{width:15px;height:15px}
+.cpi-chat-tuck:hover{background:rgba(255,255,255,.09);color:var(--tx);border-color:rgba(255,255,255,.2)}
+.cpi-chat-tuck:focus-visible{outline:2px solid #7c83f5;outline-offset:2px}
+/* .cpi-chat-live sits between the title and this button and used to be pushed
+   right by nothing at all; with a button after it the auto margin has to move
+   onto the button or the pill drifts into the middle. */
+.cpi-chat-hdr .cpi-chat-live{margin-left:auto}
+.cpi-chat-tuck{margin-left:10px}
 
 /* The full trail does not fit a 62px bar on a phone: it wrapped and pushed the
    account pill past the right edge (81px of overflow at 390px). The ancestors are
