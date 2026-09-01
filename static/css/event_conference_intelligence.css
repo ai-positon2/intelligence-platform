@@ -177,15 +177,17 @@ body {
 }
 
 /* ── hero ───────────────────────────────────────────────────────────── */
-.evi-hero {
-  display: grid; grid-template-columns: minmax(0, 1fr) 380px;
-  gap: calc(var(--gutter) * 1.5); align-items: start;
-  margin-bottom: calc(var(--gutter) + 8px);
-}
-@media (max-width: 1100px) { .evi-hero { grid-template-columns: 1fr; gap: var(--gutter); } }
-
-.ph { margin-bottom: 0; }
-.ph .eyebrow {
+/* One column since the scoring card came out of it. The headline gets the
+   room that frees up, and the deck is two lines so the four plays underneath
+   are the first thing the eye lands on rather than the fifth. */
+/* Capped on the h1 rather than the whole hero, so the headline breaks over two
+   lines and the deck under it keeps a readable measure without either one
+   dictating the other's width. `balance` evens the two lines where supported
+   and is ignored where it is not. */
+.evi-hero { margin-bottom: calc(var(--gutter) + 12px); }
+.evi-hero h1 { margin-bottom: 18px; max-width: 15ch; text-wrap: balance; }
+.evi-hero p { max-width: 52ch; }
+.evi-hero .eyebrow {
   display: inline-flex; align-items: center; gap: 9px; font-size: 10.5px;
   letter-spacing: .12em; text-transform: uppercase; color: var(--evi-ink-2);
   font-weight: 600; margin-bottom: 16px; padding: 6px 14px 6px 11px;
@@ -193,78 +195,28 @@ body {
   background: linear-gradient(95deg, rgba(56,189,248,.10), rgba(139,92,246,.08));
   border: 1px solid rgba(99,102,241,.24);
 }
-.ph .eyebrow .dot {
+.evi-hero .eyebrow .dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--evi-a1); box-shadow: 0 0 10px var(--evi-a1);
 }
-.ph h1 {
-  font-family: 'Bricolage Grotesque', serif; font-size: clamp(28px, 4vw, 42px);
+.evi-hero h1 {
+  font-family: 'Bricolage Grotesque', serif; font-size: clamp(30px, 3.5vw, 44px);
   font-weight: 700; letter-spacing: -.02em; line-height: 1.08; margin-bottom: 12px;
 }
-.ph h1 em {
+.evi-hero h1 em {
   font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;
   background: linear-gradient(100deg, var(--evi-g1), var(--evi-g2) 55%, var(--evi-g3));
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.ph h1 { margin-bottom: 16px; }
-.ph p { color: var(--evi-ink-2); font-size: 15px; line-height: 1.7; max-width: 62ch; }
+.evi-hero p { color: var(--evi-ink-2); font-size: 15.5px; line-height: 1.7; }
 
-/* ── the scoring model card ─────────────────────────────────────────── */
-.evi-rubric {
-  position: relative; overflow: hidden; padding: 20px 22px 18px;
-  border-radius: var(--radius-lg, 16px); border: 1px solid var(--evi-line);
-  background:
-    radial-gradient(ellipse 120% 90% at 100% 0%, rgba(139,92,246,.10), transparent 62%),
-    var(--evi-panel);
-  box-shadow: 0 20px 60px rgba(0,0,0,.32);
-}
-/* The accent hairline the other agent pages carry along the top edge of a
-   panel. One rule, not a pseudo-element per card. */
-.evi-rubric::before, .evi-card-main::before, .evi-play[aria-selected="true"]::before {
+/* The accent hairline along a panel's top edge, the treatment the other agent
+   pages use to mark their primary surface. */
+.evi-card-main::before {
   content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
   background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2) 52%, var(--evi-a3));
   opacity: .85;
 }
-.rb-head { display: flex; align-items: baseline; justify-content: space-between;
-  gap: 12px; margin-bottom: 16px; }
-.rb-eye { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
-  font-weight: 700; color: var(--evi-ink-3); }
-.rb-total { font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px;
-  font-weight: 700; letter-spacing: -.02em; line-height: 1;
-  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g3));
-  -webkit-background-clip: text; background-clip: text; color: transparent; }
-.rb-total i { font-style: normal; font-size: 10.5px; font-weight: 600;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--evi-ink-3);
-  -webkit-text-fill-color: var(--evi-ink-3); margin-left: 5px; }
-
-.rb-rows { display: flex; flex-direction: column; gap: 11px; }
-.rb-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
-  align-items: baseline; }
-.rb-l { font-size: 12.5px; color: var(--evi-ink-2); }
-.rb-w { font-size: 12.5px; font-weight: 700; color: var(--evi-ink);
-  font-variant-numeric: tabular-nums; }
-.rb-t { grid-column: 1 / -1; height: 5px; border-radius: 3px; margin-top: 3px;
-  background: rgba(255,255,255,.06); overflow: hidden; }
-:root[data-theme="light"] .rb-t { background: rgba(20,30,60,.09); }
-.rb-t span { display: block; height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2)); }
-.rb-row.bonus .rb-l, .rb-row.bonus .rb-w { color: var(--evi-ok); }
-.rb-row.bonus .rb-t span {
-  background: linear-gradient(90deg, rgba(74,222,128,.85), rgba(74,222,128,.45));
-}
-
-.rb-note { font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
-  margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--evi-line-2); }
-.rb-floor { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
-.rb-tier {
-  display: inline-flex; align-items: baseline; gap: 6px; font-size: 10.5px;
-  color: var(--evi-ink-3); padding: 5px 10px; border-radius: var(--radius-pill, 80px);
-  border: 1px solid var(--evi-line); background: var(--evi-panel-2);
-}
-.rb-tier b { font-size: 11px; font-weight: 700; letter-spacing: .04em; }
-.rb-tier.t1 b { color: var(--evi-a1); }
-.rb-tier.t2 b { color: var(--evi-a3); }
-.rb-tier.t3 b { color: var(--evi-ink-3); }
 
 /* ── page layout: form beside a sticky rail ─────────────────────────── */
 .evi-layout {
@@ -285,48 +237,144 @@ body {
   width: 5px; height: 5px; border-radius: 50%; background: var(--evi-a2); opacity: .7; }
 .evi-cost li b { color: var(--evi-ink-2); font-weight: 600; }
 
-/* ── the four plays ─────────────────────────────────────────────────── */
+/* ── the four plays ─────────────────────────────────────────────────────
+   These carry the page. The mode chosen here decides what every field below
+   means, so they are given more weight than anything else on screen: their own
+   hue each, a filled icon, the step number, and the action they will run
+   spelled out along the bottom edge.
+
+   Each card owns --p1/--p2 and every accent inside it is drawn from those two,
+   so a card is recoloured in one place rather than in eight rules. The hues run
+   the page's own sky-to-violet ramp, plus a teal so the fourth is not a repeat. */
 .evi-plays {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--gutter); margin-bottom: var(--gutter);
+  gap: var(--gutter); margin-bottom: calc(var(--gutter) + 8px);
 }
 @media (max-width: 1100px) { .evi-plays { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .evi-plays { grid-template-columns: 1fr; } }
+
 .evi-play {
-  position: relative; overflow: hidden; appearance: none; cursor: pointer;
-  font: inherit; text-align: left; display: flex; flex-direction: column;
-  gap: 9px; padding: 17px 17px 16px;
-  border-radius: var(--radius-lg, 16px); border: 1px solid var(--evi-line);
-  background: var(--evi-panel);
-  transition: border-color .2s, background .2s, transform .2s, box-shadow .2s;
-}
-.evi-play:hover { transform: translateY(-2px); border-color: rgba(99,102,241,.34);
-  box-shadow: 0 16px 40px rgba(0,0,0,.3); }
-.evi-play .pi {
-  width: 34px; height: 34px; border-radius: var(--radius-md, 12px);
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--evi-ink-3); background: var(--evi-panel-2);
-  border: 1px solid var(--evi-line-2); transition: .2s;
-}
-.evi-play .pi svg { width: 18px; height: 18px; }
-.evi-play .pn { font-size: 14px; font-weight: 600; color: var(--evi-ink-2);
-  letter-spacing: -.01em; transition: color .2s; }
-.evi-play .pd { font-size: 11.8px; line-height: 1.55; color: var(--evi-ink-3); }
-.evi-play[aria-selected="true"] {
-  border-color: rgba(99,102,241,.46);
+  --p1: var(--evi-a1); --p2: var(--evi-a2);
+  position: relative; isolation: isolate; overflow: hidden;
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  padding: 22px 20px 0;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid var(--evi-line);
   background:
-    radial-gradient(ellipse 120% 130% at 0% 0%, rgba(56,189,248,.13), transparent 60%),
-    linear-gradient(150deg, rgba(99,102,241,.13), rgba(139,92,246,.07));
-  box-shadow: 0 14px 44px rgba(56,110,246,.18);
+    radial-gradient(ellipse 130% 90% at 0% 0%,
+      color-mix(in srgb, var(--p1) 9%, transparent), transparent 62%),
+    var(--evi-panel);
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  transition: border-color .22s var(--ease, ease), transform .22s var(--ease, ease),
+              box-shadow .22s var(--ease, ease), background .22s;
 }
-.evi-play[aria-selected="true"] .pn { color: var(--evi-ink); }
-.evi-play[aria-selected="true"] .pi {
-  color: #fff; border-color: transparent;
-  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a2) 60%, var(--evi-a3));
-  box-shadow: 0 6px 18px rgba(99,102,241,.4);
+.evi-play.p-recommend { --p1: #38bdf8; --p2: #6366f1; }
+.evi-play.p-lookup    { --p1: #22d3ee; --p2: #38bdf8; }
+.evi-play.p-discover  { --p1: #818cf8; --p2: #a78bfa; }
+.evi-play.p-workroom  { --p1: #2dd4aa; --p2: #22d3ee; }
+
+/* The hairline reads as a lit edge rather than a border: dim at rest, full
+   when the play is the one selected. */
+.evi-play::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; z-index: 2;
+  background: linear-gradient(90deg, var(--p1), var(--p2));
+  opacity: .34; transition: opacity .22s;
 }
-:root[data-theme="light"] .evi-play[aria-selected="true"] .pi { color: #fff; }
-.evi-play:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+/* A wash of the card's own hue that lifts on hover and stays up when selected,
+   so the colour is part of the surface rather than a border trick. */
+.evi-play::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--p1) 15%, transparent),
+    color-mix(in srgb, var(--p2) 7%, transparent) 58%, transparent 88%);
+  opacity: 0; transition: opacity .22s;
+}
+.evi-play:hover {
+  transform: translateY(-3px); border-color: color-mix(in srgb, var(--p1) 40%, var(--evi-line));
+  box-shadow: 0 20px 46px rgba(0,0,0,.34),
+              0 0 0 1px color-mix(in srgb, var(--p1) 16%, transparent);
+}
+.evi-play:hover::after { opacity: .55; }
+.evi-play:hover::before { opacity: .7; }
+.evi-play:focus-visible { outline: 2px solid var(--p1); outline-offset: 3px; }
+
+/* The step number. Large, set behind everything, and low enough in contrast
+   that it reads as texture until you look for it. */
+.evi-play .pnum {
+  position: absolute; top: 12px; right: 16px; z-index: 0;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.04em;
+  color: var(--evi-ink); opacity: .07; font-variant-numeric: tabular-nums;
+  transition: opacity .22s, color .22s;
+}
+.evi-play .pi {
+  position: relative; z-index: 1;
+  width: 42px; height: 42px; border-radius: var(--radius-md, 12px);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #06121f; margin-bottom: 15px;
+  background: linear-gradient(140deg, var(--p1), var(--p2));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--p1) 34%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.34);
+  transition: transform .22s var(--ease, ease), box-shadow .22s;
+}
+.evi-play .pi svg { width: 21px; height: 21px; }
+.evi-play:hover .pi { transform: scale(1.06) rotate(-3deg); }
+:root[data-theme="light"] .evi-play .pi { color: #fff; }
+
+.evi-play .pn {
+  position: relative; z-index: 1;
+  font-size: 16.5px; font-weight: 700; color: var(--evi-ink);
+  letter-spacing: -.015em; line-height: 1.25; margin-bottom: 7px;
+}
+.evi-play .pd {
+  position: relative; z-index: 1;
+  font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3);
+  margin-bottom: 18px;
+}
+
+/* The action the card will run, on the bottom edge. It is the same string the
+   run button shows, read from this element's own data-action, so a play cannot
+   promise one thing on the card and another on the button. */
+.evi-play .pgo {
+  position: relative; z-index: 1; margin-top: auto;
+  align-self: stretch; display: flex; align-items: center; gap: 7px;
+  padding: 13px 0; border-top: 1px solid var(--evi-line-2);
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--evi-ink-3); transition: color .22s;
+}
+.evi-play .pgo i {
+  font-style: normal; font-size: 13px;
+  transform: translateX(-3px); opacity: 0; transition: transform .22s, opacity .22s;
+}
+.evi-play:hover .pgo { color: var(--p1); }
+.evi-play:hover .pgo i { transform: translateX(0); opacity: 1; }
+
+/* Selected. The one card that is currently steering the form, so it is lit
+   rather than merely outlined. */
+.evi-play[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--p1) 55%, transparent);
+  box-shadow: 0 22px 50px rgba(0,0,0,.36),
+              0 0 0 1px color-mix(in srgb, var(--p1) 28%, transparent),
+              0 0 34px -6px color-mix(in srgb, var(--p1) 34%, transparent);
+}
+.evi-play[aria-selected="true"]::before { opacity: 1; }
+.evi-play[aria-selected="true"]::after { opacity: 1; }
+.evi-play[aria-selected="true"] .pnum { opacity: .16; color: var(--p1); }
+.evi-play[aria-selected="true"] .pd { color: var(--evi-ink-2); }
+.evi-play[aria-selected="true"] .pgo {
+  color: var(--p1); border-top-color: color-mix(in srgb, var(--p1) 24%, transparent);
+}
+.evi-play[aria-selected="true"] .pgo i { transform: translateX(0); opacity: 1; }
+.evi-play[aria-selected="true"] .pi { box-shadow:
+  0 8px 24px color-mix(in srgb, var(--p1) 46%, transparent),
+  inset 0 1px 0 rgba(255,255,255,.4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .evi-play, .evi-play .pi, .evi-play .pgo i { transition: none; }
+  .evi-play:hover { transform: none; }
+  .evi-play:hover .pi { transform: none; }
+}
 
 /* ── field groups ───────────────────────────────────────────────────── */
 /* Each mode's field container is a grid so the gap between a group heading and
@@ -1025,8 +1073,11 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 .evi-window.bad .wt { color: var(--evi-bad); }
 .evi-window.idle { border-left-color: var(--evi-line); }
 
-/* The declared event class and the play that follows from it. */
-.evi-play {
+/* The declared event class and the play that follows from it, inside the
+   workroom report. Named .evi-classplay, not .evi-play: that shorter name
+   belongs to the four mode cards in the hero, and while both were called
+   .evi-play every rule written for one silently applied to the other. */
+.evi-classplay {
   padding: 16px 18px; margin-bottom: 18px;
   border-radius: var(--radius-md, 12px);
   border: 1px solid rgba(99,102,241,.22);
@@ -1034,19 +1085,19 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
     radial-gradient(ellipse 60% 140% at 4% 0%, rgba(56,189,248,.1), transparent 60%),
     var(--evi-panel-2);
 }
-.evi-play .pl {
+.evi-classplay .pl {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   font-size: 15px; font-weight: 700; letter-spacing: -.015em; color: var(--evi-ink);
 }
-.evi-play .ps {
+.evi-classplay .ps {
   font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   padding: 3px 9px; border-radius: var(--radius-pill, 999px);
   background: rgba(56,189,248,.16); color: var(--evi-a1);
   border: 1px solid rgba(56,189,248,.28);
 }
-.evi-play .pw { font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 7px; }
-.evi-play .pp { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
-.evi-play .pp b { color: var(--evi-ink); }
+.evi-classplay .pw { font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 7px; }
+.evi-classplay .pp { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
+.evi-classplay .pp b { color: var(--evi-ink); }
 
 .evi-coverage.warn {
   background: linear-gradient(95deg, rgba(251,191,36,.1), rgba(251,113,133,.06));

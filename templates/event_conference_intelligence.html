@@ -49,56 +49,12 @@
 
   <div class="main">
     <div class="evi-hero">
-      <div class="ph">
-        <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
-        <h1>Know who is <em>in the room</em> before you book the booth.</h1>
-        <p>
-          Four plays over one event calendar: score it against a client&rsquo;s ICP,
-          pull the roster an event actually publishes, rank events by how many of
-          your own target accounts turn up, and work a roster you already have
-          into openers. Every list is cut rather than padded, and every row says
-          where it came from.
-        </p>
-      </div>
-
-      <!-- The scoring model, drawn from the rubric the scorer really uses. It
-           sits in the hero because it is this agent's whole argument: a number
-           out of 110 with a hard floor under it, and a bonus that two gates
-           have to agree on. Weights and thresholds are server-rendered, never
-           typed here, so this picture cannot drift from the scoring. -->
-      <aside class="evi-rubric" aria-label="How events are scored">
-        <div class="rb-head">
-          <span class="rb-eye">The scoring model</span>
-          <span class="rb-total">{{ rubric.total }}<i>max</i></span>
-        </div>
-        <div class="rb-rows">
-          {% for d in rubric.dimensions %}
-          <div class="rb-row">
-            <span class="rb-l">{{ d.label }}</span>
-            <span class="rb-w">{{ d.max }}</span>
-            <div class="rb-t" aria-hidden="true">
-              <span style="width:{{ (d.max * 100 / rubric.total)|round(1) }}%"></span>
-            </div>
-          </div>
-          {% endfor %}
-          <div class="rb-row bonus">
-            <span class="rb-l">Organizer-run matchmaking</span>
-            <span class="rb-w">+{{ rubric.bonus }}</span>
-            <div class="rb-t" aria-hidden="true">
-              <span style="width:{{ (rubric.bonus * 100 / rubric.total)|round(1) }}%"></span>
-            </div>
-          </div>
-        </div>
-        <p class="rb-note">
-          The bonus needs the organizer&rsquo;s own programme. A self-serve
-          booking app such as Whova or Brella does not earn it.
-        </p>
-        <div class="rb-floor">
-          <span class="rb-tier t1"><b>P1</b>{{ rubric.p1 }} and up</span>
-          <span class="rb-tier t2"><b>P2</b>{{ rubric.floor }} to {{ rubric.p1 - 1 }}</span>
-          <span class="rb-tier t3"><b>Cut</b>under {{ rubric.floor }}</span>
-        </div>
-      </aside>
+      <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
+      <h1>Know who is <em>in the room</em> before you book the booth.</h1>
+      <p>
+        Four plays over one event calendar. Every list is cut rather than
+        padded, and every row says where it came from.
+      </p>
     </div>
 
     <!-- The four plays. These were a row of text pills, which made the
@@ -107,59 +63,55 @@
              does, so the mode is chosen on what it produces rather than on a
              two-word label. Ids, roles and aria-selected are unchanged: the
              script still drives these as tabs. -->
-        <div class="evi-plays" role="tablist" aria-label="Mode">
-          <button class="evi-play" role="tab" id="modeRecommend" aria-selected="true"
-                  onclick="setMode('recommend')">
-            <span class="pi" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
-                <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/>
-              </svg>
-            </span>
-            <span class="pn">Which events to attend</span>
-            <span class="pd">Score a whole calendar against one client&rsquo;s ICP
-              and cut everything under the bar.</span>
-          </button>
-          <button class="evi-play" role="tab" id="modeLookup" aria-selected="false"
-                  onclick="setMode('lookup')">
-            <span class="pi" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 5.5h10M4 12h10M4 18.5h7"/>
-                <circle cx="18.5" cy="17" r="3"/><path d="M20.8 19.4L23 21.5"/>
-              </svg>
-            </span>
-            <span class="pn">Who is on the roster</span>
-            <span class="pd">Name an event and get the exhibitors, sponsors,
-              speakers and partners it publishes.</span>
-          </button>
-          <button class="evi-play" role="tab" id="modeDiscover" aria-selected="false"
-                  onclick="setMode('discover')">
-            <span class="pi" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="7.5"/><path d="M3.5 11h15M11 3.5c4 4.6 4 10.4 0 15
-                  c-4-4.6-4-10.4 0-15z"/><path d="M16.5 16.5L21 21"/>
-              </svg>
-            </span>
-            <span class="pn">Find events for an audience</span>
-            <span class="pd">Rank events by how many of your target accounts turn
-              up, not by how many people do.</span>
-          </button>
-          <button class="evi-play" role="tab" id="modeWorkroom" aria-selected="false"
-                  onclick="setMode('workroom')">
-            <span class="pi" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3.5 6.5a2 2 0 012-2h13a2 2 0 012 2v8a2 2 0 01-2 2H9l-4.5 3.5v-3.5
-                  a1 1 0 00-1-1z"/><path d="M8 9h8M8 12.5h5"/>
-              </svg>
-            </span>
-            <span class="pn">Work the room</span>
-            <span class="pd">Turn a roster you already have into one opener per
-              company, inside the 48 hour window.</span>
-          </button>
+    <div class="evi-plays" role="tablist" aria-label="Mode">
+      <button class="evi-play p-recommend" role="tab" id="modeRecommend"
+              aria-selected="true" data-play="recommend" data-action="Score the calendar"
+              onclick="setMode('recommend')">
+        <span class="pnum" aria-hidden="true">01</span>
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/></svg>
+        </span>
+        <span class="pn">Which events to attend</span>
+        <span class="pd">Score a whole calendar against one client&rsquo;s ICP and cut everything under the bar.</span>
+        <span class="pgo" aria-hidden="true">Score the calendar<i>&rarr;</i></span>
+      </button>
+      <button class="evi-play p-lookup" role="tab" id="modeLookup"
+              aria-selected="false" data-play="lookup" data-action="Build the roster"
+              onclick="setMode('lookup')">
+        <span class="pnum" aria-hidden="true">02</span>
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h10M4 12h10M4 18.5h7"/><circle cx="18.5" cy="17" r="3"/><path d="M20.8 19.4L23 21.5"/></svg>
+        </span>
+        <span class="pn">Who is on the roster</span>
+        <span class="pd">Name an event and get the exhibitors, sponsors, speakers and partners it publishes.</span>
+        <span class="pgo" aria-hidden="true">Build the roster<i>&rarr;</i></span>
+      </button>
+      <button class="evi-play p-discover" role="tab" id="modeDiscover"
+              aria-selected="false" data-play="discover" data-action="Find the events"
+              onclick="setMode('discover')">
+        <span class="pnum" aria-hidden="true">03</span>
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="M3.5 11h15M11 3.5c4 4.6 4 10.4 0 15c-4-4.6-4-10.4 0-15z"/><path d="M16.5 16.5L21 21"/></svg>
+        </span>
+        <span class="pn">Find events for an audience</span>
+        <span class="pd">Rank events by how many of your target accounts turn up, not by how many people do.</span>
+        <span class="pgo" aria-hidden="true">Find the events<i>&rarr;</i></span>
+      </button>
+      <button class="evi-play p-workroom" role="tab" id="modeWorkroom"
+              aria-selected="false" data-play="workroom" data-action="Work the room"
+              onclick="setMode('workroom')">
+        <span class="pnum" aria-hidden="true">04</span>
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5a2 2 0 012-2h13a2 2 0 012 2v8a2 2 0 01-2 2H9l-4.5 3.5v-3.5a1 1 0 00-1-1z"/><path d="M8 9h8M8 12.5h5"/></svg>
+        </span>
+        <span class="pn">Work the room</span>
+        <span class="pd">Turn a roster you already have into one opener per company, inside the 48 hour window.</span>
+        <span class="pgo" aria-hidden="true">Work the room<i>&rarr;</i></span>
+      </button>
     </div>
 
     <div class="evi-layout">
@@ -582,9 +534,16 @@
         document.getElementById(TABS[k]).setAttribute('aria-selected', k === m);
         document.getElementById(FIELDS[k]).style.display = k === m ? '' : 'none';
       });
-      document.getElementById('runBtn').textContent =
-        m === 'recommend' ? 'Score the calendar \u2192'
-        : m === 'workroom' ? 'Work the room \u2192' : 'Run \u2192';
+      // The label on the button that runs a play and the label on the card
+      // that selects it are the same fact, so it is stored once, on the card
+      // itself. A second table here drifts the moment a play is reworded, and
+      // two of the four modes were already showing a generic "Run" because of
+      // it. The fallback never fires in the page; it exists so a missing
+      // attribute shows a usable word rather than "null", and the test for
+      // this asserts the real label, so it cannot hide the failure.
+      var card = document.getElementById(TABS[m]);
+      var action = card && card.getAttribute('data-action');
+      document.getElementById('runBtn').textContent = (action || 'Run') + ' \u2192';
     }
     window.setMode = setMode;
 
@@ -1456,7 +1415,7 @@
 
       html += windowHtml(s.window);
 
-      html += '<div class="evi-play">' +
+      html += '<div class="evi-classplay">' +
         '<div class="pl">' + esc(s.event_class_label || '') +
           '<span class="ps">' + esc(s.event_class_signal || '') + ' signal</span></div>' +
         '<p class="pw">' + esc(s.event_class_why || '') + '</p>' +
