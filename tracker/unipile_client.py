@@ -16,11 +16,24 @@ returns (data, err) exactly like arena_client's (parsed, error) pairs, with
 the same typed-error-kind shape, so app.py/sci_pipeline.py can reuse the same
 "describe this to a human" pattern already established there.
 
-Base URL is configurable (UNIPILE_DSN), not hardcoded to the shared
-api.unipile.com gateway: Unipile issues each account a dedicated DSN
-(https://apiNN.unipile.com:PORT) from their dashboard, and a key that is
-valid for that DSN is not necessarily valid against the shared gateway (see
-this repo's plan file for the live probe that surfaced this).
+Base URL is configurable (UNIPILE_DSN) and REQUIRED in practice: Unipile
+issues each workspace a dedicated host (https://apiNN.unipile.com:PORT) from
+their dashboard, and a key valid for that host is not valid against the
+shared api.unipile.com gateway, which answers 401 for it.
+
+Every route below was confirmed against a real 200/201 from a live DSN on
+2026-09-01, replacing the guesses this module shipped with:
+
+  GET  /api/v1/accounts                     -> {"object":"AccountList","items":[...],"cursor":...}
+  GET  /api/v1/linkedin/company/{slug}      -> {"object":"CompanyProfile","id":"60223",...}
+  GET  /api/v1/users/{id}/posts             -> {"object":"PostList","items":[...],"cursor":...}
+  POST /api/v1/hosted/accounts/link         -> 201 {"object":"HostedAuthUrl","url":...}
+
+Two of those corrected a wrong assumption, so they are worth naming: the live
+API is on /api/v1, NOT the /v2 this module first guessed (the earlier probe
+that suggested /v2 was run against the shared gateway, a different service),
+and the hosted-auth link REQUIRES expiresOn -- without it every Connect
+button returned 400.
 """
 
 from __future__ import annotations
@@ -28,21 +41,35 @@ from __future__ import annotations
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-# Falls back to the shared gateway if UNIPILE_DSN isn't set. Known, as of
-# this module's introduction, NOT to authenticate the key this deployment
-# was first given -- set UNIPILE_DSN explicitly to the account's own
-# dashboard-issued host once that's available. Kept as a fallback rather
-# than making DSN required so probe() still reports a clear "wrong host,
-# not just wrong key" style error instead of "not configured".
+# Falls back to the shared gateway if UNIPILE_DSN isn't set. Known NOT to
+# authenticate a workspace-issued key -- kept as a fallback rather than
+# making DSN required so probe() still reports a clear "wrong host, not just
+# wrong key" style error instead of "not configured".
 _DEFAULT_BASE = "https://api.unipile.com"
 
+# Every route lives under this prefix. Confirmed live; /v2 and /v1 both 404.
+_API = "/api/v1"
+
 _TIMEOUT = 30
+
+# How long a generated hosted-auth link is asked to stay valid. Unipile's own
+# schema notes every link dies at their daily restart regardless of what is
+# asked for here, and that a fresh link must be generated per click -- which
+# app.py already does -- so this is a ceiling, not a lifetime.
+_AUTH_LINK_TTL = timedelta(hours=1)
+
+# The value sources[].status carries for an account that can actually serve
+# requests. Anything else (notably "CREDENTIALS", meaning the login has
+# lapsed and a human must reconnect it) is a connected-in-name-only account:
+# it is listed by /accounts but every call made through it fails.
+ACCOUNT_OK = "OK"
 
 # Failure kinds -- same vocabulary as arena_client's, so any caller that
 # already knows how to render one vendor's error dict knows how to render
@@ -60,7 +87,19 @@ def _api_key() -> str:
 
 
 def _dsn() -> str:
-    return (os.environ.get("UNIPILE_DSN", "") or _DEFAULT_BASE).rstrip("/")
+    """The configured host, normalized to something requests can actually
+    call. Unipile's dashboard shows the DSN as a bare host:port
+    ("api42.unipile.com:13900"), and pasting that verbatim into the env var
+    is the obvious thing to do -- but requests rejects a schemeless URL with
+    MissingSchema, which would surface as a network error rather than as
+    "your DSN is missing https://". Prepending it here means the value can
+    be copied straight out of the dashboard."""
+    raw = (os.environ.get("UNIPILE_DSN", "") or "").strip().rstrip("/")
+    if not raw:
+        return _DEFAULT_BASE
+    if "://" not in raw:
+        raw = "https://" + raw
+    return raw.rstrip("/")
 
 
 def _is_dict(v: Any) -> bool:
@@ -82,11 +121,14 @@ def describe_error(err: dict | None) -> str:
     if kind == ERR_NOT_CONFIGURED:
         return "Unipile is not configured on this deployment: UNIPILE_API_KEY is missing."
     if kind == ERR_HTTP and status == 401:
-        return ("Unipile rejected our API key (HTTP 401). This usually means the key needs "
-                "UNIPILE_DSN set to this account's own dashboard-issued host -- the shared "
-                "api.unipile.com gateway does not accept every account's key.")
+        return ("Unipile rejected our API key (HTTP 401). This usually means UNIPILE_DSN is "
+                "missing or wrong -- a key is valid only against its own workspace host "
+                "(https://apiNN.unipile.com:PORT), never the shared api.unipile.com gateway.")
     if kind == ERR_HTTP and status == 404:
         return "Unipile returned 404 for this route -- the API path may have changed."
+    if kind == ERR_HTTP and status == 422:
+        return ("Unipile could not reach that profile. The identifier may be wrong, or the "
+                "profile may be private or restricted to the connected account.")
     if kind == ERR_HTTP and status == 429:
         return "Unipile is rate-limiting us. Try again in a minute."
     if kind == ERR_HTTP:
@@ -131,10 +173,10 @@ def _request(method: str, path: str, json_body: dict | None = None,
 
 
 def _accounts_from(payload: Any) -> list[dict] | None:
-    """Unipile's list endpoints paginate under one of a few common key names.
-    Tolerant on purpose: a bare list is also accepted, since which shape this
-    endpoint actually uses hasn't been confirmed against a real connected
-    account yet (see this feature's plan file)."""
+    """The live envelope is {"object":"AccountList","items":[...]}. A bare
+    list and the other common key names stay accepted: this costs nothing
+    and means a paginated-shape change reads as a shape error at one place
+    rather than as "no accounts connected" everywhere."""
     if isinstance(payload, list):
         return payload
     if _is_dict(payload):
@@ -148,7 +190,7 @@ def list_accounts() -> tuple[list[dict] | None, dict | None]:
     """Every account connected to this Unipile workspace, across all
     platforms. Free -- no connected account required to call this, so it's
     also this client's cheapest possible connectivity check (see probe())."""
-    data, err = _request("GET", "/v2/accounts")
+    data, err = _request("GET", f"{_API}/accounts")
     if err is not None:
         return None, err
     accounts = _accounts_from(data)
@@ -158,29 +200,71 @@ def list_accounts() -> tuple[list[dict] | None, dict | None]:
     return accounts, None
 
 
-def accounts_by_platform(accounts: list[dict]) -> dict[str, list[dict]]:
+def account_platform(acct: dict) -> str:
+    """The platform an account serves, lower-cased. Live accounts carry it
+    as `type` ("LINKEDIN"); `provider` is kept as a fallback only."""
+    return str((acct or {}).get("type") or (acct or {}).get("provider") or "").lower()
+
+
+def account_status(acct: dict) -> str:
+    """An account's real usability, read from sources[].status.
+
+    This is NOT a top-level field, which matters: reading acct["status"]
+    returns None for every live account, so a caller that trusted it would
+    treat a lapsed login exactly like a healthy one. In a real workspace
+    that is not a rare edge case -- 6 of the 17 accounts on the deployment
+    this was confirmed against were sitting at "CREDENTIALS"."""
+    sources = (acct or {}).get("sources")
+    if isinstance(sources, list):
+        statuses = [str(s.get("status") or "").upper() for s in sources if isinstance(s, dict)]
+        if any(s == ACCOUNT_OK for s in statuses):
+            return ACCOUNT_OK
+        if statuses:
+            return statuses[0]
+    return str((acct or {}).get("status") or (acct or {}).get("state") or "").upper()
+
+
+def is_connected(acct: dict) -> bool:
+    """Whether calls made through this account will actually work."""
+    return account_status(acct) == ACCOUNT_OK
+
+
+def accounts_by_platform(accounts: list[dict], connected_only: bool = False) -> dict[str, list[dict]]:
     """Group a list_accounts() result by platform, lower-cased, for the admin
     Data Sources panel and for sci_pipeline's per-platform availability
-    check. Unipile's own field name for the platform (`type` vs `provider`)
-    hasn't been confirmed against a real account yet -- both are checked."""
+    check. connected_only drops accounts whose login has lapsed."""
     by_platform: dict[str, list[dict]] = {}
     for acct in accounts or []:
-        platform = str(acct.get("type") or acct.get("provider") or "").lower()
+        platform = account_platform(acct)
         if not platform:
+            continue
+        if connected_only and not is_connected(acct):
             continue
         by_platform.setdefault(platform, []).append(acct)
     return by_platform
 
 
 def is_available(platform: str) -> bool:
-    """Whether SOME connected account can serve this platform right now --
-    the gate tracker/sci_pipeline.py's per-platform collectors check before
-    ever calling list_posts. A live call, not a cached flag, by design: see
-    this feature's plan file on why no local connection-state table exists."""
+    """Whether some WORKING account can serve this platform right now -- the
+    gate tracker/sci_pipeline.py's per-platform collectors check before ever
+    calling list_posts. A live call, not a cached flag, by design: see this
+    feature's plan file on why no local connection-state table exists.
+
+    Lapsed accounts do not count. They are still listed by /accounts, so
+    counting them would report LinkedIn as available and then fail every
+    single collection through it."""
     accounts, err = list_accounts()
     if err is not None or not accounts:
         return False
-    return platform.lower() in accounts_by_platform(accounts)
+    return platform.lower() in accounts_by_platform(accounts, connected_only=True)
+
+
+def _expires_on(now: datetime | None = None) -> str:
+    """Unipile's expiresOn, in the exact format its schema's regex demands:
+    millisecond-precision ISO 8601 in UTC with a literal Z. datetime's own
+    isoformat() emits microseconds and +00:00, both of which it rejects."""
+    at = (now or datetime.now(timezone.utc)) + _AUTH_LINK_TTL
+    return at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (at.microsecond // 1000)
 
 
 def create_hosted_auth_link(providers: list[str], success_redirect_url: str | None = None,
@@ -190,19 +274,18 @@ def create_hosted_auth_link(providers: list[str], success_redirect_url: str | No
     of `providers` (e.g. ["LINKEDIN", "INSTAGRAM"]) through. This is the only
     way an account gets connected -- nothing in this codebase can complete
     that login on someone's behalf, by design (see the plan file on why).
-    The exact request body Unipile expects has not been confirmed against a
-    real 200 response yet (the probing done while planning this could only
-    confirm the route exists, not its schema, since the supplied key wasn't
-    authenticating) -- treat this as a best-effort shape pending that
-    confirmation, not a fully verified contract."""
-    body: dict = {"type": "create", "providers": providers, "api_url": _dsn()}
+
+    expiresOn is required, not optional: omitting it returns 400 for every
+    request. Confirmed against a real 201 response."""
+    body: dict = {"type": "create", "providers": providers, "api_url": _dsn(),
+                  "expiresOn": _expires_on()}
     if success_redirect_url:
         body["success_redirect_url"] = success_redirect_url
     if failure_redirect_url:
         body["failure_redirect_url"] = failure_redirect_url
     if name:
         body["name"] = name
-    data, err = _request("POST", "/v2/hosted/accounts/link", json_body=body)
+    data, err = _request("POST", f"{_API}/hosted/accounts/link", json_body=body)
     if err is not None:
         return None, err
     if not _is_dict(data) or not data.get("url"):
@@ -211,39 +294,57 @@ def create_hosted_auth_link(providers: list[str], success_redirect_url: str | No
     return data, None
 
 
-# The live v2 posts-listing path hasn't been confirmed against a real
-# connected account -- Unipile's own docs describe /api/v1/users/{id}/posts,
-# but this client's other two endpoints (/v2/accounts, /v2/hosted/accounts/
-# link) proved the docs lag the live v2 API by at least one path segment.
-# CONFIRM THIS against a real 200 response before relying on it; see the
-# plan file's Verification section.
-_POSTS_PATH = "/v2/users/{identifier}/posts"
+def get_company(identifier: str, account_id: str) -> tuple[dict | None, dict | None]:
+    """A LinkedIn company page by its vanity slug ("position2"), fetched
+    through `account_id`'s connected session.
+
+    This exists because the posts endpoint below does NOT accept a vanity
+    slug for a company: /users/position2/posts answers 422
+    invalid_recipient, while /users/60223/posts answers 200. This call is
+    how the slug becomes that number."""
+    data, err = _request("GET", f"{_API}/linkedin/company/{identifier}",
+                         params={"account_id": account_id})
+    if err is not None:
+        return None, err
+    if not _is_dict(data) or not data.get("id"):
+        return None, _err(ERR_SHAPE, "HTTP 200 but no company id in response. Keys: %s" %
+                          (sorted(data.keys())[:12] if _is_dict(data) else type(data).__name__))
+    return data, None
 
 
 def list_posts(account_id: str, identifier: str, is_company: bool = True,
                cursor: str | None = None, limit: int = 50) -> tuple[dict | None, dict | None]:
-    """Recent posts for `identifier` (a LinkedIn internal id or an Instagram
-    username), fetched through `account_id`'s connected session. Returns the
-    raw parsed response (caller normalizes) since the exact envelope shape
-    (a bare list vs. {"items": [...], "cursor": ...}) is one of the things
-    _POSTS_PATH's docstring flags as unconfirmed."""
+    """Recent posts for `identifier`, fetched through `account_id`'s
+    connected session. For a company `identifier` is its NUMERIC id, not its
+    vanity slug (see get_company). Returns the raw parsed response, since
+    normalizing a platform's post shape is each adapter's job.
+
+    Confirmed live: the envelope is {"object":"PostList","items":[...],
+    "cursor":...}; limit is capped at 100 by the vendor (asking for 100
+    returns 99-100); the cursor pages cleanly with no overlap between
+    pages."""
     params: dict[str, Any] = {"account_id": account_id, "limit": max(1, min(limit, 100))}
     if is_company:
         params["is_company"] = "true"
     if cursor:
         params["cursor"] = cursor
-    return _request("GET", _POSTS_PATH.format(identifier=identifier), params=params)
+    return _request("GET", f"{_API}/users/{identifier}/posts", params=params)
 
 
 def probe() -> dict:
     """Prove the Unipile integration end to end and report exactly where it
     fails, in the shape app.py's other vendor self-tests (_apollo_selftest,
     _arena_selftest) established. Free -- list_accounts() needs no connected
-    account and spends nothing."""
+    account and spends nothing.
+
+    Reports each account's real status and counts working accounts
+    separately from listed ones, because "LinkedIn is connected" and
+    "LinkedIn collection will work" are different claims and the admin panel
+    must not print the first while meaning the second."""
     key = _api_key()
     out: dict = {"configured": bool(key), "key_len": len(key), "dsn": _dsn(),
                 "elapsed_ms": 0, "ok": False, "accounts": [], "by_platform": {},
-                "error_kind": "", "error": ""}
+                "connected_by_platform": {}, "error_kind": "", "error": ""}
     if not key:
         out["error_kind"] = ERR_NOT_CONFIGURED
         out["error"] = describe_error(_err(ERR_NOT_CONFIGURED))
@@ -260,9 +361,12 @@ def probe() -> dict:
         out["error_kind"] = err.get("kind") or ""
         out["error"] = describe_error(err)
         return out
-    by_platform = accounts_by_platform(accounts or [])
+    accounts = accounts or []
     out["ok"] = True
-    out["accounts"] = [{"id": a.get("id"), "platform": (a.get("type") or a.get("provider") or "").lower(),
-                        "status": a.get("status") or a.get("state")} for a in (accounts or [])]
-    out["by_platform"] = {p: len(rows) for p, rows in by_platform.items()}
+    out["accounts"] = [{"id": a.get("id"), "name": a.get("name"),
+                        "platform": account_platform(a), "status": account_status(a),
+                        "connected": is_connected(a)} for a in accounts]
+    out["by_platform"] = {p: len(rows) for p, rows in accounts_by_platform(accounts).items()}
+    out["connected_by_platform"] = {
+        p: len(rows) for p, rows in accounts_by_platform(accounts, connected_only=True).items()}
     return out

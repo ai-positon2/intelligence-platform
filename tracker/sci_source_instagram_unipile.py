@@ -3,12 +3,28 @@ Unipile instead of Apify -- tried FIRST by tracker/sci_pipeline.py's
 _collect_instagram, ahead of the Apify actor path
 (tracker/sci_source_instagram.py).
 
-Field names below (caption.text, video.url/preview_image, like_count,
-comment_count) are Unipile's documented shape for this endpoint; carried
-through defensively for the same reason tracker/sci_source_linkedin_unipile.py
-does -- the live v2 API has already proven to diverge from the docs in its
-URL paths, so field-name assumptions get the same "confirm once a real
-account is connected" caveat.
+UNCONFIRMED, and deliberately so. As of 2026-09-01 the Unipile workspace
+this deployment uses has 17 connected accounts and every one of them is
+LinkedIn, so there is no way to see a real Instagram response. What that
+does and does not leave verified:
+
+  Confirmed: the route this goes through (GET /api/v1/users/{id}/posts) and
+  the list envelope, from the LinkedIn side of the same endpoint. And that
+  this adapter is never reached without an account, since
+  unipile_client.is_available("instagram") is a live check that currently
+  returns False, so Instagram still falls through to Apify exactly as
+  before.
+
+  NOT confirmed: every field name below (caption.text, video.url/
+  preview_image, like_count, comment_count, carousel_media). These are
+  Unipile's documented shape, and this vendor's docs have already been
+  wrong once about something as basic as the API path prefix. They are read
+  defensively (chained .get() fallbacks) but they are not evidence.
+
+Connect a real Instagram account through the admin Data sources panel, then
+check normalize() against one live response before trusting an Instagram
+report. tracker/sci_source_linkedin_unipile.py is what this file should look
+like afterwards: its docstring quotes the actual payload.
 """
 
 from __future__ import annotations

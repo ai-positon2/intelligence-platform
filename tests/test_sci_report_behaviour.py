@@ -1176,3 +1176,58 @@ def test_the_radar_only_draws_measures_every_platform_reports():
     assert "Avg views" not in axes, "views became an axis although LinkedIn reports none: %r" % (axes,)
     assert "Avg interactions" in axes and "Posts" in axes
     assert len(axes) >= 3, "fewer than three axes survived, so the radar should not have drawn: %r" % (axes,)
+
+
+# ── LinkedIn thumbnails: two vendors, one raw field ────────────────────────
+
+def test_a_unipile_linkedin_post_shows_its_real_image_not_the_platform_icon():
+    """Unipile describes a LinkedIn post's media as attachments[] of
+    {type,url}; the Apify actor describes it as a flat images[]. Both land in
+    the same raw field, so a resolver that reads only one leaves every post
+    from the other vendor with a bare platform icon where its creative
+    should be."""
+    probe = """
+      var unipile = {platform:'linkedin', raw:{attachments:[
+        {type:'img', unavailable:false, url:'https://example.invalid/real.jpg'}]}};
+      var apify   = {platform:'linkedin', raw:{images:['https://example.invalid/apify.jpg']}};
+      ({unipile: postThumbnail(unipile), apify: postThumbnail(apify)});
+    """
+    got = _run(probe)
+    assert got["unipile"] == "https://example.invalid/real.jpg"
+    assert got["apify"] == "https://example.invalid/apify.jpg"
+
+
+def test_a_linkedin_video_attachment_is_never_used_as_a_thumbnail():
+    """A video attachment's url is the mp4 itself. Putting it in an <img src>
+    is exactly the bug that once broke the thumbnail on every video post on
+    every platform: it 404s and hides itself, so it fails invisibly."""
+    probe = """
+      var video = {platform:'linkedin', raw:{attachments:[
+        {type:'video', unavailable:false, url:'https://example.invalid/clip.mp4'}]}};
+      var mixed = {platform:'linkedin', raw:{attachments:[
+        {type:'video', unavailable:false, url:'https://example.invalid/clip.mp4'},
+        {type:'img', unavailable:false, url:'https://example.invalid/poster.jpg'}]}};
+      ({video: postThumbnail(video), mixed: postThumbnail(mixed)});
+    """
+    got = _run(probe)
+    assert got["video"] is None
+    assert got["mixed"] == "https://example.invalid/poster.jpg"
+
+
+def test_an_expired_linkedin_attachment_is_skipped_for_the_next_one():
+    probe = """
+      var post = {platform:'linkedin', raw:{attachments:[
+        {type:'img', unavailable:true,  url:'https://example.invalid/gone.jpg'},
+        {type:'img', unavailable:false, url:'https://example.invalid/live.jpg'}]}};
+      ({thumb: postThumbnail(post)});
+    """
+    assert _run(probe)["thumb"] == "https://example.invalid/live.jpg"
+
+
+def test_a_linkedin_link_post_falls_back_to_the_article_cover():
+    probe = """
+      var post = {platform:'linkedin', raw:{attachments:[],
+        article:{title:'x', picture_url:'https://example.invalid/cover.jpg'}}};
+      ({thumb: postThumbnail(post)});
+    """
+    assert _run(probe)["thumb"] == "https://example.invalid/cover.jpg"

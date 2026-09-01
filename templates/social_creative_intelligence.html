@@ -286,11 +286,25 @@
       loadDataSources();
     }
 
-    function dsRow(platform, connected, count){
+    // `working` is the count of accounts that can actually serve a request;
+    // `listed` counts every account Unipile still returns for the platform,
+    // including ones whose login has lapsed. They are reported separately on
+    // purpose: a lapsed account is listed forever, so collapsing the two
+    // numbers would print "17 accounts connected" on a workspace where six
+    // of them fail every call.
+    function dsRow(platform, working, listed){
       var meta = platformMeta(platform);
-      var statusHtml = connected
-        ? '<span class="sci-datasrc-status ok">' + count + ' account' + (count === 1 ? '' : 's') + ' connected</span>'
-        : '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
+      var stale = Math.max(0, listed - working);
+      var statusHtml;
+      if(working > 0){
+        statusHtml = '<span class="sci-datasrc-status ok">' + working + ' account' + (working === 1 ? '' : 's') + ' working' +
+          (stale ? ', ' + stale + (stale === 1 ? ' needs' : ' need') + ' reconnecting' : '') + '</span>';
+      } else if(listed > 0){
+        statusHtml = '<span class="sci-datasrc-status warn">' + listed + ' account' + (listed === 1 ? '' : 's') + ' signed out</span>' +
+          '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Reconnect ' + esc(platform) + '</button>';
+      } else {
+        statusHtml = '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
+      }
       return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
         '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
     }
@@ -311,9 +325,9 @@
             body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Unipile is unavailable right now.') + '</div>';
             return;
           }
-          var byPlatform = d.by_platform || {};
+          var listed = d.by_platform || {}, working = d.connected_by_platform || {};
           body.innerHTML = UNIPILE_PLATFORMS.map(function(p){
-            return dsRow(p, !!byPlatform[p], byPlatform[p] || 0);
+            return dsRow(p, working[p] || 0, listed[p] || 0);
           }).join('') + '<div class="sci-datasrc-note">Facebook, TikTok and X collect through Apify once its key is configured &mdash; Unipile only covers LinkedIn and Instagram here.</div>';
         })
         .catch(function(){
@@ -615,6 +629,18 @@
         return null;
       }
       if(platform === 'linkedin'){
+        // Unipile and the Apify actor describe a LinkedIn post's media
+        // completely differently, and both shapes land in this one field, so
+        // both are read. Unipile: attachments[] of {type:'img'|'video', url},
+        // where only the img rows are displayable -- a video row's url is the
+        // mp4 itself, which is exactly the mistake that once put a broken
+        // image on every video card. Apify: a flat images/imageUrls array.
+        var atts = raw.attachments || [];
+        for(var k=0;k<atts.length;k++){
+          var at = atts[k] || {};
+          if(at.url && !at.unavailable && (at.type || '').toLowerCase() === 'img') return at.url;
+        }
+        if(raw.article && raw.article.picture_url) return raw.article.picture_url;
         var imgs = raw.images || raw.imageUrls || [];
         if(imgs.length){ var im = imgs[0]; return (typeof im === 'string') ? im : (im && im.url) || null; }
         return null;
