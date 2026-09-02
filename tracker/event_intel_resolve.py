@@ -191,7 +191,9 @@ _DISCOVER_SYSTEM = (
     "visited. Never invent a plausible-sounding conference name. A wrong "
     "event on this list costs somebody a travel budget.\n"
     "2. Prefer the NEXT upcoming edition. Include a past edition only when no "
-    "future one is announced, and say so in `why`.\n"
+    "future one is announced, and say so in `why`. TODAY IS {today}: an edition "
+    "is upcoming only if it starts on or after that date, measured from that "
+    "date and not from your own sense of when now is.\n"
     "3. Rank by how concentrated the described audience is, NOT by how big "
     "the event is. A 400-person vertical summit where most attendees are the "
     "target buyer beats a 30,000-person general show where a handful are.\n"
@@ -230,7 +232,8 @@ def discover_events(audience: str, region: str | None = None,
         user += "\nRegion or geography to prioritise: %s" % region
     user += ("\nReturn at most %d events, best fit first." % max(1, min(limit, 12)))
 
-    res = claude_websearch.ask(_DISCOVER_SYSTEM, user, max_uses=12, max_tokens=8000)
+    system = _DISCOVER_SYSTEM.replace("{today}", datetime.date.today().isoformat())
+    res = claude_websearch.ask(system, user, max_uses=12, max_tokens=8000)
     if res.get("error"):
         return {"events": [], "note": "", "error": res["error"]}
 
