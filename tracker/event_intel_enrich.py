@@ -178,7 +178,15 @@ def find_people(domains: list[str], titles: list[str] | None = None,
 
     filters: dict = {"company_domains": uniq}
     if titles:
-        filters["job_titles"] = list(titles)
+        # "titles" is the PERSON-title key, which apollo_client maps to
+        # person_titles. "job_titles" is an employer-level key mapping to
+        # q_organization_job_titles, which means "companies with open job
+        # postings for these titles": a different question with a plausible
+        # name. Asking it returned arbitrary employees, at only the subset of
+        # exhibitors currently hiring a VP Marketing, and zero people at every
+        # exhibitor that was not. The title box did the opposite of its label,
+        # silently, on the one step that bills.
+        filters["titles"] = list(titles)
 
     people: list[dict] = []
     try:
