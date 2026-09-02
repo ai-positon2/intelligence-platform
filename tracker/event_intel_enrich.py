@@ -126,15 +126,20 @@ def resolve_companies(domains: list[str], key: str | None = None,
     from . import apollo_client
     key = key or api_key()
     uniq = sorted({d for d in domains if d})
-    result = {"by_domain": {}, "credits": 0, "unmatched": [], "error": None}
+    result = {"by_domain": {}, "credits": 0, "unmatched": [],
+              "unattempted": [], "error": None}
     if not uniq:
         return result
     if not key:
+        # Nothing was looked up, so nothing is unmatched. Reporting these as
+        # unmatched would say Apollo has no record of companies Apollo was
+        # never asked about.
         result["error"] = "APOLLO_API_KEY is not configured on this deployment."
-        result["unmatched"] = uniq
+        result["unattempted"] = uniq
         return result
 
     matched: dict[str, dict] = {}
+    attempted: list[str] = []
     for i in range(0, len(uniq), DOMAIN_BATCH):
         batch = uniq[i:i + DOMAIN_BATCH]
         try:
@@ -147,13 +152,22 @@ def resolve_companies(domains: list[str], key: str | None = None,
             result["error"] = "Apollo company lookup failed: %s" % str(e)[:200]
             logger.warning("event_intel_enrich: company batch %d failed: %s", i, e)
             break
+        # Counted only once the call has returned. A batch that raised was not
+        # an answer about the companies in it, and every batch after it never
+        # ran at all: on a 200-domain roster failing at batch 3, that is 125
+        # companies. Reporting those as unmatched hands the caller the exact
+        # sentence this module exists to refuse, "we looked and Apollo has no
+        # record", about companies nobody looked up.
+        attempted.extend(batch)
         if rows:
             result["credits"] += 1
         for domain, row in _index_by_domain(rows).items():
             matched.setdefault(domain, row)
 
     result["by_domain"] = {d: _slim(c) for d, c in matched.items() if d in set(uniq)}
-    result["unmatched"] = [d for d in uniq if d not in result["by_domain"]]
+    done = set(attempted)
+    result["unmatched"] = [d for d in attempted if d not in result["by_domain"]]
+    result["unattempted"] = [d for d in uniq if d not in done]
     return result
 
 

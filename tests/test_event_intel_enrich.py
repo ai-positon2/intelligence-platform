@@ -65,3 +65,45 @@ def test_no_domains_is_not_an_error_and_calls_nothing(sent):
     assert out["error"] is None
     assert out["by_domain"] == {}
     assert "payload" not in sent, "Apollo was called with nothing to look up"
+
+
+# ── a failed batch is not a verdict on the companies it never reached ─────
+
+def test_a_batch_failure_does_not_report_later_companies_as_unmatched(monkeypatch):
+    """resolve_companies stops at the first failing batch, and every batch
+    after it never runs. Those domains used to be reported as unmatched, which
+    the pipeline writes as resolution="no_match" and the report renders with
+    the wording reserved for a real negative: "we looked and Apollo has no
+    record". On a 200-domain roster failing at batch 3 that is 125 companies
+    given a verdict nobody reached."""
+    calls = {"n": 0}
+
+    def fake_search(filters, key, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return [{"primary_domain": "a1.com", "name": "A1"}]
+        raise RuntimeError("HTTP 503 from Apollo")
+
+    monkeypatch.setattr(E.apollo_client if hasattr(E, "apollo_client") else
+                        __import__("tracker.apollo_client", fromlist=["x"]),
+                        "search_companies", fake_search)
+
+    domains = ["a%d.com" % i for i in range(1, 60)]
+    out = E.resolve_companies(domains, key="k")
+
+    assert out["error"] and "503" in out["error"]
+    assert out["unattempted"], "the never-queried domains were not reported"
+    # Nothing may appear in both buckets.
+    assert not (set(out["unmatched"]) & set(out["unattempted"]))
+    # Every domain is accounted for exactly once.
+    seen = set(out["by_domain"]) | set(out["unmatched"]) | set(out["unattempted"])
+    assert seen == set(domains)
+
+
+def test_no_api_key_reports_nothing_as_unmatched():
+    """Nothing was looked up, so nothing is unmatched. Saying otherwise claims
+    Apollo has no record of companies Apollo was never asked about."""
+    out = E.resolve_companies(["a.com", "b.com"], key="")
+    assert out["error"] and "APOLLO_API_KEY" in out["error"]
+    assert out["unmatched"] == []
+    assert out["unattempted"] == ["a.com", "b.com"]

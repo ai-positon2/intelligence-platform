@@ -132,7 +132,8 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
         out["error"] = err
         return out
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                          require="confidence")
     if not isinstance(parsed, dict):
         logger.warning("event_intel_resolve: unparsable reply for %r "
                        "(blocks=%s, stop_reason=%s, chars=%s)", query,
@@ -226,7 +227,8 @@ def discover_events(audience: str, region: str | None = None,
     if res.get("error"):
         return {"events": [], "note": "", "error": res["error"]}
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                          require="events")
     if not isinstance(parsed, dict):
         return {"events": [], "note": "",
                 "error": {"kind": claude_websearch.ERR_UNPARSABLE,

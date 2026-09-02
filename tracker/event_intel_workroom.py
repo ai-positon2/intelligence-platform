@@ -436,7 +436,7 @@ def draft_batch(rows: list[dict], profile: dict, event: dict,
     if res.get("error"):
         return {"drafts": {},
                 "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="companies")
     if not isinstance(parsed, dict):
         return {"drafts": {},
                 "error": "The qualification pass ran but its answer could not be read."}

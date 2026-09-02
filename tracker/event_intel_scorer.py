@@ -151,7 +151,7 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
     if res.get("error"):
         return {"scores": {},
                 "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="scores")
     if not isinstance(parsed, dict):
         return {"scores": {},
                 "error": "The scoring pass ran but its answer could not be read."}
