@@ -158,7 +158,13 @@ def test_heavy_overlap_with_another_client_is_flagged():
     assert g["flagged"] is True
     assert g["worst"]["overlap"] == 0.75
     assert g["worst"]["client_name"] == "Acme"
-    assert "Acme" in g["advice"]
+    # The name is available to whoever runs the analysis and is deliberately
+    # NOT in the advice string, because the advice string is what reaches the
+    # deliverable and the deliverable leaves the building. Naming Acme here
+    # would put one client's engagement into another client's report.
+    assert "Acme" not in g["advice"]
+    assert "a different client on this account" in g["advice"]
+    assert "75%" in g["advice"]
 
 
 def test_a_distinct_list_is_measured_and_not_flagged():

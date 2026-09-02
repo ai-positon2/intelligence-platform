@@ -293,12 +293,17 @@ def genericness(names: list[str], prior_runs: list[dict],
     flagged = worst["overlap"] >= GENERIC_THRESHOLD
     advice = ""
     if flagged:
+        # Deliberately does NOT name the other client. This string is the
+        # one that reaches the deliverable, and the deliverable leaves the
+        # building: naming whose list it matched would put one client's
+        # engagement into another client's report. The name stays available
+        # on `worst` for whoever is running the analysis.
         advice = (
-            "%d%% of this list was also recommended to %s. Two clients with "
-            "different ICPs should not get the same events. Replace three to "
-            "five of the famous names with vertical-specific or regional "
-            "alternatives before acting on it."
-            % (round(worst["overlap"] * 100), worst["client_name"]))
+            "%d%% of this list was also recommended to a different client on "
+            "this account. Two clients with different ICPs should not get the "
+            "same events. Replace three to five of the famous names with "
+            "vertical-specific or regional alternatives before acting on it."
+            % round(worst["overlap"] * 100))
     return {"measured": True, "flagged": flagged, "checked": len(comparisons),
             "worst": worst, "comparisons": comparisons[:5],
             "why_not_measured": "", "advice": advice}

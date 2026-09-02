@@ -6,6 +6,8 @@ that a category which found nothing is distinguishable from one that failed,
 and that the same event cannot occupy three slots under three labels.
 """
 
+import json
+
 import pytest
 
 from tracker import claude_websearch
@@ -43,8 +45,12 @@ def test_the_category_prompt_names_which_side_of_the_floor_to_look_at():
         category_label=R.CATEGORY_LABELS[R.CAT_FREE_VENDOR],
         category_brief=R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR],
         profile=D.profile_brief(PROFILE),
+        today="2026-09-02",
         where_buyers=R.CLASSIFICATION_WHERE_BUYERS_ARE[R.CLASS_B2B_TO_MARKETING])
     assert "Behind the booths" in sys_prompt
+    assert "TODAY IS 2026-09-02" in sys_prompt, (
+        "without an anchor the model measures the client's window from "
+        "whenever it believes now is")
     assert "Free vendor conference" in sys_prompt
     assert "under-utilised" in sys_prompt
 
@@ -105,13 +111,102 @@ def test_merge_keeps_one_row_when_two_categories_find_the_same_event():
 def test_merge_dedupes_on_the_website_when_the_names_share_nothing():
     """Side events in particular get renamed year to year while keeping the
     same registration page, so the host is the only thing tying them together."""
-    by = {R.CAT_INDUSTRY_FLAGSHIP: [_e("Northwind Field Day", "https://ops.example")],
-          R.CAT_SIDE_EVENT: [_e("Revenue Leaders Dinner", "https://www.ops.example/x",
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [_e("Northwind Field Day",
+                                      "https://ops.example/dinner")],
+          R.CAT_SIDE_EVENT: [_e("Revenue Leaders Dinner",
+                                "https://www.ops.example/dinner/",
                                 R.CAT_SIDE_EVENT)]}
     assert D.name_key("Northwind Field Day") != D.name_key("Revenue Leaders Dinner")
     out = D.merge(by)
     assert len(out) == 1
     assert out[0]["name"] == "Northwind Field Day"
+
+
+def test_one_host_running_many_events_is_not_one_event():
+    """The dedup that used to empty two of the six categories. Every AWS Summit
+    is on aws.amazon.com and every side event is on lu.ma, so deduping on the
+    bare host deleted the free-vendor and side-event circuits, which are the
+    two the category split exists to surface."""
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [
+              _e("AWS re:Invent", "https://aws.amazon.com/reinvent")],
+          R.CAT_REGIONAL_FLAGSHIP: [
+              _e("AWS Summit London", "https://aws.amazon.com/summits/london",
+                 R.CAT_REGIONAL_FLAGSHIP)],
+          R.CAT_FREE_VENDOR: [
+              _e("AWS Summit New York", "https://aws.amazon.com/summits/nyc",
+                 R.CAT_FREE_VENDOR)]}
+    assert len(D.merge(by)) == 3
+
+
+def test_two_side_events_on_one_ticketing_host_stay_two_events():
+    by = {R.CAT_SIDE_EVENT: [
+        _e("RevOps Breakfast", "https://lu.ma/revops-bfast", R.CAT_SIDE_EVENT),
+        _e("CMO Dinner", "https://lu.ma/cmo-dinner", R.CAT_SIDE_EVENT)]}
+    assert len(D.merge(by)) == 2
+
+
+def test_two_continents_of_the_same_brand_are_two_events():
+    """Money20/20 USA and Money20/20 Europe are different dates, different
+    cities and different buyers. Stripping the region collapsed them into one
+    row and silently removed a real event from the client's year."""
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [
+        _e("Money20/20 USA", "https://us.money2020.example"),
+        _e("Money20/20 Europe", "https://eu.money2020.example")]}
+    assert [e["name"] for e in D.merge(by)] == ["Money20/20 USA",
+                                                "Money20/20 Europe"]
+
+
+def test_a_region_and_no_region_are_still_one_event():
+    """The other direction, which must keep working: a name that states no
+    region is compatible with any region."""
+    by = {R.CAT_VERTICAL_SUMMIT: [
+        _e("MarTech Summit Europe", "https://a.example", R.CAT_VERTICAL_SUMMIT),
+        _e("MarTech Summit", "https://b.example", R.CAT_VERTICAL_SUMMIT)]}
+    assert len(D.merge(by)) == 1
+
+
+@pytest.mark.parametrize("excluded,kept", [
+    ("CES", "Processing Summit"),
+    ("CES", "Access Live"),
+    ("AI", "Retail Week"),
+    ("SaaS", "Sales Enablement Summit"),
+])
+def test_an_exclusion_never_matches_a_word_it_merely_sits_inside(excluded, kept):
+    """"CES" used to exclude "ProCESsing Summit" and "Access Live". A false
+    exclusion deletes a real recommendation and leaves no trace of it anywhere
+    in the report."""
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [_e(kept)]}
+    assert [e["name"] for e in D.merge(by, force_exclude=excluded)] == [kept]
+
+
+def test_a_commitment_never_matches_a_word_it_merely_sits_inside():
+    """Worse than a false exclusion: a falsely committed event is kept below
+    the scoring floor and then named in the executive summary as money the
+    client has already spent."""
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [_e("Retail Week")]}
+    out = D.merge(by, force_include="AI")
+    assert out[0]["committed"] is False
+
+
+def test_a_commitment_still_matches_the_edition_it_names():
+    by = {R.CAT_INDUSTRY_FLAGSHIP: [_e("Money20/20 USA 2026")]}
+    assert D.merge(by, force_include="Money20/20 USA")[0]["committed"] is True
+
+
+def test_a_category_answered_without_searching_is_discarded(monkeypatch):
+    """The refusal event_intel_recover already applies to a recovered roster,
+    for the same reason and with more at stake: here the thing being recalled
+    is whole conferences rather than rows on a page somebody can check."""
+    def fake_ask(system, user, **kw):
+        return {"text": json.dumps({"events": [{"name": "Ghost Expo"}],
+                                    "note": ""}),
+                "error": None, "text_block_count": 1, "stop_reason": "end_turn",
+                "search_count": 0}
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert r["status"] == D.STATUS_ERROR
+    assert r["events"] == []
+    assert "without running a single search" in r["detail"]
 
 
 def test_merge_honours_the_force_exclude_list_in_code_not_just_the_prompt():
@@ -135,7 +230,11 @@ def _stub(monkeypatch, payload=None, error=None, text=None):
             return {"text": "", "error": error}
         import json
         return {"text": text if text is not None else json.dumps(payload),
-                "error": None, "text_block_count": 1, "stop_reason": "end_turn"}
+                "error": None, "text_block_count": 1, "stop_reason": "end_turn",
+                # A real reply carries the number of searches it ran. Discovery
+                # now discards a category answered without one, so a stub that
+                # omits this is stubbing an ungrounded answer.
+                "search_count": kw.pop("search_count", 3)}
     monkeypatch.setattr(claude_websearch, "ask", fake_ask)
 
 

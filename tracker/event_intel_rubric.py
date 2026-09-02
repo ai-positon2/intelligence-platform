@@ -51,6 +51,7 @@ and a score computed from three guesses are indistinguishable without it.
 
 from __future__ import annotations
 
+import datetime
 import re
 
 # ── Step 0: classification, and which side of the floor it points at ──────
@@ -81,6 +82,28 @@ CLASSIFICATION_LABELS = {
     CLASS_B2C_BOOTH_DENSITY: "B2C brand selling to the other exhibitors",
     CLASS_B2B_TO_MARKETING: "B2B, selling to marketing, growth or sales",
     CLASS_B2B_OTHER_FUNCTION: "B2B, selling to a non-marketing function",
+}
+
+# The same fact as CLASSIFICATION_WHERE_BUYERS_ARE, as a lower-case noun
+# phrase that can be dropped into the middle of a sentence. The capitalised
+# version above is a sentence, and lower-casing a sentence to reuse it mid-
+# paragraph is what produced "so behind the booths. at most b2b events" on
+# every report this agent has ever printed.
+CLASSIFICATION_BUYER_PLACE = {
+    CLASS_B2C_GENERAL: "in the audience",
+    CLASS_B2C_BOOTH_DENSITY: "at the exhibitor booths, among the other brands",
+    CLASS_B2B_TO_MARKETING: "behind the booths",
+    CLASS_B2B_OTHER_FUNCTION: "in the audience and the session tracks",
+}
+
+# The reason, where there is one worth stating. Kept whole, with its own
+# capitals, because it is a sentence and gets rendered as one.
+CLASSIFICATION_WHY = {
+    CLASS_B2B_TO_MARKETING: (
+        "At most B2B events every booth is staffed by a marketing or sales "
+        "buyer, which is the whole reason a booth-to-booth motion works."),
+    CLASS_B2C_BOOTH_DENSITY: (
+        "The people who can sign are working the floor, not walking it."),
 }
 
 # Shown in the report so a reader can see which crowd was scored, and why.
@@ -253,29 +276,63 @@ _MATCHMAKING_VETO = (
     "meeting scheduler in the app", "app-based networking",
 )
 
-# Patterns that indicate the organizer takes active responsibility for pairing.
-# Stems rather than exact phrases: "the organizer pre-schedules 1:1 meetings"
-# and "pre-scheduled meetings" describe the same programme, and an exact-match
-# list rejects one of them. A false negative here silently strips a real P1
-# event of a bonus it earned, which is worse than the false positive the veto
-# list already catches.
-_MATCHMAKING_AFFIRM = tuple(re.compile(p, re.I) for p in (
+# Evidence that describes no programme that exists YET. A hedge is not weak
+# evidence, it is the absence of evidence wearing its clothes, so it refuses the
+# bonus outright before either list below is consulted. "A hosted-buyer
+# experience is planned for a future edition" contains the strongest phrase on
+# the affirm list and describes something nobody can book this year.
+_MATCHMAKING_HEDGE = tuple(re.compile(p, re.I) for p in (
+    r"could\s+not\s+(be\s+)?confirm",
+    r"couldn'?t\s+confirm",
+    r"not\s+confirmed",
+    r"unconfirmed",
+    r"no\s+(evidence|mention|sign|details?)\s+of",
+    r"\bno\s+(formal\s+)?matchmak",
+    r"unclear\s+(whether|if)",
+    r"(is|are|was|were)\s+(being\s+)?planned",
+    r"planned\s+for",
+    r"future\s+edition",
+    r"next\s+(year|edition)",
+    r"(may|might|could)\s+(offer|run|include|introduce)",
+    r"expected\s+to\s+(offer|run|launch)",
+    r"we\s+(believe|assume|think)",
+    r"informal(ly)?",
+))
+
+# Two tiers, because the veto exists to reject the conference app and a single
+# agreeable synonym used to defeat it. STRONG patterns name the organiser or an
+# industry term of art that only means an organiser-run programme; they beat the
+# veto, which is what lets a real hosted-buyer show that also ships Swapcard
+# keep its bonus. SUPPORTING patterns are consistent with a real programme but
+# are also exactly how app vendors and welcome parties describe themselves
+# ("concierge", "speed dating", "meetings programme"), so on their own they
+# qualify an event with no veto against it and never override one.
+_MATCHMAKING_STRONG = tuple(re.compile(p, re.I) for p in (
     r"hosted[-\s]?buyer",
     r"hosted[-\s]?delegate",
-    r"matchmak",
     r"pre[-\s]?schedul",
     r"curated\s+(1:1|one[-\s]to[-\s]one|meeting|introduc)",
     r"organi[sz]e(r|rs|d)?[^.]{0,40}?(match|pair|schedul|introduc|curat)",
     r"organi[sz]er[-\s]run",
     r"double[-\s]?opt[-\s]?in",
     r"account[-\s]managed",
+    r"(match|pair)\w*\s+(operated|run|managed|administered)\s+by\s+"
+    r"(the\s+)?(show|organi[sz]er|event|team)",
+    r"1:1s?\s+(are\s+)?(pre[-\s]?)?(matched|arranged|assigned|booked\s+for)",
+))
+
+_MATCHMAKING_SUPPORTING = tuple(re.compile(p, re.I) for p in (
+    r"matchmak",
     r"concierge",
     r"speed[-\s]?dating",
     r"ai[-\s]?match",
     r"(connect|meetings?|buyer|delegate)\s+programm?e",
-    r"1:1s?\s+(are\s+)?(pre[-\s]?)?(matched|arranged|assigned|booked\s+for)",
     r"introduc\w+\s+(you|vendors|buyers|exhibitors)",
 ))
+
+# Kept as the union so anything that used to read this name still sees every
+# affirming pattern.
+_MATCHMAKING_AFFIRM = _MATCHMAKING_STRONG + _MATCHMAKING_SUPPORTING
 
 
 def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
@@ -303,16 +360,27 @@ def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
                 "reason": ("Matchmaking was claimed but nothing was cited to "
                            "support it, so the bonus is not awarded.")}
 
-    vetoed = [v for v in _MATCHMAKING_VETO if v in low]
-    affirmed = [r.pattern for r in _MATCHMAKING_AFFIRM if r.search(text)]
+    hedged = [r.pattern for r in _MATCHMAKING_HEDGE if r.search(text)]
+    if hedged:
+        return {"bonus": 0, "awarded": False,
+                "reason": ("The evidence hedges rather than describes a "
+                           "programme that runs at this edition, so there is "
+                           "nothing here a delegate could actually book.")}
 
-    if vetoed and not affirmed:
+    vetoed = [v for v in _MATCHMAKING_VETO if v in low]
+    strong = [r.pattern for r in _MATCHMAKING_STRONG if r.search(text)]
+    supporting = [r.pattern for r in _MATCHMAKING_SUPPORTING if r.search(text)]
+
+    if vetoed and not strong:
+        # A supporting word does not clear a veto. This is the gap that used to
+        # let "speed-dating style networking, self-serve sign-up in Brella"
+        # collect the full ten points.
         return {"bonus": 0, "awarded": False,
                 "reason": ("The only matchmaking here is self-serve booking in "
                            "a conference app (%s), which is a baseline "
                            "expectation of any modern event rather than a "
                            "differentiator." % vetoed[0])}
-    if not affirmed:
+    if not (strong or supporting):
         return {"bonus": 0, "awarded": False,
                 "reason": ("The evidence does not describe the organizer "
                            "taking responsibility for pairing attendees with "
@@ -322,6 +390,36 @@ def matchmaking_bonus(organizer_run: bool, evidence: str) -> dict:
 
 
 # ── Scoring ───────────────────────────────────────────────────────────────
+
+_LEADING_INT = re.compile(r"^\s*(-?\d+)")
+
+
+def read_subscore(dimension: str, value) -> tuple:
+    """Return (clamped_score, was_readable).
+
+    The distinction this adds is the whole point. A model that never returned
+    `dm_access` and a model that looked at the event and scored it 0 are the
+    same number, and they mean opposite things: one is a 40-point dimension
+    nobody measured, the other is a verdict. Reported as a verdict, the first
+    one quietly removes a real event from the list at a plausible-looking 56.
+
+    "38/40" is read as 38. It is a very common way for a model to answer a
+    question phrased "out of 40", and scoring it 0 punished the event for the
+    grader's formatting.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return 0, False
+    if isinstance(value, bool):
+        return 0, False
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        m = _LEADING_INT.match(str(value))
+        if not m:
+            return 0, False
+        n = int(m.group(1))
+    return max(0, min(DIMENSION_MAX.get(dimension, 0), n)), True
+
 
 def clamp_subscore(dimension: str, value) -> int:
     """Clamp one sub-score into its dimension's range.
@@ -338,6 +436,13 @@ def clamp_subscore(dimension: str, value) -> int:
     except (TypeError, ValueError):
         n = 0
     return max(0, min(DIMENSION_MAX[dimension], n))
+
+
+def _unscored_dimensions(relevance, dm_access, engagement) -> list:
+    """Which of the three dimensions the grader did not actually return."""
+    given = {DIM_RELEVANCE: relevance, DIM_DM_ACCESS: dm_access,
+             DIM_ENGAGEMENT: engagement}
+    return [d for d in DIMENSIONS if not read_subscore(d, given[d])[1]]
 
 
 def score(relevance, dm_access, engagement, *, organizer_run: bool = False,
@@ -372,6 +477,34 @@ def score(relevance, dm_access, engagement, *, organizer_run: bool = False,
 # What a candidate must carry before its score means anything. Missing values
 # are reported, not filled in: the skill's output explicitly lists "unverified
 # attendee counts" as something the assumptions section must name.
+def _as_date(value):
+    """A datetime.date from whatever the store handed back, or None."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    try:
+        return datetime.date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def has_finished(candidate: dict, today=None) -> bool:
+    """True when this edition is over.
+
+    A recommendation is a claim about the future. Until this existed nothing in
+    the recommend path compared a date to today, so a conference that ended in
+    2019 could score 92, tier P1, and render under the label "Must-attend.
+    Book it." beside its own past date. The end date decides it where there is
+    one, because an event is still worth walking into on its final morning.
+    """
+    today = today or datetime.date.today()
+    end = _as_date(candidate.get("ends_on")) or _as_date(candidate.get("starts_on"))
+    return bool(end and end < today)
+
+
 _GAP_CHECKS = (
     ("attendees", "The event publishes no attendance figure, so density is "
                   "judged from its stated audience rather than a headcount."),
@@ -382,25 +515,37 @@ _GAP_CHECKS = (
 )
 
 
-def gaps_for(candidate: dict) -> list[str]:
+def gaps_for(candidate: dict, today=None) -> list[str]:
     """What could NOT be measured for this candidate.
 
     A score built on three confident readings and a score built on three
     guesses render identically without this. Every checker in this codebase
     is required to report what it could not measure.
     """
+    c = candidate or {}
     out = []
     for field, note in _GAP_CHECKS:
-        if not (candidate or {}).get(field):
+        if not c.get(field):
             out.append(note)
+    # A dimension nobody scored is the most consequential thing that can be
+    # missing from a row, because it is worth up to 40 of the 100 points the
+    # row is being judged on.
+    for dim in _unscored_dimensions(c.get(DIM_RELEVANCE), c.get(DIM_DM_ACCESS),
+                                    c.get(DIM_ENGAGEMENT)):
+        out.append("%s was never scored, so this total is out of %d, not %d."
+                   % (DIMENSION_LABELS[dim], BASE_MAX - DIMENSION_MAX[dim],
+                      BASE_MAX))
     for dim in DIMENSIONS:
-        if not (candidate or {}).get(dim + "_note"):
+        if not c.get(dim + "_note"):
             out.append("No reasoning was recorded for %s, so its sub-score "
                        "cannot be audited." % DIMENSION_LABELS[dim].lower())
+    if has_finished(c, today):
+        out.append("This edition has already ended, so it is history rather "
+                   "than a recommendation.")
     return out
 
 
-def rank(candidates: list[dict], cap: int = DEFAULT_CAP) -> dict:
+def rank(candidates: list[dict], cap: int = DEFAULT_CAP, today=None) -> dict:
     """Sort, cut everything below the floor, cap, and report what was dropped.
 
     NEVER pads. The skill: "A short list of P1/P2 events beats a long list
@@ -415,8 +560,18 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP) -> dict:
     scored = sorted((c for c in candidates or []),
                     key=lambda c: (-(c.get("total") or 0),
                                    (c.get("name") or "").lower()))
-    kept, excluded, below = [], [], []
+    kept, excluded, below, finished = [], [], [], []
     for c in scored:
+        # Before any question of merit: an edition that is over cannot be
+        # attended. It is reported in its own bucket rather than dropped,
+        # because "we found it and it already happened" is a different and more
+        # useful statement than silence, and it tells the reader the next
+        # edition is the thing to go looking for.
+        if has_finished(c, today):
+            finished.append({"name": c.get("name"), "total": c.get("total") or 0,
+                             "ends_on": c.get("ends_on") or c.get("starts_on"),
+                             "category": c.get("category")})
+            continue
         if (c.get("total") or 0) >= RANK_FLOOR:
             kept.append(c)
         elif c.get("committed"):
@@ -446,6 +601,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP) -> dict:
         "kept": kept,
         "excluded": excluded,
         "over_cap": over_cap,
+        "finished": finished,
         # Committed events that did not clear the bar on their own merits.
         "committed_below_bar": below,
         "counts": {
@@ -454,6 +610,7 @@ def rank(candidates: list[dict], cap: int = DEFAULT_CAP) -> dict:
             TIER_P2: sum(1 for c in kept if c.get("tier") == TIER_P2),
             "excluded": len(excluded),
             "over_cap": len(over_cap),
+            "finished": len(finished),
             "committed_below_bar": len(below),
         },
     }
@@ -463,7 +620,6 @@ def methodology_note(classification: str) -> str:
     """The scoring methodology as applied to THIS client, which is element 3
     of the executive summary the skill specifies."""
     orient = orientation_for(classification)
-    where = CLASSIFICATION_WHERE_BUYERS_ARE[classification]
     side = ("the exhibitor booths" if orient == ORIENTATION_BOOTH
             else "the audience and session tracks")
     return (
@@ -473,9 +629,14 @@ def methodology_note(classification: str) -> str:
         "Decision-maker access (40) is buyer density plus the structural reach "
         "to them. Engagement mode (20) is whether these people are in a "
         "vendor-buying mindset or a learning one. "
-        "You are classified as %s, so %s Density and reach are therefore "
-        "scored at %s. "
+        "You are classified as %s, which puts the people you sell to %s.%s "
+        "Relevance and access are therefore scored at %s rather than on the "
+        "other side of the room. "
         "P1 is 80 or above, P2 is 70 to 79, and anything below 70 is excluded "
         "rather than used to pad the list. Cost is shown beside each event as "
         "context for your decision and is never an input to a score."
-        % (CLASSIFICATION_LABELS[classification].lower(), where.lower(), side))
+        % (CLASSIFICATION_LABELS[classification],
+           CLASSIFICATION_BUYER_PLACE[classification],
+           (" " + CLASSIFICATION_WHY[classification])
+           if classification in CLASSIFICATION_WHY else "",
+           side))

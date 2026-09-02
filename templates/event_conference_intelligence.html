@@ -146,7 +146,7 @@
             <div class="evi-psum" data-profile="{{ p.id }}" hidden>
               <div class="ps-head">
                 <span class="ps-name">{{ p.client_name }}</span>
-                {% if p.client_site %}<span class="ps-site">{{ p.client_site }}</span>{% endif %}
+                {% if p.website %}<span class="ps-site">{{ p.website }}</span>{% endif %}
                 {% if cl %}<span class="ps-or">{{ cl.orientation }}-driven</span>{% endif %}
                 <span class="ps-lock">Locked</span>
               </div>
@@ -190,7 +190,7 @@
                 <div class="evi-classes" role="radiogroup" aria-label="Classification">
                   {% for c in classifications %}
                   <button type="button" class="evi-class" role="radio"
-                          aria-checked="{{ 'true' if loop.first else 'false' }}"
+                          aria-checked="false"
                           data-classification="{{ c.key }}"
                           onclick="pickClass('{{ c.key }}')">
                     <span class="cl">{{ c.label }}</span>
@@ -363,7 +363,7 @@
               <div class="evi-classes evi-eclasses" role="radiogroup" aria-label="Event class">
                 {% for c in event_classes %}
                 <button type="button" class="evi-class" role="radio"
-                        aria-checked="{{ 'true' if loop.first else 'false' }}"
+                        aria-checked="false"
                         data-eventclass="{{ c.key }}"
                         onclick="pickEventClass('{{ c.key }}')">
                   <span class="cl">{{ c.label }}</span>
@@ -503,6 +503,10 @@
     var mode = 'recommend', poll = null, current = null, activeRoles = null;
     var pickedClass = null, pickedEventClass = null;
 
+    function plural(n, word){
+      return n + ' ' + word + (Number(n) === 1 ? '' : 's');
+    }
+
     function esc(s){
       return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
@@ -584,13 +588,19 @@
     }
     window.onProfilePick = onProfilePick;
 
-    /* Both radiogroups render their first card with aria-checked="true", so on
-       load the page SHOWS a selection that the script does not have. Saving
-       then fails on a classification the user can see is highlighted. Read the
+    /* Neither radiogroup pre-checks a card, because both of them ask a
+       question this agent refuses to answer on the user's behalf. Read the
        checked card back rather than trusting a variable nothing has set. */
     function checkedValue(attr){
-      var on = document.querySelector('[' + attr + '][aria-checked="true"]')
-            || document.querySelector('[' + attr + ']');
+      /* Only a genuinely checked option counts. The fallback that used to sit
+         here returned the FIRST option whether or not anyone had chosen it,
+         which meant the two questions this agent refuses to guess at, which
+         side of the floor to score and what your relationship to the event
+         was, always arrived answered. The guards downstream could not fire,
+         and the first event class is "Our own event", so an unanswered form
+         drafted follow-ups to a competitor's guests in the voice of their
+         host. */
+      var on = document.querySelector('[' + attr + '][aria-checked="true"]');
       return on ? on.getAttribute(attr) : null;
     }
 
@@ -636,7 +646,12 @@
           var sel = document.getElementById('profilePick');
           var o = document.createElement('option');
           o.value = res.j.profile.id;
-          o.textContent = res.j.profile.client_name + ' \u00b7 ' + res.j.profile.classification;
+          /* The label, not the enum key. A freshly saved profile used to
+             read "Northwind - b2b_to_marketing" in a list whose other options
+             read "B2B, selling to marketing, growth or sales". */
+          o.textContent = res.j.profile.client_name + ' \u00b7 ' +
+            (CLASSIFICATION_LABELS[res.j.profile.classification] ||
+             res.j.profile.classification);
           sel.insertBefore(o, sel.firstChild);
           sel.value = String(res.j.profile.id);
           onProfilePick();
@@ -1134,10 +1149,18 @@
             : '') +
           '<div class="db">' +
             ['going', 'skipped', 'went'].map(function(d){
+              /* The name travels in a data attribute, through esc(), and the
+                 handler is delegated below. It used to be interpolated with
+                 JSON.stringify into an onclick inside a double-quoted
+                 attribute: JSON.stringify emits its own double quotes, so the
+                 attribute ended at the first one and the handler was the
+                 fragment "recordOutcome(this," on every row. Event names are
+                 written by web search and a model, so the same expression also
+                 let a name containing a quote add attributes of its own. */
               return '<button type="button" class="dbtn' +
                 (prior && prior.decision === d ? ' on' : '') +
-                '" onclick="recordOutcome(this, ' + JSON.stringify(c.name) +
-                ', \'' + d + '\')">' + esc(labels[d] || d) + '</button>';
+                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '">' +
+                esc(labels[d] || d) + '</button>';
             }).join('') +
           '</div>' +
         '</div>' +
@@ -1164,15 +1187,31 @@
     }
     window.recordOutcome = recordOutcome;
 
+    /* One delegated listener for every decision button, present and future.
+       Rows are re-rendered from JS on every run, so binding per button would
+       have to be redone on each render and would be forgotten once. */
+    document.addEventListener('click', function(ev){
+      var t = ev.target;
+      var btn = t && t.closest ? t.closest('.dbtn') : null;
+      if (!btn || !btn.hasAttribute('data-outcome')) { return; }
+      recordOutcome(btn, btn.getAttribute('data-event'),
+                    btn.getAttribute('data-outcome'));
+    });
+
     var SUB_LABELS = {relevance: 'Relevance', dm_access: 'Decision-maker access',
                       engagement: 'Engagement mode'};
     /* Rendered from the rubric rather than typed, on the same grounds as the
        label tables around it: the number the report prints as the bar and the
        number the scorer cuts on have to be the same one. */
     var RANK_FLOOR = {{ rubric.floor }};
+    var CLASSIFICATION_LABELS = {
+      {%- for c in classifications %}
+      {{ c.key|tojson }}: {{ c.label|tojson }}{{ ',' if not loop.last }}
+      {%- endfor %}
+    };
     var CATEGORY_LABELS = {
       {%- for c in categories %}
-      '{{ c.key }}': '{{ c.label }}'{{ ',' if not loop.last }}
+      {{ c.key|tojson }}: {{ c.label|tojson }}{{ ',' if not loop.last }}
       {%- endfor %}
     };
 
@@ -1289,6 +1328,18 @@
           '</div><div class="evi-cut">' + s.excluded.map(function(e){
             return '<span class="cutp">' + esc(e.name) + '<b>' + esc(e.total) +
               '</b></span>'; }).join('') + '</div></div>';
+      }
+      if ((s.finished || []).length) {
+        html += '<div class="evi-sec"><h3>Already over</h3>' +
+          '<div class="evi-note">Found for this profile, then kept out of the ' +
+          'ranking because the edition has already ended. A recommendation is a ' +
+          'claim about the future, so these are reported rather than scored ' +
+          'against a date nobody can attend. Where one is an annual fixture, ' +
+          'the next edition is the thing to look for.' +
+          '</div><div class="evi-cut">' + s.finished.map(function(e){
+            return '<span class="cutp">' + esc(e.name) +
+              '<b>ended ' + esc(e.ends_on || '?') + '</b></span>'; }).join('') +
+          '</div></div>';
       }
       if ((s.unscored || []).length) {
         html += '<div class="evi-sec"><h3>Not scored</h3><div class="evi-note">' +
@@ -1510,8 +1561,9 @@
         (run.mode === 'discover' ? run.query : (ev.name || run.query));
       document.getElementById('drawerSub').innerHTML =
         run.mode === 'discover'
-          ? esc((s.discovered_events || evs.length) + ' events found' +
-                (s.harvested_events ? ', ' + s.harvested_events + ' rosters sampled' : ''))
+          ? esc(plural(s.discovered_events || evs.length, 'event') + ' found' +
+                (s.harvested_events
+                  ? ', ' + plural(s.harvested_events, 'roster') + ' sampled' : ''))
           : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(ev.organizer) : '');
 
       var html = '';
@@ -1577,6 +1629,6 @@
   });
   </script>
 
-  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Event & Conference Intelligence',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Event & Conference Intelligence',seconds:s,email:{{ (user.email if user else "")|tojson }}}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 </body>
 </html>

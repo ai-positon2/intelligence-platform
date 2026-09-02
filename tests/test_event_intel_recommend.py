@@ -277,8 +277,28 @@ def test_the_top_five_case_is_the_client_line_not_the_conference_blurb():
 
 def test_top_five_says_so_when_no_case_was_written():
     top = REP.top_five([{"name": "E", "total": 90}])
-    assert "No case was written" in top[0]["case"]
+    assert "no written case" in top[0]["case"]
     assert top[0]["when"] == "dates not announced"
+    assert top[0]["case_is_generic"] is False
+
+
+def test_top_five_marks_a_case_that_is_really_the_generic_description():
+    """client_line is the only sentence written about THIS client. Falling
+    back to the event description is sometimes the best available answer;
+    doing it silently puts the deliberately generic line in the flagship slot
+    with nothing on screen to say so."""
+    top = REP.top_five([{"name": "E", "total": 90,
+                         "description": "Six hundred payments people."}])
+    assert top[0]["case"] == "Six hundred payments people."
+    assert top[0]["case_is_generic"] is True
+
+
+def test_top_five_does_not_mark_a_real_client_case_as_generic():
+    top = REP.top_five([{"name": "E", "total": 90,
+                         "description": "Six hundred payments people.",
+                         "client_line": "Northwind sells to exactly these."}])
+    assert top[0]["case"] == "Northwind sells to exactly these."
+    assert top[0]["case_is_generic"] is False
 
 
 # ── the whole play ────────────────────────────────────────────────────────
@@ -411,3 +431,37 @@ def test_an_unexpected_crash_never_leaves_a_run_stuck_on_running(monkeypatch):
     P.run_job(1, "recommend", "Northwind", profile=PROFILE, email="me@p2.example")
     assert fake.runs[1]["status"] == "failed"
     assert "kaboom" in fake.runs[1]["error"]
+
+
+# ── a finished edition travels all the way to the reader ──────────────────
+
+def test_a_finished_edition_is_named_in_the_assumptions():
+    """rank() keeps it out of the list; this is the other half. A bucket
+    computed and then dropped between rank() and the page reads as "we did not
+    find it", which is a different and false claim from "we found it and it is
+    over"."""
+    ranked = {"kept": [], "over_cap": [], "counts": {},
+              "finished": [{"name": "Analytics Leaders Forum 2019",
+                            "total": 84, "ends_on": "2019-03-03"}]}
+    summary = REP.executive_summary(
+        profile={"client_name": "Northwind",
+                 "classification": R.CLASS_B2B_TO_MARKETING},
+        ranked=ranked, shortfall=[], audit={"checked": 0},
+        generic={"measured": False, "why_not_measured": ""},
+        scoring_errors=[], interchangeable=[], banned=[], thin=[], unscored=[])
+    joined = " ".join(summary["assumptions"])
+    assert "already finished" in joined
+    assert "Analytics Leaders Forum 2019" in joined
+    assert "2019-03-03" in joined
+
+
+def test_a_run_with_nothing_finished_says_nothing_about_it():
+    """A caveat that fires on every run is noise, not candour."""
+    summary = REP.executive_summary(
+        profile={"client_name": "Northwind",
+                 "classification": R.CLASS_B2B_TO_MARKETING},
+        ranked={"kept": [], "over_cap": [], "finished": [], "counts": {}},
+        shortfall=[], audit={"checked": 0},
+        generic={"measured": False, "why_not_measured": ""},
+        scoring_errors=[], interchangeable=[], banned=[], thin=[], unscored=[])
+    assert not any("already finished" in a for a in summary["assumptions"])

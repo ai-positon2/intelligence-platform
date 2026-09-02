@@ -97,10 +97,18 @@ class _LinkedText(HTMLParser):
             alt = (dict(attrs).get("alt") or "").strip()
             if alt:
                 # Exhibitor grids are frequently nothing but logo images, and
-                # the company name lives only in the alt text.
-                self.parts.append(alt + " ")
+                # the company name lives only in the alt text. When the logo is
+                # inside its own link, which is how every sponsor tier is built,
+                # that alt text IS the anchor's label: writing it to self.parts
+                # instead left the anchor empty, and an anchor with no label had
+                # its href thrown away a few lines below. That single misplaced
+                # append cost the domain of every logo-linked sponsor.
+                self._append(alt + " ")
         elif tag in _BLOCK_TAGS:
-            self.parts.append("\n")
+            # A separator inside an anchor belongs to the label, not to the
+            # page. Written to self.parts it landed outside the text being
+            # collected, and a linked card came back as "Acme IncBooth 402".
+            self._append("\n" if self._href is None else " ")
 
     def handle_endtag(self, tag):
         if tag in _SKIP_TAGS:
@@ -109,7 +117,7 @@ class _LinkedText(HTMLParser):
         if self._skip:
             return
         if tag == "a":
-            label = "".join(self._a_text).strip()
+            label = " ".join("".join(self._a_text).split()).strip()
             href = self._href
             self._href, self._a_text = None, []
             if label:
@@ -122,19 +130,33 @@ class _LinkedText(HTMLParser):
                 else:
                     self.parts.append(label)
         elif tag in _BLOCK_TAGS:
-            self.parts.append("\n")
+            self._append("\n" if self._href is None else " ")
+
+    def _append(self, text: str) -> None:
+        """Write to whichever buffer is currently open.
+
+        Everything between <a> and </a> belongs to that anchor's label. Every
+        writer in this class goes through here so a new one cannot reintroduce
+        the bug where content was written past an open anchor.
+        """
+        if self._href is not None:
+            self._a_text.append(text)
+        else:
+            self.parts.append(text)
 
     def handle_data(self, data):
         if self._skip:
             return
-        if self._href is not None:
-            self._a_text.append(data)
-        else:
-            self.parts.append(data)
+        self._append(data)
 
     def text(self) -> str:
+        # NOT unescaped again here. HTMLParser(convert_charrefs=True) has
+        # already decoded character data, and it always decodes attribute
+        # values, so a second pass only reaches the URLs this class just
+        # inlined. html.unescape resolves the legacy entity names without a
+        # trailing semicolon, which rewrote "?type=exh&reg=EU&sect=3" into
+        # "?type=exh(R)=EU(S)=3" and put a dead link in the client's report.
         raw = "".join(self.parts)
-        raw = _html.unescape(raw)
         raw = re.sub(r"[ \t\r\f\v]+", " ", raw)
         raw = re.sub(r"\n\s*\n\s*\n+", "\n\n", raw)
         lines = [ln.strip() for ln in raw.split("\n")]
@@ -351,10 +373,25 @@ _DOMAIN_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a
 # Never accepted as an organisation's "own" domain: these are where a
 # directory links when it does not have the company's site.
 _NON_COMPANY_HOSTS = {
-    "linkedin.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
-    "youtube.com", "tiktok.com", "crunchbase.com", "wikipedia.org", "goo.gl",
-    "bit.ly", "lnkd.in", "eventbrite.com", "hopin.com", "swapcard.com",
-    "medium.com", "github.com", "google.com", "maps.google.com",
+    # Social and link shorteners.
+    "linkedin.com", "twitter.com", "x.com", "facebook.com", "fb.me",
+    "instagram.com", "youtube.com", "youtu.be", "tiktok.com", "xing.com",
+    "crunchbase.com", "wikipedia.org", "goo.gl", "bit.ly", "lnkd.in",
+    "t.co", "hubs.ly", "ow.ly", "buff.ly", "medium.com", "github.com",
+    "google.com", "maps.google.com",
+    # Event platforms. A directory hosted on one of these links each exhibitor
+    # to its in-platform profile, so without this every row on the floor
+    # resolves to the platform and the client is shown a roster where all 200
+    # exhibitors are Whova Inc. These six are the ones this product meets most
+    # often and every one of them was missing.
+    "cvent.com", "bizzabo.com", "whova.com", "brella.io", "grip.events",
+    "sched.com", "swapcard.com", "hopin.com", "splashthat.com", "lu.ma",
+    "eventbrite.com", "eventbrite.co.uk", "eventbrite.ca", "eventbrite.com.au",
+    "eventbrite.de", "eventbrite.fr", "eventbrite.ie", "eventbrite.nl",
+    "eventbrite.es", "eventbrite.it", "eventbrite.sg", "eventbrite.hk",
+    "accelevents.com", "pheedloop.com", "attendify.com", "expofp.com",
+    "map-dynamics.com", "a2zinc.net", "mapyourshow.com", "swoogo.com",
+    "regfox.com", "ticketmaster.com", "meetup.com",
 }
 
 

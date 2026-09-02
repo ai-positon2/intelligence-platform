@@ -550,3 +550,55 @@ def test_the_store_clamps_a_fit_score_on_its_own_account(given, expected):
     row = store.normalise_outreach({"org_name": "Acme", "fit": given}, 1, 2,
                                    "E", W.CLASS_OWNED)
     assert row["fit"] == expected
+
+
+
+# ── the fallback openers are the product, not a placeholder ───────────────
+
+def _fb(cls, client="Northwind Analytics"):
+    return W.fallback_opener(org="Acme Robotics", event_name="FinovateFall 2026",
+                             role_label="Exhibitor", event_class=cls,
+                             client_name=client)
+
+
+def test_every_event_class_produces_a_different_opener():
+    """exhibited and attended used to return byte-identical text, which
+    contradicted this module's whole premise that the class changes the
+    play."""
+    openers = [_fb(c) for c in W.EVENT_CLASSES]
+    assert len(set(openers)) == len(W.EVENT_CLASSES), openers
+
+
+def test_the_competitor_opener_claims_nothing_about_where_we_were():
+    """CLASS_COMPETITOR says the event belonged to a competitor. It says
+    nothing about whether the client attended, and reps attend competitor
+    events for recon constantly. "We were not there" was an unestablished
+    fact, hardcoded, in a module whose headline rule is that it never
+    fabricates one."""
+    o = _fb(W.CLASS_COMPETITOR).lower()
+    assert "we were not there" not in o
+    assert "not there" not in o
+
+
+def test_the_owned_opener_is_not_a_thank_you_for_attending():
+    """Its own opener_rule: "Never open with a generic thank-you for
+    attending." The fallback used to open "Thanks for being part of ..."."""
+    o = _fb(W.CLASS_OWNED).lower()
+    assert not o.startswith("thank")
+    assert "thanks for" not in o
+
+
+@pytest.mark.parametrize("cls", W.EVENT_CLASSES)
+def test_a_branded_opener_agrees_with_its_own_verb(cls):
+    """A company name takes a singular verb. Interpolating it into a sentence
+    written for "we" produced "Northwind Analytics were there too" on every
+    branded run."""
+    o = _fb(cls)
+    assert "Analytics were" not in o
+    assert "Analytics are" not in o
+
+
+@pytest.mark.parametrize("cls", W.EVENT_CLASSES)
+def test_an_unbranded_opener_agrees_with_its_own_verb(cls):
+    o = _fb(cls, client=None)
+    assert "We was" not in o and "We is" not in o

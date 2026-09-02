@@ -516,22 +516,49 @@ def fallback_opener(*, org: str, event_name: str, role_label: str,
     actually have to say, and this gives them a true first line to say it
     after.
     """
-    who = client_name or "we"
+    # A company name takes a singular verb and "we" takes a plural one.
+    # Interpolating the name into a sentence written for "we" is what produced
+    # "Northwind Analytics were there too" on every branded run.
+    if client_name:
+        subject, was = client_name, "was"
+    else:
+        subject, was = "We", "were"
+
     if event_class == CLASS_COMPETITOR:
-        return ("I saw %s was at %s. We were not there, but the question we "
-                "hear most from teams in your position is worth 20 minutes if "
-                "it is on your list too." % (org, event_name))
+        # Says nothing about where the sender was. The previous version opened
+        # "We were not there", which nothing in the profile, the roster or the
+        # declared class establishes, and which is simply false whenever a rep
+        # attends a competitor's event for recon. No displacement language and
+        # no comparison, per this class's rule.
+        return ("I saw %s at %s. Teams looking at that end of the market tend "
+                "to arrive at the same question, and it is worth twenty "
+                "minutes if it is on your list too." % (org, event_name))
     if event_class == CLASS_OWNED:
-        return ("Thanks for being part of %s. I wanted to follow up on the "
-                "part of it most relevant to %s." % (event_name, org))
+        # Not a thank-you for attending, which this class's own opener_rule
+        # forbids and which the previous version was. Without a session on
+        # record the honest move is to name the agenda as the thing worth
+        # picking up, and leave the sender to name which part.
+        return ("%s joined us at %s. Something on that agenda earned the "
+                "registration, and that is the thread I would rather pick up "
+                "than send a general follow-up." % (org, event_name))
     if event_class == CLASS_PARTNER:
-        return ("I noticed %s at %s. We work next door to that problem, and "
-                "the overlap is usually worth a short conversation."
-                % (org, event_name))
-    return ("I saw %s on the %s list at %s. %s were there too, and there is "
-            "one thing from the week I would be curious to compare notes on."
-            % (org, role_label.lower(), event_name,
-               who if who != "we" else "We"))
+        return ("I noticed %s at %s. %s %s next door to that problem, and the "
+                "overlap is usually worth a short conversation."
+                % (org, event_name, subject,
+                   "works" if client_name else "work"))
+    if event_class == CLASS_EXHIBITED:
+        return ("I saw %s on the %s list at %s. %s had a stand there too, and "
+                "if we did not get to speak, there is one thing I would have "
+                "asked." % (org, role_label.lower(), event_name, subject))
+    # CLASS_ATTENDED. Deliberately not the exhibited sentence: the two used to
+    # return byte-identical text, which quietly contradicted this module's
+    # whole premise that the class changes the play. Having no booth is the
+    # difference, and it is the honest thing to lead with when there is no
+    # observation on record to offer instead.
+    return ("I saw %s on the %s list at %s. %s %s in the audience that week "
+            "rather than on the floor, so what I am curious about is how it "
+            "looked from your side of it."
+            % (org, role_label.lower(), event_name, subject, was))
 
 
 def enforce(rows: list[dict], *, event_class: str, notes: dict,
