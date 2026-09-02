@@ -661,6 +661,316 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .f-weak { --band: var(--evi-f-weak); }
 .f-na { --band: var(--evi-f-na); }
 
+/* ── the chart kit ──────────────────────────────────────────────────────
+   Donut, bars, columns, funnel and ring. All five read --band off a .f-*
+   or .t-* class on the element itself, which is the same mechanism the
+   calendar rail and the fit gauge already use, so a colour cannot mean one
+   thing in a chart and another on the card the chart points at.
+
+   Every draw-in below animates from a `from` keyframe only. The value each
+   one animates TO is the element's own inline width/height/dasharray, so
+   one keyframe serves a hundred different bars without any of them being
+   told what their final size is twice. */
+
+/* Every draw-in below is armed by script one frame AFTER the chart is
+   written, never by the stylesheet on its own. A keyframe that grows a bar
+   from zero renders as an empty axis anywhere the timeline does not run: a
+   background tab, a print, a screenshot taken before first paint. Arming
+   from inside a requestAnimationFrame callback means the chart is drawn
+   finished by default and only ever animated on a screen that is painting.
+   Nothing here is load-bearing for whether a number can be read. */
+@keyframes evi-arc-draw { from { stroke-dasharray: 0 400; } }
+@keyframes evi-grow-w { from { width: 0; } }
+@keyframes evi-grow-h { from { height: 0; } }
+@keyframes evi-rise { from { opacity: 0; transform: translateY(7px); } }
+
+/* Tier bands. P1/P2/P3 are the recommendation's own words for the same job
+   the fit bands do in the other two reports, so they feed the same variable
+   rather than carrying colours of their own. */
+.t-P1 { --band: var(--evi-f-hi); }
+.t-P2 { --band: var(--evi-f-mid); }
+.t-P3 { --band: var(--evi-f-weak); }
+.f-ok { --band: var(--evi-ok); }
+.f-warn { --band: var(--evi-warn); }
+.f-bad { --band: var(--evi-bad); }
+
+/* -- donut ------------------------------------------------------------- */
+.evi-donut { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.evi-donut .dw { position: relative; width: 108px; height: 108px; flex-shrink: 0; }
+.evi-donut svg { width: 100%; height: 100%; display: block; }
+.evi-donut .tr {
+  fill: none; stroke: var(--evi-line); stroke-width: 12;
+}
+.evi-donut .sg {
+  fill: none; stroke: var(--band, var(--evi-f-na)); stroke-width: 12;
+}
+.evi-anim .evi-donut .sg {
+  animation: evi-arc-draw .7s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .09s);
+}
+.evi-donut .dc {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px; pointer-events: none;
+}
+.evi-donut .dc b {
+  font-size: 27px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--evi-ink);
+}
+.evi-donut .dc i {
+  font-style: normal; font-size: 9.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--evi-ink-3); text-align: center;
+  max-width: 74px; line-height: 1.25;
+}
+
+.evi-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; min-width: 0; flex: 1 1 180px; }
+.evi-legend .lg {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  color: var(--evi-ink-2); background: none; border: 0; padding: 2px 0;
+  font-family: inherit; text-align: left;
+}
+.evi-legend button.lg { cursor: pointer; }
+.evi-legend button.lg:hover { color: var(--evi-ink); }
+.evi-legend button.lg[aria-pressed="true"] { color: var(--evi-ink); font-weight: 650; }
+.evi-legend .lg i {
+  width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0;
+  background: var(--band, var(--evi-f-na));
+}
+.evi-legend button.lg[aria-pressed="true"] i {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--band, var(--evi-f-na)) 26%, transparent);
+}
+
+/* -- labelled bars ----------------------------------------------------- */
+.evi-bars { display: flex; flex-direction: column; gap: 11px; }
+.evi-bars .br {
+  display: grid; gap: 3px 12px; align-items: center;
+  grid-template-columns: minmax(96px, 150px) 1fr auto;
+}
+.evi-anim .evi-bars .br {
+  animation: evi-rise .4s ease-out both; animation-delay: calc(var(--i, 0) * .05s);
+}
+.evi-bars .bl { font-size: 12.5px; font-weight: 620; color: var(--evi-ink); }
+.evi-bars .bt {
+  position: relative; height: 9px; border-radius: 5px;
+  background: var(--evi-line-2); overflow: hidden;
+}
+.evi-bars .bt .fl {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px;
+  background: var(--band, var(--evi-a2));
+}
+.evi-anim .evi-bars .bt .fl {
+  animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .05s + .08s);
+}
+/* The quota mark. A bar that reaches it met what was asked of it, and one
+   that stops short is short by a visible distance rather than by a number
+   the reader has to subtract. */
+.evi-bars .bt .gl {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; z-index: 2;
+  background: var(--evi-ink-2); opacity: .55;
+}
+/* Only a bar measured against a quota carries a verdict colour. A bar that
+   is just a count of something, an industry, a company size, is drawn in
+   the page accent: green would tell the reader that having four of a thing
+   is good, which is not a claim this chart is in a position to make. */
+.evi-bars .br.met { --band: var(--evi-ok); }
+.evi-bars .br.short { --band: var(--evi-warn); }
+.evi-bars .br.error { --band: var(--evi-bad); }
+.evi-bars .bn {
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--evi-ink);
+  font-weight: 650; white-space: nowrap;
+}
+.evi-bars .bn i { font-style: normal; color: var(--evi-ink-3); font-weight: 500; }
+.evi-bars .bw {
+  grid-column: 1 / -1; font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55;
+}
+.evi-bars .bw b { color: var(--evi-bad); font-weight: 650; }
+@media (max-width: 620px) {
+  .evi-bars .br { grid-template-columns: 1fr auto; }
+  .evi-bars .bt { grid-column: 1 / -1; order: 3; }
+  .evi-bars .bw { order: 4; }
+}
+
+/* -- column spread ----------------------------------------------------- */
+.evi-cols { display: flex; flex-direction: column; gap: 9px; }
+.evi-cols .cwrap { padding-top: 12px; }
+.evi-cols .cs {
+  position: relative; display: flex; align-items: flex-end;
+  justify-content: space-between; gap: 4px; height: 138px;
+}
+/* Capped, then spread. Eleven columns filling a 1000px drawer are ninety
+   pixels wide each, which reads as a wall of blocks rather than as a
+   distribution; capped and evenly spaced, the same eleven read as a chart
+   and forty still fit. */
+.evi-cols .cx {
+  flex: 1 1 0; min-width: 5px; max-width: 34px; height: 100%;
+  display: flex; align-items: flex-end;
+  background: none; border: 0; padding: 0; font: inherit;
+}
+.evi-cols button.cx { cursor: pointer; }
+.evi-cols .cl {
+  display: block; width: 100%; border-radius: 3px 3px 1px 1px;
+  background: var(--band, var(--evi-f-na));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  transition: filter .14s ease, transform .14s ease;
+}
+.evi-anim .evi-cols .cl {
+  animation: evi-grow-h .55s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .028s);
+}
+/* A stub, not a zero. Hatched so it cannot be mistaken for a very low score
+   at a glance, which is the one misreading this column has to survive. */
+.evi-cols .cl.na {
+  background: repeating-linear-gradient(45deg,
+    var(--evi-f-na) 0 3px, transparent 3px 6px);
+  box-shadow: inset 0 0 0 1px var(--evi-line);
+}
+.evi-cols button.cx:hover .cl, .evi-cols button.cx:focus-visible .cl {
+  filter: brightness(1.28); transform: translateY(-2px);
+}
+.evi-cols button.cx:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-cols .fo {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px dashed var(--evi-ink-3); opacity: .75;
+  pointer-events: none; z-index: 3;
+}
+.evi-cols .fo b {
+  position: absolute; right: 0; top: -7px; font-size: 9.5px; font-weight: 650;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--evi-ink-3);
+  background: var(--evi-panel); padding: 1px 5px; border-radius: 4px;
+}
+.evi-cols .cn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
+.evi-cols .cn b { color: var(--evi-ink); font-weight: 650; }
+
+/* -- funnel ------------------------------------------------------------ */
+.evi-funnel { display: flex; flex-direction: column; gap: 10px; }
+.evi-anim .evi-funnel .fs {
+  animation: evi-rise .42s ease-out both; animation-delay: calc(var(--i, 0) * .07s);
+}
+.evi-funnel .fb {
+  height: 30px; border-radius: 7px; display: flex; align-items: center;
+  padding: 0 11px; min-width: 44px;
+  background: linear-gradient(96deg,
+    color-mix(in srgb, var(--band, var(--evi-a2)) 78%, transparent),
+    color-mix(in srgb, var(--band, var(--evi-a2)) 34%, transparent));
+  border: 1px solid color-mix(in srgb, var(--band, var(--evi-a2)) 40%, transparent);
+}
+.evi-anim .evi-funnel .fb {
+  animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .07s + .05s);
+}
+.evi-funnel .fb b {
+  font-size: 15px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.evi-funnel .fl { font-size: 12px; color: var(--evi-ink-2); margin-top: 4px; }
+.evi-funnel .fn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+
+/* -- single-arc stat --------------------------------------------------- */
+.evi-ring { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.evi-ring .rw { position: relative; display: block; width: 74px; height: 74px; flex-shrink: 0; }
+.evi-ring svg { width: 100%; height: 100%; display: block; }
+.evi-ring .tr { fill: none; stroke: var(--evi-line); stroke-width: 8; }
+.evi-ring .vl {
+  fill: none; stroke: var(--band, var(--evi-f-na)); stroke-width: 8;
+  stroke-linecap: round;
+}
+.evi-anim .evi-ring .vl {
+  animation: evi-arc-draw .8s cubic-bezier(.22,.85,.3,1) both;
+}
+.evi-ring .rn {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.evi-ring .rv { display: flex; align-items: baseline; gap: 1px; }
+.evi-ring .rn b {
+  font-size: 22px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--evi-ink);
+}
+.evi-ring .rn i {
+  font-style: normal; font-size: 10px; color: var(--evi-ink-3); line-height: 1;
+}
+.evi-ring .rl {
+  font-size: 12px; color: var(--evi-ink-2); line-height: 1.45; min-width: 0;
+}
+.evi-ring .rl i {
+  display: block; font-style: normal; font-size: 11px; color: var(--evi-ink-3);
+  margin-top: 2px;
+}
+
+/* Nothing above moves for a reader who has asked the OS for less motion.
+   Scoped to this file's own animations by name so it cannot switch off a
+   spinner that is reporting that a 40 minute run is still alive. */
+@media (prefers-reduced-motion: reduce) {
+  .evi-anim .evi-donut .sg, .evi-anim .evi-bars .br, .evi-anim .evi-bars .bt .fl,
+  .evi-anim .evi-cols .cl, .evi-anim .evi-funnel .fs, .evi-anim .evi-funnel .fb,
+  .evi-anim .evi-ring .vl {
+    animation: none !important;
+  }
+}
+
+/* ── the roster panels ──────────────────────────────────────────────────
+   Flex, not grid. Three panels in a four-track grid keep the width four
+   would have had and leave a dead column on the right, and auto-fit does
+   not fix it: the 1fr distribution is settled before an empty track
+   collapses. Flex has no track count to get wrong. */
+.evi-panels { display: flex; flex-wrap: wrap; gap: var(--gutter, 14px); }
+.evi-panel {
+  flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 17px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-panel h4 {
+  font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-panel .pn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; margin-top: auto; }
+.evi-panel .pn b { color: var(--evi-warn); font-weight: 650; }
+@media (max-width: 620px) { .evi-panel { flex-basis: 100%; } }
+
+/* Role bands, taken off the table's own role pills so a slice of the donut
+   and the pill on the row it stands for are the same colour. */
+.rb-exhibitor { --band: #38bdf8; }
+.rb-sponsor { --band: #8b5cf6; }
+.rb-speaker { --band: #4ade80; }
+.rb-partner { --band: #fbbf24; }
+.rb-media { --band: #94a3b8; }
+.rb-declared { --band: #f472b6; }
+:root[data-theme="light"] .rb-exhibitor { --band: #0284c7; }
+:root[data-theme="light"] .rb-sponsor { --band: #7c3aed; }
+:root[data-theme="light"] .rb-speaker { --band: #15803d; }
+:root[data-theme="light"] .rb-partner { --band: #a16207; }
+:root[data-theme="light"] .rb-media { --band: #64748b; }
+:root[data-theme="light"] .rb-declared { --band: #be185d; }
+
+/* ── the event, at the top of a lookup ─────────────────────────────────── */
+.evi-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.evi-hero-ev {
+  display: flex; flex-direction: column; gap: 11px; margin-bottom: 18px;
+  padding: 17px 19px 16px; border-radius: var(--radius-md, 12px);
+  background:
+    linear-gradient(150deg, rgba(56,189,248,.09), transparent 62%),
+    var(--evi-panel-2);
+  border: 1px solid var(--evi-line);
+}
+.evi-anim .evi-hero-ev { animation: evi-rise .45s ease-out both; }
+.evi-hero-ev .hn {
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2;
+  color: var(--evi-ink); display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px;
+}
+.evi-hero-ev .he {
+  font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--evi-ink-3);
+  padding: 2px 8px; border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--evi-line); background: var(--evi-panel);
+}
+.evi-hero-ev .ha { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.6; }
+.evi-hero-ev .hl {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--evi-a1); text-decoration: none;
+}
+.evi-hero-ev .hl:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .evi-anim .evi-hero-ev { animation: none; } }
+
 /* ── at a glance ─────────────────────────────────────────────────────── */
 .evi-glance { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 780px) { .evi-glance { grid-template-columns: 1fr; } }
@@ -1189,7 +1499,18 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   .evi-scrim { position: static; background: none; backdrop-filter: none; padding: 0; display: block; }
   .evi-drawer { height: auto; max-width: none; border: none; box-shadow: none; }
   .evi-drawer-body { overflow: visible; }
-  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-cal { background: #fff; border-color: #d8dde8; }
+  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-cal,
+  .evi-panel, .evi-hero-ev, .evi-window { background: #fff; border-color: #d8dde8; }
+  /* A print can start while a draw-in is halfway through, and a bar caught at
+     40% of its width prints at 40% of its width. Nothing here animates on
+     paper. */
+  .evi-anim * { animation: none !important; }
+  /* The charts are the one place on this page where colour carries meaning
+     rather than decoration, so the blanket ink rule above must not repaint
+     them. A donut whose every slice prints the same dark grey is a picture
+     of nothing. */
+  .evi-donut .sg, .evi-ring .vl, .evi-cols .cl, .evi-bars .bt .fl,
+  .evi-funnel .fb, .evi-legend .lg i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* The rail's numbers sit on a coloured disc, and the blanket dark-ink
      rule above would print them dark-on-dark. */
   .evi-cal .mk { color: #fff !important; border-color: #fff; box-shadow: none; }
@@ -1327,12 +1648,33 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .evi-top li:hover { border-color: rgba(99,102,241,.3); transform: translateX(2px); }
 .evi-top li::before {
-  content: counter(top); position: absolute; left: 16px; top: 15px;
+  content: counter(top); position: absolute; left: 16px; top: 15px; z-index: 1;
   width: 24px; height: 24px; border-radius: 50%;
   display: grid; place-items: center;
   font-size: 12px; font-weight: 700; color: #fff;
   background: linear-gradient(135deg, var(--evi-a1), var(--evi-a2));
 }
+/* The whole entry is the control when it has somewhere to go, so the target
+   is the card rather than a link at the end of the sentence. */
+.evi-top .tw {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.evi-top li.go:hover { border-color: color-mix(in srgb, var(--band, var(--evi-a2)) 45%, transparent); }
+.evi-top .tw:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 4px; border-radius: 8px; }
+.evi-top .ts i { font-style: normal; font-weight: 500; color: var(--evi-ink-3); }
+/* The score as a length as well as a number, against the same 110 the
+   spread above uses, so the two charts agree about what a 99 looks like. */
+.evi-top .tb {
+  height: 4px; border-radius: 3px; background: var(--evi-line-2);
+  overflow: hidden; margin-top: 8px;
+}
+.evi-top .tb span {
+  display: block; height: 100%; border-radius: 3px;
+  background: var(--band, var(--evi-a2));
+}
+.evi-anim .evi-top .tb span { animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .evi-anim .evi-top .tb span { animation: none; } }
 .evi-top .tn {
   display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
   font-size: 15px; font-weight: 600; letter-spacing: -.01em;
@@ -1400,21 +1742,13 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   padding: 13px 15px; border-radius: var(--radius-md, 10px);
   background: var(--evi-panel); border: 1px solid var(--evi-line-2);
 }
-.evi-cand .cscore .tot {
+/* The total is a ring now, and it has to hold the whole left column against
+   the three sub-scores on the right. Without the span it takes one grid cell
+   and the bars wrap around it. */
+.evi-cand .cscore .evi-ring {
   grid-row: 1 / span 4; align-self: center;
-  font-family: 'Bricolage Grotesque', serif;
-  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
-  padding-right: 18px; margin-right: 4px; border-right: 1px solid var(--evi-line-2);
-  font-variant-numeric: tabular-nums; min-width: 92px;
-}
-.evi-cand.t-P1 .cscore .tot {
-  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a3));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.evi-cand .cscore .tot span {
-  display: block; font-family: 'Space Grotesk', sans-serif;
-  font-size: 11px; font-weight: 600; color: var(--evi-ink-3);
-  -webkit-text-fill-color: var(--evi-ink-3); letter-spacing: 0; margin-top: 3px;
+  padding-right: 16px; margin-right: 4px; border-right: 1px solid var(--evi-line-2);
+  max-width: 190px;
 }
 
 .evi-sub { display: grid; gap: 4px; }
@@ -1560,12 +1894,16 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
    hours, and a user who believes they are inside it when they are not will
    send an opener whose whole premise is stale. */
 .evi-window {
-  display: flex; flex-direction: column; gap: 5px;
+  display: flex; align-items: center; gap: 16px;
   padding: 15px 18px; margin-bottom: 18px;
   border-radius: var(--radius-md, 12px);
   border: 1px solid var(--evi-line); border-left-width: 3px;
   background: var(--evi-panel-2);
 }
+.evi-window .wr { flex-shrink: 0; }
+.evi-window .wr .evi-ring .rl { display: none; }
+.evi-window .wb { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+@media (max-width: 560px) { .evi-window { flex-direction: column; align-items: flex-start; } }
 .evi-window .wt {
   font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; color: var(--evi-ink);
 }
@@ -1647,14 +1985,17 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   background: rgba(148,163,184,.14); color: var(--evi-ink-3);
   border: 1px solid var(--evi-line-2); white-space: nowrap;
 }
-.evi-out .ofit {
-  flex-shrink: 0; text-align: right; font-size: 10px; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--evi-ink-3); font-weight: 600;
-}
-.evi-out .ofit span {
-  display: block; font-family: 'Bricolage Grotesque', serif;
-  font-size: 22px; font-weight: 700; letter-spacing: -.03em; color: var(--evi-ink);
-  font-variant-numeric: tabular-nums; text-transform: none;
+.evi-out .ofit { flex-shrink: 0; }
+/* The label sits under the number inside the ring's own box rather than
+   beside it: the card's header row is already a name and a role and has no
+   room for a third column of words. */
+.evi-out .ofit .evi-ring { flex-direction: column; gap: 0; }
+.evi-out .ofit .evi-ring .rw { width: 58px; height: 58px; }
+.evi-out .ofit .evi-ring .rn b { font-size: 17px; }
+.evi-out .ofit .evi-ring .rn i { display: none; }
+.evi-out .ofit .evi-ring .rl {
+  font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 600; text-align: center;
 }
 .evi-out .op { font-size: 12.5px; color: var(--evi-ink-2); margin-top: 4px; }
 .evi-out .ofn { font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 8px; }
@@ -1723,9 +2064,9 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 
 @media (max-width: 640px) {
   .evi-cand .cscore { grid-template-columns: 1fr; }
-  .evi-cand .cscore .tot {
+  .evi-cand .cscore .evi-ring {
     grid-row: auto; border-right: none; padding-right: 0; margin-right: 0;
-    border-bottom: 1px solid var(--evi-line-2); padding-bottom: 10px; min-width: 0;
+    border-bottom: 1px solid var(--evi-line-2); padding-bottom: 10px; max-width: none;
   }
   .evi-cand .mm { grid-column: 1; }
   .evi-out .ot { flex-direction: column; }

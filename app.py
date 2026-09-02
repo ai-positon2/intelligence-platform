@@ -8672,7 +8672,15 @@ def event_conference_intelligence():
                                    {"key": d,
                                     "label": event_intel_rubric.DIMENSION_LABELS[d],
                                     "max": event_intel_rubric.DIMENSION_MAX[d]}
-                                   for d in event_intel_rubric.DIMENSIONS]})
+                                   for d in event_intel_rubric.DIMENSIONS]},
+                           # The follow-up window, for the same reason as the
+                           # rubric above. The workroom report draws an arc
+                           # against these hours and says them in a sentence
+                           # beside it, and both used to be typed into the
+                           # template while the pipeline cut on the constants
+                           # here.
+                           window={"prime": event_intel_workroom.PRIME_HOURS,
+                                   "total": event_intel_workroom.WINDOW_HOURS})
 
 
 @app.route("/p2/b2b-agents/event-conference-intelligence/profiles",

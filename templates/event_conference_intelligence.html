@@ -1300,6 +1300,228 @@
         '<span class="fl">' + esc(b ? b.l : '') + '</span></div>';
     }
 
+    /* -- the chart kit ---------------------------------------------------
+       Five shapes shared by all three reports: a donut, a labelled bar set,
+       a column spread, a funnel and a single-arc stat. They exist so that a
+       roster read by one play and a category quota counted by another are
+       not two different visual languages, and so that everything drawn is
+       drawn from the same stored rows the tables underneath are built from.
+
+       One rule holds across all five, and it is the same rule the rest of
+       this agent runs on. What is MISSING gets a segment of its own. A
+       roster donut that quietly leaves out the companies nobody could look
+       up draws a cleaner run than the one that happened. So "not stated",
+       "could not be read" and "not scored" are drawn, in a muted band, and
+       are never folded into a neighbour or dropped for being awkward.
+
+       Every animation here is a draw-in with only a `from` keyframe, so the
+       value it animates TO is whatever the element's own inline style says.
+       That is what keeps one shared @keyframes honest across a hundred
+       different bar widths, and it is why nothing here needs a second pass
+       over the DOM after render() to start moving. */
+
+    /* Charts are written finished and the animation is armed one frame
+       later, never the other way round.
+
+       A background tab does not run requestAnimationFrame and its document
+       timeline does not advance, so a bar grown from a `from` keyframe sits
+       at zero for as long as nobody is looking, which is also exactly when a
+       screenshot or a print is taken. Arming from inside a frame callback
+       means the finished chart is the default rendering and the animation is
+       something that only ever happens on a screen that is painting.
+
+       Armed once per report rather than once per render: the filters in
+       these views re-enter render(), and replaying every bar each time
+       somebody presses a role chip is a flinch, not a flourish. */
+    var ANIM_FOR = null;
+
+    function armAnim(key){
+      var el = document.getElementById('drawerBody');
+      if (!el || !el.classList) return;
+      if (ANIM_FOR === key) return;
+      ANIM_FOR = key;
+      el.classList.remove('evi-anim');
+      if (typeof requestAnimationFrame !== 'function') return;
+      requestAnimationFrame(function(){
+        if (ANIM_FOR === key) el.classList.add('evi-anim');
+      });
+    }
+
+    /* Segments with nothing in them are dropped: a zero has no area to draw
+       and an empty legend entry is noise. Everything above zero survives,
+       muted bands included. */
+    function liveSegs(segs){
+      return (segs || []).filter(function(s){ return Number(s.n) > 0; });
+    }
+
+    function segLegend(segs, opts){
+      opts = opts || {};
+      return '<div class="evi-legend">' + segs.map(function(s){
+        var lbl = s.label + ' ' + s.n;
+        if (!opts.pick) {
+          return '<span class="lg ' + esc(s.cls) + '"><i></i>' + esc(lbl) + '</span>';
+        }
+        return '<button type="button" class="lg ' + esc(s.cls) + '" aria-pressed="' +
+          (opts.on === s.k) + '" title="' + esc(opts.hint ? opts.hint(s) : lbl) +
+          '" onclick="' + esc(opts.pick(s)) + '"><i></i>' + esc(lbl) + '</button>';
+      }).join('') + '</div>';
+    }
+
+    /* A donut. The number in the hole is the one number the chart is about,
+       and the segments always sum to it, so the picture can be checked
+       against the number without leaving the picture. */
+    function evDonut(segs, centre, centreLabel, opts){
+      segs = liveSegs(segs);
+      opts = opts || {};
+      var total = segs.reduce(function(n, s){ return n + Number(s.n); }, 0);
+      if (!total) return '';
+      var r = 42, C = 2 * Math.PI * r, off = 0;
+      var arcs = segs.map(function(s, i){
+        var len = (Number(s.n) / total) * C;
+        var a = '<circle class="sg ' + esc(s.cls) + '" cx="50" cy="50" r="' + r +
+          '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) +
+          '" stroke-dashoffset="' + (-off).toFixed(2) + '" style="--i:' + i + '">' +
+          '<title>' + esc(s.label + ': ' + s.n) + '</title></circle>';
+        off += len;
+        return a;
+      }).join('');
+      return '<div class="evi-donut">' +
+        '<div class="dw"><svg viewBox="0 0 100 100" role="img" aria-label="' +
+        esc(segs.map(function(x){ return x.label + ' ' + x.n; }).join(', ')) + '">' +
+        '<circle class="tr" cx="50" cy="50" r="' + r + '"/>' +
+        '<g transform="rotate(-90 50 50)">' + arcs + '</g></svg>' +
+        '<span class="dc"><b>' + esc(centre) + '</b><i>' + esc(centreLabel || '') +
+        '</i></span></div>' + segLegend(segs, opts) + '</div>';
+    }
+
+    /* Labelled horizontal bars against a common maximum. Used wherever the
+       comparison is "how much of what was asked for did we get", which is
+       category coverage and nothing else so far. A row can carry a state,
+       and a row whose search FAILED is drawn in the bad band rather than as
+       a short bar, because a short bar reads as a finding about the market
+       and this one is a hole in the analysis. */
+    function evBars(rows){
+      rows = rows || [];
+      if (!rows.length) return '';
+      var max = rows.reduce(function(m, r){
+        return Math.max(m, Number(r.max) || 0, Number(r.n) || 0); }, 1);
+      return '<div class="evi-bars">' + rows.map(function(r, i){
+        var n = Number(r.n) || 0, of = Number(r.max) || 0;
+        var w = Math.max(2, (n / max) * 100);
+        var goal = of ? (of / max) * 100 : 0;
+        /* A row can report a word rather than a count. Some categories are
+           known to have met their quota without the run having stored how
+           many they found, and printing the quota as if it were the count
+           would be inventing a number to fill a column. */
+        var reads = r.text != null
+          ? '<b>' + esc(r.text) + '</b>'
+          : esc(n) + (of ? '<i> of ' + esc(of) + '</i>' : '');
+        return '<div class="br ' + esc(r.state || '') + '" style="--i:' + i + '">' +
+          '<div class="bl">' + esc(r.label) + '</div>' +
+          '<div class="bt">' +
+            (goal ? '<span class="gl" style="left:' + goal.toFixed(2) + '%"></span>' : '') +
+            '<span class="fl" style="width:' + w.toFixed(2) + '%"></span></div>' +
+          '<div class="bn">' + reads + '</div>' +
+          (r.note ? '<div class="bw">' + r.note + '</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    /* One column per row, in the order the list below is in, so the shape of
+       the spread and the order of the cards are the same fact. `floor`, when
+       given, is drawn as a line across the columns: it is a real number the
+       run cut on, not a visual flourish, and drawing it is what makes the
+       gap between the kept and the cut legible.
+
+       An item with no value gets a stub column in the muted band and is
+       counted in the note, never a zero-height column. Zero is a score. Not
+       scored is not. */
+    function evCols(items, opts){
+      items = items || [];
+      opts = opts || {};
+      if (items.length < 2) return '';
+      var top = items.reduce(function(m, it){
+        return Math.max(m, Number(it.n) || 0); }, 0) || 1;
+      var scale = Math.max(top, Number(opts.max) || 0);
+      var missing = 0;
+      var cols = items.map(function(it, i){
+        var has = it.n != null && it.n !== '';
+        if (!has) missing += 1;
+        var h = has ? Math.max(8, (Number(it.n) / scale) * 100) : 6;
+        var lbl = it.label + (has ? ': ' + it.n : ': not scored');
+        var body = '<span class="cl ' + esc(it.cls || 'f-na') + (has ? '' : ' na') +
+          '" style="height:' + h.toFixed(2) + '%;--i:' + i + '"></span>';
+        /* Not every column has somewhere to go. The cut list is stored as
+           names and totals with no card of its own, and a button that does
+           nothing when pressed is worse than a shape that never offered. */
+        var j = opts.jump ? opts.jump(it, i) : null;
+        if (!j) {
+          return '<span class="cx" title="' + esc(lbl) + '">' + body + '</span>';
+        }
+        return '<button type="button" class="cx" title="' + esc(lbl) +
+          '" aria-label="' + esc(lbl) + '" onclick="' + esc(j) + '">' +
+          body + '</button>';
+      }).join('');
+      var floor = (opts.floor != null && scale)
+        ? '<span class="fo" style="bottom:' +
+          Math.min(100, (opts.floor / scale) * 100).toFixed(2) + '%"><b>' +
+          esc(opts.floorLabel || ('the bar, ' + opts.floor)) + '</b></span>' : '';
+      var note = opts.note || '';
+      if (missing) {
+        note += (note ? ' ' : '') + plural(missing, 'stub') +
+          ' at the foot of the chart ' + (missing === 1 ? 'is an item' : 'are items') +
+          ' with no score, drawn short rather than as a zero.';
+      }
+      /* The line goes INSIDE the column box. Positioned against the padded
+         wrapper instead, its percentage was measured against a taller box
+         than the columns were, so the bar it drew sat a few pixels above the
+         height it was describing. */
+      return '<div class="evi-cols">' +
+        '<div class="cwrap"><div class="cs">' + floor + cols + '</div></div>' +
+        (note ? '<div class="cn">' + note + '</div>' : '') + '</div>';
+    }
+
+    /* A funnel: each step as a share of the first, so the drop between two
+       steps is the thing you see. Steps are given, never derived, because
+       the difference between "cut" and "never looked at" is exactly what a
+       derived funnel would smooth over. */
+    function evFunnel(steps){
+      steps = (steps || []).filter(function(s){ return s.n != null; });
+      if (steps.length < 2) return '';
+      var first = Number(steps[0].n) || 1;
+      return '<div class="evi-funnel">' + steps.map(function(s, i){
+        var w = Math.max(6, (Number(s.n) / first) * 100);
+        return '<div class="fs ' + esc(s.cls || '') + '" style="--i:' + i + '">' +
+          '<div class="fb" style="width:' + w.toFixed(2) + '%"><b>' + esc(s.n) +
+          '</b></div><div class="fl">' + esc(s.label) + '</div>' +
+          (s.note ? '<div class="fn">' + esc(s.note) + '</div>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    /* One value on one arc, big. `max` is stated rather than assumed: the
+       recommendation scores out of 110 and a fit scores out of 100, and an
+       arc that silently rescaled one to the other would be lying about both. */
+    function evRing(value, max, label, cls, sub){
+      if (value == null) return '';
+      var r = 40, C = 2 * Math.PI * r;
+      var on = Math.max(0, Math.min(1, Number(value) / (max || 100))) * C;
+      return '<div class="evi-ring ' + esc(cls || 'f-na') + '" role="img" aria-label="' +
+        esc(value + ' out of ' + max + ', ' + label) + '">' +
+        '<span class="rw"><svg viewBox="0 0 100 100" aria-hidden="true">' +
+        '<circle class="tr" cx="50" cy="50" r="' + r + '"/>' +
+        '<circle class="vl" cx="50" cy="50" r="' + r + '" stroke-dasharray="' +
+        on.toFixed(2) + ' ' + C.toFixed(2) + '" transform="rotate(-90 50 50)"/></svg>' +
+        /* The number is centred inside a box the exact size of the ring, and
+           the value and its denominator share a baseline inside THAT. The
+           previous version centred them with a line-height, which held at
+           one ring size and drifted the moment a card asked for a smaller
+           one. Same bug the fit gauge had, same fix. */
+        '<span class="rn"><span class="rv"><b>' + esc(value) + '</b><i>/' +
+        esc(max) + '</i></span></span>' +
+        '</span><span class="rl">' + esc(label) +
+        (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span></div>';
+    }
+
     /* ── at a glance ───────────────────────────────────────────────────── */
     function glanceHtml(rows, sm){
       var tiles = [];
@@ -1362,6 +1584,187 @@
         '<div class="evi-glance">' + tiles.join('') + '</div></div>';
     }
 
+    /* -- the roster, drawn -----------------------------------------------
+       A roster arrives as a table of forty rows, and the three questions
+       somebody actually opens it with, who is in it, whether we could read
+       the pages, and what these companies do, are each answerable only by
+       reading forty rows and counting. So they are counted here, from the
+       same rows the table below is built from.
+
+       The second panel is the one that matters most and is the one a
+       prettier report would leave out. Pages that could not be read are
+       drawn at the same size as pages that could, in the bad band, because
+       the size of that slice IS the size of the doubt about everything else
+       on this screen. */
+
+    var ROLE_BAND = {exhibitor: 'rb-exhibitor', sponsor: 'rb-sponsor',
+                     speaker: 'rb-speaker', partner: 'rb-partner',
+                     media: 'rb-media', attendee_declared: 'rb-declared'};
+
+    var SOURCE_LABEL = {ok: 'Read', recovered: 'Recovered by search',
+                        blocked: 'Blocked', not_found: 'Not found',
+                        error: 'Failed'};
+    /* Recovered is deliberately NOT in the good band. The page could not be
+       read and a model reassembled the list from search results, which is
+       weaker evidence than a page we parsed, and the store keeps them apart
+       for exactly that reason. */
+    var SOURCE_BAND = {ok: 'f-ok', recovered: 'f-warn', blocked: 'f-bad',
+                       not_found: 'f-na', error: 'f-bad'};
+
+    function srcLabel(k){
+      return SOURCE_LABEL[k] || String(k || '').replace(/_/g, ' ');
+    }
+
+    function panel(title, body, note){
+      if (!body) return '';
+      return '<div class="evi-panel"><h4>' + esc(title) + '</h4>' + body +
+        (note ? '<p class="pn">' + note + '</p>' : '') + '</div>';
+    }
+
+    function rolePanel(run){
+      var counts = (run.summary || {}).by_role || {};
+      var labels = run.role_labels || {};
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      if (!keys.length) return '';
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      var segs = keys.map(function(k){
+        return {k: k, n: counts[k], label: labels[k] || k,
+                cls: ROLE_BAND[k] || 'f-na'};
+      });
+      var declared = counts.attendee_declared || 0;
+      return panel('Who is on it',
+        evDonut(segs, total, 'listed', {
+          on: activeRoles,
+          pick: function(sg){ return "eviFilter('" + sg.k + "')"; },
+          hint: function(sg){
+            return (activeRoles === sg.k ? 'Showing only ' : 'Show only ') +
+              (labels[sg.k] || sg.k) + ' (' + sg.n + ')'; }
+        }),
+        'Every slice is a published listing. ' +
+        (declared
+          ? esc(plural(declared, 'row')) + ' came from someone saying publicly that ' +
+            'they are going, which is the only slice here that is not the ' +
+            'organiser&rsquo;s own list. '
+          : '') +
+        'It is not an attendee list. Pick a slice to filter the table.');
+    }
+
+    function tierPanel(run){
+      var rows = run.participants || [];
+      var withTier = rows.filter(function(p){ return p.tier; });
+      if (!withTier.length) return '';
+      var counts = {};
+      withTier.forEach(function(p){ counts[p.tier] = (counts[p.tier] || 0) + 1; });
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var segs = keys.map(function(k, i){
+        return {k: k, n: counts[k], label: k,
+                cls: ['f-hi', 'f-mid', 'f-low', 'f-weak'][i] || 'f-na'};
+      });
+      var none = rows.length - withTier.length;
+      if (none > 0) {
+        segs.push({k: '_none', n: none, label: 'No tier published', cls: 'f-na'});
+      }
+      /* The centre is the whole roster, not the tiered part of it. The
+         segments have to sum to the number in the hole or the picture and
+         the number disagree, and the muted slice is most of this one. */
+      return panel('What they paid for',
+        evDonut(segs, rows.length, 'on the roster'),
+        'Sponsorship tier as the organiser published it. A tier is a budget ' +
+        'somebody already signed off, which is the closest thing on this page ' +
+        'to a spending signal. The muted slice is rows with no tier on the ' +
+        'listing, not rows that paid nothing.');
+    }
+
+    function sourcePanel(run){
+      var srcs = run.sources || [];
+      if (!srcs.length) return '';
+      var counts = {};
+      srcs.forEach(function(x){ counts[x.status] = (counts[x.status] || 0) + 1; });
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var segs = keys.map(function(k){
+        return {k: k, n: counts[k], label: srcLabel(k), cls: SOURCE_BAND[k] || 'f-na'};
+      });
+      var unread = srcs.length - (counts.ok || 0);
+      return panel('Pages we could open',
+        evDonut(segs, srcs.length, 'attempted'),
+        unread
+          ? '<b>' + esc(plural(unread, 'page')) + ' did not come back readable.</b> ' +
+            'The roster is short by whatever was on ' +
+            (unread === 1 ? 'it' : 'them') + ', and there is no way to know how ' +
+            'much that is. Every attempt is listed under Sources at the foot of ' +
+            'this report.'
+          : 'Every page the harvester tried came back readable, so this roster ' +
+            'is as complete as what the event has published.');
+    }
+
+    function firmoPanel(run){
+      var rows = run.participants || [];
+      var inds = {}, looked = 0;
+      rows.forEach(function(p){
+        var ind = (p.apollo || {}).industry;
+        if (!ind) return;
+        looked += 1;
+        inds[ind] = (inds[ind] || 0) + 1;
+      });
+      if (!looked) return '';
+      var keys = Object.keys(inds).sort(function(a, b){ return inds[b] - inds[a]; });
+      var top = keys.slice(0, 6);
+      var bars = top.map(function(k){
+        return {label: k, n: inds[k], max: 0};
+      });
+      var rest = keys.length - top.length;
+      return panel('What they do',
+        evBars(bars),
+        'Industry as Apollo records it, for the ' + esc(looked) + ' of ' +
+        esc(rows.length) + ' organisations that have been matched. ' +
+        (rest ? esc(plural(rest, 'other industry')) + ' had one row each. ' : '') +
+        'The other ' + esc(rows.length - looked) + ' have not been looked up, so ' +
+        'they are absent from this chart rather than counted as unknown.');
+    }
+
+    function rosterGlance(run){
+      var panels = [rolePanel(run), tierPanel(run), sourcePanel(run), firmoPanel(run)]
+                     .filter(Boolean);
+      if (!panels.length) return '';
+      return '<div class="evi-sec"><h3>The shape of this roster</h3>' +
+        '<div class="evi-panels">' + panels.join('') + '</div></div>';
+    }
+
+    /* The event itself, at the top, because a lookup drawer opens on one
+       event and the reader's first question is when it is and whether there
+       is still time to do anything about it. Built out of the same tag row
+       the discover cards use, so the two never disagree about what a
+       stated size or an unstated format looks like. */
+    function eventHero(ev){
+      if (!ev || !ev.name) return '';
+      var tags = [];
+      var when = dateRangeText(ev);
+      tags.push(when ? tag('', 'when', when)
+                     : tag('mut', 'when', 'No date announced',
+                           'The organiser has not published a date for this edition.'));
+      var soon = countdownText(ev);
+      if (soon) tags.push(tag(soon === 'already finished' ? 'warn' : 'go', 'soon', soon));
+      if (ev.location) tags.push(tag('', 'where', ev.location));
+      var fk = formatKey(ev);
+      tags.push(fk === 'unknown'
+        ? tag('mut', 'form', 'Format not stated',
+              'The organiser has not said whether this runs in person.')
+        : tag('', 'form', FORMAT_LABEL[fk] || fk));
+      if (ev.stated_size) {
+        tags.push(tag('mut', 'size', ev.stated_size, 'The organiser’s own claim.'));
+      }
+      var site = safeUrl(ev.website);
+      return '<div class="evi-hero-ev">' +
+        '<div class="hn">' + esc(ev.name) +
+          (ev.edition ? '<span class="he">' + esc(ev.edition) + '</span>' : '') + '</div>' +
+        '<div class="evi-tags">' + tags.join('') + '</div>' +
+        (ev.audience_note ? '<p class="ha">' + esc(citeText(ev.audience_note)) + '</p>' : '') +
+        (site ? '<a class="hl" href="' + esc(site) + '" target="_blank" ' +
+                'rel="noopener noreferrer">' + esc(ev.organizer || 'Event site') +
+                '<i aria-hidden="true">&#8599;</i></a>' : '') +
+      '</div>';
+    }
+
     /* ── the calendar rail ─────────────────────────────────────────────── */
     /* Markers are laid out in percentages of the rail rather than pixels,
        because the rail is whatever the drawer is wide. The separation below
@@ -1372,7 +1775,28 @@
        an unreadable pile of markers. */
     var MK_HALF_PCT = 2.2;
 
-    function railHtml(rows){
+    /* `opts` exists so the recommendation can put its ranked list on the
+       same calendar without a second rail being written. Every default is
+       what this function did when it only served the event set, so passing
+       nothing is the old behaviour exactly.
+
+         band(r)   the colour class. Defaults to the fit band, which is
+                   wrong for a recommendation: those score out of 110 and
+                   carry a tier, and rescaling one to the other would put a
+                   99 in the same colour as a 90.
+         anchor(r) the id on the card this marker jumps to.
+         title(r)  the hover and screen-reader text.
+         head      the section heading.
+    */
+    function railHtml(rows, opts){
+      opts = opts || {};
+      var bandOf = opts.band || function(r){ return bandClass(fitOf(r.ev)); };
+      var anchorOf = opts.anchor || function(r){ return evAnchor(r.ev, r.rank - 1); };
+      var titleOf = opts.title || function(r){
+        var n = fitOf(r.ev);
+        return r.ev.name + ' \u00b7 ' + dateRangeText(r.ev) +
+          (n == null ? '' : ' \u00b7 ' + n + ' fit');
+      };
       var dated = [], undated = [];
       rows.forEach(function(r){
         (dayNum(r.ev.starts_on) == null ? undated : dated).push(r);
@@ -1435,10 +1859,9 @@
          the span, the lanes and the month axis, so the same run would draw a
          different shape depending on which chip was pressed. */
       var marks = placed.map(function(r){
-        var n = fitOf(r.ev), cls = bandClass(n);
+        var cls = bandOf(r);
         var out = FORMAT_FILTER && formatKey(r.ev) !== FORMAT_FILTER;
-        var title = r.ev.name + ' · ' + dateRangeText(r.ev) +
-          (n == null ? '' : ' · ' + n + ' fit') +
+        var title = titleOf(r) +
           (out ? ' · outside the format you are filtering on' : '');
         return '<span class="sp ' + cls + (out ? ' out' : '') + '" style="left:' +
           r._L.toFixed(3) + '%;width:' + r._W.toFixed(3) + '%;top:' +
@@ -1447,7 +1870,7 @@
           '" style="left:' + r._C.toFixed(3) +
           '%;top:' + (r._lane * 30) + 'px" title="' + esc(title) +
           '" aria-label="' + esc(title) + '" onclick="eviReveal(\'' +
-          esc(evAnchor(r.ev, r.rank - 1)) + '\')">' + esc(r.rank) + '</button>';
+          esc(anchorOf(r)) + '\')">' + esc(r.rank) + '</button>';
       }).join('');
 
       var nowAt = pct(t);
@@ -1460,7 +1883,7 @@
           esc(plural(undated.length, 'event')) + ' not on the rail.</b> ' +
           undated.slice(0, 4).map(function(r){
             return '<button type="button" class="un" onclick="eviReveal(\'' +
-              esc(evAnchor(r.ev, r.rank - 1)) + '\')">' + esc(r.ev.name) + '</button>';
+              esc(anchorOf(r)) + '\')">' + esc(r.ev.name) + '</button>';
           }).join(', ') +
           (undated.length > 4 ? ' and ' + (undated.length - 4) + ' more' : '') +
           (undated.length === 1 ? ' has ' : ' have ') +
@@ -1472,7 +1895,7 @@
          enough piles five markers into one smudge and prints the month
          labels over each other; a minimum width is the only thing that
          keeps the spacing the lane algorithm assumed. */
-      return '<div class="evi-sec"><h3>When they land</h3>' +
+      return '<div class="evi-sec"><h3>' + esc(opts.head || 'When they land') + '</h3>' +
         '<div class="evi-calwrap"><div class="evi-cal" style="--lanes:' + lanes + '">' +
         '<div class="grid">' + ticks.map(function(k, i){
           return '<span style="left:' + k.at.toFixed(3) + '%"></span>';
@@ -1765,7 +2188,7 @@
         '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
     }
 
-    function candidateRow(c, prior, labels){
+    function candidateRow(c, prior, labels, idx){
       prior = prior || null; labels = labels || {};
       var site = safeUrl(c.website);
       var when = c.starts_on
@@ -1774,7 +2197,11 @@
         : 'dates not announced';
       var where = [c.city, c.country].filter(Boolean).join(', ') || 'location unconfirmed';
       var gaps = c.gaps || [];
-      return '<div class="evi-cand t-' + esc(c.tier || 'P3') + '">' +
+      /* The id is what the calendar marker and the column in the spread
+         both jump to, so it is derived from the row's position in the kept
+         list and from nothing else. */
+      return '<div class="evi-cand ' + tierClass(c.tier) + '" id="' +
+        esc(candAnchor(idx || 0)) + '">' +
         '<div class="ct">' +
           '<div class="cn">' +
             '<span class="tier">' + esc(c.tier || '') + '</span>' +
@@ -1790,8 +2217,9 @@
             (c.booths ? ' &middot; ' + esc(c.booths) : '') +
           '</div>' +
         '</div>' +
-        '<div class="cscore"><div class="tot">' + esc(c.total) +
-          '<span>/110</span></div>' +
+        '<div class="cscore">' +
+          evRing(c.total, 110, TIER_LABEL[c.tier] || 'scored',
+                 tierClass(c.tier)) +
           bar('Relevance', c.relevance, 40) +
           bar('DM access', c.dm_access, 40) +
           bar('Engagement', c.engagement, 20) +
@@ -1874,6 +2302,7 @@
 
     var SUB_LABELS = {relevance: 'Relevance', dm_access: 'Decision-maker access',
                       engagement: 'Engagement mode'};
+    var TIER_LABEL = {P1: 'must-attend', P2: 'strong', P3: 'below the bar'};
     /* Rendered from the rubric rather than typed, on the same grounds as the
        label tables around it: the number the report prints as the bar and the
        number the scorer cuts on have to be the same one. */
@@ -1889,32 +2318,155 @@
       {%- endfor %}
     };
 
+    /* -- the recommendation, drawn ---------------------------------------
+       The report already had every number it needed and drew none of them.
+       A year of dated events arrived as a list of paragraphs, which is the
+       one shape that makes "when is this all happening" unanswerable, and
+       the bar the whole run cuts on was a sentence rather than a line.
+
+       Three drawings, from the same stored rows the list below is built
+       from: what happened to everything found, when the survivors land, and
+       where each of them sits against the bar. */
+
+    function tierClass(t){
+      return 't-' + (t === 'P1' || t === 'P2' ? t : 'P3');
+    }
+
+    function candAnchor(i){ return 'cand-' + (i + 1); }
+
+    /* Found, scored, cleared. Each step is a subset of the one above it, so
+       the funnel is a real containment rather than three numbers drawn in
+       descending order. The gap between found and scored is accounted for in
+       words rather than in a fourth bar, because the pieces of it are
+       reported separately below and a bar would imply they add up to it. */
+    function verdictHtml(s, counts) {
+      var found = Number(s.discovered) || 0;
+      var scored = (Number(counts.kept) || 0) + (Number(counts.excluded) || 0);
+      var cleared = Number(counts.kept) || 0;
+      if (!found && !scored) return '';
+      var gaps = [];
+      if (counts.finished) gaps.push(plural(counts.finished, 'edition') + ' already over');
+      if ((s.unscored || []).length) {
+        gaps.push(plural(s.unscored.length, 'event') + ' never scored');
+      }
+      if (counts.over_cap) gaps.push(counts.over_cap + ' over the cap you set');
+      return evFunnel([
+        {n: found, label: 'Found across the six searches', cls: 'f-mid',
+         note: gaps.length ? 'Including ' + gaps.join(', ') + '.' : ''},
+        {n: scored, label: 'Scored against the rubric', cls: 'f-mid'},
+        {n: cleared, label: 'Cleared the bar of ' + RANK_FLOOR, cls: 't-P1',
+         note: 'Everything below is what these ' + cleared + ' are.'}
+      ]);
+    }
+
+    /* The kept list on a calendar. Same rail the event set uses, so an
+       undated event is listed beside it rather than plotted at a guess, and
+       the same marker press jumps to the same kind of card. */
+    function planRail(kept){
+      var rows = kept.map(function(c, i){
+        return {ev: {name: c.name, starts_on: c.starts_on, ends_on: c.ends_on},
+                c: c, i: i, rank: i + 1};
+      });
+      return railHtml(rows, {
+        head: 'When they land',
+        band: function(r){ return tierClass(r.c.tier); },
+        anchor: function(r){ return candAnchor(r.i); },
+        title: function(r){
+          return r.c.name + ' · ' + dateRangeText(r.ev) + ' · ' +
+                 r.c.total + ' of 110' + (r.c.tier ? ' · ' + r.c.tier : '');
+        }
+      });
+    }
+
+    /* Every scored event on one axis, with the bar drawn across it. The cut
+       ones are here on purpose: without them the chart shows a tidy list of
+       winners, and the single most useful thing about a floor is seeing what
+       it stopped. Heights are a share of 110, the real maximum, rather than
+       of the best score found, so a weak year draws as a low chart. */
+    function spreadHtml(kept, s){
+      var items = kept.map(function(c, i){
+        return {n: c.total, label: c.name, cls: tierClass(c.tier), _i: i, _kept: true};
+      }).concat((s.excluded || []).map(function(e){
+        return {n: e.total, label: e.name + ' (cut)', cls: 't-P3', _kept: false};
+      }));
+      if (items.length < 2) return '';
+      items.sort(function(a, b){ return (Number(b.n) || 0) - (Number(a.n) || 0); });
+      var body = evCols(items, {
+        max: 110, floor: RANK_FLOOR,
+        floorLabel: 'the bar, ' + RANK_FLOOR,
+        jump: function(it){
+          return it._kept ? "eviReveal('" + candAnchor(it._i) + "')" : null; },
+        note: 'One column per scored event, out of the 110 a perfect one would ' +
+              'score. Everything under the line was cut. Pick a column above ' +
+              'the line to jump to it.'
+      });
+      if (!body) return '';
+      return '<div class="evi-sec"><h3>Against the bar</h3>' + body + '</div>';
+    }
+
+    /* Six searches, one per kind of event, and whether each came back with
+       what was asked of it. This is the honesty centre of the whole report:
+       a category that returned nothing because the market has nothing looks
+       identical, in a list of events, to a category whose search crashed.
+
+       So a failed search is drawn in the bad band with the reason under it,
+       a short one in the warning band, and a category that met its quota
+       without the run recording HOW many it found reports the word rather
+       than a number. Filling that column with the quota would be inventing a
+       count to make a chart look complete, which is the exact move this
+       agent exists to not make. */
     function coverageHtml(s){
       var rows = s.shortfall || [];
       var statuses = s.statuses || {};
-      var searched = Object.keys(statuses).length;
-      var head = '<h3>Category coverage</h3>';
-      if (!rows.length) {
-        return '<div class="evi-sec">' + head +
-          '<div class="evi-coverage"><span class="ic">&#10003;</span><span class="tx">' +
-          'All six discovery categories returned at least two events, so no kind ' +
-          'of event is missing from this list. ' +
-          'Searching each category separately is what stops the famous names ' +
-          'crowding out the vertical summits, the free vendor days and the side events.' +
-          '</span></div></div>';
-      }
-      return '<div class="evi-sec">' + head + '<div class="evi-shortfall">' +
-        rows.map(function(r){
-          return '<div class="sf ' + esc(r.status) + '">' +
-            '<span class="k">' + esc(r.label) + '</span>' +
-            '<span class="v">' + esc(r.found) + ' of ' + esc(r.quota) + '</span>' +
-            '<span class="w">' + (r.status === 'error'
-              ? '<b>The search did not run.</b> ' : '') + esc(r.why) + '</span></div>';
-        }).join('') + '</div>' +
-        (searched ? '<div class="evi-note">Categories are searched one at a time, ' +
-          'so an empty one is a fact about this client\'s market and a failed one ' +
-          'is a hole in the analysis. They are never merged.</div>' : '') +
-        '</div>';
+      var byCat = {};
+      rows.forEach(function(r){ byCat[r.category] = r; });
+      var quotas = rows.map(function(r){ return Number(r.quota) || 0; })
+                       .filter(function(q){ return q > 0; });
+      var quota = quotas.length ? Math.max.apply(null, quotas) : 0;
+
+      var keys = Object.keys(CATEGORY_LABELS);
+      Object.keys(statuses).forEach(function(k){
+        if (keys.indexOf(k) < 0) keys.push(k);
+      });
+      rows.forEach(function(r){
+        if (keys.indexOf(r.category) < 0) keys.push(r.category);
+      });
+      if (!keys.length) return '';
+
+      var bars = keys.map(function(k){
+        var sf = byCat[k], st = statuses[k] || {};
+        var label = CATEGORY_LABELS[k] || (sf && sf.label) || k;
+        if (sf) {
+          return {label: label, n: Number(sf.found) || 0, max: Number(sf.quota) || 0,
+                  state: sf.status === 'error' ? 'error' : 'short',
+                  note: (sf.status === 'error'
+                          ? '<b>The search did not run.</b> ' : '') + esc(sf.why || '')};
+        }
+        if (st.kept != null) {
+          return {label: label, n: Number(st.kept) || 0, max: quota, state: 'met'};
+        }
+        return {label: label, n: quota || 1, max: quota, state: 'met',
+                text: 'met the quota'};
+      });
+
+      var failed = rows.filter(function(r){ return r.status === 'error'; }).length;
+      var short = rows.length - failed;
+      var verdict = failed
+        ? '<b>' + esc(plural(failed, 'search')) + ' did not run</b>, so this list ' +
+          'is missing a kind of event rather than having found none. That is a ' +
+          'hole in the analysis, not a finding about the market.'
+        : (short
+            ? esc(plural(short, 'category')) + ' came back under quota after ' +
+              'searching. An empty category is a fact about this client&rsquo;s market.'
+            : 'Every category returned what was asked of it, so no kind of event ' +
+              'is missing from this list.');
+
+      return '<div class="evi-sec"><h3>Category coverage</h3>' +
+        evBars(bars) +
+        '<div class="evi-note" style="margin-top:12px">' + verdict +
+        ' Categories are searched one at a time and are never merged, which is ' +
+        'what stops the famous names crowding out the vertical summits, the ' +
+        'free vendor days and the side events.</div></div>';
     }
 
     function recommendHtml(run){
@@ -1964,6 +2516,7 @@
           '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
             '<i>below ' + RANK_FLOOR + '</i></span>' +
         '</div>' +
+        verdictHtml(s, counts) +
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
         '<div class="ex-assume"><h4>Assumptions and what was not measured</h4><ul>' +
@@ -1972,20 +2525,40 @@
         '</ul></div>' +
       '</div>';
 
+      html += planRail(kept);
+      html += spreadHtml(kept, s);
+
       if ((s.top_five || []).length) {
+        /* The five and the ranked list are the same events written twice, and
+           the top five used to be a dead end: the reader met a name here and
+           had to go and find it again below to see why it scored what it did.
+           Matching on the stored name is what links them, and a name that is
+           NOT in the kept list, which can happen when the cap cuts the list
+           shorter than five, renders as plain text rather than as a control
+           that goes nowhere. */
+        var atName = {};
+        kept.forEach(function(c, i){ atName[c.name] = i; });
         html += '<div class="evi-sec"><h3>Top five</h3><ol class="evi-top">' +
           s.top_five.map(function(t){
-            return '<li><div class="tn">' + esc(t.name) +
-              '<span class="ts">' + esc(t.total) + '</span></div>' +
+            var at = atName[t.name];
+            var pct = Math.max(0, Math.min(100, (Number(t.total) || 0) / 110 * 100));
+            var body = '<div class="tn">' + esc(t.name) +
+              '<span class="ts">' + esc(t.total) + '<i>/110</i></span></div>' +
+              '<div class="tb"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
               '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(t.when) + '</div>' +
-              '<div class="tc">' + esc(t.case) + '</div></li>';
+              '<div class="tc">' + esc(t.case) + '</div>';
+            return '<li class="' + tierClass(t.tier) + (at == null ? '' : ' go') + '">' +
+              (at == null ? body
+                : '<button type="button" class="tw" onclick="eviReveal(\'' +
+                  esc(candAnchor(at)) + '\')" aria-label="Jump to ' + esc(t.name) +
+                  ' in the ranked list">' + body + '</button>') + '</li>';
           }).join('') + '</ol></div>';
       }
 
       html += '<div class="evi-sec"><h3>The ranked list</h3>' +
         (kept.length
-          ? '<div class="evi-cands">' + kept.map(function(c){
-              return candidateRow(c, byName[c.name], decLabels); }).join('') + '</div>'
+          ? '<div class="evi-cands">' + kept.map(function(c, i){
+              return candidateRow(c, byName[c.name], decLabels, i); }).join('') + '</div>'
           : '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + '. That is the answer, not a ' +
             'failure: the list is not padded to a target count.</div>') +
         (outc.note ? '<div class="evi-note" style="margin-top:12px">' +
@@ -2045,6 +2618,7 @@
         html += recommendHtml(run);
       }
       document.getElementById('drawerBody').innerHTML = html;
+      armAnim('recommend:' + run.id + ':' + run.status);
     }
 
     /* ── work the room ──────────────────────────────────────────────────
@@ -2054,7 +2628,15 @@
        message someone is about to send under their own name is the failure
        this whole play exists to prevent. */
 
+    /* Rendered, not typed. The pipeline decides at 48 and 72 hours and the
+       report used to say those numbers in prose of its own; an arc drawn
+       against a hardcoded 72 beside a pipeline cutting at something else is
+       a picture that disagrees with the run it is describing. */
+    var WINDOW_PRIME_H = {{ window.prime }};
+    var WINDOW_TOTAL_H = {{ window.total }};
+
     var WINDOW_TONE = {prime: 'ok', closing: 'warn', expired: 'bad', early: 'idle'};
+    var WINDOW_BAND = {prime: 'f-ok', closing: 'f-warn', expired: 'f-bad', early: 'f-na'};
     var DRAFT_LABEL = {
       rewritten_no_booth_note: 'Opener replaced: claimed a conversation',
       rewritten_aggressive: 'Opener replaced: displacement language',
@@ -2065,25 +2647,46 @@
       if (!w) return '';
       var tone = WINDOW_TONE[w.state] || 'idle';
       var head = !w.known ? 'Follow-up window unknown'
-        : w.state === 'prime' ? 'Inside the 48-hour window'
-        : w.state === 'closing' ? 'The 72-hour window is closing'
+        : w.state === 'prime' ? 'Inside the ' + WINDOW_PRIME_H + '-hour window'
+        : w.state === 'closing' ? 'The ' + WINDOW_TOTAL_H + '-hour window is closing'
         : w.state === 'early' ? 'This event has not ended yet'
-        : 'The 72-hour window has passed';
+        : 'The ' + WINDOW_TOTAL_H + '-hour window has passed';
+      /* The arc is drawn only when the hours are known. An unknown window
+         with a ring at zero would read as "no time has passed", which is the
+         opposite of what not knowing means. An expired one is drawn full
+         rather than overflowing: past the end of the window, how far past is
+         in the sentence beside it. */
+      var ring = '';
+      if (w.known && w.hours != null && w.state !== 'early') {
+        ring = evRing(Math.round(Number(w.hours)), WINDOW_TOTAL_H,
+                      'hours since it ended',
+                      WINDOW_BAND[w.state] || 'f-na',
+                      w.state === 'expired'
+                        ? 'The window was ' + WINDOW_TOTAL_H + ' hours'
+                        : 'Of the ' + WINDOW_TOTAL_H + ' the play is built for');
+      }
       return '<div class="evi-window ' + tone + '">' +
-        '<div class="wt">' + esc(head) + '</div>' +
-        '<div class="wn">' + esc(w.note || '') + '</div></div>';
+        (ring ? '<div class="wr">' + ring + '</div>' : '') +
+        '<div class="wb"><div class="wt">' + esc(head) + '</div>' +
+        '<div class="wn">' + esc(w.note || '') + '</div></div></div>';
     }
 
-    function outreachCard(r, labels){
+    function outAnchor(i){ return 'out-' + (i + 1); }
+
+    function outreachCard(r, labels, idx){
       labels = labels || {};
       var status = r.draft_status || 'ok';
       var flagged = r.draft_flagged || [];
-      return '<div class="evi-out s-' + esc(status) + '">' +
+      return '<div class="evi-out s-' + esc(status) + '" id="' +
+        esc(outAnchor(idx || 0)) + '">' +
         '<div class="ot">' +
           '<div class="on">' + esc(r.org_name) +
             (r.role ? '<span class="orl">' + esc(labels[r.role] || r.role) +
               '</span>' : '') + '</div>' +
-          (r.fit != null ? '<div class="ofit"><span>' + esc(r.fit) + '</span>fit</div>' : '') +
+          (r.fit != null
+            ? '<div class="ofit">' +
+              evRing(r.fit, 100, 'fit', bandClass(r.fit)) + '</div>'
+            : '') +
         '</div>' +
         (r.person_name
           ? '<div class="op">' + esc(r.person_name) +
@@ -2108,6 +2711,63 @@
           ? '<div class="ow"><div class="own">' + esc(r.account_note) + '</div></div>'
           : '') +
       '</div>';
+    }
+
+    /* -- the room, drawn -------------------------------------------------
+       Same three questions as the recommendation, asked of a roster instead
+       of a calendar: what happened to everyone on it, how they sit against
+       the floor, and what kind of listing they were. The floor is the run's
+       own number rather than a constant here, because a workroom run stores
+       the floor it actually cut on. */
+    function roomFunnel(s, c, rows){
+      var roster = Number(c.roster) || 0;
+      var qualified = rows.filter(function(r){ return !r.unqualified && r.fit != null;
+        }).length;
+      var kept = Number(c.kept) || 0;
+      if (!roster && !qualified) return '';
+      var unq = rows.filter(function(r){ return r.unqualified; }).length;
+      return evFunnel([
+        {n: roster, label: 'On the roster you pointed at', cls: 'f-mid',
+         note: unq ? plural(unq, 'company') + ' could not be qualified at all, so ' +
+                     (unq === 1 ? 'it is' : 'they are') + ' unscored rather than ' +
+                     'scored low.' : ''},
+        {n: qualified, label: 'Qualified and scored', cls: 'f-mid'},
+        {n: kept, label: 'Cleared the floor of ' + (s.floor || 55), cls: 'f-ok',
+         note: 'These are the ones with a draft below.'}
+      ]);
+    }
+
+    function roomSpread(kept, cut, floor){
+      var items = kept.map(function(r, i){
+        return {n: r.fit, label: r.org_name, cls: bandClass(r.fit), _i: i, _kept: true};
+      }).concat(cut.map(function(r){
+        return {n: r.fit, label: r.org_name + ' (cut)', cls: 'f-weak', _kept: false};
+      }));
+      if (items.length < 2) return '';
+      items.sort(function(a, b){ return (Number(b.n) || 0) - (Number(a.n) || 0); });
+      return evCols(items, {
+        max: 100, floor: floor, floorLabel: 'the floor, ' + floor,
+        jump: function(it){
+          return it._kept ? "eviReveal('" + outAnchor(it._i) + "')" : null; },
+        note: 'One column per company that got a score, out of 100. Everything ' +
+              'under the line was cut. Pick a column above it to jump to the draft.'
+      });
+    }
+
+    function roomRoles(rows, labels){
+      var counts = {};
+      rows.forEach(function(r){
+        if (!r.role) return;
+        counts[r.role] = (counts[r.role] || 0) + 1;
+      });
+      var keys = Object.keys(counts);
+      if (keys.length < 2) return '';
+      keys.sort(function(a, b){ return counts[b] - counts[a]; });
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      return evDonut(keys.map(function(k){
+        return {k: k, n: counts[k], label: (labels || {})[k] || k,
+                cls: ROLE_BAND[k] || 'f-na'};
+      }), total, 'with a draft');
     }
 
     function renderWorkroom(run){
@@ -2161,6 +2821,30 @@
         esc(s.send_note || '') + ' ' + esc((s.repeats || {}).crm_note || '') +
         '</span></div>';
 
+      var floorN = s.floor || 55;
+      var keptRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
+                                                     r.fit >= floorN; });
+      var cutRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
+                                                    r.fit < floorN; });
+      var funnel = roomFunnel(s, c, rows);
+      var roles = roomRoles(keptRows, run.role_labels);
+      if (funnel || roles) {
+        html += '<div class="evi-sec"><h3>What happened to the roster</h3>' +
+          '<div class="evi-panels">' +
+          (funnel ? '<div class="evi-panel"><h4>From roster to drafts</h4>' + funnel +
+            '</div>' : '') +
+          (roles ? '<div class="evi-panel"><h4>How they were listed</h4>' + roles +
+            '<p class="pn">The role each company was published under at the event. ' +
+            'A sponsor bought its way onto the page and an exhibitor booked a stand, ' +
+            'which are different sizes of commitment and worth different openers.' +
+            '</p></div>' : '') +
+          '</div></div>';
+      }
+      var spread = roomSpread(keptRows, cutRows, floorN);
+      if (spread) {
+        html += '<div class="evi-sec"><h3>Against the floor</h3>' + spread + '</div>';
+      }
+
       if ((s.qualify_errors || []).length) {
         html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
           '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
@@ -2189,16 +2873,16 @@
           }).join('') + '</div></div>';
       }
 
-      var kept = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
-                                                 r.fit >= (s.floor || 55); });
-      var cut = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
-                                                r.fit < (s.floor || 55); });
+      /* The same three lists the charts above were drawn from. Computed
+         once: a chart and a list that each filter the rows themselves are
+         two chances to disagree about where the floor is. */
+      var kept = keptRows, cut = cutRows;
       var unq = rows.filter(function(r){ return r.unqualified; });
 
       html += '<div class="evi-sec"><h3>Worth contacting</h3>' +
         (kept.length
-          ? '<div class="evi-outs">' + kept.map(function(r){
-              return outreachCard(r, run.role_labels || {}); }).join('') + '</div>'
+          ? '<div class="evi-outs">' + kept.map(function(r, i){
+              return outreachCard(r, run.role_labels || {}, i); }).join('') + '</div>'
           : '<div class="evi-empty">Nothing on this roster cleared the ICP floor. ' +
             'That is the answer, not a failure.</div>') +
         '<div style="margin-top:14px">' +
@@ -2223,6 +2907,7 @@
           '</div></div>';
       }
       document.getElementById('drawerBody').innerHTML = html;
+      armAnim('workroom:' + run.id + ':' + run.status);
     }
 
     /* Lookup, plus the retired discover play. No new discover run can be
@@ -2259,11 +2944,18 @@
         html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
           esc(s.no_pages_note) + '</span></div>';
       }
+      /* The event first, then the caveat, then the numbers, then the shape,
+         then the table. A reader who stops after the first screen should
+         have the date, the honesty note and the size of the roster; a
+         reader who stops after the second should also know how much of it
+         could not be read. The table is for the reader who did not stop. */
+      if (run.mode !== 'discover') { html = eventHero(evs[0]) + html; }
       if ((run.participants || []).length || s.sources_tried) {
         html += coverage(run);
         html += stats(run);
       }
       html += eventsHtml(run);
+      html += rosterGlance(run);
       if ((run.participants || []).length) {
         html += '<div class="evi-sec"><h3>Roster</h3>' + roleBar(run) + rosterTable(run) +
           '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
@@ -2284,6 +2976,7 @@
         '<b>No events matched</b><span>' +
         esc(s.note || s.discover_note ||
             'Nothing to show for this run.') + '</span></div>';
+      armAnim(run.mode + ':' + run.id + ':' + run.status);
     }
 
     if (document.readyState === 'loading') {
