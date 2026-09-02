@@ -352,3 +352,89 @@ def test_discovery_returns_facts_and_scores_nothing(monkeypatch):
     for c in D.discover(PROFILE)["candidates"]:
         for field in ("total", "tier", "relevance", "dm_access", "engagement"):
             assert field not in c
+
+
+# ── a starved search is not an empty market ──────────────────────────────
+#
+# Observed live on 2026-09-02. The server-side search tool stopped answering
+# part-way through two of six categories, one of them after an initial batch
+# of eight parallel queries, and the model wrote its reply from what it
+# already had. Both were recorded status="empty", and the report renders that
+# as "this category has nothing for you". The truth was that the search never
+# finished. This is the exact conflation the six-category split exists to
+# prevent, running in the direction nobody checked.
+
+def _reply(events, note="n", complete=None):
+    body = {"events": events, "note": note}
+    if complete is not None:
+        body["search_complete"] = complete
+    return json.dumps(body)
+
+
+def _run_category(monkeypatch, reply, search_count=9):
+    from tracker import event_intel_discover as D
+    monkeypatch.setattr(D.claude_websearch, "ask", lambda *a, **k: {
+        "text": reply, "raw": reply, "error": None, "stop_reason": "end_turn",
+        "text_block_count": 1, "tool_version": "v", "search_count": search_count,
+        "tool_errors": [], "usage": {}})
+    return D.search_category("industry_flagship", {"classification": "b2b_to_marketing"})
+
+
+def test_an_unfinished_search_with_nothing_found_is_an_error_not_an_empty_category(monkeypatch):
+    from tracker import event_intel_discover as D
+    r = _run_category(monkeypatch, _reply([], note="I could not finish.",
+                                          complete=False))
+    assert r["status"] == D.STATUS_ERROR, (
+        "a search that was cut off was reported as a category with nothing in it")
+    assert "gap in the search" in r["detail"]
+
+
+def test_an_unfinished_search_that_still_found_events_keeps_them_and_says_so(monkeypatch):
+    from tracker import event_intel_discover as D
+    ev = {"name": "Real Event", "starts_on": "2027-03-01",
+          "sources": ["https://example.com/e"], "category_fit": "fits",
+          "confidence": "high"}
+    r = _run_category(monkeypatch, _reply([ev], complete=False))
+    assert r["status"] == D.STATUS_PARTIAL
+    assert len(r["events"]) == 1, "confirmed events were thrown away with the gap"
+    assert r["detail"]
+
+
+def test_a_finished_search_with_nothing_found_is_still_a_real_empty(monkeypatch):
+    """The other half of the distinction. A properly searched category that
+    genuinely has nothing must keep saying so, or the fix above would turn
+    every honest empty into a scary error."""
+    from tracker import event_intel_discover as D
+    r = _run_category(monkeypatch, _reply([], note="Searched, nothing fits.",
+                                          complete=True))
+    assert r["status"] == D.STATUS_EMPTY
+    assert r["note"] == "Searched, nothing fits."
+
+
+def test_no_completeness_declaration_reports_what_could_not_be_measured(monkeypatch):
+    """Silence is not a claim of success. An older reply with no
+    search_complete field must not be read as a finished search."""
+    from tracker import event_intel_discover as D
+    r = _run_category(monkeypatch, _reply([], note="nothing"))
+    assert r["status"] == D.STATUS_EMPTY
+    assert "did not say" in r["detail"] and "cut off" in r["detail"]
+
+
+def test_the_shortfall_reason_for_a_partial_search_describes_the_SEARCH(monkeypatch):
+    """The bug as a reader experiences it. `why` must not print the model's
+    description of the market when the market was never fully looked at."""
+    from tracker import event_intel_discover as D
+    ev = {"name": "Only One", "starts_on": "2027-03-01",
+          "sources": ["https://example.com/e"], "category_fit": "fits",
+          "confidence": "high"}
+    monkeypatch.setattr(D.claude_websearch, "ask", lambda *a, **k: {
+        "text": _reply([ev], note="This market looks quiet.", complete=False),
+        "raw": "", "error": None, "stop_reason": "end_turn",
+        "text_block_count": 1, "tool_version": "v", "search_count": 9,
+        "tool_errors": [], "usage": {}})
+    out = D.discover({"classification": "b2b_to_marketing"})
+    reasons = {s["category"]: s["why"] for s in out["shortfall"]}
+    for cat, why in reasons.items():
+        assert "This market looks quiet." not in why, (
+            "category %s reported an unfinished search as a fact about the "
+            "market" % cat)

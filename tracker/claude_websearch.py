@@ -53,9 +53,99 @@ ERR_TRANSPORT = "transport"
 ERR_MAX_TOKENS = "max_tokens"
 ERR_EMPTY = "empty_response"
 ERR_UNPARSABLE = "unparsable"
+# The server-side web_search tool refused a call and returned an error block
+# in place of results, so the model wrote its answer from whatever it already
+# had. Observed live on 2026-09-02: two of six discovery categories came back
+# reporting that the tool had stopped answering part-way through, one of them
+# after an initial batch of eight parallel queries.
+#
+# max_uses itself is honoured (a probe capping it at 1 billed exactly one
+# search), so this is not a budget the caller can simply lower to avoid. It is
+# a server-side limit across the whole turn, and it can be hit for reasons the
+# caller does not control. What matters here is only that a STARVED search
+# must never be reported as "we looked and found nothing".
+ERR_SEARCH_LIMIT = "search_limit"
+
+# Error codes the web_search tool returns in place of results. Anything here
+# means the search did not run, as opposed to running and matching nothing.
+SEARCH_STARVED_CODES = ("max_uses_exceeded", "too_many_requests", "unavailable")
 
 _RESULT_KEYS = ("text", "raw", "error", "stop_reason", "text_block_count",
-                "tool_version", "search_count")
+                "tool_version", "search_count", "tool_errors", "usage")
+
+
+def _search_count(resp, usage: dict) -> int:
+    """How many WEB SEARCHES this reply actually ran.
+
+    Not the number of server_tool_use blocks. web_search is one of several
+    server-side tools and the model reaches for the others freely: a probe
+    that capped web_search at 1 came back with eighteen server_tool_use
+    blocks, seventeen of which were code execution. Counting blocks therefore
+    reported eighteen searches for a reply that ran one.
+
+    That number is not cosmetic. Two callers use it as the "did you actually
+    look this up, or are you reciting?" guard and discard the answer when it
+    is zero. Counting every tool alike lets a reply that ran no search at all
+    satisfy the guard, and a recalled list of conferences is then accepted as
+    a confirmed one.
+
+    usage.server_tool_use.web_search_requests is the billed count and is
+    authoritative. The block scan is the fallback for responses that carry no
+    usage, and it filters on the tool name for the same reason.
+    """
+    billed = usage.get("web_search_requests")
+    if isinstance(billed, int):
+        return billed
+    return sum(1 for b in getattr(resp, "content", None) or []
+               if getattr(b, "type", "") == "server_tool_use"
+               and getattr(b, "name", "") == "web_search")
+
+
+def _tool_errors(resp) -> list:
+    """Error codes the web_search tool returned in place of results.
+
+    A web_search_tool_result block carries either a list of results or a
+    single error object. The error is the only in-band signal that a search
+    was refused rather than answered, and without reading it a starved search
+    is indistinguishable from a thorough one that found nothing.
+    """
+    codes = []
+    for b in getattr(resp, "content", None) or []:
+        if getattr(b, "type", "") != "web_search_tool_result":
+            continue
+        content = getattr(b, "content", None)
+        for item in (content if isinstance(content, list) else [content]):
+            if item is None:
+                continue
+            code = getattr(item, "error_code", None)
+            if code is None and isinstance(item, dict):
+                code = item.get("error_code")
+            if code:
+                codes.append(str(code))
+    return codes
+
+
+def _usage(resp) -> dict:
+    """Token and billed-search counts, flattened. Empty when unavailable.
+
+    Reported so a run can say what it cost. Without this the only number
+    anyone had was wall-clock time, which says nothing about the bill.
+    """
+    u = getattr(resp, "usage", None)
+    if u is None:
+        return {}
+    out = {}
+    for f in ("input_tokens", "output_tokens", "cache_read_input_tokens",
+              "cache_creation_input_tokens"):
+        v = getattr(u, f, None)
+        if v is not None:
+            out[f] = v
+    stu = getattr(u, "server_tool_use", None)
+    if stu is not None:
+        v = getattr(stu, "web_search_requests", None)
+        if v is not None:
+            out["web_search_requests"] = v
+    return out
 
 
 def _tool_version_unsupported(err) -> bool:
@@ -110,7 +200,8 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     client = _client(timeout)
     if client is None:
         return {"text": "", "raw": "", "stop_reason": None, "text_block_count": 0,
-                "tool_version": None, "search_count": 0,
+                "tool_version": None, "search_count": 0, "tool_errors": [],
+                "usage": {},
                 "error": _err(ERR_NOT_CONFIGURED,
                               "ANTHROPIC_API_KEY is not configured on this deployment.")}
 
@@ -161,22 +252,35 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
             # string) from a network or key problem.
             kind = ERR_NO_TOOL_VERSION
         return {"text": "", "raw": "", "stop_reason": None, "text_block_count": 0,
-                "tool_version": None, "search_count": 0, "error": _err(kind, detail)}
+                "tool_version": None, "search_count": 0, "tool_errors": [],
+                "usage": {}, "error": _err(kind, detail)}
 
     # Join EVERY text block, in order. Not content[-1]: with web_search on,
     # the answer is split into one block per cited span and the last one is a
     # fragment. This is the single highest-value line in the module.
     blocks = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
     text = "".join(blocks)
-    searches = sum(1 for b in resp.content
-                   if getattr(b, "type", "") == "server_tool_use")
     stop_reason = getattr(resp, "stop_reason", None)
+    tool_errors = _tool_errors(resp)
+    usage = _usage(resp)
+    searches = _search_count(resp, usage)
 
     out = {"text": text, "raw": text, "stop_reason": stop_reason,
            "text_block_count": len(blocks), "tool_version": used_version,
-           "search_count": searches, "error": None}
+           "search_count": searches, "tool_errors": tool_errors,
+           "usage": usage, "error": None}
 
-    if stop_reason == "max_tokens":
+    if any(c in SEARCH_STARVED_CODES for c in tool_errors):
+        # Deliberately BEFORE the max_tokens and empty checks. A starved
+        # search usually still produces prose, so every later check would
+        # class it as a good answer.
+        out["error"] = _err(
+            ERR_SEARCH_LIMIT,
+            "The web_search tool stopped returning results part-way through "
+            "(%s) after %d searches, so this answer was written from an "
+            "incomplete search rather than a finished one."
+            % (", ".join(sorted(set(tool_errors))), searches))
+    elif stop_reason == "max_tokens":
         # Distinct from "we could not read it": it ran out of room mid-answer.
         # Named so it never hides behind a generic unreadable-response string.
         out["error"] = _err(ERR_MAX_TOKENS,

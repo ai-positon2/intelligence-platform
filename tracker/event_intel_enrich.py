@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,42 @@ def resolve_companies(domains: list[str], key: str | None = None,
     return result
 
 
+_CORP_SUFFIXES = ("inc", "llc", "ltd", "limited", "corp", "corporation", "co",
+                  "gmbh", "sa", "sas", "bv", "nv", "ag", "plc", "pty", "srl",
+                  "spa", "ab", "as", "oy", "kk", "holdings", "group", "the")
+
+
+def _normalise_company_name(name: str) -> str:
+    """A company name reduced to comparable letters and digits.
+
+    "HubSpot, Inc." and "hubspot" have to land on the same key, because one
+    comes from Apollo and the other from a domain label.
+    """
+    if not name:
+        return ""
+    words = re.split(r"[^a-z0-9]+", str(name).lower())
+    words = [w for w in words if w and w not in _CORP_SUFFIXES]
+    return "".join(words)
+
+
+def _company_label(domain: str) -> str:
+    """The comparable label of a domain: gong.io -> gong, hub-spot.com -> hubspot."""
+    if not domain:
+        return ""
+    host = str(domain).strip().lower().split("/")[0]
+    parts = [p for p in host.split(".") if p]
+    if not parts:
+        return ""
+    # Drop the TLD, and a second level for co.uk / com.au style hosts.
+    if len(parts) >= 3 and parts[-2] in ("co", "com", "org", "net", "gov", "ac"):
+        label = parts[-3]
+    elif len(parts) >= 2:
+        label = parts[-2]
+    else:
+        label = parts[0]
+    return _normalise_company_name(label)
+
+
 def find_people(domains: list[str], titles: list[str] | None = None,
                 key: str | None = None, per_company: int = 5) -> dict:
     """Free people lookup at resolved companies.
@@ -223,25 +260,66 @@ def find_people(domains: list[str], titles: list[str] | None = None,
 
     from .event_intel_harvest import clean_domain
     wanted_domains = set(uniq)
+    # Apollo does not always return an employer DOMAIN on a people search.
+    # On the live API every row came back with organization_domain=None and
+    # organization_name set, which meant the domain-only grouping below
+    # discarded 100% of the people it had just been handed, and reported
+    # error=None while doing it. Grouping therefore falls back to the employer
+    # NAME, matched against the label of each domain that was asked for.
+    by_label: dict = {}
+    for dom in uniq:
+        label = _company_label(dom)
+        if label:
+            by_label.setdefault(label, dom)
+
+    unattributed: dict = {}
+    masked = 0
     for p in people:
         d = clean_domain(p.get("company_domain") or p.get("organization_domain")
                          or p.get("company_website") or "")
+        org_name = p.get("organization_name") or p.get("company_name") or ""
+        if not d:
+            d = by_label.get(_normalise_company_name(org_name))
         # Apollo's q_organization_domains_list is a relevance hint, not a
         # hard filter (apollo_client says so in its own comments), so rows
         # for companies nobody asked about do come back. Dropping them here
         # is what keeps a person from being shown under the wrong exhibitor.
         if not d or d not in wanted_domains:
+            # NOT silently dropped. A person Apollo returned who could not be
+            # tied to a requested company is a hole in the read, and the
+            # caller has to be able to tell that apart from "this company has
+            # nobody in these roles".
+            if org_name:
+                unattributed[org_name] = unattributed.get(org_name, 0) + 1
             continue
         bucket = out["by_domain"].setdefault(d, [])
         if len(bucket) >= per_company:
             continue
+        if p.get("name_masked"):
+            masked += 1
         bucket.append({
-            "name": p.get("name") or " ".join(
-                [x for x in (p.get("first_name"), p.get("last_name")) if x]) or None,
+            # full_name is the populated one when Apollo masks a record:
+            # last_name comes back null while full_name still carries the
+            # surname, so reading first+last alone rendered "Emily He" as
+            # "Emily".
+            "name": (p.get("name") or p.get("full_name") or " ".join(
+                [x for x in (p.get("first_name"), p.get("last_name")) if x])
+                or None),
             "title": p.get("title"),
             "seniority": p.get("seniority"),
             "linkedin": p.get("linkedin_url"),
             "location": p.get("location") or p.get("city"),
+            "name_masked": bool(p.get("name_masked")),
         })
     out["total"] = sum(len(v) for v in out["by_domain"].values())
+    out["unattributed"] = unattributed
+    out["returned"] = len(people)
+    out["names_masked"] = masked
+    if people and not out["total"]:
+        # The precise failure this fallback exists for. Saying nothing here is
+        # what let a dead lookup read as an empty result for two releases.
+        out["note"] = (
+            "Apollo returned %d people but none could be tied to a company on "
+            "this roster, so none are shown. This is a gap in the lookup, not "
+            "a finding about these companies." % len(people))
     return out

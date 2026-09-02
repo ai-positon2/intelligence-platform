@@ -50,6 +50,11 @@ logger = logging.getLogger(__name__)
 STATUS_OK = "ok"
 STATUS_EMPTY = "empty"
 STATUS_ERROR = "error"
+# Some events confirmed, but the search behind them was cut short. Distinct
+# from ok (a finished search) and from error (nothing usable came back),
+# because the shortfall for this category is real but its events are not
+# suspect.
+STATUS_PARTIAL = "partial"
 
 # Three concurrent searches. Six at once reliably trips rate limiting, and one
 # at a time turns a recommend run into six sequential multi-search lookups.
@@ -119,11 +124,22 @@ Respond with ONLY a JSON object, no prose before or after:
 "in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
 "organizer_run": true|false, "matchmaking_evidence": str|null, \
 "famous": true|false, "category_fit": str, "confidence": \
-"high"|"medium"|"low", "sources": [str]}}], "note": str}}
+"high"|"medium"|"low", "sources": [str]}}], "note": str, \
+"search_complete": true|false}}
 
 `category_fit` is one sentence saying why this event belongs to the \
 "{category_label}" category specifically. `note` says what you searched and \
-what you could not confirm."""
+what you could not confirm.
+
+`search_complete` is the most important field in this object when it is \
+false. Set it to true ONLY if you were able to run every search you wanted \
+to run. Set it to FALSE if the search tool stopped returning results, refused \
+a call, cut you off, or you otherwise stopped early for any reason. An empty \
+`events` array with search_complete true means "I searched this category \
+properly and it genuinely has nothing for this client", and it is reported to \
+the client in exactly those words. The same empty array with search_complete \
+false means "I could not finish looking", which is a completely different \
+statement. Never report an unfinished search as an empty category."""
 
 
 def profile_brief(profile: dict) -> str:
@@ -443,6 +459,35 @@ def search_category(category: str, profile: dict) -> dict:
         if clean:
             events.append(clean)
     note = str(parsed.get("note") or "")[:600]
+
+    # A search that was cut off is not a category that is empty. The model is
+    # asked to declare this outright, because the alternative signals are all
+    # unreliable: the tool does not always emit an error block, and reading the
+    # failure out of the prose note means pattern-matching English. A run that
+    # got starved once reported "Emerging event: empty", which the report then
+    # renders to a paying client as "there is nothing in this category for
+    # you", when the truth was that the search never finished.
+    complete = parsed.get("search_complete")
+    if complete is False:
+        detail = ("The model reported that it could not finish searching this "
+                  "category, so an empty result here is a gap in the search "
+                  "rather than a fact about the market.")
+        if events:
+            # Partial, not worthless: keep what was confirmed and say so.
+            return {"category": category, "status": STATUS_PARTIAL,
+                    "events": events, "note": note, "detail": detail}
+        return {"category": category, "status": STATUS_ERROR, "events": [],
+                "note": note, "detail": detail}
+
+    if not events and complete is None:
+        # Nothing found and no declaration either way. Report the thing that
+        # could not be measured instead of picking the flattering reading.
+        return {"category": category, "status": STATUS_EMPTY, "events": [],
+                "note": note,
+                "detail": ("This category returned no events and did not say "
+                           "whether its search finished, so it cannot be told "
+                           "apart from a search that was cut off.")}
+
     return {"category": category,
             "status": STATUS_OK if events else STATUS_EMPTY,
             "events": events, "note": note, "detail": ""}
@@ -498,11 +543,16 @@ def discover(profile: dict) -> dict:
     for s in rubric.category_shortfall(surviving):
         st = statuses.get(s["category"]) or {}
         s["status"] = st.get("status", STATUS_ERROR)
-        # The distinction the whole module is built around.
+        # The distinction the whole module is built around. A partial search
+        # reads from `detail` for the same reason an errored one does: the
+        # reason it fell short is a fact about the SEARCH, and the model's own
+        # note is a description of the market. Printing the note for a search
+        # that was cut off is how "we could not finish looking" gets rendered
+        # as "there is nothing here for you".
         s["why"] = (st.get("detail") or "The search for this category did not run.") \
-            if s["status"] == STATUS_ERROR \
+            if s["status"] in (STATUS_ERROR, STATUS_PARTIAL) \
             else (st.get("note") or "This category returned nothing for this client.")
-        if s["status"] != STATUS_ERROR and st.get("merged_away"):
+        if s["status"] not in (STATUS_ERROR, STATUS_PARTIAL) and st.get("merged_away"):
             s["why"] = ("%s %d of the %d events found here were the same events "
                         "already listed under another category."
                         % (s["why"], st["merged_away"], st["found"]))

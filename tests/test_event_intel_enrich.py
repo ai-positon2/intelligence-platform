@@ -107,3 +107,121 @@ def test_no_api_key_reports_nothing_as_unmatched():
     assert out["error"] and "APOLLO_API_KEY" in out["error"]
     assert out["unmatched"] == []
     assert out["unattempted"] == ["a.com", "b.com"]
+
+
+# ── what the LIVE Apollo API actually returns ────────────────────────────
+#
+# Every row below is the real shape observed against api.apollo.io on
+# 2026-09-02: organization_name populated, organization_domain null,
+# last_name null, name null, full_name carrying a masked surname, and
+# name_masked true. Under the domain-only grouping these tests were written
+# for, all 25 live rows were discarded and find_people returned
+# {"by_domain": {}, "total": 0, "error": None}: a dead lookup that reported
+# success, on every roster, for every client.
+
+def _live_row(org, full, title, **kw):
+    row = {
+        "id": "x", "full_name": full, "first_name": full.split(" ")[0],
+        "last_name": None, "name_masked": True, "title": title,
+        "seniority": None, "linkedin_url": None, "city": None,
+        "organization_id": None, "organization_name": org,
+        "organization_domain": None, "organization_website": None,
+        "employer_unconfirmed": True,
+    }
+    row.update(kw)
+    return row
+
+
+@pytest.fixture()
+def live_rows(monkeypatch):
+    """Serve a fixed set of live-shaped rows from apollo_client.search_people."""
+    box = {"rows": []}
+
+    def fake_search_people(filters, key, **kw):
+        if kw.get("page", 1) > 1:
+            return []
+        return list(box["rows"])
+
+    from tracker import apollo_client
+    monkeypatch.setattr(apollo_client, "search_people", fake_search_people)
+    return box
+
+
+def test_a_person_with_no_employer_domain_is_still_placed_by_employer_name(live_rows):
+    """The regression. Apollo returned the right people and the grouping threw
+    every one of them away, because it keyed on a field the API left null."""
+    live_rows["rows"] = [
+        _live_row("HubSpot", "Kipp Bo***r", "CMO"),
+        _live_row("Gong", "Emily He", "Chief Marketing Officer"),
+    ]
+    out = E.find_people(["hubspot.com", "gong.io"], titles=["CMO"], key="k")
+    assert out["error"] is None
+    assert out["total"] == 2, "live-shaped rows were dropped again"
+    assert [p["title"] for p in out["by_domain"]["hubspot.com"]] == ["CMO"]
+    assert out["by_domain"]["gong.io"][0]["name"] == "Emily He"
+
+
+def test_a_masked_surname_is_kept_rather_than_truncated_to_a_first_name(live_rows):
+    """last_name is null on a masked record while full_name still carries the
+    surname, so reading first+last rendered "Emily He" as "Emily"."""
+    live_rows["rows"] = [_live_row("Gong", "Emily He", "CMO")]
+    out = E.find_people(["gong.io"], titles=["CMO"], key="k")
+    assert out["by_domain"]["gong.io"][0]["name"] == "Emily He"
+
+
+def test_a_masked_record_says_it_is_masked(live_rows):
+    """A partial name must not be rendered as if it were the whole name."""
+    live_rows["rows"] = [_live_row("Gong", "Anita Go***y", "Chief of Staff, CMO")]
+    out = E.find_people(["gong.io"], titles=["CMO"], key="k")
+    assert out["by_domain"]["gong.io"][0]["name_masked"] is True
+    assert out["names_masked"] == 1
+
+
+def test_company_suffixes_and_punctuation_do_not_block_the_match(live_rows):
+    live_rows["rows"] = [
+        _live_row("HubSpot, Inc.", "A B***c", "CMO"),
+        _live_row("Acme Group Ltd", "C D***e", "VP Marketing"),
+    ]
+    out = E.find_people(["hubspot.com", "acme.co.uk"], titles=["CMO"], key="k")
+    assert set(out["by_domain"]) == {"hubspot.com", "acme.co.uk"}
+
+
+def test_a_person_nobody_asked_about_is_reported_not_silently_dropped(live_rows):
+    """q_organization_domains_list is a relevance hint, so strangers come back.
+    Dropping them is right; dropping them SILENTLY is how a broken grouping
+    hid for two releases."""
+    live_rows["rows"] = [
+        _live_row("HubSpot", "A B***c", "CMO"),
+        _live_row("Some Other Company", "E F***g", "CMO"),
+    ]
+    out = E.find_people(["hubspot.com"], titles=["CMO"], key="k")
+    assert out["total"] == 1
+    assert out["unattributed"] == {"Some Other Company": 1}
+
+
+def test_people_returned_but_none_attributable_reads_as_a_gap_not_a_finding(live_rows):
+    """The exact sentence the old code could not say. Zero contacts because
+    the lookup broke must never look like zero contacts because the companies
+    have nobody in these roles."""
+    live_rows["rows"] = [_live_row("Totally Unrelated Co", "A B***c", "CMO")]
+    out = E.find_people(["hubspot.com"], titles=["CMO"], key="k")
+    assert out["total"] == 0
+    assert out["returned"] == 1
+    assert out["note"] and "gap in the lookup" in out["note"]
+
+
+def test_an_employer_domain_still_wins_when_apollo_does_return_one(live_rows):
+    """The name fallback is a LAST resort and must never override a real
+    domain. The two disagree in the wild: an acquired brand keeps its own
+    domain under the parent's name, so a row can carry organization_domain
+    gong.io and organization_name HubSpot while BOTH are on the roster. The
+    domain is the identifier; the name is the guess. Getting this backwards
+    files a person under a company they do not work for, which is worse than
+    not finding them, because it reads as a confirmed contact."""
+    live_rows["rows"] = [
+        _live_row("HubSpot", "A B***c", "CMO", organization_domain="gong.io"),
+    ]
+    out = E.find_people(["gong.io", "hubspot.com"], titles=["CMO"], key="k")
+    assert list(out["by_domain"]) == ["gong.io"], (
+        "the employer NAME overrode the employer DOMAIN and filed this person "
+        "under the wrong company")
