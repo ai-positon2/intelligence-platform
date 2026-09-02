@@ -326,3 +326,86 @@ def test_an_unrecognised_provenance_falls_back_to_the_weaker_grade():
     src = inspect.getsource(store.save_participants)
     assert "else VIA_SEARCH" in src
     assert "else VIA_PAGE" not in src
+
+
+# ── the flattener, against the markup real event sites actually ship ──────
+#
+# Every test below was a live defect. The parser is what lookup, discover and
+# workroom all stand on: a roster with no domains cannot be resolved, enriched,
+# or matched against the client's own account list, so losing a link here
+# empties three modes at once.
+
+def test_a_logo_inside_its_own_link_keeps_the_link():
+    """The single most common sponsor and exhibitor markup on the web: a grid
+    of linked logos where the company name exists only in the alt text. The
+    alt text was written past the open anchor, so the anchor had no label, and
+    an anchor with no label had its href discarded. Every sponsor tier came
+    back as names with no domains."""
+    html = ('<ul class="sponsors">'
+            '<li><a href="https://acme-corp.de/">'
+            '<img src="/logos/acme.svg" alt="Acme Corp GmbH"></a></li>'
+            '<li><a href="https://beta.io">'
+            '<img src="/l/b.png" alt="Beta Ltd"></a></li></ul>')
+    text = H.html_to_linked_text(html, "https://ev.example/sponsors")
+    assert "Acme Corp GmbH [https://acme-corp.de/]" in text
+    assert "Beta Ltd [https://beta.io]" in text
+
+
+def test_a_logo_beside_a_link_still_contributes_its_alt_text():
+    """The sibling case, which already worked and must keep working."""
+    html = '<li><img alt="Initech Software" src="/l.png"><a href="/x">More</a></li>'
+    text = H.html_to_linked_text(html, "https://ev.example/e")
+    assert "Initech Software" in text
+
+
+def test_a_card_wrapped_in_a_link_does_not_run_its_fields_together():
+    """Card-layout directories are the norm. The block separators were written
+    outside the label being collected, so the company name arrived as
+    "Acme IncBooth 402Hall 4" and the booth number was swallowed into it."""
+    html = ('<a href="https://acme.com"><div class="card"><h3>Acme Inc</h3>'
+            '<span>Booth 402</span><p>Hall 4</p></div></a>')
+    text = H.html_to_linked_text(html, "https://ev.example/e")
+    assert "Acme Inc Booth 402 Hall 4 [https://acme.com]" in text
+    assert "AcmeInc" not in text and "IncBooth" not in text
+
+
+def test_an_href_carrying_entities_is_not_decoded_twice():
+    """HTMLParser has already decoded the attribute. A second unescape reached
+    the URLs this class had just inlined, and html.unescape resolves the legacy
+    entity names without a trailing semicolon, so "&reg=" and "&sect=" were
+    rewritten into symbols and the stored source_url was a dead link."""
+    html = '<a href="https://x.com/dir?type=exh&amp;reg=EU&amp;sect=3">Acme</a>'
+    text = H.html_to_linked_text(html, "https://ev.example/e")
+    assert "https://x.com/dir?type=exh&reg=EU&sect=3" in text
+
+
+def test_a_plain_anchor_is_unaffected():
+    html = '<li><a href="https://plain.com">Plain Co</a> Booth 12</li>'
+    text = H.html_to_linked_text(html, "https://ev.example/e")
+    assert "Plain Co [https://plain.com]" in text
+    assert "Booth 12" in text
+
+
+# ── the host is not always a company ──────────────────────────────────────
+
+@pytest.mark.parametrize("url", [
+    "https://web.cvent.com/event/abc/exhibitor/xyz",
+    "https://acme.bizzabo.com/",
+    "https://whova.com/portal/exhibitor/acme",
+    "https://next.brella.io/companies/123",
+    "https://myevent.sched.com/x",
+    "https://lu.ma/revops-breakfast",
+    "https://acme.eventbrite.co.uk/",
+    "https://t.co/abc",
+    "https://hubs.ly/x",
+])
+def test_an_event_platform_profile_is_never_a_company_domain(url):
+    """A directory hosted on one of these links each exhibitor to its
+    in-platform profile. Without this every row on the floor resolves to the
+    platform, and the client is shown a roster where all two hundred
+    exhibitors are Whova Inc, ~200 employees, Boston."""
+    assert H.clean_domain(url) is None
+
+
+def test_a_real_company_link_still_resolves():
+    assert H.clean_domain("https://www.acme.com/about") == "acme.com"

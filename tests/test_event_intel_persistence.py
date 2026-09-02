@@ -5,6 +5,8 @@ whether a row is trustworthy before it is ever written, so the tests are about
 refusals and recomputation rather than about SQL.
 """
 
+import datetime
+
 import pytest
 
 from tracker import event_intel_rubric as R
@@ -82,11 +84,19 @@ def test_long_free_text_is_capped_rather_than_stored_whole():
 
 # ── candidate shaping ─────────────────────────────────────────────────────
 
+def _soon(days: int = 90) -> str:
+    return (datetime.date.today() + datetime.timedelta(days=days)).isoformat()
+
+
 def _cand(**over):
     base = {"name": "PMM Summit", "category": R.CAT_VERTICAL_SUMMIT,
             "relevance": 34, "dm_access": 33, "engagement": 16,
             "relevance_note": "n", "dm_access_note": "n", "engagement_note": "n",
-            "website": "https://pmm.example", "starts_on": "2026-04-02",
+            "website": "https://pmm.example",
+            # Relative to the clock, not a literal. A hardcoded date silently
+            # becomes a past date, and a past date is now a gap, so this
+            # fixture would have started failing on its own.
+            "starts_on": _soon(), "ends_on": _soon(93),
             "attendees": "600"}
     base.update(over)
     return base
@@ -179,6 +189,30 @@ def test_gaps_are_recorded_on_every_candidate():
     assert thin["gaps"], "a candidate with nothing measured must say so"
     full = S.normalise_candidate(_cand())
     assert full["gaps"] == []
+
+
+@pytest.mark.parametrize("raw,kept,quarter", [
+    ("2026-11-04", "2026-11-04", None),
+    ("2026-11-04T00:00:00Z", "2026-11-04", None),
+    ("Q2 2026", None, "Q2 2026"),
+    ("TBD", None, "TBD"),
+    ("2026-13-45", None, "2026-13-45"),
+    ("04/11/2026", None, "04/11/2026"),
+])
+def test_a_date_that_will_not_parse_is_kept_as_text_not_forced_into_a_date(
+        raw, kept, quarter):
+    """These land in a DATE column. Postgres answers "Q2 2026" by aborting the
+    statement, which in a batch insert used to cost every other event in the
+    run. The reader still needs the answer, so it is kept as the quarter."""
+    c = S.normalise_candidate(_cand(starts_on=raw, ends_on=None))
+    assert c["starts_on"] == kept, raw
+    assert c["quarter"] == quarter, raw
+
+
+def test_an_end_before_its_start_drops_the_end_not_the_start():
+    c = S.normalise_candidate(_cand(starts_on="2027-05-10", ends_on="2027-05-02"))
+    assert c["starts_on"] == "2027-05-10"
+    assert c["ends_on"] is None
 
 
 def test_cost_note_rides_along_without_touching_the_score():

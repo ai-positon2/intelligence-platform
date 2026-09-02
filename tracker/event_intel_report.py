@@ -66,7 +66,8 @@ def _fmt_where(c: dict) -> str:
 def assumptions(*, shortfall: list, audit: dict, generic: dict,
                 candidates: list, scoring_errors: list,
                 interchangeable: list, banned: list, thin: list,
-                unscored: list, over_cap: list | None = None) -> list[str]:
+                unscored: list, over_cap: list | None = None,
+                finished: list | None = None) -> list[str]:
     """Element 4. Everything this run could not establish, stated plainly.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -173,6 +174,21 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
                    % (len(thin), " is" if len(thin) == 1 else "s are",
                       ", ".join(t["name"] for t in thin[:4])))
 
+    # An edition that is already over, returned by a search asked for the next
+    # one, is worth saying out loud twice over: it is a row the reader can see
+    # is missing from the ranking, and it means the source being searched is
+    # behind on that event.
+    if finished:
+        names = ", ".join("%s (ended %s)" % (f.get("name"), f.get("ends_on") or "?")
+                          for f in finished[:6])
+        out.append(
+            "%d event%s found for this profile had already finished and %s left "
+            "out of the ranking rather than scored against a date nobody can "
+            "attend: %s. Where one of these is an annual fixture, the next "
+            "edition is the thing to go looking for."
+            % (len(finished), "" if len(finished) == 1 else "s",
+               "was" if len(finished) == 1 else "were", names))
+
     gapped = [c for c in (candidates or []) if c.get("gaps")]
     if gapped:
         out.append(
@@ -207,6 +223,15 @@ def top_five(kept: list[dict]) -> list[dict]:
     that is supposed to be about this client rather than this event."""
     out = []
     for c in (kept or [])[:MAX_TOP]:
+        # client_line is the only sentence in the report written about THIS
+        # client; description is written about the event and would read the
+        # same for anybody. Falling back from one to the other is sometimes
+        # the best available answer, but doing it silently puts the generic
+        # line in the flagship slot with nothing on screen to say so.
+        case = c.get("client_line")
+        generic = not case
+        if generic:
+            case = c.get("description")
         out.append({
             "name": c.get("name"),
             "edition": c.get("edition"),
@@ -214,8 +239,10 @@ def top_five(kept: list[dict]) -> list[dict]:
             "tier": c.get("tier"),
             "where": _fmt_where(c),
             "when": _fmt_when(c),
-            "case": (c.get("client_line") or c.get("description")
-                     or "No case was written for this event."),
+            "case": case or ("The sub-scores for this event were recorded but "
+                             "no written case was, so read the breakdown "
+                             "rather than this line."),
+            "case_is_generic": bool(generic and c.get("description")),
         })
     return out
 
@@ -244,6 +271,7 @@ def executive_summary(*, profile: dict, ranked: dict, **kw) -> dict:
         # 4. Assumptions and notes.
         "assumptions": assumptions(candidates=(ranked or {}).get("kept") or [],
                                    over_cap=(ranked or {}).get("over_cap") or [],
+                                   finished=(ranked or {}).get("finished") or [],
                                    **kw),
         # 5. Top five must-attend.
         "top_five": top_five((ranked or {}).get("kept") or []),

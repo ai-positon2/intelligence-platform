@@ -39,6 +39,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import re
+import datetime
 from urllib.parse import urlparse
 
 from . import claude_websearch
@@ -73,17 +74,26 @@ WHERE THIS CLIENT'S BUYERS PHYSICALLY ARE AT AN EVENT: {where_buyers}
 That is not a detail. It decides which side of the floor matters, so when you \
 describe an event, describe the side of it this client would actually work.
 
+TODAY IS {today}. Every judgement about whether an event is upcoming, and \
+every reading of the client's time window, is measured from that date and not \
+from your own sense of when now is.
+
 RULES.
 1. Use web search. Do not answer from memory. Every event you return must be \
 one you confirmed exists by visiting a real page during this search, and every \
 URL you return must be one you actually opened. A plausible-sounding \
-conference name that does not exist costs somebody a travel budget.
+conference name that does not exist costs somebody a travel budget. Return at \
+least one URL in `sources` for every event; an event you cannot cite is an \
+event you did not confirm, so leave it out.
 2. Return ONLY events that genuinely belong to the category above. If this \
 category has nothing for this client, return an empty array and explain \
 concretely in `note` what you searched for and why nothing fits. An honest \
 empty category is a finding. A flagship relabelled to fill a quota is not.
-3. Prefer the next edition inside the client's stated time window. Include a \
-past edition only if no future one is announced, and say so.
+3. Return the next edition that STARTS ON OR AFTER {today}. An edition that \
+has already finished cannot be attended and must not be returned as a \
+recommendation. Where only a past edition exists, say so in `note` and leave \
+the event out; where the next edition is announced but undated, return it with \
+null dates rather than guessing one.
 4. `attendees` and `booths` are the event's OWN published claims, quoted as \
 they state them ("12,000+ attendees", "430 exhibitors"), or null. NEVER \
 estimate either. A number you invented is indistinguishable from one they \
@@ -184,6 +194,83 @@ def host_key(url: str) -> str:
     return h[4:] if h.startswith("www.") else h
 
 
+# The region words name_key strips. Kept as their own signal because dropping
+# them is right in one direction and wrong in the other: "MarTech Summit
+# Europe" and "MarTech Summit" are one event found twice, while "Money20/20
+# USA" and "Money20/20 Europe" are two events on two continents with two buyer
+# sets, and merging them silently deletes one of them from the client's year.
+_REGION_WORDS = frozenset((
+    "europe", "emea", "apac", "usa", "us", "uk", "na", "world", "global",
+    "international", "america", "americas", "asia", "japan", "china", "india",
+    "australia", "canada", "germany", "france", "london", "berlin", "paris",
+    "singapore", "dubai", "amsterdam", "vegas",
+))
+
+
+def region_key(name: str) -> str:
+    """The region words in a name, normalised, or "" if it names no region."""
+    plain = " ".join(_NONWORD.sub(" ", (name or "").lower()).split())
+    found = sorted({t for t in plain.split() if t in _REGION_WORDS})
+    return " ".join(found)
+
+
+def _tokens(key: str) -> tuple:
+    return tuple(key.split())
+
+
+def _contains_tokens(hay: tuple, needle: tuple) -> bool:
+    """Whole-token containment, never a raw substring.
+
+    This is the difference between "CES" matching "CES 2027" and "CES"
+    matching "ProCESsing Summit". The second one used to silently delete a real
+    recommendation with no trace anywhere in the report.
+    """
+    n = len(needle)
+    if not n or n > len(hay):
+        return False
+    return any(hay[i:i + n] == needle for i in range(len(hay) - n + 1))
+
+
+def names_match(a: str, b: str) -> bool:
+    """One event under two names.
+
+    Two tests: the stripped names must contain one another token for token,
+    AND their regions must not contradict. A name with no region is compatible
+    with any region, which is what keeps "MarTech Summit" and "MarTech Summit
+    Europe" together.
+    """
+    ka, kb = name_key(a), name_key(b)
+    if not ka or not kb:
+        return False
+    ta, tb = _tokens(ka), _tokens(kb)
+    if not (_contains_tokens(ta, tb) or _contains_tokens(tb, ta)):
+        return False
+    ra, rb = region_key(a), region_key(b)
+    return not ra or not rb or ra == rb
+
+
+def site_key(url: str) -> str:
+    """Host AND path, because the host alone is not an event.
+
+    Deduping on the bare host merged every event an organiser or a vendor runs:
+    AWS re:Invent with every AWS Summit, and every side event on lu.ma with
+    every other one. Those are the free-vendor and side-event categories, the
+    two the six-category split exists to surface, emptied by the dedup step.
+    Two rows are the same page when they are the same page.
+    """
+    host = host_key(url)
+    if not host:
+        return ""
+    try:
+        path = (urlparse(url).path or "").lower().rstrip("/")
+    except Exception:
+        path = ""
+    for tail in ("/index.html", "/index.htm", "/index.php", "/home"):
+        if path.endswith(tail):
+            path = path[:-len(tail)]
+    return host + path
+
+
 def _excluded(name: str, force_exclude: str | None) -> bool:
     """Honour the profile's force-exclude list on our side too.
 
@@ -193,34 +280,26 @@ def _excluded(name: str, force_exclude: str | None) -> bool:
     """
     if not force_exclude:
         return False
-    key = name_key(name)
-    if not key:
+    if not name_key(name):
         return False
-    for line in re.split(r"[\n,;]+", force_exclude):
-        ex = name_key(line)
-        if ex and (ex in key or key in ex):
-            return True
-    return False
+    return any(names_match(name, line)
+               for line in re.split(r"[\n,;]+", force_exclude) if line.strip())
 
 
 def committed_keys(force_include: str | None) -> set:
-    """The name keys of events the client has already committed to."""
-    out = set()
-    for line in re.split(r"[\n,;]+", str(force_include or "")):
-        k = name_key(line)
-        if k:
-            out.add(k)
-    return out
+    """The events the client has already committed to, as written."""
+    return {line.strip() for line in re.split(r"[\n,;]+", str(force_include or ""))
+            if line.strip() and name_key(line)}
 
 
 def is_committed(name: str, keys: set) -> bool:
-    """Same containment match force-exclude uses, so "Money20/20" written on
-    the profile matches "Money20/20 USA 2026" coming back from a search, and
-    "SaaStr" matches "SaaStr Annual"."""
-    key = name_key(name)
-    if not key:
+    """Same whole-name match force-exclude uses, so "Money20/20" written on the
+    profile matches "Money20/20 USA 2026" coming back from a search and
+    "SaaStr" matches "SaaStr Annual", while "Money20/20 USA" no longer claims
+    the client has paid for "Money20/20 Europe"."""
+    if not name_key(name):
         return False
-    return any(k in key or key in k for k in (keys or set()))
+    return any(names_match(name, k) for k in (keys or set()))
 
 
 def merge(by_category: dict, force_exclude: str | None = None,
@@ -233,22 +312,27 @@ def merge(by_category: dict, force_exclude: str | None = None,
     the narrower label would disguise exactly the bias being guarded against.
     """
     out: list[dict] = []
-    seen_names: set[str] = set()
-    seen_hosts: set[str] = set()
+    kept_names: list[str] = []
+    seen_sites: set[str] = set()
     committed = committed_keys(force_include)
     for cat in rubric.CATEGORIES:
         for ev in (by_category.get(cat) or []):
-            nk = name_key(ev.get("name") or "")
-            hk = host_key(ev.get("website") or "")
-            if not nk:
+            name = ev.get("name") or ""
+            if not name_key(name):
                 continue
-            if _excluded(ev.get("name") or "", force_exclude):
+            if _excluded(name, force_exclude):
                 continue
-            if nk in seen_names or (hk and hk in seen_hosts):
+            sk = site_key(ev.get("website") or "")
+            if sk and sk in seen_sites:
                 continue
-            seen_names.add(nk)
-            if hk:
-                seen_hosts.add(hk)
+            # Compared against the names already kept rather than against a set
+            # of keys, because "same event" now depends on two names together
+            # (their regions have to agree) and cannot be reduced to one string.
+            if any(names_match(name, kept) for kept in kept_names):
+                continue
+            kept_names.append(name)
+            if sk:
+                seen_sites.add(sk)
             # Set here, in code, from the user's own profile. A model that
             # returns committed:true for an event nobody committed to must not
             # be able to promote itself past the floor.
@@ -318,6 +402,7 @@ def search_category(category: str, profile: dict) -> dict:
     system = _SYSTEM.format(
         category_label=rubric.CATEGORY_LABELS[category],
         category_brief=rubric.CATEGORY_BRIEF[category],
+        today=datetime.date.today().isoformat(),
         profile=profile_brief(profile),
         where_buyers=rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
             profile.get("classification"), "Confirm with the client."))
@@ -331,6 +416,17 @@ def search_category(category: str, profile: dict) -> dict:
         err = res["error"]
         return {"category": category, "status": STATUS_ERROR, "events": [],
                 "note": "", "detail": "%s: %s" % (err["kind"], err["detail"])}
+
+    # The same refusal event_intel_recover applies to a recovered roster, for
+    # the same reason and with more at stake: a reply that ran no search is a
+    # recollection, and here the thing being recalled is whole conferences
+    # rather than rows on a page somebody can check.
+    if not res.get("search_count"):
+        return {"category": category, "status": STATUS_ERROR, "events": [],
+                "note": "",
+                "detail": ("The model answered this category without running a "
+                           "single search, so its events are recalled rather "
+                           "than confirmed and were discarded.")}
 
     parsed = claude_websearch.extract_json(res.get("text") or "")
     if not isinstance(parsed, dict):
@@ -384,18 +480,34 @@ def discover(profile: dict) -> dict:
                              "label": rubric.CATEGORY_LABELS[cat],
                              "found": len(r["events"])}
 
+    candidates = merge(by_category, (profile or {}).get("force_exclude"),
+                       (profile or {}).get("force_include"))
+
+    # Coverage is reported from what SURVIVED dedup and the exclude list, not
+    # from what each search returned. Measured before, the report could tell a
+    # client that the free-vendor category was covered in a run where every one
+    # of its events had been merged away and it contributed nothing.
+    surviving: dict[str, list] = {c: [] for c in rubric.CATEGORIES}
+    for ev in candidates:
+        surviving.setdefault(ev.get("category"), []).append(ev)
+    for cat, st in statuses.items():
+        st["kept"] = len(surviving.get(cat) or [])
+        st["merged_away"] = max(0, st["found"] - st["kept"])
+
     shortfall = []
-    for s in rubric.category_shortfall(by_category):
+    for s in rubric.category_shortfall(surviving):
         st = statuses.get(s["category"]) or {}
         s["status"] = st.get("status", STATUS_ERROR)
         # The distinction the whole module is built around.
         s["why"] = (st.get("detail") or "The search for this category did not run.") \
             if s["status"] == STATUS_ERROR \
             else (st.get("note") or "This category returned nothing for this client.")
+        if s["status"] != STATUS_ERROR and st.get("merged_away"):
+            s["why"] = ("%s %d of the %d events found here were the same events "
+                        "already listed under another category."
+                        % (s["why"], st["merged_away"], st["found"]))
         shortfall.append(s)
 
-    candidates = merge(by_category, (profile or {}).get("force_exclude"),
-                       (profile or {}).get("force_include"))
     ran = sum(1 for s in statuses.values() if s["status"] != STATUS_ERROR)
     return {
         "candidates": candidates,

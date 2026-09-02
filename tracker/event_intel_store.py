@@ -35,9 +35,11 @@ must read as a fact about the request, not a fact about the world.
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -873,6 +875,41 @@ _CANDIDATE_FIELDS = (
     "cost_note", "confidence", "committed", "gaps", "sources")
 
 
+_ISO_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
+
+
+def iso_date_or_none(value) -> str | None:
+    """A real calendar date as YYYY-MM-DD, or None.
+
+    Dates reach this module as whatever a language model wrote, and they land
+    in a DATE column. Postgres answers "Q2 2026" by aborting the statement,
+    which in a batch insert costs every other row in it. Parsing here means an
+    unusable date costs its own field instead of the run it arrived in.
+
+    Deliberately strict. A date is only accepted in the ISO order the prompt
+    asks for, because "04/11/2026" is the 4th of November to the organiser who
+    published it and the 11th of April to the reader, and a booking made on the
+    wrong one of those is worse than no date at all. Anything rejected here is
+    kept as text by the caller rather than discarded.
+    """
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date().isoformat()
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    m = _ISO_DATE.match(str(value).strip())
+    if not m:
+        return None
+    try:
+        return datetime.date(int(m.group(1)), int(m.group(2)),
+                             int(m.group(3))).isoformat()
+    except ValueError:
+        # A well-formed but impossible date (2026-13-45). Same treatment as
+        # unparseable: the reader keeps the raw text, the DATE column gets NULL.
+        return None
+
+
 def normalise_candidate(raw: dict) -> dict | None:
     """Shape one scored candidate, recomputing the total from its sub-scores.
 
@@ -914,17 +951,34 @@ def normalise_candidate(raw: dict) -> dict | None:
         except (TypeError, ValueError):
             return None
 
+    starts_on = iso_date_or_none(r.get("starts_on"))
+    ends_on = iso_date_or_none(r.get("ends_on"))
+    # An event that ends before it starts is two unrelated readings, not a
+    # range. The start is the one a reader plans around, so the end is the one
+    # dropped, and the row still says when the event begins.
+    if starts_on and ends_on and ends_on < starts_on:
+        ends_on = None
+    # A date that would not parse is still an answer to "when": "Q2 2026" and
+    # "October 2026" are what the organiser has actually announced this early.
+    # It cannot go in a DATE column, so it is kept as the quarter text rather
+    # than thrown away, and the row reads as scheduled-but-undated instead of
+    # as having no timing at all.
+    quarter = _txt("quarter", 12)
+    if not quarter and not starts_on:
+        raw_when = str(r.get("starts_on") or "").strip()
+        quarter = raw_when[:12] or None
+
     out = {
         "event_id": r.get("event_id"),
         "name": name[:250],
         "edition": _txt("edition", 80),
         "website": website or None,
         "organizer": _txt("organizer", 200),
-        "starts_on": r.get("starts_on") or None,
-        "ends_on": r.get("ends_on") or None,
+        "starts_on": starts_on,
+        "ends_on": ends_on,
         "country": _txt("country", 100),
         "city": _txt("city", 120),
-        "quarter": _txt("quarter", 12),
+        "quarter": quarter,
         "days": _num("days", 1, 30),
         "industry": _txt("industry", 160),
         # Held as TEXT, quoted as the event states it. Never normalised to an
@@ -978,18 +1032,42 @@ def save_candidates(run_id: int, rows: list[dict]) -> int:
             clean = normalise_candidate(r)
             if clean is None:
                 continue
-            payload.append(tuple(
+            # run_id is prepended here rather than carried on the row, the same
+            # way save_event and save_participants do it, so the column can
+            # never depend on a caller remembering to set it.
+            payload.append((run_id,) + tuple(
                 json.dumps(clean[f]) if f in ("gaps", "sources") else clean[f]
                 for f in _CANDIDATE_FIELDS))
         if not payload:
             return 0
-        with conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO evi_candidates (%s) VALUES (%s)"
-                % (", ".join(_CANDIDATE_FIELDS),
-                   ", ".join(["%s"] * len(_CANDIDATE_FIELDS))), payload)
-        conn.commit()
-        return len(payload)
+        cols = ("run_id",) + _CANDIDATE_FIELDS
+        sql = ("INSERT INTO evi_candidates (%s) VALUES (%s)"
+               % (", ".join(cols), ", ".join(["%s"] * len(cols))))
+        try:
+            with conn.cursor() as cur:
+                cur.executemany(sql, payload)
+            conn.commit()
+            return len(payload)
+        except Exception as e:
+            # A batch insert is all-or-nothing, so one unwritable value would
+            # otherwise empty a report that discovery had already filled. Retry
+            # per row: a bad row costs itself and is named in the log, and the
+            # other fourteen events still reach the reader.
+            conn.rollback()
+            logger.warning("event_intel_store.save_candidates: batch insert "
+                           "failed (%s); retrying row by row", e)
+            written = 0
+            for row in payload:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(sql, row)
+                    conn.commit()
+                    written += 1
+                except Exception as row_error:
+                    conn.rollback()
+                    logger.warning("event_intel_store.save_candidates: dropped "
+                                   "%r (%s)", row[2], row_error)
+            return written
     except Exception as e:
         logger.warning("event_intel_store.save_candidates failed: %s", e)
         return 0

@@ -7,6 +7,8 @@ default classification, a padded list, a bonus awarded on the model's say-so.
 
 import inspect
 
+import datetime
+
 import pytest
 
 from tracker import event_intel_rubric as R
@@ -127,6 +129,38 @@ def test_self_serve_app_booking_never_earns_the_bonus(app):
     assert r["awarded"] is False
 
 
+@pytest.mark.parametrize("hollow", [
+    "A hosted-buyer style experience is planned for a future edition.",
+    "We could not confirm any matchmaking, but the organiser introduces you "
+    "informally at the welcome party.",
+    "The organiser may introduce you to relevant buyers.",
+    "Hosted buyer programme expected to launch next year.",
+])
+def test_hedged_evidence_earns_nothing(hollow):
+    """A hedge is not weak evidence, it is the absence of evidence wearing its
+    clothes. Each of these contains a phrase from the affirm list and describes
+    nothing a delegate could book at this edition."""
+    r = R.matchmaking_bonus(True, hollow)
+    assert r["bonus"] == 0, hollow
+    assert r["awarded"] is False
+
+
+@pytest.mark.parametrize("weak_plus_app", [
+    "Attendees book their own meetings through the Swapcard app; there is "
+    "also a concierge desk.",
+    "The event runs a meetings programme: attendees use the conference app "
+    "to request 1:1s.",
+    "Speed-dating style networking session, self-serve sign-up in Brella.",
+])
+def test_a_supporting_word_does_not_clear_the_app_veto(weak_plus_app):
+    """The hole this closes: any single agreeable word used to override the
+    veto, so "speed-dating, self-serve sign-up in Brella" collected the full
+    ten points. Ten points is exactly the width of the P2 to P1 band."""
+    r = R.matchmaking_bonus(True, weak_plus_app)
+    assert r["bonus"] == 0, weak_plus_app
+    assert "conference app" in r["reason"]
+
+
 @pytest.mark.parametrize("real", [
     "Money20/20 Connect: the organizer pre-schedules 1:1 meetings against stated criteria.",
     "WTM Hosted Buyer programme, account-managed pairing.",
@@ -233,19 +267,89 @@ def test_gaps_name_the_unmeasured_fields():
 
 
 def test_a_complete_candidate_reports_no_gaps():
+    """Complete means every sub-score too. The earlier version of this fixture
+    omitted all three and still expected silence, which is the row the
+    never-scored check exists to catch."""
     complete = {"attendees": "4,000", "website": "https://x.example",
-                "starts_on": "2026-05-01"}
-    for d in R.DIMENSIONS:
+                "starts_on": "2026-05-01", "ends_on": "2026-05-03"}
+    for i, d in enumerate(R.DIMENSIONS):
         complete[d + "_note"] = "reasoned"
-    assert R.gaps_for(complete) == []
+        complete[d] = 10 + i
+    assert R.gaps_for(complete, today=datetime.date(2026, 1, 1)) == []
 
 
 def test_missing_reasoning_is_itself_a_gap():
     c = {"attendees": "1", "website": "https://x.example", "starts_on": "2026-01-01",
+         R.DIM_RELEVANCE: 30, R.DIM_DM_ACCESS: 30, R.DIM_ENGAGEMENT: 10,
          R.DIM_RELEVANCE + "_note": "yes", R.DIM_DM_ACCESS + "_note": "yes"}
-    gaps = R.gaps_for(c)
+    gaps = R.gaps_for(c, today=datetime.date(2025, 1, 1))
     assert len(gaps) == 1
     assert "engagement mode" in gaps[0].lower()
+
+
+# ── a dimension nobody scored is not a dimension scored zero ──────────────
+
+def test_a_dimension_the_grader_skipped_is_named_as_unscored():
+    """The failure this replaces: a missing dm_access clamped to 0, the event
+    totalled 56, fell under the floor, and was reported as judged and found
+    wanting. A 40-point dimension nobody looked at is the single most
+    consequential thing that can be absent from a row."""
+    c = {"attendees": "1", "website": "https://x.example", "starts_on": "2026-01-01",
+         R.DIM_RELEVANCE: 38, R.DIM_ENGAGEMENT: 18}
+    for d in R.DIMENSIONS:
+        c[d + "_note"] = "yes"
+    gaps = R.gaps_for(c, today=datetime.date(2025, 1, 1))
+    joined = " ".join(gaps).lower()
+    assert "decision-maker access was never scored" in joined
+    assert "out of 60, not 100" in joined
+
+
+@pytest.mark.parametrize("raw,expected,readable", [
+    (38, 38, True),
+    ("38", 38, True),
+    ("38/40", 38, True),
+    (99, 40, True),
+    (-5, 0, True),
+    (None, 0, False),
+    ("", 0, False),
+    ("n/a", 0, False),
+])
+def test_read_subscore_separates_a_verdict_from_an_absence(raw, expected, readable):
+    got, ok = R.read_subscore(R.DIM_RELEVANCE, raw)
+    assert got == expected, raw
+    assert ok is readable, raw
+
+
+# ── an edition that is over is not a recommendation ───────────────────────
+
+def test_a_finished_edition_is_reported_as_history():
+    c = {"attendees": "1", "website": "https://x.example",
+         "starts_on": "2026-03-01", "ends_on": "2026-03-03"}
+    for d in R.DIMENSIONS:
+        c[d] = 20
+        c[d + "_note"] = "yes"
+    gaps = R.gaps_for(c, today=datetime.date(2026, 9, 1))
+    assert any("already ended" in g for g in gaps), gaps
+
+
+def test_rank_keeps_a_finished_edition_out_of_the_list():
+    """Before this, a conference that ended in 2019 could score 92, tier P1,
+    and render under the label "Must-attend. Book it." beside its own past
+    date."""
+    past = {"name": "Ghost Summit", "total": 92, "tier": R.TIER_P1,
+            "starts_on": "2019-03-01", "ends_on": "2019-03-03"}
+    live = {"name": "Real Summit", "total": 84, "tier": R.TIER_P1,
+            "starts_on": "2026-11-01", "ends_on": "2026-11-03"}
+    out = R.rank([past, live], today=datetime.date(2026, 9, 1))
+    assert [c["name"] for c in out["kept"]] == ["Real Summit"]
+    assert [c["name"] for c in out["finished"]] == ["Ghost Summit"]
+    assert out["counts"]["finished"] == 1
+
+
+def test_an_undated_event_is_never_treated_as_finished():
+    """No date is a gap, not a verdict. An annual event whose next edition is
+    not announced must not be filed under history."""
+    assert R.has_finished({"name": "X"}, today=datetime.date(2026, 9, 1)) is False
 
 
 @pytest.mark.parametrize("vague", [
@@ -263,3 +367,34 @@ def test_vague_evidence_earns_nothing_even_with_the_claim_set(vague):
     assert r["bonus"] == 0, vague
     assert r["awarded"] is False
     assert "responsibility for pairing" in r["reason"]
+
+
+
+# ── the methodology paragraph is on every report a client reads ───────────
+
+@pytest.mark.parametrize("cls", R.CLASSIFICATIONS)
+def test_the_methodology_paragraph_is_not_lower_cased_mid_sentence(cls):
+    """It used to read "so behind the booths. at most b2b events every booth
+    is staffed by...": a whole multi-sentence string put through .lower() to
+    be reused mid-paragraph."""
+    note = R.methodology_note(cls)
+    for sentence in note.split(". "):
+        s = sentence.strip()
+        if s and s[0].isalpha():
+            assert s[0].isupper(), "sentence starts lower-case: %r" % s[:60]
+
+
+@pytest.mark.parametrize("cls", R.CLASSIFICATIONS)
+def test_the_methodology_paragraph_keeps_the_segment_name_capitalised(cls):
+    """The client's own segment name, printed as "b2b", in the paragraph that
+    explains how their money is being allocated."""
+    note = R.methodology_note(cls)
+    assert "b2b" not in note and "b2c" not in note
+
+
+@pytest.mark.parametrize("cls", R.CLASSIFICATIONS)
+def test_the_methodology_paragraph_has_no_verbless_fragment(cls):
+    """"so in the audience." was rendered as a sentence."""
+    for sentence in R.methodology_note(cls).split(". "):
+        s = sentence.strip().rstrip(".")
+        assert not s.lower().startswith("so "), s[:60]

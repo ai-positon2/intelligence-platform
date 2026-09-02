@@ -401,6 +401,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "generic": generic,
         "excluded": ranked["excluded"],
         "over_cap": ranked["over_cap"],
+        "finished": ranked["finished"],
         "unscored": [{"name": c.get("name"), "note": c.get("scoring_note")}
                      for c in scored["unscored"]],
         "orientation": profile.get("orientation"),

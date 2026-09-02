@@ -95,8 +95,16 @@ Respond with ONLY a JSON object:
 
 `name` must exactly match the name you were given."""
 
-_BANNED = ("premier", "world-class", "world class", "must-attend",
-           "unparalleled", "cutting-edge", "industry-leading")
+# Whole words, not substrings. "leading" was missing entirely, which is the
+# most common superlative of the set and one the prompt explicitly bans, so
+# "the leading fintech conference" passed a check that reported itself as
+# having run. Substring matching also fired "premier" on "premiere".
+_BANNED = tuple(re.compile(r"\b%s\b" % p, re.I) for p in (
+    r"premier", r"world[-\s]class", r"leading", r"industry[-\s]leading",
+    r"must[-\s]attend", r"unparalleled", r"cutting[-\s]edge",
+    r"best[-\s]in[-\s]class", r"unrivall?ed", r"game[-\s]chang\w+",
+    r"the go[-\s]to event", r"can'?t[-\s]miss", r"flagship event",
+))
 
 
 def _candidate_brief(c: dict) -> str:
@@ -244,7 +252,8 @@ def flag_banned_language(candidates: list[dict]) -> list[dict]:
     out = []
     for c in (candidates or []):
         text = "%s %s" % (c.get("description") or "", c.get("client_line") or "")
-        hits = sorted({w for w in _BANNED if w in text.lower()})
+        hits = sorted({m.group(0).lower()
+                       for r in _BANNED for m in r.finditer(text)})
         if hits:
             out.append({"name": c.get("name"), "words": hits})
     return out
