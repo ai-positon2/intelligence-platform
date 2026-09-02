@@ -117,7 +117,7 @@ def recover_page(url: str, kind: str, event_name: str, event_host: str = "",
                           "event's listing.")
         return {"source": source, "rows": []}
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="rows")
     if not isinstance(parsed, dict):
         source["note"] = ("Recovery by search ran but its answer could not be "
                           "read.")

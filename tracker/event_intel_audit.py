@@ -127,7 +127,7 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
         out["error"] = "%s: %s" % (res["error"]["kind"], res["error"]["detail"])
         return out
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="audits")
     if not isinstance(parsed, dict):
         out["error"] = "The famous-event audit ran but its answer could not be read."
         return out

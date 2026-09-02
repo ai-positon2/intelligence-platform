@@ -409,3 +409,77 @@ def test_an_event_platform_profile_is_never_a_company_domain(url):
 
 def test_a_real_company_link_still_resolves():
     assert H.clean_domain("https://www.acme.com/about") == "acme.com"
+
+
+# ── a reply cut off mid-array is unreadable, not an empty page ────────────
+
+def _truncated_rows_reply(n=200, cut=9000):
+    """What stop_reason=max_tokens leaves behind: the outer envelope never
+    closes, so the first BALANCED object in the reply is the first row."""
+    rows = [{"org_name": "Exhibitor Company Number %d Ltd" % i,
+             "org_domain": "exhibitor%d.example.com" % i,
+             "role": "exhibitor", "booth": "A%d" % i} for i in range(n)]
+    return json.dumps({"rows": rows, "note": "page 1 of 3"})[:cut]
+
+
+def test_a_truncated_reply_does_not_parse_into_its_own_first_row():
+    """The defect: that first row is a dict, so every caller's
+    isinstance(parsed, dict) guard passed, .get("rows") was None, and a
+    300-exhibitor page was recorded as an event that publishes no exhibitors,
+    counted under sources_read as successfully read, with no error and no
+    recovery attempted. It fires hardest on the densest pages, because those
+    are the ones that overflow."""
+    cut = _truncated_rows_reply()
+    assert claude_websearch.extract_json(cut, require="rows") is None
+
+    loose = claude_websearch.extract_json(cut)
+    assert isinstance(loose, dict) and "rows" not in loose, (
+        "without require, the first row still parses and looks like an envelope")
+
+
+def test_a_complete_reply_is_unaffected():
+    whole = json.dumps({"rows": [{"org_name": "Acme", "role": "exhibitor"}],
+                        "note": "ok"})
+    got = claude_websearch.extract_json(whole, require="rows")
+    assert got["rows"][0]["org_name"] == "Acme"
+
+
+@pytest.mark.parametrize("raw", [
+    'Here you go: {"rows":[{"org_name":"Acme"}]} hope that helps',
+    '```json\n{"rows":[{"org_name":"Acme"}]}\n```',
+])
+def test_prose_and_fences_still_parse(raw):
+    """Models wrap JSON in prose even when told not to, and with web_search on
+    the citation-bearing prose is often unavoidable."""
+    assert claude_websearch.extract_json(raw, require="rows")["rows"]
+
+
+def test_the_wrong_envelope_is_refused_rather_than_partly_accepted():
+    """And it must not fall through to a bare array found inside it."""
+    assert claude_websearch.extract_json('{"scores":[]}', require="rows") is None
+    assert claude_websearch.extract_json('[{"a":1}]', require="rows") is None
+
+
+def test_harvest_reports_a_truncated_reply_as_unreadable_not_as_an_empty_page(
+        monkeypatch):
+    """The integration point. It is not enough that extract_json can refuse a
+    truncated reply; extract_participants has to ask it to. Without the
+    envelope name, a dense page comes back rows=0, error=None, which the
+    caller records as "this event publishes no exhibitors" and which
+    should_recover() then declines to retry because the status is ok."""
+    _stub_ask(monkeypatch, text=_truncated_rows_reply())
+    out = H.extract_participants("some page text", "https://ev.example/exhibitors",
+                                 "exhibitor_list", "Money20/20", "ev.example")
+    assert out["rows"] == []
+    assert out["error"], "a cut-off reply was reported as a page listing nobody"
+    assert out["error"]["kind"] == claude_websearch.ERR_UNPARSABLE
+
+
+def test_harvest_still_reads_a_complete_reply(monkeypatch):
+    _stub_ask(monkeypatch, payload={"rows": [
+        {"org_name": "Acme Payments", "org_domain": "acme.com",
+         "role": "exhibitor"}], "note": "page 1 of 1"})
+    out = H.extract_participants("text", "https://ev.example/exhibitors",
+                                 "exhibitor_list", "Money20/20", "ev.example")
+    assert out["error"] is None
+    assert [r["org_name"] for r in out["rows"]] == ["Acme Payments"]

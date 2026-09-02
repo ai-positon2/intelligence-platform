@@ -428,7 +428,7 @@ def search_category(category: str, profile: dict) -> dict:
                            "single search, so its events are recalled rather "
                            "than confirmed and were discarded.")}
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="events")
     if not isinstance(parsed, dict):
         logger.warning("event_intel_discover: unparsable reply for category %s "
                        "(blocks=%s, stop=%s)", category,

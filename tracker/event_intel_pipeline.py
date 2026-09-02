@@ -595,7 +595,14 @@ def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = No
     if matched:
         people = event_intel_enrich.find_people(sorted(matched), titles=titles)
 
+    # Domains no call ever covered, because a batch failed and the ones after
+    # it never ran. Their rows are left exactly as they were: unresolved is the
+    # truthful state for a company nobody looked up.
+    unattempted = set(res.get("unattempted") or [])
+
     for domain, ids in by_domain.items():
+        if domain in unattempted:
+            continue
         company = matched.get(domain)
         if company:
             payload = dict(company)
@@ -615,6 +622,7 @@ def resolve_run_companies(run_id: int, email: str, titles: list[str] | None = No
     return {
         "resolved": len(matched),
         "unmatched": len(res.get("unmatched") or []),
+        "unattempted": len(res.get("unattempted") or []),
         "credits": res.get("credits", 0),
         "people": people.get("total", 0),
         "error": res.get("error") or people.get("error"),

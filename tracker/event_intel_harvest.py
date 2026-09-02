@@ -448,7 +448,7 @@ def extract_participants(page_text: str, page_url: str, page_kind: str,
     if res.get("error"):
         return {"rows": [], "note": "", "error": res["error"]}
 
-    parsed = claude_websearch.extract_json(res.get("text") or "")
+    parsed = claude_websearch.extract_json(res.get("text") or "", require="rows")
     if not isinstance(parsed, dict):
         return {"rows": [], "note": "",
                 "error": {"kind": claude_websearch.ERR_UNPARSABLE,

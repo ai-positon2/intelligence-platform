@@ -189,13 +189,24 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     return out
 
 
-def extract_json(raw: str):
+def extract_json(raw: str, require: str | None = None):
     """Pull the first balanced JSON object or array out of a reply.
 
     Models wrap JSON in prose or a ```json fence even when told not to, and
     with web_search on, the citation-bearing prose is often unavoidable. Scans
     for a balanced structure while ignoring braces inside string literals,
     rather than a greedy first-to-last slice that swallows trailing text.
+
+    `require` is the envelope key the caller asked the model for ("rows",
+    "events", "scores"). Pass it. When a reply is cut off mid-array, which is
+    what stop_reason=max_tokens produces, the outer object never closes and the
+    first BALANCED object in the reply is the first row. That is a dict, so an
+    isinstance check passes it, and the caller then reads an envelope key that
+    is not there and concludes the model found nothing. A 300-exhibitor page
+    becomes an event that publishes no exhibitors, recorded as successfully
+    read. With `require` set, an object that is not the envelope is refused,
+    the caller reports unreadable rather than empty, and recovery gets its
+    chance.
     """
     if not raw:
         return None
@@ -222,8 +233,16 @@ def extract_json(raw: str):
                     depth -= 1
                     if depth == 0:
                         try:
-                            return json.loads(raw[start:i + 1])
+                            found = json.loads(raw[start:i + 1])
                         except Exception:
                             break
+                        if require and not (isinstance(found, dict)
+                                            and require in found):
+                            # Parsed, but it is not the thing that was asked
+                            # for. Keep looking rather than hand back a row
+                            # dressed as an envelope, or a bare array found
+                            # somewhere inside one.
+                            break
+                        return found
             start = raw.find(opener, start + 1)
     return None
