@@ -530,3 +530,130 @@ def test_the_event_lookup_tells_the_model_what_day_it_is():
     assert datetime.date.today().isoformat() in seen["user"], (
         "the lookup never told the model what day it is")
     assert "on or after" in seen["user"]
+
+
+# ── the verdict has to reach the event it is about ────────────────────────
+#
+# Found by the live run of 2026-09-03, not by this suite. The audit is shown
+# each marquee event as "Name (City) - audience note" because the city is
+# what separates two editions, so a reply that repeats the name it was given
+# comes back carrying the city. Keyed strictly, that reply misses the
+# candidate it is about, and the event is cut with the reason "the audit
+# returned no verdict" while the real verdict sits unread beside it.
+
+def test_a_verdict_that_echoes_the_city_back_still_lands_on_its_event():
+    """The exact shape of the live failure: INBOUND was audited, weighed
+    against a named alternative and cut on the merits, then cut a second time
+    for never having been audited. The reader saw the false reason."""
+    audit = {"error": None, "verdicts": {}}
+    audit["verdicts"][A.name_key("INBOUND (rebranding to UNBOUND) (Boston, MA)")] = {
+        "verdict": A.VERDICT_CUT, "alternative": "B2B Marketing Exchange",
+        "alternative_website": None, "alternative_note": None,
+        "why": "The room is split across functions.",
+        "name": "INBOUND (rebranding to UNBOUND) (Boston, MA)"}
+    out = A.apply_audit([_c("INBOUND (rebranding to UNBOUND)", True)], audit)
+    assert out == [] or out[0].get("audit_verdict") == A.VERDICT_CUT
+    entry = [e for e in audit.get("cut") or []] if audit.get("cut") else []
+    # The event is still cut, but for the reason the audit actually gave.
+    assert not any(e.get("no_verdict") for e in entry), (
+        "the event was recorded as never audited")
+
+
+def test_the_alternative_survives_a_verdict_that_echoed_the_city():
+    """The consequence of the miss, and the reason it mattered more than a
+    wrong sentence: an unmatched verdict takes its named alternative with it,
+    so the better event the audit had already identified is never promoted."""
+    audit = {"error": None, "cut": [], "verdicts": {}}
+    audit["verdicts"][A.name_key("Dreamforce (San Francisco, CA)")] = {
+        "verdict": A.VERDICT_CUT, "alternative": "Tiny Vertical Summit",
+        "alternative_website": "https://tiny.example",
+        "alternative_note": None, "why": "Too broad.",
+        "name": "Dreamforce (San Francisco, CA)"}
+    A.apply_audit([_c("Dreamforce", True)], audit)
+    wanted = A.alternatives_to_promote(
+        {"cut": [dict(audit["verdicts"][A.name_key("Dreamforce (San Francisco, CA)")],
+                      name="Dreamforce (San Francisco, CA)")]},
+        [_c("Dreamforce", True)])
+    assert [w["name"] for w in wanted] == ["Tiny Vertical Summit"]
+
+
+def test_a_kept_verdict_that_echoes_the_city_keeps_its_event():
+    audit = {"error": None, "verdicts": {}}
+    audit["verdicts"][A.name_key("CES (Las Vegas, NV)")] = {
+        "verdict": A.VERDICT_KEPT, "alternative": "A smaller show",
+        "alternative_website": None, "alternative_note": None,
+        "why": "The floor is genuinely the buyer.", "name": "CES (Las Vegas, NV)"}
+    out = A.apply_audit([_c("CES", True)], audit)
+    assert [c["name"] for c in out] == ["CES"], (
+        "a kept marquee event was dropped because its verdict came back with "
+        "the city attached")
+    assert out[0]["audit_verdict"] == A.VERDICT_KEPT
+
+
+def test_an_ambiguous_loose_match_is_refused_rather_than_guessed():
+    """Two marquee events whose names contain one another are exactly where a
+    loose match would staple one event's verdict onto the other. A wrong
+    verdict is worse than the missing one this fallback exists to fix."""
+    audit = {"error": None, "verdicts": {}}
+    for nm in ("MarTech Summit (Boston, MA)", "MarTech Summit Europe (Berlin)"):
+        audit["verdicts"][A.name_key(nm)] = {
+            "verdict": A.VERDICT_KEPT, "alternative": "Something",
+            "alternative_website": None, "alternative_note": None,
+            "why": "w", "name": nm}
+    out = A.apply_audit([_c("MarTech Summit", True)], audit)
+    # Exactly one of the two verdicts is a real key match for this name, and
+    # neither is, so it is cut as unaudited rather than given the wrong one.
+    assert out == [], "an ambiguous verdict was applied anyway"
+
+
+def test_an_exact_key_still_wins_over_a_loose_one():
+    audit = {"error": None, "verdicts": {}}
+    audit["verdicts"][A.name_key("Big Show")] = {
+        "verdict": A.VERDICT_KEPT, "alternative": "Alt",
+        "alternative_website": None, "alternative_note": None,
+        "why": "exact", "name": "Big Show"}
+    audit["verdicts"][A.name_key("Big Show Europe (Berlin)")] = {
+        "verdict": A.VERDICT_CUT, "alternative": None,
+        "alternative_website": None, "alternative_note": None,
+        "why": "loose", "name": "Big Show Europe (Berlin)"}
+    out = A.apply_audit([_c("Big Show", True)], audit)
+    assert [c["name"] for c in out] == ["Big Show"]
+    assert "exact" in out[0]["audit_note"], out[0]["audit_note"]
+
+
+def test_a_cut_entry_still_names_the_event_it_cut(monkeypatch):
+    """The name on a cut entry is not decoration. `alternatives_to_promote`
+    reads it as `replaces`, and `promote_alternatives` then looks the replaced
+    event up by that name to inherit its category, so a promoted alternative
+    with no name to replace lands in the wrong slot on the report."""
+    _stub(monkeypatch, {"audits": [
+        {"name": "Dreamforce (San Francisco, CA)", "verdict": "cut",
+         "why": "Too broad for this ICP.",
+         "alternative": "Tiny Vertical Summit",
+         "alternative_website": "https://tiny.example"}]})
+    out = A.audit_famous([_c("Dreamforce", True, city="San Francisco, CA")], PROFILE)
+    assert out["cut"], "nothing was recorded as cut"
+    assert out["cut"][0].get("name"), "the cut entry does not say what was cut"
+    wanted = A.alternatives_to_promote(out, [_c("Dreamforce", True)])
+    assert wanted and wanted[0]["replaces"], (
+        "the promotion does not know which event it is standing in for")
+
+
+def test_a_verdict_for_a_different_edition_never_lands_on_this_one():
+    """The loose match must not merge two editions of the same series. A
+    verdict written about the Singapore edition, applied to the European one,
+    would cut a real event on the strength of a judgement about a different
+    room in a different market."""
+    audit = {"error": None, "verdicts": {}}
+    audit["verdicts"][A.name_key("MarTech Summit APAC (Singapore)")] = {
+        "verdict": A.VERDICT_CUT, "alternative": None,
+        "alternative_website": None, "alternative_note": None,
+        "why": "Wrong market for this client.",
+        "name": "MarTech Summit APAC (Singapore)"}
+    out = A.apply_audit([_c("MarTech Summit Europe", True)], audit)
+    assert out == [], (
+        "the European edition survived, so it took the APAC verdict")
+    entry = (audit.get("cut") or [])[-1] if audit.get("cut") else {}
+    assert entry.get("no_verdict"), (
+        "the event was cut on another edition's verdict rather than reported "
+        "as unaudited: %r" % entry.get("why"))

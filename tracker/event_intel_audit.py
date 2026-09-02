@@ -168,10 +168,13 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
         rec = {"verdict": verdict, "alternative": alternative or None,
                "alternative_website": website or None,
                "alternative_note": str(a.get("alternative_note") or "")[:400] or None,
-               "why": why}
+               "why": why,
+               # The name the audit answered under, kept so that a reply which
+               # echoes back more than the event's name can still be matched to
+               # the candidate it is about. See _verdict_for below.
+               "name": str(a.get("name") or "")[:250]}
         out["verdicts"][key] = rec
-        (out["kept"] if verdict == VERDICT_KEPT else out["cut"]).append(
-            {"name": str(a.get("name") or "")[:250], **rec})
+        (out["kept"] if verdict == VERDICT_KEPT else out["cut"]).append(dict(rec))
 
     # A call that succeeded, was given famous events, and yielded not one
     # usable verdict has audited nothing: it is a parse or shape failure
@@ -186,6 +189,38 @@ def audit_famous(candidates: list[dict], profile: dict) -> dict:
             % ("the one marquee event it was given" if len(famous) == 1
                else "any of the %d marquee events it was given" % len(famous)))
     return out
+
+
+def _verdict_for(name: str, verdicts: dict) -> dict | None:
+    """This candidate's verdict, tolerating what the prompt itself added.
+
+    The audit is SHOWN each marquee event as "Name (City) - audience note",
+    because the city is what tells one edition from another. A reply that
+    repeats the name it was given therefore comes back carrying the city, and
+    an exact key lookup misses the candidate the verdict is about. The event
+    is then cut with the reason "the famous-event audit returned no verdict
+    for this event" while its verdict sits unread in the same dictionary.
+
+    Found in the live run of 2026-09-03: INBOUND was audited, weighed against
+    B2B Marketing Exchange, cut on the merits with a written reason, and then
+    cut again for never having been audited. The reason the reader saw was
+    the false one, and the alternative the audit had named was never promoted
+    because the verdict it came attached to was treated as missing.
+
+    The loose match is only ever accepted when it is UNAMBIGUOUS. Two marquee
+    events whose names contain one another are exactly where guessing would
+    staple one event's verdict onto another, and a wrong verdict is worse
+    than the missing one this is fixing.
+    """
+    key = name_key(name or "")
+    if not key:
+        return None
+    exact = verdicts.get(key)
+    if exact is not None:
+        return exact
+    hits = [v for k, v in verdicts.items()
+            if k != key and names_match(name or "", v.get("name") or k)]
+    return hits[0] if len(hits) == 1 else None
 
 
 def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
@@ -215,7 +250,7 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
                                "against a more targeted alternative.")
             out.append(c)
             continue
-        v = verdicts.get(name_key(c.get("name") or ""))
+        v = _verdict_for(c.get("name") or "", verdicts)
         if not v:
             c["audit_verdict"] = VERDICT_CUT
             c["audit_note"] = ("Cut: the famous-event audit returned no verdict "
