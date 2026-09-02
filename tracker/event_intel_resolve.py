@@ -183,99 +183,10 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
             "error": None}
 
 
-_DISCOVER_SYSTEM = (
-    "You find the real business events, conferences and trade shows that a "
-    "described audience actually attends, using web search.\n\n"
-    "RULES.\n"
-    "1. Return only events you have confirmed exist, with a real website you "
-    "visited. Never invent a plausible-sounding conference name. A wrong "
-    "event on this list costs somebody a travel budget.\n"
-    "2. Prefer the NEXT upcoming edition. Include a past edition only when no "
-    "future one is announced, and say so in `why`. TODAY IS {today}: an edition "
-    "is upcoming only if it starts on or after that date, measured from that "
-    "date and not from your own sense of when now is.\n"
-    "3. Rank by how concentrated the described audience is, NOT by how big "
-    "the event is. A 400-person vertical summit where most attendees are the "
-    "target buyer beats a 30,000-person general show where a handful are.\n"
-    "4. `why` must say who this event actually gathers and why it fits the "
-    "described audience, in one or two sentences grounded in what the event's "
-    "own site says. Do not restate the audience back.\n"
-    "5. If the description is too vague to find real events, return an empty "
-    "array and explain in `note` rather than returning general-purpose "
-    "conferences that fit anybody.\n\n"
-    "Respond with ONLY a JSON object:\n"
-    '{"events": [{"name": str, "edition": str|null, "website": str|null, '
-    '"organizer": str|null, "starts_on": "YYYY-MM-DD"|null, '
-    '"ends_on": "YYYY-MM-DD"|null, "location": str|null, '
-    '"format": "in_person"|"virtual"|"hybrid"|null, "stated_size": str|null, '
-    '"audience_note": str|null, "fit_score": 0-100, "why": str, '
-    '"confidence": "high"|"medium"|"low"}], "note": str}'
-)
-
-
-def discover_events(audience: str, region: str | None = None,
-                    limit: int = 8) -> dict:
-    """Discover mode: an ICP/industry description in, ranked events out.
-
-    Ranking is by audience concentration rather than headcount, which is the
-    whole reason this is worth running: the biggest show in a sector is
-    usually the worst value per conversation, and that is invisible from an
-    attendance number alone.
-    """
-    audience = (audience or "").strip()
-    if not audience:
-        return {"events": [], "note": "No audience description was provided.",
-                "error": None}
-
-    user = "Audience / ICP: %s" % audience
-    if region:
-        user += "\nRegion or geography to prioritise: %s" % region
-    user += ("\nReturn at most %d events, best fit first." % max(1, min(limit, 12)))
-
-    system = _DISCOVER_SYSTEM.replace("{today}", datetime.date.today().isoformat())
-    res = claude_websearch.ask(system, user, max_uses=12, max_tokens=8000)
-    if res.get("error"):
-        return {"events": [], "note": "", "error": res["error"]}
-
-    parsed = claude_websearch.extract_json(res.get("text") or "",
-                                          require="events")
-    if not isinstance(parsed, dict):
-        return {"events": [], "note": "",
-                "error": {"kind": claude_websearch.ERR_UNPARSABLE,
-                          "detail": (res.get("text") or "")[:400]}}
-
-    events = []
-    for e in (parsed.get("events") or [])[:limit]:
-        if not isinstance(e, dict):
-            continue
-        name = str(e.get("name") or "").strip()
-        if not name:
-            continue
-        website = str(e.get("website") or "").strip()
-        if website and not website.lower().startswith(("http://", "https://")):
-            website = ""
-        try:
-            fit = int(e.get("fit_score") or 0)
-        except (TypeError, ValueError):
-            fit = 0
-        events.append({
-            "name": name[:200],
-            "edition": (str(e.get("edition") or "").strip() or None),
-            "website": website or None,
-            "organizer": (str(e.get("organizer") or "").strip() or None),
-            "starts_on": e.get("starts_on") or None,
-            "ends_on": e.get("ends_on") or None,
-            "location": (str(e.get("location") or "").strip() or None),
-            "format": (str(e.get("format") or "").strip() or None),
-            "stated_size": (str(e.get("stated_size") or "").strip() or None),
-            "audience_note": (str(e.get("audience_note") or "").strip() or None),
-            "fit_score": max(0, min(100, fit)),
-            "fit_reasoning": str(e.get("why") or "")[:800],
-            "confidence": (str(e.get("confidence") or "medium").lower()),
-        })
-    events.sort(key=lambda x: x["fit_score"], reverse=True)
-    return {"events": events, "note": str(parsed.get("note") or "")[:400],
-            "error": None}
+# `_DISCOVER_SYSTEM` and `discover_events()` lived here and are gone with the
+# discover play. resolve_event() below stays: lookup runs on it, and so does
+# the recommendation's alternative-promotion step, which has to confirm a
+# replacement event really exists before it goes on a client's list.
 
 
 def probe(query: str = "Web Summit") -> dict:

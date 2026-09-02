@@ -1,4 +1,10 @@
-"""The discover/lookup drawer: what the reader is actually shown.
+"""The lookup drawer, and the drawer for the retired discover play.
+
+`discover` no longer has a card, a form or a route: no new run can start.
+Runs already stored still open from history and are still valid as a source
+roster for work-the-room, so this file keeps rendering them. It is the guard
+that the retirement did not quietly break every run somebody already paid
+for, which is what would make it a deletion rather than a retirement.
 
 Every test here EXECUTES the page's own inline script in node and asserts on
 the HTML it produces. Nothing re-implements the view. The defect this file

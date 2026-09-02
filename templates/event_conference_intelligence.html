@@ -52,7 +52,7 @@
       <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
       <h1>Know who is <em>in the room</em> before you book the booth.</h1>
       <p>
-        Four ways to use it, one event calendar. Lists get cut rather than
+        Three ways to use it, one event calendar. Lists get cut rather than
         padded, and every row says where it came from.
       </p>
     </div>
@@ -109,18 +109,6 @@
         <span class="pio"><span class="a">an event name</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>who will be there</span></span>
         <span class="pd">Name any conference and we build its roster: the exhibitors, sponsors, speakers and partners it lists in public.</span>
         <span class="pgo" aria-hidden="true">Build the roster<i>&rarr;</i></span>
-      </button>
-      <button class="evi-play p-discover" role="tab" id="modeDiscover"
-              aria-selected="false" data-play="discover" data-action="Find the events"
-              onclick="setMode('discover')">
-        <span class="pi" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-               stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7.5"/><path d="M3.5 11h15M11 3.5c4 4.6 4 10.4 0 15c-4-4.6-4-10.4 0-15z"/><path d="M16.5 16.5L21 21"/></svg>
-        </span>
-        <span class="pn">A quick look at one audience</span>
-        <span class="pio"><span class="a">one sentence</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>a fast ranked list</span></span>
-        <span class="pd">Describe who you want to meet. One pass instead of six, with no scoring and no audit. Paste your account list and events come back ordered by how many of yours are really on the roster.</span>
-        <span class="pgo" aria-hidden="true">Find the events<i>&rarr;</i></span>
       </button>
       <button class="evi-play p-workroom" role="tab" id="modeWorkroom"
               aria-selected="false" data-play="workroom" data-action="Work the room"
@@ -324,29 +312,6 @@
             </div>
           </div>
 
-          <div id="discoverFields" style="display:none">
-            <div class="evi-row">
-              <div class="evi-field">
-                <label for="audience">Who are you trying to reach?</label>
-                <input type="text" id="audience" autocomplete="off"
-                       placeholder="e.g. VPs of Marketing at US healthcare SaaS companies" />
-              </div>
-              <div class="evi-field">
-                <label for="region">Region (optional)</label>
-                <input type="text" id="region" placeholder="North America" autocomplete="off" />
-              </div>
-            </div>
-            <div class="evi-field" style="margin-top:14px">
-              <label for="targets">Your target accounts (optional, one per line)</label>
-              <textarea id="targets" placeholder="acme.com&#10;Globex Industrial&#10;initech.co.uk"></textarea>
-              <span class="hint">
-                Domains match most reliably. Given these, events are ranked by how many of
-                them actually appear in the roster, which is a different question from how
-                big the event is.
-              </span>
-            </div>
-          </div>
-
           <div id="workroomFields" style="display:none">
             <div class="evi-row">
               <div class="evi-field">
@@ -454,14 +419,18 @@
               <div class="evi-runs" id="runsList">
                 {% if runs %}
                   {% for r in runs %}
-                  {# Each of the four plays produces a different kind of run, so
-                     each says what it actually was. The old line read every
-                     non-lookup run as an "audience search", which called a
-                     scored calendar and a set of drafted openers the same
-                     thing, and printed "0 listed" beside both. #}
+                  {# Each play produces a different kind of run, so each says
+                     what it actually was. The old line read every non-lookup
+                     run as an "audience search", which called a scored
+                     calendar and a set of drafted openers the same thing, and
+                     printed "0 listed" beside both.
+
+                     `discover` is a retired play and its label stays: runs
+                     made before it was retired are still in this list, and
+                     dropping the key would print them with no kind at all. #}
                   {% set kinds = {'recommend': 'Scored calendar',
                                   'lookup': 'Event roster',
-                                  'discover': 'Audience search',
+                                  'discover': 'Audience search (retired)',
                                   'workroom': 'Room worked'} %}
                   <button class="evi-run m-{{ r.mode }}" type="button"
                           onclick="openRun({{ r.id }})">
@@ -549,11 +518,11 @@
       return s;
     }
 
-    var MODES = ['recommend', 'lookup', 'discover', 'workroom'];
+    var MODES = ['recommend', 'lookup', 'workroom'];
     var FIELDS = {recommend: 'recommendFields', lookup: 'lookupFields',
-                  discover: 'discoverFields', workroom: 'workroomFields'};
+                  workroom: 'workroomFields'};
     var TABS = {recommend: 'modeRecommend', lookup: 'modeLookup',
-                discover: 'modeDiscover', workroom: 'modeWorkroom'};
+                workroom: 'modeWorkroom'};
 
     function setMode(m){
       mode = m;
@@ -732,16 +701,10 @@
         body.event_class = ec;
         body.booth_notes = document.getElementById('boothNotes').value;
         body.ends_on = document.getElementById('endsOn').value;
-      } else if (mode === 'lookup') {
+      } else {
         body.query = document.getElementById('eventName').value.trim();
         body.year = document.getElementById('eventYear').value.trim();
         if (!body.query) { showFormError('Enter an event name.'); return false; }
-      } else {
-        body.query = document.getElementById('audience').value.trim();
-        body.region = document.getElementById('region').value.trim();
-        body.targets = document.getElementById('targets').value
-          .split('\n').map(function(t){ return t.trim(); }).filter(Boolean);
-        if (!body.query) { showFormError('Describe the audience you want to reach.'); return false; }
       }
       var btn = document.getElementById('runBtn');
       btn.disabled = true;
@@ -751,9 +714,7 @@
           ? 'Searching all six event categories. This takes a few minutes and runs in the background, so you can leave this page.'
         : mode === 'lookup'
           ? 'Resolving the event and reading the pages it publishes. This runs in the background, so you can leave this page.'
-        : mode === 'workroom'
-          ? 'Qualifying the roster and drafting an opener for each company. This runs in the background, so you can leave this page.'
-          : 'Searching for events and sampling their rosters. This runs in the background, so you can leave this page.';
+          : 'Qualifying the roster and drafting an opener for each company. This runs in the background, so you can leave this page.';
 
       fetch(BASE + '/run', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -781,7 +742,6 @@
       scoring: 'Scoring each event on relevance, decision-maker access and engagement.',
       ranking: 'Ranking, and cutting everything below 70.',
       resolving: 'Identifying the event and confirming which edition it is.',
-      discovering: 'Searching for events that gather this audience.',
       harvesting: 'Reading the pages the event publishes its participants on.',
       reading_roster: 'Reading the roster you already harvested.',
       qualifying: 'Qualifying each company to the ICP and drafting an opener.',
@@ -798,14 +758,13 @@
     var STAGE_ORDER = {
       recommend: ['discovering_categories', 'auditing', 'scoring', 'ranking'],
       lookup: ['resolving', 'harvesting'],
-      discover: ['discovering', 'harvesting'],
       workroom: ['reading_roster', 'qualifying', 'checking_drafts', 'saving']
     };
     var SHORT = {
       discovering_categories: 'Search six categories', auditing: 'Audit the famous names',
       scoring: 'Score every event', ranking: 'Rank and cut below 70',
       resolving: 'Identify the event', harvesting: 'Read the published pages',
-      discovering: 'Search for events', reading_roster: 'Read the roster',
+      reading_roster: 'Read the roster',
       qualifying: 'Qualify and draft', checking_drafts: 'Check every draft',
       saving: 'Save the drafts'
     };
@@ -2267,6 +2226,12 @@
       document.getElementById('drawerBody').innerHTML = html;
     }
 
+    /* Lookup, plus the retired discover play. No new discover run can be
+       started, but the ones already in the table are still openable from
+       history and still valid as a workroom source, so this reads them. The
+       two differ in one place only: the drawer heading is the event in a
+       lookup and the query in a discover, because a discover run had no one
+       subject event. */
     function render(run){
       if (run.mode === 'recommend') { return renderRecommend(run); }
       if (run.mode === 'workroom') { return renderWorkroom(run); }

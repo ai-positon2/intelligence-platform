@@ -233,3 +233,67 @@ def test_the_page_offers_exactly_the_four_classifications_the_rubric_knows():
     for key in rubric.CLASSIFICATIONS:
         assert key in html, key
     assert html.count('data-classification="') == len(rubric.CLASSIFICATIONS)
+
+
+# ── the retired play ──────────────────────────────────────────────────────
+#
+# `discover` described an audience and got back events ranked by how many of
+# your own named accounts turned up in them. It was retired because it read,
+# to anybody arriving on the page, as a shorter and worse `recommend`.
+#
+# Retiring is not deleting. No new run can start, but runs already stored
+# still open from history and are still valid as a workroom source, so these
+# two tests pull in opposite directions on purpose: the door is shut and the
+# records are still readable.
+
+
+def test_no_new_run_can_be_started_on_the_retired_play():
+    c = _client("harness@position2.com")
+    r = c.post(BASE + "/run", json={"mode": "discover",
+                                    "query": "VPs of marketing at fintechs"})
+    assert r.status_code == 400, (
+        "the retired play still accepts runs (%s)" % r.status_code)
+
+
+def test_the_retired_play_is_gone_from_the_page_that_starts_runs():
+    c = _client("harness@position2.com")
+    html = c.get(BASE).get_data(as_text=True)
+    assert 'data-play="discover"' not in html, "the retired play still has a card"
+    assert 'id="discoverFields"' not in html, "the retired play still has its form"
+    assert "setMode('discover')" not in html, "the retired play is still selectable"
+
+
+def test_a_run_already_stored_under_the_retired_play_still_opens(monkeypatch):
+    """The reason the drawer and the roster picker still know the word. A
+    retirement that quietly broke every run somebody had already paid for
+    would be a deletion wearing a retirement's clothes."""
+    run = {"id": 7, "mode": "discover", "status": "complete", "stage": "done",
+           "query": "VPs of marketing at fintechs", "error": None,
+           "credits_spent": 0, "created_at": "2026-08-31T10:00:00",
+           "summary": {"discovered_events": 2}}
+    monkeypatch.setattr(store, "get_run", lambda run_id, email: dict(run))
+    monkeypatch.setattr(store, "get_events", lambda run_id: [])
+    monkeypatch.setattr(store, "get_participants", lambda run_id: [])
+    monkeypatch.setattr(store, "get_sources", lambda run_id: [])
+    monkeypatch.setattr(store, "get_candidates", lambda run_id: [])
+    monkeypatch.setattr(store, "get_outreach", lambda run_id: [])
+    c = _client("harness@position2.com")
+    r = c.get(BASE + "/runs/7")
+    assert r.status_code == 200, "a stored run of the retired play no longer opens"
+    assert r.get_json()["mode"] == "discover"
+
+
+def test_a_stored_run_of_the_retired_play_is_still_a_usable_roster(monkeypatch):
+    """Work the room reads a roster somebody already harvested. A roster that
+    was harvested is a roster, whatever play harvested it."""
+    runs = [{"id": 7, "mode": "discover", "query": "fintech VPs",
+             "status": "complete", "created_at": "2026-08-31T10:00:00",
+             "credits_spent": 0, "participant_count": 12,
+             "event_name": "Fintech Summit"}]
+    monkeypatch.setattr(store, "list_runs", lambda email, limit=60: runs)
+    monkeypatch.setattr(store, "list_profiles", lambda email: [])
+    c = _client("harness@position2.com")
+    html = c.get(BASE).get_data(as_text=True)
+    assert 'value="7"' in html and "Fintech Summit" in html, (
+        "a harvested roster from the retired play is no longer offered to "
+        "work the room")
