@@ -38,13 +38,22 @@ from __future__ import annotations
 import logging
 
 from . import claude_websearch
-from .event_intel_discover import name_key
+from .event_intel_discover import name_key, names_match
 
 logger = logging.getLogger(__name__)
 
 VERDICT_KEPT = "kept"
 VERDICT_CUT = "cut"
 VERDICT_UNAUDITED = "unaudited"
+# An event that reached the list because the audit named it as a better fit
+# than a marquee event it cut. It was never discovered by a category search,
+# so it must never be presented as though it had been.
+VERDICT_PROMOTED = "promoted"
+
+# Each promotion costs one resolve_event call, which is a live search. Three
+# is enough to replace the marquee events a normal run cuts without turning
+# the audit into a second discovery pass.
+MAX_PROMOTED = 3
 
 # Above this share of a prior list for a DIFFERENT client, the list is
 # generic. The skill's remedy at that point is to replace three to five famous
@@ -235,6 +244,180 @@ def apply_audit(candidates: list[dict], audit: dict) -> list[dict]:
 
 
 # ── Step 6: the cross-client pattern check, measured ──────────────────────
+
+
+def alternatives_to_promote(audit: dict, candidates: list[dict]) -> list[dict]:
+    """The alternatives worth putting on the list, in audit order.
+
+    Only alternatives from CUT verdicts. A KEPT verdict means the marquee
+    event justified its place AGAINST the named alternative, so that
+    alternative lost the comparison; promoting it would add an event the
+    audit had just implicitly rejected.
+
+    Deduped two ways. Against the candidates already on the list, because a
+    category search may well have found the same event, and a second copy
+    would be scored twice and could occupy two slots under the cap. And
+    against each other, because two cut marquee events routinely point at the
+    same replacement.
+    """
+    out: list[dict] = []
+    seen: set = set()
+    for entry in (audit or {}).get("cut") or []:
+        name = str((entry or {}).get("alternative") or "").strip()
+        if not name:
+            continue
+        key = name_key(name)
+        if not key or key in seen:
+            continue
+        if any(names_match(name, c.get("name") or "") for c in candidates or []):
+            continue
+        seen.add(key)
+        out.append({
+            "name": name,
+            "website": entry.get("alternative_website") or None,
+            "note": entry.get("alternative_note") or None,
+            "replaces": str(entry.get("name") or "").strip() or None,
+        })
+    return out
+
+
+def promote_alternatives(audit: dict, candidates: list[dict],
+                         resolver=None, cap: int = MAX_PROMOTED) -> dict:
+    """Turn the audit's named alternatives into scoreable candidates.
+
+    The gap this closes: the audit would cut a marquee event, name a better
+    one and explain in detail why it is better, and then nothing ever looked
+    the better one up. A run could end with an empty list while the system
+    itself had already identified the event the client should attend. Live on
+    2026-09-02: MarTech Conference was cut for being fully online with no
+    exhibit floor, INBOUND was named as the in-person alternative with a real
+    expo floor, and INBOUND was never scored, never stored and never shown.
+
+    Every promotion is CONFIRMED before it is used. The audit names an event;
+    it does not establish that the event exists, when it runs or where. That
+    is the same standard discovery is held to, and skipping it here would put
+    a conference on a client's travel calendar on the strength of one
+    sentence written while cutting something else.
+
+    An alternative that cannot be confirmed is REPORTED, never dropped and
+    never injected half-formed. "The audit recommended this and it could not
+    be confirmed" is a fact the reader needs; silence would hide the same gap
+    this function exists to close.
+
+    Returns {"promoted": [...], "unconfirmed": [...], "considered": int,
+             "not_attempted": [...]}.
+    """
+    from . import event_intel_rubric as rubric
+    if resolver is None:
+        from .event_intel_resolve import resolve_event as resolver
+
+    wanted = alternatives_to_promote(audit, candidates)
+    out: dict = {"promoted": [], "unconfirmed": [], "considered": len(wanted),
+                 "not_attempted": []}
+    if not wanted:
+        return out
+
+    # By category of the event being replaced, so a promoted event lands in
+    # the same slot on the report as the one it stands in for.
+    by_name = {name_key(c.get("name") or ""): c for c in candidates or []}
+
+    for alt in wanted[:max(0, cap)]:
+        try:
+            res = resolver(alt["name"])
+        except Exception as e:                       # never raises upward
+            logger.warning("event_intel_audit: resolving alternative %r failed: %s",
+                           alt["name"], e)
+            res = {"ok": False, "reasoning": "The lookup failed: %s" % str(e)[:200]}
+        if not (res or {}).get("ok") or not (res or {}).get("event"):
+            out["unconfirmed"].append({
+                "name": alt["name"], "replaces": alt["replaces"],
+                "why": (str((res or {}).get("reasoning") or "").strip()
+                        or "The event could not be confirmed."),
+                "confidence": (res or {}).get("confidence"),
+            })
+            continue
+        # A replacement has to be attendable. The lookup is allowed to return
+        # the most recent past edition when no future one is announced, which
+        # is right for reading a roster and wrong here: offering an event that
+        # has already happened in place of one just cut leaves the client with
+        # a line they cannot act on, dressed as a recommendation.
+        if rubric.has_finished(res["event"]):
+            out["unconfirmed"].append({
+                "name": alt["name"], "replaces": alt["replaces"],
+                "why": ("The only edition that could be confirmed (%s) has "
+                        "already finished, and no future one is announced, so "
+                        "there is nothing here to attend."
+                        % (res["event"].get("starts_on") or "date unknown")),
+                "confidence": (res or {}).get("confidence"),
+                "finished": True,
+            })
+            continue
+        replaced = by_name.get(name_key(alt["replaces"] or ""))
+        out["promoted"].append(
+            _candidate_from_alternative(res, alt, replaced))
+
+    # Named, never looked at, because the cost ceiling was reached. Said out
+    # loud rather than trimmed away, so the reader can ask for the rest.
+    for alt in wanted[max(0, cap):]:
+        out["not_attempted"].append({"name": alt["name"],
+                                     "replaces": alt["replaces"]})
+    return out
+
+
+def _candidate_from_alternative(res: dict, alt: dict,
+                                replaced: dict | None) -> dict:
+    """One confirmed alternative, in the shape the scorer and store expect.
+
+    `famous` is forced FALSE regardless of how well known the event is. It is
+    the flag that decides what gets audited, and a promoted event auditing
+    into another promotion would recurse. It has also already been through the
+    comparison this step exists to force: it IS the more targeted alternative.
+    """
+    ev = res.get("event") or {}
+    sources = [p.get("url") for p in (res.get("pages") or [])
+               if isinstance(p, dict) and p.get("url")][:8]
+    website = ev.get("website") or alt.get("website")
+    if website and website not in sources:
+        sources.insert(0, website)
+
+    replaces = alt.get("replaces")
+    note = ("On this list because the famous-event audit cut %s and named this "
+            "as the more targeted alternative. It was then looked up and "
+            "confirmed separately; it was not found by a category search."
+            % (replaces or "a marquee event"))
+    if alt.get("note"):
+        note = "%s The audit's reason: %s" % (note, alt["note"])
+
+    return {
+        "name": ev.get("name") or alt["name"],
+        "edition": ev.get("edition"),
+        "website": website or None,
+        "organizer": ev.get("organizer"),
+        "starts_on": ev.get("starts_on"),
+        "ends_on": ev.get("ends_on"),
+        "country": None,
+        "city": ev.get("location"),
+        "days": None,
+        "industry": None,
+        "attendees": ev.get("stated_size"),
+        "booths": None,
+        "audience_note": ev.get("audience_note"),
+        "format": ev.get("format"),
+        "cost_note": None,
+        "organizer_run": False,
+        # Not carried over from the audit's prose. The bonus needs evidence
+        # the rubric has read, and a sentence about why one event beats
+        # another is not that.
+        "matchmaking_evidence": None,
+        "famous": False,
+        "category": (replaced or {}).get("category"),
+        "category_fit": note[:500],
+        "confidence": ev.get("confidence") or "medium",
+        "sources": sources,
+        "audit_verdict": VERDICT_PROMOTED,
+        "audit_note": note[:800],
+    }
+
 
 def genericness(names: list[str], prior_runs: list[dict],
                 this_client: str | None = None) -> dict:
