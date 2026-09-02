@@ -279,8 +279,27 @@ html::-webkit-scrollbar-thumb:hover { background-color: rgba(74,222,128,.55); ba
    day chart's zero stub: "almost nothing" has to look different from "nothing",
    so a non-zero row always keeps a visible nub. */
 .gd-bar-fill[data-w]:not([data-w="0"]) { min-width: 4px; }
-.gd-bar-num { font-size: 11.5px; font-weight: 700; color: #bef264; width: 46px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.gd-bar-sub { font-size: 10px; color: #6c7f78; width: 46px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.gd-bar-num { font-size: 11.5px; font-weight: 700; color: #bef264; width: 54px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+/* Wide enough for the longest thing this column ever holds ("46 loc · 12 full",
+   sixteen characters) and told not to wrap. At 46px it broke mid-phrase and
+   printed "full" on a second line, which pushed the row taller than its
+   neighbours and made a tidy list look broken.
+   Fixed width rather than auto, deliberately: the track is the flex child that
+   absorbs the remainder, so a sub that sized to its own content would hand a
+   different track length to every row, and two equal values would draw
+   different-length bars. */
+.gd-bar-sub { font-size: 10px; color: #6c7f78; width: 84px; text-align: right; flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Label width is per-list, because these three lists hold very different
+   things and share one set of classes. States are two characters ("MA") and
+   the 118px default is already generous. Brands run to 19. Services run to 29
+   and, worse, three of them are "New Patient Offer | $79 / $99 / $199", where
+   the price is both the only difference and the first thing an ellipsis eats:
+   at 118px the tab showed three identical rows reading "New Patient Offer | …".
+   Widening the shared default instead would squeeze the track inside the
+   half-width states card, which is how that track once computed to 0px. */
+#servicesBody .gd-bar-name { flex-basis: 232px; }
+#brandsBody .gd-bar-name { flex-basis: 168px; }
 
 /* Tabs + toolbar */
 .gd-tabs { display: flex; position: relative; background: rgba(255,255,255,.025); border-bottom: 1px solid rgba(255,255,255,.07); padding: 7px; }
@@ -826,6 +845,9 @@ html:root[data-theme="light"]::-webkit-scrollbar-thumb:hover { background-color:
      can go rather than truncating "48 practices" to "48 practi…". */
   .gd-bar-sub { display: none; }
   .gd-bar-name { flex-basis: 140px; }
+  /* The per-list widths above are id-scoped, so they outrank the line above
+     and would follow the page onto a phone, leaving no room for the bar. */
+  #servicesBody .gd-bar-name, #brandsBody .gd-bar-name { flex-basis: 140px; }
   .gd-ribbon-key { gap: 5px 10px; }
   .gd-tab { font-size: 11.5px; padding: 10px 5px; }
 }
