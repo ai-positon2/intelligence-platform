@@ -36,10 +36,17 @@ _CITED = ("This is the flagship gathering, where a recap noted attendees came fr
           + _OPEN + '"47 states and 9 countries"' + _CLOSE + ", evenly split.")
 
 _SHIM = """
+/* A DOM only as real as these tests need, with one rule taken seriously:
+   getElementById returns null for an id that is not on the page. A shim that
+   fabricates a node for every id asked of it makes "did this control find
+   its target?" unanswerable, and that is exactly what the reveal and the
+   card click turn on. Ids written by render() are resolved out of the markup
+   render() produced, and cached, so a node has a stable identity. */
 function __node(id){
   return {
-    _id: id, style: {}, value: '', disabled: false, textContent: '', innerHTML: '',
-    children: [], firstChild: null,
+    _id: id, tagName: 'DIV', style: {}, value: '', disabled: false,
+    textContent: '', innerHTML: '', children: [], firstChild: null,
+    parentNode: null,
     getAttribute: function(){ return null; }, setAttribute: function(){},
     classList: {add:function(){},remove:function(){},toggle:function(){},
                 contains:function(){return false;}},
@@ -47,19 +54,51 @@ function __node(id){
     insertBefore: function(){}, addEventListener: function(){}
   };
 }
+
+// The ids the template itself ships. Read off the served page and injected,
+// so this list cannot drift out of date against the markup.
+var __CHROME = __PAGE_IDS;
 var __els = {};
+var __rendered = {};
+
+function __fromMarkup(id){
+  var body = __els.drawerBody ? String(__els.drawerBody.innerHTML) : '';
+  var m = new RegExp('<([a-zA-Z]+)([^>]*\\\\sid="' + id + '"[^>]*)>').exec(body);
+  if (!m) return null;
+  var attrs = m[2];
+  var el = __node(id);
+  el.tagName = m[1].toUpperCase();
+  el.getAttribute = function(k){
+    var a = new RegExp('\\\\s' + k + '="([^"]*)"').exec(attrs);
+    return a ? a[1] : null;
+  };
+  return el;
+}
+
 global.document = {
   readyState: 'complete',
   getElementById: function(id){
-    if (!__els[id]) __els[id] = __node(id);
-    return __els[id];
+    if (__CHROME.indexOf(id) >= 0) {
+      if (!__els[id]) __els[id] = __node(id);
+      return __els[id];
+    }
+    if (__rendered[id] === undefined || __rendered[id] === null) {
+      __rendered[id] = __fromMarkup(id);
+    }
+    return __rendered[id];
   },
   querySelectorAll: function(){ return []; },
   querySelector: function(){ return null; },
   createElement: function(){ return __node('x'); },
   addEventListener: function(){}
 };
-global.window = {addEventListener: function(){}};
+global.__opened = [];
+global.__selection = '';
+global.window = {
+  addEventListener: function(){},
+  open: function(u){ global.__opened.push(u); return null; },
+  getSelection: function(){ return {toString: function(){ return global.__selection; }}; }
+};
 global.location = {hash: '', pathname: '/'};
 global.fetch = function(){
   return Promise.resolve({ok: true, json: function(){ return Promise.resolve({}); }});
@@ -71,6 +110,17 @@ global.clearTimeout = function(){};
 """
 
 
+class _Page:
+    """The page's inline script, plus the ids its own markup carries."""
+
+    def __init__(self, script, ids):
+        self.script = script
+        self.ids = ids
+
+    def index(self, needle):
+        return self.script.index(needle)
+
+
 @pytest.fixture(scope="module")
 def page_script():
     c = appmod.app.test_client()
@@ -78,12 +128,14 @@ def page_script():
         sess["google_user"] = {"email": "harness@position2.com", "name": "T"}
     resp = c.get(_PAGE)
     assert resp.status_code == 200, "the page did not render (%s)" % resp.status_code
-    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
-                        resp.get_data(as_text=True), re.S)
+    html = resp.get_data(as_text=True)
+    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)
     hits = [b for b in blocks if "function eventsHtml" in b]
     assert len(hits) == 1, \
         "expected exactly one inline block defining eventsHtml, found %d" % len(hits)
-    return hits[0]
+    ids = sorted(set(re.findall(r'\sid="([A-Za-z][\w-]*)"', html)))
+    assert "drawerBody" in ids, "the drawer is no longer in the page markup"
+    return _Page(hits[0], ids)
 
 
 def _render(page_script, run, sort="ranked"):
@@ -92,11 +144,33 @@ def _render(page_script, run, sort="ranked"):
     probe = ("\nEVENT_SORT = %s;\ncurrent = __RUN;\nrender(__RUN);\n"
              "console.log(JSON.stringify({body: "
              "document.getElementById('drawerBody').innerHTML}));\n" % json.dumps(sort))
-    js = "%s\nvar __RUN = %s;\n%s" % (
-        _SHIM, json.dumps(run), page_script[:at] + probe + page_script[at:])
+    src = page_script.script
+    js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
+        json.dumps(page_script.ids), _SHIM, json.dumps(run),
+        src[:at] + probe + src[at:])
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
     return json.loads(r.stdout.strip().splitlines()[-1])["body"]
+
+
+def _drive(page_script, run, js, sort="ranked"):
+    """Render, press something, and read back what the page redrew.
+
+    The controls in this view all re-enter render(), so the only way to test
+    that pressing one changes the list is to let it happen.
+    """
+    at = page_script.index(_IIFE_CLOSE)
+    probe = ("\nEVENT_SORT = %s;\ncurrent = __RUN;\nrender(__RUN);\n%s\n"
+             "console.log(JSON.stringify({body: "
+             "document.getElementById('drawerBody').innerHTML,"
+             " opened: global.__opened}));\n" % (json.dumps(sort), js))
+    page = page_script.script
+    src = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
+        json.dumps(page_script.ids), _SHIM, json.dumps(run),
+        page[:at] + probe + page[at:])
+    r = subprocess.run(["node", "-e", src], capture_output=True, text=True, timeout=90)
+    assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
+    return json.loads(r.stdout.strip().splitlines()[-1])
 
 
 def _event(**kw):
@@ -192,7 +266,7 @@ def test_an_event_with_no_date_is_not_drawn_on_the_rail(page_script):
              _event(id=2, name="Second", starts_on="2027-09-01", ends_on="2027-09-02")]
     undated = _event(id=3, name="Undated Summit", starts_on=None, ends_on=None)
     html = _render(page_script, _run(dated + [undated]))
-    assert 'class="evi-rail"' in html, "the rail was not drawn for two dated events"
+    assert 'class="evi-cal"' in html, "the rail was not drawn for two dated events"
     assert html.count('class="mk ') == 2, \
         "the rail drew %d markers for 2 dated events" % html.count('class="mk ')
     assert "Undated Summit" in html.split('class="evi-events"')[0], \
@@ -206,7 +280,7 @@ def test_the_rail_is_not_drawn_at_all_when_almost_nothing_is_dated(page_script):
     html = _render(page_script, _run([
         _event(id=1, starts_on="2027-05-04", ends_on="2027-05-06"),
         _event(id=2, name="Second", starts_on=None, ends_on=None)]))
-    assert 'class="evi-rail"' not in html
+    assert 'class="evi-cal"' not in html
 
 
 def test_an_undated_event_says_so_on_its_own_card(page_script):
@@ -229,7 +303,11 @@ def test_the_rail_scrolls_in_its_own_box_rather_than_squeezing(page_script):
     html = _render(page_script, _run([
         _event(id=1, starts_on="2027-05-04", ends_on="2027-05-06"),
         _event(id=2, name="Second", starts_on="2027-09-01", ends_on="2027-09-02")]))
-    assert 'class="evi-railwrap"' in html
+    assert 'class="evi-calwrap"' in html
+    # NOT evi-rail: the page's own right-hand <aside class="evi-rail"> owns
+    # that name, and sharing it handed the sidebar this calendar's 640px
+    # minimum width.
+    assert 'class="evi-rail"' not in html
 
 
 # -- order ----------------------------------------------------------------
@@ -317,14 +395,14 @@ def test_the_fit_spread_has_one_bar_for_every_event(page_script):
     html = _render(page_script, _run(_three()))
     bars = re.findall(r'<div class="tbars">(.*?)</div>', html, re.S)
     assert len(bars) == 1
-    assert bars[0].count("<i ") == 3
+    assert bars[0].count("<button") == 3
 
 
 def test_an_unscored_event_still_gets_a_bar_and_is_not_drawn_as_a_zero(page_script):
     html = _render(page_script, _run([_event(id=1, fit_score=None),
                                       _event(id=2, name="B", fit_score=90)]))
     bars = re.findall(r'<div class="tbars">(.*?)</div>', html, re.S)[0]
-    assert bars.count("<i ") == 2
+    assert bars.count("<button") == 2
     assert "not scored" in bars, "an unscored event is drawn as if it had a score"
 
 
@@ -376,8 +454,10 @@ def test_every_onclick_this_view_writes_is_a_function_that_exists(page_script):
     probe = ("\ncurrent = __RUN;\nrender(__RUN);\n"
              "console.log(JSON.stringify(%s.map(function(n){"
              " return [n, typeof window[n]]; })));\n" % json.dumps(names))
-    js = "%s\nvar __RUN = %s;\n%s" % (
-        _SHIM, json.dumps(run), page_script[:at] + probe + page_script[at:])
+    src = page_script.script
+    js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
+        json.dumps(page_script.ids), _SHIM, json.dumps(run),
+        src[:at] + probe + src[at:])
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, r.stderr[-2000:]
     kinds = json.loads(r.stdout.strip().splitlines()[-1])
@@ -391,7 +471,245 @@ def test_every_rail_marker_points_at_a_card_that_is_on_the_page(page_script):
     html = _render(page_script, _run([
         _event(id=1, name="First", starts_on="2027-11-01", ends_on="2027-11-02"),
         _event(id=2, name="Second", starts_on="2027-06-01", ends_on="2027-06-02")]))
-    targets = set(re.findall(r"onclick=\"eviJump\('([^']+)'\)\"", html))
+    targets = set(re.findall(r"onclick=\"evi(?:Jump|Reveal)\('([^']+)'\)\"", html))
     ids = {c[0] for c in _cards(html)}
     assert targets, "the rail wrote no jump targets"
     assert targets <= ids, "markers point at %r, cards are %r" % (targets, ids)
+
+
+# -- guarding the guard ---------------------------------------------------
+
+def test_the_harness_dom_answers_honestly_about_what_is_on_the_page(page_script):
+    """Several tests here turn on getElementById returning null for an id
+    that is not rendered. A shim that fabricates a node for every id asked of
+    it makes all of them vacuously pass, which is exactly what happened once
+    while this file was being written: a swallowed backslash in the shim's
+    own regex meant no rendered id ever resolved, and the tests that were
+    supposed to prove the reveal works passed anyway."""
+    out = _drive(page_script, _run([_event(website="https://example.com/e")]),
+                 "global.__opened.push('present:' + "
+                 "!!document.getElementById('eviev-1'));"
+                 "global.__opened.push('absent:' + "
+                 "(document.getElementById('eviev-404') === null));"
+                 "global.__opened.push('attr:' + "
+                 "document.getElementById('eviev-1').getAttribute('data-site'));")
+    assert out["opened"] == ["present:true", "absent:true",
+                             "attr:https://example.com/e"]
+
+
+# -- the score reads against the ring it is reporting ---------------------
+
+def _inside(html, opener):
+    """The markup between `opener` and its own matching </span>.
+
+    Counting depth rather than reaching for the next close tag: the whole
+    point of this check is that the number is NESTED, and a non-greedy match
+    to the next `</span>` happily reports a sibling as a child.
+    """
+    at = html.index(opener) + len(opener)
+    depth, i = 1, at
+    while depth and i < len(html):
+        o = html.find("<span", i)
+        c = html.find("</span>", i)
+        if c == -1:
+            break
+        if o != -1 and o < c:
+            depth += 1
+            i = o + 5
+        else:
+            depth -= 1
+            if not depth:
+                return html[at:c]
+            i = c + 7
+    raise AssertionError("%r never closes" % opener)
+
+
+def test_the_score_sits_inside_the_ring_box_not_the_column(page_script):
+    """The number used to be positioned against the whole gauge column, which
+    is wider than the circle, so it printed thirteen pixels left of the arc,
+    and at the mobile breakpoint it landed somewhere else again. It has to be
+    a child of a box that is exactly the ring."""
+    html = _render(page_script, _run([_event(fit_score=96)]))
+    assert '<span class="ring">' in html, "the gauge no longer wraps its ring"
+    inner = _inside(html, '<span class="ring">')
+    assert '<span class="n">96</span>' in inner, \
+        "the number is a sibling of the ring, not a child of it"
+    assert "<svg" in inner, "the ring box no longer holds the arc it sizes"
+    assert 'class="fl"' not in inner, "the label was swept inside the ring"
+
+
+# -- what is clickable ----------------------------------------------------
+
+def test_a_card_with_a_website_is_a_link_surface(page_script):
+    html = _render(page_script, _run([_event(website="https://example.com/e")]))
+    card = re.search(r'<article class="([^"]+)"[^>]*data-site="([^"]+)"[^>]*>', html)
+    assert card, "the card carries no click target"
+    assert "link" in card.group(1)
+    assert card.group(2) == "https://example.com/e"
+
+
+def test_a_card_with_no_website_is_not_pretending_to_be_clickable(page_script):
+    html = _render(page_script, _run([_event(website=None)]))
+    assert "data-site" not in html
+    assert 'class="evi-ev f-mid link"' not in html
+
+
+def test_a_card_never_carries_an_unsafe_url_as_its_click_target(page_script):
+    html = _render(page_script, _run([_event(website="javascript:alert(1)")]))
+    assert "data-site" not in html and "javascript:" not in html
+
+
+def test_clicking_a_card_opens_its_site_once(page_script):
+    out = _drive(page_script, _run([_event(website="https://example.com/e")]),
+                 "window.eviOpenCard(document.getElementById('eviev-1'), "
+                 "{target: document.getElementById('eviev-1')});")
+    assert out["opened"] == ["https://example.com/e"]
+
+
+def test_a_click_that_finished_a_selection_is_not_a_click(page_script):
+    """These cards exist to be quoted. A drag that ends inside one must not
+    navigate away from the words the reader was selecting."""
+    out = _drive(page_script, _run([_event(website="https://example.com/e")]),
+                 "global.__selection = '47 states and 9 countries';"
+                 "window.eviOpenCard(document.getElementById('eviev-1'), "
+                 "{target: document.getElementById('eviev-1')});")
+    assert out["opened"] == []
+
+
+def test_a_control_inside_a_card_keeps_its_own_job(page_script):
+    """The title anchor and the chips are inside the click surface. Letting
+    the card handler fire for them would open the site twice, or open it
+    instead of doing what the control was for."""
+    inner = ("{target: {tagName: 'A', parentNode: "
+             "document.getElementById('eviev-1')}}")
+    out = _drive(page_script, _run([_event(website="https://example.com/e")]),
+                 "window.eviOpenCard(document.getElementById('eviev-1'), %s);" % inner)
+    assert out["opened"] == []
+
+
+def test_every_bar_in_the_fit_spread_jumps_to_its_own_event(page_script):
+    html = _render(page_script, _run(_three()))
+    bars = re.findall(r'<div class="tbars">(.*?)</div>', html, re.S)[0]
+    targets = re.findall(r"onclick=\"eviReveal\('([^']+)'\)\"", bars)
+    ids = [c[0] for c in _cards(html)]
+    assert targets == ids, "the bars point at %r, the cards are %r" % (targets, ids)
+
+
+# -- filtering by format --------------------------------------------------
+
+def _mixed():
+    return _run([_event(id=1, name="Live", format="in_person"),
+                 _event(id=2, name="Both", format="hybrid"),
+                 _event(id=3, name="Online", format="virtual"),
+                 _event(id=4, name="Unsaid", format=None)])
+
+
+def test_picking_a_format_narrows_the_list_to_it(page_script):
+    out = _drive(page_script, _mixed(), "window.eviFormatFilter('hybrid');")
+    assert [c[2] for c in _cards(out["body"])] == ["Both"]
+
+
+def test_picking_the_same_format_twice_clears_it(page_script):
+    out = _drive(page_script, _mixed(),
+                 "window.eviFormatFilter('hybrid'); window.eviFormatFilter('hybrid');")
+    assert len(_cards(out["body"])) == 4
+
+
+def test_a_filtered_list_says_what_it_is_hiding_and_how_to_stop(page_script):
+    """A list quietly shorter than the count above it is a bug this page has
+    shipped once already."""
+    out = _drive(page_script, _mixed(), "window.eviFormatFilter('hybrid');")
+    assert 'class="evi-filterbar"' in out["body"], \
+        "a filtered list renders no notice at all"
+    bar = _inside(out["body"].replace('<div class="evi-filterbar">',
+                                      '<span class="evi-filterbar">', 1)
+                  .replace("</div>", "</span>"),
+                  '<span class="evi-filterbar">')
+    assert "Showing <b>1</b> of 4" in bar
+    assert "Show all 4" in bar
+    assert "hidden" not in out["body"].split('class="evi-filterbar"')[1][:40], \
+        "the notice is rendered but hidden"
+
+
+def test_the_charts_above_keep_showing_the_whole_set_while_filtered(page_script):
+    """A chart that redrew itself around the filter it is offering would make
+    the filter impossible to reason about."""
+    out = _drive(page_script, _mixed(), "window.eviFormatFilter('hybrid');")
+    bars = re.findall(r'<div class="tbars">(.*?)</div>', out["body"], re.S)[0]
+    assert bars.count("<button") == 4, "the spread redrew itself around the filter"
+    assert "In person 1" in out["body"] and "Hybrid 1" in out["body"]
+
+
+def test_a_filter_dims_the_rail_rather_than_redrawing_the_calendar(page_script):
+    """Dropping points would change the span, the lanes and the month axis,
+    so the same run would draw a different shape per chip pressed."""
+    run = _run([_event(id=1, name="Live", format="in_person",
+                       starts_on="2027-05-04", ends_on="2027-05-06"),
+                _event(id=2, name="Both", format="hybrid",
+                       starts_on="2027-09-01", ends_on="2027-09-02")])
+    out = _drive(page_script, run, "window.eviFormatFilter('hybrid');")
+    assert out["body"].count('class="mk ') == 2, "the rail dropped a marker"
+    assert out["body"].count("mk f-mid out") == 1, "nothing on the rail is dimmed"
+
+
+def test_jumping_to_an_event_the_filter_is_hiding_brings_it_back(page_script):
+    """Scrolling to nothing looks like a broken control."""
+    out = _drive(page_script, _mixed(),
+                 "window.eviFormatFilter('hybrid'); window.eviReveal('eviev-3');")
+    names = [c[2] for c in _cards(out["body"])]
+    assert "Online" in names, "the reveal left its target hidden"
+    assert len(names) == 4
+
+
+def test_a_format_with_nothing_in_it_says_so_rather_than_going_blank(page_script):
+    out = _drive(page_script, _run([_event(id=1, format="in_person")]),
+                 "window.eviFormatFilter('virtual');")
+    assert "Nothing in that format" in out["body"]
+
+
+def test_the_undated_names_are_the_way_into_their_own_cards(page_script):
+    run = _run([_event(id=1, starts_on="2027-05-04", ends_on="2027-05-06"),
+                _event(id=2, name="Second", starts_on="2027-09-01",
+                       ends_on="2027-09-02"),
+                _event(id=3, name="Undated Summit", starts_on=None, ends_on=None)])
+    html = _render(page_script, run)
+    tray = html.split('class="evi-events"')[0]
+    targets = re.findall(r"onclick=\"eviReveal\('([^']+)'\)\"", tray)
+    assert "eviev-3" in targets, "the undated name is not a way into its card"
+
+
+def test_the_calendar_does_not_reuse_a_class_the_page_already_owns():
+    """It did. <aside class="evi-rail"> is the form's right-hand column, and
+    the calendar shipped rendering itself with the same name, so the sidebar
+    inherited a 640px minimum width and the whole page grew a horizontal
+    scrollbar, while the calendar inherited the sidebar's sticky column and
+    drew itself 640px wide inside a 1074px drawer.
+
+    A drawer-only harness cannot see this: it renders no page chrome. So the
+    check is against the page's own static markup, with its scripts removed
+    so that strings inside the renderer do not count as markup.
+    """
+    c = appmod.app.test_client()
+    with c.session_transaction() as sess:
+        sess["google_user"] = {"email": "harness@position2.com", "name": "T"}
+    html = c.get(_PAGE).get_data(as_text=True)
+    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)
+    script = [b for b in blocks if "function eventsHtml" in b][0]
+
+    m = re.search(r'<div class="([\w -]+)"><div class="([\w -]+)" style="--lanes',
+                  script)
+    assert m, "the calendar no longer renders a wrapper and a panel"
+    mine = set(m.group(1).split()) | set(m.group(2).split())
+    assert mine, "the calendar renders with no class at all"
+
+    chrome = html
+    for b in blocks:
+        chrome = chrome.replace(b, "")
+    owned = set()
+    for attr in re.findall(r'class="([^"]*)"', chrome):
+        owned.update(attr.split())
+
+    clash = mine & owned
+    assert not clash, (
+        "the calendar renders with %r, which the page's own markup already "
+        "uses; both elements now get both sets of rules" % sorted(clash))

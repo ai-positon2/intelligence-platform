@@ -863,6 +863,7 @@
       /* Per-run state, not per-session: a reader who sorted one roster by
          date should not find the next run they open already sorted. */
       EVENT_SORT = 'ranked';
+      FORMAT_FILTER = null;
       fetch(BASE + '/runs/' + runId)
         .then(function(r){ return r.json(); })
         .then(function(run){
@@ -1251,6 +1252,17 @@
       return 'eviev-' + (ev && ev.id != null ? String(ev.id) : 'p' + i);
     }
 
+    /* A jump into a card the format filter is currently hiding. Clearing
+       the filter is the only honest way to honour the click: scrolling to
+       nothing looks like a broken control. */
+    window.eviReveal = function(anchor){
+      if (FORMAT_FILTER && !document.getElementById(anchor)) {
+        FORMAT_FILTER = null;
+        redrawRun();
+      }
+      window.eviJump(anchor);
+    };
+
     window.eviJump = function(anchor){
       var el = document.getElementById(anchor);
       if (!el) return;
@@ -1292,13 +1304,19 @@
       if (n == null) return '';
       var b = fitBand(n), r = 21, c = 2 * Math.PI * r;
       var on = Math.max(0, Math.min(100, n)) / 100 * c;
+      /* The number lives INSIDE a box the size of the ring, not absolutely
+         placed against the whole gauge column. The column is wider than the
+         ring, so a number centred on the column sat left of the arc it was
+         reporting, and on a narrower ring at the mobile breakpoint it sat
+         somewhere else again. */
       return '<div class="evi-gauge ' + bandClass(n) + '" role="img" aria-label="Fit ' +
         esc(n) + ' out of 100, ' + esc(b ? b.l : '') + '">' +
+        '<span class="ring">' +
         '<svg viewBox="0 0 52 52" aria-hidden="true">' +
         '<circle class="tr" cx="26" cy="26" r="' + r + '"/>' +
         '<circle class="vl" cx="26" cy="26" r="' + r + '" stroke-dasharray="' +
         on.toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 26 26)"/></svg>' +
-        '<span class="n">' + esc(n) + '</span>' +
+        '<span class="n">' + esc(n) + '</span></span>' +
         '<span class="fl">' + esc(b ? b.l : '') + '</span></div>';
     }
 
@@ -1322,15 +1340,17 @@
           ? srt[(srt.length - 1) / 2]
           : Math.round((srt[srt.length / 2 - 1] + srt[srt.length / 2]) / 2);
         tiles.push('<div class="evi-tile"><div class="tl">Fit spread</div>' +
-          '<div class="tbars">' + rows.map(function(r){
+          '<div class="tbars">' + rows.map(function(r, i){
             var n = fitOf(r.ev);
-            return '<i class="' + bandClass(n) + '" style="height:' +
+            var lbl = r.ev.name + (n == null ? ': not scored' : ': ' + n + ' fit');
+            return '<button type="button" class="' + bandClass(n) + '" style="height:' +
               (n == null ? 5 : Math.max(9, Math.min(100, n))) + '%" title="' +
-              esc(r.ev.name + (n == null ? ': not scored' : ': ' + n + ' fit')) +
-              '"></i>';
+              esc(lbl) + '" aria-label="' + esc(lbl) + '" onclick="eviReveal(\'' +
+              esc(evAnchor(r.ev, i)) + '\')"></button>';
           }).join('') + '</div>' +
           '<div class="tn"><b>' + esc(top) + '</b> best, <b>' + esc(mid) +
-          '</b> median, one bar per event in the order below</div></div>');
+          '</b> median. One bar per event, in the order below. Pick one to ' +
+          'jump to it.</div></div>');
       }
 
       var mix = {in_person: 0, hybrid: 0, virtual: 0, unknown: 0};
@@ -1338,13 +1358,24 @@
       var segs = ['in_person', 'hybrid', 'virtual', 'unknown'].filter(function(k){
         return mix[k] > 0;
       });
-      tiles.push('<div class="evi-tile"><div class="tl">How you attend</div>' +
-        '<div class="tstack">' + segs.map(function(k){
-          return '<i class="s-' + k + '" style="flex-grow:' + mix[k] + '" title="' +
-            esc((FORMAT_LABEL[k] || 'Format not stated') + ': ' + mix[k]) + '"></i>';
+      function fmtLabel(k){ return FORMAT_LABEL[k] || 'Format not stated'; }
+      function fmtHint(k){
+        return (FORMAT_FILTER === k ? 'Showing only ' : 'Show only ') + fmtLabel(k) +
+               ' (' + mix[k] + ')';
+      }
+      tiles.push('<div class="evi-tile' + (FORMAT_FILTER ? ' on' : '') +
+        '"><div class="tl">How you attend</div>' +
+        '<div class="tstack" role="group" aria-label="Filter by format">' +
+        segs.map(function(k){
+          return '<button type="button" class="s-' + k + '" style="flex-grow:' + mix[k] +
+            '" aria-pressed="' + (FORMAT_FILTER === k) + '" title="' + esc(fmtHint(k)) +
+            '" aria-label="' + esc(fmtHint(k)) + '" onclick="eviFormatFilter(\'' + k +
+            '\')"></button>';
         }).join('') + '</div><div class="tlegend">' + segs.map(function(k){
-          return '<span class="lg s-' + k + '"><i></i>' +
-            esc((FORMAT_LABEL[k] || 'Not stated') + ' ' + mix[k]) + '</span>';
+          return '<button type="button" class="lg s-' + k + '" aria-pressed="' +
+            (FORMAT_FILTER === k) + '" title="' + esc(fmtHint(k)) + '" onclick="' +
+            'eviFormatFilter(\'' + k + '\')"><i></i>' +
+            esc((FORMAT_LABEL[k] || 'Not stated') + ' ' + mix[k]) + '</button>';
         }).join('') + '</div></div>');
 
       return '<div class="evi-sec"><h3>At a glance</h3>' +
@@ -1419,15 +1450,23 @@
       });
 
       var lanes = laneRight.length;
+      /* Under a format filter the markers DIM rather than disappear. The
+         rail is a calendar: dropping points out of it would silently change
+         the span, the lanes and the month axis, so the same run would draw a
+         different shape depending on which chip was pressed. */
       var marks = placed.map(function(r){
         var n = fitOf(r.ev), cls = bandClass(n);
+        var out = FORMAT_FILTER && formatKey(r.ev) !== FORMAT_FILTER;
         var title = r.ev.name + ' · ' + dateRangeText(r.ev) +
-          (n == null ? '' : ' · ' + n + ' fit');
-        return '<span class="sp ' + cls + '" style="left:' + r._L.toFixed(3) +
-          '%;width:' + r._W.toFixed(3) + '%;top:' + (r._lane * 30 + 11) + 'px"></span>' +
-          '<button type="button" class="mk ' + cls + '" style="left:' + r._C.toFixed(3) +
+          (n == null ? '' : ' · ' + n + ' fit') +
+          (out ? ' · outside the format you are filtering on' : '');
+        return '<span class="sp ' + cls + (out ? ' out' : '') + '" style="left:' +
+          r._L.toFixed(3) + '%;width:' + r._W.toFixed(3) + '%;top:' +
+          (r._lane * 30 + 11) + 'px"></span>' +
+          '<button type="button" class="mk ' + cls + (out ? ' out' : '') +
+          '" style="left:' + r._C.toFixed(3) +
           '%;top:' + (r._lane * 30) + 'px" title="' + esc(title) +
-          '" aria-label="' + esc(title) + '" onclick="eviJump(\'' +
+          '" aria-label="' + esc(title) + '" onclick="eviReveal(\'' +
           esc(evAnchor(r.ev, r.rank - 1)) + '\')">' + esc(r.rank) + '</button>';
       }).join('');
 
@@ -1439,7 +1478,10 @@
       if (undated.length) {
         tail = '<div class="evi-undated">' + TAG_ICON.warn + '<span><b>' +
           esc(plural(undated.length, 'event')) + ' not on the rail.</b> ' +
-          esc(undated.map(function(r){ return r.ev.name; }).slice(0, 4).join(', ')) +
+          undated.slice(0, 4).map(function(r){
+            return '<button type="button" class="un" onclick="eviReveal(\'' +
+              esc(evAnchor(r.ev, r.rank - 1)) + '\')">' + esc(r.ev.name) + '</button>';
+          }).join(', ') +
           (undated.length > 4 ? ' and ' + (undated.length - 4) + ' more' : '') +
           (undated.length === 1 ? ' has ' : ' have ') +
           'no announced date, so nothing is drawn at a guessed one.</span></div>';
@@ -1451,7 +1493,7 @@
          labels over each other; a minimum width is the only thing that
          keeps the spacing the lane algorithm assumed. */
       return '<div class="evi-sec"><h3>When they land</h3>' +
-        '<div class="evi-railwrap"><div class="evi-rail" style="--lanes:' + lanes + '">' +
+        '<div class="evi-calwrap"><div class="evi-cal" style="--lanes:' + lanes + '">' +
         '<div class="grid">' + ticks.map(function(k, i){
           return '<span style="left:' + k.at.toFixed(3) + '%"></span>';
         }).join('') + '</div>' + now +
@@ -1505,7 +1547,14 @@
       var ed = ev.edition ? String(ev.edition).trim() : '';
       if (ed && when && when.indexOf(ed) >= 0) ed = '';
 
-      return '<article class="evi-ev ' + cls + '" id="' + esc(evAnchor(ev, r.rank - 1)) + '">' +
+      /* The whole card opens the event's own page. The title below is still
+         a real anchor, which is the keyboard and screen-reader route to the
+         same place; this is the mouse shortcut, so it is hidden from the
+         accessibility tree rather than announced twice. */
+      return '<article class="evi-ev ' + cls + (site ? ' link' : '') + '" id="' +
+        esc(evAnchor(ev, r.rank - 1)) + '"' +
+        (site ? ' data-site="' + esc(site) + '" onclick="eviOpenCard(this, event)"' : '') +
+        '>' +
         '<div class="rk">' + esc(r.rank) + '</div>' +
         '<div class="bd">' +
           '<h4 class="nm">' + (site
@@ -1536,13 +1585,60 @@
        end of the date view and are labelled there. */
     var EVENT_SORT = 'ranked';
 
-    window.eviSortEvents = function(k){
-      if (k === EVENT_SORT || !current) return;
-      EVENT_SORT = k;
+    /* Every control in this view changes what is drawn, so they all go
+       through one redraw that puts the reader back where they were. A
+       control that scrolls the drawer to the top as a side effect of being
+       pressed is a control nobody presses twice. */
+    function redrawRun(){
+      if (!current) return;
       var body = document.getElementById('drawerBody');
       var keep = body ? body.scrollTop : 0;
       render(current);
       if (body) body.scrollTop = keep;
+    }
+
+    window.eviSortEvents = function(k){
+      if (k === EVENT_SORT || !current) return;
+      EVENT_SORT = k;
+      redrawRun();
+    };
+
+    /* Clicking a slice of the format chart narrows the list to it, and
+       clicking it again clears. The charts above keep showing the WHOLE set
+       either way: a chart that silently redrew itself around the filter it
+       is offering would make the filter impossible to reason about. */
+    var FORMAT_FILTER = null;
+
+    window.eviFormatFilter = function(k){
+      if (!current) return;
+      FORMAT_FILTER = (FORMAT_FILTER === k) ? null : k;
+      redrawRun();
+    };
+
+    window.eviClearFilter = function(){
+      FORMAT_FILTER = null;
+      redrawRun();
+    };
+
+    /* A card is a link surface as well as a card. The title stays a real
+       anchor, which is what keyboard and screen-reader users follow; this is
+       the mouse shortcut over the same destination.
+
+       Two things it must not break. Text selection: these cards exist to be
+       quoted, and a click that ends a drag is a selection rather than a
+       click. And the controls inside them, which have their own jobs. */
+    window.eviOpenCard = function(el, ev){
+      var url = el && el.getAttribute('data-site');
+      if (!url) return;
+      var sel = window.getSelection ? String(window.getSelection()) : '';
+      if (sel && sel.replace(/\s+/g, '').length > 1) return;
+      var t = ev && ev.target;
+      while (t && t !== el) {
+        var tag = (t.tagName || '').toLowerCase();
+        if (tag === 'a' || tag === 'button' || tag === 'input') return;
+        t = t.parentNode;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     function eventsHtml(run){
@@ -1579,6 +1675,9 @@
       var rows = evs.map(function(ev, i){ return {ev: ev, rank: i + 1}; });
 
       var shown = rows.slice();
+      if (FORMAT_FILTER) {
+        shown = shown.filter(function(r){ return formatKey(r.ev) === FORMAT_FILTER; });
+      }
       if (EVENT_SORT === 'date') {
         shown.sort(function(a, b){
           var da = dayNum(a.ev.starts_on), db = dayNum(b.ev.starts_on);
@@ -1602,6 +1701,17 @@
         rb.push('Only the best-fitting rosters are read in full. The rest are marked ' +
                 'unread rather than assumed empty.');
       }
+      /* When a filter is on, say what is being hidden and how to stop. A
+         list that is quietly shorter than the count above it is the bug the
+         recommend view already had once. */
+      var filtered = FORMAT_FILTER
+        ? '<div class="evi-filterbar"><span>Showing <b>' + shown.length + '</b> of ' +
+          rows.length + ', ' + esc((FORMAT_LABEL[FORMAT_FILTER] ||
+            'format not stated').toLowerCase()) + ' only.</span>' +
+          '<button type="button" onclick="eviClearFilter()">Show all ' +
+          rows.length + '</button></div>'
+        : '';
+
       var head = '<div class="evi-sec"><h3>Events found</h3>' +
         '<div class="evi-listbar">' +
         (rb.length ? '<span class="rb">' + rb.join(' ') + '</span>' : '<span></span>') +
@@ -1609,12 +1719,18 @@
         [{k: 'ranked', l: 'By fit'}, {k: 'date', l: 'By date'}].map(function(o){
           return '<button type="button" aria-pressed="' + (EVENT_SORT === o.k) +
             '" onclick="eviSortEvents(\'' + o.k + '\')">' + o.l + '</button>';
-        }).join('') + '</span></div>';
+        }).join('') + '</span></div>' + filtered;
 
       return glanceHtml(rows, sm) + railHtml(rows) + head +
-        '<div class="evi-events">' + shown.map(function(r){
-          return eventCard(r, overlap, sampled, knowSampled);
-        }).join('') + '</div></div>';
+        '<div class="evi-events">' + (shown.length
+          ? shown.map(function(r){
+              return eventCard(r, overlap, sampled, knowSampled);
+            }).join('')
+          : '<div class="evi-empty"><span class="ic">&#9788;</span>' +
+            '<b>Nothing in that format</b><span>None of these events is ' +
+            esc((FORMAT_LABEL[FORMAT_FILTER] || 'unstated').toLowerCase()) +
+            '. Show all ' + rows.length + ' to bring them back.</span></div>') +
+        '</div></div>';
     }
 
     function resolveBar(run){
