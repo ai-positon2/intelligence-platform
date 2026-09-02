@@ -530,30 +530,3 @@ def test_the_event_lookup_tells_the_model_what_day_it_is():
     assert datetime.date.today().isoformat() in seen["user"], (
         "the lookup never told the model what day it is")
     assert "on or after" in seen["user"]
-
-
-def test_the_discover_search_tells_the_model_what_day_it_is():
-    """Same hole, the other entry point. Discover's rule 2 asked for the NEXT
-    upcoming edition without ever saying when now is, so a run dated
-    2026-09-02 came back ranking a conference that had finished in July of
-    that year. The lookup path was anchored and this one was not."""
-    import datetime
-    from tracker import event_intel_resolve as RES
-    seen = {}
-
-    def fake_ask(system, user, **kw):
-        seen["system"] = system
-        return {"text": '{"events": [], "note": ""}', "raw": "", "error": None,
-                "stop_reason": "end_turn", "text_block_count": 1, "tool_version": "v",
-                "search_count": 1, "tool_errors": [], "usage": {}}
-
-    RES.claude_websearch.ask, real = fake_ask, RES.claude_websearch.ask
-    try:
-        RES.discover_events("people with type 1 diabetes")
-    finally:
-        RES.claude_websearch.ask = real
-    assert datetime.date.today().isoformat() in seen["system"], (
-        "the discover search never told the model what day it is")
-    assert "{today}" not in seen["system"], (
-        "the date placeholder reached the model unfilled")
-    assert "on or after" in seen["system"]

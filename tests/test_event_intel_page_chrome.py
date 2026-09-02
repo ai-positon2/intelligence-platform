@@ -13,6 +13,7 @@ reached.
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ import app as appmod
 from tracker import event_intel_rubric as rubric
 from tracker import event_intel_store
 
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PAGE = "/p2/b2b-agents/event-conference-intelligence"
 _IIFE_CLOSE = "\n  })();"
 
@@ -69,14 +71,19 @@ def test_the_scoring_model_card_is_gone_from_the_hero():
     for gone in ('class="evi-rubric"', 'class="rb-total"', 'class="rb-tier'):
         assert gone not in html, "%s is back on the page without its guard" % gone
 
-# ── the four plays ───────────────────────────────────────────────────────
+# ── the plays ────────────────────────────────────────────────────────────
+#
+# Three of them since `discover` was retired. These read the count off the
+# page rather than hardcoding it, so adding or removing a play does not
+# need a sweep through this file: what they actually assert is that every
+# play on the page is complete and distinct from the others.
 
 def test_each_play_says_what_it_produces():
     """The mode was a two-word pill. Each card now carries a description, and
     an empty one would render as a card that explains nothing."""
     html = _page()
     cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
-    assert len(cards) == 4, "expected four plays, found %d" % len(cards)
+    assert len(cards) >= 2, "expected several plays, found %d" % len(cards)
     seen = set()
     for card in cards:
         name = re.search(r'<span class="pn">(.*?)</span>', card, re.S)
@@ -85,7 +92,7 @@ def test_each_play_says_what_it_produces():
         assert desc and len(desc.group(1).split()) >= 6, (
             "the %r card does not say what it produces" % (name and name.group(1)))
         seen.add(name.group(1).strip())
-    assert len(seen) == 4, "two plays share a name: %s" % seen
+    assert len(seen) == len(cards), "two plays share a name: %s" % seen
 
 
 def test_every_play_has_an_icon():
@@ -104,7 +111,7 @@ def test_every_play_has_an_icon():
 
 def _play_cards(html=None):
     cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html or _page(), re.S)
-    assert len(cards) == 4, "expected four play cards, found %d" % len(cards)
+    assert len(cards) >= 2, "expected several play cards, found %d" % len(cards)
     out = []
     for card in cards:
         title = re.search(r'<span class="pn">(.*?)</span>', card, re.S)
@@ -119,14 +126,13 @@ def _play_cards(html=None):
 
 
 def test_every_play_says_what_it_takes_what_it_returns_and_what_it_runs():
-    """The cards are the page's primary control, and two of the four read as
-    "find me events" from the title alone. What you START FROM is the only
-    thing that separates them, so each card carries it on its own line.
+    """The cards are the page's primary control. Each says what you hand it
+    and what it hands back, on its own line, because two of them used to read
+    as "find me events" from the title alone.
 
-    This replaced a 01 to 04 step number. The number looked like an order and
-    was not one: these are four alternatives, and the one real dependency
-    between them (work the room needs a roster) is not what the numbering was
-    describing.
+    This replaced a step number, which looked like an order and was not one:
+    these are alternatives, and the one real dependency between them (work
+    the room needs a roster) is not what the numbering was describing.
     """
     cards = _play_cards()
     starts, actions = [], []
@@ -141,7 +147,7 @@ def test_every_play_says_what_it_takes_what_it_returns_and_what_it_runs():
         assert go.group(1).strip() == c["action"], (
             "the card shows %r but would run %r" % (go.group(1).strip(), c["action"]))
         actions.append(c["action"])
-    assert len(set(starts)) == 4, (
+    assert len(set(starts)) == len(cards), (
         "two plays claim to start from the same thing, which is the confusion "
         "this line exists to remove: %s" % starts)
     assert len(set(actions)) >= 3, (
@@ -161,7 +167,7 @@ def test_the_arrow_in_that_line_is_not_the_only_thing_carrying_the_meaning():
 
 
 def test_the_entry_cards_are_free_of_the_jargon_that_made_them_unreadable():
-    """These four cards are the first thing somebody sees on this page, and
+    """These cards are the first thing somebody sees on this page, and
     every one of these terms was on them: correct, and meaningless to anybody
     who had not already used the tool.
 
@@ -182,35 +188,6 @@ def _card_text(card):
     """Everything on a card that a reader actually reads."""
     return re.sub(r"<[^>]+>", " ",
                   card["title"] + " " + card["io"] + " " + card["desc"])
-
-
-def test_the_two_plays_that_both_find_events_say_which_one_is_which():
-    """Cards one and three keep collapsing into each other, because both
-    answer "which events?". Saying what you start from was not enough: "a
-    client" and "your buyers" are the same thing to a reader.
-
-    What actually separates them is depth. Recommend is six category
-    searches, a famous-name audit, one rubric over every survivor and a floor
-    under the list. Discover is a single pass carrying the model's own fit
-    number, ranked against your own account list if you paste one. Whichever
-    words the cards use, the deep one has to claim the scoring and the fast
-    one has to disclaim it, or the page is offering the same thing twice.
-    """
-    by_play = {}
-    for card in re.findall(r'<button class="evi-play[^"]*".*?</button>',
-                           _page(), re.S):
-        key = re.search(r'data-play="([^"]+)"', card).group(1)
-        by_play[key] = re.sub(r"<[^>]+>", " ",
-                              re.search(r'<span class="pn">.*?<span class="pgo"',
-                                        card, re.S).group(0)).lower()
-    deep, fast = by_play["recommend"], by_play["discover"]
-
-    assert "scored" in deep or "scoring" in deep, (
-        "the deep play does not say it scores anything: %r" % deep)
-    assert "no scoring" in fast, (
-        "the fast play does not say it skips the scoring, so it reads as a "
-        "second copy of the deep one: %r" % fast)
-    assert deep != fast
 
 
 def test_the_deep_play_says_how_long_it_takes():
@@ -244,7 +221,7 @@ def test_a_play_that_names_another_play_names_one_that_exists():
 
 
 def test_no_play_falls_back_to_a_generic_run_label():
-    """Two of the four modes used to show a bare "Run", which told the user
+    """Two of the modes used to show a bare "Run", which told the user
     nothing about what pressing it would do."""
     html = _page()
     for card in re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S):
@@ -272,13 +249,43 @@ def test_the_mode_cards_do_not_share_a_class_with_the_report_s_play_block():
         % sorted(overlap))
 
 
+def test_the_intro_counts_the_plays_that_are_actually_on_the_page():
+    """It said "Four ways to use it" for the first ten minutes after the
+    fourth play was retired. A sentence that miscounts the things directly
+    under it is the cheapest possible way to look careless."""
+    html = _page()
+    n = len(re.findall(r'<button class="evi-play', html))
+    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+    assert n in words, "unexpected number of plays: %d" % n
+    intro = re.search(r'<div class="evi-hero">.*?<p>(.*?)</p>', html, re.S)
+    assert intro, "the page has no intro paragraph any more"
+    text = re.sub(r"\s+", " ", intro.group(1)).strip().lower()
+    assert words[n] in text, (
+        "the page shows %d plays and its intro says %r" % (n, text[:80]))
+
+
+def test_the_play_row_does_not_hardcode_how_many_plays_there_are():
+    """It was a four-track grid. The day the fourth play was retired that
+    left a quarter of the row empty, and the cards kept the width they had
+    when there were four of them. auto-fit did not fix it either: the 1fr
+    distribution is settled before the empty track collapses."""
+    css = open(os.path.join(_ROOT, "static/css/event_conference_intelligence.css")).read()
+    block = re.search(r"\.evi-plays\s*\{([^}]*)\}", css)
+    assert block, ".evi-plays has no rule any more"
+    fixed = re.search(r"repeat\(\s*(\d+)", block.group(1))
+    assert not fixed, (
+        "the play row is laid out in a fixed %s tracks, so it will not divide "
+        "itself correctly the next time a play is added or retired"
+        % fixed.group(1))
+
+
 def test_each_play_has_its_own_accent_class():
     """The cards are told apart by hue as well as by wording; a shared class
     would paint all four the same."""
     html = _page()
     hues = re.findall(r'<button class="evi-play (p-\w+)"', html)
-    assert len(hues) == 4 and len(set(hues)) == 4, (
-        "the four plays do not each carry their own accent class: %s" % hues)
+    assert hues and len(set(hues)) == len(hues), (
+        "two plays share an accent class, so the page paints them the same: %s" % hues)
 
 
 # ── the saved-profile row ────────────────────────────────────────────────
@@ -315,7 +322,11 @@ def test_a_profile_whose_classification_is_unknown_still_lists(monkeypatch):
 
 def test_each_kind_of_run_is_named_for_the_play_that_made_it(monkeypatch):
     """Every run that was not a lookup used to read "Audience search", which
-    called a scored calendar and a set of drafted openers the same thing."""
+    called a scored calendar and a set of drafted openers the same thing.
+
+    `discover` is in this list on purpose even though the play is retired.
+    Runs made before it was retired are still in history, and dropping the
+    label would print them with no kind at all."""
     runs = [{"id": i, "mode": m, "query": "q%d" % i, "status": "complete",
              "created_at": "2026-08-31T10:00:00", "credits_spent": 0,
              "participant_count": 0, "event_name": "Run %d" % i}
@@ -378,10 +389,9 @@ var __els = {
   sourceRun: __node({id: 'sourceRun', value: ''}),
   wrProfile: __node({id: 'wrProfile', value: ''}),
   modeRecommend: __node(PLAY_ATTRS.recommend), modeLookup: __node(PLAY_ATTRS.lookup),
-  modeDiscover: __node(PLAY_ATTRS.discover), modeWorkroom: __node(PLAY_ATTRS.workroom),
+  modeWorkroom: __node(PLAY_ATTRS.workroom),
   recommendFields: __node({id: 'recommendFields'}),
   lookupFields: __node({id: 'lookupFields'}),
-  discoverFields: __node({id: 'discoverFields'}),
   workroomFields: __node({id: 'workroomFields'})
 };
 __els.profileForm.style.display = 'none';
@@ -438,7 +448,7 @@ def _exec(probe, pick="new", profile_ids=("3", "4")):
         eid = re.search(r'id="([^"]+)"', card)
         assert key and act and eid, "a play card is missing data-play/data-action/id"
         attrs[key.group(1)] = {"id": eid.group(1), "data-action": act.group(1)}
-    assert len(attrs) == 4, "expected four play cards, found %d" % len(attrs)
+    assert len(attrs) >= 2, "expected several play cards, found %d" % len(attrs)
     shim = (_SHIM.replace("PLAY_ATTRS", json.dumps(attrs))
                  .replace("PICK", json.dumps(pick))
                  .replace("PROFILE_IDS", json.dumps(list(profile_ids)))
@@ -476,9 +486,9 @@ def test_the_button_label_follows_the_play():
 def test_the_button_label_is_read_off_the_selected_card():
     """One copy of a play's action wording, on the card. Change the card and
     the button has to follow, or the two can promise different things."""
-    out = _exec("document.getElementById('modeDiscover')"
+    out = _exec("document.getElementById('modeLookup')"
                 ".setAttribute('data-action', 'Sweep the calendar');"
-                "setMode('discover');console.log(JSON.stringify({"
+                "setMode('lookup');console.log(JSON.stringify({"
                 "label: document.getElementById('runBtn').textContent}));")
     assert out["label"].startswith("Sweep the calendar"), (
         "the button kept its own copy of the label: %r" % out["label"])
@@ -486,12 +496,15 @@ def test_the_button_label_is_read_off_the_selected_card():
 
 @pytestmark_node
 def test_every_play_s_button_label_matches_its_card():
-    out = _exec("var o={};['recommend','lookup','discover','workroom']"
+    out = _exec("var o={};['recommend','lookup','workroom']"
                 ".forEach(function(m){setMode(m);"
                 "o[m]=document.getElementById('runBtn').textContent;});"
                 "console.log(JSON.stringify(o));")
     html = _page()
-    for card in re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S):
+    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
+    assert len(out) == len(cards), (
+        "the page has %d plays but the probe drove %d" % (len(cards), len(out)))
+    for card in cards:
         key = re.search(r'data-play="([^"]+)"', card).group(1)
         act = re.search(r'data-action="([^"]+)"', card).group(1)
         assert out[key].startswith(act), (

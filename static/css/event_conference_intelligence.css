@@ -246,15 +246,22 @@ body {
    Each card owns --p1/--p2 and every accent inside it is drawn from those two,
    so a card is recoloured in one place rather than in eight rules. The hues run
    the page's own sky-to-violet ramp, plus a teal so the fourth is not a repeat. */
+/* The row divides itself between however many plays the page ships. It was
+   a four-track grid, and the day the fourth play was retired that left a
+   quarter of the row empty. `auto-fit` does not fix it either: the 1fr
+   distribution is computed before the empty track collapses, so three cards
+   still came out four-wide with dead space on the right. Flex has no track
+   count to get wrong. */
 .evi-plays {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex; flex-wrap: wrap;
   gap: var(--gutter); margin-bottom: calc(var(--gutter) + 8px);
 }
-@media (max-width: 1100px) { .evi-plays { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .evi-plays { grid-template-columns: 1fr; } }
 
 .evi-play {
   --p1: var(--evi-a1); --p2: var(--evi-a2);
+  /* Share the row equally, wrap below the basis. Height comes from the
+     container's default stretch, so the cards stay level with each other. */
+  flex: 1 1 260px; min-width: 0;
   position: relative; isolation: isolate; overflow: hidden;
   appearance: none; cursor: pointer; font: inherit; text-align: left;
   display: flex; flex-direction: column; align-items: flex-start; gap: 0;
@@ -413,6 +420,8 @@ body {
 .evi-play[aria-selected="true"] .pi { box-shadow:
   0 8px 24px color-mix(in srgb, var(--p1) 46%, transparent),
   inset 0 1px 0 rgba(255,255,255,.4); }
+
+@media (max-width: 620px) { .evi-play { flex-basis: 100%; } }
 
 @media (prefers-reduced-motion: reduce) {
   .evi-play, .evi-play .pi, .evi-play .pgo i, .evi-play .pio { transition: none; }

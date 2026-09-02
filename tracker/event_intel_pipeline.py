@@ -11,8 +11,6 @@ is happening rather than spinning on "running".
                -> check the list against what this user was handed for other
                clients -> assemble a five-element executive summary
     lookup     resolve one event -> harvest its published pages -> summarise
-    discover   find candidate events for an audience -> harvest the top few
-               -> rank by how many of the user's own target accounts appear
     workroom   the gtm-skills event-radar play over a roster this agent
                already harvested: declare the event class -> qualify the
                roster to the ICP -> draft one opener per company -> throw
@@ -46,10 +44,15 @@ from .event_intel_store import (ROLE_ATTENDEE_DECLARED, SOURCE_OK,
 
 logger = logging.getLogger(__name__)
 
-# Discover mode harvests only the best-fitting few, because harvesting is the
-# expensive half in wall-clock and the ranking question is answered by a
-# sample of the roster rather than all of it.
-DISCOVER_HARVEST_TOP = 3
+# `discover` was retired. It described an audience and got back events ranked
+# by how many of the user's own named accounts appeared in the sampled
+# rosters, and to anybody meeting this page for the first time it read as a
+# shorter, worse `recommend`. Its pipeline is gone, so no new one can start.
+#
+# Runs already in the table keep their stored summary and still render, and
+# the one live trace is the workroom roster picker, which still accepts a
+# discover run as its source: a roster that was harvested is a roster,
+# whatever play harvested it.
 
 ROSTER_NOTE = (
     "This roster is what the event publishes openly: its exhibitors, sponsors, "
@@ -212,98 +215,6 @@ def _run_lookup(run_id: int, query: str, year_hint: str | None) -> None:
     _harvest_event(run_id, event_id, event, pages)
     store.update_run(run_id, status="complete", stage="done",
                      summary=_summarise(run_id))
-
-
-def _run_discover(run_id: int, audience: str, region: str | None,
-                  targets: list[str]) -> None:
-    store.update_run(run_id, stage="discovering")
-    found = event_intel_resolve.discover_events(audience, region)
-    if found.get("error"):
-        store.update_run(run_id, status="failed", stage="discovering",
-                         error="Event discovery could not run (%s)."
-                         % found["error"]["detail"])
-        return
-    events = found.get("events") or []
-    if not events:
-        store.update_run(run_id, status="complete", stage="done",
-                         summary={**_summarise(run_id), "no_events": True,
-                                  "note": found.get("note") or
-                                  "No events matched that description."})
-        return
-
-    saved: list[tuple[int, dict]] = []
-    for e in events:
-        eid = store.save_event(run_id, e)
-        if eid is not None:
-            saved.append((eid, e))
-
-    # Harvest only the best-fitting few. The ranking question is answered by
-    # a sample; harvesting eight full exhibitor directories to rank them would
-    # cost minutes for information the fit score already carries.
-    store.update_run(run_id, stage="harvesting")
-    # Which events were actually sampled. Without this, an event with no
-    # target-account hits is indistinguishable from one nobody looked at, and
-    # those mean opposite things: "none of your accounts are there" is a
-    # finding, "we did not read this roster" is a hole.
-    harvested: list[int] = []
-    for event_id, event in saved[:DISCOVER_HARVEST_TOP]:
-        if not event.get("website"):
-            continue
-        sub = event_intel_resolve.resolve_event(
-            "%s %s" % (event["name"], event.get("edition") or ""))
-        if sub.get("ok") and sub.get("pages"):
-            _harvest_event(run_id, event_id, sub["event"], sub["pages"])
-            harvested.append(event_id)
-
-    summary = _summarise(run_id)
-    summary["harvested_events"] = len(harvested)
-    summary["harvested_event_ids"] = harvested
-    summary["discovered_events"] = len(saved)
-    summary["discover_note"] = found.get("note") or ""
-    if targets:
-        overlap = _target_overlap(run_id, targets)
-        summary["target_overlap"] = overlap
-        # The mode's stated promise is that events are ranked by how many of
-        # YOUR accounts are in the roster, not by how big the event is. Until
-        # this existed the overlap was displayed and the order was untouched,
-        # so the promise on the form was not kept.
-        summary["event_order"] = [
-            eid for eid, _ in sorted(
-                saved,
-                key=lambda pair: (-len(overlap.get(str(pair[0])) or []),
-                                  -(pair[1].get("fit_score") or 0),
-                                  (pair[1].get("name") or "").lower()))]
-        summary["ranked_by"] = (
-            "Ranked by how many of your own target accounts appear in the "
-            "roster, then by fit. Only the %d best-fitting event%s had %s "
-            "roster read, so an event below that is unranked on overlap "
-            "rather than shown to have none."
-            % (len(harvested), "" if len(harvested) == 1 else "s",
-               "its" if len(harvested) == 1 else "their"))
-    store.update_run(run_id, status="complete", stage="done", summary=summary)
-
-
-def _target_overlap(run_id: int, targets: list[str]) -> dict:
-    """How many of the user's own named accounts appear in each event's
-    harvested roster. This is the number the whole discover mode exists to
-    produce: it ranks events by the density of accounts you already care
-    about, rather than by attendance."""
-    from .event_intel_harvest import clean_domain
-    wanted_domains = {d for d in (clean_domain(t) for t in targets) if d}
-    wanted_names = {t.strip().lower() for t in targets if t.strip()}
-
-    hits: dict[int, list[str]] = {}
-    for p in store.get_participants(run_id):
-        eid = p.get("event_id")
-        if eid is None:
-            continue
-        dom = (p.get("org_domain") or "").lower()
-        name = (p.get("org_name") or "").strip().lower()
-        if (dom and dom in wanted_domains) or (name and name in wanted_names):
-            bucket = hits.setdefault(eid, [])
-            if p["org_name"] not in bucket:
-                bucket.append(p["org_name"])
-    return {str(k): v for k, v in hits.items()}
 
 
 def _run_recommend(run_id: int, email: str, profile: dict) -> None:
@@ -563,9 +474,6 @@ def run_job(run_id: int, mode: str, query: str, **kwargs) -> None:
             _run_workroom(run_id, kwargs.get("email") or "", int(source_run_id),
                           profile, event_class, kwargs.get("booth_notes"),
                           kwargs.get("ends_on"))
-        elif mode == "discover":
-            _run_discover(run_id, query, kwargs.get("region"),
-                          kwargs.get("targets") or [])
         else:
             _run_lookup(run_id, query, kwargs.get("year_hint"))
     except Exception as e:

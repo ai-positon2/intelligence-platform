@@ -8601,9 +8601,17 @@ def social_creative_intelligence_run(run_id):
 
 
 # ── Event & Conference Intelligence ────────────────────────────
-# Two modes over one store. `lookup` names an event and gets back the roster
-# the event itself publishes; `discover` describes an audience and gets back
-# events ranked by how many of your own target accounts are in them.
+# Three plays over one store. `recommend` scores a whole calendar against a
+# locked client profile; `lookup` names an event and gets back the roster the
+# event itself publishes; `workroom` turns a harvested roster into one opener
+# per company.
+#
+# A fourth, `discover`, was retired: it described an audience and got back
+# events ranked by how many of your own named accounts turned up in them. It
+# was removed because it read, to anybody arriving on the page, as a shorter
+# and worse `recommend`. No new discover run can be started. Runs already
+# stored still open and still work as a source roster for `workroom`, which
+# is why the drawer and the roster picker still know the word.
 #
 # The one thing to preserve when touching any of this: the agent NEVER calls
 # a published participant list an attendee list. Events sell attendee lists
@@ -8715,7 +8723,10 @@ def event_conference_intelligence_run():
     from tracker import event_intel_pipeline, event_intel_store, event_intel_workroom
     payload = request.get_json(silent=True) or {}
     mode = str(payload.get("mode") or "lookup").strip().lower()
-    if mode not in ("lookup", "discover", "recommend", "workroom"):
+    if mode not in ("lookup", "recommend", "workroom"):
+        # `discover` is deliberately absent and deliberately not special-cased
+        # into a friendlier message: it is retired, so a client still asking
+        # for it is a stale page rather than a user who needs guidance.
         return jsonify({"error": "Unknown mode."}), 400
 
     email = (_get_user() or {}).get("email", "").lower()
@@ -8769,15 +8780,13 @@ def event_conference_intelligence_run():
     else:
         query = str(payload.get("query") or "").strip()
         if not query:
-            return jsonify({"error": "An event name is required." if mode == "lookup"
-                            else "An audience description is required."}), 400
+            return jsonify({"error": "An event name is required."}), 400
 
     # Free text straight from a form, capped before it reaches a model prompt
     # and a TEXT column. Not a security boundary (both handle long input
     # fine), just a refusal to store a pasted document as an event name.
     query = query[:400]
     icp_note = str(payload.get("icp_note") or "").strip()[:2000] or None
-    targets = [t.strip() for t in (payload.get("targets") or []) if str(t).strip()][:400]
 
     run_id = event_intel_store.save_run(email, mode, query, icp_note,
                                         profile_id=(profile or {}).get("id"),
@@ -8790,8 +8799,6 @@ def event_conference_intelligence_run():
         target=event_intel_pipeline.run_job,
         args=(run_id, mode, query),
         kwargs={"year_hint": str(payload.get("year") or "").strip()[:20] or None,
-                "region": str(payload.get("region") or "").strip()[:120] or None,
-                "targets": targets,
                 "email": email,
                 "profile": profile,
                 "source_run_id": (source_run_id if mode == "workroom" else None),
