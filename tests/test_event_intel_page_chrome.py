@@ -102,28 +102,100 @@ def test_every_play_has_an_icon():
             "the %r card's icon draws nothing" % (name and name.group(1)))
 
 
-def test_every_play_carries_a_step_number_and_the_action_it_runs():
-    """The cards are the page's primary control. Each one states the play, what
-    it produces, and the action it will run, so the choice is made on the card
-    rather than by pressing the button to find out."""
-    html = _page()
-    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html, re.S)
-    assert len(cards) == 4
-    nums, actions = [], []
+def _play_cards(html=None):
+    cards = re.findall(r'<button class="evi-play[^"]*".*?</button>', html or _page(), re.S)
+    assert len(cards) == 4, "expected four play cards, found %d" % len(cards)
+    out = []
     for card in cards:
-        num = re.search(r'<span class="pnum"[^>]*>(\d+)</span>', card)
-        assert num, "a play card has no step number"
-        nums.append(num.group(1))
-        attr = re.search(r'data-action="([^"]+)"', card)
-        go = re.search(r'<span class="pgo"[^>]*>(.*?)<i>', card, re.S)
-        assert attr, "a play card has no data-action"
-        assert go, "a play card does not show the action it runs"
-        assert go.group(1).strip() == attr.group(1), (
-            "the card shows %r but would run %r" % (go.group(1).strip(), attr.group(1)))
-        actions.append(attr.group(1))
-    assert nums == ["01", "02", "03", "04"], "the plays are not numbered in order: %s" % nums
+        title = re.search(r'<span class="pn">(.*?)</span>', card, re.S)
+        io = re.search(r'<span class="pio">(.*?)</span>\s*<span class="pd">', card, re.S)
+        desc = re.search(r'<span class="pd">(.*?)</span>', card, re.S)
+        act = re.search(r'data-action="([^"]+)"', card)
+        assert title and desc and act, "a play card is missing its title, blurb or action"
+        out.append({"raw": card, "title": title.group(1).strip(),
+                    "io": io.group(1) if io else "", "desc": desc.group(1).strip(),
+                    "action": act.group(1)})
+    return out
+
+
+def test_every_play_says_what_it_takes_what_it_returns_and_what_it_runs():
+    """The cards are the page's primary control, and two of the four read as
+    "find me events" from the title alone. What you START FROM is the only
+    thing that separates them, so each card carries it on its own line.
+
+    This replaced a 01 to 04 step number. The number looked like an order and
+    was not one: these are four alternatives, and the one real dependency
+    between them (work the room needs a roster) is not what the numbering was
+    describing.
+    """
+    cards = _play_cards()
+    starts, actions = [], []
+    for c in cards:
+        assert c["io"], "the %r card does not say what it takes" % c["title"]
+        a = re.search(r'<span class="a">(.*?)</span>', c["io"], re.S)
+        b = re.search(r'<span class="b">(.*?)</span>', c["io"], re.S)
+        assert a and b, "the %r card's line is not a from and a to" % c["title"]
+        starts.append(re.sub(r"<[^>]+>", "", a.group(1)).strip())
+        go = re.search(r'<span class="pgo"[^>]*>(.*?)<i>', c["raw"], re.S)
+        assert go, "the %r card does not show the action it runs" % c["title"]
+        assert go.group(1).strip() == c["action"], (
+            "the card shows %r but would run %r" % (go.group(1).strip(), c["action"]))
+        actions.append(c["action"])
+    assert len(set(starts)) == 4, (
+        "two plays claim to start from the same thing, which is the confusion "
+        "this line exists to remove: %s" % starts)
     assert len(set(actions)) >= 3, (
         "the plays barely distinguish their actions: %s" % actions)
+
+
+def test_the_arrow_in_that_line_is_not_the_only_thing_carrying_the_meaning():
+    """It is a picture of a word. A reader who is hearing the page rather than
+    seeing it gets "rightwards arrow" in the middle of a sentence, or nothing
+    at all, unless the word is there too."""
+    for c in _play_cards():
+        assert 'aria-hidden="true"' in re.search(
+            r'<i[^>]*>&rarr;</i>', c["io"]).group(0), (
+            "the %r card's arrow is announced as a glyph" % c["title"])
+        assert 'class="evi-sr"' in c["io"], (
+            "the %r card's line has no spoken word where the arrow is" % c["title"])
+
+
+def test_the_entry_cards_are_free_of_the_jargon_that_made_them_unreadable():
+    """These four cards are the first thing somebody sees on this page, and
+    every one of these terms was on them: correct, and meaningless to anybody
+    who had not already used the tool.
+
+    Scoped to the cards on purpose. The intake form deeper in the page says
+    ICP, and should: by then the reader has chosen a play and has context.
+    """
+    banned = ["icp", "under the bar", "48 hour", "opener per company",
+              "target accounts"]
+    for c in _play_cards():
+        text = re.sub(r"<[^>]+>", " ", c["title"] + " " + c["io"] + " " + c["desc"])
+        low = text.lower()
+        for word in banned:
+            assert word not in low, (
+                "the %r card is back to saying %r" % (c["title"], word))
+
+
+def test_a_play_that_names_another_play_names_one_that_exists():
+    """Work the room refuses to run without a roster and tells you which play
+    builds one, by title, in two places: a hint under the field and the error
+    the form throws. Retitling that play without updating both points the user
+    at something that is not on the page, and nothing else would notice.
+    """
+    html = _page()
+    titles = {c["title"] for c in _play_cards(html)}
+    # Both spellings: the hint is HTML with curly quotes and a line break
+    # after "Run", the error is a JavaScript string with straight ones.
+    quoted = set(re.findall(r'Run\s+(?:&ldquo;|")(.+?)(?:&rdquo;|")', html, re.S))
+    quoted = {q.strip() for q in quoted if q.strip()}
+    assert quoted, "nothing on the page points at another play by name any more"
+    unknown = quoted - titles
+    assert not unknown, (
+        "the page tells the user to run %s, which is not the title of any card "
+        "on it. The cards are %s" % (sorted(unknown), sorted(titles)))
+
 
 
 def test_no_play_falls_back_to_a_generic_run_label():

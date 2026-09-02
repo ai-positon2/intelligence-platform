@@ -299,15 +299,54 @@ body {
 .evi-play:hover::before { opacity: .7; }
 .evi-play:focus-visible { outline: 2px solid var(--p1); outline-offset: 3px; }
 
-/* The step number. Large, set behind everything, and low enough in contrast
-   that it reads as texture until you look for it. */
-.evi-play .pnum {
-  position: absolute; top: 12px; right: 16px; z-index: 0;
-  font-family: 'Bricolage Grotesque', sans-serif;
-  font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.04em;
-  color: var(--evi-ink); opacity: .07; font-variant-numeric: tabular-nums;
-  transition: opacity .22s, color .22s;
+/* Visually hidden, still read aloud. The arrow in the line below is a
+   picture of a word, and a screen reader that announces "rightwards arrow"
+   in the middle of a sentence is being told less than a sighted reader. */
+.evi-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
+
+/* What you hand this play and what it hands back, on one line under the
+   title. Two of these four cards read as "find me events" from the title
+   alone; what you START FROM is the only thing that separates them, so it
+   gets its own line rather than being the fourth clause of a sentence.
+
+   This replaced a 01 to 04 step number, which looked like an order and was
+   not one: these are four alternatives, and the only real dependency between
+   them runs the wrong way round for the numbering. */
+.evi-play .pio {
+  position: relative; z-index: 1;
+  /* Two rows on every card, not just the ones whose text is long enough to
+     wrap. Left to wrap on its own, one card in four sat on a single line and
+     the row below it started three pixels higher than its neighbours, which
+     is the sort of difference you feel without being able to name. */
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  margin-bottom: 12px; padding: 7px 12px;
+  border-radius: var(--radius-md, 12px);
+  font-size: 11.5px; line-height: 1.35;
+  background: color-mix(in srgb, var(--p1) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p1) 20%, transparent);
+  transition: background .22s, border-color .22s;
+}
+/* The arrow lives INSIDE the result, not between the two halves. At four
+   cards across, this line wraps, and with the arrow as a sibling the break
+   fell after it: "an event name ->" on one line and the answer orphaned on
+   the next. */
+.evi-play .pio .a { color: var(--evi-ink-3); }
+.evi-play .pio .b {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  color: var(--evi-ink-2); font-weight: 650;
+}
+.evi-play .pio .b i {
+  font-style: normal; font-size: 12px; line-height: 1; color: var(--p1);
+}
+.evi-play:hover .pio, .evi-play[aria-selected="true"] .pio {
+  background: color-mix(in srgb, var(--p1) 15%, transparent);
+  border-color: color-mix(in srgb, var(--p1) 34%, transparent);
+}
+.evi-play[aria-selected="true"] .pio .b { color: var(--evi-ink); }
+
 .evi-play .pi {
   position: relative; z-index: 1;
   width: 42px; height: 42px; border-radius: var(--radius-md, 12px);
@@ -324,8 +363,14 @@ body {
 
 .evi-play .pn {
   position: relative; z-index: 1;
-  font-size: 16.5px; font-weight: 700; color: var(--evi-ink);
-  letter-spacing: -.015em; line-height: 1.25; margin-bottom: 7px;
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 17.5px; font-weight: 700; color: var(--evi-ink);
+  letter-spacing: -.02em; line-height: 1.22; margin-bottom: 9px;
+  /* Two lines' worth whether the title needs them or not, so the four cards
+     line their rows up with each other instead of each starting wherever its
+     own title happened to end. */
+  min-height: 2.44em;
+  text-wrap: balance;
 }
 .evi-play .pd {
   position: relative; z-index: 1;
@@ -360,7 +405,6 @@ body {
 }
 .evi-play[aria-selected="true"]::before { opacity: 1; }
 .evi-play[aria-selected="true"]::after { opacity: 1; }
-.evi-play[aria-selected="true"] .pnum { opacity: .16; color: var(--p1); }
 .evi-play[aria-selected="true"] .pd { color: var(--evi-ink-2); }
 .evi-play[aria-selected="true"] .pgo {
   color: var(--p1); border-top-color: color-mix(in srgb, var(--p1) 24%, transparent);
@@ -371,7 +415,7 @@ body {
   inset 0 1px 0 rgba(255,255,255,.4); }
 
 @media (prefers-reduced-motion: reduce) {
-  .evi-play, .evi-play .pi, .evi-play .pgo i { transition: none; }
+  .evi-play, .evi-play .pi, .evi-play .pgo i, .evi-play .pio { transition: none; }
   .evi-play:hover { transform: none; }
   .evi-play:hover .pi { transform: none; }
 }
