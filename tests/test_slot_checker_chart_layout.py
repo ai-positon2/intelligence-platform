@@ -206,3 +206,78 @@ def test_the_ribbon_palette_is_themed_rather_than_inlined():
     assert "style=\"background:'+RIB" not in tpl, (
         "ribbon colours must come from a class, not an inline style"
     )
+
+
+# ── the Services tab was unreadable at both ends of the row ──────────────
+#
+# Reported from a screenshot on 2026-09-02. Two separate faults in one row:
+#
+#   * The label box was 118px, shared with the states list (two characters,
+#     "MA") and the brands list. Service names run to 29 characters, and three
+#     of them are "New Patient Offer | $79 / $99 / $199", where the price is
+#     both the only difference between them and the first thing an ellipsis
+#     eats. The tab showed three identical rows reading "New Patient Offer | …".
+#
+#   * The meta box was 46px holding up to "46 loc · 12 full", so it wrapped
+#     after the number and printed "full" alone on a second line, making that
+#     row taller than its neighbours.
+#
+# Measured in a browser at the time (labels untruncated, meta on one line,
+# track still 641px, both themes, down to 375px). These pin the declarations
+# that produced it.
+
+def test_the_meta_column_is_told_not_to_wrap():
+    css = _read(CSS)
+    assert _decl(css, ".gd-bar-sub", "white-space") == "nowrap"
+
+
+def test_the_meta_column_can_hold_its_longest_string():
+    """"46 loc · 12 full" is sixteen characters at 10px. 46px could not."""
+    css = _read(CSS)
+    width = _decl(css, ".gd-bar-sub", "width")
+    assert width and width.endswith("px")
+    assert int(width[:-2]) >= 80, width
+
+
+def test_the_meta_column_keeps_a_fixed_width():
+    """Not auto. The track is the flex child that absorbs the remainder, so a
+    meta column sized to its own content would hand a different track length to
+    every row and two equal values would draw different-length bars."""
+    css = _read(CSS)
+    assert _decl(css, ".gd-bar-sub", "width") not in (None, "auto", "max-content")
+    assert _decl(css, ".gd-bar-sub", "flex-shrink") == "0"
+
+
+def test_the_services_labels_get_their_own_width():
+    """Widening the shared default instead would squeeze the track inside the
+    half-width states card, which is how that track once computed to 0px."""
+    css = _read(CSS)
+    basis = _decl(css, "#servicesBody .gd-bar-name", "flex-basis")
+    assert basis and basis.endswith("px")
+    assert int(basis[:-2]) >= 210, basis
+    # The shared rule sets the basis through the `flex` shorthand, not the
+    # longhand, so it has to be read as one.
+    shared = _decl(css, ".gd-bar-name", "flex")
+    assert shared and shared.split()[-1] == "118px", (
+        "the shared default moved; the states card's track depends on it: %r"
+        % shared)
+
+
+def test_the_per_list_label_widths_are_switched_off_on_a_phone():
+    """They carry an id, so they outrank the plain .gd-bar-name override in the
+    mobile block and would follow the page onto a phone, leaving the bar with
+    almost nothing. The override has to be at least as specific."""
+    css = _strip_comments(_read(CSS))
+    mob = re.search(r"@media\s*\(max-width:\s*720px\)\s*\{(.*?)\n\}", css, re.S)
+    assert mob, "the 720px block moved"
+    body = mob.group(1)
+    assert "#servicesBody .gd-bar-name" in body and "#brandsBody .gd-bar-name" in body, (
+        "the id-scoped label widths are not reset on mobile")
+
+
+def test_the_track_still_has_a_floor_it_cannot_be_squeezed_below():
+    """The round-4 guard. Widening the columns either side of it took room from
+    the track, so the floor matters more now, not less."""
+    css = _read(CSS)
+    mw = _decl(css, ".gd-bar-track", "min-width")
+    assert mw and int(mw.replace("px", "")) >= 56, mw
