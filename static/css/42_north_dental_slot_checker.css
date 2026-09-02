@@ -386,6 +386,12 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 .gd-spark i { width: 3px; background: #2dd4aa; border-radius: 1px; min-height: 1px; display: block; cursor: pointer; transition: filter .12s; }
 .gd-spark i:hover { filter: brightness(1.5); }
 .gd-spark i.z { background: rgba(255,255,255,.10); }
+/* The day picked in the chart above, marked in every row's fortnight shape so
+   the single number in "Slots <day>" has something to sit against. Wider as
+   well as brighter: colour alone would carry none of this to a reader who
+   cannot separate the two greens. Declared after .z so it still reads on a
+   day a practice happens to be closed. */
+.gd-spark i.hi { background: #bef264; width: 5px; }
 .gd-row-in { animation: gdRowIn .5s cubic-bezier(.22,1,.36,1) both; }
 @keyframes gdRowIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 
@@ -727,6 +733,7 @@ table.gd-tbl td:last-child { padding-right: 22px; }
 :root[data-theme="light"] .gd-badge.no-data::before { background: #96a09b; }
 :root[data-theme="light"] .gd-spark i { background: #047857; }
 :root[data-theme="light"] .gd-spark i.z { background: rgba(18,26,54,.10); }
+:root[data-theme="light"] .gd-spark i.hi { background: #3f6212; }
 :root[data-theme="light"] .gd-heat thead th,
 :root[data-theme="light"] .gd-heat tbody th.rowhead,
 :root[data-theme="light"] .gd-heat thead th.rowhead { background: rgba(255,255,255,.99); }

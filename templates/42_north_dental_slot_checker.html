@@ -603,9 +603,13 @@
         }
         return true;
       });
-      var shown=VIEW.reduce(function(s,p){return s+p.total;},0);
+      /* Summing p.total here while a day is selected reported the whole
+         fortnight's slots beside a row count that had already been narrowed to
+         one day, which is the same number reading as two different things. */
+      var shown=VIEW.reduce(function(s,p){return s+dayCount(p);},0);
       document.getElementById('resultCount').textContent=
-        VIEW.length+' of '+DATA.practices.length+' locations · '+n(shown)+' slots';
+        VIEW.length+' of '+DATA.practices.length+' locations · '+n(shown)+' slots'+
+        (DATE_FILTER!=null?(' on '+dayLabel()):'');
       document.getElementById('cntPractices').textContent=' '+VIEW.length;
       renderPractices(); renderHeat();
     }
@@ -654,11 +658,73 @@
     }
 
     /* ── practices table ─────────────────────────────────────────────────── */
-    var COLS=[
-      ['office','#',''],['name','Location',''],['brand','Brand',''],['state','State',''],
-      ['service_count','Services','num'],['total','Open slots','num'],
-      ['lead_days','Next open','num'],['spark','Pattern','']
-    ];
+    /* Day-scoped accessors. When a day is picked in the chart, every number in
+       this table has to be about THAT day. Leaving the fortnight totals in
+       place under a day filter is the worst of both worlds: the rows are the
+       right rows, so the numbers look trustworthy, and a practice with three
+       slots on Thursday reads as 500. The per-day figures were already in the
+       payload (p.counts[i], p.services[].counts[i]); nothing here asks the
+       server for anything new. */
+    function dayCount(p){
+      return DATE_FILTER==null ? p.total : (p.counts[DATE_FILTER]||0);
+    }
+    function dayServices(p){
+      if(DATE_FILTER==null) return p.service_count;
+      return (p.services||[]).filter(function(s){
+        return ((s.counts||[])[DATE_FILTER]||0)>0;
+      }).length;
+    }
+    function dayShare(p){
+      /* What fraction of this practice's whole fortnight lands on the chosen
+         day. The number that says whether the day is ordinary for them or
+         their one big session. Null, not zero, when there is nothing to
+         divide by: an unknown share is not a share of none. */
+      if(DATE_FILTER==null || !p.total) return null;
+      return (p.counts[DATE_FILTER]||0)/p.total*100;
+    }
+    function dayLabel(){
+      var x=DATA&&DATA.by_date&&DATA.by_date[DATE_FILTER];
+      return x?(x.weekday+' '+x.label):'';
+    }
+    function pct(v){ return v==null?'—':(v<1?'<1%':Math.round(v)+'%'); }
+
+    /* One source of truth for the columns AND the sort dropdown. They used to
+       be two hand-kept lists, which is how a column and its sort option drift
+       apart. Entries are [key, label, class]. */
+    function cols(){
+      if(DATE_FILTER==null) return [
+        ['office','#',''],['name','Location',''],['brand','Brand',''],['state','State',''],
+        ['service_count','Services','num'],['total','Open slots','num'],
+        ['lead_days','Next open','num'],['spark','Pattern','']
+      ];
+      var d=dayLabel();
+      return [
+        ['office','#',''],['name','Location',''],['brand','Brand',''],['state','State',''],
+        ['service_count','Services open','num'],['total','Slots '+d,'num'],
+        ['day_share','Share of total','num'],['spark','Pattern','']
+      ];
+    }
+    /* Sortable fields for the dropdown, in the order a person would look for
+       them. "spark" is a drawing, not a field. */
+    var SORT_LABELS={total:'Open slots',name:'Location',brand:'Brand',state:'State',
+                     service_count:'Services',lead_days:'Next open',office:'Office #',
+                     day_share:'Share of total'};
+    function renderSortOptions(){
+      var sel=document.getElementById('sortField');
+      if(!sel) return;
+      var keys=cols().filter(function(c){return c[0]!=='spark';})
+                     .map(function(c){return c[0];});
+      /* A key that only exists while a day is picked must not survive the
+         filter being cleared, or the dropdown lands on a blank value and the
+         table sorts by a field with no column. */
+      if(keys.indexOf(SORT.key)<0) SORT.key='total';
+      var d=dayLabel();
+      sel.innerHTML=keys.map(function(k){
+        var lbl=(k==='total'&&DATE_FILTER!=null)?('Slots '+d):(SORT_LABELS[k]||k);
+        return '<option value="'+esc(k)+'">'+esc(lbl)+'</option>';
+      }).join('');
+      sel.value=SORT.key;
+    }
     function sortBy(k){
       if(SORT.key===k) SORT.dir=-SORT.dir;
       else { SORT.key=k; SORT.dir=(k==='name'||k==='brand'||k==='state'||k==='office')?1:-1; }
@@ -684,14 +750,25 @@
       var b=document.getElementById('sortDirBtn');
       if(b) b.textContent=SORT.dir>0?'↑':'↓';
     }
+    /* Sorting has to agree with what the row actually prints, or the table is
+       ordered by numbers that are not on screen. */
+    function sortVal(p,k){
+      if(k==='day_share') return dayShare(p)||0;
+      if(DATE_FILTER!=null){
+        if(k==='total') return dayCount(p);
+        if(k==='service_count') return dayServices(p);
+      }
+      return p[k];
+    }
     function renderPractices(){
+      renderSortOptions();
       syncSortControls();
       var body=document.getElementById('practicesBody');
       if(!VIEW.length){ body.innerHTML='<div class="gd-empty"><b>No locations match</b>Try clearing a filter.</div>'; return; }
       var rows=VIEW.slice().sort(function(a,b){
         var k=SORT.key;
         if(k==='spark') k='total';
-        var x=a[k], y=b[k];
+        var x=sortVal(a,k), y=sortVal(b,k);
         /* Never-open practices sort last on "first open" whichever way the
            column is pointed: null is the absence of a lead time, not a small one. */
         if(k==='lead_days'){
@@ -706,7 +783,7 @@
       });
       var max=Math.max.apply(null,DATA.practices.map(function(p){return p.peak;}))||1;
       var h='<table class="gd-tbl"><thead><tr>';
-      COLS.forEach(function(c){
+      cols().forEach(function(c){
         var active=SORT.key===c[0];
         var arrow=active?'<span class="gd-sort-arrow">'+(SORT.dir>0?'↑':'↓')+'</span>':'';
         h+='<th class="'+c[2]+(active?' sorted':'')+'" onclick="sortBy(\''+c[0]+'\')">'+esc(c[1])+arrow+'</th>';
@@ -719,10 +796,12 @@
             (p.account&&p.account!==p.name?'<div class="gd-sub">'+esc(p.account)+'</div>':'')+'</td>'+
           '<td>'+esc(p.brand||'—')+'</td>'+
           '<td><span class="gd-state">'+esc(p.state||'—')+'</span></td>'+
-          '<td class="num">'+p.service_count+(p.zero_services?' <span class="gd-full-note">('+p.zero_services+' full)</span>':'')+'</td>'+
-          '<td class="num"><b>'+n(p.total)+'</b></td>'+
-          '<td class="num">'+leadLabel(p.lead_days)+'</td>'+
-          '<td>'+spark(p.counts,max,DATA.dates)+'</td></tr>';
+          '<td class="num">'+dayServices(p)+
+            (DATE_FILTER==null&&p.zero_services?' <span class="gd-full-note">('+p.zero_services+' full)</span>':'')+
+            (DATE_FILTER!=null?' <span class="gd-full-note">of '+p.service_count+'</span>':'')+'</td>'+
+          '<td class="num"><b>'+n(dayCount(p))+'</b></td>'+
+          '<td class="num">'+(DATE_FILTER==null?leadLabel(p.lead_days):pct(dayShare(p)))+'</td>'+
+          '<td>'+spark(p.counts,max,DATA.dates,DATE_FILTER)+'</td></tr>';
       });
       body.innerHTML=h+'</tbody></table>';
       wireSparkTips(body);
@@ -777,11 +856,15 @@
        than closed over, so wireSparkTips() can read a bar's own day and count
        straight off the element -- one wiring pass works for every spark in a
        container, whichever practice or service it belongs to. */
-    function spark(counts,max,dates){
+    function spark(counts,max,dates,hi){
+      /* `hi` marks the selected day so the fourteen-day shape stays readable
+         next to a single day's number: without it the row shows one figure and
+         a chart of a different period, with nothing tying them together. */
       return '<span class="gd-spark">'+counts.map(function(c,i){
         var hh=c>0?Math.max(2,Math.round(c/max*22)):1;
         var d=dates&&dates[i];
-        return '<i class="'+(c>0?'':'z')+'" style="height:'+hh+'px" data-c="'+c+'"'+
+        var cl=(c>0?'':'z')+((hi!=null&&i===hi)?' hi':'');
+        return '<i class="'+cl+'" style="height:'+hh+'px" data-c="'+c+'"'+
           (d?' data-d="'+esc(d.weekday+' '+d.label)+'"':'')+'></i>';
       }).join('')+'</span>';
     }
