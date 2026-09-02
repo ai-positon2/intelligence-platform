@@ -178,8 +178,8 @@ body {
 
 /* ── hero ───────────────────────────────────────────────────────────── */
 /* One column since the scoring card came out of it. The headline gets the
-   room that frees up, and the deck is two lines so the four plays underneath
-   are the first thing the eye lands on rather than the fifth. */
+   room that frees up, and the deck is two lines so the play cards underneath
+   are the first thing the eye lands on rather than the last. */
 /* Capped on the h1 rather than the whole hero, so the headline breaks over two
    lines and the deck under it keeps a readable measure without either one
    dictating the other's width. `balance` evens the two lines where supported
@@ -237,7 +237,7 @@ body {
   width: 5px; height: 5px; border-radius: 50%; background: var(--evi-a2); opacity: .7; }
 .evi-cost li b { color: var(--evi-ink-2); font-weight: 600; }
 
-/* ── the four plays ─────────────────────────────────────────────────────
+/* ── the plays ─────────────────────────────────────────────────────
    These carry the page. The mode chosen here decides what every field below
    means, so they are given more weight than anything else on screen: their own
    hue each, a filled icon, the step number, and the action they will run
@@ -373,7 +373,7 @@ body {
   font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
   font-size: 17.5px; font-weight: 700; color: var(--evi-ink);
   letter-spacing: -.02em; line-height: 1.22; margin-bottom: 9px;
-  /* Two lines' worth whether the title needs them or not, so the four cards
+  /* Two lines' worth whether the title needs them or not, so the cards
      line their rows up with each other instead of each starting wherever its
      own title happened to end. */
   min-height: 2.44em;
@@ -1583,7 +1583,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 
 /* The declared event class and the play that follows from it, inside the
    workroom report. Named .evi-classplay, not .evi-play: that shorter name
-   belongs to the four mode cards in the hero, and while both were called
+   belongs to the mode cards in the hero, and while both were called
    .evi-play every rule written for one silently applied to the other. */
 .evi-classplay {
   padding: 16px 18px; margin-bottom: 18px;

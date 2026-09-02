@@ -184,6 +184,33 @@ def test_the_entry_cards_are_free_of_the_jargon_that_made_them_unreadable():
                 "the %r card is back to saying %r" % (c["title"], word))
 
 
+def test_no_entry_card_outruns_the_others_in_length():
+    """The deep play's card kept growing back into a dense paragraph: six
+    searches, one bar, famous names earning their place, every cut explaining
+    itself, all before the reader had decided anything. Every clause was true
+    and the card was still the one people said they could not read.
+
+    The caps are absolute rather than relative to the shortest card, because a
+    relative rule passes if every card inflates together, which is the way
+    this copy actually drifts. A description that will not fit inside them is
+    a description that belongs on the screen after the click.
+    """
+    for c in _play_cards():
+        desc = re.sub(r"<[^>]+>", " ", c["desc"])
+        desc = re.sub(r"&\w+;", " ", desc).strip()
+        words = desc.split()
+        sentences = [x.strip() for x in re.split(r"(?<=[.!?])\s+", desc) if x.strip()]
+        assert len(words) <= 35, (
+            "the %r card is back to a paragraph: %d words" % (c["title"], len(words)))
+        assert len(sentences) <= 2, (
+            "the %r card stacks %d sentences on somebody who has not chosen a "
+            "play yet" % (c["title"], len(sentences)))
+        longest = max(sentences, key=lambda x: len(x.split()))
+        assert len(longest.split()) <= 30, (
+            "the %r card has a %d word sentence in it: %r"
+            % (c["title"], len(longest.split()), longest))
+
+
 def _card_text(card):
     """Everything on a card that a reader actually reads."""
     return re.sub(r"<[^>]+>", " ",

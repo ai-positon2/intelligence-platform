@@ -57,7 +57,7 @@
       </p>
     </div>
 
-    <!-- The four plays. These were a row of text pills, which made the
+    <!-- The three plays. These were a row of text pills, which made the
              single most important structural choice on the page the least
              visible thing on it. Each is now a card that says what the play
              does, so the mode is chosen on what it produces rather than on a
@@ -65,26 +65,25 @@
              script still drives these as tabs.
 
              Every card carries one line saying what you hand it and what it
-             hands back, in place of a 01 to 04 step number that implied an
-             order these do not run in.
+             hands back, in place of a step number that implied an order these
+             do not run in.
 
-             Cards one and three are the pair that keeps collapsing into each
-             other, because both answer "which events?". Saying what you start
-             from was not enough: a client and your buyers are the same thing
-             to a reader. What actually separates them is DEPTH. One is six
-             category searches, a famous-name audit, one rubric over every
-             survivor and a floor under the list, and it takes twenty to forty
-             minutes. The other is a single pass with the model's own fit
-             number, ranked against your account list if you paste one. So the
-             cards say that, and the fast one says out loud that it does not
-             score or audit.
+             The titles are three different questions: which events, who is
+             there, what to say afterwards. The pair that used to collapse
+             into each other was this first card and a faster unscored version
+             of the same thing, and that faster one is retired, so the titles
+             can now say plainly what each play answers instead of working to
+             tell two similar plays apart.
 
-             The wording is deliberately plain. ICP, cut everything under the
+             The wording is deliberately plain, and no card runs past two
+             short sentences. ICP, cut everything under the
              bar, the 48 hour window and one opener per company were all
              correct and all meaningless to somebody opening this page for the
              first time. The app's own word, roster, is kept but explained in
              the sentence that introduces it, because it is the word every
-             later screen uses. -->
+             later screen uses. Twenty to forty minutes stays on the first
+             card: it is the one fact that decides whether somebody presses it
+             now or comes back later. -->
     <div class="evi-plays" role="tablist" aria-label="Mode">
       <button class="evi-play p-recommend" role="tab" id="modeRecommend"
               aria-selected="true" data-play="recommend" data-action="Score the calendar"
@@ -93,9 +92,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
                stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/></svg>
         </span>
-        <span class="pn">The full recommendation</span>
+        <span class="pn">Which events are worth going to</span>
         <span class="pio"><span class="a">a client profile</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>a shortlist you can defend</span></span>
-        <span class="pd">Six searches, one for each kind of event. Everything found is scored against the same bar, big names have to earn their place, and every cut says why. Twenty to forty minutes.</span>
+        <span class="pd">Tell us who your client sells to and we search the whole calendar, rank what we find, and say why each event made the cut or missed it. Twenty to forty minutes.</span>
         <span class="pgo" aria-hidden="true">Score the calendar<i>&rarr;</i></span>
       </button>
       <button class="evi-play p-lookup" role="tab" id="modeLookup"
