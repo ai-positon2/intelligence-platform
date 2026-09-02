@@ -70,7 +70,7 @@ def test_the_hub_card_is_renamed_and_points_at_the_new_path(client):
     "/p2/b2b-agents/linkedin-intelligence",
     "/p2/b2b-agents/ad-intelligence",
     "/p2/b2b-agents/linkedin-strategy-researcher",
-    "/p2/b2b-agents/gentle-dental-slot-checker",
+    "/p2/b2b-agents/42-north-dental-slot-checker",
 ])
 def test_every_renamed_page_is_routed(path):
     """Registered, not necessarily 200 (some need live upstreams). A missing

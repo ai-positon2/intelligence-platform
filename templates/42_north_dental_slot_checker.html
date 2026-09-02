@@ -4,13 +4,13 @@
 <script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Gentle Dental Slot Checker — Platform</title>
+  <title>42 North Dental Slot Checker — Platform</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/gentle_dental_slot_checker.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/42_north_dental_slot_checker.css') }}?v=7">
   <script src="/static/js/theme.js"></script>
   <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
   <script src="/static/js/pfx_bg.js?v=3" defer></script>
@@ -28,7 +28,7 @@
       <div class="bc">
         <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
         <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
-        <span class="bc-cur">Gentle Dental Slot Checker</span>
+        <span class="bc-cur">42 North Dental Slot Checker</span>
       </div>
     </div>
     <div class="user-menu" id="userMenu">
@@ -54,7 +54,7 @@
     <div class="ph">
       <div>
         <div class="eyebrow">B2B Agents · Appointment availability</div>
-        <h1>Gentle Dental Slot Checker</h1>
+        <h1>42 North Dental Slot Checker</h1>
         <p>What a new patient would actually be offered if they tried to book right now, across every location the agent checks: which services are open, on which days, and where the calendar is full.</p>
       </div>
       <div class="gd-ph-side">
@@ -263,7 +263,7 @@
     /* ── boot ────────────────────────────────────────────────────────────── */
     function boot(){
       loadInsights();
-      fetch('/p2/b2b-agents/gentle-dental-slot-checker/data')
+      fetch('/p2/b2b-agents/42-north-dental-slot-checker/data')
         .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
         .then(function(d){
           DATA = d;
@@ -335,7 +335,7 @@
         body.setAttribute('data-state','loading');
         body.innerHTML='<div class="gd-ai-loading"><div class="gd-ai-pulse"></div>Reading this week\'s numbers…</div>';
       }
-      fetch('/p2/b2b-agents/gentle-dental-slot-checker/insights'+(force?'?fresh=1':''))
+      fetch('/p2/b2b-agents/42-north-dental-slot-checker/insights'+(force?'?fresh=1':''))
         .then(function(r){ return r.json(); })
         .then(renderInsights)
         .catch(function(){
@@ -1060,7 +1060,7 @@
       {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
       {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
       {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
-      {t:'Gentle Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/gentle-dental-slot-checker',i:'◷'},
+      {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
       {t:'Social Creative Intelligence Analyst',d:'Cross-platform creative analysis',u:'/p2/b2b-agents/social-creative-intelligence',i:'▣'},
       {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
     ];
@@ -1133,6 +1133,6 @@
     });
   })();
   </script>
-  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Gentle Dental Slot Checker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'42 North Dental Slot Checker',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
 </body>
 </html>
