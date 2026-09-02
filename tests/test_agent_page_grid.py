@@ -32,7 +32,7 @@ PAGES = [
     ("company_people_intelligence.css", ".shell"),  # Contact Finder
     ("linkedin.css", ".shell"),                     # LinkedIn Intelligence
     ("job_change_alert.css", ".main"),
-    ("gentle_dental_slot_checker.css", ".main"),
+    ("42_north_dental_slot_checker.css", ".main"),
     ("anonymous_visitors.css", ".main"),
     ("linkedin_playbook_studio.css", ".main"),
     ("event_conference_intelligence.css", ".main"),

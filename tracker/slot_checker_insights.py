@@ -1,4 +1,4 @@
-"""Claude-powered synthesis layer for the Gentle Dental Slot Checker dashboard.
+"""Claude-powered synthesis layer for the 42 North Dental Slot Checker dashboard.
 
 tracker/slot_checker.py already turns the weekly crawl into totals, breakdowns
 by state/service/brand/weekday, and an alerts list -- but those are still

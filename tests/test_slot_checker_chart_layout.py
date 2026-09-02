@@ -25,8 +25,8 @@ import os
 import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CSS = os.path.join(ROOT, "static", "css", "gentle_dental_slot_checker.css")
-TPL = os.path.join(ROOT, "templates", "gentle_dental_slot_checker.html")
+CSS = os.path.join(ROOT, "static", "css", "42_north_dental_slot_checker.css")
+TPL = os.path.join(ROOT, "templates", "42_north_dental_slot_checker.html")
 
 
 def _read(path):

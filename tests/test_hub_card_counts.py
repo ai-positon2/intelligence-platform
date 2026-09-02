@@ -126,9 +126,9 @@ def test_the_description_mentions_job_change_alerts_now_that_it_shipped(hub_card
     assert "Job Change Alert" in dashboard_cards["live"]
 
 
-def test_gentle_dental_slot_checker_is_one_of_the_live_dashboards(dashboard_cards):
+def test_42_north_dental_slot_checker_is_one_of_the_live_dashboards(dashboard_cards):
     """The dashboard that took the count from 7/7 to 8/8 on 2026-08-21."""
-    assert "Gentle Dental Slot Checker" in dashboard_cards["live"]
+    assert "42 North Dental Slot Checker" in dashboard_cards["live"]
 
 
 def test_the_description_mentions_appointment_availability(hub_card, dashboard_cards):
@@ -136,7 +136,7 @@ def test_the_description_mentions_appointment_availability(hub_card, dashboard_c
     changes above: the Slot Checker is a whole live dashboard, so the copy has to
     account for it rather than leaving it invisible on the busiest page."""
     assert "appointment availability" in hub_card["desc"].lower()
-    assert "Gentle Dental Slot Checker" in dashboard_cards["live"]
+    assert "42 North Dental Slot Checker" in dashboard_cards["live"]
 
 
 def test_social_creative_intelligence_analyst_is_one_of_the_live_dashboards(dashboard_cards):

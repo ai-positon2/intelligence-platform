@@ -4133,7 +4133,7 @@ def job_change_alert_tracked():
     return resp
 
 
-# ── Gentle Dental Slot Checker ────────────────────────────────────────────────
+# ── 42 North Dental Slot Checker ────────────────────────────────────────────────
 # Appointment availability across the dental practice portfolio the Slot Checker
 # agent crawls weekly. tracker/slot_checker.py owns the reading, parsing and
 # derivation; this app only calls fetch().
@@ -4145,15 +4145,38 @@ def job_change_alert_tracked():
 # ever fails -- see tracker.slot_checker._snapshot's docstring.
 
 
+# Renamed 2026-09-02: "Gentle Dental Slot Checker" -> "42 North Dental Slot
+# Checker". Only 46 of the 82 practices are Gentle Dental; the rest are ~31
+# other brands under the same parent, which the Jarvis booking URLs already
+# call 42-north-dental, so the new name is the accurate one. The old paths
+# redirect rather than 404: this is a staff dashboard people have bookmarked,
+# and a dead link reads as "the tool was taken away".
+
+
 @app.route("/p2/b2b-agents/gentle-dental-slot-checker")
-@position2_required
-def gentle_dental_slot_checker():
-    return render_template("gentle_dental_slot_checker.html", user=_get_user())
+def gentle_dental_slot_checker_legacy():
+    return redirect("/p2/b2b-agents/42-north-dental-slot-checker", code=301)
 
 
 @app.route("/p2/b2b-agents/gentle-dental-slot-checker/data")
+def gentle_dental_slot_checker_data_legacy():
+    return redirect("/p2/b2b-agents/42-north-dental-slot-checker/data", code=301)
+
+
+@app.route("/p2/b2b-agents/gentle-dental-slot-checker/insights")
+def gentle_dental_slot_checker_insights_legacy():
+    return redirect("/p2/b2b-agents/42-north-dental-slot-checker/insights", code=301)
+
+
+@app.route("/p2/b2b-agents/42-north-dental-slot-checker")
 @position2_required
-def gentle_dental_slot_checker_data():
+def slot_checker_page():
+    return render_template("42_north_dental_slot_checker.html", user=_get_user())
+
+
+@app.route("/p2/b2b-agents/42-north-dental-slot-checker/data")
+@position2_required
+def slot_checker_data():
     """JSON payload for the Slot Checker dashboard.
 
     No hand-rolled gzip here, unlike the three older data routes above: the
@@ -4170,9 +4193,9 @@ def gentle_dental_slot_checker_data():
     return resp
 
 
-@app.route("/p2/b2b-agents/gentle-dental-slot-checker/insights")
+@app.route("/p2/b2b-agents/42-north-dental-slot-checker/insights")
 @position2_required
-def gentle_dental_slot_checker_insights():
+def slot_checker_insights_route():
     """AI-synthesized weekly briefing over the current dashboard numbers.
 
     tracker/slot_checker_insights.py degrades to (None, None) when
@@ -4969,6 +4992,13 @@ _PAGE_LABEL_ALIASES = (
     # slug/title are both retired, not reused.
     ("/p2/b2b-agents/linkedin-playbook-studio", "/p2/b2b-agents/linkedin-strategy-researcher"),
     ("LinkedIn Playbook Studio", "LinkedIn Strategy Researcher"),
+    # gentle-dental-slot-checker -> 42-north-dental-slot-checker, 2026-09-02.
+    # Safe to fold forward on both axes: neither the old slug nor the old title
+    # is being reused by anything else, so every historical row under them
+    # means this one dashboard. Without these, every page view recorded before
+    # the rename would drop out of this page's totals on the day it shipped.
+    ("/p2/b2b-agents/gentle-dental-slot-checker", "/p2/b2b-agents/42-north-dental-slot-checker"),
+    ("Gentle Dental Slot Checker", "42 North Dental Slot Checker"),
     # NOT aliased, deliberately: the old hidden agent's slug/title
     # ("linkedin-strategy-researcher" / "LinkedIn Strategy Researcher") were
     # reassigned the same day to the new agent above, rather than retired. That

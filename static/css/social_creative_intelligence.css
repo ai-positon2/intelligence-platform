@@ -5,7 +5,7 @@
    page has ever had -- Phase 1-3 left it on shared tokens only, so .main,
    .card, .btn-primary and .topbar were never actually defined anywhere the
    page could reach and rendered unstyled. Every other agent page (see
-   gentle_dental_slot_checker.css, linkedin_playbook_studio.css) defines its
+   42_north_dental_slot_checker.css, linkedin_playbook_studio.css) defines its
    own copy of these; this file follows that convention instead of assuming
    a shared base that doesn't exist. */
 

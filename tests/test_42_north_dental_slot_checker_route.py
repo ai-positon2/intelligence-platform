@@ -1,4 +1,4 @@
-"""/p2/b2b-agents/gentle-dental-slot-checker (page + /data).
+"""/p2/b2b-agents/42-north-dental-slot-checker (page + /data).
 
 Both routes are @position2_required: this is internal availability data for a
 client's practice network, not something to serve to any signed-in user.
@@ -29,7 +29,7 @@ import app as appmod  # noqa: E402
 from tracker import slot_checker as sc  # noqa: E402
 from tracker import slot_checker_insights as sci  # noqa: E402
 
-URL = "/p2/b2b-agents/gentle-dental-slot-checker"
+URL = "/p2/b2b-agents/42-north-dental-slot-checker"
 DATA = URL + "/data"
 INSIGHTS = URL + "/insights"
 
@@ -105,7 +105,7 @@ def test_page_renders_for_any_position2_staff(snapshot):
     snapshot(_fake())
     resp = _client("someone@position2.com").get(URL)
     assert resp.status_code == 200
-    assert b"Gentle Dental Slot Checker" in resp.data
+    assert b"42 North Dental Slot Checker" in resp.data
 
 
 def test_the_page_ships_the_stylesheet_and_the_data_url_it_calls(snapshot):
@@ -113,7 +113,7 @@ def test_the_page_ships_the_stylesheet_and_the_data_url_it_calls(snapshot):
     the two things without which it renders blank."""
     snapshot(_fake())
     body = _client().get(URL).data.decode()
-    assert "css/gentle_dental_slot_checker.css" in body
+    assert "css/42_north_dental_slot_checker.css" in body
     assert DATA in body
 
 
@@ -303,3 +303,93 @@ def test_insights_fresh_param_bypasses_the_cache(monkeypatch, snapshot):
     c.get(INSIGHTS)
     c.get(INSIGHTS + "?fresh=1")
     assert calls["n"] == 2
+
+
+# ── the 2026-09-02 rename ────────────────────────────────────────────────
+#
+# "Gentle Dental Slot Checker" became "42 North Dental Slot Checker": only 46
+# of the 82 practices are Gentle Dental, and the rest are ~31 other brands
+# under the same parent, which the Jarvis booking URLs already call
+# 42-north-dental. Three things have to survive a rename on this platform, and
+# a previous one got the third wrong: the old links, the analytics history, and
+# the data that happens to contain the old words.
+
+OLD = "/p2/b2b-agents/gentle-dental-slot-checker"
+
+
+@pytest.mark.parametrize("suffix", ["", "/data", "/insights"])
+def test_the_old_paths_redirect_instead_of_404ing(suffix):
+    """This is a staff dashboard people have bookmarked. A dead link reads as
+    "the tool was taken away", not "the tool was renamed"."""
+    resp = _client().get(OLD + suffix, follow_redirects=False)
+    assert resp.status_code == 301, "an old bookmark now 404s"
+    assert resp.headers["Location"].endswith(
+        "/p2/b2b-agents/42-north-dental-slot-checker" + suffix)
+
+
+def test_the_redirect_does_not_require_a_session():
+    """The redirect must land before the auth gate, or a signed-out user
+    following an old bookmark is bounced to a login that then sends them to
+    the dead path again."""
+    resp = appmod.app.test_client().get(OLD, follow_redirects=False)
+    assert resp.status_code == 301
+
+
+def test_analytics_history_from_before_the_rename_still_counts():
+    """Page views were logged under the old title and the old path. Without an
+    alias entry both drop out of this page's totals on the day the rename
+    ships, which is how a rename silently forks its own history."""
+    assert appmod._page_label("Gentle Dental Slot Checker") == \
+        "42 North Dental Slot Checker"
+    assert appmod._page_label(OLD) == \
+        "/p2/b2b-agents/42-north-dental-slot-checker"
+
+
+def test_the_new_label_is_stable_under_the_alias_map():
+    """A substring alias that also matches its own output would rewrite the
+    new name on every pass."""
+    for s in ("42 North Dental Slot Checker",
+              "/p2/b2b-agents/42-north-dental-slot-checker"):
+        assert appmod._page_label(s) == s
+
+
+def test_the_gentle_dental_BRAND_is_not_renamed_anywhere_in_the_data():
+    """The dangerous half of this rename. "Gentle Dental" is the real brand on
+    46 of the 82 practices, and it appears in the snapshot, the sheet parser
+    and their fixtures. A blanket find-and-replace of "Gentle Dental" would
+    relabel real practices and quietly corrupt the brand mix panel, the brand
+    filter and the AI briefing's by_brand numbers. Only the three full
+    identifiers were ever meant to move."""
+    import io
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    snap = io.open(os.path.join(root, "data", "slot_checker_snapshot.json"),
+                   encoding="utf-8").read()
+    assert "Gentle Dental" in snap, (
+        "the practice brand was renamed along with the dashboard")
+    assert "42 North Dental Slot Checker" not in snap, (
+        "the dashboard's new name leaked into the practice data")
+
+
+def test_no_source_file_still_points_at_the_retired_template_or_stylesheet():
+    """The files moved. A stale render_template or <link> would 500 or render
+    unstyled, and neither shows up as a failing import."""
+    import io
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tracked = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True,
+                             text=True).stdout.split()
+    offenders = []
+    for rel in tracked:
+        if rel.endswith((".json", ".csv", ".xlsx", ".md")):
+            continue
+        try:
+            body = io.open(os.path.join(root, rel), encoding="utf-8").read()
+        except Exception:
+            continue
+        # The FILES, not the bare word: the legacy redirect views are named
+        # gentle_dental_slot_checker_*_legacy on purpose, so that they read as
+        # what they are at the call site.
+        if any(("gentle_dental_slot_checker" + ext) in body
+               for ext in (".html", ".css")):
+            offenders.append(rel)
+    assert not offenders, "still reference the moved files: %s" % offenders

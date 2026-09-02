@@ -5,7 +5,7 @@
    .c-adint amber, .c-gdsc lime), and starting on sky rather than teal keeps
    it apart from .c-lps.
 
-   Follows the same convention as gentle_dental_slot_checker.css and
+   Follows the same convention as 42_north_dental_slot_checker.css and
    social_creative_intelligence.css: this page defines its own .main/.card/
    .topbar rather than assuming a shared base, because there isn't one. */
 

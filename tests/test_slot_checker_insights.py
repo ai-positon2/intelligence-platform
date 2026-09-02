@@ -1,5 +1,5 @@
 """tracker/slot_checker_insights.py: the Claude synthesis layer over the
-Gentle Dental Slot Checker's own derived dashboard numbers.
+42 North Dental Slot Checker's own derived dashboard numbers.
 
 Same architectural rule under test as test_lps_enrichment.py, which this file
 mirrors closely: anything that could go wrong (no ANTHROPIC_API_KEY, an empty
