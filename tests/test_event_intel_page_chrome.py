@@ -178,6 +178,51 @@ def test_the_entry_cards_are_free_of_the_jargon_that_made_them_unreadable():
                 "the %r card is back to saying %r" % (c["title"], word))
 
 
+def _card_text(card):
+    """Everything on a card that a reader actually reads."""
+    return re.sub(r"<[^>]+>", " ",
+                  card["title"] + " " + card["io"] + " " + card["desc"])
+
+
+def test_the_two_plays_that_both_find_events_say_which_one_is_which():
+    """Cards one and three keep collapsing into each other, because both
+    answer "which events?". Saying what you start from was not enough: "a
+    client" and "your buyers" are the same thing to a reader.
+
+    What actually separates them is depth. Recommend is six category
+    searches, a famous-name audit, one rubric over every survivor and a floor
+    under the list. Discover is a single pass carrying the model's own fit
+    number, ranked against your own account list if you paste one. Whichever
+    words the cards use, the deep one has to claim the scoring and the fast
+    one has to disclaim it, or the page is offering the same thing twice.
+    """
+    by_play = {}
+    for card in re.findall(r'<button class="evi-play[^"]*".*?</button>',
+                           _page(), re.S):
+        key = re.search(r'data-play="([^"]+)"', card).group(1)
+        by_play[key] = re.sub(r"<[^>]+>", " ",
+                              re.search(r'<span class="pn">.*?<span class="pgo"',
+                                        card, re.S).group(0)).lower()
+    deep, fast = by_play["recommend"], by_play["discover"]
+
+    assert "scored" in deep or "scoring" in deep, (
+        "the deep play does not say it scores anything: %r" % deep)
+    assert "no scoring" in fast, (
+        "the fast play does not say it skips the scoring, so it reads as a "
+        "second copy of the deep one: %r" % fast)
+    assert deep != fast
+
+
+def test_the_deep_play_says_how_long_it_takes():
+    """Twenty to forty minutes, measured over live runs. It is the single most
+    decision-relevant fact about choosing between these two and it used to be
+    nowhere on the page."""
+    deep = [c for c in _play_cards()
+            if 'data-play="recommend"' in c["raw"]][0]
+    assert re.search(r"\bminutes\b", _card_text(deep)), (
+        "nothing on the card says what a full run costs in time")
+
+
 def test_a_play_that_names_another_play_names_one_that_exists():
     """Work the room refuses to run without a roster and tells you which play
     builds one, by title, in two places: a hint under the field and the error
