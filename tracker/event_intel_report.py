@@ -67,7 +67,8 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
                 candidates: list, scoring_errors: list,
                 interchangeable: list, banned: list, thin: list,
                 unscored: list, over_cap: list | None = None,
-                finished: list | None = None) -> list[str]:
+                finished: list | None = None,
+                promoted: dict | None = None) -> list[str]:
     """Element 4. Everything this run could not establish, stated plainly.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -122,6 +123,37 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
                      % (", ".join(str(c.get("name")) for c in skipped if c.get("name")),
                         "it was" if len(skipped) == 1 else "they were"))
         out.append(line)
+
+    # Where a promoted event came from. Without this it sits in the middle of
+    # a category's results looking like something that category's search
+    # found, and the reader has no way to know it arrived by a different route
+    # and was confirmed by a different check.
+    pr = promoted or {}
+    added, unconfirmed = pr.get("promoted") or [], pr.get("unconfirmed") or []
+    not_attempted = pr.get("not_attempted") or []
+    if added or unconfirmed or not_attempted:
+        bits = []
+        if added:
+            bits.append("%s %s named by the audit as a better fit than a "
+                        "marquee event it cut, then confirmed separately and "
+                        "added to this list"
+                        % (", ".join(str(c.get("name")) for c in added),
+                           "was" if len(added) == 1 else "were"))
+        if unconfirmed:
+            bits.append("%s %s named as an alternative but could not be "
+                        "confirmed, so %s not on the list and the event %s "
+                        "replaced is simply gone"
+                        % (", ".join(str(c.get("name")) for c in unconfirmed),
+                           "was" if len(unconfirmed) == 1 else "were",
+                           "it is" if len(unconfirmed) == 1 else "they are",
+                           "it" if len(unconfirmed) == 1 else "they"))
+        if not_attempted:
+            bits.append("%s %s named but not looked up, because this run stops "
+                        "after %d replacements"
+                        % (", ".join(str(c.get("name")) for c in not_attempted),
+                           "was" if len(not_attempted) == 1 else "were",
+                           len(added) + len(unconfirmed)))
+        out.append("Replacements for cut marquee events: %s." % "; ".join(bits))
 
     if generic:
         if not generic.get("measured"):

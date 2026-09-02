@@ -344,6 +344,15 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
     audit = event_intel_audit.audit_famous(found["candidates"], profile)
     survivors = event_intel_audit.apply_audit(found["candidates"], audit)
 
+    # The other half of Step 3. Cutting a marquee event on the strength of a
+    # named alternative and then never looking that alternative up leaves the
+    # client with a shorter list and no replacement, while the run has already
+    # worked out what the replacement should be. Each one is confirmed by its
+    # own lookup before it is allowed onto the list.
+    promoted = event_intel_audit.promote_alternatives(audit, survivors)
+    if promoted["promoted"]:
+        survivors = survivors + promoted["promoted"]
+
     # Step 4 and 8. One rubric, one pass, over everything that survived.
     store.update_run(run_id, stage="scoring")
     scored = event_intel_scorer.score_all(survivors, profile)
@@ -389,7 +398,8 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         profile=profile, ranked=ranked,
         shortfall=found["shortfall"], audit=audit, generic=generic,
         scoring_errors=scored["errors"], interchangeable=interchangeable,
-        banned=banned, thin=thin, unscored=scored["unscored"])
+        banned=banned, thin=thin, unscored=scored["unscored"],
+        promoted=promoted)
     summary.update({
         "mode": "recommend",
         "shortfall": found["shortfall"],
@@ -397,7 +407,12 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         "categories_failed": found["categories_failed"],
         "discovered": found["found"],
         "audit": {"checked": audit["checked"], "error": audit.get("error"),
-                  "cut": audit.get("cut") or []},
+                  "cut": audit.get("cut") or [],
+                  "promoted": [{"name": c.get("name"),
+                                "replaces": c.get("audit_note")}
+                               for c in promoted["promoted"]],
+                  "unconfirmed": promoted["unconfirmed"],
+                  "not_attempted": promoted["not_attempted"]},
         "generic": generic,
         "excluded": ranked["excluded"],
         "over_cap": ranked["over_cap"],

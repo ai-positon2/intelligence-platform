@@ -24,6 +24,7 @@ this codebase:
 
 from __future__ import annotations
 
+import datetime
 import logging
 
 from . import claude_websearch
@@ -121,7 +122,13 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
     if not query:
         return _failed("none", "No event name was provided.")
 
-    user = "Event: %s" % query
+    # The prompt already says to prefer the next upcoming edition, but with no
+    # date in the conversation the model has no way to tell upcoming from past
+    # and will happily resolve last year's. Observed on 2026-09-02: a lookup
+    # for INBOUND returned the 2025 edition, five days before the run's own
+    # date would have made that obviously finished.
+    user = ("Event: %s\nTODAY IS %s. An edition is upcoming only if it starts "
+            "on or after that date." % (query, datetime.date.today().isoformat()))
     if year_hint:
         user += "\nEdition/year the user is asking about: %s" % year_hint
 
