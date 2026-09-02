@@ -183,3 +183,36 @@ def test_the_billed_count_wins_over_the_block_scan(transport):
     r.usage.server_tool_use.web_search_requests = 5
     transport["resp"] = r
     assert C.ask("s", "u")["search_count"] == 5
+
+
+# -- citation markup ------------------------------------------------------
+# Same reason as above: the stripper working while ask() never calls it is
+# exactly the bug. The tag is assembled rather than written out so that
+# nothing between here and disk can soften the string under test.
+
+_O = "<" + "cite"
+_C = "<" + "/cite>"
+
+
+def test_ask_hands_back_text_with_the_citation_markup_already_gone(transport):
+    transport["resp"] = _resp(
+        text="attendees came from " + _O + ' index="1-2">47 states' + _C + ".")
+    r = C.ask("s", "u")
+    assert "cite" not in r["text"].lower(), \
+        "ask() returned citation markup for its caller to store"
+    assert r["text"] == "attendees came from \u201c47 states\u201d."
+
+
+def test_the_untouched_reply_is_still_available_for_a_diagnostic(transport):
+    """A probe that reports what actually came back has to see what actually
+    came back. `raw` is that; `text` is what callers parse."""
+    original = "came from " + _O + ' index="1-2">47 states' + _C + "."
+    transport["resp"] = _resp(text=original)
+    r = C.ask("s", "u")
+    assert r["raw"] == original
+    assert r["text"] != r["raw"]
+
+
+def test_a_reply_with_no_markup_is_passed_through_unchanged(transport):
+    transport["resp"] = _resp(text='He said "no" about <b>everything</b>.')
+    assert C.ask("s", "u")["text"] == 'He said "no" about <b>everything</b>.'

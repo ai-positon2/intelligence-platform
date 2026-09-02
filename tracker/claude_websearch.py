@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -259,13 +260,16 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     # the answer is split into one block per cited span and the last one is a
     # fragment. This is the single highest-value line in the module.
     blocks = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
-    text = "".join(blocks)
+    joined = "".join(blocks)
+    # `text` is what callers parse and store; `raw` stays exactly what
+    # came back, so a diagnostic still shows the reply as it was sent.
+    text = strip_citation_markup(joined)
     stop_reason = getattr(resp, "stop_reason", None)
     tool_errors = _tool_errors(resp)
     usage = _usage(resp)
     searches = _search_count(resp, usage)
 
-    out = {"text": text, "raw": text, "stop_reason": stop_reason,
+    out = {"text": text, "raw": joined, "stop_reason": stop_reason,
            "text_block_count": len(blocks), "tool_version": used_version,
            "search_count": searches, "tool_errors": tool_errors,
            "usage": usage, "error": None}
@@ -291,6 +295,48 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
                             "The search ran but the model never wrote an answer "
                             "(stop_reason=%s)." % stop_reason)
     return out
+
+
+_CITE_PAIR = re.compile(r"<cite\b[^>]*>(.*?)</cite>", re.I | re.S)
+_CITE_ANY = re.compile(r"</?cite\b[^>]*>", re.I | re.S)
+_CITE_EDGE = re.compile(r"^[\"\'\u201c\u2018]+|[\"\'\u201d\u2019]+$")
+
+
+def strip_citation_markup(text: str) -> str:
+    """Turn inline cite markup back into the quotation it was wrapping.
+
+    With web_search on, the model marks every span it lifted off a page with
+    an inline cite tag carrying the index of the result it came from. That is
+    presentation markup for a chat client, and this module's callers are not
+    one: they hand the text to json.loads and then store the strings. So the
+    tag travelled all the way to a rendered page and readers saw it printed
+    literally in the middle of a sentence.
+
+    It also cannot simply be deleted. What the tag wraps is a direct quote
+    from the event's own site, and the sentence around it reads as one:
+    "a recap noted attendees came from 47 states". Dropping the marks turns a
+    quotation into our own claim about someone else's page, which is the one
+    thing this agent must never do. So the pair becomes real quotation marks,
+    and quote characters the model already put inside are not doubled.
+
+    An opener with no closer, or a stray closer, is markup with no quotation
+    to recover, and is removed rather than shown.
+    """
+    if not text:
+        return ""
+    low = text.lower()
+    # Both halves. A closing tag does not contain the opening one, so a guard
+    # that looks only for the opener returns a stray closer to the caller
+    # untouched, which is the one shape that reaches a page as visible markup.
+    if "<cite" not in low and "</cite" not in low:
+        return text
+
+    def _one(m):
+        inner = _CITE_ANY.sub("", m.group(1)).strip()
+        inner = _CITE_EDGE.sub("", inner).strip()
+        return "\u201c%s\u201d" % inner if inner else ""
+
+    return _CITE_ANY.sub("", _CITE_PAIR.sub(_one, text))
 
 
 def extract_json(raw: str, require: str | None = None):

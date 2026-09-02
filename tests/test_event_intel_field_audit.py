@@ -379,12 +379,27 @@ def test_discover_renders_in_the_order_the_pipeline_ranked():
 
 @nodeonly
 def test_a_roster_nobody_read_never_looks_like_one_with_no_hits():
-    """The two are identical in words and mean opposite things."""
+    """The two are identical in words and mean opposite things.
+
+    Both states used to be a paragraph under the card, which meant the same
+    twenty words printed under four cards in a row. They are chips in the
+    card's own tag row now. The claim is unchanged and is what this asserts:
+    the two states must be distinguishable, and neither may be claimed for
+    the event whose roster actually held a hit.
+    """
     html = _render(_discover(event_order=[1, 2, 3, 4],
                              harvested_event_ids=[1, 2],
                              target_overlap={"1": ["Acme"]}))
-    assert "This roster was read and none of your target accounts are on it." in html
-    assert "This roster was not read" in html
+    read = "Roster read, none of yours"
+    unread = "Roster not read"
+    assert read in html and unread in html
+    assert read != unread
+    # Ev1's roster was read AND held a hit, so it must claim neither.
+    cards = re.split(r'(?=<article class="evi-ev )', html)
+    ev1 = [c for c in cards if c.startswith("<article") and "Ev1" in c]
+    assert len(ev1) == 1
+    assert read not in ev1[0] and unread not in ev1[0]
+    assert "Acme" in ev1[0]
 
 
 @nodeonly

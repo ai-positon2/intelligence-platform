@@ -860,6 +860,9 @@
         '<span id="drawerLive" role="status" aria-live="polite">Reading what it ' +
         'stored.</span></div>';
       activeRoles = null;
+      /* Per-run state, not per-session: a reader who sorted one roster by
+         date should not find the next run they open already sorted. */
+      EVENT_SORT = 'ranked';
       fetch(BASE + '/runs/' + runId)
         .then(function(r){ return r.json(); })
         .then(function(run){
@@ -1098,14 +1101,465 @@
       }).join('') + '</div>';
     }
 
+    /* ── the event set, drawn ────────────────────────────────────────────
+       Six events used to arrive as six paragraphs, and the three things a
+       reader actually compares across them, when it lands, how well it
+       fits, and whether it is a room they can physically walk into, were
+       each buried mid-sentence. So the set is drawn before it is read, out
+       of the same numbers the cards below carry and no others.
+
+       Nothing here estimates. An event with no announced date is never
+       placed on the rail at a plausible-looking position; it is listed
+       beside the rail and said to be undated, for the same reason the
+       roster never fills a blank cell with a likely value. A format the
+       organiser has not stated is its own segment in the mix, not folded
+       into "in person" because most events are. */
+
+    /* One table for the bands, so the gauge on a card, the colour of its
+       bar in the spread and the colour of its marker on the rail cannot
+       drift into disagreeing about what a 70 is. */
+    var FIT_BANDS = [{k: 'hi', min: 85, l: 'strong fit'},
+                     {k: 'mid', min: 70, l: 'good fit'},
+                     {k: 'low', min: 55, l: 'fair fit'},
+                     {k: 'weak', min: 0, l: 'weak fit'}];
+
+    function fitOf(ev){
+      var n = ev && ev.fit_score;
+      if (n == null || n === '') return null;
+      n = Number(n);
+      return isNaN(n) ? null : n;
+    }
+
+    function fitBand(n){
+      if (n == null) return null;
+      for (var i = 0; i < FIT_BANDS.length; i++) {
+        if (n >= FIT_BANDS[i].min) return FIT_BANDS[i];
+      }
+      return FIT_BANDS[FIT_BANDS.length - 1];
+    }
+
+    function bandClass(n){
+      var b = fitBand(n);
+      return b ? 'f-' + b.k : 'f-na';
+    }
+
+    /* Dates arrive as YYYY-MM-DD and are compared as whole UTC days. A bare
+       new Date('2026-07-07') is midnight UTC, which is the previous evening
+       everywhere west of Greenwich, so every American reader would have seen
+       this rail draw July 7 on July 6. */
+    function dayNum(d){
+      if (!d) return null;
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));
+      if (!m) return null;
+      var n = Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000;
+      return isNaN(n) ? null : n;
+    }
+
+    function todayNum(){
+      var n = new Date();
+      return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000;
+    }
+
+    function endDay(ev){
+      var s = dayNum(ev.starts_on), e = dayNum(ev.ends_on);
+      return (e != null && s != null && e > s) ? e : s;
+    }
+
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    /* "Jul 7 to 12, 2026" rather than "Jul 7, 2026 to Jul 12, 2026". The
+       repeated month and year carried no information and cost the chip two
+       lines at the width these sit at. */
+    function dateRangeText(ev){
+      var s = dayNum(ev.starts_on);
+      if (s == null) return '';
+      var e = endDay(ev);
+      var sd = new Date(s * 86400000);
+      var one = MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ', ' + sd.getUTCFullYear();
+      if (e == null || e === s) return one;
+      var ed = new Date(e * 86400000);
+      if (ed.getUTCFullYear() !== sd.getUTCFullYear()) {
+        return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ', ' + sd.getUTCFullYear() +
+               ' to ' + MONTHS[ed.getUTCMonth()] + ' ' + ed.getUTCDate() + ', ' + ed.getUTCFullYear();
+      }
+      if (ed.getUTCMonth() !== sd.getUTCMonth()) {
+        return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ' to ' +
+               MONTHS[ed.getUTCMonth()] + ' ' + ed.getUTCDate() + ', ' + ed.getUTCFullYear();
+      }
+      return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ' to ' + ed.getUTCDate() +
+             ', ' + sd.getUTCFullYear();
+    }
+
+    /* How far off it is, in the unit a reader would use out loud. Returns
+       null when there is no start date, because "unknown" and "soon" are
+       not the same answer and a blank chip is the honest one. */
+    function countdownText(ev){
+      var s = dayNum(ev.starts_on);
+      if (s == null) return null;
+      var t = todayNum(), e = endDay(ev);
+      if (s <= t && e != null && e >= t) return 'happening now';
+      var d = s - t;
+      if (d < 0) return 'already finished';
+      if (d === 0) return 'today';
+      if (d === 1) return 'tomorrow';
+      if (d < 28) return 'in ' + d + ' days';
+      var mo = Math.round(d / 30.44);
+      if (mo < 24) return 'in about ' + mo + ' month' + (mo === 1 ? '' : 's');
+      return 'in about ' + (Math.round(d / 36.525) / 10) + ' years';
+    }
+
+    var FORMAT_LABEL = {in_person: 'In person', hybrid: 'Hybrid', virtual: 'Virtual'};
+
+    function formatKey(ev){
+      var f = String((ev && ev.format) || '').toLowerCase().replace(/[\s\-]+/g, '_');
+      return FORMAT_LABEL[f] ? f : 'unknown';
+    }
+
+    /* Web-search replies wrap anything lifted from a page in an inline
+       cite tag. It reached the database as written and this view escaped
+       and printed it, so readers saw the tag rather than the quotation it
+       was wrapping. New runs are cleaned before they are stored, but every
+       run already saved still carries the raw markup and cannot be re-fetched
+       without paying for the search again, so the same recovery runs here:
+       the tag becomes the quotation it always meant.
+
+       Returns HTML. Everything that was not a cite tag is escaped first, so
+       nothing else in the model's prose can reach the page as markup. */
+    function citeText(s){
+      if (s == null) return '';
+      var src = String(s), out = '', i = 0, m;
+      var re = /<cite\b[^>]*>([\s\S]*?)<\/cite>/gi;
+      while ((m = re.exec(src)) !== null) {
+        out += esc(src.slice(i, m.index));
+        var q = m[1].replace(/<\/?cite\b[^>]*>/gi, '').trim()
+                    .replace(/^["'“‘]+/, '')
+                    .replace(/["'”’]+$/, '');
+        if (q) out += '“' + esc(q) + '”';
+        i = m.index + m[0].length;
+      }
+      out += esc(src.slice(i));
+      /* An opener with no closer, or a closer on its own, is markup the
+         reader must never see even though there is no quotation to recover
+         from it. */
+      return out.replace(/&lt;\/?cite\b[\s\S]*?&gt;/gi, '');
+    }
+
+    /* The anchor a rail marker jumps to. Derived from the event id where
+       there is one so it survives a re-sort, and from the position where
+       there is not. */
+    function evAnchor(ev, i){
+      return 'eviev-' + (ev && ev.id != null ? String(ev.id) : 'p' + i);
+    }
+
+    window.eviJump = function(anchor){
+      var el = document.getElementById(anchor);
+      if (!el) return;
+      el.scrollIntoView({block: 'center', behavior: 'smooth'});
+      el.classList.add('lit');
+      setTimeout(function(){ el.classList.remove('lit'); }, 1400);
+    };
+
+    var TAG_ICON = {
+      when: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/>' +
+            '<path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+      soon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      where: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+             'stroke-linecap="round"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/>' +
+             '<circle cx="12" cy="10" r="2.5"/></svg>',
+      form: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/>' +
+            '<path d="M8 21h8M12 17v4"/></svg>',
+      size: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><path d="M17 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>' +
+            '<circle cx="9.5" cy="7" r="3.5"/><path d="M22 20v-2a4 4 0 00-3-3.9"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><path d="M12 3l9 16H3l9-16z"/><path d="M12 9v4M12 16h.01"/></svg>'
+    };
+
+    function tag(kind, icon, text, title){
+      if (!text) return '';
+      return '<span class="evi-tag' + (kind ? ' ' + kind : '') + '"' +
+        (title ? ' title="' + esc(title) + '"' : '') + '>' +
+        (TAG_ICON[icon] || '') + '<span>' + esc(text) + '</span></span>';
+    }
+
+    /* The score as a ring. The number alone made 96 and 82 look like the
+       same kind of answer at a glance; the arc is the part that reads from
+       across the room. */
+    function fitGauge(n){
+      if (n == null) return '';
+      var b = fitBand(n), r = 21, c = 2 * Math.PI * r;
+      var on = Math.max(0, Math.min(100, n)) / 100 * c;
+      return '<div class="evi-gauge ' + bandClass(n) + '" role="img" aria-label="Fit ' +
+        esc(n) + ' out of 100, ' + esc(b ? b.l : '') + '">' +
+        '<svg viewBox="0 0 52 52" aria-hidden="true">' +
+        '<circle class="tr" cx="26" cy="26" r="' + r + '"/>' +
+        '<circle class="vl" cx="26" cy="26" r="' + r + '" stroke-dasharray="' +
+        on.toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 26 26)"/></svg>' +
+        '<span class="n">' + esc(n) + '</span>' +
+        '<span class="fl">' + esc(b ? b.l : '') + '</span></div>';
+    }
+
+    /* ── at a glance ───────────────────────────────────────────────────── */
+    function glanceHtml(rows, sm){
+      var tiles = [];
+      var scored = rows.map(function(r){ return fitOf(r.ev); })
+                       .filter(function(n){ return n != null; });
+
+      var sampled = (sm.harvested_events != null)
+        ? sm.harvested_events : ((sm.harvested_event_ids || []).length);
+      tiles.push('<div class="evi-tile"><div class="tl">Events found</div>' +
+        '<div class="tv">' + rows.length + '</div><div class="tn">' +
+        (sampled ? esc(sampled + ' of them had a roster read')
+                 : 'No roster was sampled on this run') + '</div></div>');
+
+      if (scored.length) {
+        var srt = scored.slice().sort(function(a, b){ return a - b; });
+        var top = srt[srt.length - 1];
+        var mid = srt.length % 2
+          ? srt[(srt.length - 1) / 2]
+          : Math.round((srt[srt.length / 2 - 1] + srt[srt.length / 2]) / 2);
+        tiles.push('<div class="evi-tile"><div class="tl">Fit spread</div>' +
+          '<div class="tbars">' + rows.map(function(r){
+            var n = fitOf(r.ev);
+            return '<i class="' + bandClass(n) + '" style="height:' +
+              (n == null ? 5 : Math.max(9, Math.min(100, n))) + '%" title="' +
+              esc(r.ev.name + (n == null ? ': not scored' : ': ' + n + ' fit')) +
+              '"></i>';
+          }).join('') + '</div>' +
+          '<div class="tn"><b>' + esc(top) + '</b> best, <b>' + esc(mid) +
+          '</b> median, one bar per event in the order below</div></div>');
+      }
+
+      var mix = {in_person: 0, hybrid: 0, virtual: 0, unknown: 0};
+      rows.forEach(function(r){ mix[formatKey(r.ev)] += 1; });
+      var segs = ['in_person', 'hybrid', 'virtual', 'unknown'].filter(function(k){
+        return mix[k] > 0;
+      });
+      tiles.push('<div class="evi-tile"><div class="tl">How you attend</div>' +
+        '<div class="tstack">' + segs.map(function(k){
+          return '<i class="s-' + k + '" style="flex-grow:' + mix[k] + '" title="' +
+            esc((FORMAT_LABEL[k] || 'Format not stated') + ': ' + mix[k]) + '"></i>';
+        }).join('') + '</div><div class="tlegend">' + segs.map(function(k){
+          return '<span class="lg s-' + k + '"><i></i>' +
+            esc((FORMAT_LABEL[k] || 'Not stated') + ' ' + mix[k]) + '</span>';
+        }).join('') + '</div></div>');
+
+      return '<div class="evi-sec"><h3>At a glance</h3>' +
+        '<div class="evi-glance">' + tiles.join('') + '</div></div>';
+    }
+
+    /* ── the calendar rail ─────────────────────────────────────────────── */
+    /* Markers are laid out in percentages of the rail rather than pixels,
+       because the rail is whatever the drawer is wide. The separation below
+       is the one number that has to assume a width: it is the room a marker
+       needs so two of them do not overlap, expressed as a share of a rail
+       of 640px, which is the minimum width the rail scrolls at. Being
+       generous here costs an extra lane and nothing else; being mean costs
+       an unreadable pile of markers. */
+    var MK_HALF_PCT = 2.2;
+
+    function railHtml(rows){
+      var dated = [], undated = [];
+      rows.forEach(function(r){
+        (dayNum(r.ev.starts_on) == null ? undated : dated).push(r);
+      });
+      if (dated.length < 2) return '';
+
+      var t = todayNum();
+      var lo = t, hi = -Infinity;
+      dated.forEach(function(r){
+        var s = dayNum(r.ev.starts_on), e = endDay(r.ev);
+        if (s < lo) lo = s;
+        if (e > hi) hi = e;
+      });
+      if (hi <= lo) hi = lo + 30;
+
+      var loD = new Date(lo * 86400000), hiD = new Date(hi * 86400000);
+      var from = Date.UTC(loD.getUTCFullYear(), loD.getUTCMonth(), 1) / 86400000;
+      var to = Date.UTC(hiD.getUTCFullYear(), hiD.getUTCMonth() + 1, 1) / 86400000;
+      var span = to - from;
+      if (span <= 0) return '';
+      function pct(d){ return ((d - from) / span) * 100; }
+
+      var ticks = [], cur = from, guard = 0;
+      while (cur < to && guard++ < 80) {
+        var cd = new Date(cur * 86400000);
+        ticks.push({at: pct(cur), m: cd.getUTCMonth(), y: cd.getUTCFullYear()});
+        cur = Date.UTC(cd.getUTCFullYear(), cd.getUTCMonth() + 1, 1) / 86400000;
+      }
+      /* At most nine labels on the rail. Ten monthly labels fit across a
+         desktop drawer and collide into each other on the narrow one the
+         rail scrolls inside, and a month label printed over the next one
+         is worse than no month label. */
+      var every = Math.ceil(ticks.length / 9);
+      var axis = ticks.map(function(k, i){
+        var show = (i % every === 0);
+        return '<span class="tk' + (show ? '' : ' q') + '" style="left:' +
+          k.at.toFixed(3) + '%">' + (show
+            ? '<b>' + MONTHS[k.m] + (k.m === 0 || i === 0 ? ' ' + k.y : '') + '</b>'
+            : '') + '</span>';
+      }).join('');
+
+      var placed = dated.slice().sort(function(a, b){
+        return dayNum(a.ev.starts_on) - dayNum(b.ev.starts_on);
+      });
+      var laneRight = [];
+      placed.forEach(function(r){
+        var s = dayNum(r.ev.starts_on), e = endDay(r.ev);
+        if (e == null || e < s) e = s;
+        var L = pct(s), R = pct(e + 1), C = (L + R) / 2;
+        var from_ = Math.min(L, C - MK_HALF_PCT), to_ = Math.max(R, C + MK_HALF_PCT);
+        var lane = 0;
+        while (laneRight[lane] != null && laneRight[lane] > from_) lane += 1;
+        laneRight[lane] = to_;
+        r._L = L; r._W = Math.max(R - L, 0.35); r._C = C; r._lane = lane;
+      });
+
+      var lanes = laneRight.length;
+      var marks = placed.map(function(r){
+        var n = fitOf(r.ev), cls = bandClass(n);
+        var title = r.ev.name + ' · ' + dateRangeText(r.ev) +
+          (n == null ? '' : ' · ' + n + ' fit');
+        return '<span class="sp ' + cls + '" style="left:' + r._L.toFixed(3) +
+          '%;width:' + r._W.toFixed(3) + '%;top:' + (r._lane * 30 + 11) + 'px"></span>' +
+          '<button type="button" class="mk ' + cls + '" style="left:' + r._C.toFixed(3) +
+          '%;top:' + (r._lane * 30) + 'px" title="' + esc(title) +
+          '" aria-label="' + esc(title) + '" onclick="eviJump(\'' +
+          esc(evAnchor(r.ev, r.rank - 1)) + '\')">' + esc(r.rank) + '</button>';
+      }).join('');
+
+      var nowAt = pct(t);
+      var now = (nowAt >= 0 && nowAt <= 100)
+        ? '<span class="now" style="left:' + nowAt.toFixed(3) + '%"><b>today</b></span>' : '';
+
+      var tail = '';
+      if (undated.length) {
+        tail = '<div class="evi-undated">' + TAG_ICON.warn + '<span><b>' +
+          esc(plural(undated.length, 'event')) + ' not on the rail.</b> ' +
+          esc(undated.map(function(r){ return r.ev.name; }).slice(0, 4).join(', ')) +
+          (undated.length > 4 ? ' and ' + (undated.length - 4) + ' more' : '') +
+          (undated.length === 1 ? ' has ' : ' have ') +
+          'no announced date, so nothing is drawn at a guessed one.</span></div>';
+      }
+
+      /* The rail scrolls inside its own box below about 700px rather than
+         squeezing. Every position on it is a percentage, so a rail narrow
+         enough piles five markers into one smudge and prints the month
+         labels over each other; a minimum width is the only thing that
+         keeps the spacing the lane algorithm assumed. */
+      return '<div class="evi-sec"><h3>When they land</h3>' +
+        '<div class="evi-railwrap"><div class="evi-rail" style="--lanes:' + lanes + '">' +
+        '<div class="grid">' + ticks.map(function(k, i){
+          return '<span style="left:' + k.at.toFixed(3) + '%"></span>';
+        }).join('') + '</div>' + now +
+        '<div class="marks" style="height:' + (lanes * 30 - 8) + 'px">' + marks + '</div>' +
+        '<div class="axis">' + axis + '</div></div></div>' + tail + '</div>';
+    }
+
+    /* ── the cards ─────────────────────────────────────────────────────── */
+    function eventCard(r, overlap, sampled, knowSampled){
+      var ev = r.ev, n = fitOf(ev), cls = bandClass(n);
+      var site = safeUrl(ev.website);
+      var hits = overlap[String(ev.id)] || [];
+
+      var tags = [];
+      var when = dateRangeText(ev);
+      tags.push(when ? tag('', 'when', when)
+                     : tag('mut', 'when', 'No date announced',
+                           'The organiser has not published a date for the next edition.'));
+      var soon = countdownText(ev);
+      if (soon) {
+        tags.push(tag(soon === 'already finished' ? 'warn' : 'go', 'soon', soon));
+      }
+      if (ev.location) tags.push(tag('', 'where', ev.location));
+      var fk = formatKey(ev);
+      tags.push(fk === 'unknown'
+        ? tag('mut', 'form', 'Format not stated',
+              'The organiser does not say whether this runs in person, online or both.')
+        : tag('', 'form', FORMAT_LABEL[fk]));
+      if (ev.stated_size) {
+        tags.push(tag('', 'size', ev.stated_size,
+                      'The number the event publishes about itself. Nothing here estimates one.'));
+      }
+      if (String(ev.confidence || '').toLowerCase() === 'low') {
+        tags.push(tag('warn', 'warn', 'Low confidence',
+                      'The search was not able to confirm this one as firmly as the rest.'));
+      }
+      /* Whether this roster was read is a per-event fact and has to travel on
+         the event. It used to travel as a sentence, which meant the same
+         twenty words printed under four cards in a row and read as padding.
+         The two states stay visually apart, because "we read it and none of
+         yours were there" and "we never read it" mean opposite things. */
+      if (knowSampled && !hits.length) {
+        tags.push(sampled[String(ev.id)]
+          ? tag('mut', 'size', 'Roster read, none of yours',
+                'This roster was read in full and none of your target accounts are on it.')
+          : tag('warn', 'warn', 'Roster not read',
+                'This roster was not read, so whether your target accounts are on it is '
+                + 'unknown. Only the best-fitting few are sampled.'));
+      }
+
+      var ed = ev.edition ? String(ev.edition).trim() : '';
+      if (ed && when && when.indexOf(ed) >= 0) ed = '';
+
+      return '<article class="evi-ev ' + cls + '" id="' + esc(evAnchor(ev, r.rank - 1)) + '">' +
+        '<div class="rk">' + esc(r.rank) + '</div>' +
+        '<div class="bd">' +
+          '<h4 class="nm">' + (site
+            ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' +
+              esc(ev.name) + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9"/>' +
+              '<path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>'
+            : esc(ev.name)) +
+            (ed ? '<span class="ed">' + esc(ed) + '</span>' : '') + '</h4>' +
+          (ev.organizer ? '<div class="org">organised by ' + esc(ev.organizer) + '</div>' : '') +
+          '<div class="tags">' + tags.join('') + '</div>' +
+          (ev.fit_reasoning ? '<p class="why">' + citeText(ev.fit_reasoning) + '</p>' : '') +
+          (ev.audience_note ? '<p class="aud">' + citeText(ev.audience_note) + '</p>' : '') +
+          (hits.length
+            ? '<div class="evi-overlap"><b>' + hits.length +
+              '</b> of your target accounts are in this roster: ' +
+              esc(hits.slice(0, 8).join(', ')) +
+              (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>'
+            : '') +
+        '</div>' + fitGauge(n) + '</article>';
+    }
+
+    /* Ranked order is what the form promised and stays the default. Date
+       order answers a different question ("what is next?") and is the one
+       thing a reader was doing by hand, so it is a toggle rather than a
+       second copy of the list. Neither order invents a position for an
+       event with no date: undated events keep their ranked places at the
+       end of the date view and are labelled there. */
+    var EVENT_SORT = 'ranked';
+
+    window.eviSortEvents = function(k){
+      if (k === EVENT_SORT || !current) return;
+      EVENT_SORT = k;
+      var body = document.getElementById('drawerBody');
+      var keep = body ? body.scrollTop : 0;
+      render(current);
+      if (body) body.scrollTop = keep;
+    };
+
     function eventsHtml(run){
       var evs = (run.events || []).slice();
-      if (evs.length < 2) return '';
+      /* In lookup mode the one subject event IS the drawer's heading, so
+         listing it again is a duplicate and the section is suppressed. In
+         discover mode the heading is the query, and a search that found
+         exactly one event was rendering that event as nothing at all. */
+      if (!evs.length) return '';
+      if (run.mode !== 'discover' && evs.length < 2) return '';
+
       var sm = run.summary || {};
       var overlap = sm.target_overlap || {};
-      // Render in the order the pipeline ranked, so the list on screen is the
-      // one the form promised: ordered by how many of YOUR accounts are in
-      // each roster, not by discovery order.
+
+      /* Render in the order the pipeline ranked, so the list on screen is
+         the one the form promised: ordered by how many of YOUR accounts are
+         in each roster, not by discovery order. */
       var order = sm.event_order || null;
       if (order && order.length) {
         var pos = {};
@@ -1118,43 +1572,48 @@
           return pa - pb;
         });
       }
-      // Which rosters were actually read. An event nobody sampled must never
-      // render the same as one sampled and found to contain none of your
-      // accounts.
+
+      /* The rank badge is the position in the ranking, so it is stamped
+         here and travels with the event through a re-sort. A card that
+         reads "3" under a date sort is still the third best fit. */
+      var rows = evs.map(function(ev, i){ return {ev: ev, rank: i + 1}; });
+
+      var shown = rows.slice();
+      if (EVENT_SORT === 'date') {
+        shown.sort(function(a, b){
+          var da = dayNum(a.ev.starts_on), db = dayNum(b.ev.starts_on);
+          if (da == null && db == null) return a.rank - b.rank;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return da - db || (a.rank - b.rank);
+        });
+      }
+
+      /* Which rosters were actually read. An event nobody sampled must
+         never render the same as one sampled and found to contain none of
+         your accounts. */
       var sampled = {};
       (sm.harvested_event_ids || []).forEach(function(id){ sampled[String(id)] = 1; });
       var knowSampled = (sm.harvested_event_ids || []).length > 0;
-      return '<div class="evi-sec"><h3>Events found</h3>' +
-        (sm.ranked_by ? '<div class="evi-note">' + esc(sm.ranked_by) + '</div>' : '') +
-        '<div class="evi-events">' +
-        evs.map(function(ev){
-          var hits = overlap[String(ev.id)] || [];
-          var site = safeUrl(ev.website);
-          return '<div class="evi-event"><div class="top"><div style="min-width:0">' +
-            '<div class="nm">' + (site ? '<a href="' + esc(site) +
-              '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">' +
-              esc(ev.name) + '</a>' : esc(ev.name)) + '</div>' +
-            '<div class="meta">' + eventLine(ev) +
-              (ev.stated_size ? ' · ' + esc(ev.stated_size) + ' (the event\'s own claim)' : '') +
-            '</div></div>' +
-            (ev.fit_score != null ? '<div class="evi-fit">' + esc(ev.fit_score) +
-              '<span class="fl">fit</span></div>' : '') +
-            '</div>' +
-            (ev.fit_reasoning ? '<div class="why">' + esc(ev.fit_reasoning) + '</div>' : '') +
-            (hits.length
-              ? '<div class="evi-overlap"><b>' + hits.length +
-                '</b> of your target accounts are in this roster: ' +
-                esc(hits.slice(0, 8).join(', ')) +
-                (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>'
-              : (knowSampled
-                  ? (sampled[String(ev.id)]
-                      ? '<div class="evi-overlap none">This roster was read and ' +
-                        'none of your target accounts are on it.</div>'
-                      : '<div class="evi-overlap unknown">This roster was not read, ' +
-                        'so whether your target accounts are on it is unknown. ' +
-                        'Only the best-fitting few are sampled.</div>')
-                  : '')) +
-            '</div>';
+
+      var rb = [];
+      if (sm.ranked_by) rb.push(esc(sm.ranked_by));
+      if (knowSampled) {
+        rb.push('Only the best-fitting rosters are read in full. The rest are marked ' +
+                'unread rather than assumed empty.');
+      }
+      var head = '<div class="evi-sec"><h3>Events found</h3>' +
+        '<div class="evi-listbar">' +
+        (rb.length ? '<span class="rb">' + rb.join(' ') + '</span>' : '<span></span>') +
+        '<span class="evi-seg" role="group" aria-label="Order these events">' +
+        [{k: 'ranked', l: 'By fit'}, {k: 'date', l: 'By date'}].map(function(o){
+          return '<button type="button" aria-pressed="' + (EVENT_SORT === o.k) +
+            '" onclick="eviSortEvents(\'' + o.k + '\')">' + o.l + '</button>';
+        }).join('') + '</span></div>';
+
+      return glanceHtml(rows, sm) + railHtml(rows) + head +
+        '<div class="evi-events">' + shown.map(function(r){
+          return eventCard(r, overlap, sampled, knowSampled);
         }).join('') + '</div></div>';
     }
 

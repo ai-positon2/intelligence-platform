@@ -580,25 +580,297 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-source .u a:hover { color: var(--evi-a1); }
 .evi-source .n { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 3px; line-height: 1.5; }
 
-/* ── events (discover mode) ─────────────────────────────────────────── */
-.evi-events { display: grid; gap: 12px; }
-.evi-event {
-  padding: 16px 18px; border-radius: var(--radius-md, 10px);
+/* ── events (discover mode) ─────────────────────────────────────────────
+   Three views of one set of events, drawn from the same numbers: the mix
+   at the top, the calendar in the middle, the cards below. Every colour in
+   all three comes from the fit band, so a marker on the rail, a bar in the
+   spread and the ring on a card are recognisably the same event. */
+
+/* Band colours. Declared once and consumed by .f-* below, so the rail, the
+   spread and the gauge cannot drift apart. */
+:root {
+  --evi-f-hi: #38bdf8;
+  --evi-f-mid: #6366f1;
+  --evi-f-low: #8b5cf6;
+  --evi-f-weak: #64748b;
+  --evi-f-na: #4b5675;
+}
+:root[data-theme="light"] {
+  --evi-f-hi: #0284c7;
+  --evi-f-mid: #4f46e5;
+  --evi-f-low: #7c3aed;
+  --evi-f-weak: #64748b;
+  --evi-f-na: #94a3b8;
+}
+.f-hi { --band: var(--evi-f-hi); }
+.f-mid { --band: var(--evi-f-mid); }
+.f-low { --band: var(--evi-f-low); }
+.f-weak { --band: var(--evi-f-weak); }
+.f-na { --band: var(--evi-f-na); }
+
+/* ── at a glance ─────────────────────────────────────────────────────── */
+.evi-glance { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 780px) { .evi-glance { grid-template-columns: 1fr; } }
+.evi-tile {
+  display: flex; flex-direction: column; gap: 9px; min-width: 0;
+  padding: 15px 17px 14px; border-radius: var(--radius-md, 10px);
   background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
 }
-.evi-event .top { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
-.evi-event .nm { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
-.evi-event .meta { font-size: 12px; color: var(--evi-ink-3); margin-top: 4px; }
-.evi-event .why { font-size: 12.8px; color: var(--evi-ink-2); line-height: 1.6; margin-top: 9px; }
-.evi-fit {
-  flex-shrink: 0; text-align: right; font-size: 20px; font-weight: 700;
-  background: linear-gradient(100deg, var(--evi-a1), var(--evi-a3));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+.evi-tile .tl {
+  font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3);
 }
-.evi-fit .fl { display: block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--evi-ink-3); -webkit-text-fill-color: var(--evi-ink-3); font-weight: 600; }
-.evi-overlap { margin-top: 10px; font-size: 12px; color: var(--evi-ink-2); }
-.evi-overlap b { color: var(--evi-a1); }
+.evi-tile .tv {
+  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  margin-top: auto;
+}
+.evi-tile .tn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+.evi-tile .tn b { color: var(--evi-ink); font-weight: 650; }
+
+/* One bar per event, in the order of the list below. Heights are the score
+   itself, so the chart is the numbers and not a ranking of them: two events
+   both at 96 draw two equal bars rather than a first and a second. */
+.evi-tile .tbars {
+  display: flex; align-items: flex-end; gap: 4px; height: 46px; margin-top: auto;
+}
+.evi-tile .tbars i {
+  flex: 1 1 0; min-width: 4px; border-radius: 3px 3px 1px 1px;
+  background: var(--band, var(--evi-f-na));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.evi-tile .tstack {
+  display: flex; gap: 3px; height: 12px; margin-top: auto; border-radius: 999px;
+  overflow: hidden;
+}
+.evi-tile .tstack i { min-width: 6px; border-radius: 999px; }
+.s-in_person { background: var(--evi-f-hi); }
+.s-hybrid { background: var(--evi-f-mid); }
+.s-virtual { background: var(--evi-f-low); }
+.s-unknown { background: var(--evi-f-na); }
+.evi-tile .tlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.evi-tile .lg {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--evi-ink-3); white-space: nowrap;
+}
+.evi-tile .lg i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.evi-tile .lg.s-in_person { background: none; }
+.evi-tile .lg.s-hybrid { background: none; }
+.evi-tile .lg.s-virtual { background: none; }
+.evi-tile .lg.s-unknown { background: none; }
+.evi-tile .lg.s-in_person i { background: var(--evi-f-hi); }
+.evi-tile .lg.s-hybrid i { background: var(--evi-f-mid); }
+.evi-tile .lg.s-virtual i { background: var(--evi-f-low); }
+.evi-tile .lg.s-unknown i { background: var(--evi-f-na); }
+
+/* ── the calendar rail ───────────────────────────────────────────────── */
+/* Wide content scrolls in its own box; the page body never does. Every
+   position on the rail is a percentage of its width, so below the minimum
+   the markers pile into one smudge and the month labels print over each
+   other. Scrolling keeps the spacing the lane algorithm assumed. */
+.evi-railwrap { overflow-x: auto; overflow-y: hidden; }
+.evi-rail {
+  position: relative; min-width: 640px; padding: 14px 12px 0;
+  border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-rail .grid { position: absolute; inset: 14px 12px 26px; pointer-events: none; }
+.evi-rail .grid span {
+  position: absolute; top: 0; bottom: 0; width: 1px; background: var(--evi-line-2);
+}
+/* Where now is. Drawn under the markers so it never hides one, and only
+   drawn at all when today falls inside the span the events cover. */
+.evi-rail .now {
+  position: absolute; top: 8px; bottom: 26px; width: 0;
+  border-left: 1px dashed rgba(56,189,248,.55); pointer-events: none;
+}
+.evi-rail .now b {
+  position: absolute; top: -4px; left: 5px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--evi-a1);
+}
+.evi-rail .marks { position: relative; margin: 8px 0 4px; }
+/* The true run of a multi-day event. A one-day event draws a hairline that
+   the marker covers, which is correct: there is nothing to span. */
+.evi-rail .sp {
+  position: absolute; height: 8px; border-radius: 999px;
+  background: var(--band, var(--evi-f-na)); opacity: .38;
+}
+.evi-rail .mk {
+  position: absolute; transform: translateX(-50%);
+  appearance: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #061021; background: var(--band, var(--evi-f-na));
+  border: 2px solid var(--evi-panel);
+  box-shadow: 0 2px 10px rgba(2,8,24,.5);
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+:root[data-theme="light"] .evi-rail .mk { color: #fff; border-color: #fff; }
+.evi-rail .mk:hover, .evi-rail .mk:focus-visible {
+  transform: translateX(-50%) scale(1.16); box-shadow: 0 3px 16px rgba(56,189,248,.45);
+  outline: none;
+}
+.evi-rail .axis {
+  position: relative; height: 26px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-rail .axis .tk { position: absolute; top: 0; }
+.evi-rail .axis .tk::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 1px; height: 5px;
+  background: var(--evi-line);
+}
+.evi-rail .axis .tk b {
+  position: absolute; top: 7px; left: 3px; white-space: nowrap;
+  font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--evi-ink-3);
+}
+/* Events with no announced date. Never drawn on the rail at a guessed
+   position: named beside it instead, which is the honest shape of the gap. */
+.evi-undated {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 10px;
+  padding: 11px 14px; border-radius: var(--radius-sm, 8px);
+  border: 1px solid rgba(251,191,36,.28); background: rgba(251,191,36,.07);
+  font-size: 12px; line-height: 1.55; color: var(--evi-ink-2);
+}
+.evi-undated svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px;
+  color: var(--evi-warn); }
+.evi-undated b { color: var(--evi-ink); font-weight: 650; }
+
+/* ── the list header ─────────────────────────────────────────────────── */
+.evi-listbar {
+  display: flex; align-items: flex-end; gap: 10px 16px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.evi-listbar .rb {
+  flex: 1 1 300px; min-width: 0; font-size: 12px; line-height: 1.5;
+  color: var(--evi-ink-3);
+}
+/* margin-left rather than justify-content: space-between, which parks the
+   control at the LEFT of the second line the moment the note beside it wraps. */
+.evi-seg {
+  display: inline-flex; flex-shrink: 0; margin-left: auto; padding: 3px; gap: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+}
+.evi-seg button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
+  padding: 5px 13px; border-radius: var(--radius-pill, 999px);
+  border: 1px solid transparent; background: none; color: var(--evi-ink-3);
+}
+.evi-seg button:hover { color: var(--evi-ink); }
+.evi-seg button[aria-pressed="true"] {
+  color: var(--evi-ink); background: rgba(99,102,241,.18);
+  border-color: rgba(99,102,241,.38);
+}
+
+/* ── the cards ───────────────────────────────────────────────────────── */
+.evi-events { display: grid; gap: 12px; }
+.evi-ev {
+  display: grid; gap: 0 15px; align-items: start;
+  grid-template-columns: 30px minmax(0, 1fr) 78px;
+  padding: 16px 18px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  border-left: 3px solid var(--band, var(--evi-f-na));
+  scroll-margin: 24px; transition: box-shadow .2s ease, border-color .2s ease;
+}
+.evi-ev.lit {
+  border-color: var(--band, var(--evi-a1));
+  box-shadow: 0 0 0 1px var(--band, var(--evi-a1)), 0 6px 26px rgba(56,189,248,.22);
+}
+.evi-ev .rk {
+  font-size: 12.5px; font-weight: 700; line-height: 26px; text-align: center;
+  width: 26px; height: 26px; border-radius: 50%; color: var(--evi-ink-3);
+  background: rgba(255,255,255,.05); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-ev .rk { background: rgba(20,30,60,.05); }
+.evi-ev .bd { min-width: 0; }
+.evi-ev .nm {
+  font-size: 16px; font-weight: 700; letter-spacing: -.012em; line-height: 1.3;
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+}
+.evi-ev .nm a {
+  color: inherit; text-decoration: none; display: inline-flex; align-items: baseline; gap: 6px;
+}
+.evi-ev .nm a:hover { color: var(--evi-a1); }
+.evi-ev .nm a svg { width: 12px; height: 12px; flex-shrink: 0; opacity: .45;
+  align-self: center; }
+.evi-ev .nm a:hover svg { opacity: 1; }
+.evi-ev .nm .ed {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--evi-ink-3); padding: 2px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(255,255,255,.05); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-ev .nm .ed { background: rgba(20,30,60,.05); }
+.evi-ev .org { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-ev .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.evi-tag {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  font-size: 11.5px; font-weight: 550; line-height: 1.35; color: var(--evi-ink-2);
+  padding: 4px 9px; border-radius: var(--radius-xs, 5px);
+  background: rgba(255,255,255,.045); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-tag { background: rgba(20,30,60,.04); }
+.evi-tag svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--evi-ink-3); }
+.evi-tag.go {
+  color: var(--evi-a1); border-color: rgba(56,189,248,.3); background: rgba(56,189,248,.09);
+}
+.evi-tag.go svg { color: var(--evi-a1); }
+.evi-tag.warn {
+  color: var(--evi-warn); border-color: rgba(251,191,36,.3); background: rgba(251,191,36,.08);
+}
+.evi-tag.warn svg { color: var(--evi-warn); }
+/* A fact the organiser has not published. Deliberately dimmer than a stated
+   one: an unstated format must not read as a stated one. */
+.evi-tag.mut { color: var(--evi-ink-3); border-style: dashed; background: none; }
+.evi-ev .why { font-size: 13px; color: var(--evi-ink-2); line-height: 1.62; margin-top: 11px; }
+.evi-ev .aud {
+  font-size: 12.2px; color: var(--evi-ink-3); line-height: 1.6; margin-top: 7px;
+}
+
+/* The score, as an arc. The number on its own made 96 and 62 look like the
+   same sort of answer until you read them. */
+.evi-gauge {
+  position: relative; width: 78px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.evi-gauge svg { width: 52px; height: 52px; display: block; }
+.evi-gauge circle { fill: none; stroke-width: 5; stroke-linecap: round; }
+.evi-gauge .tr { stroke: var(--evi-line); }
+.evi-gauge .vl { stroke: var(--band, var(--evi-f-na)); }
+.evi-gauge .n {
+  position: absolute; top: 0; left: 0; width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--evi-ink);
+}
+.evi-gauge .fl {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--evi-ink-3); text-align: center; line-height: 1.3;
+}
+/* Whether YOUR accounts are on this roster. The two states of this line
+   read almost identically in words and mean opposite things, so the left
+   accent is what tells them apart. It used to be declared only on the two
+   overrides and never on the base rule, so there was no border to recolour
+   and both states rendered the same. */
+.evi-overlap {
+  margin-top: 11px; font-size: 12px; line-height: 1.55; color: var(--evi-ink-2);
+  padding: 8px 12px; border-radius: var(--radius-xs, 5px);
+  border-left: 2px solid var(--evi-a1); background: rgba(56,189,248,.07);
+}
+.evi-overlap b { color: var(--evi-a1); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .evi-ev { grid-template-columns: 26px minmax(0, 1fr); }
+  .evi-gauge {
+    grid-column: 1 / -1; flex-direction: row; width: auto; gap: 9px;
+    justify-content: flex-start; margin-top: 12px;
+  }
+  .evi-gauge svg, .evi-gauge .n { width: 42px; height: 42px; }
+  .evi-gauge .n { position: absolute; font-size: 14px; }
+  .evi-rail .mk { width: 22px; height: 22px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evi-ev, .evi-rail .mk { transition: none; }
+}
 
 /* ── history ────────────────────────────────────────────────────────── */
 .evi-runs { display: flex; flex-direction: column; gap: 8px; }
@@ -768,11 +1040,14 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
    is exactly the artefact this agent exists to not produce. */
 @media print {
   html:root, html:root[data-theme="light"] { background: #fff; }
-  .topbar, .evi-modes, .evi-btn, .evi-rolebar, .evi-x, #eviHistoryCard { display: none !important; }
+  .topbar, .evi-modes, .evi-btn, .evi-rolebar, .evi-x, .evi-seg, #eviHistoryCard { display: none !important; }
   .evi-scrim { position: static; background: none; backdrop-filter: none; padding: 0; display: block; }
   .evi-drawer { height: auto; max-width: none; border: none; box-shadow: none; }
   .evi-drawer-body { overflow: visible; }
-  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-event { background: #fff; border-color: #d8dde8; }
+  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-rail { background: #fff; border-color: #d8dde8; }
+  /* The rail's numbers sit on a coloured disc, and the blanket dark-ink
+     rule above would print them dark-on-dark. */
+  .evi-rail .mk { color: #fff !important; border-color: #fff; box-shadow: none; }
   .evi-coverage { background: #f4f7ff; border-color: #b9c6ea; }
   * { color: #10162a !important; }
   .evi-table { min-width: 0; font-size: 11px; }
@@ -1349,13 +1624,12 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-exec .ex-budget b { color: var(--evi-ink); }
 .evi-exec .ex-budget i { font-style: normal; color: var(--evi-ink-3); }
 
-/* "We read this and found none" against "we did not read this". Coloured
-   apart because they look identical in words and mean opposite things. */
-.evi-overlap.none { border-left-color: var(--evi-ink-3); color: var(--evi-ink-3); }
-.evi-overlap.unknown {
-  border-left-color: var(--evi-warn); color: var(--evi-ink-2);
-  background: rgba(251,191,36,.07);
-}
+/* "We read this and found none" against "we did not read this" are now two
+   chips in the card's own tag row rather than two paragraphs under it, so
+   these two overrides have nothing left to select. Their job moved to
+   .evi-tag.mut and .evi-tag.warn, which are still coloured apart for the
+   same reason: the two states read identically in words and mean opposite
+   things. */
 
 /* An event the client has already paid for. Marked wherever it appears, so it
    is never read as an event that earned its place on the list. */
