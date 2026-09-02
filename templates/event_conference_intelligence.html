@@ -418,6 +418,7 @@
               <span id="runningText">Working. This runs in the background, so you can leave
                 this page and find the result in History when it is done.</span>
             </div>
+            <ol id="runningSteps" class="evi-steps" aria-label="Run progress"></ol>
           </div>
           <div id="formError" class="evi-err" style="display:none"></div>
         </div>
@@ -738,7 +739,7 @@
       }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
         .then(function(res){
           if (!res.ok) { throw new Error(res.j.error || 'The run could not be started.'); }
-          watch(res.j.run_id);
+          watch(res.j.run_id, mode);
         })
         .catch(function(err){
           btn.disabled = false;
@@ -768,23 +769,85 @@
       done: 'Finishing up.'
     };
 
-    function watch(runId){
-      if (poll) clearInterval(poll);
-      poll = setInterval(function(){
+    /* The stages each mode actually goes through, in order. Drawn up front so
+       a run that takes minutes shows what it is working through and what is
+       left, rather than one spinner and one sentence. Keys match the STAGES
+       table above, which matches what the pipeline reports. */
+    var STAGE_ORDER = {
+      recommend: ['discovering_categories', 'auditing', 'scoring', 'ranking'],
+      lookup: ['resolving', 'harvesting'],
+      discover: ['discovering', 'harvesting'],
+      workroom: ['reading_roster', 'qualifying', 'checking_drafts', 'saving']
+    };
+    var SHORT = {
+      discovering_categories: 'Search six categories', auditing: 'Audit the famous names',
+      scoring: 'Score every event', ranking: 'Rank and cut below 70',
+      resolving: 'Identify the event', harvesting: 'Read the published pages',
+      discovering: 'Search for events', reading_roster: 'Read the roster',
+      qualifying: 'Qualify and draft', checking_drafts: 'Check every draft',
+      saving: 'Save the drafts'
+    };
+
+    function renderSteps(mode, stage){
+      var el = document.getElementById('runningSteps');
+      var order = STAGE_ORDER[mode] || [];
+      if (!order.length) { el.innerHTML = ''; return; }
+      var at = order.indexOf(stage);
+      el.innerHTML = order.map(function(key, i){
+        var state = at < 0 ? 'pending'
+                  : (i < at ? 'done' : (i === at ? 'now' : 'pending'));
+        return '<li class="' + state + '"><span class="dot"></span>' +
+               '<span class="tx">' + esc(SHORT[key] || key) + '</span></li>';
+      }).join('');
+    }
+
+    function watch(runId, mode){
+      /* Recursive setTimeout, not setInterval: a status call slower than the
+         interval used to stack a second request on top of the first. And a
+         failure exit, because .catch(function(){}) meant a route that 404s or
+         redirects to a login page polled forever with the Run button disabled
+         and no way out of it but a reload. */
+      if (poll) { clearTimeout(poll); poll = null; }
+      var misses = 0;
+      renderSteps(mode, null);
+
+      function stop(){ if (poll) { clearTimeout(poll); poll = null; } }
+
+      function tick(){
         fetch(BASE + '/runs/' + runId + '/status')
-          .then(function(r){ return r.json(); })
+          .then(function(r){
+            if (!r.ok) { throw new Error('status ' + r.status); }
+            return r.json();
+          })
           .then(function(s){
+            misses = 0;
             if (s.stage && STAGES[s.stage]) {
               document.getElementById('runningText').textContent = STAGES[s.stage];
             }
+            renderSteps(mode, s.stage);
             if (s.status === 'complete' || s.status === 'failed') {
-              clearInterval(poll); poll = null;
+              stop();
               document.getElementById('runBtn').disabled = false;
               document.getElementById('runningWrap').style.display = 'none';
               openRun(runId);
+              return;
             }
-          }).catch(function(){});
-      }, 2500);
+            poll = setTimeout(tick, 2500);
+          })
+          .catch(function(){
+            misses += 1;
+            if (misses >= 5) {
+              stop();
+              document.getElementById('runBtn').disabled = false;
+              document.getElementById('runningText').textContent =
+                'Lost contact with the run. It may still be going: reload the ' +
+                'page and open it under Your runs.';
+              return;
+            }
+            poll = setTimeout(tick, 2500 * misses);
+          });
+      }
+      tick();
     }
 
     function openRun(runId){
@@ -792,11 +855,24 @@
       document.getElementById('drawerTitle').textContent = 'Loading';
       document.getElementById('drawerSub').textContent = '';
       document.getElementById('drawerBody').innerHTML =
-        '<div class="evi-empty"><span class="evi-spinner"></span></div>';
+        '<div class="evi-empty"><span class="ic"><span class="evi-spinner"></span></span>' +
+        '<b>Loading this run</b>' +
+        '<span id="drawerLive" role="status" aria-live="polite">Reading what it ' +
+        'stored.</span></div>';
       activeRoles = null;
       fetch(BASE + '/runs/' + runId)
         .then(function(r){ return r.json(); })
-        .then(function(run){ current = run; render(run); })
+        .then(function(run){
+          current = run;
+          render(run);
+          /* A run opened from history may still be going. Without this the
+             drawer showed a stage sentence that never changed and a spinner
+             that never resolved, which is precisely the path the form's own
+             copy sends people down. */
+          if (run.status === 'running' || run.status === 'queued') {
+            watchDrawer(runId, run.mode);
+          }
+        })
         .catch(function(){
           document.getElementById('drawerBody').innerHTML =
             '<div class="evi-err">This run could not be loaded.</div>';
@@ -804,8 +880,51 @@
     }
     window.openRun = openRun;
 
+    /* Polling for a run being watched from the drawer rather than the form.
+       Separate handle so closing the drawer stops it and a form run started
+       meanwhile is not cancelled by it. */
+    var drawerPoll = null;
+    function stopDrawerWatch(){
+      if (drawerPoll) { clearTimeout(drawerPoll); drawerPoll = null; }
+    }
+    function watchDrawer(runId, mode){
+      stopDrawerWatch();
+      var misses = 0;
+      function tick(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){
+            if (!r.ok) { throw new Error('status ' + r.status); }
+            return r.json();
+          })
+          .then(function(s){
+            misses = 0;
+            if (s.status === 'complete' || s.status === 'failed') {
+              stopDrawerWatch();
+              openRun(runId);
+              return;
+            }
+            var live = document.getElementById('drawerLive');
+            if (live && s.stage && STAGES[s.stage]) {
+              live.textContent = STAGES[s.stage];
+            }
+            drawerPoll = setTimeout(tick, 2500);
+          })
+          .catch(function(){
+            misses += 1;
+            if (misses >= 5) { stopDrawerWatch(); return; }
+            drawerPoll = setTimeout(tick, 2500 * misses);
+          });
+      }
+      drawerPoll = setTimeout(tick, 2500);
+    }
+    window.watchDrawer = watchDrawer;
+
     function closeDrawer(){
       document.getElementById('drawer').classList.remove('on');
+      /* A run being watched from the drawer keeps polling until the drawer is
+         closed. Leaving it running would keep hitting the status route for a
+         run nobody is looking at any more. */
+      stopDrawerWatch();
       current = null;
     }
     window.closeDrawer = closeDrawer;
@@ -1572,7 +1691,8 @@
       }
       if (run.status === 'running') {
         html += '<div class="evi-running"><span class="evi-spinner"></span>' +
-          '<span>' + esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+          '<span id="drawerLive" role="status" aria-live="polite">' +
+          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
       }
       if (s.no_pages) {
         html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
@@ -1599,7 +1719,10 @@
           sourcesHtml(run) + '</div>';
       }
       document.getElementById('drawerBody').innerHTML = html ||
-        '<div class="evi-empty">Nothing to show for this run.</div>';
+        '<div class="evi-empty"><span class="ic">&#9788;</span>' +
+        '<b>No events matched</b><span>' +
+        esc(s.note || s.discover_note ||
+            'Nothing to show for this run.') + '</span></div>';
     }
 
     if (document.readyState === 'loading') {

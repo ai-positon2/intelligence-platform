@@ -493,17 +493,35 @@ body {
 :root[data-theme="light"] .evi-chip[aria-pressed="true"] { color: #1b2440; }
 .evi-chip .n { opacity: .65; font-weight: 500; margin-left: 5px; }
 
-.evi-tablewrap { overflow-x: auto; border-radius: var(--radius-md, 10px);
-  border: 1px solid var(--evi-line-2); }
-table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+/* The roster is the one surface that can arrive with four hundred rows and
+   company names of any length, both of them read off third-party pages. So:
+   a height-constrained scroll container (without one the sticky header had
+   nothing to stick inside and never engaged), an OPAQUE header (the panel
+   token is semi-transparent, so rows scrolled through the old one), a fixed
+   layout with real column widths, and per-cell ellipsis. */
+.evi-tablewrap {
+  overflow: auto; max-height: min(560px, 58vh);
+  border-radius: var(--radius-md, 10px); border: 1px solid var(--evi-line-2);
+  overscroll-behavior: contain;
+}
+table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 13px; min-width: 720px; table-layout: fixed; }
 .evi-table th {
   text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--evi-ink-3); font-weight: 600; padding: 11px 14px;
-  border-bottom: 1px solid var(--evi-line); background: var(--evi-panel-2);
-  position: sticky; top: 0;
+  border-bottom: 1px solid var(--evi-line);
+  background: var(--evi-panel-solid, #141a2e);
+  position: sticky; top: 0; z-index: 2;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
 }
+:root[data-theme="light"] .evi-table th { background: #eef1f8; }
 .evi-table td { padding: 11px 14px; border-bottom: 1px solid var(--evi-line-2);
-  vertical-align: top; }
+  vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
+.evi-table tbody tr:nth-child(even) td { background: rgba(127,140,180,.035); }
+.evi-table td:nth-child(1) { width: 34%; }
+.evi-table td:nth-child(2) { width: 13%; }
+.evi-table td:nth-child(3) { width: 26%; }
+.evi-table .num { font-variant-numeric: tabular-nums; }
 .evi-table tr:last-child td { border-bottom: none; }
 .evi-table tbody tr:hover { background: rgba(99,102,241,.06); }
 .evi-org { font-weight: 600; color: var(--evi-ink); }
@@ -655,8 +673,53 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
 }
 .evi-sec h3::after { content: ""; flex: 1; height: 1px; background: var(--evi-line-2); }
 
-.evi-empty { padding: 30px; text-align: center; color: var(--evi-ink-3); font-size: 13px;
-  line-height: 1.6; }
+/* The empty state is not a gap in the page, it is one of its answers.
+   "Nothing cleared 70. That is the answer, not a failure." is rendered
+   through this class, and it used to be bare grey text on nothing. An agent
+   whose value is that it says what it could not find cannot render those
+   sentences as if something had gone wrong. */
+.evi-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 9px; padding: 34px 30px; min-height: min(300px, 40vh);
+  text-align: center; color: var(--evi-ink-3); font-size: 13px; line-height: 1.6;
+  border: 1px dashed var(--evi-line); border-radius: var(--radius-md, 10px);
+  background: linear-gradient(180deg, rgba(99,102,241,.05), rgba(99,102,241,0));
+}
+.evi-empty .ic {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin-bottom: 3px; border-radius: 50%;
+  font-size: 17px; color: var(--evi-a2);
+  background: rgba(99,102,241,.11); border: 1px solid rgba(99,102,241,.2);
+}
+.evi-empty b {
+  display: block; color: var(--evi-ink); font-size: 14px; font-weight: 650;
+  letter-spacing: -.01em;
+}
+.evi-empty span:not(.ic) { max-width: 46ch; }
+
+/* The stage list. A run can sit here for minutes, and the backend names every
+   stage it goes through, so the page shows the whole sequence and marks it
+   off rather than swapping one sentence in and out. */
+.evi-steps { list-style: none; margin: 11px 0 0; padding: 0 0 0 3px;
+  display: flex; flex-direction: column; gap: 7px; }
+.evi-steps li { display: flex; align-items: center; gap: 9px;
+  font-size: 12px; color: var(--evi-ink-3);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  letter-spacing: -.01em; transition: color .25s ease; }
+.evi-steps .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--evi-line); transition: background .25s ease, box-shadow .25s ease; }
+.evi-steps li.done { color: var(--evi-ink-2); }
+.evi-steps li.done .dot { background: var(--evi-a2); }
+.evi-steps li.now { color: var(--evi-ink); font-weight: 600; }
+.evi-steps li.now .dot { background: var(--evi-a1);
+  box-shadow: 0 0 0 4px rgba(99,102,241,.18); animation: evi-pulse 1.5s ease-in-out infinite; }
+@keyframes evi-pulse {
+  50% { box-shadow: 0 0 0 7px rgba(99,102,241,.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evi-steps li.now .dot { animation: none; }
+  .evi-spinner { animation-duration: 2s; }
+}
 .evi-spinner {
   width: 13px; height: 13px; border: 2px solid rgba(99,102,241,.25);
   border-top-color: var(--evi-a2); border-radius: 50%; display: inline-block;
@@ -673,6 +736,31 @@ table.evi-table { width: 100%; border-collapse: collapse; font-size: 13px; min-w
   padding: 13px 15px; border-radius: var(--radius-md, 10px); font-size: 13px;
   background: rgba(251,113,133,.09); border: 1px solid rgba(251,113,133,.28);
   color: var(--evi-ink-2); line-height: 1.6; margin-top: 16px;
+}
+
+/* The drawer had no rule at any width, so on a phone it rendered as a
+   ~367px desktop sheet at 94vh holding a 720px-min table: about 2.2x
+   horizontal scroll with no ellipsis and no visible scrollbar. Below 720px it
+   becomes what it should be, a full-height sheet. */
+@media (max-width: 720px) {
+  .evi-scrim { padding: 0; align-items: flex-end; }
+  .evi-drawer { max-width: none; width: 100%; height: 100vh; max-height: 100vh;
+    border-radius: 0; border-left: none; border-right: none; }
+  .evi-drawer-body { padding-left: 16px; padding-right: 16px; overscroll-behavior: contain; }
+  .evi-tablewrap { max-height: none; }
+  .evi-empty { min-height: 200px; padding: 26px 18px; }
+}
+@media (max-width: 560px) {
+  .evi-steps li { font-size: 11px; }
+}
+
+/* The drawer used to appear by switching display, with no transition, where
+   both comparator pages animate theirs in. */
+.evi-drawer { animation: evi-rise .22s cubic-bezier(.2,.7,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .evi-drawer { animation: none; } }
+@keyframes evi-rise {
+  from { opacity: 0; transform: translateY(12px) scale(.995); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* Print: the roster travels, the chrome does not. The coverage banner is
