@@ -616,6 +616,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   padding: 15px 17px 14px; border-radius: var(--radius-md, 10px);
   background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
 }
+.evi-tile.on { border-color: rgba(99,102,241,.4); }
 .evi-tile .tl {
   font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
   font-weight: 700; color: var(--evi-ink-3);
@@ -629,31 +630,54 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-tile .tn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
 .evi-tile .tn b { color: var(--evi-ink); font-weight: 650; }
 
-/* One bar per event, in the order of the list below. Heights are the score
-   itself, so the chart is the numbers and not a ranking of them: two events
-   both at 96 draw two equal bars rather than a first and a second. */
+/* One bar per event, in the order of the list below, and each one is the way
+   into its own card. Heights are the score itself, so the chart is the
+   numbers and not a ranking of them: two events both at 96 draw two equal
+   bars rather than a first and a second. */
 .evi-tile .tbars {
   display: flex; align-items: flex-end; gap: 4px; height: 46px; margin-top: auto;
 }
-.evi-tile .tbars i {
+.evi-tile .tbars button {
+  appearance: none; padding: 0; border: 0; font: inherit; cursor: pointer;
   flex: 1 1 0; min-width: 4px; border-radius: 3px 3px 1px 1px;
   background: var(--band, var(--evi-f-na));
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  transition: filter .14s ease, transform .14s ease;
 }
+.evi-tile .tbars button:hover, .evi-tile .tbars button:focus-visible {
+  filter: brightness(1.28); transform: translateY(-2px); outline: none;
+}
+.evi-tile .tbars button:focus-visible { box-shadow: 0 0 0 2px var(--evi-a1); }
 .evi-tile .tstack {
   display: flex; gap: 3px; height: 12px; margin-top: auto; border-radius: 999px;
-  overflow: hidden;
 }
-.evi-tile .tstack i { min-width: 6px; border-radius: 999px; }
+.evi-tile .tstack button {
+  appearance: none; padding: 0; border: 0; font: inherit; cursor: pointer;
+  min-width: 6px; border-radius: 999px;
+  transition: filter .14s ease, box-shadow .14s ease;
+}
+.evi-tile .tstack button:hover { filter: brightness(1.25); }
+.evi-tile .tstack button:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--evi-a1);
+}
+/* A slice that is not the one being filtered on steps back rather than
+   disappearing, so the mix on screen is still the mix of the whole set. */
+.evi-tile.on .tstack button[aria-pressed="false"] { filter: saturate(.25) opacity(.5); }
+.evi-tile.on .tlegend .lg[aria-pressed="false"] { opacity: .55; }
 .s-in_person { background: var(--evi-f-hi); }
 .s-hybrid { background: var(--evi-f-mid); }
 .s-virtual { background: var(--evi-f-low); }
 .s-unknown { background: var(--evi-f-na); }
-.evi-tile .tlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.evi-tile .tlegend { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .evi-tile .lg {
-  display: inline-flex; align-items: center; gap: 6px;
+  appearance: none; border: 0; background: none; padding: 2px 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; font: inherit;
   font-size: 11.5px; color: var(--evi-ink-3); white-space: nowrap;
+  transition: color .14s ease, opacity .14s ease;
 }
+.evi-tile .lg:hover { color: var(--evi-ink); }
+.evi-tile .lg[aria-pressed="true"] { color: var(--evi-ink); font-weight: 650; }
+.evi-tile .lg:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
 .evi-tile .lg i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 .evi-tile .lg.s-in_person { background: none; }
 .evi-tile .lg.s-hybrid { background: none; }
@@ -669,34 +693,38 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
    position on the rail is a percentage of its width, so below the minimum
    the markers pile into one smudge and the month labels print over each
    other. Scrolling keeps the spacing the lane algorithm assumed. */
-.evi-railwrap { overflow-x: auto; overflow-y: hidden; }
-.evi-rail {
+/* NOT .evi-rail. That name is already taken by the page's own right-hand
+   <aside class="evi-rail">, and using it here silently handed the sidebar a
+   640px min-width and this calendar the sidebar's sticky positioning. The
+   drawer-only preview could not see it because it renders no page chrome. */
+.evi-calwrap { overflow-x: auto; overflow-y: hidden; }
+.evi-cal {
   position: relative; min-width: 640px; padding: 14px 12px 0;
   border-radius: var(--radius-md, 10px);
   background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
 }
-.evi-rail .grid { position: absolute; inset: 14px 12px 26px; pointer-events: none; }
-.evi-rail .grid span {
+.evi-cal .grid { position: absolute; inset: 14px 12px 26px; pointer-events: none; }
+.evi-cal .grid span {
   position: absolute; top: 0; bottom: 0; width: 1px; background: var(--evi-line-2);
 }
 /* Where now is. Drawn under the markers so it never hides one, and only
    drawn at all when today falls inside the span the events cover. */
-.evi-rail .now {
+.evi-cal .now {
   position: absolute; top: 8px; bottom: 26px; width: 0;
   border-left: 1px dashed rgba(56,189,248,.55); pointer-events: none;
 }
-.evi-rail .now b {
+.evi-cal .now b {
   position: absolute; top: -4px; left: 5px; font-size: 9.5px; font-weight: 700;
   letter-spacing: .07em; text-transform: uppercase; color: var(--evi-a1);
 }
-.evi-rail .marks { position: relative; margin: 8px 0 4px; }
+.evi-cal .marks { position: relative; margin: 8px 0 4px; }
 /* The true run of a multi-day event. A one-day event draws a hairline that
    the marker covers, which is correct: there is nothing to span. */
-.evi-rail .sp {
+.evi-cal .sp {
   position: absolute; height: 8px; border-radius: 999px;
   background: var(--band, var(--evi-f-na)); opacity: .38;
 }
-.evi-rail .mk {
+.evi-cal .mk {
   position: absolute; transform: translateX(-50%);
   appearance: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
   width: 26px; height: 26px; border-radius: 50%; padding: 0;
@@ -706,20 +734,26 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   box-shadow: 0 2px 10px rgba(2,8,24,.5);
   transition: transform .14s ease, box-shadow .14s ease;
 }
-:root[data-theme="light"] .evi-rail .mk { color: #fff; border-color: #fff; }
-.evi-rail .mk:hover, .evi-rail .mk:focus-visible {
+:root[data-theme="light"] .evi-cal .mk { color: #fff; border-color: #fff; }
+.evi-cal .mk:hover, .evi-cal .mk:focus-visible {
   transform: translateX(-50%) scale(1.16); box-shadow: 0 3px 16px rgba(56,189,248,.45);
   outline: none;
 }
-.evi-rail .axis {
+/* Outside the filter, not gone from the calendar. See the note in
+   railHtml(): dropping points would change the span, the lanes and the
+   month axis, so the same run would draw a different shape per chip. */
+.evi-cal .mk.out { filter: saturate(.15) opacity(.42); }
+.evi-cal .mk.out:hover { filter: none; }
+.evi-cal .sp.out { opacity: .12; }
+.evi-cal .axis {
   position: relative; height: 26px; border-top: 1px solid var(--evi-line-2);
 }
-.evi-rail .axis .tk { position: absolute; top: 0; }
-.evi-rail .axis .tk::before {
+.evi-cal .axis .tk { position: absolute; top: 0; }
+.evi-cal .axis .tk::before {
   content: ""; position: absolute; top: 0; left: 0; width: 1px; height: 5px;
   background: var(--evi-line);
 }
-.evi-rail .axis .tk b {
+.evi-cal .axis .tk b {
   position: absolute; top: 7px; left: 3px; white-space: nowrap;
   font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
   color: var(--evi-ink-3);
@@ -735,6 +769,14 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-undated svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px;
   color: var(--evi-warn); }
 .evi-undated b { color: var(--evi-ink); font-weight: 650; }
+.evi-undated .un {
+  appearance: none; border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: inherit; color: var(--evi-ink);
+  text-decoration: underline; text-decoration-color: rgba(251,191,36,.5);
+  text-underline-offset: 3px;
+}
+.evi-undated .un:hover { color: var(--evi-warn); text-decoration-color: currentColor; }
+.evi-undated .un:focus-visible { outline: 2px solid var(--evi-warn); outline-offset: 2px; }
 
 /* ── the list header ─────────────────────────────────────────────────── */
 .evi-listbar {
@@ -762,6 +804,27 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   color: var(--evi-ink); background: rgba(99,102,241,.18);
   border-color: rgba(99,102,241,.38);
 }
+.evi-seg button:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 1px; }
+
+/* A list quietly shorter than the count above it is a bug this page has
+   shipped once already. When a filter is on it says so, and says how to
+   stop, in the same place the list starts. */
+.evi-filterbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px 14px; flex-wrap: wrap; margin-bottom: 12px;
+  padding: 9px 14px; border-radius: var(--radius-sm, 8px);
+  font-size: 12px; color: var(--evi-ink-2);
+  background: rgba(99,102,241,.09); border: 1px solid rgba(99,102,241,.26);
+}
+.evi-filterbar b { color: var(--evi-ink); font-weight: 700; }
+.evi-filterbar button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
+  padding: 5px 12px; border-radius: var(--radius-pill, 999px);
+  color: var(--evi-ink); background: rgba(99,102,241,.18);
+  border: 1px solid rgba(99,102,241,.42);
+}
+.evi-filterbar button:hover { background: rgba(99,102,241,.3); }
+.evi-filterbar button:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 1px; }
 
 /* ── the cards ───────────────────────────────────────────────────────── */
 .evi-events { display: grid; gap: 12px; }
@@ -771,12 +834,27 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   padding: 16px 18px; border-radius: var(--radius-md, 10px);
   background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
   border-left: 3px solid var(--band, var(--evi-f-na));
-  scroll-margin: 24px; transition: box-shadow .2s ease, border-color .2s ease;
+  scroll-margin: 24px;
+  transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
 }
 .evi-ev.lit {
   border-color: var(--band, var(--evi-a1));
   box-shadow: 0 0 0 1px var(--band, var(--evi-a1)), 0 6px 26px rgba(56,189,248,.22);
 }
+/* The whole card opens the event's page. The title inside is still a real
+   anchor, which is the keyboard and screen-reader route to the same place,
+   so this is a mouse shortcut and nothing more. Deliberately NOT a stretched
+   ::after overlay: that would make the quotes in the card unselectable, and
+   being able to copy them is most of why they are there. */
+.evi-ev.link { cursor: pointer; }
+.evi-ev.link:hover {
+  border-color: var(--evi-line); border-left-color: var(--band, var(--evi-f-na));
+  box-shadow: 0 6px 26px rgba(2,8,24,.42);
+  transform: translateY(-1px);
+}
+:root[data-theme="light"] .evi-ev.link:hover { box-shadow: 0 6px 22px rgba(30,45,90,.12); }
+.evi-ev.link:hover .nm a { color: var(--evi-a1); }
+.evi-ev.link:hover .nm a svg { opacity: 1; }
 .evi-ev .rk {
   font-size: 12.5px; font-weight: 700; line-height: 26px; text-align: center;
   width: 26px; height: 26px; border-radius: 50%; color: var(--evi-ink-3);
@@ -828,19 +906,30 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 
 /* The score, as an arc. The number on its own made 96 and 62 look like the
-   same sort of answer until you read them. */
+   same sort of answer until you read them.
+
+   The number is positioned against .ring, which is exactly the size of the
+   circle. It used to be absolutely placed against the whole gauge column,
+   which is wider, so it sat thirteen pixels left of the arc it was
+   reporting, and at the mobile breakpoint it sat somewhere else again. */
 .evi-gauge {
-  position: relative; width: 78px; flex-shrink: 0;
+  width: 78px; flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
-.evi-gauge svg { width: 52px; height: 52px; display: block; }
+.evi-gauge .ring {
+  position: relative; display: block; width: 52px; height: 52px; flex-shrink: 0;
+}
+.evi-gauge svg { width: 100%; height: 100%; display: block; }
 .evi-gauge circle { fill: none; stroke-width: 5; stroke-linecap: round; }
 .evi-gauge .tr { stroke: var(--evi-line); }
 .evi-gauge .vl { stroke: var(--band, var(--evi-f-na)); }
 .evi-gauge .n {
-  position: absolute; top: 0; left: 0; width: 52px; height: 52px;
+  position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--evi-ink);
+  /* Tabular figures. Proportional digits make 96 and 11 different widths, so
+     a column of gauges wobbles against its own rings. */
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
 }
 .evi-gauge .fl {
   font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
@@ -864,12 +953,15 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
     grid-column: 1 / -1; flex-direction: row; width: auto; gap: 9px;
     justify-content: flex-start; margin-top: 12px;
   }
-  .evi-gauge svg, .evi-gauge .n { width: 42px; height: 42px; }
-  .evi-gauge .n { position: absolute; font-size: 14px; }
-  .evi-rail .mk { width: 22px; height: 22px; font-size: 10px; }
+  /* Only the ring resizes. The number is inside it and follows. */
+  .evi-gauge .ring { width: 42px; height: 42px; }
+  .evi-gauge .n { font-size: 14px; }
+  .evi-cal .mk { width: 22px; height: 22px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .evi-ev, .evi-rail .mk { transition: none; }
+  .evi-ev, .evi-cal .mk, .evi-tile .tbars button, .evi-tile .tstack button,
+  .evi-tile .lg { transition: none; }
+  .evi-ev.link:hover, .evi-tile .tbars button:hover { transform: none; }
 }
 
 /* ── history ────────────────────────────────────────────────────────── */
@@ -1044,10 +1136,10 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   .evi-scrim { position: static; background: none; backdrop-filter: none; padding: 0; display: block; }
   .evi-drawer { height: auto; max-width: none; border: none; box-shadow: none; }
   .evi-drawer-body { overflow: visible; }
-  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-rail { background: #fff; border-color: #d8dde8; }
+  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-cal { background: #fff; border-color: #d8dde8; }
   /* The rail's numbers sit on a coloured disc, and the blanket dark-ink
      rule above would print them dark-on-dark. */
-  .evi-rail .mk { color: #fff !important; border-color: #fff; box-shadow: none; }
+  .evi-cal .mk { color: #fff !important; border-color: #fff; box-shadow: none; }
   .evi-coverage { background: #f4f7ff; border-color: #b9c6ea; }
   * { color: #10162a !important; }
   .evi-table { min-width: 0; font-size: 11px; }
