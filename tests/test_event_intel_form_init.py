@@ -359,6 +359,10 @@ _DRAFT_OK = {
     "classification_why": "They sell to claims operations, not to marketing.",
     "classification_confidence": "high",
     "sources": ["https://northwind.example/customers"],
+    "pages": [{"url": "https://northwind.example/customers", "status": "ok",
+               "note": ""},
+              {"url": "https://northwind.example/pricing", "status": "blocked",
+               "note": "Server refused the request (HTTP 403)."}],
     "note": "",
 }
 
@@ -570,3 +574,21 @@ def test_the_button_is_usable_again_after_a_failed_draft(keys):
         "});", *keys)
     assert out["disabled"] is False
     assert out["text"] == "Read the site and fill this in"
+
+
+def test_a_page_that_refused_us_is_named_next_to_the_field_it_explains(keys):
+    """Without this a blank deal size is just blank. With it, "we asked for
+    their pricing page and it refused us" is on screen, and the reader knows
+    whether to go and look themselves or to accept that it is not published."""
+    out = _run(_draft_probe(_DRAFT_OK), *keys)
+    assert "1 page we tried could not be read" in out["read"]["html"]
+    assert "northwind.example/pricing" in out["read"]["html"]
+    assert "403" in out["read"]["html"]
+
+
+def test_nothing_is_said_when_every_page_was_read(keys):
+    """The control. A line that always appears stops carrying information."""
+    clean = dict(_DRAFT_OK, pages=[{"url": "https://northwind.example/customers",
+                                    "status": "ok", "note": ""}])
+    out = _run(_draft_probe(clean), *keys)
+    assert "could not be read" not in out["read"]["html"]
