@@ -413,7 +413,10 @@ def test_a_failed_category_search_is_not_drawn_as_a_thin_market(page_script):
             by_state[name.group(1)] = state
     assert by_state.get("Emerging event") == "error", by_state
     assert by_state.get("Side event") == "short", by_state
-    assert "The search did not run" in html
+    # And the two are told apart in words as well as in colour, under the
+    # chart rather than inside it.
+    assert "The search did not finish" in html
+    assert "The market is thin" in html
 
 
 def test_a_category_with_no_stored_count_reports_a_word_not_a_number(page_script):

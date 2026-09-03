@@ -553,31 +553,252 @@ def test_a_severity_dot_survives_background_graphics_being_off(page_script):
         "every severity prints the same ring, so the coding is gone")
 
 
-def test_a_long_category_reason_is_folded_behind_its_own_bar(page_script):
-    """Six categories with a paragraph under each is the section nobody
-    read."""
+def _coverage(page_script, shortfall, **kw):
+    """A report whose only content is what the coverage section is built on."""
+    run = _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        shortfall=shortfall, **kw)
+    html = _render(page_script, run)
+    at = html.index("Category coverage")
+    return html[at:]
+
+
+def test_a_paragraph_length_reason_is_folded_and_not_dropped(page_script):
+    """Six categories with a paragraph under each is the section nobody read,
+    and it is the section a reader complained about twice. The reasons live
+    under the chart now, one line each, and the paragraph is behind the
+    line."""
     long_why = ("Searched for manufacturer, hospital and patient-association "
                 "days that carry a diabetes-technology audience, and "
                 "separately for free expo halls attached to the clinical "
                 "meetings. Nothing with a published date came back.")
-    html = _render(page_script, _recommend(
-        [_cand("ATTD", 74, "P2")], discovered=2,
-        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
-        shortfall=[{"category": "free_vendor", "label": "Free sponsor-funded event",
-                    "status": "empty", "found": 0, "quota": 2, "why": long_why}]))
+    html = _coverage(page_script, [
+        {"category": "free_vendor", "label": "Free sponsor-funded event",
+         "status": "empty", "found": 0, "quota": 2, "why": long_why}])
     assert long_why[:40] in html, "the reason was dropped rather than folded"
-    row = re.search(r'<details class="bw bwd">(.*?)</details>', html, re.S)
-    assert row, "a paragraph-length reason is still printed under the bar"
+    # Not on a bar row. The chart is a picture and a paragraph inside it is
+    # what stopped it being one.
+    bars = html[:html.index("Why they fell short")]
+    assert long_why[:40] not in bars
+    row = re.search(r'<details class="nr n-thin"[^>]*>(.*?)</details>', html, re.S)
+    assert row, "the reason is not behind a fold of its own"
     assert long_why[:40] in row.group(1)
+    assert "Free sponsor-funded event" in row.group(1), "unattributed"
 
 
-def test_a_short_category_reason_is_not_worth_a_click(page_script):
-    """A fold that hides four words costs more than it saves."""
+def test_one_reason_shared_by_three_categories_is_said_once(page_script):
+    """The run this was reported on recorded the same sentence for three
+    categories, and the report printed it three times, in three wrapped
+    paragraphs, between three bars."""
+    same = ("The search for this category reported that it could not be "
+            "finished, so an empty result here is a gap in the search rather "
+            "than a fact about the market.")
+    html = _coverage(page_script, [
+        {"category": "vertical_summit", "label": "Vertical summit",
+         "status": "error", "found": 0, "quota": 2, "why": same},
+        {"category": "emerging", "label": "Emerging event",
+         "status": "error", "found": 0, "quota": 2, "why": same},
+        {"category": "side_event", "label": "Side event",
+         "status": "error", "found": 0, "quota": 2, "why": same}])
+    why = html[html.index("Why they fell short"):]
+    assert why.count("The search did not finish") == 1, \
+        "one statement, three times"
+    assert why.count(same) == 1, "the same paragraph more than once"
+    for name in ("Vertical summit", "Emerging event", "Side event"):
+        assert name in why, "%s lost its place in the group" % name
+
+
+def test_two_categories_short_for_different_reasons_keep_both_reasons(page_script):
+    """The other half of grouping. Merging the statement must not merge the
+    evidence: a reader has to be able to tell which reason belongs to which
+    category."""
+    html = _coverage(page_script, [
+        {"category": "free_vendor", "label": "Free sponsor-funded event",
+         "status": "empty", "found": 0, "quota": 2,
+         "why": "Every city day on this calendar is aimed at practitioners "
+                "rather than at the people who sign for a booth."},
+        {"category": "emerging", "label": "Emerging event",
+         "status": "empty", "found": 0, "quota": 2,
+         "why": "No first-to-third edition event serves this buyer at all, "
+                "and the two that came close are consumer meet-ups."}])
+    why = html[html.index("Why they fell short"):]
+    assert why.count("Nothing here for this client") == 1
+    assert "aimed at practitioners" in why and "consumer meet-ups" in why
+    # Attributed, because one statement now covers two categories.
+    assert "<b>Free sponsor-funded event.</b>" in why
+    assert "<b>Emerging event.</b>" in why
+
+
+def test_a_cut_off_search_is_never_reported_as_an_empty_market(page_script):
+    """`partial` means the search ran and did not finish. Read as anything
+    else it prints "nothing here for this client" under a category whose own
+    stored reason says the opposite, which is the one mistake this section
+    exists to avoid."""
+    html = _coverage(page_script, [
+        {"category": "regional_flagship", "label": "Regional flagship",
+         "status": "partial", "found": 0, "quota": 2,
+         "why": "The search for this category reported that it could not be "
+                "finished."}])
+    why = html[html.index("Why they fell short"):]
+    assert "Nothing here for this client" not in why
+    assert "The search did not finish" in why
+    assert 'class="nr n-gap"' in why, "a hole was drawn as a thin market"
+
+
+def test_a_spent_search_budget_is_re_read_as_a_budget_and_not_a_fault(page_script):
+    """Runs made before that was understood recorded a spent budget as a
+    broken search, so the report told a client a category had gone
+    unsearched when it had been searched to the limit we paid for. The stored
+    row cannot be fixed, so it is corrected on the way out."""
+    html = _coverage(page_script, [
+        {"category": "vertical_summit", "label": "Vertical summit",
+         "status": "error", "found": 0, "quota": 2,
+         "why": "search_limit: The web_search tool stopped returning results "
+                "part-way through (max_uses_exceeded) after 6 searches, so "
+                "this answer was written from an incomplete search rather "
+                "than a finished one."}])
+    why = html[html.index("Why they fell short"):]
+    assert "used every search it was allowed" in why
+    assert 'class="nr n-gap"' not in why, "a spent budget is not a hole"
+    # And the sentence that contradicted it, in the tool's own vocabulary,
+    # does not survive behind the fold either.
+    for token in ("web_search", "max_uses_exceeded", "search_limit"):
+        assert token not in html, "%s reached the report" % token
+    assert "budget being enforced rather than a fault" in why
+
+
+def test_a_stored_reason_written_for_the_log_stays_off_the_surface(page_script):
+    """Runs stored before the write path was fixed carry an error kind and
+    the wrapper's developer detail. The surface line is composed here, so it
+    is clean whatever the row holds, and the stored text is kept behind
+    it."""
+    stored = ("unparsable: the reply could not be read (stop_reason=max_tokens, "
+              "blocks=3)")
+    html = _coverage(page_script, [
+        {"category": "side_event", "label": "Side event",
+         "status": "error", "found": 0, "quota": 2, "why": stored}])
+    why = html[html.index("Why they fell short"):]
+    head = why[:why.index("</summary>")] if "</summary>" in why else why
+    for token in ("unparsable", "stop_reason", "max_tokens", "blocks="):
+        assert token not in head, "%s is on the surface of the report" % token
+    assert "The search did not finish" in head
+
+
+def test_a_short_reason_about_the_market_is_the_line_itself(page_script):
+    """The one sentence in this section that is about the client's market is
+    better than anything composed from a status, so it is promoted to the
+    line rather than hidden behind one."""
+    html = _coverage(page_script, [
+        {"category": "side_event", "label": "Side event",
+         "status": "empty", "found": 0, "quota": 2,
+         "why": "Nothing published yet."}])
+    why = html[html.index("Why they fell short"):]
+    assert "Nothing published yet." in why
+    assert "<details" not in why, "a fold that hides four words costs more " \
+        "than it saves"
+
+
+def test_a_reason_lifted_from_a_stored_row_is_capitalised(page_script):
+    """Every other line here is composed and starts with a capital. A real
+    stored row reads "the market is thin"."""
+    html = _coverage(page_script, [
+        {"category": "side_event", "label": "Side event",
+         "status": "short", "found": 1, "quota": 2, "why": "the market is thin"}])
+    why = html[html.index("Why they fell short"):]
+    assert "The market is thin" in why
+    assert ">the market is thin" not in why
+
+
+def test_a_reason_cut_off_mid_word_is_marked_as_cut(page_script):
+    """The old write path stored the reason at a flat character count, so a
+    real report ended a paragraph on "caregivers/clinicia"."""
+    cut = ("Results confirmed this category consists of enterprise software "
+           "vendor road-shows whose audiences are IT and business budget "
+           "owners, and this client sells directly to people with type 1 "
+           "diabetes and their caregivers/clinicia")
+    html = _coverage(page_script, [
+        {"category": "free_vendor", "label": "Free sponsor-funded event",
+         "status": "empty", "found": 0, "quota": 2, "why": cut}])
+    assert "caregivers/clinicia\u2026" in html or \
+        "caregivers/clinicia&hellip;" in html or \
+        "caregivers/clinicia…" in html
+
+
+def test_diagnostics_inside_a_stored_paragraph_do_not_reach_the_page(page_script):
+    """Verbatim from a run a client printed. The parenthetical is entirely
+    this codebase's own diagnostics and the sentence after it is an
+    instruction to us, and both were on paper."""
+    stored = ("1 discovery category did not run, so this list is missing a "
+              "kind of event rather than having found none: Regional flagship "
+              "(max_tokens: Ran out of output budget before finishing "
+              "(stop_reason=max_tokens). Raise max_tokens or lower "
+              "max_uses.). That is a hole in the analysis, not a finding "
+              "about the market.")
     html = _render(page_script, _recommend(
         [_cand("ATTD", 74, "P2")], discovered=2,
         counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=[stored]))
+    for token in ("max_tokens", "stop_reason", "max_uses", "Ran out of output"):
+        assert token not in html, "%s reached the page" % token
+    # The finding it was buried in survives, and reads as it should.
+    assert "having found none: Regional flagship." in html
+    assert "not a finding about the market" in html
+
+
+def test_a_plumbing_sentence_inside_a_stored_paragraph_goes_but_the_rest_stays(page_script):
+    """The model's account of a search tool, mid-paragraph, with a real
+    finding in front of it."""
+    stored = ("2 categories came back under the two-event quota after "
+              "searching: Emerging event and Side event. However, the "
+              "web_search tool hit a hard per-turn call limit partway "
+              "through and returned 'server tool use limit exceeded'.")
+    html = _render(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=[stored]))
+    assert "web_search" not in html and "server tool use limit" not in html
+    assert "came back under the two-event quota" in html
+
+
+def test_a_stored_paragraph_that_is_all_plumbing_is_kept_rather_than_emptied(page_script):
+    """The conservative half, and the one that matters more. Every fact in
+    this block is one the agent's value rests on, so losing a real finding to
+    a keyword match is worse than showing a reader a token they will
+    ignore."""
+    stored = "The web_search tool returned max_uses_exceeded after 6 searches."
+    html = _render(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=[stored]))
+    assert "What was not measured" in html
+    assert "6 searches" in html, "the paragraph was deleted, not scrubbed"
+
+
+def test_the_report_does_not_talk_about_a_model_even_in_stored_text(page_script):
+    """A reader of this report has no model. What they can act on is what the
+    search found and what it could not reach, and runs stored before the
+    write path said so keep their own wording."""
+    html = _render(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=["The model reported that it could not finish searching "
+                     "this category."],
         shortfall=[{"category": "side_event", "label": "Side event",
-                    "status": "empty", "found": 0, "quota": 2,
-                    "why": "Nothing published yet."}]))
-    assert "Nothing published yet." in html
-    assert '<details class="bw bwd">' not in html
+                    "status": "error", "found": 0, "quota": 2,
+                    "why": "The model could not finish this one."}]))
+    assert "model" not in html.lower()
+    assert "The search reported that it could not finish" in html
+
+
+def test_the_verdict_names_the_categories_that_did_not_finish(page_script):
+    """"3 category searches did not run" left the reader to work out which
+    three by cross-reading the chart above it."""
+    html = _coverage(page_script, [
+        {"category": "emerging", "label": "Emerging event", "status": "error",
+         "found": 0, "quota": 2, "why": "Cut off."},
+        {"category": "side_event", "label": "Side event", "status": "error",
+         "found": 0, "quota": 2, "why": "Cut off."}])
+    top = html[:html.index("Why they fell short")]
+    assert "2 category searches did not finish" in top
+    assert "Emerging event, Side event" in top

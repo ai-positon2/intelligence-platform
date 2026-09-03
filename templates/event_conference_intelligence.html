@@ -1901,7 +1901,6 @@
        a short bar, because a short bar reads as a finding about the market
        and this one is a hole in the analysis. */
     /* Longer than this and a category's reason is a paragraph, not a label. */
-    var BAR_NOTE_INLINE = 90;
 
     function evBars(rows){
       rows = rows || [];
@@ -1925,16 +1924,6 @@
             (goal ? '<span class="gl" style="left:' + goal.toFixed(2) + '%"></span>' : '') +
             '<span class="fl" style="width:' + w.toFixed(2) + '%"></span></div>' +
           '<div class="bn">' + reads + '</div>' +
-          /* Six categories with a paragraph under each is the section
-             nobody read. The bars are the picture, so they stay one row
-             each; the reason sits one click behind the row that owns it.
-             Short reasons are not worth a click and stay in place. */
-          (r.note
-            ? (String(r.note).replace(/<[^>]*>/g, '').length > BAR_NOTE_INLINE
-                ? '<details class="bw bwd"><summary>Why</summary><p>' +
-                  r.note + '</p></details>'
-                : '<div class="bw">' + r.note + '</div>')
-            : '') +
         '</div>';
       }).join('') + '</div>';
     }
@@ -3057,6 +3046,187 @@
       return html + '</div>';
     }
 
+    /* -- why a category fell short, said once -------------------------
+       This section had a paragraph under every bar it explained, which is
+       the shape that destroys a chart: six categories, six wrapped
+       paragraphs interleaved between six bars, and the picture the chart was
+       drawing disappeared into them. Three of those paragraphs were also the
+       same sentence printed three times, and two of the rest were stored
+       prose written for a log.
+
+       So the chart keeps its rows and the reasons move underneath it,
+       grouped: a reason that applies to three categories is stated once and
+       names all three. */
+
+    /* A reason written for whoever reads the log rather than the report. The
+       leading token is the shape errors used to be recorded in
+       ("search_limit: the web_search tool ..."), and the rest is vocabulary
+       nobody outside this codebase can act on. Runs stored before the write
+       path was fixed still carry both, so they are caught on the way out as
+       well as on the way in. */
+    var REASON_KIND = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+\s*:\s*/;
+    var REASON_PLUMBING = /web_search|max_uses|max_tokens|stop_reason|search_limit|server tool|per-turn|per turn|tool errors|unparsable|token limit|call limit|HTTP\s*\d/i;
+    var COVER_HEAD_CHARS = 96;
+
+    /* Words this report used for its own machinery, rewritten on the way out.
+
+       "The model" is what this codebase calls the thing doing the searching.
+       A reader of this report is choosing which conference to buy a booth at
+       and has no model: what they can act on is what the SEARCH found and
+       what it could not reach. The write path says "the search" now, and
+       runs stored before it did keep their own wording, so the swap happens
+       at the read path as well. Same reason the category aliases do. */
+    var REASON_WORDS = [[/\bthe model\b/g, 'the search'],
+                        [/\bThe model\b/g, 'The search']];
+
+    function reworded(text){
+      var t = String(text == null ? '' : text);
+      for (var i = 0; i < REASON_WORDS.length; i++) {
+        t = t.replace(REASON_WORDS[i][0], REASON_WORDS[i][1]);
+      }
+      return t;
+    }
+
+    function cleanReason(text){
+      var t = reworded(text)
+        .replace(/\s+/g, ' ').trim().replace(REASON_KIND, '');
+      /* Stored reasons were cut at a flat character count, so one ends
+         "caregivers/clinicia". Marked as cut rather than left looking
+         broken: no punctuation at the end of a sentence this long is not a
+         style, it is a truncation. */
+      if (t.length > 80 && !/[.!?\u2026]$/.test(t)) t += '\u2026';
+      /* Capitalised here rather than at the point it is used as a head. A
+         stored row reads "the market is thin", and capitalising only the
+         head made the head and the reason different strings, so the row
+         grew a fold whose whole content was the line above it in
+         lowercase. */
+      return t ? t[0].toUpperCase() + t.slice(1) : t;
+    }
+
+    /* Whether a stored reason can be shown on the surface of the report.
+       Short, and about the market rather than about our tooling. Anything
+       else is still kept, one click behind a line of our own. */
+    function readsLikeAFinding(text){
+      return !!text && text.length <= COVER_HEAD_CHARS &&
+             !REASON_PLUMBING.test(text);
+    }
+
+    /* A search that did not finish, whichever way it stopped. `error` is a
+       search that never produced anything usable and `partial` is one that
+       was cut off part-way, and neither is a fact about the client's market.
+       Reading only `error` as a hole put "Nothing here for this client"
+       under a category whose own stored reason said, in our words, that it
+       could not finish searching. */
+    function reasonIsGap(sf){
+      return sf.status === 'error' || sf.status === 'partial';
+    }
+
+    function coverageReason(sf){
+      var full = cleanReason(sf.why);
+      var found = Number(sf.found) || 0;
+      var quota = Number(sf.quota) || 0;
+      var level = reasonIsGap(sf) ? 'gap' : 'thin';
+      var head;
+      if (reasonIsGap(sf)) {
+        head = 'The search did not finish';
+        /* A stored reason naming max_uses_exceeded is describing this run's
+           own search budget being enforced, which is a complete piece of
+           work and not a broken one. Runs made before that was understood
+           recorded it as a failed search, so the report told a client a
+           category had gone unsearched when it had been searched to the
+           limit we paid for. Corrected here, because the stored row cannot
+           be. */
+        if (/max_uses_exceeded/i.test(full)) {
+          head = 'The search used every search it was allowed';
+          level = 'thin';
+          /* The stored sentence has to go with the verdict it belonged to.
+             Left in place it sat behind this line contradicting it, in the
+             tool's own error vocabulary, and a reader who opened the fold
+             was worse off than one who did not. What replaces it says what
+             happened and admits the run recorded it differently, rather
+             than quietly presenting the correction as the original. */
+          full = 'This run recorded the search as broken because it reached ' +
+                 'for one more search than its budget allowed. That is the ' +
+                 'budget being enforced rather than a fault, so the category ' +
+                 'was searched to the limit it was given and what it found ' +
+                 'is in this list.';
+        }
+      } else if (!found) {
+        head = 'Nothing here for this client';
+      } else {
+        head = 'Only ' + plural(found, 'event') +
+               (quota ? ' of the ' + quota + ' asked for' : '');
+      }
+      /* A stored reason that already reads like a finding is better than
+         anything composed from a status: it is the one sentence in this
+         section that is about the client's market. */
+      if (level !== 'gap' && readsLikeAFinding(full)) head = full;
+      return {level: level, head: head, detail: full};
+    }
+
+    function coverageWhyHtml(rows){
+      var groups = [], seen = {};
+      (rows || []).forEach(function(sf){
+        var r = coverageReason(sf);
+        /* Keyed on the statement alone. Keying on the reason as well split
+           one statement into a row per category, so a reader saw the same
+           line twice in a column of four and read it as a bug. */
+        var key = r.level + ' ' + r.head;
+        if (!seen[key]) {
+          seen[key] = {level: r.level, head: r.head, items: []};
+          groups.push(seen[key]);
+        }
+        seen[key].items.push({
+          name: sf.label || catLabel(sf.category) || '',
+          detail: r.detail === r.head ? '' : r.detail});
+      });
+      if (!groups.length) return '';
+      /* Holes first. A category that went unsearched changes what the list
+         is worth more than one that came back thin. */
+      groups.sort(function(a, b){
+        return (a.level === 'gap' ? 0 : 1) - (b.level === 'gap' ? 0 : 1); });
+      return '<div class="evi-why"><h4>Why they fell short</h4><div class="nl">' +
+        groups.map(function(g, i){
+          var chips = g.items.map(function(it){
+            return it.name ? '<span class="wc">' + esc(it.name) + '</span>' : '';
+          }).join('');
+          var head = '<span class="nd n-' + esc(g.level) + '"></span>' +
+            '<span class="nx">' + esc(g.head) + '</span>' +
+            '<span class="wn">' + chips + '</span>';
+          var told = g.items.filter(function(it){ return it.detail; });
+          if (!told.length) {
+            return '<div class="nr n-' + esc(g.level) + '" style="--i:' + i +
+                   '">' + head + '</div>';
+          }
+          /* Attributed once there is more than one category behind the
+             statement. An unlabelled pair of paragraphs leaves the reader
+             unable to tell which category each belongs to, which is the one
+             thing the fold is for.
+
+             Categories whose reason is word-for-word the same share one
+             paragraph and are named together. Three categories cut off by
+             the same thing recorded the same sentence three times, and
+             printing it three times behind one fold is the wall of text
+             this section was redrawn to remove, just moved one click back. */
+          var told2 = [], byDetail = {};
+          told.forEach(function(it){
+            if (!byDetail[it.detail]) {
+              byDetail[it.detail] = {detail: it.detail, names: []};
+              told2.push(byDetail[it.detail]);
+            }
+            if (it.name) byDetail[it.detail].names.push(it.name);
+          });
+          var body = told2.map(function(it){
+            var label = g.items.length > 1 && it.names.length
+              ? '<b>' + esc(it.names.join(', ')) + '.</b> ' : '';
+            return '<p>' + label + esc(it.detail) + '</p>'; }).join('');
+          return '<details class="nr n-' + esc(g.level) + '" style="--i:' + i +
+            '"><summary>' + head +
+            '<span class="nmore" aria-hidden="true">Why</span></summary>' +
+            body + '</details>';
+        }).join('') + '</div></div>';
+    }
+
     function coverageHtml(s){
       var rows = s.shortfall || [];
       var statuses = s.statuses || {};
@@ -3079,10 +3249,15 @@
         var sf = byCat[k], st = statuses[k] || {};
         var label = catLabel(k) || (sf && sf.label) || '';
         if (sf) {
-          return {label: label, n: Number(sf.found) || 0, max: Number(sf.quota) || 0,
-                  state: sf.status === 'error' ? 'error' : 'short',
-                  note: (sf.status === 'error'
-                          ? '<b>The search did not run.</b> ' : '') + esc(sf.why || '')};
+          /* No note on the row. Six of these with a paragraph each is the
+             section that had to be redrawn: the reasons are grouped below,
+             where three categories sharing one reason cost one line rather
+             than three paragraphs. The row still carries the verdict, in the
+             colour of its bar and in the count beside it. */
+          var r = coverageReason(sf);
+          return {label: label, n: Number(sf.found) || 0,
+                  max: Number(sf.quota) || 0,
+                  state: r.level === 'gap' ? 'error' : 'short'};
         }
         if (st.kept != null) {
           return {label: label, n: Number(st.kept) || 0, max: quota, state: 'met'};
@@ -3091,15 +3266,24 @@
                 text: 'met the quota'};
       });
 
-      var failed = rows.filter(function(r){ return r.status === 'error'; }).length;
+      /* Counted from the same reading the rows are drawn from, so the
+         sentence and the chart cannot disagree. A stored row saying its
+         search broke on `max_uses_exceeded` is re-read as a spent budget,
+         and it must stop being counted as a hole here too. */
+      var failed = rows.filter(function(r){
+        return coverageReason(r).level === 'gap'; }).length;
+      var gapNames = rows.filter(function(r){
+        return coverageReason(r).level === 'gap'; })
+        .map(function(r){ return r.label || catLabel(r.category); });
       var short = rows.length - failed;
       var verdict = failed
         /* "1 search did not run" reads as one query out of dozens. What did
            not run is a whole kind of event, and the count is of categories. */
         ? '<b>' + esc(plural(failed, 'category search', 'category searches')) +
-          ' did not run</b>, so this list ' +
-          'is missing a kind of event rather than having found none. That is a ' +
-          'hole in the analysis, not a finding about the market.'
+          ' did not finish</b>' +
+          (gapNames.length ? ' (' + esc(gapNames.join(', ')) + ')' : '') +
+          ', so this list is missing a kind of event rather than having found ' +
+          'none. That is a hole in the analysis, not a finding about the market.'
         : (short
             ? esc(plural(short, 'category', 'categories')) +
               ' came back under quota after ' +
@@ -3117,7 +3301,8 @@
         ' <details class="evi-inline"><summary>Why six categories</summary>' +
         '<p>They are searched one at a time and never merged, which is what ' +
         'stops the famous names crowding out the narrower summits, the free ' +
-        'sponsor-funded days and the side events.</p></details></div></div>' +
+        'sponsor-funded days and the side events.</p></details></div>' +
+        coverageWhyHtml(rows) + '</div>' +
         searchFunnelHtml(s);
     }
 
@@ -3193,6 +3378,40 @@
     var NOTE_LABEL = {gap: 'Not measured', thin: 'Measured on less',
                       note: 'Worth knowing', ok: 'Clean'};
 
+    /* Diagnostics out of a stored paragraph, before it is shown or printed.
+
+       The write path no longer produces any of this, but a run stored before
+       it was fixed keeps what it was written with, and one of those runs
+       carries, inside a parenthetical, in a document a client printed:
+
+         Regional flagship (max_tokens: Ran out of output budget before
+         finishing (stop_reason=max_tokens). Raise max_tokens or lower
+         max_uses.)
+
+       Two shapes, so two passes. A parenthetical whose contents are entirely
+       our own diagnostics is dropped, which is what removes the worst of it
+       and leaves "... having found none: Regional flagship." reading exactly
+       as it should. Then any whole sentence about the tooling goes, which is
+       what removes the model's account of a search tool it could not stop
+       talking about.
+
+       Deliberately conservative: if the two passes would leave nothing, the
+       paragraph is kept exactly as stored. Losing a real finding to a
+       keyword match is worse than showing a reader a token they will ignore,
+       and every fact in this block is one the agent's value rests on. */
+    function scrubStored(text){
+      var t = reworded(text).replace(/\s+/g, ' ').trim();
+      if (!t || !REASON_PLUMBING.test(t)) return t;
+      t = t.replace(/\s*\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g,
+        function(whole, inner){
+          return REASON_PLUMBING.test(inner) ? '' : whole; });
+      var kept = (t.match(/[^.!?]+(?:[.!?]+|$)/g) || [])
+        .map(function(s){ return s.trim(); })
+        .filter(function(s){ return s && !REASON_PLUMBING.test(s); });
+      if (!kept.length) return t;
+      return kept.join(' ').replace(/\s+([.,;:])/g, '$1').trim();
+    }
+
     /* A head for a paragraph of stored prose, and only when the paragraph
        offers one.
        A head is the FIRST SENTENCE, whole, and short enough to scan. Nothing
@@ -3226,7 +3445,7 @@
         return '<div class="ex-notes"><div class="nh">' +
           '<h4>What was not measured</h4></div><div class="nl">' +
           old.map(function(a, i){
-            var full = String(a || '').replace(/\s+/g, ' ').trim();
+            var full = scrubStored(a);
             if (!full) return '';
             var head = foldHead(full);
             if (!head) {
