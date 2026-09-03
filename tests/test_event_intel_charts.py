@@ -78,6 +78,9 @@ def _cand(name, total, tier, **kw):
 
 def _recommend(cands, **summary):
     s = {"title": "T", "client_profile": "P", "methodology": "M", "assumptions": [],
+         # Every finished run now carries both shapes. A stub with only the
+         # prose one is stubbing a summary the pipeline no longer produces.
+         "notes": [],
          "discovered": 20, "counts": {"P1": 1, "P2": 1, "kept": len(cands),
                                       "excluded": 0, "finished": 0},
          "top_five": [], "excluded": [], "finished": [], "unscored": [],
@@ -154,14 +157,23 @@ def _workroom(rows, **summary):
 # ── the rule every donut on the page obeys ────────────────────────────────
 
 def _donuts(html):
-    """(centre, [segment counts]) for every donut in the markup."""
-    out = []
+    """(centre, [segment counts]) for every donut in the markup.
+
+    Also returns how many donuts it could NOT read. The centre pattern only
+    matches a bare integer, so a donut whose centre is written as anything
+    else was silently skipped and its invariant went unchecked, which is a
+    checker quietly exempting the one chart most likely to be wrong. The
+    count comes back so the test can fail on it instead.
+    """
+    out, skipped = [], 0
     for d in re.findall(r'<div class="evi-donut">.*?</div>\s*</div>', html, re.S):
         centre = re.search(r'<span class="dc"><b>(\d+)</b>', d)
         segs = [int(x) for x in re.findall(r'<title>[^<]*?: (\d+)</title>', d)]
         if centre:
             out.append((int(centre.group(1)), segs))
-    return out
+        else:
+            skipped += 1
+    return out, skipped
 
 
 def test_a_donut_centre_is_the_sum_of_its_own_segments(page_script):
@@ -179,12 +191,33 @@ def test_a_donut_centre_is_the_sum_of_its_own_segments(page_script):
     srcs = [_src("https://a", "ok"), _src("https://b", "ok"),
             _src("https://c", "blocked"), _src("https://d", "not_found")]
     html = _render(page_script, _lookup(parts, srcs))
-    found = _donuts(html)
+    found, skipped = _donuts(html)
     assert len(found) >= 3, "expected a donut per panel, found %d" % len(found)
+    assert not skipped, (
+        "%d donut(s) had a centre this test cannot read, so their segments "
+        "went unchecked. Either the centre is a bare count, or this checker "
+        "has to learn the new shape: a chart nobody checks is worse than no "
+        "chart." % skipped)
     for centre, segs in found:
         assert sum(segs) == centre, (
             "a donut's segments add to %d inside a centre that says %d"
             % (sum(segs), centre))
+
+
+def test_the_donut_reader_reports_a_centre_it_cannot_read():
+    """The guard above only fires on a shape no chart on the page currently
+    produces, so nothing exercised it and a mutant that deleted the counter
+    survived. Driven directly instead: an unreadable centre has to come back
+    as a skip, not as an absence."""
+    ok = ('<div class="evi-donut"><span class="dc"><b>3</b></span>'
+          '<title>A: 1</title><title>B: 2</title></div>\n</div>')
+    found, skipped = _donuts(ok)
+    assert found == [(3, [1, 2])] and skipped == 0
+    odd = ok.replace("<b>3</b>", "<b>1 of 6</b>")
+    found, skipped = _donuts(odd)
+    assert found == [] and skipped == 1, (
+        "a donut whose centre this reader cannot parse was dropped in "
+        "silence, so its segments went unchecked")
 
 
 def test_the_rows_with_no_tier_are_a_slice_rather_than_a_gap(page_script):
@@ -323,8 +356,10 @@ def test_the_cut_events_are_in_the_spread_and_offer_no_jump(page_script):
 
 
 def test_the_bar_is_drawn_at_the_rubric_s_floor(page_script):
+    """Three events, not two: the spread needs three to draw at all, because
+    two columns carry no distribution to read."""
     html = _render(page_script, _recommend(
-        [_cand("A", 99, "P1"), _cand("B", 80, "P2")]))
+        [_cand("A", 99, "P1"), _cand("B", 80, "P2"), _cand("C", 74, "P2")]))
     floor = re.search(r'<span class="fo" style="bottom:([\d.]+)%"><b>([^<]+)</b>', html)
     assert floor, "the floor is not drawn on the spread"
     from tracker import event_intel_rubric as rubric
