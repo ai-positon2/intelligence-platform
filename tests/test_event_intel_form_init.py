@@ -147,7 +147,16 @@ function __cardNode(attr, key, checked){
   // touch aria-checked.
   n._cs = __node({});
   n._cs.hidden = true;
-  n.querySelector = function(sel){ return sel === '.cs' ? this._cs : null; };
+  // The card's own label, which the refusal message quotes back ("We read
+  // them as X"). Without it the page reads `undefined` here and the branch
+  // that names the suggestion can never be exercised.
+  n._cl = __node({});
+  n._cl.textContent = (typeof CLASS_LABELS !== 'undefined' && CLASS_LABELS[key]) || key;
+  n.querySelector = function(sel){
+    if (sel === '.cs') return this._cs;
+    if (sel === '.cl') return this._cl;
+    return null;
+  };
   return n;
 }
 
@@ -233,7 +242,11 @@ global.location = {hash: '', pathname: '/'};
 // Overridable, so a test can stand in a draft reply. The default stays the
 // empty-but-successful answer every existing test was written against.
 var __fetchReply = {ok: true, body: {}};
+// Counted, because "the save was refused before it went anywhere" is a claim
+// about a request that did NOT happen, and only a counter can check that.
+__state.fetches = 0;
 global.fetch = function(){
+  __state.fetches++;
   return Promise.resolve({
     ok: __fetchReply.ok,
     json: function(){ return Promise.resolve(__fetchReply.body); }
@@ -264,10 +277,13 @@ def _run(probe, class_keys, event_keys):
     # Spliced INSIDE the IIFE and AFTER the init block, so it observes the
     # state the browser is left in once the page has loaded.
     script = script[:at] + "\n" + probe + script[at:]
+    from tracker import event_intel_rubric
     js = ("var CLASS_KEYS = %s;\nvar EVENT_KEYS = %s;\nvar EV_FIELDS = %s;\n"
-          "var HIDDEN_IDS = %s;\n%s\n%s"
+          "var HIDDEN_IDS = %s;\nvar CLASS_LABELS = %s;\n%s\n%s"
           % (json.dumps(class_keys), json.dumps(event_keys),
-             json.dumps(_EV_FIELDS), json.dumps(_hidden_ids(html)), _SHIM, script))
+             json.dumps(_EV_FIELDS), json.dumps(_hidden_ids(html)),
+             json.dumps(event_intel_rubric.CLASSIFICATION_LABELS),
+             _SHIM, script))
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2000:]
     return json.loads(r.stdout.strip().splitlines()[-1])
@@ -716,3 +732,180 @@ def test_reopening_does_not_move_the_cursor_a_second_time(keys):
         "revealRest(true);"
         "console.log(JSON.stringify({focused: __state.focused || null}));", *keys)
     assert out["focused"] is None
+
+
+# ── The one question that can stop a save ─────────────────────────────────
+#
+# Pressing "Lock this profile" without choosing a side of the floor used to
+# POST anyway and paint the server's own words under the button:
+#
+#   Unknown classification ''. It must be one of: b2c_general,
+#   b2c_booth_density, b2b_to_marketing, b2b_other_function. ...
+#
+# Right for an API client, wrong for a person: internal keys, four hundred
+# pixels from the question, and no statement of what to do. The server keeps
+# refusing, which is the hard stop the whole play depends on. It just stops
+# being the first thing a person meets.
+
+def test_locking_without_an_answer_never_reaches_the_server(keys):
+    out = _run(
+        "saveProfile();"
+        "console.log(JSON.stringify({"
+        "  fetches: __state.fetches,"
+        "  shown: !document.getElementById('classError').hidden,"
+        "  msg: document.getElementById('classError').textContent,"
+        "  focused: __state.focused || null,"
+        "  bottom: document.getElementById('profileError').style.display}));", *keys)
+    assert out["fetches"] == 0, "the save was sent knowing it would be refused"
+    assert out["shown"] is True
+    assert out["focused"] == "classGroup", "refused the save and pointed nowhere"
+    assert out["bottom"] == "none", "the message also appeared under the button"
+
+
+def test_the_refusal_says_what_to_do_and_names_no_internal_keys(keys):
+    out = _run(
+        "saveProfile();"
+        "console.log(JSON.stringify({"
+        "  msg: document.getElementById('classError').textContent}));", *keys)
+    msg = out["msg"]
+    assert "choose where" in msg
+    for key in ("b2c_general", "b2c_booth_density", "b2b_to_marketing",
+                "b2b_other_function", "Unknown classification"):
+        assert key not in msg, "the enum leaked into what a person reads: %r" % msg
+
+
+def test_the_refusal_points_at_the_card_we_suggested(keys):
+    """It is one click away and the reader has already been given a reason.
+    Naming the card turns "answer this" into "confirm this"."""
+    from tracker import event_intel_rubric
+    key = keys[0][2]
+    label = event_intel_rubric.CLASSIFICATION_LABELS[key]
+    out = _run(
+        "applyDraft({draft: {}, evidence: {}, sources: [],"
+        " classification: CLASS_KEYS[2], classification_why: 'Because.'});"
+        "saveProfile();"
+        "console.log(JSON.stringify({"
+        "  msg: document.getElementById('classError').textContent}));", *keys)
+    assert label in out["msg"], out["msg"]
+    assert "Click that card" in out["msg"]
+
+
+def test_with_nothing_suggested_the_refusal_invents_no_card(keys):
+    out = _run(
+        "saveProfile();"
+        "console.log(JSON.stringify({"
+        "  msg: document.getElementById('classError').textContent}));", *keys)
+    assert "Click that card" not in out["msg"]
+    assert "We read them as" not in out["msg"]
+
+
+def test_answering_clears_the_refusal(keys):
+    out = _run(
+        "saveProfile();"
+        "pickClass(CLASS_KEYS[1]);"
+        "console.log(JSON.stringify({"
+        "  hidden: document.getElementById('classError').hidden,"
+        "  msg: document.getElementById('classError').textContent}));", *keys)
+    assert out["hidden"] is True
+    assert out["msg"] == ""
+
+
+def test_an_answered_form_is_actually_sent(keys):
+    """The guard must refuse exactly one thing and get out of the way."""
+    out = _run(
+        "pickClass(CLASS_KEYS[1]);"
+        "document.getElementById('clientName').value = 'Northwind';"
+        "saveProfile();"
+        "console.log(JSON.stringify({fetches: __state.fetches,"
+        "  shown: !document.getElementById('classError').hidden}));", *keys)
+    assert out["fetches"] == 1
+    assert out["shown"] is False
+
+
+def test_the_servers_enum_never_reaches_the_page(keys):
+    """Belt and braces. The guard above makes this unreachable, and
+    "unreachable" rests on the page and the server agreeing about a list of
+    keys. If they ever disagree, a person still gets told what to do."""
+    out = _run(
+        "pickClass(CLASS_KEYS[1]);"
+        "__fetchReply = {ok: false, body: {error: \"Unknown classification ''. \""
+        "  + 'It must be one of: b2c_general, b2c_booth_density.'}};"
+        "saveProfile();"
+        "setTimeout(function(){ console.log(JSON.stringify({"
+        "  bottom: document.getElementById('profileError').textContent,"
+        "  inline: document.getElementById('classError').textContent}));}, 0);",
+        *keys)
+    assert "b2c_general" not in out["bottom"], out["bottom"]
+    assert "Unknown classification" not in out["bottom"]
+    assert "choose where" in out["inline"]
+
+
+def test_an_unrelated_save_failure_is_still_reported_as_itself(keys):
+    """The translation must not swallow every other reason a save can fail."""
+    out = _run(
+        "pickClass(CLASS_KEYS[1]);"
+        "__fetchReply = {ok: false, body: {error: 'Storage is unavailable.'}};"
+        "saveProfile();"
+        "setTimeout(function(){ console.log(JSON.stringify({"
+        "  bottom: document.getElementById('profileError').textContent}));}, 0);",
+        *keys)
+    assert out["bottom"] == "Storage is unavailable."
+
+
+# ── The card carries a reason, not an essay ───────────────────────────────
+
+def test_the_card_shows_one_sentence_of_a_paragraph(keys):
+    """Printed in full, the reasoning tripled the height of one card in a
+    four-card grid and left the other three with a hole above their footer."""
+    long_why = ("The iLet is a prescription device marketed to people with "
+                "type 1 diabetes. A physician's prescription is part of the "
+                "purchase pathway. The end buyer is the individual consumer.")
+    out = _run(
+        "applyDraft({draft: {}, evidence: {}, sources: [],"
+        " classification: CLASS_KEYS[0], classification_confidence: 'medium',"
+        " classification_why: %s});"
+        "var card = document.querySelector('[data-suggested]');"
+        "console.log(JSON.stringify({cs: card.querySelector('.cs').textContent}));"
+        % json.dumps(long_why), *keys)
+    cs = out["cs"]
+    assert "medium confidence" in cs
+    assert "The iLet is a prescription device marketed to people with type 1 " \
+           "diabetes." in cs
+    assert "purchase pathway" not in cs, "the whole paragraph is on the card"
+    assert cs.endswith("Click to confirm.")
+
+
+def test_the_whole_reasoning_is_still_on_the_page(keys):
+    """Shortening the card must not lose it. It moves to What we read, where
+    there is room for prose."""
+    long_why = ("First sentence. Second sentence that the card will not show "
+                "because it only shows one.")
+    out = _run(
+        "applyDraft({draft: {}, evidence: {}, sources: [],"
+        " classification: CLASS_KEYS[0], classification_why: %s});"
+        "console.log(JSON.stringify({"
+        "  read: document.getElementById('draftRead').innerHTML}));"
+        % json.dumps(long_why), *keys)
+    assert "Second sentence that the card will not show" in out["read"]
+    assert "Why we read them as" in out["read"]
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("One. Two.", "One."),
+    ("No full stop here", "No full stop here"),
+    ("Priced at 4.5 units. Next.", "Priced at 4.5 units."),
+    ("", ""),
+])
+def test_only_a_real_sentence_end_ends_the_sentence(keys, text, expected):
+    """A decimal point and an abbreviation are not sentence ends, and cutting
+    at one would print half a clause on the card."""
+    out = _run("console.log(JSON.stringify({v: firstSentence(%s, 150)}));"
+               % json.dumps(text), *keys)
+    assert out["v"] == expected
+
+
+def test_a_single_endless_sentence_is_still_cut_to_fit(keys):
+    out = _run("console.log(JSON.stringify({v: firstSentence('%s', 60)}));"
+               % ("word " * 40).strip(), *keys)
+    assert len(out["v"]) <= 61
+    assert out["v"].endswith("\u2026")

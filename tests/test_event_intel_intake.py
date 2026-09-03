@@ -531,3 +531,46 @@ def test_the_pages_that_do_say_are_still_read(path):
     the draft of every page worth reading."""
     text = "Link [https://a.example%s]\n" % path
     assert I.pick_links(text, "https://a.example") == ["https://a.example" + path]
+
+
+# ── Trimming long prose ───────────────────────────────────────────────────
+
+def test_a_trimmed_note_never_ends_mid_word():
+    """What a real draft printed on screen: "...no sales-cycle length was
+    published on t". A hard slice reads as a model that stopped mid-thought
+    rather than as text we cut, and only one of those is worth going to look
+    into."""
+    long = ("Beta Bionics sells a prescription insulin pump to individual "
+            "patients and no pricing was published on the site. ") * 8
+    out = I._text(long, 400)
+    assert len(out) <= 401
+    assert out.endswith("…")
+    # The last real word survives whole.
+    assert out[:-1].split()[-1] in long.split()
+
+
+def test_text_that_fits_is_returned_untouched():
+    assert I._text("Short enough.", 400) == "Short enough."
+    assert I._text("x" * 400, 400) == "x" * 400
+    assert I._text("", 400) is None
+    assert I._text(None, 400) is None
+
+
+def test_one_endless_token_is_cut_rather_than_thrown_away():
+    """Honouring the word boundary unconditionally would return almost
+    nothing when the overflowing word is longer than the cap.
+
+    The string needs an EARLY space and a long token after it, or the boundary
+    rule is never exercised: with no space at all there is nothing to find and
+    any threshold passes.
+    """
+    out = I._text("a " + "x" * 90, 20)
+    assert out == "a " + "x" * 18 + "…", out
+    # No space anywhere: the same outcome by a different route.
+    assert I._text("x" * 90, 20) == "x" * 20 + "…"
+
+
+def test_the_trim_leaves_no_dangling_punctuation():
+    out = I._text("One two three four five, six seven", 26)
+    assert not out[:-1].rstrip().endswith(",")
+    assert out.endswith("…")

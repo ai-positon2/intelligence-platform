@@ -234,9 +234,15 @@
                   one we will not guess. It decides which crowd every score
                   measures.</span>
               </div>
-              <div class="evi-field">
+              <div class="evi-field" id="classField">
                 <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
-                <div class="evi-classes" role="radiogroup" aria-label="Classification">
+                <!-- The one unanswered question that can stop a save, so it
+                     carries its own message. It used to surface four hundred
+                     pixels lower as the server's enum list, next to a button,
+                     nowhere near the thing it was about. -->
+                <div id="classError" class="evi-err" hidden></div>
+                <div class="evi-classes" role="radiogroup" aria-label="Classification"
+                     id="classGroup" tabindex="-1">
                   {% for c in classifications %}
                   <button type="button" class="evi-class" role="radio"
                           aria-checked="false"
@@ -244,8 +250,10 @@
                           onclick="pickClass('{{ c.key }}')">
                     <span class="cl">{{ c.label }}</span>
                     <span class="cw">{{ c.where }}</span>
-                    <span class="co">{{ c.orientation }}-driven</span>
+                    <!-- Before the chip, so the chip stays the last line of
+                         every card and the four line up across the row. -->
                     <span class="cs" hidden></span>
+                    <span class="co">{{ c.orientation }}-driven</span>
                   </button>
                   {% endfor %}
                 </div>
@@ -586,6 +594,8 @@
        refused for a classification the user can see is highlighted. */
     function pickClass(key){
       pickedClass = key;
+      var ce = document.getElementById('classError');
+      if (ce) { ce.hidden = true; ce.textContent = ''; }
       Array.prototype.forEach.call(
         document.querySelectorAll('[data-classification]'), function(b){
           b.setAttribute('aria-checked', b.getAttribute('data-classification') === key);
@@ -709,6 +719,7 @@
         document.querySelectorAll('[data-classification]'), function(card){
           card.removeAttribute('data-suggested');
           card.removeAttribute('data-suggest-why');
+          card.removeAttribute('data-suggest-confidence');
           var n = card.querySelector('.cs');
           if (n) { n.hidden = true; n.textContent = ''; }
         });
@@ -778,6 +789,16 @@
           '<p class="rc">If that is not your client, the name matched a ' +
           'different company. Correct the website and read it again.</p>';
       }
+      /* The reasoning in full. The card beside the four options gets one
+         sentence of it, because a paragraph there tripled that card's height
+         and left the other three looking broken. This is where the rest of
+         it lives, next to the sentence about what the company sells that it
+         follows from. */
+      if (d.classification_why) {
+        var cl = CLASSIFICATION_LABELS[d.classification] || d.classification;
+        html += '<p class="rw"><b>Why we read them as ' + esc(cl || 'that') +
+          '.</b> ' + esc(d.classification_why) + '</p>';
+      }
       if (d.note) html += '<p class="rn">' + esc(d.note) + '</p>';
       if (kept.length) {
         html += '<p class="rn">' + esc(plural(kept.length, 'field')) +
@@ -830,9 +851,12 @@
       if (!card) return;
       if (!card.querySelector('.cs')) return;
       card.setAttribute('data-suggested', '1');
-      card.setAttribute('data-suggest-why', 'Our reading' +
-        (confidence ? ', ' + confidence + ' confidence' : '') +
-        (why ? '. ' + why : '.'));
+      /* The reasoning ALONE. It used to be stored with "Our reading, medium
+         confidence." glued to the front, which made that the first sentence,
+         so trimming the card to one sentence would have kept the label and
+         thrown the reason away. */
+      card.setAttribute('data-suggest-why', why || '');
+      card.setAttribute('data-suggest-confidence', confidence || '');
       renderSuggestion();
     }
 
@@ -842,16 +866,40 @@
        clicked, which reads as though the click did not take. The reasoning
        stays either way, including when somebody picks a DIFFERENT card: what
        we read is worth keeping on screen next to the answer they gave. */
+    /* One sentence, and never more than will fit in a card.
+
+       The full reasoning runs to a paragraph, and printed in full it tripled
+       the height of one card in a four-card grid, which left the other three
+       with a hole above their footer and made the group look broken. The
+       whole of it is still on the page, under What we read, where there is
+       room for prose. */
+    var SUGGEST_CHARS = 150;
+
+    function firstSentence(text, cap){
+      var t = String(text || '').trim();
+      if (!t) return '';
+      // A full stop that ends a sentence, not one inside "e.g." or a decimal.
+      var m = t.match(/^[\s\S]*?[.!?](?=\s+[A-Z(]|$)/);
+      var out = (m ? m[0] : t).trim();
+      if (out.length <= cap) return out;
+      var cut = out.slice(0, cap), at = cut.lastIndexOf(' ');
+      if (at > cap * 0.6) cut = cut.slice(0, at);
+      return cut.replace(/[\s,;:.]+$/, '') + '\u2026';
+    }
+
     function renderSuggestion(){
       var card = document.querySelector('[data-suggested]');
       if (!card) return;
       var n = card.querySelector('.cs');
       if (!n) return;
       var why = card.getAttribute('data-suggest-why') || '';
+      var conf = card.getAttribute('data-suggest-confidence') || '';
       var decided = !!document.querySelector(
         '[data-classification][aria-checked="true"]');
-      n.textContent = why + (decided ? '' : ' Click to confirm.');
-      n.hidden = !why;
+      var head = 'Our reading' + (conf ? ', ' + conf + ' confidence' : '');
+      n.textContent = head + '. ' + firstSentence(why, SUGGEST_CHARS) +
+        (decided ? '' : ' Click to confirm.');
+      n.hidden = !(why || conf);
     }
 
     /* A counting clock, because the wait varies with somebody else's server.
@@ -928,9 +976,36 @@
     }
     window.draftProfile = draftProfile;
 
+    /* The one question that can stop a save, answered where it is asked.
+
+       Pressing Lock without it used to POST anyway and paint the server's own
+       message under the button: `Unknown classification ''. It must be one
+       of: b2c_general, b2c_booth_density, ...`. That message is right for an
+       API client and wrong for a person: it names internal keys, it is far
+       from the question, and it does not say what to do. The server keeps it
+       and keeps refusing, which is the hard stop the play depends on. It just
+       stops being the first thing a person meets. */
+    function classificationMissing(){
+      var box = document.getElementById('classError');
+      var suggested = document.querySelector('[data-suggested]');
+      var label = suggested ? (suggested.querySelector('.cl') || {}).textContent : '';
+      box.textContent = 'One thing left: choose where this client\u2019s buyers '
+        + 'stand at an event. It is the only answer we will not guess, because '
+        + 'it decides which crowd every score measures.'
+        + (label ? ' We read them as \u201c' + label.trim() + '\u201d. Click that '
+                 + 'card if you agree.' : '');
+      box.hidden = false;
+      var group = document.getElementById('classGroup');
+      if (group) {
+        if (group.scrollIntoView) group.scrollIntoView({block: 'center'});
+        if (group.focus) group.focus();
+      }
+    }
+
     function saveProfile(){
       var err = document.getElementById('profileError');
       err.style.display = 'none';
+      if (!pickedClass) { classificationMissing(); return; }
       var body = {
         client_name: document.getElementById('clientName').value.trim(),
         website: document.getElementById('clientSite').value.trim(),
@@ -969,6 +1044,15 @@
         })
         .catch(function(e){
           btn.disabled = false;
+          // The guard above means this should be unreachable for the
+          // classification. It is handled anyway, because "unreachable" here
+          // rests on the page and the server agreeing about a list of keys,
+          // and if they ever disagree the person must still be told what to
+          // do rather than shown the keys.
+          if (/classification/i.test(e.message || '')) {
+            classificationMissing();
+            return;
+          }
           err.textContent = e.message;
           err.style.display = '';
         });
