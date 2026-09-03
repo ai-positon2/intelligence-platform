@@ -749,6 +749,21 @@
             esc(shortUrl(u)) + '</a>';
         }).join('') + '</div>';
       }
+      /* The pages we tried and could not read.
+         Without this, a blank deal size is just blank. With it, "we asked for
+         their pricing page and it refused us" is on screen next to the field
+         it explains, and the reader knows whether to go and look themselves
+         or to accept that the answer is not published. */
+      var missed = (d.pages || []).filter(function(p){ return p.status !== 'ok'; });
+      if (missed.length) {
+        html += '<p class="rn"><b>' + esc(plural(missed.length, 'page')) +
+          ' we tried could not be read.</b> ' + missed.map(function(p){
+            /* Not wrapped in brackets: fetch_page's notes are whole
+               sentences that already end in a full stop, and the bracketed
+               version rendered "(Server refused the request (HTTP 403).)". */
+            return esc(shortUrl(p.url)) + (p.note ? ': ' + esc(p.note) : '.');
+          }).join(' ') + '</p>';
+      }
       read.innerHTML = html;
       read.hidden = false;
 
