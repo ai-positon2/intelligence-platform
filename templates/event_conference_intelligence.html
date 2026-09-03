@@ -192,9 +192,9 @@
 
             <div id="profileForm" style="display:none">
               <div class="evi-group">
-                <span class="gh">Step 1 &middot; Who is this for</span>
-                <span class="gs">Give us a name and a website and we will read the
-                  site and fill the rest of this in for you to check.</span>
+                <span class="gh">Who is this for</span>
+                <span class="gs">Two things to start. We read their site and fill
+                  in the rest for you to check.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -214,14 +214,25 @@
                 <span class="dh">We fetch a handful of their pages and read
                   them, usually in under a minute. Nothing is saved until you
                   lock the profile, and you can change anything it writes.</span>
+                <button type="button" class="evi-link" id="manualBtn"
+                        onclick="revealRest(true)">or fill it in myself</button>
               </div>
               <div id="draftError" class="evi-err" style="display:none;margin-top:12px"></div>
               <div id="draftRead" class="evi-read" hidden></div>
 
+            <!-- Everything below stays folded away until there is something to
+                 check. The form asked for twelve fields and a classification
+                 before it had done anything for you, which is what a first-time
+                 reader met and what made the play look like paperwork. It is
+                 the same fields; what changed is that they arrive filled in,
+                 as a thing to correct rather than a thing to compose. -->
+            <div id="profileRest" hidden>
+
               <div class="evi-group">
-                <span class="gh">Step 2 &middot; Which side of the floor</span>
-                <span class="gs">This one is yours to answer. It decides which
-                  crowd every score measures.</span>
+                <span class="gh">Which side of the floor</span>
+                <span class="gs">This one is yours to answer, and it is the only
+                  one we will not guess. It decides which crowd every score
+                  measures.</span>
               </div>
               <div class="evi-field">
                 <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
@@ -240,7 +251,9 @@
                 </div>
               </div>
               <div class="evi-group">
-                <span class="gh">Step 3 &middot; Who they sell to</span>
+                <span class="gh">Who they sell to</span>
+                <span class="gs">Correct anything that looks wrong. A blank
+                  field is one their site does not answer.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -267,7 +280,7 @@
                 </div>
               </div>
               <div class="evi-group">
-                <span class="gh">Step 4 &middot; How far to look</span>
+                <span class="gh">How far to look</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -280,10 +293,10 @@
                   <input type="text" id="windowMonths" placeholder="12" />
                 </div>
               </div>
-              <div class="evi-group">
-                <span class="gh">Step 5 &middot; Standing instructions</span>
-                <span class="gs">Carried into every run on this profile.</span>
-              </div>
+              <details class="evi-optional">
+                <summary><span class="gh">Standing instructions</span>
+                  <span class="gs">Optional. Carried into every run on this
+                    profile.</span></summary>
               <div class="evi-row evi-row-3">
                 <div class="evi-field">
                   <label for="forceInclude">Already committed to these</label>
@@ -310,9 +323,11 @@
                   </span>
                 </div>
               </div>
+              </details>
               <button type="button" class="evi-btn evi-btn-ghost" style="margin-top:16px"
                       onclick="saveProfile()" id="saveProfileBtn">Lock this profile</button>
               <div id="profileError" class="evi-err" style="display:none;margin-top:12px"></div>
+            </div>
             </div>
           </div>
 
@@ -706,7 +721,32 @@
           'See the page we read</a>.'
         : '');
       e.style.display = '';
+      /* A failed read must not be a dead end. The rest of the form opens so
+         the profile can still be filled in by hand, and the error stays on
+         screen above it rather than being cleared by the reveal. */
+      revealRest(false);
     }
+
+    /* The fold. Everything past the name and the website waits here until
+       there is something to check, because a first-time reader who meets
+       twelve empty fields and a classification has met paperwork, not a tool.
+
+       `focus` is false when the draft opened it: the page has just written
+       into those fields and moving the cursor would fight the reader's eye.
+       It is true only when somebody asked to fill it in themselves. */
+    function revealRest(focus){
+      var rest = document.getElementById('profileRest');
+      if (!rest) return;
+      var wasHidden = rest.hidden;
+      rest.hidden = false;
+      var manual = document.getElementById('manualBtn');
+      if (manual) manual.hidden = true;
+      if (focus && wasHidden) {
+        var first = document.getElementById('buyerRoles');
+        if (first && first.focus) first.focus();
+      }
+    }
+    window.revealRest = revealRest;
 
     function applyDraft(d){
       clearDraftMarks();
@@ -769,6 +809,9 @@
 
       suggestClass(d.classification, d.classification_why,
                    d.classification_confidence);
+      // Last, so the fields and the suggested card are already written when
+      // the block appears and nothing is seen filling itself in.
+      revealRest(false);
     }
 
     function shortUrl(u){
