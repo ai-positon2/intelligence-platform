@@ -1385,6 +1385,48 @@
       return (months[mi] || p[1]) + ' ' + parseInt(p[2], 10) + ', ' + p[0];
     }
 
+    /* Every category key the page knows a label for is in CATEGORY_LABELS,
+       and every use of it had the same fallback: `LABELS[k] || k`. So a key
+       from an older stored run, or one the rubric renamed, printed raw.
+       Reports went out reading "3 days &middot; famous_flagship" in the meta
+       line of a card and "virtual" where a category belonged, which is both
+       an internal token shown to a client and, in the second case, actively
+       misleading: it sat one line above a chip saying "In person".
+
+       Falling back to the key is still right, because dropping the category
+       would be worse. It just has to be spelled the way a person writes. */
+    function catLabel(key){
+      var k = String(key == null ? '' : key);
+      if (CATEGORY_LABELS[k]) return CATEGORY_LABELS[k];
+      if (!k) return '';
+      var words = k.replace(/[_-]+/g, ' ').trim();
+      return words ? words[0].toUpperCase() + words.slice(1) : '';
+    }
+
+    /* The summary stores some dates as text it built at run time, and it
+       built them as ISO. So "Top five" printed "2027-06-08 to 2027-06-10"
+       and the ranked list printed "Jun 8, 2027 to Jun 10, 2027" for the same
+       event, ten lines apart. The writer is fixed too, but stored runs keep
+       what they were written with, so every ISO date is rewritten on the way
+       out rather than only on the way in. */
+    var ISO_IN_TEXT = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+    function fmtDatesIn(text){
+      if (!text) return '';
+      return String(text).replace(ISO_IN_TEXT, function(m){ return fmtDate(m); });
+    }
+
+    /* Attendance is the event's own claim and is labelled as one. The label
+       was appended unconditionally, so a figure that already carried it came
+       out as "600 attendees (their claim) (their claim)". And a value with no
+       number in it is not an attendance figure at all: one run stored
+       "Free, virtual" in the field, which the report then presented to a
+       reader as this event's published attendance. */
+    function attendanceClaim(raw){
+      var v = String(raw == null ? '' : raw).trim();
+      if (!v || !/\d/.test(v)) return '';
+      return /their claim/i.test(v) ? v : v + ' (their claim)';
+    }
+
     function eventLine(ev){
       var bits = [];
       if (ev.edition) bits.push(esc(ev.edition));
@@ -2682,8 +2724,10 @@
           '</div>' +
           '<div class="cm">' + esc(when) + ' &middot; ' + esc(where) +
             (c.days ? ' &middot; ' + esc(c.days) + ' day' + (c.days === 1 ? '' : 's') : '') +
-            ' &middot; ' + esc(CATEGORY_LABELS[c.category] || c.category) +
-            (c.attendees ? ' &middot; ' + esc(c.attendees) + ' (their claim)' : '') +
+            ' &middot; ' + esc(catLabel(c.category)) +
+            (function(){
+              var claim = attendanceClaim(c.attendees);
+              return claim ? ' &middot; ' + esc(claim) : ''; })() +
             (c.booths ? ' &middot; ' + esc(c.booths) : '') +
           '</div>' +
           /* Whether it runs in person is decision-relevant on its own: an 82
@@ -2713,7 +2757,7 @@
           bar('DM access', c.dm_access, 40) +
           bar('Engagement', c.engagement, 20) +
           '<div class="mm' + (c.matchmaking ? ' on' : '') + '">' +
-            (c.matchmaking ? '+10 matchmaking' : 'no matchmaking bonus') +
+            (c.matchmaking ? '+10 matchmaking' : 'No matchmaking bonus') +
             '<span>' + esc(c.matchmaking_reason || '') + '</span></div>' +
         '</div>' +
         (c.description ? '<p class="cd">' + esc(c.description) + ' ' +
@@ -2967,7 +3011,7 @@
         kept += Number(st.kept != null ? st.kept : st.found) || 0;
         (st.rejected || []).forEach(function(r){
           ruled.push({name: r.name, reason: r.reason,
-                      label: CATEGORY_LABELS[k] || st.label || k});
+                      label: catLabel(k) || st.label});
         });
       });
       if (!named) return '';
@@ -3033,7 +3077,7 @@
 
       var bars = keys.map(function(k){
         var sf = byCat[k], st = statuses[k] || {};
-        var label = CATEGORY_LABELS[k] || (sf && sf.label) || k;
+        var label = catLabel(k) || (sf && sf.label) || '';
         if (sf) {
           return {label: label, n: Number(sf.found) || 0, max: Number(sf.quota) || 0,
                   state: sf.status === 'error' ? 'error' : 'short',
@@ -3149,14 +3193,65 @@
     var NOTE_LABEL = {gap: 'Not measured', thin: 'Measured on less',
                       note: 'Worth knowing', ok: 'Clean'};
 
+    /* A head for a paragraph of stored prose, and only when the paragraph
+       offers one.
+       A head is the FIRST SENTENCE, whole, and short enough to scan. Nothing
+       is cut to make one fit: a head invented by chopping a sentence in half
+       can say the opposite of the paragraph beneath it, and "quoted as
+       stated and..." is a worse line than the paragraph it replaced. Where
+       the leading sentence is too long, or where the first full stop is
+       buried inside a parenthetical, this returns nothing and the caller
+       prints the paragraph as it always was. */
+    var OLD_HEAD_CHARS = 96;
+    function foldHead(text){
+      var full = String(text || '').trim();
+      if (full.length <= OLD_HEAD_CHARS) return full;
+      var m = /[.!?](\s|$)/.exec(full);
+      if (!m) return '';
+      var end = m.index + 1;
+      return end <= OLD_HEAD_CHARS ? full.slice(0, end) : '';
+    }
+
     function notesHtml(s){
       var ns = s.notes || [];
       if (!ns.length) {
+        /* A run stored before the head-and-detail split. Its facts are five
+           finished paragraphs and one of them ran to 600 characters, so
+           printing them as a list is the block the whole redesign was for.
+           The stored text cannot be rewritten, but it can be given the same
+           shape: a line to scan, the paragraph behind it. Nothing is
+           dropped, and printing opens every fold. */
         var old = s.assumptions || [];
         if (!old.length) return '';
-        return '<div class="ex-assume"><h4>What was not measured</h4><ul>' +
-          old.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') +
-          '</ul></div>';
+        return '<div class="ex-notes"><div class="nh">' +
+          '<h4>What was not measured</h4></div><div class="nl">' +
+          old.map(function(a, i){
+            var full = String(a || '').replace(/\s+/g, ' ').trim();
+            if (!full) return '';
+            var head = foldHead(full);
+            if (!head) {
+              /* No sentence short enough to stand for the rest. The
+                 paragraph is not cut and not summarised: the whole of it is
+                 in the row, shortened to two lines by the stylesheet and
+                 released when the row is opened. Nothing is edited, nothing
+                 is hidden from a screen reader, and printing opens it. */
+              return '<details class="nr n-note nfull" style="--i:' + i +
+                '"><summary><span class="nd n-note"></span>' +
+                '<span class="nx">' + esc(full) + '</span>' +
+                '<span class="nmore" aria-hidden="true">All</span>' +
+                '</summary></details>';
+            }
+            var row = '<span class="nd n-note"></span><span class="nx">' +
+                      esc(head) + '</span>';
+            if (head === full) {
+              return '<div class="nr n-note" style="--i:' + i + '">' +
+                     row + '</div>';
+            }
+            return '<details class="nr n-note" style="--i:' + i +
+              '"><summary>' + row +
+              '<span class="nmore" aria-hidden="true">Why</span></summary>' +
+              '<p>' + esc(full) + '</p></details>';
+          }).join('') + '</div></div>';
       }
       var counts = {};
       ns.forEach(function(n){ counts[n.level] = (counts[n.level] || 0) + 1; });
@@ -3266,7 +3361,7 @@
             var body = '<div class="tn">' + esc(t.name) +
               '<span class="ts">' + esc(t.total) + '<i>/110</i></span></div>' +
               '<div class="tb"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-              '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(t.when) + '</div>' +
+              '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(fmtDatesIn(t.when)) + '</div>' +
               '<div class="tc">' + esc(t.case) + '</div>';
             return '<li class="' + tierClass(t.tier) + (at == null ? '' : ' go') + '">' +
               (at == null ? body
@@ -3306,7 +3401,7 @@
           'the next edition is the thing to look for.' +
           '</div><div class="evi-cut">' + s.finished.map(function(e){
             return '<span class="cutp">' + esc(e.name) +
-              '<b>ended ' + esc(e.ends_on || '?') + '</b></span>'; }).join('') +
+              '<b>ended ' + esc(fmtDate(e.ends_on) || 'date unknown') + '</b></span>'; }).join('') +
           '</div></div>';
       }
       if ((s.unscored || []).length) {

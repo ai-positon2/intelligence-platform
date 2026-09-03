@@ -439,16 +439,68 @@ def test_the_notes_carry_a_tally_so_the_count_is_readable_without_counting(page_
 
 
 def test_a_run_stored_before_the_pointers_existed_still_renders(page_script):
-    """The prose shape lives in every finished run's stored summary. It
-    renders as the paragraphs it always was rather than being split on a
-    guess: inventing a head by cutting a sentence in half is how you get a
-    heading that means the opposite of the paragraph under it."""
+    """The prose shape lives in every finished run's stored summary, and no
+    stored text is ever cut to make a head: a head invented by chopping a
+    sentence in half can say the opposite of the paragraph under it.
+
+    A paragraph that opens with a short sentence of its own is a different
+    case, and that sentence becomes the head with the paragraph behind it.
+    That is not a guess, it is the paragraph's own first sentence, and it is
+    the only way a run stored before the split reads like the ones after it.
+    """
     html = _render(page_script, _recommend(
         [_cand("ATTD", 74, "P2")], discovered=2,
         counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
         assumptions=["An old stored paragraph that was never split up."]))
     assert "An old stored paragraph that was never split up." in html
     assert "What was not measured" in html
+
+
+def test_a_stored_paragraph_with_no_short_sentence_is_printed_whole(page_script):
+    """Verbatim from the run this was reported on. Its first full stop is
+    inside a parenthetical thirty words in, so there is no sentence to head it
+    with and it keeps its paragraph."""
+    para = ("1 discovery category did not run, so this list is missing a kind "
+            "of event rather than having found none: Regional flagship (the "
+            "answer ran past the length it was allowed). That is a hole in "
+            "the analysis, not a finding about the market.")
+    html = _render(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=[para]))
+    assert para in html
+    assert "nfull" in html, "the shortened row was not used"
+    assert "\u2026" not in html.split("What was not measured")[1][:900], \
+        "a sentence was cut to make a head"
+    # Shortened by the stylesheet, not by the markup: the whole paragraph is
+    # in the row, and every fold is opened for the print.
+    css = _decommented(_CSS)
+    # rindex: the print block carries a rule with the same selector, and it
+    # sits earlier in the file.
+    at = css.rindex(".evi-exec .nr.nfull .nx")
+    assert "-webkit-line-clamp: 2" in css[at:at + 260]
+    assert "-webkit-line-clamp: none" in css[css.index(".nr.nfull[open] .nx"):][:120]
+    rules = _rules(_print_block())
+    clamp = [d for sel, d in rules.items()
+             if "nfull" in sel and "line-clamp" in d]
+    assert clamp and all("none" in d for d in clamp), \
+        "the print keeps a CSS clamp on a paragraph nobody can click open"
+
+
+def test_a_stored_paragraph_that_opens_with_a_short_sentence_is_folded(page_script):
+    para = ("Cross-client check: not measured. There are no completed "
+            "recommendations for a different client to compare this list "
+            "against yet, so the cross-client check could not run. It becomes "
+            "meaningful from the second client onwards.")
+    html = _render(page_script, _recommend(
+        [_cand("ATTD", 74, "P2")], discovered=2,
+        counts={"P1": 0, "P2": 1, "kept": 1, "excluded": 1, "finished": 0},
+        assumptions=[para]))
+    at = html.index("What was not measured")
+    block = html[at:at + 1400]
+    assert "<details" in block, "a paragraph with a short opener stayed flat"
+    assert "Cross-client check: not measured." in block
+    assert para in block, "the paragraph behind the fold lost text"
 
 
 def test_every_fold_is_opened_for_the_print():

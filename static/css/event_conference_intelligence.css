@@ -1768,6 +1768,9 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   /* Opened for the print by beforeprint, so the marker beside a head that
      is now showing its reason anyway is just noise on paper. */
   .evi-exec .nr .nmore, .evi-bars .bw.bwd > summary::after { display: none; }
+  /* Opened by the print handler, so the two-line clamp has to lift too:
+     a paragraph shortened by CSS on paper is a paragraph deleted. */
+  .evi-exec .nr.nfull .nx { display: block; -webkit-line-clamp: none; }
   /* An ellipsis on screen is a promise that hovering or widening will show
      the rest. Paper cannot keep that promise, so a truncated event name is
      just a name the reader does not have. "ATTD 2027 (Advanced
@@ -2003,6 +2006,19 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   background: var(--evi-ink-3);
 }
 .evi-exec .nr .nx { flex: 1 1 auto; min-width: 0; }
+/* A stored paragraph with no sentence short enough to head it. The row still
+   scans because it is two lines like its neighbours, but the shortening is
+   the stylesheet's and not the text's: the whole paragraph is in the markup,
+   and opening the row releases it. The dot sits on the first line rather
+   than halfway down eight of them. */
+.evi-exec .nr.nfull > summary { align-items: flex-start; }
+.evi-exec .nr.nfull .nd, .evi-exec .nr.nfull .nmore { margin-top: 5px; }
+.evi-exec .nr.nfull .nx {
+  color: var(--evi-ink-3);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.evi-exec .nr.nfull[open] .nx { display: block; -webkit-line-clamp: none; }
 .evi-exec .nr .nmore {
   flex: 0 0 auto; font-size: 10px; letter-spacing: .07em;
   text-transform: uppercase; font-weight: 700; color: var(--evi-ink-3);
