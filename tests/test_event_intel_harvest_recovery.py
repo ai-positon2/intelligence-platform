@@ -87,12 +87,22 @@ def test_a_duplicate_link_to_one_page_is_followed_once():
 
 # ── harvest_page walking the listing ──────────────────────────────────────
 
-def _stub_fetch(monkeypatch, pages):
-    """pages: {url: (text, status)}"""
+def _stub_fetch(monkeypatch, pages, redirects=None):
+    """pages: {url: (text, status)}. redirects: {requested: landed_on}.
+
+    Mirrors the real fetch_page's shape, `final_url` included. A stub that
+    omitted it would let every test here pass with the redirect handling
+    deleted, because the caller falls back to the requested URL.
+    """
+    redirects = redirects or {}
+
     def fake(url):
-        text, status = pages.get(url, ("", store.SOURCE_ERROR))
-        return {"url": url, "status": status, "http_status": 200 if status == store.SOURCE_OK else 500,
-                "text": text, "note": "", "truncated": False, "spa": None}
+        final = redirects.get(url, url)
+        text, status = pages.get(final, pages.get(url, ("", store.SOURCE_ERROR)))
+        return {"url": url, "final_url": final, "status": status,
+                "http_status": 200 if status == store.SOURCE_OK else 500,
+                "text": text, "note": "", "truncated": False, "spa": None,
+                "redirected": final != url}
     monkeypatch.setattr(H, "fetch_page", fake)
 
 
@@ -483,3 +493,182 @@ def test_harvest_still_reads_a_complete_reply(monkeypatch):
                                  "exhibitor_list", "Money20/20", "ev.example")
     assert out["error"] is None
     assert [r["org_name"] for r in out["rows"]] == ["Acme Payments"]
+
+
+# ── Pagination carried in the path (WordPress and friends) ────────────────
+
+def test_a_wordpress_archive_paginates_in_its_path():
+    """`/exhibitors/page/2/` is how WordPress serves page two of any archive,
+    and a query-string-only reader stopped at page one on every one of them."""
+    text = _t("https://ev.com/exhibitors/page/2/", "https://ev.com/exhibitors/page/3/")
+    assert H.next_page_links(text, "https://ev.com/exhibitors/") == [
+        "https://ev.com/exhibitors/page/2/", "https://ev.com/exhibitors/page/3/"]
+
+
+def test_the_listing_front_page_is_not_followed_back_from_page_two():
+    text = _t("https://ev.com/exhibitors/", "https://ev.com/exhibitors/page/3/")
+    assert H.next_page_links(text, "https://ev.com/exhibitors/page/2/") == [
+        "https://ev.com/exhibitors/page/3/"]
+
+
+@pytest.mark.parametrize("href", [
+    "https://ev.com/exhibitors/page/2/",
+    "https://ev.com/exhibitors/page/2",
+    "https://ev.com/exhibitors/page-2",
+    "https://ev.com/exhibitors/page_2",
+    "https://ev.com/exhibitors/pg/2",
+])
+def test_the_common_path_pagination_shapes_are_recognised(href):
+    assert H.next_page_links(_t(href), "https://ev.com/exhibitors/") == [href]
+
+
+def test_a_bare_numbered_path_is_never_treated_as_a_page():
+    """On /speakers/, the link /speakers/42/ is speaker forty-two. Following
+    it would pull a profile into the roster AND count it as a directory page
+    that had been read, so the roster would look longer and be wronger."""
+    assert H.next_page_links(_t("https://ev.com/speakers/42/"),
+                             "https://ev.com/speakers/") == []
+    assert H.next_page_links(_t("https://ev.com/speakers/2/"),
+                             "https://ev.com/speakers/") == []
+
+
+def test_a_path_paginated_link_on_another_listing_is_not_the_next_page():
+    assert H.next_page_links(_t("https://ev.com/speakers/page/2/"),
+                             "https://ev.com/exhibitors/") == []
+
+
+def test_path_and_query_pagination_of_one_listing_still_agree():
+    """A site that links its own pages both ways must not produce two rosters."""
+    text = _t("https://ev.com/exhibitors/page/2/")
+    assert H.next_page_links(text, "https://ev.com/exhibitors") == [
+        "https://ev.com/exhibitors/page/2/"]
+
+
+def test_a_query_filter_still_blocks_a_path_paginated_next_page():
+    text = _t("https://ev.com/exhibitors/page/2/?category=fintech")
+    assert H.next_page_links(text, "https://ev.com/exhibitors/") == []
+
+
+# ── Redirects ─────────────────────────────────────────────────────────────
+
+def test_a_redirected_listing_still_follows_its_own_pagination(monkeypatch):
+    """/exhibitors -> /2026/exhibitors/ is the normal shape of a site that has
+    run for more than one year. Before the final URL was read, every next-page
+    link failed the same-listing test and the walk stopped at page one with
+    nothing on screen saying so."""
+    asked = "https://ev.com/exhibitors"
+    landed = "https://ev.com/2026/exhibitors/"
+    p2 = "https://ev.com/2026/exhibitors/page/2/"
+    _stub_fetch(monkeypatch,
+                {landed: (_t(p2), store.SOURCE_OK), p2: ("", store.SOURCE_OK)},
+                redirects={asked: landed})
+    _stub_extract(monkeypatch, {landed: [_row("Acme")], p2: [_row("Beta")]})
+    got = H.harvest_page({"url": asked, "kind": "exhibitors"}, "Ev")
+    assert sorted(r["org_name"] for r in got["rows"]) == ["Acme", "Beta"]
+    assert got["source"]["pages_read"] == 2
+
+
+def test_the_ledger_keeps_the_published_url_and_names_the_redirect(monkeypatch):
+    """The URL a reader can check against the event's own site is the one the
+    event published, so that stays the ledger row. Where it actually went is
+    recorded beside it rather than swapped in."""
+    asked = "https://ev.com/exhibitors"
+    landed = "https://ev.com/2026/exhibitors/"
+    _stub_fetch(monkeypatch, {landed: ("text", store.SOURCE_OK)},
+                redirects={asked: landed})
+    _stub_extract(monkeypatch, {landed: [_row("Acme")]})
+    got = H.harvest_page({"url": asked, "kind": "exhibitors"}, "Ev")
+    assert got["source"]["url"] == asked
+    assert got["source"]["final_url"] == landed
+
+
+def test_a_row_points_at_the_page_it_was_actually_read_from(monkeypatch):
+    """Same rule the recovery path already keeps: the citation is where the
+    row was seen, not where we went looking."""
+    asked = "https://ev.com/exhibitors"
+    landed = "https://ev.com/2026/exhibitors/"
+    _stub_fetch(monkeypatch, {landed: ("text", store.SOURCE_OK)},
+                redirects={asked: landed})
+    _stub_extract(monkeypatch, {landed: [_row("Acme")]})
+    got = H.harvest_page({"url": asked, "kind": "exhibitors"}, "Ev")
+    assert got["rows"][0]["source_url"] == landed
+
+
+def test_an_unredirected_page_records_no_redirect(monkeypatch):
+    p1 = "https://ev.com/exh"
+    _stub_fetch(monkeypatch, {p1: ("text", store.SOURCE_OK)})
+    _stub_extract(monkeypatch, {p1: [_row("Acme")]})
+    got = H.harvest_page({"url": p1, "kind": "exhibitors"}, "Ev")
+    assert got["source"]["final_url"] is None
+
+
+@pytest.mark.parametrize("a,b", [
+    ("https://ev.com/exh", "https://ev.com/exh/"),
+    ("https://ev.com/exh", "https://EV.com/exh"),
+])
+def test_a_cosmetic_redirect_is_not_reported_as_one(a, b):
+    """A trailing slash or a host case change has not moved the page, and
+    reporting those would put a redirect note on most of the web."""
+    assert H._same_page(a, b) is True
+
+
+def test_a_redirect_to_another_path_is_reported():
+    assert H._same_page("https://ev.com/exh", "https://ev.com/2026/exh") is False
+    assert H._same_page("https://ev.com/exh", "https://other.com/exh") is False
+
+
+# ── A listing that declares its own size ──────────────────────────────────
+
+@pytest.mark.parametrize("text,expected", [
+    ("Showing exhibitors. Page 1 of 14", 14),
+    ("page 1 / 9", 9),
+    ("1 of 23 pages", 23),
+    ("Page 1 of 1", None),
+    ("no pagination here", None),
+    ("Copyright 2026 of 2026", None),
+])
+def test_a_listing_that_declares_its_page_count_is_read(text, expected):
+    assert H.declared_page_count(text) == expected
+
+
+def test_the_largest_declared_count_wins():
+    """A directory footer often carries more than one counter, and the roster
+    is short by the bigger of them."""
+    assert H.declared_page_count("Page 1 of 3 ... page 1 of 14") == 14
+
+
+def test_a_listing_we_could_not_walk_says_how_short_it_is(monkeypatch):
+    """The case this exists for: the page numbers are a cursor, or a button
+    that posts, so there is no link to follow and the old code stopped at page
+    one in silence. The page told us it had fourteen."""
+    p1 = "https://ev.com/exh"
+    _stub_fetch(monkeypatch, {p1: ("Page 1 of 14", store.SOURCE_OK)})
+    _stub_extract(monkeypatch, {p1: [_row("Acme")]})
+    got = H.harvest_page({"url": p1, "kind": "exhibitors"}, "Ev")
+    note = got["source"]["note"]
+    assert "says it has 14 pages and 1 was read" in note
+    assert "could not be followed" in note
+    assert got["source"]["pages_declared"] == 14
+
+
+def test_a_listing_read_to_its_declared_end_says_nothing_about_it(monkeypatch):
+    p1, p2 = "https://ev.com/exh?page=1", "https://ev.com/exh?page=2"
+    _stub_fetch(monkeypatch, {p1: ("Page 1 of 2 " + _t(p2), store.SOURCE_OK),
+                              p2: ("Page 2 of 2", store.SOURCE_OK)})
+    _stub_extract(monkeypatch, {p1: [_row("Acme")], p2: [_row("Beta")]})
+    got = H.harvest_page({"url": p1, "kind": "exhibitors"}, "Ev")
+    assert "is incomplete" not in got["source"]["note"]
+    assert "pages_declared" not in got["source"]
+
+
+def test_a_declared_shortfall_does_not_blame_the_links_when_links_ran_out(monkeypatch):
+    """Two different holes. Followable links that hit the cap is one story;
+    no followable links at all is another, and they must not share wording."""
+    urls = ["https://ev.com/exh?page=%d" % n for n in range(1, 8)]
+    pages = {u: ("Page 1 of 14 " + _t(*urls), store.SOURCE_OK) for u in urls}
+    _stub_fetch(monkeypatch, pages)
+    _stub_extract(monkeypatch, {u: [_row("Org%d" % i)] for i, u in enumerate(urls)})
+    got = H.harvest_page({"url": urls[0], "kind": "exhibitors"}, "Ev", max_pages=3)
+    note = got["source"]["note"]
+    assert "says it has 14 pages and 3 were read" in note
+    assert "could not be followed" not in note
