@@ -504,6 +504,53 @@ body {
   max-width: 42ch; min-width: 0;
 }
 
+/* The way past a read that will not happen: no website, a site that refuses
+   us, or somebody who simply knows the answers. Styled as a quiet aside
+   rather than a second button, because it is the path most people should not
+   take and one of two equal-looking buttons is a decision nobody asked for. */
+.evi-link {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--evi-ink-3);
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--evi-line);
+}
+.evi-link:hover { color: var(--evi-a1); text-decoration-color: currentColor; }
+.evi-link:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 3px; }
+/* Its own row, always. Left to wrap naturally it landed at the end of the
+   hint paragraph and read as the last few words of that sentence. */
+.evi-draftbar .evi-link { flex: 0 0 100%; text-align: left; margin-top: 2px; }
+
+/* Three fields that are genuinely optional, folded so they do not read as
+   three more things to answer. */
+.evi-optional { margin-top: 22px; }
+.evi-optional > summary {
+  cursor: pointer; list-style: none; display: flex;
+  flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding-bottom: 9px; border-bottom: 1px solid var(--evi-line-2);
+}
+.evi-optional > summary::-webkit-details-marker { display: none; }
+.evi-optional > summary::before {
+  content: "\203a"; color: var(--evi-ink-3); font-size: 15px; line-height: 1;
+  transition: transform .16s ease; transform-origin: 50% 55%;
+}
+.evi-optional[open] > summary::before { transform: rotate(90deg); }
+.evi-optional > summary:hover .gh { color: var(--evi-ink); }
+/* The same label treatment the other group headings get. `.gh` and `.gs` are
+   scoped to `.evi-group`, so without this the one heading that is a summary
+   renders as plain sentence-case text next to five small-caps siblings.
+   No tick bar: the chevron already marks this row, and two markers on one
+   line read as a mistake. */
+.evi-optional > summary .gh {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--evi-ink-2);
+}
+.evi-optional > summary .gs { font-size: 11.5px; color: var(--evi-ink-3); }
+.evi-optional > .evi-row { margin-top: 16px; }
+
+/* The fold itself. It carries no styling of its own on purpose: what is
+   inside it has to look identical whether it arrived open or closed. */
+#profileRest[hidden] { display: none; }
+
 /* What was read, shown before anything that was written from it. The company
    sentence is deliberately the largest thing here: two firms sharing a name is
    the failure mode that produces a complete, confident, well-sourced profile

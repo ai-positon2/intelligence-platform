@@ -28,16 +28,46 @@ pytestmark = pytest.mark.skipif(shutil.which("node") is None,
                                 reason="node is needed to execute the page script")
 
 
-def _page_script():
+def _page_html():
     c = appmod.app.test_client()
     with c.session_transaction() as sess:
         sess["google_user"] = {"email": "harness@position2.com", "name": "T"}
     resp = c.get(_PAGE)
     assert resp.status_code == 200, "the page did not render (%s)" % resp.status_code
+    return resp.get_data(as_text=True)
+
+
+def _page_script(html=None):
     blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
-                        resp.get_data(as_text=True), re.S)
+                        html if html is not None else _page_html(), re.S)
     assert blocks, "the page has no inline script"
     return blocks[0]
+
+
+_ID = re.compile(r'\bid="([^"]+)"')
+_HIDDEN = re.compile(r'(?:^|\s)hidden(?=[\s>=])')
+
+
+def _hidden_ids(html):
+    """Every element the template renders with a bare `hidden` attribute.
+
+    Fed to the shim so its starting state is the TEMPLATE'S starting state.
+    The alternative is writing it out by hand, and the last hand-written
+    assumption in this shim (that the template pre-checked a radio card)
+    stopped being true and left two tests asserting fiction against a DOM
+    nobody rendered. A derived value cannot drift.
+    """
+    out = []
+    for tag in re.findall(r"<[a-zA-Z][^>]*>", html):
+        m = _ID.search(tag)
+        if not m:
+            continue
+        # Strip every quoted value first, so the word "hidden" inside a class
+        # name, an onclick or a placeholder is not read as the attribute.
+        bare = re.sub(r'="[^"]*"', "=", tag)
+        if _HIDDEN.search(bare):
+            out.append(m.group(1))
+    return sorted(set(out))
 
 
 # A DOM shaped like a first run: one profile option ("new"), no saved rosters,
@@ -85,7 +115,13 @@ function __node(attrs){
    ran. */
 var __made = {};
 function __el(id){
-  if (!__made[id]) __made[id] = __node({id: id});
+  if (!__made[id]) {
+    __made[id] = __node({id: id});
+    // Exactly what the template rendered. `profileRest` arrives hidden, and a
+    // shim that handed it back visible would let the whole fold be deleted
+    // with every test still green.
+    if (HIDDEN_IDS.indexOf(id) !== -1) __made[id].hidden = true;
+  }
   return __made[id];
 }
 
@@ -220,16 +256,18 @@ _EV_FIELDS = _ev_fields()
 
 
 def _run(probe, class_keys, event_keys):
-    script = _page_script()
+    html = _page_html()
+    script = _page_script(html)
     assert _IIFE_CLOSE in script, (
         "the page's IIFE no longer closes with a two-space-indented `})();`")
     at = script.index(_IIFE_CLOSE)
     # Spliced INSIDE the IIFE and AFTER the init block, so it observes the
     # state the browser is left in once the page has loaded.
     script = script[:at] + "\n" + probe + script[at:]
-    js = ("var CLASS_KEYS = %s;\nvar EVENT_KEYS = %s;\nvar EV_FIELDS = %s;\n%s\n%s"
+    js = ("var CLASS_KEYS = %s;\nvar EVENT_KEYS = %s;\nvar EV_FIELDS = %s;\n"
+          "var HIDDEN_IDS = %s;\n%s\n%s"
           % (json.dumps(class_keys), json.dumps(event_keys),
-             json.dumps(_EV_FIELDS), _SHIM, script))
+             json.dumps(_EV_FIELDS), json.dumps(_hidden_ids(html)), _SHIM, script))
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2000:]
     return json.loads(r.stdout.strip().splitlines()[-1])
@@ -592,3 +630,89 @@ def test_nothing_is_said_when_every_page_was_read(keys):
                                     "status": "ok", "note": ""}])
     out = _run(_draft_probe(clean), *keys)
     assert "could not be read" not in out["read"]["html"]
+
+
+# ── The fold: what a first-time reader is actually asked for ──────────────
+#
+# The intake had five numbered steps, twelve inputs and a four-card question
+# on screen before it had done anything for you. The draft filled them in, but
+# you met the wall first, and "this asks for a lot" was the fair reading.
+#
+# Everything past the name and the website is folded away now. These tests pin
+# both halves: that it starts folded, and that it always opens again, because
+# a fold with no way out is worse than the wall it replaced.
+
+def test_the_form_opens_asking_for_two_things(keys):
+    out = _run("console.log(JSON.stringify({"
+               "  rest: document.getElementById('profileRest').hidden,"
+               "  name: !!document.getElementById('clientName'),"
+               "  site: !!document.getElementById('clientSite')}));", *keys)
+    assert out["rest"] is True, "the rest of the intake is on screen from the start"
+    assert out["name"] and out["site"]
+
+
+def test_a_finished_draft_opens_the_rest(keys):
+    """It opens as a thing to correct, which is the entire point of folding
+    it: the same fields, arriving filled in."""
+    out = _run(
+        "applyDraft({draft: {buyer_roles: 'CMO'}, evidence: {}, sources: [],"
+        " classification: CLASS_KEYS[1], classification_why: 'because'});"
+        "console.log(JSON.stringify({"
+        "  rest: document.getElementById('profileRest').hidden,"
+        "  roles: document.getElementById('buyerRoles').value,"
+        "  focused: __state.focused || null}));", *keys)
+    assert out["rest"] is False
+    assert out["roles"] == "CMO"
+    # The page has just written into those fields. Moving the cursor as well
+    # would fight the reader's eye at the exact moment they are reading.
+    assert out["focused"] is None, "the draft stole the cursor"
+
+
+def test_a_draft_that_fails_is_not_a_dead_end(keys):
+    """No website, a site that refuses us, or the wrong company. The error
+    stays on screen AND the form opens, because the alternative is a page
+    whose only control has just failed."""
+    out = _run(
+        "showDraftError('The site could not be read.');"
+        "console.log(JSON.stringify({"
+        "  rest: document.getElementById('profileRest').hidden,"
+        "  err: document.getElementById('draftError').style.display}));", *keys)
+    assert out["rest"] is False
+    assert out["err"] == "", "the reason it failed was cleared by the reveal"
+
+
+def test_somebody_who_knows_the_answers_can_skip_the_read(keys):
+    out = _run(
+        "revealRest(true);"
+        "console.log(JSON.stringify({"
+        "  rest: document.getElementById('profileRest').hidden,"
+        "  manual: document.getElementById('manualBtn').hidden,"
+        "  focused: __state.focused || null}));", *keys)
+    assert out["rest"] is False
+    assert out["manual"] is True, "the way in is still offered after it was taken"
+    assert out["focused"] == "buyerRoles", "opened it and left the cursor nowhere"
+
+
+def test_opening_the_rest_answers_nothing_on_the_users_behalf(keys):
+    """The guarantee the whole form rests on. Revealing is not answering, and
+    a classification the code refuses to infer must still be unanswered after
+    the block it lives in appears."""
+    out = _run(
+        "revealRest(true);"
+        "applyDraft({draft: {}, evidence: {}, sources: [],"
+        " classification: CLASS_KEYS[2], classification_why: 'because'});"
+        "console.log(JSON.stringify({"
+        "  picked: pickedClass,"
+        "  checked: checkedValue('data-classification')}));", *keys)
+    assert out["picked"] is None
+    assert out["checked"] is None
+
+
+def test_reopening_does_not_move_the_cursor_a_second_time(keys):
+    """A draft arriving after somebody already opened it by hand must not
+    yank the cursor out of the field they are typing in."""
+    out = _run(
+        "revealRest(true); __state.focused = null;"
+        "revealRest(true);"
+        "console.log(JSON.stringify({focused: __state.focused || null}));", *keys)
+    assert out["focused"] is None
