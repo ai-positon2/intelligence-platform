@@ -110,6 +110,26 @@ def test_one_unwritable_row_does_not_empty_the_run(run):
     assert vague["quarter"] == "Q2 2026", "the reader lost the only timing given"
 
 
+def test_the_three_qualifying_facts_survive_the_round_trip(run):
+    """format, confidence and the cited pages, through real SQL.
+
+    `format` is the one that had no column at all, so every read of it was
+    discarded at insert time and the pure tests could not tell. This is the
+    same shape as the defect this whole file was opened for: a column the
+    INSERT names and the table does not have raises, gets caught, and returns
+    a count nobody checks."""
+    assert S.save_candidates(run, [
+        _cand("Virtual One", format="virtual", confidence="low",
+              sources=["https://v.example/expo"]),
+        _cand("Unstated One", format="TBC")]) == 2
+    by = {r["name"]: r for r in S.get_candidates(run)}
+    assert by["Virtual One"]["format"] == "virtual"
+    assert by["Virtual One"]["confidence"] == "low"
+    assert by["Virtual One"]["sources"] == ["https://v.example/expo"]
+    # Outside the closed set, so it lands as NULL rather than as a format.
+    assert by["Unstated One"]["format"] is None
+
+
 def test_cross_run_history_can_see_a_completed_run(run):
     S.save_candidates(run, [_cand("Historic Summit")])
     S.update_run(run, status="complete", stage="done")

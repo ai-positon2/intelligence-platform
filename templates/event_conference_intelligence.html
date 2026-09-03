@@ -2493,6 +2493,25 @@
             (c.attendees ? ' &middot; ' + esc(c.attendees) + ' (their claim)' : '') +
             (c.booths ? ' &middot; ' + esc(c.booths) : '') +
           '</div>' +
+          /* Whether it runs in person is decision-relevant on its own: an 82
+             you fly to and an 82 you watch are not the same proposition.
+             Discovery has always read it; until the column existed it was
+             thrown away at write time. Unknown says so rather than defaulting
+             to in person, and low confidence is shown next to it because it
+             qualifies every fact on this row. */
+          '<div class="cflags">' +
+            (function(){
+              var fk = formatKey(c);
+              return fk === 'unknown'
+                ? '<span class="cfl mut" title="The organiser does not say ' +
+                  'whether this runs in person, online or both.">Format not stated</span>'
+                : '<span class="cfl">' + esc(FORMAT_LABEL[fk]) + '</span>';
+            })() +
+            (String(c.confidence || '').toLowerCase() === 'low'
+              ? '<span class="cfl warn" title="The search could not confirm ' +
+                'this one as firmly as the rest, so weigh the facts on this ' +
+                'card accordingly.">Low confidence</span>' : '') +
+          '</div>' +
         '</div>' +
         '<div class="cscore">' +
           evRing(c.total, 110, TIER_LABEL[c.tier] || 'scored',
@@ -2516,6 +2535,18 @@
             ' This never moved a score.</p>' : '') +
           (gaps.length ? '<p class="gaps"><b>Not measured.</b> ' +
             gaps.map(esc).join(' ') + '</p>' : '') +
+          /* The pages the confirmation actually opened. A score you cannot
+             trace back to a page is a score you have to take on trust, and
+             these were collected on every candidate from the first version
+             and shown on none of them. */
+          (function(){
+            var srcs = (c.sources || []).filter(safeUrl);
+            if (!srcs.length) return '';
+            return '<div class="csrc"><b>Checked against</b>' + srcs.map(function(u){
+              return '<a href="' + esc(safeUrl(u)) + '" target="_blank" ' +
+                'rel="noopener noreferrer">' + esc(shortUrl(u)) + '</a>';
+            }).join('') + '</div>';
+          })() +
         '</details>' +
         /* What you already decided about this event, and the control to
            change it. A previous rejection is shown, never used to hide the

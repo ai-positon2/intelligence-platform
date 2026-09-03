@@ -251,6 +251,7 @@ def _ensure_tables(conn) -> None:
                 industry TEXT,
                 attendees TEXT,
                 booths TEXT,
+                format VARCHAR(16),
                 category VARCHAR(32) NOT NULL,
                 famous BOOLEAN NOT NULL DEFAULT FALSE,
                 committed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -350,6 +351,12 @@ def _ensure_tables(conn) -> None:
                     "provenance VARCHAR(12) NOT NULL DEFAULT 'page'")
         cur.execute("ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS "
                     "committed BOOLEAN NOT NULL DEFAULT FALSE")
+        # Discovery has always read whether an event is in person, virtual or
+        # hybrid, and the column it needed did not exist, so every read of it
+        # was thrown away at write time. Rows stored before this get NULL,
+        # which renders as nothing rather than as "in person".
+        cur.execute("ALTER TABLE evi_candidates ADD COLUMN IF NOT EXISTS "
+                    "format VARCHAR(16)")
     conn.commit()
     _TABLES_READY = True
 
@@ -868,7 +875,7 @@ def update_profile(profile_id: int, email: str, payload: dict) -> bool:
 _CANDIDATE_FIELDS = (
     "event_id", "name", "edition", "website", "organizer", "starts_on", "ends_on",
     "country", "city", "quarter", "days", "industry", "attendees", "booths",
-    "category", "famous", "audit_verdict", "audit_note",
+    "format", "category", "famous", "audit_verdict", "audit_note",
     "relevance", "relevance_note", "dm_access", "dm_access_note",
     "engagement", "engagement_note", "matchmaking", "matchmaking_evidence",
     "matchmaking_reason", "total", "tier", "description", "client_line",
@@ -908,6 +915,21 @@ def iso_date_or_none(value) -> str | None:
         # A well-formed but impossible date (2026-13-45). Same treatment as
         # unparseable: the reader keeps the raw text, the DATE column gets NULL.
         return None
+
+
+EVENT_FORMATS = ("in_person", "virtual", "hybrid")
+
+
+def _fmt(value) -> str | None:
+    """One of the three formats, or nothing.
+
+    A total function over a closed set, in the same spirit as the rubric's
+    orientation lookup: an unrecognised word is dropped rather than stored and
+    rendered as if it meant something. "TBC" on a card reads as a fact about
+    the event.
+    """
+    v = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return v if v in EVENT_FORMATS else None
 
 
 def normalise_candidate(raw: dict) -> dict | None:
@@ -951,6 +973,10 @@ def normalise_candidate(raw: dict) -> dict | None:
         except (TypeError, ValueError):
             return None
 
+    # Normalised BEFORE gaps_for reads it, so a format the closed set rejects
+    # is reported as unknown rather than passing the gap check on the strength
+    # of the raw string and then rendering as nothing.
+    r["format"] = _fmt(r.get("format"))
     starts_on = iso_date_or_none(r.get("starts_on"))
     ends_on = iso_date_or_none(r.get("ends_on"))
     # An event that ends before it starts is two unrelated readings, not a
@@ -987,6 +1013,10 @@ def normalise_candidate(raw: dict) -> dict | None:
         # never published.
         "attendees": _txt("attendees", 80),
         "booths": _txt("booths", 80),
+        # in_person / virtual / hybrid. Decision-relevant on its own: a
+        # virtual event scoring 82 and an in-person one scoring 82 are not the
+        # same proposition, because one of them costs flights.
+        "format": r["format"],
         "category": category,
         "famous": bool(r.get("famous")),
         "audit_verdict": _txt("audit_verdict", 16),

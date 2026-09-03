@@ -271,7 +271,8 @@ def test_a_complete_candidate_reports_no_gaps():
     omitted all three and still expected silence, which is the row the
     never-scored check exists to catch."""
     complete = {"attendees": "4,000", "website": "https://x.example",
-                "starts_on": "2026-05-01", "ends_on": "2026-05-03"}
+                "starts_on": "2026-05-01", "ends_on": "2026-05-03",
+                "format": "in_person", "sources": ["https://x.example/expo"]}
     for i, d in enumerate(R.DIMENSIONS):
         complete[d + "_note"] = "reasoned"
         complete[d] = 10 + i
@@ -280,6 +281,7 @@ def test_a_complete_candidate_reports_no_gaps():
 
 def test_missing_reasoning_is_itself_a_gap():
     c = {"attendees": "1", "website": "https://x.example", "starts_on": "2026-01-01",
+         "format": "hybrid", "sources": ["https://x.example/expo"],
          R.DIM_RELEVANCE: 30, R.DIM_DM_ACCESS: 30, R.DIM_ENGAGEMENT: 10,
          R.DIM_RELEVANCE + "_note": "yes", R.DIM_DM_ACCESS + "_note": "yes"}
     gaps = R.gaps_for(c, today=datetime.date(2025, 1, 1))
