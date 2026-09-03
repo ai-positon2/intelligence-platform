@@ -68,7 +68,8 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
                 interchangeable: list, banned: list, thin: list,
                 unscored: list, over_cap: list | None = None,
                 finished: list | None = None,
-                promoted: dict | None = None) -> list[str]:
+                promoted: dict | None = None,
+                scoring_batches: int = 0) -> list[str]:
     """Element 4. Everything this run could not establish, stated plainly.
 
     Ordered by how much it should change a reader's confidence, not by the
@@ -183,6 +184,20 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
             % (len(unscored), "" if len(unscored) == 1 else "s",
                "was" if len(unscored) == 1 else "were",
                ", ".join(c.get("name") or "?" for c in unscored[:6])))
+    # More than one grading pass means more than one grader, and totals from
+    # different passes were never compared side by side. The candidates are
+    # dealt across the passes so no pass sees a single category, which is what
+    # keeps the totals close to comparable, but "close to" is not "identical"
+    # and a ranked table invites the reader to assume identical.
+    if (scoring_batches or 0) > 1:
+        out.append(
+            "The %d events were graded in %d separate passes rather than one, "
+            "with the categories dealt evenly across them so no pass saw only "
+            "one kind of event. Scores are still absolute against the rubric, "
+            "but two events one point apart may have been graded in different "
+            "passes, so treat small gaps near the top as a tie."
+            % (len(candidates or []) + len(unscored or []), scoring_batches))
+
     if scoring_errors:
         out.append("Scoring reported %d error%s: %s."
                    % (len(scoring_errors), "" if len(scoring_errors) == 1 else "s",

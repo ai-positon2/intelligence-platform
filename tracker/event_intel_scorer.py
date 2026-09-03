@@ -164,6 +164,35 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
     return {"scores": out, "error": None}
 
 
+def deal(candidates: list[dict], size: int = BATCH) -> list[list[dict]]:
+    """Split candidates into batches, DEALT round-robin rather than sliced.
+
+    This module exists so that one standard is applied to every candidate
+    instead of six category finders each grading their own. Past `size`
+    candidates that guarantee is weaker than it looks: each batch is a
+    separate call, and a batch can only calibrate against the events inside
+    it.
+
+    Slicing made that as bad as it can get. `merge()` returns candidates in
+    CATEGORIES order, so a contiguous slice of six was usually one or two
+    categories: one grader saw nothing but industry flagships and another
+    nothing but side events, and "dense with the right buyers" means a
+    different thing to each of them. Dealing spreads every category across
+    every batch, so each grader sees the same mix.
+
+    It does not make separate calls into one grader. That is what `batches`
+    in the returned dict is for, and the report says how many ran.
+    """
+    n = len(candidates)
+    if n <= size:
+        return [list(candidates)] if n else []
+    count = (n + size - 1) // size
+    out: list[list[dict]] = [[] for _ in range(count)]
+    for i, c in enumerate(candidates):
+        out[i % count].append(c)
+    return out
+
+
 def score_all(candidates: list[dict], profile: dict) -> dict:
     """Score every candidate, in concurrent batches.
 
@@ -172,7 +201,7 @@ def score_all(candidates: list[dict], profile: dict) -> dict:
     "we judged this and it is bad"; dropping it reads as "this does not
     exist". Neither is what happened.
     """
-    batches = [candidates[i:i + BATCH] for i in range(0, len(candidates), BATCH)]
+    batches = deal(candidates, BATCH)
     merged: dict = {}
     errors: list[str] = []
     if batches:
