@@ -37,16 +37,44 @@ def sheet_configured(monkeypatch):
     monkeypatch.setattr(appmod, "_VI_OK", False)
 
 
+READS = 6          # 5 sheet ranges + access requests
+BARRIER_WAIT = 5.0  # generous; a serial implementation fails here, not hangs
+
+
 class _ConcurrencyTracker:
-    def __init__(self):
+    """Counts overlap, and FORCES it to be observable.
+
+    The earlier version only counted, and asserted the peak reached 4. That
+    is not a property of the code under test. ThreadPoolExecutor grows its
+    pool lazily: `_adjust_thread_count` skips spawning whenever a worker is
+    already idle, so on a loaded machine several 0.05s reads finish before
+    later threads exist and the peak lands at 3 with the reads still issued
+    concurrently. The assertion measured how fast threads spun up.
+
+    The barrier removes the timing question. No read can finish until all six
+    have arrived, so no worker goes idle, every submit spawns its thread, and
+    the peak is six or the reads were not concurrent. A serial implementation
+    blocks the first read until the barrier times out and can never reach six.
+    """
+
+    def __init__(self, parties=READS):
         self.lock = threading.Lock()
+        self.barrier = threading.Barrier(parties)
         self.in_flight = 0
         self.max_in_flight = 0
+        self.broke = False
 
     def enter(self):
         with self.lock:
             self.in_flight += 1
             self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        try:
+            self.barrier.wait(timeout=BARRIER_WAIT)
+        except threading.BrokenBarrierError:
+            # Everything that reaches here after the first timeout gets the
+            # broken barrier immediately, which is what keeps a serial run
+            # from taking parties x BARRIER_WAIT seconds to fail.
+            self.broke = True
 
     def exit(self):
         with self.lock:
@@ -86,11 +114,18 @@ def test_the_five_sheet_reads_overlap_instead_of_running_one_after_another(monke
     appmod._fetch_visitor_analytics_uncached()
     elapsed = time.time() - started
 
-    # 6 reads (5 sheet ranges + access requests) at 0.05s each: ~0.3s serial,
-    # ~0.05s concurrent. A generous 0.2s ceiling leaves room for scheduling
-    # jitter without letting a regression to serial reads sneak back in.
-    assert elapsed < 0.2, "reads took as long as if they ran one after another"
-    assert tracker.max_in_flight >= 4, "reads never actually overlapped"
+    # The barrier is the real assertion: all six reads were in flight at the
+    # same instant, or they were not concurrent. Checked on the tracker rather
+    # than left to an exception, because the read wrapper catches its own
+    # failures and a swallowed BrokenBarrierError would read as a clean pass.
+    assert not tracker.broke, "reads never actually overlapped"
+    assert tracker.max_in_flight == READS, (
+        "expected all %d reads in flight together, saw %d"
+        % (READS, tracker.max_in_flight))
+    # Backstop for the shape the barrier cannot see: six reads that overlap
+    # and are still individually slow. Loose, because overlap is now proven
+    # above rather than inferred from the clock.
+    assert elapsed < 1.0, "reads took as long as if they ran one after another"
 
 
 def test_read_access_requests_is_called_exactly_once_per_fetch(monkeypatch):
