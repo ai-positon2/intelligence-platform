@@ -38,19 +38,31 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_event_intel_event_view import _SHIM, _IIFE_CLOSE, page_script  # noqa: E402,F401
 
 
-def _render(page_script, run):
-    """Run the page's real render() over `run` and return what it wrote."""
+def _render_parts(page_script, run):
+    """Run the page's real render() over `run` and return everything it wrote.
+
+    Both the report body and the heading above it, because the heading is
+    prose too and has had its own defects: it once read "1 events cleared the
+    bar of 2 found" to a paying client.
+    """
     at = page_script.index(_IIFE_CLOSE)
     probe = ("\ncurrent = __RUN;\nrender(__RUN);\n"
              "console.log(JSON.stringify({body: "
-             "document.getElementById('drawerBody').innerHTML}));\n")
+             "document.getElementById('drawerBody').innerHTML, "
+             "title: document.getElementById('drawerTitle').textContent, "
+             "sub: document.getElementById('drawerSub').textContent}));\n")
     src = page_script.script
     js = "var __PAGE_IDS = %s;\n%s\nvar __RUN = %s;\n%s" % (
         json.dumps(page_script.ids), _SHIM, json.dumps(run),
         src[:at] + probe + src[at:])
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=90)
     assert r.returncode == 0, "the page script threw:\n%s" % r.stderr[-2500:]
-    return json.loads(r.stdout.strip().splitlines()[-1])["body"]
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+def _render(page_script, run):
+    """Just the report body. What most tests here assert on."""
+    return _render_parts(page_script, run)["body"]
 
 
 # ── payloads ──────────────────────────────────────────────────────────────
@@ -302,7 +314,7 @@ def test_the_cut_events_are_in_the_spread_and_offer_no_jump(page_script):
     html = _render(page_script, _recommend(
         [_cand("A", 99, "P1"), _cand("B", 80, "P2")],
         excluded=[{"name": "Cut one", "tier": "P3", "total": 40}]))
-    spread = re.search(r'<div class="evi-cols">.*?</div>\s*</div>', html, re.S)
+    spread = re.search(r'<div class="evi-cols[^"]*">.*?</div>\s*</div>', html, re.S)
     assert spread and "Cut one (cut)" in spread.group(0), (
         "the cut events are missing from the spread")
     cut_col = re.search(r'<(\w+)[^>]*title="Cut one \(cut\)[^"]*"', spread.group(0))
@@ -423,7 +435,7 @@ def test_an_unqualified_company_is_not_a_zero_on_the_spread(page_script):
     rows = [_out("A", 80), _out("B", 70), _out("C", 30),
             _out("D", None, unqualified=True)]
     html = _render(page_script, _workroom(rows))
-    spread = re.search(r'<div class="evi-cols">.*?<div class="cn">', html, re.S)
+    spread = re.search(r'<div class="evi-cols[^"]*">.*?<div class="cn">', html, re.S)
     assert spread, "the fit spread was not drawn"
     assert "D" not in re.findall(r'title="([^"]*)"', spread.group(0)), (
         "an unqualified company was given a column")
@@ -461,7 +473,7 @@ def test_the_charts_and_the_lists_cut_at_the_same_floor(page_script):
     is, and the drawing would be the one nobody checked."""
     rows = [_out("A", 90), _out("B", 56), _out("C", 54), _out("D", 20)]
     html = _render(page_script, _workroom(rows, floor=55))
-    spread = re.search(r'<div class="evi-cols">.*?<div class="cn">', html, re.S)
+    spread = re.search(r'<div class="evi-cols[^"]*">.*?<div class="cn">', html, re.S)
     titles = re.findall(r'title="([^"]*)"', spread.group(0))
     cut_in_chart = {t.split(" (cut)")[0] for t in titles if "(cut)" in t}
     cut_in_list = set(re.findall(r'<span class="cutp">([A-D])<b>', html))

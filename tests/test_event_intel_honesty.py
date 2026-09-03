@@ -123,9 +123,18 @@ var document = {
   // The page reads the profile-summary blocks back by attribute on load. A
   // shim missing a method the page really calls fails the run for a reason
   // that has nothing to do with what these tests are checking.
-  querySelectorAll: function(){ return []; }
+  querySelectorAll: function(){ return []; },
+  // The page swaps the theme attribute for the duration of a print. It reads
+  // and writes it on the root element, so the shim needs one; without it the
+  // handler cannot be exercised at all and a test of it would pass vacuously.
+  documentElement: __el('html')
 };
-var window = {};
+// addEventListener, because the page registers beforeprint and afterprint
+// handlers at load. A shim missing a method the page really calls fails every
+// test in the file for a reason none of them is about. The shared harness in
+// test_event_intel_event_view.py has the same members; these two shims have
+// drifted apart once already.
+var window = {addEventListener: function(){}};
 var fetch = function(){ return {then: function(){ return {then: function(){ return {catch: function(){}}; }, catch: function(){}}; }, catch: function(){}}; };
 var setInterval = function(){ return 0; };
 var clearInterval = function(){};

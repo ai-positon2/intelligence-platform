@@ -537,8 +537,12 @@
     var mode = 'recommend', poll = null, current = null, activeRoles = null;
     var pickedClass = null, pickedEventClass = null;
 
-    function plural(n, word){
-      return n + ' ' + word + (Number(n) === 1 ? '' : 's');
+    /* `many` for the words an "s" does not pluralise. Without it the only
+       way to say "6 discovery categories" was to add the s and then patch it
+       back out, which is a spelling bug waiting for the first reader who
+       hits a count of one. */
+    function plural(n, word, many){
+      return n + ' ' + (Number(n) === 1 ? word : (many || word + 's'));
     }
 
     function esc(s){
@@ -1234,8 +1238,43 @@
       tick();
     }
 
+    /* Whether a report is open on top of the page.
+       Print needs to know. Somebody printing this page is printing the
+       report, not the three cards explaining what the agent does, and CSS
+       inside the drawer cannot see far enough up the tree to say so. Set in
+       one place next to the class that opens the drawer, so the two cannot
+       drift apart. */
+    function readingMode(on){
+      document.body.classList.toggle('evi-reading', !!on);
+    }
+
+    /* Print in the light palette, whatever the reader is using.
+       The dark palette is a design for a backlit screen: its card fills are
+       near-black and its ink is near-white. On paper the print rules turn
+       every colour to dark ink and the fills stay dark, so the labels under
+       the summary's big numbers came out grey-on-charcoal and the report
+       read as damaged. Swapping the attribute hands the whole job to the
+       light palette that already exists, rather than restating three dozen
+       surfaces inside @media print and missing one. */
+    var _printTheme = null;
+    window.addEventListener('beforeprint', function(){
+      var r = document.documentElement;
+      _printTheme = r.getAttribute('data-theme');
+      r.setAttribute('data-theme', 'light');
+    });
+    window.addEventListener('afterprint', function(){
+      var r = document.documentElement;
+      /* Absent is not the same as dark: with no attribute the palette falls
+         back to the sheet's own default, and writing "dark" here would pin a
+         reader to it. */
+      if (_printTheme === null) r.removeAttribute('data-theme');
+      else r.setAttribute('data-theme', _printTheme);
+      _printTheme = null;
+    });
+
     function openRun(runId){
       document.getElementById('drawer').classList.add('on');
+      readingMode(true);
       document.getElementById('drawerTitle').textContent = 'Loading';
       document.getElementById('drawerSub').textContent = '';
       document.getElementById('drawerBody').innerHTML =
@@ -1309,6 +1348,7 @@
 
     function closeDrawer(){
       document.getElementById('drawer').classList.remove('on');
+      readingMode(false);
       /* A run being watched from the drawer keeps polling until the drawer is
          closed. Leaving it running would keep hitting the status route for a
          run nobody is looking at any more. */
@@ -1880,7 +1920,7 @@
          wrapper instead, its percentage was measured against a taller box
          than the columns were, so the bar it drew sat a few pixels above the
          height it was describing. */
-      return '<div class="evi-cols">' +
+      return '<div class="evi-cols' + (items.length <= 4 ? ' few' : '') + '">' +
         '<div class="cwrap"><div class="cs">' + floor + cols + '</div></div>' +
         (note ? '<div class="cn">' + note + '</div>' : '') + '</div>';
     }
@@ -2121,7 +2161,7 @@
         evBars(bars),
         'Industry as Apollo records it, for the ' + esc(looked) + ' of ' +
         esc(rows.length) + ' organisations that have been matched. ' +
-        (rest ? esc(plural(rest, 'other industry')) + ' had one row each. ' : '') +
+        (rest ? esc(plural(rest, 'other industry', 'other industries')) + ' had one row each. ' : '') +
         'The other ' + esc(rows.length - looked) + ' have not been looked up, so ' +
         'they are absent from this chart rather than counted as unknown.');
     }
@@ -2786,7 +2826,16 @@
       }
       if (counts.over_cap) gaps.push(counts.over_cap + ' over the cap you set');
       return evFunnel([
-        {n: found, label: 'Found across the six searches', cls: 'f-mid',
+        {n: found,
+         /* Not "the six searches". A run makes one finding call per category
+            and then one confirmation call per candidate, so the number of
+            searches is neither six nor knowable from here. What is fixed, and
+            what the reader actually wants, is how many kinds of event were
+            looked for. */
+         label: 'Found across the ' +
+           plural(Object.keys(CATEGORY_LABELS).length,
+                  'discovery category', 'discovery categories'),
+         cls: 'f-mid',
          note: gaps.length ? 'Including ' + gaps.join(', ') + '.' : ''},
         {n: scored, label: 'Scored against the rubric', cls: 'f-mid'},
         {n: cleared, label: 'Cleared the bar of ' + RANK_FLOOR, cls: 't-P1',
@@ -2969,11 +3018,15 @@
       var failed = rows.filter(function(r){ return r.status === 'error'; }).length;
       var short = rows.length - failed;
       var verdict = failed
-        ? '<b>' + esc(plural(failed, 'search')) + ' did not run</b>, so this list ' +
+        /* "1 search did not run" reads as one query out of dozens. What did
+           not run is a whole kind of event, and the count is of categories. */
+        ? '<b>' + esc(plural(failed, 'category search', 'category searches')) +
+          ' did not run</b>, so this list ' +
           'is missing a kind of event rather than having found none. That is a ' +
           'hole in the analysis, not a finding about the market.'
         : (short
-            ? esc(plural(short, 'category')) + ' came back under quota after ' +
+            ? esc(plural(short, 'category', 'categories')) +
+              ' came back under quota after ' +
               'searching. An empty category is a fact about this client&rsquo;s market.'
             : 'Every category returned what was asked of it, so no kind of event ' +
               'is missing from this list.');
@@ -2982,8 +3035,8 @@
         evBars(bars) +
         '<div class="evi-note" style="margin-top:12px">' + verdict +
         ' Categories are searched one at a time and are never merged, which is ' +
-        'what stops the famous names crowding out the vertical summits, the ' +
-        'free vendor days and the side events.</div></div>' +
+        'what stops the famous names crowding out the narrower summits, the ' +
+        'free sponsor-funded days and the side events.</div></div>' +
         searchFunnelHtml(s);
     }
 
@@ -3123,7 +3176,7 @@
         (run.profile || {}).client_name || run.query;
       document.getElementById('drawerSub').textContent =
         run.status === 'complete'
-          ? ((s.counts || {}).kept || 0) + ' events cleared the bar of '
+          ? plural((s.counts || {}).kept || 0, 'event') + ' cleared the bar of '
             + (s.discovered || 0) + ' found'
           : (STAGES[run.stage] || 'Working.');
       var html = '';
@@ -3246,7 +3299,7 @@
       var unq = rows.filter(function(r){ return r.unqualified; }).length;
       return evFunnel([
         {n: roster, label: 'On the roster you pointed at', cls: 'f-mid',
-         note: unq ? plural(unq, 'company') + ' could not be qualified at all, so ' +
+         note: unq ? plural(unq, 'company', 'companies') + ' could not be qualified at all, so ' +
                      (unq === 1 ? 'it is' : 'they are') + ' unscored rather than ' +
                      'scored low.' : ''},
         {n: qualified, label: 'Qualified and scored', cls: 'f-mid'},
