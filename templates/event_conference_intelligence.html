@@ -129,20 +129,27 @@
         <form class="evi-form" id="eviForm" onsubmit="return startRun(event)">
           <div id="recommendFields">
             <div class="evi-field">
-              <label for="profilePick">Client profile</label>
+              <label for="profilePick">Client</label>
               {# The stored value is an enum key. Printing it raw put
                  "b2b_to_marketing" in front of the user; the readable label is
                  already on the classifications list the route sends. #}
+              {# "Set up a new client" is FIRST and selected, so the page opens
+                 on the one path that needs explaining and nothing is chosen on
+                 the user's behalf. Last in the list, a browser selected the
+                 first saved profile instead, which meant the client a
+                 half-hour search was about had been picked by list order.
+                 Saved profiles are one click away and their terms appear the
+                 moment one is chosen. #}
               <select id="profilePick" onchange="onProfilePick()">
+                <option value="new" selected>+ Set up a new client</option>
                 {% for p in profiles %}
                 {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
                 <option value="{{ p.id }}">{{ p.client_name }} &middot; {{ cl.label if cl else p.classification }}</option>
                 {% endfor %}
-                <option value="new">+ Lock a new client profile</option>
               </select>
               <span class="hint">
-                Nothing is searched or scored until a profile is locked. Which side
-                of the event floor gets measured depends on it, and it is never assumed.
+                Every event is scored for one client at a time. Pick a client you
+                have already set up, or add a new one.
               </span>
             </div>
 
@@ -157,7 +164,7 @@
                 <span class="ps-name">{{ p.client_name }}</span>
                 {% if p.website %}<span class="ps-site">{{ p.website }}</span>{% endif %}
                 {% if cl %}<span class="ps-or">{{ cl.orientation }}-driven</span>{% endif %}
-                <span class="ps-lock">Locked</span>
+                <span class="ps-lock">Saved</span>
               </div>
               {% if cl %}
               <div class="ps-class"><b>{{ cl.label }}.</b> {{ cl.where }}</div>
@@ -191,10 +198,15 @@
             {% endfor %}
 
             <div id="profileForm" style="display:none">
-              <div class="evi-group">
-                <span class="gh">Who is this for</span>
-                <span class="gs">Two things to start. We read their site and fill
-                  in the rest for you to check.</span>
+              {# Numbered, because this IS a sequence and it did not look like
+                 one: a select, a paragraph, two inputs, two buttons of equal
+                 weight and a third button, stacked flat. The numbers also say
+                 how much is left, which is the question a form this long is
+                 really being asked. #}
+              <div class="evi-group step">
+                <span class="gh"><span class="gn">1</span>Who is the client?</span>
+                <span class="gs">Their name and website is all we need. We read
+                  the site and fill in the rest for you to check.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -203,19 +215,23 @@
                          placeholder="e.g. Northwind Analytics" />
                 </div>
                 <div class="evi-field">
-                  <label for="clientSite">Client website</label>
+                  <label for="clientSite">Website</label>
                   <input type="text" id="clientSite" autocomplete="off"
                          placeholder="https://northwind.example" />
                 </div>
               </div>
+              {# The read is a helper, so it is styled as one. It used to be a
+                 full-weight gradient pill, identical to the button that runs
+                 the search, one above the other: two identical buttons is a
+                 decision nobody asked for. #}
               <div class="evi-draftbar">
-                <button type="button" class="evi-btn" id="draftBtn"
-                        onclick="draftProfile()">Read the site and fill this in</button>
-                <span class="dh">We fetch a handful of their pages and read
-                  them, usually in under a minute. Nothing is saved until you
-                  lock the profile, and you can change anything it writes.</span>
+                <button type="button" class="evi-btn evi-btn-ghost" id="draftBtn"
+                        onclick="draftProfile()">Read their site</button>
+                <span class="dh">We read a few of their pages, usually in
+                  under a minute. Nothing is saved yet, and you can change
+                  anything we write.</span>
                 <button type="button" class="evi-link" id="manualBtn"
-                        onclick="revealRest(true)">or fill it in myself</button>
+                        onclick="revealRest(true)">or type it in myself</button>
               </div>
               <div id="draftError" class="evi-err" style="display:none;margin-top:12px"></div>
               <div id="draftRead" class="evi-read" hidden></div>
@@ -228,14 +244,16 @@
                  as a thing to correct rather than a thing to compose. -->
             <div id="profileRest" hidden>
 
-              <div class="evi-group">
-                <span class="gh">Which side of the floor</span>
-                <span class="gs">This one is yours to answer, and it is the only
-                  one we will not guess. It decides which crowd every score
-                  measures.</span>
+              <div class="evi-group step">
+                <span class="gh"><span class="gn">2</span>Where do their buyers stand?</span>
+                <span class="gs">The one thing we will not guess for you. It
+                  decides which crowd every score is about.</span>
               </div>
+              {# No label of its own. The step heading above IS the question,
+                 and asking it twice, once as a heading and once as a field
+                 label three lines apart, is how a short form starts feeling
+                 long. The radiogroup carries its own aria-label. #}
               <div class="evi-field" id="classField">
-                <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
                 <!-- The one unanswered question that can stop a save, so it
                      carries its own message. It used to surface four hundred
                      pixels lower as the server's enum list, next to a button,
@@ -258,10 +276,10 @@
                   {% endfor %}
                 </div>
               </div>
-              <div class="evi-group">
-                <span class="gh">Who they sell to</span>
-                <span class="gs">Correct anything that looks wrong. A blank
-                  field is one their site does not answer.</span>
+              <div class="evi-group step">
+                <span class="gh"><span class="gn">3</span>Who they sell to</span>
+                <span class="gs">Change anything that looks wrong. A blank field
+                  is one their site does not answer.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -287,8 +305,9 @@
                   <span class="ev" data-ev="sales_cycle" hidden></span>
                 </div>
               </div>
-              <div class="evi-group">
-                <span class="gh">How far to look</span>
+              <div class="evi-group step">
+                <span class="gh"><span class="gn">4</span>How far to look</span>
+                <span class="gs">Where to search, and how far ahead.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -302,18 +321,17 @@
                 </div>
               </div>
               <details class="evi-optional">
-                <summary><span class="gh">Standing instructions</span>
-                  <span class="gs">Optional. Carried into every run on this
-                    profile.</span></summary>
+                <summary><span class="gh">Rules for this client</span>
+                  <span class="gs">Optional. Applied to every run for
+                    them.</span></summary>
               <div class="evi-row evi-row-3">
                 <div class="evi-field">
                   <label for="forceInclude">Already committed to these</label>
                   <textarea id="forceInclude" placeholder="Money20/20&#10;SaaStr Annual"></textarea>
                   <span class="hint">
-                    Scored alongside everything else and kept on the list whatever
-                    they score, marked. If something you have already paid for does
-                    not clear the bar, that is the most useful thing this can tell
-                    you, so it is never quietly dropped.
+                    Scored like everything else and always shown, marked. If
+                    something you have already paid for does not clear the bar,
+                    that is worth knowing, so it is never quietly dropped.
                   </span>
                 </div>
                 <div class="evi-field">
@@ -325,15 +343,22 @@
                   <label for="budgetNote">Budget, for context only</label>
                   <textarea id="budgetNote" placeholder="about $40k for the year"></textarea>
                   <span class="hint">
-                    Shown beside each event and never used to score one. A cheap event
-                    reaching the wrong buyers is worse than an expensive one reaching
-                    the right ones.
+                    Shown next to each event, never used to score one. A cheap
+                    event reaching the wrong buyers is worse than an expensive
+                    one reaching the right ones.
                   </span>
                 </div>
               </div>
               </details>
-              <button type="button" class="evi-btn evi-btn-ghost" style="margin-top:16px"
-                      onclick="saveProfile()" id="saveProfileBtn">Lock this profile</button>
+              {# The real action of this flow, so it looks like one. It was the
+                 quietest button on the page while the helper above it was the
+                 loudest. #}
+              <div class="evi-savebar">
+                <button type="button" class="evi-btn evi-btn-save"
+                        onclick="saveProfile()" id="saveProfileBtn">Save this client</button>
+                <span class="dh">Saved for reuse. What you see above is exactly
+                  what every score will be measured against.</span>
+              </div>
               <div id="profileError" class="evi-err" style="display:none;margin-top:12px"></div>
             </div>
             </div>
@@ -349,7 +374,7 @@
               <div class="evi-field">
                 <label for="eventYear">Edition or year (optional)</label>
                 <input type="text" id="eventYear" placeholder="2026" autocomplete="off" />
-                <span class="hint">Left blank, it resolves the next upcoming edition.</span>
+                <span class="hint">Leave it blank for the next edition.</span>
               </div>
             </div>
           </div>
@@ -369,21 +394,22 @@
                   {% endif %}{% endfor %}
                 </select>
                 <span class="hint">
-                  This play works a roster you have already harvested. Run
-                  &ldquo;Who will be at an event&rdquo; on it first.
+                  Works on a roster you already built. Run
+                  &ldquo;Who will be at an event&rdquo; first.
                 </span>
               </div>
               <div class="evi-field">
-                <label for="wrProfile">Client profile</label>
+                <label for="wrProfile">Client</label>
                 <select id="wrProfile">
                   {% if not profiles %}
-                  <option value="" disabled selected>No locked profile yet</option>
+                  <option value="" disabled selected>No client saved yet</option>
                   {% endif %}
                   {% for p in profiles %}
                   <option value="{{ p.id }}">{{ p.client_name }}</option>
                   {% endfor %}
                 </select>
-                <span class="hint">Used to qualify the roster to an ICP and cut the tail.</span>
+                <span class="hint">Used to rank the roster for this client and
+                  cut the tail.</span>
               </div>
             </div>
 
@@ -436,8 +462,14 @@
                last field, so a long intake form has a visible end to it. -->
           <div class="evi-actions">
             <button type="submit" class="evi-btn" id="runBtn">Run →</button>
-            <span class="evi-actions-note">Runs in the background. You can leave
-              this page and pick the result up under Your runs.</span>
+            {# Says so BEFORE the click. The button stays live, because a
+               refusal that puts the cursor in the right field is more useful
+               than one that cannot be pressed, but it stops looking like the
+               next thing to do while there is a step in front of it. #}
+            <span class="evi-actions-wait" id="runWait" hidden>Finish setting up
+              the client first.</span>
+            <span class="evi-actions-note">Runs in the background. You can close
+              this page; the result appears under Your runs.</span>
           </div>
         </form>
 
@@ -570,6 +602,7 @@
     var TABS = {recommend: 'modeRecommend', lookup: 'modeLookup',
                 workroom: 'modeWorkroom'};
 
+    /* Set by setMode once the play is known, and read by onProfilePick. */
     function setMode(m){
       mode = m;
       MODES.forEach(function(k){
@@ -586,6 +619,12 @@
       var card = document.getElementById(TABS[m]);
       var action = card && card.getAttribute('data-action');
       document.getElementById('runBtn').textContent = (action || 'Run') + ' \u2192';
+      /* Only one play needs a client picked before it can run, so the
+         waiting state has to be re-asked whenever the play changes. Left to
+         the picker's own change event it stuck: switching from the calendar
+         to naming an event carried "Finish setting up the client first"
+         onto a form with no client in it. */
+      onProfilePick();
     }
     window.setMode = setMode;
 
@@ -625,6 +664,21 @@
       var sums = document.querySelectorAll('[data-profile]');
       for (var i = 0; i < sums.length; i++) {
         sums[i].hidden = sums[i].getAttribute('data-profile') !== v;
+      }
+      /* The run button and the step in front of it, kept in step. Pressing
+         run with no client used to be answered by a paragraph of red text
+         after the click, under a button that had looked ready the whole time.
+         The button is still pressable, and still lands the cursor in the
+         first field, but it says which of the two things on this card is the
+         next one to do. Only in the play that needs a client: naming an event
+         and working a roster have no profile picker of their own here. */
+      var wait = document.getElementById('runWait');
+      var run = document.getElementById('runBtn');
+      var pending = (v === 'new' || !v) && mode === 'recommend';
+      if (wait) wait.hidden = !pending;
+      if (run) {
+        if (pending) run.className = 'evi-btn is-wait';
+        else run.className = 'evi-btn';
       }
     }
     window.onProfilePick = onProfilePick;
@@ -933,7 +987,7 @@
       DRAFT_CLOCK = null;
       if (!keepDisabled) {
         btn.disabled = false;
-        btn.textContent = 'Read the site and fill this in';
+        btn.textContent = 'Read their site';
       }
     }
 
@@ -1082,9 +1136,9 @@
           // paragraph attached.
           var name = document.getElementById('clientName');
           if (name) { name.focus(); name.scrollIntoView({block: 'center'}); }
-          showFormError('Fill in the client profile below and press "Lock this ' +
-                        'profile" first. Which side of the event floor gets ' +
-                        'scored depends on it, and it is never assumed.');
+          showFormError('Fill in the client and press "Save this client" ' +
+                        'first. Which crowd gets scored depends on it, and it ' +
+                        'is never assumed.');
           return false;
         }
         body.profile_id = parseInt(pid, 10);
@@ -1096,8 +1150,8 @@
                         'works a roster you already have.'); return false;
         }
         if (!wrp.value) {
-          showFormError('Lock a client profile first. There is no way to qualify a ' +
-                        'roster to an ICP without one.'); return false;
+          showFormError('Save a client first. There is no way to rank a ' +
+                        'roster without knowing who it is for.'); return false;
         }
         var ec = pickedEventClass || checkedValue('data-eventclass');
         if (!ec) {

@@ -240,7 +240,7 @@ def test_a_play_that_names_another_play_names_one_that_exists():
     quoted = set(re.findall(r'Run\s+(?:&ldquo;|")(.+?)(?:&rdquo;|")', html, re.S))
     quoted = {q.strip() for q in quoted if q.strip()}
     assert quoted, "nothing on the page points at another play by name any more"
-    unknown = quoted - titles
+    unknown = quoted - {" ".join(t.split()) for t in titles}
     assert not unknown, (
         "the page tells the user to run %s, which is not the title of any card "
         "on it. The cards are %s" % (sorted(unknown), sorted(titles)))

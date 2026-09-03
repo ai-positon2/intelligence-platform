@@ -44,6 +44,20 @@ def _page_script(html=None):
     return blocks[0]
 
 
+def _draft_label():
+    """The draft button's label, read off the template.
+
+    The shim's nodes start with empty text, so a test driving it cannot read
+    the label from its own DOM. Read from the page instead: this sentence was
+    pinned as a literal in two separate tests, and a rename broke both of
+    them while proving nothing about the thing they were written for, which is
+    that the button comes back from its progress label.
+    """
+    m = re.search(r'id="draftBtn"[^>]*>([^<]+)<', _page_html())
+    assert m, "the draft button is gone from the page"
+    return " ".join(m.group(1).split())
+
+
 _ID = re.compile(r'\bid="([^"]+)"')
 _HIDDEN = re.compile(r'(?:^|\s)hidden(?=[\s>=])')
 
@@ -356,7 +370,7 @@ def test_running_without_a_locked_profile_lands_the_cursor_in_the_form(keys):
         "  error: document.getElementById('formError').textContent}));", *keys)
     assert out["display"] == "", "the refusal left the intake form hidden"
     assert out["focused"] == "clientName", "the refusal did not put the cursor in the form"
-    assert "Lock this profile" in out["error"], \
+    assert "Save this client" in out["error"], \
         "the refusal does not name the control that fixes it: %r" % out["error"]
 
 
@@ -601,17 +615,20 @@ def test_the_button_counts_while_it_reads_and_resets_afterwards(keys):
         "document.getElementById('clientName').value = 'Northwind';\n"
         "document.getElementById('clientSite').value = 'https://a.example';\n"
         "var btn = document.getElementById('draftBtn');\n"
+        "var before = btn.textContent;\n"
         "var p = draftProfile();\n"
         "var during = {text: btn.textContent, disabled: btn.disabled};\n"
         "p.then(function(){\n"
-        "  console.log(JSON.stringify({during: during,\n"
+        "  console.log(JSON.stringify({before: before, during: during,\n"
         "    after: {text: btn.textContent, disabled: btn.disabled}}));\n"
         "});" % json.dumps(_DRAFT_OK), *keys)
     assert "Reading the site" in out["during"]["text"]
     assert "0s" in out["during"]["text"], (
         "the button showed no elapsed time, so a long wait looks like a hang")
     assert out["during"]["disabled"] is True
-    assert out["after"]["text"] == "Read the site and fill this in"
+    assert out["after"]["text"] == _draft_label(), (
+        "the button did not go back to the label the page gives it: %r"
+        % out["after"]["text"])
     assert out["after"]["disabled"] is False, (
         "the button stayed disabled, so a failed draft could never be retried")
 
@@ -622,12 +639,15 @@ def test_the_button_is_usable_again_after_a_failed_draft(keys):
         "document.getElementById('clientName').value = 'Northwind';\n"
         "document.getElementById('clientSite').value = 'https://a.example';\n"
         "var btn = document.getElementById('draftBtn');\n"
+        "var before = btn.textContent;\n"
         "draftProfile().then(function(){\n"
         "  console.log(JSON.stringify({disabled: btn.disabled,\n"
-        "    text: btn.textContent}));\n"
+        "    before: before, text: btn.textContent}));\n"
         "});", *keys)
     assert out["disabled"] is False
-    assert out["text"] == "Read the site and fill this in"
+    assert out["text"] == _draft_label(), (
+        "the button kept its progress label after a failed read: %r"
+        % out["text"])
 
 
 def test_a_page_that_refused_us_is_named_next_to_the_field_it_explains(keys):
