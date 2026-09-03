@@ -217,6 +217,51 @@ def _err(kind: str, detail: str) -> dict:
     return {"kind": kind, "detail": detail[:500]}
 
 
+# What each failure means to a person reading a report, as opposed to a person
+# fixing this file.
+#
+# `detail` is written for the log. It names the stop_reason, it quotes the
+# tool's own error code back, and in one case it ends with "Raise max_tokens or
+# lower max_uses", which is an instruction to us and gibberish to anybody else.
+# Callers were interpolating it straight into report prose, so a live client
+# report carried the line:
+#
+#   "Regional flagship (max_tokens: Ran out of output budget before finishing
+#    (stop_reason=max_tokens). Raise max_tokens or lower max_uses.)"
+#
+# under a heading, in a document somebody is paying for. The reader learned
+# nothing they could act on and was handed our plumbing to carry.
+#
+# These are clauses, not sentences, so a caller can put them where the reason
+# belongs in its own sentence. Every kind this module can return has one, and
+# an unknown kind falls back to a clause rather than to `detail`: falling back
+# to the detail is exactly the leak this exists to close.
+READER_REASON = {
+    ERR_NOT_CONFIGURED: "the search service is not switched on for this server",
+    ERR_NO_TOOL_VERSION: "the search service would not accept any search "
+                         "version this server knows how to ask for",
+    ERR_TRANSPORT: "the connection to the search service failed part-way",
+    ERR_MAX_TOKENS: "the answer ran past the length it was allowed and "
+                    "stopped mid-sentence",
+    ERR_EMPTY: "the search ran but no answer came back with it",
+    ERR_UNPARSABLE: "the answer came back in a shape that could not be read",
+    ERR_SEARCH_LIMIT: "the search tool stopped returning results part-way "
+                      "through",
+}
+
+_READER_FALLBACK = "the search could not be completed"
+
+
+def reader_reason(err) -> str:
+    """One clause saying why a call failed, safe to print to anybody.
+
+    Takes the error dict `ask` returns, or a bare kind. Never returns the
+    developer detail and never returns an empty string.
+    """
+    kind = err.get("kind") if isinstance(err, dict) else err
+    return READER_REASON.get(kind or "", _READER_FALLBACK)
+
+
 def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
         timeout: float = 280.0, model: str | None = None) -> dict:
     """One streamed Claude call, with the web_search tool when max_uses > 0.

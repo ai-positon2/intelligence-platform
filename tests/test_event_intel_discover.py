@@ -412,15 +412,24 @@ def test_a_finder_out_of_searches_says_so_in_our_words_not_as_a_fault(monkeypatc
 def test_a_failed_search_explains_itself_without_naming_the_error_kind(monkeypatch):
     """The kind is a machine token. Rendered under a category label in the
     report it read "Side event: Transport: peer closed connection", a double
-    colon around a word that means nothing to the reader."""
+    colon around a word that means nothing to the reader.
+
+    The detail is no better. It is written for whoever reads the log, and one
+    kind of it ends "Raise max_tokens or lower max_uses", which a live report
+    printed to a paying client. So neither half of the error reaches the
+    reader: what reaches them is the clause claude_websearch keeps for the
+    purpose, and the log gets both halves in full.
+    """
     _stages(monkeypatch,
             find_error={"kind": "transport",
                         "detail": "peer closed connection without a body."})
     r = D.search_category(R.CAT_SIDE_EVENT, PROFILE)
     assert r["status"] == D.STATUS_ERROR
-    assert "peer closed connection" in r["detail"]
-    assert not r["detail"].startswith("transport"), (
+    assert "peer closed connection" not in r["detail"], (
+        "the developer detail leaked into a sentence a client reads")
+    assert "transport" not in r["detail"].lower(), (
         "the error kind leaked into a sentence a client reads")
+    assert "connection to the search service failed" in r["detail"]
     assert r["detail"][0].isupper()
 
 
@@ -540,7 +549,11 @@ def test_a_category_whose_search_failed_reports_error_not_empty(monkeypatch):
     _stages(monkeypatch, find_error={"kind": "transport", "detail": "HTTP 503"})
     r = D.search_category(R.CAT_FREE_VENDOR, PROFILE)
     assert r["status"] == D.STATUS_ERROR
-    assert "503" in r["detail"]
+    # The status carries the distinction; the sentence has to carry it too,
+    # in words, without quoting the transport error at somebody who cannot
+    # act on it.
+    assert "could not be completed" in r["detail"]
+    assert "503" not in r["detail"]
 
 
 def test_an_unreadable_reply_is_an_error_rather_than_an_empty_category(monkeypatch):
@@ -831,7 +844,9 @@ def test_candidates_the_confirmer_could_not_check_are_an_error_not_an_empty(monk
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert r["status"] == D.STATUS_ERROR
     assert r["rejected"] == []
-    assert "could not be checked" in r["detail"] and "503" in r["detail"]
+    assert "could not be checked" in r["detail"]
+    assert "503" not in r["detail"], "the transport detail reached the report"
+    assert "connection to the search service failed" in r["detail"]
 
 
 def test_a_confirmation_that_cites_nothing_is_not_a_confirmation(monkeypatch):
