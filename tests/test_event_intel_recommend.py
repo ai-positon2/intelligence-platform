@@ -302,9 +302,14 @@ def test_assumptions_separate_a_failed_category_from_an_empty_one():
 
 
 def test_assumptions_say_when_the_cross_client_check_could_not_run():
+    """Case-insensitive on purpose. The reason arrives from the caller in
+    whatever case it was written, and a note now starts its detail with a
+    capital, because "Cross-client check: not measured" followed by "first
+    run for this client" read like two half-finished sentences."""
     s = _summary(generic={"measured": False,
                           "why_not_measured": "no earlier client to compare against"})
-    assert any("no earlier client" in a for a in s["assumptions"])
+    assert any("no earlier client" in a.lower() for a in s["assumptions"])
+    assert any("not measured" in a for a in s["assumptions"])
 
 
 def test_assumptions_carry_the_genericness_warning_when_flagged():
@@ -552,3 +557,69 @@ def test_a_run_with_nothing_finished_says_nothing_about_it():
         generic={"measured": False, "why_not_measured": ""},
         scoring_errors=[], interchangeable=[], banned=[], thin=[], unscored=[])
     assert not any("already finished" in a for a in summary["assumptions"])
+
+
+# ── one list of facts, two renderings ────────────────────────────────────
+
+def test_the_pointers_and_the_prose_are_the_same_facts():
+    """Two builders would eventually disagree, and the one nobody reads would
+    be the one that stayed right."""
+    s = _summary(shortfall=[
+        {"category": R.CAT_SIDE_EVENT, "label": "Side event",
+         "status": "error", "why": "The call failed."}])
+    assert len(s["notes"]) == len(s["assumptions"])
+    for note, prose in zip(s["notes"], s["assumptions"]):
+        assert note["head"].rstrip(".") in prose
+        if note["detail"]:
+            assert note["detail"] in prose
+
+
+def test_every_pointer_head_fits_on_one_line():
+    """A head is read in a column. One that wraps to three lines on a phone
+    is a paragraph again, which is the thing this replaced."""
+    s = _summary(shortfall=[
+        {"category": R.CAT_SIDE_EVENT, "label": "Side event", "status": "error",
+         "why": "x" * 400},
+        {"category": R.CAT_FREE_VENDOR, "label": "Free sponsor-funded event",
+         "status": "empty", "why": "y" * 400, "budget_spent": True}],
+        unscored=[{"name": "N%d" % i} for i in range(9)],
+        banned=[{"name": "B%d" % i} for i in range(5)],
+        thin=[{"name": "T%d" % i} for i in range(4)],
+        interchangeable=[{"a": "A", "b": "B"}],
+        scoring_errors=["boom", "bang"],
+        scoring_batches=4,
+        ranked={"kept": [{"name": "K", "attendees": "9,000", "gaps": ["format"]}],
+                "over_cap": [{"name": "O%d" % i} for i in range(3)],
+                "finished": [{"name": "F", "ends_on": "2026-01-01"}],
+                "counts": {}})
+    assert len(s["notes"]) >= 8, "expected most of the note kinds to fire"
+    long = [n["head"] for n in s["notes"] if len(n["head"]) > REP.HEAD_CHARS]
+    assert not long, "these heads are too long to scan: %r" % long
+
+
+def test_a_pointer_detail_is_a_sentence_not_a_fragment():
+    """"Cross-client check: not measured" followed by "first run for this
+    client" read like two half-finished thoughts."""
+    s = _summary(generic={"measured": False,
+                          "why_not_measured": "first run for this client"})
+    note = [n for n in s["notes"] if "Cross-client" in n["head"]][0]
+    assert note["detail"] == "First run for this client."
+
+
+def test_a_run_with_nothing_to_report_says_so_once():
+    s = _summary()
+    assert len(s["notes"]) >= 1
+    clean = [n for n in s["notes"] if n["level"] == REP.LEVEL_OK]
+    assert len(clean) <= 1
+
+
+def test_a_spent_budget_is_its_own_pointer_not_folded_into_the_short_one():
+    """"Short with searches to spare" and "short having spent everything it
+    was given" are different findings, and only the second is worth spending
+    more on."""
+    s = _summary(shortfall=[
+        {"category": R.CAT_VERTICAL_SUMMIT, "label": "Vertical summit",
+         "status": "empty", "why": "Nothing found.", "budget_spent": True}])
+    heads = [n["head"] for n in s["notes"]]
+    assert any("used every search allowed" in h for h in heads)
+    assert any("under the two-event quota" in h for h in heads)

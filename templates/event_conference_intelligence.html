@@ -1256,11 +1256,23 @@
        read as damaged. Swapping the attribute hands the whole job to the
        light palette that already exists, rather than restating three dozen
        surfaces inside @media print and missing one. */
-    var _printTheme = null;
+    var _printTheme = null, _printOpened = [];
     window.addEventListener('beforeprint', function(){
       var r = document.documentElement;
       _printTheme = r.getAttribute('data-theme');
       r.setAttribute('data-theme', 'light');
+      /* Every folded reason opens for the print.
+         Folding is what made the report readable on screen, and on paper it
+         would make it incomplete: a "Why" nobody can click is a fact deleted
+         from the page. Paper has no interaction and no shortage of room, so
+         it gets all of it. Only the ones this closes again are recorded, so
+         a section the reader had already opened stays open afterwards. */
+      var shut = document.querySelectorAll('#drawer details:not([open])');
+      _printOpened = [];
+      for (var i = 0; i < shut.length; i++) {
+        _printOpened.push(shut[i]);
+        shut[i].setAttribute('open', '');
+      }
     });
     window.addEventListener('afterprint', function(){
       var r = document.documentElement;
@@ -1270,6 +1282,8 @@
       if (_printTheme === null) r.removeAttribute('data-theme');
       else r.setAttribute('data-theme', _printTheme);
       _printTheme = null;
+      _printOpened.forEach(function(d){ d.removeAttribute('open'); });
+      _printOpened = [];
     });
 
     function openRun(runId){
@@ -1844,6 +1858,9 @@
        and a row whose search FAILED is drawn in the bad band rather than as
        a short bar, because a short bar reads as a finding about the market
        and this one is a hole in the analysis. */
+    /* Longer than this and a category's reason is a paragraph, not a label. */
+    var BAR_NOTE_INLINE = 90;
+
     function evBars(rows){
       rows = rows || [];
       if (!rows.length) return '';
@@ -1866,7 +1883,16 @@
             (goal ? '<span class="gl" style="left:' + goal.toFixed(2) + '%"></span>' : '') +
             '<span class="fl" style="width:' + w.toFixed(2) + '%"></span></div>' +
           '<div class="bn">' + reads + '</div>' +
-          (r.note ? '<div class="bw">' + r.note + '</div>' : '') +
+          /* Six categories with a paragraph under each is the section
+             nobody read. The bars are the picture, so they stay one row
+             each; the reason sits one click behind the row that owns it.
+             Short reasons are not worth a click and stay in place. */
+          (r.note
+            ? (String(r.note).replace(/<[^>]*>/g, '').length > BAR_NOTE_INLINE
+                ? '<details class="bw bwd"><summary>Why</summary><p>' +
+                  r.note + '</p></details>'
+                : '<div class="bw">' + r.note + '</div>')
+            : '') +
         '</div>';
       }).join('') + '</div>';
     }
@@ -2839,7 +2865,8 @@
          note: gaps.length ? 'Including ' + gaps.join(', ') + '.' : ''},
         {n: scored, label: 'Scored against the rubric', cls: 'f-mid'},
         {n: cleared, label: 'Cleared the bar of ' + RANK_FLOOR, cls: 't-P1',
-         note: 'Everything below is what these ' + cleared + ' are.'}
+         note: cleared === 1 ? 'The one below is what it is.'
+                             : 'Everything below is what these ' + cleared + ' are.'}
       ]);
     }
 
@@ -2873,7 +2900,10 @@
       }).concat((s.excluded || []).map(function(e){
         return {n: e.total, label: e.name + ' (cut)', cls: 't-P3', _kept: false};
       }));
-      if (items.length < 2) return '';
+      /* Three, not two. Two columns carry no distribution to read, and the
+         cut one is named under "Scored and cut" either way, so at two events
+         this chart was a tall empty band earning nothing. */
+      if (items.length < 3) return '';
       items.sort(function(a, b){ return (Number(b.n) || 0) - (Number(a.n) || 0); });
       var body = evCols(items, {
         max: 110, floor: RANK_FLOOR,
@@ -2952,9 +2982,11 @@
       if (unchecked) lost.push(unchecked + ' that could not be checked');
 
       var html = '<div class="evi-sec"><h3>What the search looked at</h3>' +
-        '<div class="evi-note">Every candidate is confirmed by a second search ' +
-        'that did not propose it, so an event reaches this list only when ' +
-        'something other than the finder went and looked.</div>' +
+        '<div class="evi-note"><details class="evi-inline"><summary>' +
+        'How a candidate becomes an event</summary><p>Every candidate is ' +
+        'confirmed by a second search that did not propose it, so an event ' +
+        'reaches this list only when something other than the finder went ' +
+        'and looked.</p></details></div>' +
         evFunnel([
           {n: named, label: 'Named by the search', cls: 'f-mid'},
           {n: confirmed, label: 'Confirmed by a second search',
@@ -3031,13 +3063,123 @@
             : 'Every category returned what was asked of it, so no kind of event ' +
               'is missing from this list.');
 
+      /* The second sentence is the same on every run, so it reads as
+         boilerplate by the third report and gets skipped along with the
+         verdict in front of it. Kept, because it is the reason the coverage
+         numbers mean anything, and folded so the verdict lands on its own. */
       return '<div class="evi-sec"><h3>Category coverage</h3>' +
         evBars(bars) +
         '<div class="evi-note" style="margin-top:12px">' + verdict +
-        ' Categories are searched one at a time and are never merged, which is ' +
-        'what stops the famous names crowding out the narrower summits, the ' +
-        'free sponsor-funded days and the side events.</div></div>' +
+        ' <details class="evi-inline"><summary>Why six categories</summary>' +
+        '<p>They are searched one at a time and never merged, which is what ' +
+        'stops the famous names crowding out the narrower summits, the free ' +
+        'sponsor-funded days and the side events.</p></details></div></div>' +
         searchFunnelHtml(s);
+    }
+
+    /* ── the answer, before the workings ──────────────────────────────
+       A reader had to pass the profile, the counts, the funnel, everything
+       that was not measured, the spread and the top five before learning
+       which event to book. The answer goes first now, in one line, with the
+       glance at how much of the intended search actually landed beside it.
+       Everything under it is the workings. */
+    function coverageSplit(s){
+      var rows = s.shortfall || [];
+      var known = Object.keys(CATEGORY_LABELS).length ||
+                  Object.keys(s.statuses || {}).length;
+      var failed = 0, short = 0;
+      rows.forEach(function(r){
+        if (r.status === 'error') failed += 1; else short += 1;
+      });
+      return {total: known, failed: failed, short: short,
+              met: Math.max(0, known - failed - short)};
+    }
+
+    function answerHtml(s, counts, kept){
+      var top = kept && kept.length ? kept[0] : null;
+      var cv = coverageSplit(s);
+      var p1 = Number(counts.P1) || 0, p2 = Number(counts.P2) || 0;
+      var line = p1 ? plural(p1, 'must-attend event')
+               : (p2 ? plural(p2, 'event') + ' worth the trip, none unmissable'
+                     : 'Nothing cleared the bar of ' + RANK_FLOOR);
+      /* A ring, not a donut. The glance wants one number against a stated
+         maximum, and a donut's centre has to be the sum of its own segments,
+         which here would be the constant 6 on every run. */
+      var dial = cv.total ? evRing(
+        cv.met, cv.total, 'categories delivered',
+        cv.failed ? 'f-bad' : (cv.short ? 'f-mid' : 'f-hi'),
+        (cv.short ? cv.short + ' came up short' : '') +
+        (cv.short && cv.failed ? ', ' : '') +
+        (cv.failed ? cv.failed + ' did not run' : '')) : '';
+
+      return '<div class="evi-answer">' +
+        '<div class="aw">' +
+          '<div class="ae">The answer</div>' +
+          '<div class="al">' + esc(line) + '</div>' +
+          (top
+            ? '<button type="button" class="at ' + tierClass(top.tier) + '" ' +
+              'onclick="eviReveal(\'' + esc(candAnchor(0)) + '\')">' +
+              '<span class="an">' + esc(top.name) + '</span>' +
+              '<span class="as"><b>' + esc(top.total) + '</b><i>/110</i></span>' +
+              '<span class="am">' + esc(dateRangeText(top)) +
+              (top.city ? ' &middot; ' + esc(top.city) : '') + '</span>' +
+              '</button>'
+            : '<div class="az">The list is not padded to a target count, so an ' +
+              'empty one is an answer.</div>') +
+        '</div>' +
+        (dial ? '<div class="ad">' + dial + '</div>' : '') +
+      '</div>';
+    }
+
+    /* ── what was not measured, as pointers ────────────────────────────
+       This was fifteen possible paragraphs printed in full, and a real
+       report came back with a 180-word block of them. Every one of those
+       facts earns its place: an agent whose value is that it says what it
+       could not measure cannot drop them. What it can do is stop making a
+       person read all of it to find the one line that matters.
+
+       So a fact is a HEAD, always visible and one line, and a DETAIL, one
+       click behind it. Nothing is lost and the section can be scanned.
+
+       A run stored before `notes` existed has only the flattened prose, so
+       that shape still renders. It renders as the paragraphs it always was
+       rather than being split on a guess: inventing a head by cutting a
+       sentence in half is how you get a heading that means the opposite of
+       the paragraph under it. */
+    var NOTE_LABEL = {gap: 'Not measured', thin: 'Measured on less',
+                      note: 'Worth knowing', ok: 'Clean'};
+
+    function notesHtml(s){
+      var ns = s.notes || [];
+      if (!ns.length) {
+        var old = s.assumptions || [];
+        if (!old.length) return '';
+        return '<div class="ex-assume"><h4>What was not measured</h4><ul>' +
+          old.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') +
+          '</ul></div>';
+      }
+      var counts = {};
+      ns.forEach(function(n){ counts[n.level] = (counts[n.level] || 0) + 1; });
+      var tally = ['gap', 'thin', 'note'].filter(function(k){ return counts[k]; })
+        .map(function(k){
+          return '<span class="nt n-' + k + '"><b>' + counts[k] + '</b>' +
+                 esc(NOTE_LABEL[k]) + '</span>';
+        }).join('');
+      return '<div class="ex-notes">' +
+        '<div class="nh"><h4>What was not measured</h4>' +
+          (tally ? '<div class="ntally">' + tally + '</div>' : '') + '</div>' +
+        '<div class="nl">' + ns.map(function(n, i){
+          var head = '<span class="nd n-' + esc(n.level || 'note') + '"></span>' +
+            '<span class="nx">' + esc(n.head) + '</span>';
+          if (!n.detail) {
+            return '<div class="nr n-' + esc(n.level || 'note') +
+                   '" style="--i:' + i + '">' + head + '</div>';
+          }
+          return '<details class="nr n-' + esc(n.level || 'note') +
+            '" style="--i:' + i + '"><summary>' + head +
+            '<span class="nmore" aria-hidden="true">Why</span></summary>' +
+            '<p>' + esc(n.detail) + '</p></details>';
+        }).join('') + '</div></div>';
     }
 
     function recommendHtml(run){
@@ -3067,6 +3209,7 @@
       var html = '<div class="evi-exec">' +
         '<div class="ex-eyebrow">Executive summary</div>' +
         '<h2 class="ex-title">' + esc(s.title || '') + '</h2>' +
+        answerHtml(s, counts, kept) +
         '<p class="ex-profile">' + esc(s.client_profile || '') + '</p>' +
         (s.where_buyers ? '<div class="ex-where"><b>' +
           esc(s.classification_label || '') + '.</b> ' + esc(s.where_buyers) +
@@ -3090,25 +3233,32 @@
         verdictHtml(s, counts) +
         '<details class="ex-method"><summary>How these were scored</summary><p>' +
           esc(s.methodology || '') + '</p></details>' +
-        '<div class="ex-assume"><h4>Assumptions and what was not measured</h4><ul>' +
-          (s.assumptions || []).map(function(a){
-            return '<li>' + esc(a) + '</li>'; }).join('') +
-        '</ul></div>' +
+        notesHtml(s) +
       '</div>';
 
       html += planRail(kept);
       html += spreadHtml(kept, s);
 
-      if ((s.top_five || []).length) {
-        /* The five and the ranked list are the same events written twice, and
-           the top five used to be a dead end: the reader met a name here and
-           had to go and find it again below to see why it scored what it did.
-           Matching on the stored name is what links them, and a name that is
-           NOT in the kept list, which can happen when the cap cuts the list
-           shorter than five, renders as plain text rather than as a control
-           that goes nowhere. */
-        var atName = {};
-        kept.forEach(function(c, i){ atName[c.name] = i; });
+      /* The five and the ranked list are the same events written twice, and
+         the top five used to be a dead end: the reader met a name here and
+         had to go and find it again below to see why it scored what it did.
+         Matching on the stored name is what links them, and a name that is
+         NOT in the kept list, which can happen when the cap cuts the list
+         shorter than five, renders as plain text rather than as a control
+         that goes nowhere. */
+      var atName = {};
+      kept.forEach(function(c, i){ atName[c.name] = i; });
+      /* Top five is a SELECTION, and when it is not one it earns no section.
+         With one kept event it printed that event here, again under "The
+         ranked list" immediately below, and a third time in the answer band
+         at the top. So it renders when it either shortlists a longer list or
+         carries a name the ranked list does not have, which is what happens
+         when the cap cut the list shorter than five. Element 5 of the summary
+         is still built and still stored either way. */
+      var fiveExtra = (s.top_five || []).filter(function(t){
+        return atName[t.name] == null; }).length;
+      if ((s.top_five || []).length &&
+          (fiveExtra || kept.length > s.top_five.length)) {
         html += '<div class="evi-sec"><h3>Top five</h3><ol class="evi-top">' +
           s.top_five.map(function(t){
             var at = atName[t.name];
