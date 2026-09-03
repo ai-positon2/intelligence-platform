@@ -2415,6 +2415,88 @@
        than a number. Filling that column with the quota would be inventing a
        count to make a chart look complete, which is the exact move this
        agent exists to not make. */
+    /* The two-stage search, drawn as what happened to each candidate.
+
+       Discovery names candidates and then confirms each one with a separate
+       search that did not propose it. Only the survivors reach the list, so a
+       reader shown one event has no way to tell whether one was all there
+       ever was or the only one of eleven that held up. Those are very
+       different reports and they used to look identical.
+
+       The three outcomes are kept apart for the reason the whole module is
+       built around. A candidate a search RULED OUT is a fact about the
+       client's year. A candidate nothing could check is a hole. Adding them
+       together would let the second wear the first's clothes.
+
+       A run recorded before discovery was split carries no candidate count at
+       all. It gets no funnel, rather than one built from the numbers that do
+       exist: "named 3, confirmed 3" is a claim that run never made.
+
+       Two guards cover that case on purpose, and neither is redundant on its
+       own terms: the filter is the rule (only measured categories count) and
+       the zero check is the degenerate case (every measured category named
+       nothing). Breaking either alone changes no output, which is worth
+       knowing before someone deletes one as dead code. Breaking BOTH draws a
+       fabricated funnel over an old run, and that is what the test pins. */
+    function searchFunnelHtml(s){
+      var statuses = s.statuses || {};
+      var keys = Object.keys(statuses).filter(function(k){
+        return statuses[k] && statuses[k].proposed != null;
+      });
+      if (!keys.length) return '';
+
+      var named = 0, confirmed = 0, kept = 0, ruled = [];
+      keys.forEach(function(k){
+        var st = statuses[k];
+        named += Number(st.proposed) || 0;
+        confirmed += Number(st.found) || 0;
+        kept += Number(st.kept != null ? st.kept : st.found) || 0;
+        (st.rejected || []).forEach(function(r){
+          ruled.push({name: r.name, reason: r.reason,
+                      label: CATEGORY_LABELS[k] || st.label || k});
+        });
+      });
+      if (!named) return '';
+
+      /* Exact, not estimated. Every candidate ends in one of three places, so
+         the ones nothing could check are what is left over. */
+      var unchecked = Math.max(0, named - confirmed - ruled.length);
+      var merged = Math.max(0, confirmed - kept);
+
+      var lost = [];
+      if (ruled.length) lost.push(plural(ruled.length, 'candidate') + ' ruled out');
+      if (unchecked) lost.push(unchecked + ' that could not be checked');
+
+      var html = '<div class="evi-sec"><h3>What the search looked at</h3>' +
+        '<div class="evi-note">Every candidate is confirmed by a second search ' +
+        'that did not propose it, so an event reaches this list only when ' +
+        'something other than the finder went and looked.</div>' +
+        evFunnel([
+          {n: named, label: 'Named by the search', cls: 'f-mid'},
+          {n: confirmed, label: 'Confirmed by a second search',
+           cls: confirmed ? 'f-hi' : 'f-bad',
+           note: lost.length ? lost.join(', ') : ''},
+          {n: kept, label: 'Kept as candidates', cls: kept ? 'f-hi' : 'f-bad',
+           note: merged ? plural(merged, 'event') +
+                 ' already listed under another category' : ''}
+        ]);
+
+      if (unchecked) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+          '<b>' + esc(plural(unchecked, 'candidate')) + ' could not be checked ' +
+          'at all.</b> Those are missing from this list because the check ' +
+          'failed, not because they were found wanting.</span></div>';
+      }
+      if (ruled.length) {
+        html += '<div class="evi-ruled">' + ruled.map(function(r){
+          return '<div class="rr"><span class="rn">' + esc(r.name) + '</span>' +
+            '<span class="rc">' + esc(r.label) + '</span>' +
+            '<span class="rw">' + esc(r.reason) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      return html + '</div>';
+    }
+
     function coverageHtml(s){
       var rows = s.shortfall || [];
       var statuses = s.statuses || {};
@@ -2466,7 +2548,8 @@
         '<div class="evi-note" style="margin-top:12px">' + verdict +
         ' Categories are searched one at a time and are never merged, which is ' +
         'what stops the famous names crowding out the vertical summits, the ' +
-        'free vendor days and the side events.</div></div>';
+        'free vendor days and the side events.</div></div>' +
+        searchFunnelHtml(s);
     }
 
     function recommendHtml(run){

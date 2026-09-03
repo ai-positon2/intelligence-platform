@@ -1834,6 +1834,40 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   font-size: 11px; font-weight: 700; color: var(--evi-ink-2);
   font-variant-numeric: tabular-nums; opacity: .8;
 }
+
+/* Candidates a confirming search ruled out.
+
+   Deliberately not the pill above. A pill holds a name and a number, and the
+   only part of a ruled-out candidate worth reading is the reason: "the 2026
+   edition was the last one" and "no edition falls inside the client's window"
+   are different facts about the client's year, and a row that showed just the
+   name would flatten them into the same shrug. So the name and its category
+   share the top line and the reason gets the width of the row underneath. */
+.evi-ruled { display: grid; gap: 7px; margin-top: 12px; }
+.evi-ruled .rr {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2);
+  border-left: 2px solid color-mix(in srgb, var(--evi-warn) 55%, transparent);
+}
+.evi-ruled .rn {
+  grid-column: 1; font-size: 12.5px; font-weight: 650;
+  color: var(--evi-ink-2); min-width: 0; overflow-wrap: anywhere;
+}
+.evi-ruled .rc {
+  grid-column: 2; justify-self: end; align-self: baseline;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--evi-ink-3); opacity: .72; white-space: nowrap;
+}
+.evi-ruled .rw {
+  grid-column: 1 / -1; font-size: 12px; line-height: 1.55;
+  color: var(--evi-ink-3); overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .evi-ruled .rr { grid-template-columns: minmax(0, 1fr); }
+  .evi-ruled .rc { grid-column: 1; justify-self: start; }
+}
 .evi-note {
   font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3);
   max-width: 80ch; margin-bottom: 4px;
