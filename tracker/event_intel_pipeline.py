@@ -310,7 +310,7 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         shortfall=found["shortfall"], audit=audit, generic=generic,
         scoring_errors=scored["errors"], interchangeable=interchangeable,
         banned=banned, thin=thin, unscored=scored["unscored"],
-        promoted=promoted)
+        promoted=promoted, scoring_batches=scored.get("batches") or 0)
     summary.update({
         "mode": "recommend",
         "shortfall": found["shortfall"],
