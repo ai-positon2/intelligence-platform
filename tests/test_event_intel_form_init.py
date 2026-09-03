@@ -532,3 +532,41 @@ def test_choosing_a_different_side_keeps_our_reading_on_screen(keys):
     assert out["picked"] == "b2b_to_marketing"
     assert "claims operations" in out["suggested"]["text"]
     assert "Click to confirm" not in out["suggested"]["text"]
+
+
+def test_the_button_counts_while_it_reads_and_resets_afterwards(keys):
+    """A measured draft took 450 seconds. A button reading "Reading the site…"
+    unchanged for seven minutes is indistinguishable from a hung page, so it
+    shows the time passing instead."""
+    out = _run(
+        "__fetchReply = {ok: true, body: %s};\n"
+        "document.getElementById('clientName').value = 'Northwind';\n"
+        "document.getElementById('clientSite').value = 'https://a.example';\n"
+        "var btn = document.getElementById('draftBtn');\n"
+        "var p = draftProfile();\n"
+        "var during = {text: btn.textContent, disabled: btn.disabled};\n"
+        "p.then(function(){\n"
+        "  console.log(JSON.stringify({during: during,\n"
+        "    after: {text: btn.textContent, disabled: btn.disabled}}));\n"
+        "});" % json.dumps(_DRAFT_OK), *keys)
+    assert "Reading the site" in out["during"]["text"]
+    assert "0s" in out["during"]["text"], (
+        "the button showed no elapsed time, so a long wait looks like a hang")
+    assert out["during"]["disabled"] is True
+    assert out["after"]["text"] == "Read the site and fill this in"
+    assert out["after"]["disabled"] is False, (
+        "the button stayed disabled, so a failed draft could never be retried")
+
+
+def test_the_button_is_usable_again_after_a_failed_draft(keys):
+    out = _run(
+        "__fetchReply = {ok: false, body: {error: 'HTTP 503'}};\n"
+        "document.getElementById('clientName').value = 'Northwind';\n"
+        "document.getElementById('clientSite').value = 'https://a.example';\n"
+        "var btn = document.getElementById('draftBtn');\n"
+        "draftProfile().then(function(){\n"
+        "  console.log(JSON.stringify({disabled: btn.disabled,\n"
+        "    text: btn.textContent}));\n"
+        "});", *keys)
+    assert out["disabled"] is False
+    assert out["text"] == "Read the site and fill this in"

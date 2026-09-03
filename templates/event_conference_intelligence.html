@@ -211,7 +211,8 @@
               <div class="evi-draftbar">
                 <button type="button" class="evi-btn" id="draftBtn"
                         onclick="draftProfile()">Read the site and fill this in</button>
-                <span class="dh">Takes about a minute. Nothing is saved until you
+                <span class="dh">We fetch a handful of their pages and read
+                  them, usually in under a minute. Nothing is saved until you
                   lock the profile, and you can change anything it writes.</span>
               </div>
               <div id="draftError" class="evi-err" style="display:none;margin-top:12px"></div>
@@ -795,6 +796,37 @@
       n.hidden = !why;
     }
 
+    /* A counting clock, because the wait varies with somebody else's server.
+
+       Measured drafts land in about fifteen seconds, but they are six HTTP
+       fetches against a site we do not control followed by a model call, and
+       a slow origin can stretch that. A button showing a number is
+       distinguishable from a page that has hung; one repeating the same three
+       words is not. */
+    var DRAFT_CLOCK = null;
+
+    function startDraftClock(btn){
+      stopDraftClock(btn, true);
+      var t0 = Date.now();
+      function tick(){
+        var s = Math.round((Date.now() - t0) / 1000);
+        btn.textContent = 'Reading the site\u2026 ' + s + 's';
+      }
+      tick();
+      if (typeof setInterval === 'function') DRAFT_CLOCK = setInterval(tick, 1000);
+    }
+
+    function stopDraftClock(btn, keepDisabled){
+      if (DRAFT_CLOCK !== null && typeof clearInterval === 'function') {
+        clearInterval(DRAFT_CLOCK);
+      }
+      DRAFT_CLOCK = null;
+      if (!keepDisabled) {
+        btn.disabled = false;
+        btn.textContent = 'Read the site and fill this in';
+      }
+    }
+
     function draftProfile(){
       var btn = document.getElementById('draftBtn');
       var err = document.getElementById('draftError');
@@ -813,7 +845,7 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Reading the site…';
+      startDraftClock(btn);
       // Returned so a test can wait for it. Nothing in the page uses the
       // return value; a probe that guessed at how many microtasks the chain
       // takes would pass or fail on the shape of the code rather than on what
@@ -824,8 +856,7 @@
       }).then(function(r){
         return r.json().then(function(j){ return {ok: r.ok, j: j}; });
       }).then(function(res){
-        btn.disabled = false;
-        btn.textContent = 'Read the site and fill this in';
+        stopDraftClock(btn);
         if (!res.ok) {
           showDraftError(res.j.error || 'The site could not be read.',
                          res.j.sources);
@@ -833,8 +864,7 @@
         }
         applyDraft(res.j);
       }).catch(function(e){
-        btn.disabled = false;
-        btn.textContent = 'Read the site and fill this in';
+        stopDraftClock(btn);
         showDraftError(e.message || 'The site could not be read.');
       });
     }
