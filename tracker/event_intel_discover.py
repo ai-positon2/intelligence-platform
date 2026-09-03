@@ -855,9 +855,9 @@ def propose_category(category: str, profile: dict) -> dict:
     # rather than rows on a page somebody can check.
     if not res.get("search_count"):
         return _out(STATUS_ERROR, [], "",
-                    "The model answered this category without running a "
-                    "single search, so its events are recalled rather "
-                    "than confirmed and were discarded.")
+                    "This category was answered without a single search "
+                    "being run, so its events were recalled rather than "
+                    "confirmed and were discarded.")
 
     parsed = claude_websearch.extract_json(res.get("text") or "",
                                            require="candidates")
@@ -896,9 +896,9 @@ def propose_category(category: str, profile: dict) -> dict:
                    "as the first %d searches' worth rather than the whole of "
                    "what is out there." % (FIND_MAX_USES, FIND_MAX_USES))
                   if budget else
-                  ("The model reported that it could not finish searching this "
-                   "category, so an empty result here is a gap in the search "
-                   "rather than a fact about the market."))
+                  ("The search for this category reported that it could not "
+                   "be finished, so an empty result here is a gap in the "
+                   "search rather than a fact about the market."))
         if proposals:
             return _out(STATUS_PARTIAL, proposals, note, detail)
         return _out(STATUS_ERROR, [], note, detail)
@@ -956,9 +956,9 @@ def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
                           % claude_websearch.reader_reason(err))
 
     if not res.get("search_count"):
-        return _unchecked(name, "The model answered without running a single "
-                                "search, so it recalled this event rather than "
-                                "confirming it.")
+        return _unchecked(name, "The check was answered without a single "
+                                "search being run, so this event was recalled "
+                                "rather than confirmed.")
 
     parsed = claude_websearch.extract_json(res.get("text") or "",
                                            require="confirmed")

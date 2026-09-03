@@ -877,19 +877,31 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-bars { display: flex; flex-direction: column; gap: 11px; }
 .evi-bars .br {
   display: grid; gap: 3px 12px; align-items: center;
-  grid-template-columns: minmax(96px, 150px) 1fr auto;
+  grid-template-columns: minmax(96px, 176px) 1fr auto;
 }
 .evi-anim .evi-bars .br {
   animation: evi-rise .4s ease-out both; animation-delay: calc(var(--i, 0) * .05s);
 }
-.evi-bars .bl { font-size: 12.5px; font-weight: 620; color: var(--evi-ink); }
+.evi-bars .bl {
+  font-size: 12.5px; font-weight: 620; color: var(--evi-ink);
+  /* "Free sponsor-funded event" wraps at every width worth supporting, and
+     it wrapped to a single orphaned word. Balanced, and led tightly enough
+     that a two-line label keeps its row the same height as the rest. */
+  line-height: 1.28; text-wrap: balance;
+}
 .evi-bars .bt {
   position: relative; height: 9px; border-radius: 5px;
   background: var(--evi-line-2); overflow: hidden;
 }
 .evi-bars .bt .fl {
   position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px;
-  background: var(--band, var(--evi-a2));
+  /* Lit along its length rather than filled flat. At full width a solid
+     slab of one colour is the heaviest thing on the page, and it is not the
+     most important. */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--band, var(--evi-a2)) 62%, transparent),
+    var(--band, var(--evi-a2)));
 }
 .evi-anim .evi-bars .bt .fl {
   animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both;
@@ -914,14 +926,71 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   font-weight: 650; white-space: nowrap;
 }
 .evi-bars .bn i { font-style: normal; color: var(--evi-ink-3); font-weight: 500; }
-.evi-bars .bw {
-  grid-column: 1 / -1; font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55;
-}
-.evi-bars .bw b { color: var(--evi-bad); font-weight: 650; }
 @media (max-width: 620px) {
   .evi-bars .br { grid-template-columns: 1fr auto; }
   .evi-bars .bt { grid-column: 1 / -1; order: 3; }
-  .evi-bars .bw { order: 4; }
+}
+
+/* -- why the short categories fell short ------------------------------
+   The same row as a fact in the executive summary, because it is the same
+   kind of statement: one line to scan, the reason behind it, a dot for how
+   much it should move you. What it adds is the set of categories the reason
+   applies to, which is what lets one line replace three paragraphs. */
+.evi-why { margin-top: 16px; }
+.evi-why h4 {
+  margin: 0 0 8px; font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--evi-ink-3); font-weight: 700;
+}
+.evi-why .nl { display: grid; gap: 6px; }
+.evi-why .nr {
+  border: 1px solid var(--evi-line); border-radius: 11px;
+  background: var(--evi-bg-2);
+}
+.evi-anim .evi-why .nr {
+  animation: evi-rise .4s ease-out both; animation-delay: calc(var(--i, 0) * .05s);
+}
+.evi-why .nr > summary,
+.evi-why .nr:not(details) {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 12px; font-size: 12.8px; line-height: 1.45;
+  color: var(--evi-ink-2); list-style: none;
+}
+.evi-why .nr > summary { cursor: pointer; }
+.evi-why .nr > summary::-webkit-details-marker { display: none; }
+.evi-why .nr > summary:focus-visible {
+  outline: 2px solid var(--evi-a1); outline-offset: 2px; border-radius: 11px;
+}
+.evi-why .nr .nd {
+  flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--evi-ink-3);
+}
+.evi-why .nr.n-gap { border-color: color-mix(in srgb, var(--evi-bad) 34%, transparent); }
+.evi-why .nr.n-gap .nd { background: var(--evi-bad); }
+.evi-why .nr.n-gap .nx { color: var(--evi-ink); font-weight: 600; }
+.evi-why .nr.n-thin { border-color: color-mix(in srgb, var(--evi-warn) 30%, transparent); }
+.evi-why .nr.n-thin .nd { background: var(--evi-warn); }
+.evi-why .nr .nx { flex: 0 1 auto; min-width: 0; }
+/* The categories the line applies to. Kept on the same row as the line, and
+   right-aligned away from it, so the eye reads the statement first and the
+   scope second. */
+.evi-why .wn {
+  flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px;
+  justify-content: flex-end;
+}
+.evi-why .wc {
+  font-size: 10.5px; letter-spacing: .02em; padding: 2px 7px;
+  border-radius: 999px; border: 1px solid var(--evi-line-2);
+  color: var(--evi-ink-3); white-space: nowrap;
+}
+.evi-why .nr.n-gap .wc { border-color: color-mix(in srgb, var(--evi-bad) 30%, transparent); }
+.evi-why .nr .nmore {
+  flex: 0 0 auto; font-size: 10px; letter-spacing: .07em;
+  text-transform: uppercase; font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-why .nr[open] .nmore { color: var(--evi-a1); }
+.evi-why .nr > p {
+  padding: 0 12px 11px 28px; margin: 0; font-size: 12.4px; line-height: 1.65;
+  color: var(--evi-ink-3);
 }
 
 /* -- column spread ----------------------------------------------------- */
@@ -1767,7 +1836,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   .evi-exec .nr.n-thin .nd { outline-color: #a16207; }
   /* Opened for the print by beforeprint, so the marker beside a head that
      is now showing its reason anyway is just noise on paper. */
-  .evi-exec .nr .nmore, .evi-bars .bw.bwd > summary::after { display: none; }
+  .evi-exec .nr .nmore, .evi-why .nr .nmore { display: none; }
   /* Opened by the print handler, so the two-line clamp has to lift too:
      a paragraph shortened by CSS on paper is a paragraph deleted. */
   .evi-exec .nr.nfull .nx { display: block; -webkit-line-clamp: none; }
@@ -2048,20 +2117,6 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-inline > summary::-webkit-details-marker { display: none; }
 .evi-inline > summary:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
 .evi-inline > p { margin-top: 7px; }
-
-/* Category coverage: the bars are the picture, so a reason long enough to be
-   a paragraph goes behind the row that owns it. */
-.evi-bars .bw.bwd { padding: 0; }
-.evi-bars .bw.bwd > summary {
-  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
-  list-style: none; font-size: 10.5px; letter-spacing: .07em;
-  text-transform: uppercase; font-weight: 700; color: var(--evi-ink-3);
-}
-.evi-bars .bw.bwd > summary::-webkit-details-marker { display: none; }
-.evi-bars .bw.bwd > summary::after { content: "\203a"; font-size: 13px; }
-.evi-bars .bw.bwd[open] > summary { color: var(--evi-a1); }
-.evi-bars .bw.bwd[open] > summary::after { content: "\2039"; }
-.evi-bars .bw.bwd > p { margin-top: 6px; }
 
 /* ── top five ───────────────────────────────────────────────────────── */
 .evi-top { list-style: none; counter-reset: top; display: grid; gap: 10px; }

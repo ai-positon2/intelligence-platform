@@ -236,7 +236,10 @@ def test_a_category_answered_without_searching_is_discarded(monkeypatch):
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert r["status"] == D.STATUS_ERROR
     assert r["events"] == []
-    assert "without running a single search" in r["detail"]
+    assert "without a single search being run" in r["detail"]
+    # "The model" is our word for our own machinery. A reader of this
+    # report needs to know what the SEARCH did.
+    assert "model" not in r["detail"].lower()
 
 
 def test_merge_honours_the_force_exclude_list_in_code_not_just_the_prompt():
@@ -868,7 +871,10 @@ def test_a_confirmation_that_ran_no_search_is_discarded(monkeypatch):
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert r["events"] == []
     assert r["status"] == D.STATUS_ERROR
-    assert "without running a single search" in r["detail"]
+    assert "without a single search being run" in r["detail"]
+    # "The model" is our word for our own machinery. A reader of this
+    # report needs to know what the SEARCH did.
+    assert "model" not in r["detail"].lower()
 
 
 def test_a_refusal_with_no_reason_is_unchecked_rather_than_a_market_finding(monkeypatch):
@@ -963,7 +969,8 @@ def test_a_confirmed_event_survives_a_finder_that_was_cut_short(monkeypatch):
                       confirm=_confirm_reply(_EVENT))
     assert len(r["events"]) == 1
     assert r["status"] == D.STATUS_PARTIAL
-    assert "could not finish searching" in r["detail"]
+    assert "could not be finished" in r["detail"]
+    assert "model" not in r["detail"].lower()
 
 
 def test_the_run_never_puts_more_calls_in_flight_than_the_cap(monkeypatch):
