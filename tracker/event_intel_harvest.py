@@ -182,8 +182,9 @@ def fetch_page(url: str) -> dict:
     readable text, which in practice means its list is client-rendered. Both
     are 'we could not read this', which is what the report needs to say.
     """
-    out = {"url": url, "status": SOURCE_ERROR, "http_status": None,
-           "text": "", "note": "", "truncated": False, "spa": None}
+    out = {"url": url, "final_url": url, "status": SOURCE_ERROR,
+           "http_status": None, "text": "", "note": "", "truncated": False,
+           "spa": None, "redirected": False}
     try:
         r = requests.get(url, timeout=_TIMEOUT, stream=True, headers={
             "User-Agent": _UA,
@@ -198,6 +199,16 @@ def fetch_page(url: str) -> dict:
         return out
 
     out["http_status"] = r.status_code
+    # Where we actually ended up. `requests` follows redirects by default, so
+    # until this was read every relative link on a redirected page resolved
+    # against the URL we asked for rather than the one we got, and every
+    # next-page link failed the same-path test below, which stopped the walk
+    # at page one and said nothing. Event sites redirect constantly:
+    # /exhibitors -> /2026/exhibitors/ is the normal shape of a site that has
+    # run for more than one year.
+    final = str(getattr(r, "url", "") or url)
+    out["final_url"] = final
+    out["redirected"] = _same_page(final, url) is False
     try:
         if r.status_code == 404:
             out["status"] = SOURCE_NOT_FOUND
@@ -227,7 +238,8 @@ def fetch_page(url: str) -> dict:
     finally:
         r.close()
 
-    text = html_to_linked_text(markup, url)
+    # Relative links resolve against where the document actually came from.
+    text = html_to_linked_text(markup, out["final_url"])
     out["spa"] = client_render_marker(markup)
     if len(text) < _MIN_USEFUL_CHARS:
         out["status"] = SOURCE_BLOCKED
@@ -244,9 +256,28 @@ def fetch_page(url: str) -> dict:
         out["truncated"] = True
         out["note"] = ("Page was longer than the %d-character extraction limit and "
                        "was truncated, so this list may be incomplete." % _MAX_CHARS)
+    if out["redirected"]:
+        note = "Redirected to %s." % out["final_url"][:200]
+        out["note"] = (out["note"] + " " + note).strip() if out["note"] else note
     out["status"] = SOURCE_OK
     out["text"] = text
     return out
+
+
+def _same_page(a: str, b: str) -> bool:
+    """Same host and same path, ignoring the fragment and the trailing slash.
+
+    A redirect that only adds a slash or swaps http for https has not moved
+    the page, and reporting those as redirects would put a note on most of
+    the web.
+    """
+    try:
+        ua, ub = urlparse(a or ""), urlparse(b or "")
+    except Exception:
+        return a == b
+    return (ua.netloc.lower() == ub.netloc.lower()
+            and (ua.path or "/").rstrip("/") == (ub.path or "/").rstrip("/")
+            and ua.query == ub.query)
 
 
 def client_render_marker(markup: str) -> str | None:
@@ -272,6 +303,92 @@ _PAGE_LINK = re.compile(r"\[(https?://[^\]\s]+)\]")
 _PAGE_PARAM = re.compile(
     r"(?:^|[?&])(page|pg|p|paged|offset|start|from)=(\d+)\b", re.I)
 
+# Pagination carried in the PATH rather than the query string. WordPress is
+# the reason this exists: it serves page two of any archive at
+# `/exhibitors/page/2/`, and a query-string-only reader stops at page one on
+# every WordPress event site, which is a large share of them.
+#
+# Every pattern here carries the literal word `page` or `pg`. That label IS
+# the safety check, and a bare trailing number is deliberately NOT accepted:
+# on `/speakers/`, the link `/speakers/42/` is speaker forty-two, not page
+# forty-two, and following it would pull a profile page into the roster and
+# count it as a directory page we had read.
+_PAGE_PATH = re.compile(r"/(?:page|pg)[/_-]?(\d+)/?$", re.I)
+
+
+def _page_of_path(path: str):
+    """(stem, page number) for a path that paginates in its own segments.
+
+    The stem is the path with the pagination part removed, which is what makes
+    `/exhibitors/` and `/exhibitors/page/2/` recognisable as one listing.
+    Returns None when the path carries no page marker.
+    """
+    m = _PAGE_PATH.search(path or "")
+    if not m:
+        return None
+    try:
+        n = int(m.group(1))
+    except ValueError:
+        return None
+    stem = (path[:m.start()] or "/").rstrip("/") + "/"
+    return stem, n
+
+
+def _listing_key(u) -> tuple:
+    """What has to match for two URLs to be pages of the SAME listing.
+
+    Host, the path with any pagination stripped, and every query parameter
+    except the pagination one. A link that also changes `?category=` is a
+    filtered view of the directory rather than the next page of it.
+    """
+    path = u.path or "/"
+    got = _page_of_path(path)
+    stem = got[0] if got else (path.rstrip("/") + "/" if path != "/" else "/")
+    return (u.netloc.lower(), stem,
+            _PAGE_PARAM.sub("", u.query or ""))
+
+
+def _page_number(u) -> int:
+    """Which page of its listing this URL is. 1 when it does not say."""
+    m = _PAGE_PARAM.search(u.query or "")
+    if m:
+        try:
+            return int(m.group(2))
+        except ValueError:
+            return 1
+    got = _page_of_path(u.path or "")
+    return got[1] if got else 1
+
+
+# "Page 1 of 14" and its common phrasings. Read for one purpose: an event that
+# TELLS us how many pages its directory has, and from which we read fewer, is
+# an undercount we can name instead of one the reader has to guess at.
+_DECLARED_PAGES = re.compile(
+    r"\bpages?\s*(?:\d+\s*)?(?:of|/)\s*(\d{1,4})\b"
+    r"|\b\d+\s+of\s+(\d{1,4})\s+pages\b", re.I)
+
+
+def declared_page_count(text: str) -> int | None:
+    """How many pages the listing says it has, if it says.
+
+    The largest declared number wins: a directory footer often carries both
+    "Page 1 of 14" and a per-section counter, and the roster is short by the
+    bigger of the two.
+    """
+    best = 0
+    for m in _DECLARED_PAGES.finditer(text or ""):
+        for g in m.groups():
+            if not g:
+                continue
+            try:
+                n = int(g)
+            except ValueError:
+                continue
+            # A four-digit count is a year or a row total, not a page count.
+            if 1 < n <= 500:
+                best = max(best, n)
+    return best or None
+
 
 def next_page_links(text: str, current_url: str, limit: int = MAX_PAGES) -> list[str]:
     """Later pages of the SAME paginated listing, in page order.
@@ -282,8 +399,11 @@ def next_page_links(text: str, current_url: str, limit: int = MAX_PAGES) -> list
     Three restrictions, each of which exists because dropping it produced a
     wrong roster in testing:
 
-      * Same host and same path. A `?page=2` on a different path is a
-        different listing, and merging it silently mixes two rosters.
+      * Same host and same listing. A `?page=2` on a different path is a
+        different listing, and merging it silently mixes two rosters. The
+        path's own pagination is stripped before that comparison, so
+        `/exhibitors/` and `/exhibitors/page/2/` are recognised as one
+        listing rather than two.
       * The pagination parameter must be the only thing that differs. A link
         that also changes `?category=` is a filtered view, not the next page.
       * Strictly greater page numbers only, so "Previous" and "1" do not send
@@ -293,13 +413,8 @@ def next_page_links(text: str, current_url: str, limit: int = MAX_PAGES) -> list
         cur = urlparse(current_url)
     except Exception:
         return []
-    cur_page = 1
-    m = _PAGE_PARAM.search(cur.query or "")
-    if m:
-        try:
-            cur_page = int(m.group(2))
-        except ValueError:
-            cur_page = 1
+    cur_key = _listing_key(cur)
+    cur_page = _page_number(cur)
 
     found: dict[int, str] = {}
     for href in _PAGE_LINK.findall(text or ""):
@@ -307,20 +422,16 @@ def next_page_links(text: str, current_url: str, limit: int = MAX_PAGES) -> list
             u = urlparse(href)
         except Exception:
             continue
-        if u.netloc.lower() != cur.netloc.lower() or u.path != cur.path:
+        # Same listing: same host, same path once pagination is stripped, and
+        # the same query apart from the pagination parameter.
+        if _listing_key(u) != cur_key:
             continue
-        pm = _PAGE_PARAM.search(u.query or "")
-        if not pm:
-            continue
-        try:
-            n = int(pm.group(2))
-        except ValueError:
-            continue
+        n = _page_number(u)
+        # Strictly greater, so "Previous" and "1" do not send the harvester
+        # round in a circle re-reading what it already has. This also rejects
+        # a same-listing link that carries no page marker at all, which is the
+        # listing's own front page.
         if n <= cur_page:
-            continue
-        # Everything except the pagination parameter has to match, or this is
-        # a different slice of the directory rather than the next page of it.
-        if _PAGE_PARAM.sub("", u.query or "") != _PAGE_PARAM.sub("", cur.query or ""):
             continue
         found.setdefault(n, href)
     return [found[n] for n in sorted(found)[:max(0, limit)]]
@@ -495,14 +606,19 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     """
     url, kind = page["url"], page.get("kind") or "unknown"
     fetched = fetch_page(url)
+    # The ledger keeps the URL the event PUBLISHED, because that is the one a
+    # reader can check against the event's own site. Everything that reads the
+    # document works from where the document actually came from.
+    here = fetched.get("final_url") or url
     source = {"url": url, "kind": kind, "status": fetched["status"],
               "http_status": fetched["http_status"], "rows_found": 0,
               "note": fetched["note"], "pages_read": 0, "pages_seen": 1,
-              "spa": fetched.get("spa")}
+              "spa": fetched.get("spa"),
+              "final_url": here if here != url else None}
     if fetched["status"] != SOURCE_OK:
         return {"source": source, "rows": []}
 
-    ext = extract_participants(fetched["text"], url, kind, event_name, event_host)
+    ext = extract_participants(fetched["text"], here, kind, event_name, event_host)
     if ext.get("error"):
         source["status"] = SOURCE_ERROR
         source["note"] = ("The page was fetched but could not be read: %s"
@@ -516,9 +632,11 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     # Follow the rest of the listing. A page that fails mid-run stops the
     # walk and says where it stopped, rather than silently returning what it
     # happened to reach.
-    seen_urls = {url}
-    queue = next_page_links(fetched["text"], url, limit=max_pages - 1)
+    seen_urls = {url, here}
+    queue = next_page_links(fetched["text"], here, limit=max_pages - 1)
     source["pages_seen"] = 1 + len(queue)
+    # What the listing SAYS it has, which is not always what it links to.
+    declared = declared_page_count(fetched["text"])
     stopped = None
     while queue and source["pages_read"] < max_pages:
         nxt = queue.pop(0)
@@ -531,6 +649,8 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
                        % (source["pages_read"] + 1, source["pages_seen"],
                           got["note"] or got["status"]))
             break
+        nxt = got.get("final_url") or nxt
+        seen_urls.add(nxt)
         sub = extract_participants(got["text"], nxt, kind, event_name, event_host)
         if sub.get("error"):
             stopped = ("Stopped following this listing at page %d of %d: the "
@@ -552,6 +672,22 @@ def harvest_page(page: dict, event_name: str, event_host: str = "",
     elif queue and source["pages_read"] >= max_pages:
         notes.append("This listing has more pages than the %d-page limit, so "
                      "it is incomplete." % max_pages)
+
+    # A directory that prints "Page 1 of 14" has told us its own size. If we
+    # read fewer than that, the roster is short by a knowable amount, and
+    # saying so is the difference between an undercount and a stated one.
+    # Checked LAST and independently of the queue, because the case this
+    # exists for is precisely the one where no next-page link was followable:
+    # a cursor, a button that posts, a page number rendered in the browser.
+    if declared and source["pages_read"] < declared:
+        source["pages_declared"] = declared
+        notes.append("This listing says it has %d pages and %d %s read, so it "
+                     "is incomplete%s."
+                     % (declared, source["pages_read"],
+                        "was" if source["pages_read"] == 1 else "were",
+                        "" if (queue or stopped)
+                        else " and the remaining pages could not be followed "
+                             "from links on the page"))
 
     # De-duplicate across pages. A directory that repeats a headline sponsor
     # on every page would otherwise inflate the roster by the page count.
