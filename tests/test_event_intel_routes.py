@@ -429,7 +429,7 @@ def test_the_form_says_what_drafting_actually_does_and_how_long_it_takes():
     """
     import re
     html = _p2().get(BASE).get_data(as_text=True)
-    assert "Read the site and fill this in" in html, "the draft control is gone"
+    assert 'id="draftBtn"' in html, "the draft control is gone"
     # Scoped to the draft's own hint. The page says "a few minutes" elsewhere
     # about the RUN, which genuinely does take minutes, and an unscoped match
     # read that sentence and failed on it.
@@ -438,6 +438,9 @@ def test_the_form_says_what_drafting_actually_does_and_how_long_it_takes():
     hint = " ".join(hint.group(1).split())
     assert "a few minutes" not in hint, hint
     assert "under a minute" in hint, hint
-    assert "fetch" in hint.lower(), (
-        "the hint no longer says we read their pages, which is the thing that "
-        "makes the wait and the sources make sense: %s" % hint)
+    # Either verb. The wording is allowed to get friendlier; what it is not
+    # allowed to lose is that we go and READ THEIR PAGES, which is the thing
+    # that makes both the wait and the sources make sense.
+    assert re.search(r"\b(read|fetch)\b", hint, re.I), hint
+    assert "pages" in hint.lower(), (
+        "the hint no longer says we read their pages: %s" % hint)
