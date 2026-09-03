@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }} — Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #070910; color: #e2e8f0;
+      height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      /* 62px is the bar height every other agent page uses, so navigating
+         between agents does not shift the chrome. Purely cosmetic here: the
+         body is a flex column and .iframe-wrap takes flex:1, so the frame
+         absorbs the change.
+         The padding stays --margin-app rather than the --bleed the other bars
+         take. Those align a full-width bar with a --maxw-capped container;
+         this page has no container, it is a full-bleed iframe, and --bleed
+         would inset the bar by a centering offset for a box that is not there
+         (520px at 2560px wide). */
+      height: 62px; padding: 0 var(--margin-app); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(6,7,15,0.95); backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      z-index: 10;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 0; }
+    .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+    .brand-icon {
+      width: 30px; height: 30px; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+      box-shadow: 0 0 12px rgba(99,102,241,0.3);
+    }
+    .brand-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+    .breadcrumb {
+      display: flex; align-items: center; gap: 7px;
+      margin-left: 16px; padding-left: 16px;
+      border-left: 1px solid rgba(255,255,255,0.08);
+    }
+    .bc-link { font-size: 11.5px; color: #3d4460; text-decoration: none; transition: color 0.15s; }
+    .bc-link:hover { color: #94a3b8; }
+    .bc-sep { font-size: 11.5px; color: #1a1d27; }
+    .bc-cur {
+      font-size: 11.5px; font-weight: 600;
+      color: {{ accent }};
+    }
+
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .user-menu { position: relative; }
+    .user-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-pill); padding: 3px 12px 3px 3px;
+      cursor: pointer; user-select: none; transition: background .15s, border-color .15s;
+    }
+    .user-pill:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+    .user-pill.open  { background: rgba(255,255,255,0.07); border-color: rgba(99,102,241,0.35); }
+    .user-avatar {
+      width: 26px; height: 26px; border-radius: 50%; overflow: hidden;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-name { font-size: 11.5px; color: #64748b; }
+    .pill-chevron { font-size: 10px; color: #3d4460; margin-left: 2px; transition: transform .2s; }
+    .user-pill.open .pill-chevron { transform: rotate(180deg); }
+    .user-dropdown {
+      display: none; position: absolute; top: calc(100% + 10px); right: 0;
+      width: 220px; z-index: 100;
+      background: rgba(13,15,25,0.97); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: var(--radius-md); overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.08);
+      backdrop-filter: blur(20px); animation: dd-in .15s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes dd-in { from{opacity:0;transform:translateY(-6px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .user-dropdown.open { display: block; }
+    .dd-header { padding: 14px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .dd-name  { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 2px; }
+    .dd-email { font-size: 11.5px; color: #3d4460; }
+    .dd-items { padding: 6px; }
+    .dd-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm);
+      font-size: 13px; color: #94a3b8; text-decoration: none; transition: background .12s, color .12s;
+    }
+    .dd-item:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+    .dd-item-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+    .dd-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 4px 6px; }
+    .dd-item.danger:hover { background: rgba(239,68,68,0.08); color: #f87171; }
+
+    /* Accent line under topbar */
+    .topbar-accent {
+      height: 2px; flex-shrink: 0;
+      background: linear-gradient(90deg, {{ accent }}, transparent 60%);
+      opacity: 0.6;
+    }
+
+    /* ── Iframe container ── */
+    .iframe-wrap {
+      flex: 1; position: relative; overflow: hidden;
+    }
+
+    .iframe-loader {
+      position: absolute; inset: 0; z-index: 5;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: #070910;
+      transition: opacity 0.4s ease;
+    }
+    .iframe-loader.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.15);
+      border-top-color: {{ accent }};
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text { font-size: 13px; color: #3d4460; }
+
+    iframe {
+      width: 100%; height: 100%; border: none;
+      display: block;
+    }
+  
+:root{--logo-bg:#151b2e}
+[data-theme="light"]{--logo-bg:#ffffff}
+[data-theme="light"] body{background:#eef1f8 !important;color:#17213a !important}
+[data-theme="light"] .topbar{background:rgba(255,255,255,.85) !important;border-bottom-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .brand-name{color:#17213a !important}
+[data-theme="light"] .breadcrumb,[data-theme="light"] .bc-link,[data-theme="light"] .bc a,[data-theme="light"] .bc-sep{color:#5a6488 !important}
+[data-theme="light"] .bc-cur{color:#17213a !important}
+[data-theme="light"] .user-pill{background:rgba(18,26,54,.05) !important;border-color:rgba(18,26,54,.12) !important;color:#17213a !important}
+[data-theme="light"] .user-name,[data-theme="light"] .uname{color:#17213a !important}
+[data-theme="light"] .user-dropdown{background:#fff !important;border-color:rgba(18,26,54,.12) !important;box-shadow:0 24px 60px rgba(30,40,80,.18) !important}
+[data-theme="light"] .dd-item{color:#4d5680 !important}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06) !important;color:#17213a !important}
+[data-theme="light"] .dd-name{color:#17213a !important}[data-theme="light"] .dd-email{color:#5a6488 !important}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10) !important}
+[data-theme="light"] .card,[data-theme="light"] .glass,[data-theme="light"] .panel{background:#fff !important;border-color:rgba(18,26,54,.10) !important}
+[data-theme="light"] .card-name{color:#12203a !important}
+[data-theme="light"] .card-desc,[data-theme="light"] .sub{color:#5a6488 !important}
+</style>
+<style id="hide-scrollbars">
+html,body{scrollbar-width:none;-ms-overflow-style:none;}
+html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}
+*{scrollbar-width:none;-ms-overflow-style:none;}
+*::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important;}
+</style>
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <script src="/static/js/aurora.js?v=1" defer></script>
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+</head>
+<body>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="breadcrumb">
+        {% for label, href in breadcrumb %}
+          <a href="{{ href }}" class="bc-link">{{ label }}</a>
+          <span class="bc-sep">›</span>
+        {% endfor %}
+        <span class="bc-cur">{{ current }}</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="user-avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="topbar-accent"></div>
+
+  <!-- Iframe -->
+  <div class="iframe-wrap">
+    <div class="iframe-loader" id="loader">
+      <div class="spinner"></div>
+      <div class="loader-text">Loading {{ title }}…</div>
+    </div>
+    <iframe
+      src="{{ embed_url }}"
+      id="embed-frame"
+      allow="clipboard-write; fullscreen">
+    </iframe>
+  </div>
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    // Hide loader 1s after iframe load fires — gives the app time to render inside
+    document.getElementById('embed-frame').addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('loader').classList.add('hidden');
+      }, 1000);
+    });
+
+    (function(){
+      var _start = Date.now(), _sent = false;
+      function _send(){
+        if(_sent) return; _sent = true;
+        fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({page: window.location.pathname, title: '{{ title }}',
+          seconds: Math.round((Date.now()-_start)/1000),
+          email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
+      }
+      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
+      window.addEventListener('beforeunload', _send);
+    })();
+
+    /* Keep the address bar + breadcrumb in sync with the embedded tool.
+       The tool lives in a cross-origin iframe, so we can't read its URL — the
+       SEO app posts a {source:'p2-seo-tool', type:'route-change', tool, name}
+       message on every navigation (see seo-apps' RouteBridge). We reflect that
+       into /p2/seo/<slug> via pushState so the URL always names the current
+       agent and the browser's back/forward works across agents. */
+    (function(){
+      var frame = document.getElementById('embed-frame');
+      var expectedOrigin = '';
+      try { expectedOrigin = new URL(frame.src, location.href).origin; } catch(e){}
+      window.addEventListener('message', function(e){
+        if(expectedOrigin && e.origin !== expectedOrigin) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-seo-tool' || d.type !== 'route-change' || !d.tool) return;
+        var target = '/p2/seo/' + d.tool;
+        if(location.pathname === target) return;
+        history.pushState({seoTool:d.tool}, '', target);
+        var cur = document.querySelector('.bc-cur');
+        if(cur && d.name) cur.textContent = d.name;
+        if(d.name) document.title = d.name + ' — Platform';
+      });
+      /* On back/forward the parent URL changes but the cross-origin iframe
+         won't follow on its own, so reload to let the server render the tool
+         that the (now-current) URL points at. */
+      window.addEventListener('popstate', function(){
+        if(/^\/p2\/seo\/[^/]+/.test(location.pathname)) window.location.reload();
+      });
+    })();
+  </script>
+<script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
+</body>
+</html>

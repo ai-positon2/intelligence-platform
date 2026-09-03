@@ -1,0 +1,1429 @@
+/* social_creative_intelligence — page styles
+   Brand: orange -> pink -> purple (#fb923c -> #f472b6 -> #a855f7), the identity
+   already carried by this agent's dash-card (b2b_agents.html .c-sci) and the
+   hub "by the numbers" band. This file is the first dedicated stylesheet this
+   page has ever had -- Phase 1-3 left it on shared tokens only, so .main,
+   .card, .btn-primary and .topbar were never actually defined anywhere the
+   page could reach and rendered unstyled. Every other agent page (see
+   42_north_dental_slot_checker.css, linkedin_playbook_studio.css) defines its
+   own copy of these; this file follows that convention instead of assuming
+   a shared base that doesn't exist. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Ground goes on html:root, not body, and the selector is `html:root` rather
+   than `:root` on purpose: aurora-app.css loads after this file and carries
+   `body{background:transparent!important}` plus `html{background:#070912}`,
+   so a background on body is discarded outright and a bare `:root{...}` here
+   loses the later-wins tiebreak to aurora's `html{...}`. `html:root` scores
+   0,0,2 against that 0,0,1 and wins regardless of load order. Its own
+   light-mode ground selector (`:root[data-theme="light"] html`) is a dead
+   selector for the same reason ­- :root IS html, so it asks for an html
+   nested inside a light-themed html, which never exists -- so this page
+   defines its own light override instead of relying on it.
+   background-color is set as its own line, after the gradient shorthand,
+   because the shorthand resets background-color to transparent when it only
+   lists images -- without it, macOS's rubber-band overscroll bounce paints
+   the browser's own white canvas past the document edge on a fast scroll. */
+html:root {
+  background:
+    radial-gradient(ellipse 78% 48% at 14% -2%, rgba(251,146,60,.13) 0%, transparent 60%),
+    radial-gradient(ellipse 58% 42% at 90% 46%,  rgba(244,114,182,.11) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 55% at 50% 104%, rgba(88,20,120,.30)  0%, transparent 68%),
+    linear-gradient(160deg, #120a08 0%, #150a12 44%, #0c0810 100%);
+  background-color: #0c0810;
+  background-attachment: fixed;
+}
+html:root[data-theme="light"] {
+  background:
+    radial-gradient(ellipse 78% 48% at 14% -2%, rgba(251,146,60,.16) 0%, transparent 60%),
+    radial-gradient(ellipse 58% 42% at 90% 46%,  rgba(244,114,182,.13) 0%, transparent 55%),
+    linear-gradient(160deg, #fdf4ee 0%, #fbeef5 45%, #eef1f8 100%);
+  background-color: #eef1f8;
+  background-attachment: fixed;
+}
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif; color: #eee6f0;
+  min-height: 100vh; display: flex; flex-direction: column;
+}
+html { scrollbar-width: thin; scrollbar-color: rgba(251,146,60,.4) transparent; }
+html::-webkit-scrollbar { width: 10px; }
+html::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb { background-image: linear-gradient(180deg, rgba(251,146,60,.55), rgba(244,114,182,.45)); border-radius: var(--radius-pill, 80px); border: 3px solid transparent; background-clip: padding-box; }
+html::-webkit-scrollbar-thumb:hover { background-image: linear-gradient(180deg, rgba(251,146,60,.75), rgba(244,114,182,.65)); }
+
+.bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: radial-gradient(circle, rgba(251,146,60,.08) 1px, transparent 1px); background-size: 36px 36px; mask-image: radial-gradient(ellipse 85% 85% at 50% 30%, black 25%, transparent 100%); }
+.sci-aurora { position: fixed; inset: -25%; z-index: 0; pointer-events: none; filter: blur(80px); }
+.sci-aurora .b { position: absolute; border-radius: 50%; mix-blend-mode: screen; }
+.sci-aurora .b1 { width: 46vw; height: 46vw; left: -8vw; top: -14vh; background: radial-gradient(circle at 30% 30%, rgba(251,146,60,.26), transparent 60%); animation: sciF1 30s ease-in-out infinite; }
+.sci-aurora .b2 { width: 40vw; height: 40vw; right: -8vw; top: 2vh; background: radial-gradient(circle at 60% 40%, rgba(244,114,182,.22), transparent 60%); animation: sciF2 34s ease-in-out infinite; }
+.sci-aurora .b3 { width: 44vw; height: 44vw; left: 30vw; bottom: -18vh; background: radial-gradient(circle at 50% 50%, rgba(168,85,247,.18), transparent 62%); animation: sciF3 38s ease-in-out infinite; }
+@keyframes sciF1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(7vw,6vh) scale(1.1)} }
+@keyframes sciF2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-6vw,7vh) scale(1.12)} }
+@keyframes sciF3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(5vw,-5vh) scale(1.14)} }
+.sci-grain { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .045; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 170px; }
+@media (prefers-reduced-motion: reduce) { .sci-aurora .b { animation: none; } }
+
+/* ── Topbar / breadcrumb / user menu ────────────────────────────────────── */
+.topbar { position: sticky; top: 0; z-index: 50; height: 62px; padding: 0 var(--bleed); display: flex; align-items: center; justify-content: space-between; background: rgba(14,8,10,.88); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(255,255,255,.06); }
+.tl { display: flex; align-items: center; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.bc { display: flex; align-items: center; gap: 8px; margin-left: 18px; padding-left: 18px; border-left: 1px solid rgba(255,255,255,.08); }
+.bc a { font-size: 13px; color: #6b5f72; text-decoration: none; transition: color .15s; }
+.bc a:hover { color: #b7abbf; }
+.bc-sep { font-size: 13px; color: #2c2130; }
+.bc-cur { font-size: 13px; font-weight: 600; color: #fdba74; }
+.user-menu { position: relative; }
+.user-pill { display: flex; align-items: center; gap: 9px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-pill, 80px); padding: 4px 14px 4px 4px; cursor: pointer; user-select: none; transition: background .15s, border-color .15s; }
+.user-pill:hover, .user-pill.open { background: rgba(255,255,255,.08); border-color: rgba(251,146,60,.4); }
+.user-avatar { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg,#fb923c,#f472b6); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; color: #1f0f00; flex-shrink: 0; }
+.user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-name { font-size: 13px; font-weight: 500; color: #a99fb0; }
+.pill-chevron { font-size: 10px; color: #574d5e; margin-left: 2px; transition: transform .2s; }
+.user-pill.open .pill-chevron { transform: rotate(180deg); }
+.user-dropdown { display: none; position: absolute; top: calc(100% + 10px); right: 0; width: 220px; z-index: 9999; background: rgba(17,10,14,.97); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-md, 12px); overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.6); backdrop-filter: blur(20px); animation: sci-dd-in .15s cubic-bezier(.34,1.56,.64,1); }
+@keyframes sci-dd-in { from{opacity:0;transform:translateY(-6px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+.user-dropdown.open { display: block; }
+.dd-header { padding: 14px 16px 12px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.dd-name { font-size: 13px; font-weight: 600; color: #eee6f0; margin-bottom: 2px; }
+.dd-email { font-size: 11.5px; color: #574d5e; }
+.dd-items { padding: 6px; }
+.dd-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm, 8px); font-size: 13px; color: #a99fb0; text-decoration: none; transition: background .12s, color .12s; width: 100%; }
+.dd-item:hover { background: rgba(255,255,255,.05); color: #eee6f0; }
+.dd-item-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.dd-divider { height: 1px; background: rgba(255,255,255,.05); margin: 4px 6px; }
+.dd-item.danger:hover { background: rgba(239,68,68,.08); color: #f87171; }
+
+/* ── Page shell ──────────────────────────────────────────────────────────── */
+.main { flex: 1; position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 40px var(--margin) 72px; width: 100%; }
+
+.ph { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', ui-monospace, 'Space Grotesk', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: var(--ls-caps, .07em); text-transform: uppercase; color: #c9bfce; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 6px 13px 6px 10px; margin-bottom: 16px; }
+.eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,.22); animation: sci-pulse 2.4s ease-in-out infinite; flex-shrink: 0; }
+@keyframes sci-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(251,146,60,.45)} 50%{box-shadow:0 0 0 6px rgba(251,146,60,0)} }
+.ph h1 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: clamp(28px, 3.4vw, 40px); font-weight: 800; letter-spacing: -.025em; line-height: 1.04; color: #fbf4f2; }
+.ph h1 em { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; background: linear-gradient(100deg,#fdba74,#f472b6 55%,#c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; padding-right: .05em; }
+.ph p { font-size: 14px; color: #b3a6b8; max-width: 640px; margin-top: 10px; line-height: 1.6; }
+
+/* Idle platform-coverage preview strip, shown under the hero copy before any
+   run exists so the six platforms are legible up front, not a surprise. */
+.ph-platforms { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.ph-plat-ic { width: 34px; height: 34px; border-radius: var(--radius-md, 12px); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); color: #a99fb0; opacity: .75; transition: transform .2s ease, opacity .2s ease, border-color .2s ease; }
+.ph-plat-ic:hover { opacity: 1; transform: translateY(-2px); }
+.ph-plat-ic svg { width: 17px; height: 17px; }
+
+/* ── Command card ────────────────────────────────────────────────────────── */
+.sci-card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.018)); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-xl, 20px); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 30px 70px -36px rgba(0,0,0,.85); overflow: hidden; opacity: 0; transform: translateY(16px); animation: sci-rise .5s cubic-bezier(.22,1,.36,1) forwards; }
+.sci-card + .sci-card { margin-top: 22px; }
+@keyframes sci-rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sci-card { animation: none; opacity: 1; transform: none; } }
+.sci-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,#fb923c,#f472b6,#a855f7); }
+.sci-card-pad { padding: 26px 28px; }
+
+.sci-form { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.sci-field { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 220px; }
+.sci-field label { font-size: 10.5px; font-weight: 700; color: #877b8f; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); }
+.sci-field input { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-md, 12px); padding: 13px 15px; color: #f3ecf5; font: inherit; font-size: 14.5px; transition: border-color .15s, background .15s, box-shadow .15s; }
+.sci-field input::placeholder { color: #5c5163; }
+.sci-field input:focus { outline: none; border-color: rgba(251,146,60,.55); background: rgba(255,255,255,.055); box-shadow: 0 0 0 4px rgba(251,146,60,.12); }
+
+.sci-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: var(--radius-pill, 80px); padding: 14px 26px; font: inherit; font-size: 14px; font-weight: 700; color: #1a0a02; cursor: pointer; white-space: nowrap; background: linear-gradient(110deg,#fb923c,#f472b6 55%,#a855f7); background-size: 220% 100%; background-position: 0% 50%; box-shadow: 0 12px 30px -10px rgba(244,114,182,.55), inset 0 0 0 1px rgba(255,255,255,.25); transition: background-position .6s ease, transform .18s cubic-bezier(.16,1,.3,1), box-shadow .25s, opacity .2s; }
+.sci-btn:hover:not(:disabled) { background-position: 100% 50%; transform: translateY(-2px); }
+.sci-btn:disabled { opacity: .55; cursor: default; transform: none; }
+.sci-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(120deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%); transform: translateX(-120%); transition: transform .6s ease; }
+.sci-btn:hover:not(:disabled)::after { transform: translateX(120%); }
+@media (prefers-reduced-motion: reduce) { .sci-btn::after { display: none; } }
+
+/* ── Company disambiguation suggestions (shown while typing a name) ──────── */
+.sci-suggest-panel { margin-top: 14px; }
+.sci-suggest-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.sci-suggest-row { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); border-radius: var(--radius-md, 12px); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.sci-suggest-row:hover { background: rgba(255,255,255,.06); border-color: rgba(251,146,60,.4); transform: translateX(2px); }
+.sci-suggest-logo { position: relative; width: 34px; height: 34px; border-radius: var(--radius-sm, 8px); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg,#fb923c,#f472b6); }
+.sci-suggest-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sci-suggest-initial { display: none; font-size: 13px; font-weight: 800; color: #1a0a02; }
+.sci-suggest-logo.sci-suggest-nologo .sci-suggest-initial { display: flex; }
+.sci-suggest-info { min-width: 0; flex: 1; }
+.sci-suggest-name { font-size: 13.5px; font-weight: 700; color: #f3ecf5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-suggest-meta { font-size: 11px; color: #877b8f; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-suggest-site { font-size: 11px; color: #6b5f72; flex-shrink: 0; }
+.sci-suggest-loading, .sci-suggest-empty, .sci-suggest-fallback-note { font-size: 12.5px; color: #877b8f; padding: 10px 2px; display: flex; align-items: center; gap: 8px; line-height: 1.5; }
+.sci-suggest-fallback-note { color: #fdba74; font-size: 11.5px; padding: 0 0 8px; }
+
+/* Vendor-failure diagnostic -- the raw body + a free self-test call, admin
+   only, is what actually diagnoses this class of vendor issue instead of it
+   recurring as an unexplained "search is down" every few weeks. */
+.sci-suggest-error { margin-bottom: 10px; padding: 14px 16px; border-radius: var(--radius-md, 12px); background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.28); }
+.sci-suggest-error-msg { font-size: 12.5px; color: #e9dfe0; line-height: 1.55; }
+.sci-suggest-error-detail { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: #8b86a0; background: rgba(0,0,0,.25); border-radius: var(--radius-sm, 8px); padding: 8px 10px; margin: 10px 0 0; white-space: pre-wrap; word-break: break-word; max-height: 140px; overflow: auto; }
+.sci-suggest-check-btn { margin-top: 12px; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm, 8px); padding: 7px 14px; font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sci-suggest-check-btn:hover { background: rgba(251,191,36,.24); }
+.sci-suggest-check-btn:disabled { opacity: .6; cursor: default; }
+
+/* ── Platform chips (idle / running / drawer-strip states) ───────────────── */
+.sci-platform-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px,1fr)); gap: 10px; margin-top: 18px; }
+.pf-chip { display: flex; align-items: center; gap: 11px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); border-radius: var(--radius-md, 12px); padding: 11px 13px; transition: border-color .25s, background .25s, transform .2s; }
+.pf-chip-ic { width: 32px; height: 32px; border-radius: var(--radius-sm, 8px); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: color-mix(in srgb, var(--pf-color, #8b86a0) 16%, transparent); color: var(--pf-color, #8b86a0); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.pf-chip-ic svg { width: 17px; height: 17px; }
+.pf-chip-txt { min-width: 0; flex: 1; }
+.pf-name { font-weight: 700; font-size: 13px; color: #eee6f0; display: block; }
+.pf-status { font-size: 11px; color: #877b8f; display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-chip[data-status="pending"] .pf-chip-ic,
+.pf-chip[data-status="identifying"] .pf-chip-ic,
+.pf-chip[data-status="collecting"] .pf-chip-ic,
+.pf-chip[data-status="analyzing"] .pf-chip-ic { animation: sci-chip-pulse 1.6s ease-in-out infinite; }
+@keyframes sci-chip-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+.pf-chip[data-status="ok"] { border-color: color-mix(in srgb, var(--pf-color, #4ade80) 45%, transparent); background: color-mix(in srgb, var(--pf-color, #4ade80) 7%, transparent); }
+.pf-chip[data-status="ok"] .pf-name { color: #fff; }
+.pf-chip[data-status="low_activity"] { border-color: rgba(251,191,36,.4); background: rgba(251,191,36,.05); }
+.pf-chip[data-status="no_presence"],.pf-chip[data-status="handle_not_found"],
+.pf-chip[data-status="scrape_failed"],.pf-chip[data-status="error"] { border-color: rgba(248,113,113,.32); opacity: .82; }
+.pf-count { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--pf-color, #8b86a0); font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--pf-color, #8b86a0) 14%, transparent); border-radius: var(--radius-pill, 80px); padding: 3px 9px; }
+
+.sci-running-note { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #b3a6b8; line-height: 1.55; padding: 14px 16px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md, 12px); margin-bottom: 4px; }
+.sci-spinner { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; border: 2.5px solid rgba(251,146,60,.18); border-top-color: #fb923c; animation: sci-spin .8s linear infinite; }
+@keyframes sci-spin { to { transform: rotate(360deg); } }
+
+/* ── History ─────────────────────────────────────────────────────────────── */
+.sci-card-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 28px 0; }
+.sci-card-head h2 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 17px; font-weight: 700; color: #f3ecf5; letter-spacing: -.01em; }
+.sci-card-head .cnt { font-size: 12px; color: #877b8f; font-variant-numeric: tabular-nums; }
+.sci-run-list { padding: 16px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+.sci-run-row { display: flex; align-items: center; gap: 14px; border: 1px solid transparent; border-radius: var(--radius-md, 12px); padding: 13px 14px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.sci-run-row:hover { background: rgba(255,255,255,.035); border-color: rgba(251,146,60,.22); transform: translateX(3px); }
+.sci-run-mono { position: relative; overflow: hidden; width: 38px; height: 38px; border-radius: var(--radius-md, 12px); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13.5px; font-weight: 800; color: #1a0a02; background: linear-gradient(135deg,#fb923c,#f472b6); }
+.sci-run-mono img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.sci-run-initial { display: none; }
+.sci-run-mono.sci-run-nologo .sci-run-initial { display: block; }
+.sci-run-info { min-width: 0; flex: 1; }
+.r-name { font-weight: 700; font-size: 14px; color: #f3ecf5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-meta { font-size: 11.5px; color: #877b8f; margin-top: 3px; font-variant-numeric: tabular-nums; cursor: default; }
+.sci-run-arrow { font-size: 15px; color: #6b5f72; transition: transform .2s, color .2s; flex-shrink: 0; }
+.sci-run-row:hover .sci-run-arrow { transform: translateX(4px); color: #fdba74; }
+
+.status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); padding: 3px 9px; border-radius: var(--radius-pill, 80px); flex-shrink: 0; }
+.status-pill .d { width: 5px; height: 5px; border-radius: 50%; }
+.status-pill.st-running { background: rgba(251,191,36,.13); color: #fcd34d; }
+.status-pill.st-running .d { background: #fcd34d; animation: sci-pulse 1.6s ease-in-out infinite; }
+.status-pill.st-done { background: rgba(74,222,128,.13); color: #86efac; }
+.status-pill.st-done .d { background: #4ade80; }
+.status-pill.st-error { background: rgba(248,113,113,.13); color: #fca5a5; }
+.status-pill.st-error .d { background: #f87171; }
+
+.sci-empty { text-align: center; color: #6b5f72; font-size: 13.5px; padding: 40px 20px; }
+
+/* ── Platform brand colours ──────────────────────────────────────────────────
+   Set here rather than inline on each element, so light mode can re-pick the
+   ones that were chosen against a dark ground. Every rule downstream reads
+   --pf-color and falls back to a neutral, so an unknown platform still
+   renders; only these seven get a brand hue. */
+[data-platform="instagram"] { --pf-color: #e1306c; }
+[data-platform="linkedin"]  { --pf-color: #0a66c2; }
+[data-platform="x"]         { --pf-color: #cbd5e1; }
+[data-platform="tiktok"]    { --pf-color: #fe2c55; }
+[data-platform="youtube"]   { --pf-color: #ff0033; }
+[data-platform="facebook"]  { --pf-color: #1877f2; }
+[data-platform="reddit"]    { --pf-color: #ff4500; }
+/* X's own brand grey is a near-white picked for a black app. On paper it is
+   invisible -- icon, rail item and tiles all vanished -- so light mode swaps
+   in the dark end of the same neutral ramp. */
+[data-theme="light"] [data-platform="x"] { --pf-color: #334155; }
+.sci-datasrc-ic { color: var(--pf-color, #8b86a0); }
+
+/* ── Report modal ───────────────────────────────────────────────────────────
+   A two-column workspace, not a scroll: a fixed rail of platforms on the left,
+   one pane each on the right. The chrome (gradient bar, logo tile, action
+   buttons) stays in SCI's own orange->pink->purple; everything INSIDE a pane
+   is tinted by that platform's own brand colour, carried down on --pf-color.
+   That split is the whole system -- the frame is ours, the contents are
+   theirs -- and it is what makes a pane identifiable at a glance without
+   reading its heading. */
+.sci-drawer-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(8,4,10,.68); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.sci-drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.sci-drawer { position: fixed; top: 50%; left: 50%; width: min(1240px, 95vw); height: 92vh; background: rgba(17,10,14,.98); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-lg, 18px); box-shadow: 0 60px 140px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.02); z-index: 9001; transform: translate(-50%,-50%) scale(.94) translateY(8px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.22,1.3,.36,1), opacity .22s ease; display: flex; flex-direction: column; overflow: hidden; }
+.sci-drawer-overlay.open .sci-drawer { transform: translate(-50%,-50%) scale(1) translateY(0); opacity: 1; pointer-events: auto; }
+.sci-drawer::before { content: ''; height: 4px; flex-shrink: 0; background: linear-gradient(90deg,#fb923c,#f472b6,#a855f7); }
+
+.sci-drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #b3a6b8; font-size: 13px; cursor: pointer; transition: background .15s, color .15s; z-index: 3; flex-shrink: 0; }
+.sci-drawer-close:hover { background: rgba(255,255,255,.12); color: #f3ecf5; }
+
+/* ── Report header ───────────────────────────────────────────────────────── */
+.sci-rep-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 30px 16px; flex-wrap: wrap; flex-shrink: 0; }
+.sci-rep-id { display: flex; align-items: center; gap: 15px; min-width: 0; flex: 1 1 300px; }
+.sci-rep-logo { position: relative; width: 52px; height: 52px; border-radius: var(--radius-md, 14px); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: linear-gradient(135deg,#fb923c,#f472b6); box-shadow: 0 12px 30px -12px rgba(244,114,182,.6); }
+.sci-rep-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.sci-rep-logo span { display: none; font-size: 19px; font-weight: 800; color: #1a0a02; }
+.sci-rep-logo.sci-rep-nologo span { display: block; }
+.sci-rep-txt { min-width: 0; }
+.sci-rep-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 22px; font-weight: 700; color: #fbf4f2; line-height: 1.2; letter-spacing: -.015em; overflow-wrap: break-word; }
+.sci-rep-chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.sci-rep-chip { font-size: 11px; font-weight: 600; color: #a99fb0; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 10px; white-space: nowrap; }
+.sci-rep-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-right: 42px; }
+/* Every live account as one tap, always on screen while the report is.
+   Icon-only: it sits beside the company name, and six labelled buttons there
+   would out-shout the thing they belong to. */
+.sci-rail { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: var(--radius-pill, 80px); border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.035); }
+.sci-rail-a { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: color-mix(in srgb, var(--pf-color, #a99fb0) 74%, #ffffff); background: color-mix(in srgb, var(--pf-color, #8b86a0) 14%, transparent); transition: background .16s, transform .2s cubic-bezier(.34,1.56,.64,1); }
+.sci-rail-a svg { width: 15px; height: 15px; }
+.sci-rail-a:hover { background: color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); transform: translateY(-2px); }
+.sci-act-ic { display: inline-flex; width: 13px; height: 13px; flex-shrink: 0; }
+.sci-act-ic svg { width: 100%; height: 100%; }
+.sci-act { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm, 9px); border: 1px solid rgba(255,255,255,.11); background: rgba(255,255,255,.04); color: #b3a6b8; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s, border-color .15s, transform .15s; }
+.sci-act:hover { background: rgba(255,255,255,.09); color: #f3ecf5; border-color: rgba(251,146,60,.42); transform: translateY(-1px); }
+.sci-rep-band { padding: 0 30px 18px; border-bottom: 1px solid rgba(255,255,255,.07); flex-shrink: 0; }
+
+/* ── Stat tiles ──────────────────────────────────────────────────────────── */
+/* A full row shares the width evenly. Only a short row caps and packs left:
+   with auto-fit + 1fr a run that produced a single tile stretched it across
+   the whole 1200px panel, which read as a broken layout rather than as one
+   number, but capping every row wrapped the five-tile band to 4 + 1. */
+.sci-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
+.sci-tiles-few { grid-template-columns: repeat(auto-fit, minmax(150px, 236px)); justify-content: start; }
+.sci-tile { background: rgba(255,255,255,.032); border: 1px solid rgba(255,255,255,.075); border-radius: var(--radius-md, 12px); padding: 13px 15px 12px; opacity: 0; transform: translateY(9px); transition: opacity .4s ease, transform .4s cubic-bezier(.22,1,.36,1); }
+.sci-tile.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .sci-tile { transition: none; opacity: 1; transform: none; } }
+.sci-tile-v { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 22px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.05; }
+.sci-tile-u { font-size: 12px; font-weight: 700; color: #8b7f92; margin-left: 2px; letter-spacing: 0; }
+/* A word, not a number: drops to a size that fits the tile on one line rather
+   than hyphenating ("Multi-" / "image") and stretching the whole row. */
+.sci-tile-word { font-size: 15.5px; line-height: 1.24; letter-spacing: -.01em; }
+.sci-tile-l { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: var(--ls-caps, .07em); color: #8b7f92; margin-top: 8px; }
+.sci-tile-n { font-size: 10.5px; color: #857a8c; margin-top: 4px; line-height: 1.42; }
+/* The tile band used to butt straight into the next section label. At 10px
+   that read as tight; with a link chip on that row it reads as a collision. */
+.sci-tiles-plat { margin-bottom: 20px; }
+/* Inside a platform pane the headline number takes that platform's own hue,
+   lightened toward white so it clears the body-text contrast floor on the
+   dark ground (a raw #0a66c2 LinkedIn blue does not). */
+.sci-tiles-plat .sci-tile-v { color: color-mix(in srgb, var(--pf-color, #ffffff) 52%, #ffffff); }
+
+/* ── Shell: rail + panes ─────────────────────────────────────────────────── */
+.sci-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); flex: 1; min-height: 0; }
+.sci-nav { display: flex; flex-direction: column; gap: 2px; padding: 16px 12px 22px; border-right: 1px solid rgba(255,255,255,.07); overflow-y: auto; min-height: 0; }
+.sci-nav::-webkit-scrollbar { width: 6px; }
+.sci-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: var(--radius-pill, 80px); }
+.sci-nav-item { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 11px; border-radius: var(--radius-sm, 10px); border: 1px solid transparent; background: transparent; color: #8b7f92; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .16s, color .16s, border-color .16s; }
+.sci-nav-item:hover { background: rgba(255,255,255,.045); color: #ded3e2; }
+.sci-nav-item.active { background: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 26%, transparent); color: color-mix(in srgb, var(--pf-color, #fb923c) 42%, #ffffff); }
+/* The active rail bleeds left into the nav's own padding, so it reads as an
+   edge marker on the panel rather than a border on the button. */
+.sci-nav-item.active::before { content: ''; position: absolute; left: -12px; top: 7px; bottom: 7px; width: 3px; border-radius: var(--radius-pill, 80px); background: var(--pf-color, #fb923c); }
+.sci-nav-ic { width: 23px; height: 23px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #a99fb0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 13%, transparent); transition: background .16s, transform .2s cubic-bezier(.34,1.56,.64,1); }
+.sci-nav-ic svg { width: 13.5px; height: 13.5px; }
+.sci-nav-item:hover .sci-nav-ic { transform: scale(1.09); }
+.sci-nav-item.active .sci-nav-ic { background: color-mix(in srgb, var(--pf-color, #fb923c) 24%, transparent); }
+.sci-nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-nav-count { flex-shrink: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #948899; background: rgba(255,255,255,.055); border-radius: var(--radius-pill, 80px); padding: 2px 7px; }
+.sci-nav-item.active .sci-nav-count { color: color-mix(in srgb, var(--pf-color, #fb923c) 38%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+.sci-nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--pf-color, #fb923c); box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+/* A platform that returned nothing is dimmed with a dead grey dot rather than
+   hidden: "we looked at TikTok and found nothing" and "we never checked
+   TikTok" are different findings, and the rail has to tell them apart. */
+.sci-nav-empty { opacity: .48; }
+.sci-nav-empty:hover { opacity: .78; }
+.sci-nav-empty .sci-nav-dot { background: rgba(255,255,255,.2); box-shadow: none; }
+.sci-nav-sep { height: 1px; background: rgba(255,255,255,.07); margin: 11px 4px 3px; }
+.sci-nav-cap { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: #8a7e91; padding: 7px 11px 5px; }
+
+.sci-panes { overflow-y: auto; min-height: 0; min-width: 0; padding: 24px 30px 44px; }
+.sci-panes::-webkit-scrollbar { width: 8px; }
+.sci-panes::-webkit-scrollbar-track { background: transparent; }
+.sci-panes::-webkit-scrollbar-thumb { background-image: linear-gradient(180deg, rgba(251,146,60,.5), rgba(244,114,182,.4)); border-radius: var(--radius-pill, 80px); }
+.sci-pane { display: none; }
+.sci-pane.active { display: block; animation: sci-pane-in .34s cubic-bezier(.22,1,.36,1); }
+@keyframes sci-pane-in { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sci-pane.active { animation: none; } }
+.sci-pane-title { display: none; }  /* screen: the rail names it. print: revealed */
+
+/* Status banners */
+.sci-banner { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgba(251,191,36,.32); background: rgba(251,191,36,.06); border-radius: var(--radius-md, 12px); padding: 12px 15px; font-size: 12.5px; line-height: 1.55; margin: 0 0 16px; color: #e9dfe0; }
+.sci-banner.sci-banner-none { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.055); }
+.sci-banner b { text-transform: capitalize; color: #f3ecf5; }
+.sci-banner .bic { flex-shrink: 0; font-size: 14px; margin-top: -1px; }
+
+/* ── Platform pane hero ──────────────────────────────────────────────────── */
+.sci-phero { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sci-phero-ic { width: 46px; height: 46px; border-radius: var(--radius-md, 14px); display: grid; place-items: center; flex-shrink: 0; color: var(--pf-color, #8b86a0); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #8b86a0) 32%, transparent); box-shadow: 0 12px 30px -14px color-mix(in srgb, var(--pf-color, #8b86a0) 85%, transparent); }
+.sci-phero-ic svg { width: 24px; height: 24px; }
+.sci-phero-txt { min-width: 0; flex: 1; }
+.sci-phero-txt h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 20px; font-weight: 700; color: #fbf4f2; letter-spacing: -.015em; }
+.sci-phero-meta { display: flex; align-items: center; gap: 7px 12px; flex-wrap: wrap; margin-top: 6px; font-size: 11.5px; color: #877b8f; }
+.sci-phero-handle { font-weight: 600; color: color-mix(in srgb, var(--pf-color, #fdba74) 45%, #ffffff); }
+/* The handle IS the account, so it is the link. It used to be inert text six
+   pixels from a button that went exactly where clicking a handle implies. */
+a.sci-phero-handle { text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 42%, transparent); transition: color .16s, border-color .16s; }
+a.sci-phero-handle:hover { color: #ffffff; border-bottom-color: var(--pf-color, #fb923c); }
+/* Spelled out rather than hidden behind the word "profile": this is the one
+   line of the pane a reader may want to copy, send on, or read off paper,
+   where no link is clickable at all. */
+.sci-phero-url { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: #948899; overflow-wrap: anywhere; }
+.sci-phero-go { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; text-decoration: none; white-space: nowrap; color: color-mix(in srgb, var(--pf-color, #fdba74) 65%, #ffffff); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 34%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent); border-radius: var(--radius-pill, 80px); padding: 8px 15px; transition: background .16s, transform .16s; }
+.sci-phero-go:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); }
+.sci-phero-go-ic { display: inline-flex; width: 14px; height: 14px; flex-shrink: 0; }
+.sci-phero-go-ic svg { width: 100%; height: 100%; }
+.sci-plat-vendor { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #948899; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 3px 9px; white-space: nowrap; }
+
+/* ── Overview: the platform grid, which doubles as the rail's launcher ───── */
+.sci-pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(206px,1fr)); gap: 10px; }
+/* Two destinations, so two controls. Reading about a platform and going to
+   the account are different intentions, and one card that guesses between
+   them gets one of them wrong every time. */
+.sci-pcard { display: flex; align-items: stretch; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); overflow: hidden; transition: border-color .2s, background .2s, transform .2s; }
+.sci-pcard:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 7%, transparent); }
+.sci-pcard-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px; text-align: left; padding: 12px 13px; border: none; background: none; font-family: inherit; color: inherit; cursor: pointer; }
+.sci-pcard-go { flex-shrink: 0; width: 36px; display: grid; place-items: center; text-decoration: none; font-size: 12px; color: #948899; border-left: 1px solid rgba(255,255,255,.07); transition: background .16s, color .16s; }
+.sci-pcard-go:hover { background: color-mix(in srgb, var(--pf-color, #fb923c) 20%, transparent); color: #f6eff8; }
+.sci-pcard-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #8b86a0) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #8b86a0) 15%, transparent); }
+.sci-pcard-ic svg { width: 17px; height: 17px; }
+.sci-pcard-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.sci-pcard-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
+.sci-pcard-v { font-size: 10.5px; color: #877b8f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-pcard-x { flex-shrink: 0; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--pf-color, #fdba74) 60%, #ffffff); }
+.sci-pcard-off { opacity: .5; }
+.sci-pcard-off:hover { opacity: .8; }
+
+/* ── The account directory ───────────────────────────────────────────────
+   Every way out of the report in one grid. The platforms with nothing behind
+   them are cards too -- unclickable, carrying their reason -- because a
+   directory that lists only the four accounts that resolved reads as "they
+   are on four platforms", which is a different and unearned claim. Those
+   cards dim through explicit colours rather than opacity: an opacity that
+   halves a card's contrast is invisible to a contrast checker, which is
+   exactly how unreadable text survives a green audit. */
+.sci-accs { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
+.sci-acc { position: relative; display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-radius: var(--radius-md, 13px); border: 1px solid rgba(255,255,255,.08); background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 64%); text-decoration: none; overflow: hidden; transition: transform .2s, border-color .2s; }
+.sci-acc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--pf-color, #fb923c); }
+.sci-acc:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); }
+.sci-acc-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 78%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); }
+.sci-acc-ic svg { width: 18px; height: 18px; }
+.sci-acc-txt { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.sci-acc-n { font-size: 13px; font-weight: 700; color: #f3ecf5; }
+.sci-acc-s { font-size: 11px; color: #b3a6b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-acc-u { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: #948899; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-acc-go { flex-shrink: 0; font-size: 13px; color: color-mix(in srgb, var(--pf-color, #fdba74) 58%, #ffffff); transition: transform .2s; }
+.sci-acc:hover .sci-acc-go { transform: translate(2px, -2px); }
+.sci-acc-off { background: rgba(255,255,255,.022); }
+.sci-acc-off::before { background: #6b6272; }
+.sci-acc-off .sci-acc-ic { color: #948899; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
+.sci-acc-off .sci-acc-n { color: #b3a6b8; }
+.sci-acc-off .sci-acc-s { color: #948899; }
+
+/* ── Pane-level empty and degraded states ────────────────────────────────── */
+.sci-pane-empty { text-align: center; padding: 42px 26px; border-radius: var(--radius-lg, 16px); border: 1px dashed rgba(255,255,255,.13); background: rgba(255,255,255,.022); }
+.sci-pane-empty-h { font-size: 14.5px; font-weight: 700; color: #d6c9db; }
+.sci-pane-empty p { font-size: 12.5px; line-height: 1.62; color: #877b8f; margin: 8px auto 0; max-width: 54ch; }
+.sci-pane-note { font-size: 12.5px; line-height: 1.6; color: #877b8f; padding: 13px 16px; border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.025); }
+
+.sci-cross-lede { font-size: 13.5px; line-height: 1.6; color: #cbbfd1; padding: 15px 19px; border-radius: var(--radius-md, 12px); margin-bottom: 22px; background: linear-gradient(120deg, rgba(251,146,60,.1), rgba(168,85,247,.07)); border: 1px solid rgba(244,114,182,.2); }
+
+
+/* ── Prose measure ───────────────────────────────────────────────────────────
+   The pane is up to ~950px wide so post grids can breathe, which is far too
+   wide for running text -- a bullet ran past 110 characters and the eye lost
+   the line on the return sweep. Text blocks cap their own measure; grids and
+   charts keep the full width. */
+.sci-summary-list li, .sci-strategy-list li, .sci-claim, .sci-cross-lede,
+.sci-pane-note, .rd-theme-d, .rd-list li, .rd-comp-c { max-width: 78ch; }
+
+/* The Reddit conversation keeps its own inset panel, but inside a pane it no
+   longer needs the drawer's own 22px side margin. */
+.sci-pane .rd-section { margin: 24px 0 0; }
+
+
+/* Small mono section labels -- structural dividers so a platform block reads
+   as distinct sections rather than one continuous scroll of text. */
+.sci-section { margin-bottom: 18px; }
+.sci-section-label { display: flex; align-items: center; min-height: 26px; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #a99fb0; margin-bottom: 10px; }
+/* Scoped to the glyph, not to every span in the row: the section's link chip
+   lives here too and must not inherit the glyph's size and orange. */
+.sci-section-label > span:first-child { font-size: 11px; color: #fdba74; }
+
+/* A section's own way out, right-aligned so the eye finds it in the same
+   place in every section, and set in sans sentence case so it reads as a
+   control rather than as more of the uppercase mono label beside it. Each one
+   points at the specific post the section is describing, so the label says
+   which post -- "Most recent" and "The post that earned most" go to different
+   places and a reader deciding whether to click deserves to know which. */
+.sci-seclink { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; text-decoration: none; font-family: var(--au-body, 'Space Grotesk', system-ui, sans-serif); font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; color: #b3a6b8; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.035); border-radius: var(--radius-pill, 80px); padding: 4px 11px 4px 8px; transition: color .16s, border-color .16s, background .16s, transform .16s; }
+.sci-seclink b { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-seclink:hover { color: #f6eff8; transform: translateY(-1px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); background: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent); }
+.sci-seclink-ic { display: inline-flex; width: 13px; height: 13px; flex-shrink: 0; color: color-mix(in srgb, var(--pf-color, #fb923c) 80%, #ffffff); }
+.sci-seclink-ic svg { width: 100%; height: 100%; }
+
+/* Content-patterns bullets -- replaces the old single prose paragraph. */
+.sci-summary-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.sci-summary-list li { position: relative; padding-left: 16px; font-size: 13.5px; line-height: 1.58; color: #d6c9db; }
+.sci-summary-list li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: linear-gradient(135deg,#fb923c,#f472b6); }
+
+/* Messaging & strategy panel -- a distinct analytical read, deliberately
+   separated from the descriptive content-patterns bullets above it so "what
+   it looks like" and "what it means strategically" don't blur together. */
+.sci-strategy { position: relative; margin: 0 0 18px; padding: 15px 18px 15px 21px; border-radius: var(--radius-md, 12px); background: linear-gradient(135deg, rgba(168,85,247,.09), rgba(244,114,182,.05)); border: 1px solid rgba(168,85,247,.24); }
+.sci-strategy::before { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: var(--radius-pill, 80px); background: linear-gradient(180deg,#a855f7,#f472b6,#fb923c); }
+.sci-strategy-label { display: flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #e2a6dc; margin-bottom: 9px; }
+.sci-strategy-label span { font-size: 11px; color: #c084fc; }
+.sci-strategy-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.sci-strategy-list li { position: relative; padding-left: 16px; font-size: 13.5px; line-height: 1.62; color: #f1e9f3; }
+.sci-strategy-list li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: #c084fc; }
+
+/* Top-performing post cards -- real thumbnails resolved from the platform's
+   own scraped data, real links, real engagement numbers. This is what a
+   post id actually means, made visible instead of left as a bare number. */
+.sci-postcard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 18px; }
+.sci-postcard { display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-md, 12px); background: rgba(255,255,255,.03); overflow: hidden; text-decoration: none; transition: transform .2s, border-color .2s; }
+.sci-postcard:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 55%, transparent); }
+.sci-postcard-media { position: relative; aspect-ratio: 16 / 9; background: color-mix(in srgb, var(--pf-color, #8b86a0) 14%, transparent); display: flex; align-items: center; justify-content: center; }
+.sci-postcard-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A text-only post has no media block at all. It gets a faint wash of the
+   platform's hue instead, so it still reads as belonging to the same set, and
+   spends the reclaimed height on more of the caption. */
+.sci-postcard-text { background: linear-gradient(158deg, color-mix(in srgb, var(--pf-color, #fb923c) 10%, transparent), rgba(255,255,255,.02) 60%); }
+.sci-postcard-text .sci-postcard-title { -webkit-line-clamp: 8; font-size: 13.5px; }
+.sci-postcard-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sci-postcard-plat { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: color-mix(in srgb, var(--pf-color, #fdba74) 62%, #ffffff); }
+.sci-postcard-plat-ic { width: 12px; height: 12px; display: inline-flex; color: var(--pf-color, #8b86a0); }
+.sci-postcard-plat-ic svg { width: 100%; height: 100%; }
+.sci-postcard-type { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: color-mix(in srgb, var(--pf-color, #fdba74) 58%, #ffffff); background: color-mix(in srgb, var(--pf-color, #fb923c) 15%, transparent); border: 1px solid color-mix(in srgb, var(--pf-color, #fb923c) 28%, transparent); border-radius: var(--radius-xs, 5px); padding: 3px 8px; }
+.sci-postcard-body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+.sci-postcard-title { font-size: 13px; font-weight: 500; color: #e7dfea; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.sci-postcard-foot { display: flex; flex-wrap: nowrap; align-items: center; gap: 11px; margin-top: auto; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.06); min-width: 0; }
+.sci-postcard-date { font-size: 11px; color: #948899; white-space: nowrap; flex-shrink: 0; }
+.sci-metric-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #a79dae; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.sci-metric-ic { width: 12.5px; height: 12.5px; display: inline-flex; flex-shrink: 0; color: #6b5f72; }
+.sci-metric-ic svg { width: 100%; height: 100%; }
+.sci-postcard-view { margin-left: auto; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--pf-color, #7dd3fc) 52%, #ffffff); white-space: nowrap; flex-shrink: 0; }
+.sci-postcard:hover .sci-postcard-view { text-decoration: underline; }
+
+/* ── Posts toolbar: Top / Most-recent toggle, count, show-all ──────────── */
+.sci-posts-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.sci-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-sm, 8px); background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.sci-seg-btn { border: none; background: none; font-family: inherit; font-size: 11px; font-weight: 700; color: #948899; padding: 6px 13px; border-radius: var(--radius-xs, 5px); cursor: pointer; transition: background .15s, color .15s; }
+.sci-seg-btn:hover { color: #eee6f0; }
+.sci-seg-btn.active { background: color-mix(in srgb, var(--pf-color, #fb923c) 22%, transparent); color: color-mix(in srgb, var(--pf-color, #fdba74) 48%, #ffffff); }
+.sci-posts-count { font-size: 11px; color: #8a7e91; }
+.sci-posts-more { display: block; width: 100%; margin-top: 12px; padding: 11px; border-radius: var(--radius-md, 12px); border: 1px dashed rgba(255,255,255,.14); background: rgba(255,255,255,.02); color: #877b8f; font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+.sci-posts-more:hover { background: rgba(255,255,255,.05); color: #eee6f0; }
+
+.sci-claims { display: flex; flex-direction: column; gap: 9px; }
+.sci-claim { position: relative; padding: 12px 15px 12px 20px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius-md, 12px); font-size: 13px; line-height: 1.58; color: #ded3e2; }
+.sci-claim::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: var(--radius-pill, 80px); background: linear-gradient(180deg,#fb923c,#f472b6); }
+.sci-claim-cites { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* Citation chips -- a small linked post card (thumbnail + real title),
+   replacing the old bare "(id 39)" numeric citation. */
+.sci-cite-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-pill, 80px); padding: 3px 11px 3px 3px; text-decoration: none; transition: border-color .15s, transform .15s; }
+.sci-cite-chip:hover { border-color: rgba(251,146,60,.45); transform: translateY(-1px); }
+.sci-chip-thumb { position: relative; width: 22px; height: 22px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: color-mix(in srgb, var(--pf-color, #8b86a0) 20%, transparent); display: flex; align-items: center; justify-content: center; }
+.sci-chip-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sci-chip-ic { display: none; width: 11px; height: 11px; color: var(--pf-color, #8b86a0); }
+.sci-chip-thumb.sci-chip-noimg .sci-chip-ic { display: flex; }
+.sci-chip-ic svg { width: 100%; height: 100%; }
+.sci-chip-txt { font-size: 10.5px; font-weight: 600; color: #d6c9db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* Admin-only "Data sources" panel: per-platform Unipile connection status
+   plus a one-click connect link. Reuses .sci-card's own look; only the
+   inner row/status/connect pieces are new. */
+.sci-datasrc-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); color: #877b8f; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+.sci-datasrc-refresh { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #877b8f; border-radius: var(--radius-sm, 8px); padding: 5px 12px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.sci-datasrc-refresh:hover { background: rgba(255,255,255,.09); color: #d6c9db; }
+.sci-datasrc-refresh:disabled { opacity: .6; cursor: default; }
+.sci-datasrc-body { padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 10px; }
+.sci-datasrc-loading { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #877b8f; }
+.sci-datasrc-row { display: flex; align-items: center; gap: 10px; }
+.sci-datasrc-ic { width: 24px; height: 24px; flex-shrink: 0; display: inline-flex; }
+.sci-datasrc-ic svg { width: 100%; height: 100%; }
+.sci-datasrc-name { font-size: 13px; font-weight: 600; color: #d6c9db; text-transform: capitalize; }
+.sci-datasrc-status { margin-left: auto; font-size: 11px; font-weight: 600; }
+.sci-datasrc-status.ok { color: #4ade80; }
+/* A platform whose only accounts have signed out: not an error (nothing
+   is broken until a run needs it) but not "connected" either, so it gets
+   its own amber rather than borrowing either neighbour's colour. */
+.sci-datasrc-status.warn { color: #fbbf24; margin-right: 10px; }
+.sci-datasrc-connect { margin-left: auto; background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.4); color: #fbbf24; border-radius: var(--radius-sm, 8px); padding: 6px 13px; font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sci-datasrc-connect:hover { background: rgba(251,191,36,.24); }
+.sci-datasrc-empty { font-size: 12.5px; color: #877b8f; }
+.sci-datasrc-note { font-size: 11px; color: #6b5f72; line-height: 1.5; margin-top: 4px; }
+
+/* ══ CHARTS ═══════════════════════════════════════════════════════════════
+   Every chart in the report is one of four primitives (trend, ranked bars,
+   mix, heat grid) wearing the same card. The card is what makes a pane full
+   of very different plots read as one instrument panel instead of a pile of
+   widgets, so nothing draws its own frame. */
+
+/* ── Categorical hues ──────────────────────────────────────────────────────
+   Assigned by identity, never by array position, and never cycled past six.
+   Both sets were run through an adjacent-pair CVD separation check rather
+   than picked by eye; the dark steps measure under 3:1 on paper, so light
+   mode re-steps every one of them (see the LIGHT THEME block). Because they
+   live here and not in an inline style, that override is actually reachable. */
+.sci-chart, .sci-hi-scope { --chart-c: var(--pf-color, #fb923c); --sci-plot-ink: #150e1b; }
+
+.sci-c0 { --c: #fb923c; }
+.sci-c1 { --c: #67e8f9; }
+.sci-c2 { --c: #ec4899; }
+.sci-c3 { --c: #4ade80; }
+.sci-c4 { --c: #a855f7; }
+.sci-c5 { --c: #fcd34d; }
+
+/* ── The shared tooltip ────────────────────────────────────────────────────
+   One node for the whole report, moved to the cursor. pointer-events:none is
+   load-bearing: a tooltip that can be hovered sits between the cursor and the
+   mark it describes and makes the chart under it unhoverable. */
+.sci-tip { position: fixed; top: 0; left: 0; z-index: 99998; pointer-events: none; opacity: 0; transform: translate(-9999px,-9999px); transition: opacity .12s ease; max-width: 280px; padding: 9px 12px; border-radius: var(--radius-sm, 8px); background: rgba(15,10,20,.97); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 14px 40px rgba(0,0,0,.55); font-size: 11.5px; line-height: 1.5; color: #e7dfea; }
+.sci-tip.on { opacity: 1; }
+.sci-tip b { display: block; font-size: 11.5px; font-weight: 700; color: #ffffff; margin-bottom: 5px; overflow-wrap: anywhere; }
+.sci-tip i { display: inline-block; min-width: 108px; font-style: normal; color: #a99fb0; }
+.sci-tip s { text-decoration: none; font-weight: 700; color: #fdba74; font-variant-numeric: tabular-nums; }
+.sci-tip i + s::after { content: ''; display: block; }
+
+/* ── Chart card ─────────────────────────────────────────────────────────── */
+.sci-chart { position: relative; padding: 16px 18px 15px; border-radius: var(--radius-lg, 16px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.024); margin-bottom: 14px; }
+.sci-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.sci-chart-ht h5 { font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #eee6f0; letter-spacing: -.01em; }
+.sci-chart-ht p { font-size: 11px; color: #877b8f; margin-top: 3px; max-width: 62ch; }
+.sci-chart-note { margin-top: 12px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; line-height: 1.55; color: #857a8c; }
+.sci-chart-duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.sci-chart-duo .sci-chart { margin-bottom: 0; }
+/* One survivor should not stretch to a 950px-wide donut. */
+.sci-chart-solo { grid-template-columns: minmax(0, 560px); }
+
+/* Hovering any keyed element dims everything in the same chart that is not
+   it, which is what welds a legend row to its bar segment. Opacity only:
+   moving or resizing a mark on hover changes the thing being measured. */
+.sci-chart.hi-live [data-hi], .sci-hi-scope.hi-live [data-hi] { opacity: .28; transition: opacity .14s ease; }
+.sci-chart.hi-live [data-hi].hi-on, .sci-hi-scope.hi-live [data-hi].hi-on { opacity: 1; }
+
+/* Entrance. Charts draw once, on the pane a reader is actually looking at. */
+.sci-chart { opacity: 0; transform: translateY(10px); transition: opacity .45s ease, transform .45s cubic-bezier(.22,1,.36,1); }
+.sci-chart.drawn { opacity: 1; transform: none; }
+.sci-chart .sci-tr-line { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.sci-chart.drawn .sci-tr-line { transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1) .1s; stroke-dashoffset: 0; }
+.sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-tr-bg,
+.sci-chart .sci-tr-tail, .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl { opacity: 0; }
+.sci-chart.drawn .sci-tr-bg { opacity: 1; transition: opacity .6s ease .05s; }
+.sci-chart.drawn .sci-tr-area { opacity: 1; transition: opacity .7s ease .35s; }
+.sci-chart.drawn .sci-tr-pt { opacity: 1; transition: opacity .4s ease .75s; }
+/* The baseline and the unfinished period arrive last, after the series they
+   annotate has finished drawing itself. */
+.sci-chart.drawn .sci-tr-avg, .sci-chart.drawn .sci-tr-avgl { opacity: 1; transition: opacity .5s ease .8s; }
+.sci-chart.drawn .sci-tr-tail { opacity: .66; transition: opacity .45s ease .95s; }
+/* The radar grows out of its own centre. transform-box makes the origin the
+   viewBox centre rather than each polygon's own bounding box, which is what
+   keeps the shapes growing together instead of each from its own middle. */
+.sci-chart .sci-rd-shapes { opacity: 0; transform: scale(.76); transform-box: view-box; transform-origin: 50% 50%; }
+.sci-chart.drawn .sci-rd-shapes { opacity: 1; transform: scale(1);
+  transition: opacity .5s ease .12s, transform .72s cubic-bezier(.22,1,.36,1) .12s; }
+.sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+.sci-chart .sci-rd-ghost { opacity: 0; }
+.sci-chart.drawn .sci-rd-ring, .sci-chart.drawn .sci-rd-spoke,
+.sci-chart.drawn .sci-rd-ax { opacity: 1; transition: opacity .45s ease; }
+.sci-chart.drawn .sci-rd-ghost { opacity: 1; transition: opacity .5s ease .55s; }
+/* Widths ride on --w, not on the width property itself. A bar whose inline
+   style set width directly would beat any rule trying to grow it from zero,
+   which is how a "0 !important" starting state silently becomes permanent. */
+.sci-rank-fill, .sci-mixseg, .sci-sc-bar { width: var(--w, 0); }
+.sci-chart .sci-rank-fill, .sci-chart .sci-mixseg, .sci-chart .sci-sc-bar { width: 0; }
+.sci-chart.drawn .sci-rank-fill, .sci-chart.drawn .sci-mixseg, .sci-chart.drawn .sci-sc-bar { width: var(--w, 0); transition: width .7s cubic-bezier(.22,1,.36,1); }
+.sci-chart .sci-dn-arc { opacity: 0; }
+.sci-chart.drawn .sci-dn-arc { opacity: 1; transition: opacity .5s ease .2s; }
+
+/* ── Trend: one series, magnitude over time ─────────────────────────────── */
+.sci-tr-wrap { width: 100%; }
+.sci-tr { display: block; width: 100%; height: auto; overflow: visible; }
+.sci-tr-grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sci-tr-axis, .sci-tr-lab { fill: #857a8c; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-variant-numeric: tabular-nums; }
+/* The fill is a gradient referenced from the markup. Setting `fill` here would
+   beat that reference, so the colour lives in the stops instead. */
+.sci-tr-g0 { stop-color: var(--chart-c); stop-opacity: .34; }
+.sci-tr-g1 { stop-color: var(--chart-c); stop-opacity: .02; }
+/* A dot floor under the plot, faded out at both edges, so the series is bounded
+   by its own data rather than by a drawn box. */
+.sci-tr-dg { fill: rgba(255,255,255,.13); }
+.sci-tr-line { fill: none; stroke: var(--chart-c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* The period we are standing in, which has not finished happening yet. */
+.sci-tr-tail { fill: none; stroke: var(--chart-c); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 4 4.5; }
+/* Ring marks, not filled dots: an open centre keeps the point readable where
+   the series doubles back over itself. */
+.sci-tr-pt { fill: var(--sci-plot-ink, #150e1b); stroke: var(--chart-c); stroke-width: 1.8; }
+.sci-tr-avg { stroke: rgba(255,255,255,.42); stroke-width: 1; stroke-dasharray: 2 4; }
+.sci-tr-avgl { fill: #948899; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; letter-spacing: .04em; }
+.sci-tr-hit { fill: transparent; }
+.sci-tr-cross { stroke: color-mix(in srgb, var(--chart-c) 62%, #ffffff); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+.sci-tr-dot { fill: color-mix(in srgb, var(--chart-c) 55%, #ffffff); stroke: rgba(15,10,20,.9); stroke-width: 2; opacity: 0; }
+.sci-tr-col:hover .sci-tr-cross, .sci-tr-col:hover .sci-tr-dot { opacity: 1; }
+
+/* ── Ranked bars ───────────────────────────────────────────────────────────
+   Horizontal because the labels are words. The value column is fixed width
+   and tabular so the numbers line up as a column rather than drifting with
+   each bar's end. */
+.sci-rank { display: flex; flex-direction: column; gap: 7px; }
+.sci-rank-row { display: grid; grid-template-columns: minmax(70px, 168px) minmax(0,1fr) 56px; align-items: center; gap: 12px; text-decoration: none; border-radius: var(--radius-xs, 5px); padding: 2px 3px; }
+a.sci-rank-row:hover { background: rgba(255,255,255,.045); }
+.sci-rank-l { font-size: 11.5px; font-weight: 600; color: #cbbfd1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-rank-track { height: 9px; border-radius: var(--radius-pill, 80px); background: rgba(255,255,255,.055); overflow: hidden; }
+.sci-rank-fill { display: block; height: 100%; border-radius: var(--radius-pill, 80px); background: var(--c, var(--chart-c)); }
+.sci-rank-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; color: #a99fb0; text-align: right; font-variant-numeric: tabular-nums; }
+.sci-rank-theme .sci-rank-l { text-transform: capitalize; }
+.sci-rank-posts .sci-rank-row { grid-template-columns: minmax(120px, 300px) minmax(0,1fr) 56px; }
+
+/* ── Mix: a 100% bar plus a named, counted key ─────────────────────────── */
+.sci-mix { display: flex; flex-direction: column; gap: 12px; }
+.sci-mixbar { display: flex; height: 12px; border-radius: var(--radius-pill, 80px); overflow: hidden; background: rgba(255,255,255,.055); gap: 2px; }
+.sci-mixseg { display: block; height: 100%; background: var(--c); border-radius: 2px; }
+/* ── Radar: one profile per platform, over shared measures ─────────────────
+   Stroke-forward on purpose. Five translucent fills stacked on one another
+   turn into a single muddy blob in which no series is readable, so the fill is
+   only enough to give each shape a body and the 2px stroke carries identity. */
+.sci-rd-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+.sci-rd { display: block; width: 100%; height: auto; max-height: 330px; overflow: hidden; }
+.sci-rd-ring { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sci-rd-edge { stroke: rgba(255,255,255,.15); }
+.sci-rd-spoke { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.sci-rd-ax { fill: #9c8fa3; font-family: var(--au-body, 'Space Grotesk', system-ui, sans-serif); font-size: 10.5px; font-weight: 600; }
+.sci-rd-poly { fill: color-mix(in srgb, var(--pf-color, #fb923c) 13%, transparent);
+  stroke: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); stroke-width: 2; stroke-linejoin: round; }
+.sci-rd-pt { fill: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); stroke: var(--sci-plot-ink, #150e1b); stroke-width: 1.6; }
+.sci-rd-key { gap: 9px; }
+/* Small multiples. One profile per tile, same axes and same scale in every
+   one, so the tiles compare to each other and not only to themselves. */
+.sci-rd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(252px, 1fr)); gap: 4px 14px; }
+.sci-rd-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.sci-rd-tile .sci-rd { max-height: 230px; }
+/* The axis names shrink with the tile, so they get their own smaller step
+   rather than inheriting the standalone chart's. */
+.sci-rd-tile .sci-rd-ax { font-size: 12px; }
+.sci-rd-cap { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #cdc1d3; }
+/* The group average, ghosted behind each profile so a tile can be read against
+   its peers without looking away from it. */
+.sci-rd-ghost { fill: none; stroke: rgba(255,255,255,.44); stroke-width: 1.4; stroke-dasharray: 3 3.5; stroke-linejoin: round; }
+.sci-rd-sw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0;
+  background: color-mix(in srgb, var(--pf-color, #fb923c) 76%, #ffffff); }
+
+/* ── Loading skeletons ────────────────────────────────────────────────────
+   Only ever shown while a run is still collecting. The sweep is what separates
+   "working" from "finished and empty"; without it a grey box is a dead end. */
+.sci-chart-skel .sci-chart-head { margin-bottom: 15px; }
+.sci-skel-plot { position: relative; overflow: hidden; height: 150px; border-radius: var(--radius-md, 12px);
+  background-color: rgba(255,255,255,.022);
+  background-image: radial-gradient(rgba(255,255,255,.12) 1px, transparent 1px);
+  background-size: 13px 13px; }
+/* Deliberately close to colourless. A placeholder painted in the report's own
+   accent at full strength is a chart you can screenshot and quote, and these
+   numbers do not exist yet. */
+.sci-skel-rows { display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 14px 16px; }
+.sci-skel-row { display: flex; align-items: center; gap: 10px; }
+.sci-skel-ic { width: 15px; height: 15px; border-radius: 5px; flex-shrink: 0; background: rgba(255,255,255,.09); }
+.sci-skel-n { width: 62px; height: 8px; border-radius: 80px; flex-shrink: 0; background: rgba(255,255,255,.07); }
+.sci-skel-t { height: 8px; border-radius: 80px; width: var(--w, 60%); background: rgba(255,255,255,.05); }
+.sci-skel-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sci-skel-svg path { fill: rgba(251,146,60,.055); stroke: rgba(251,146,60,.2); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.sci-skel-sweep { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.1) 50%, transparent 62%);
+  transform: translateX(-100%); animation: sci-sweep 1.9s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes sci-sweep { to { transform: translateX(100%); } }
+
+.sci-mixkey { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.sci-mixkey-col { flex-direction: column; gap: 7px; }
+.sci-mk { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #b3a7ba; text-transform: capitalize; }
+.sci-mk i { width: 9px; height: 9px; border-radius: 3px; background: var(--c); flex-shrink: 0; }
+.sci-mk b { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: #eee6f0; font-variant-numeric: tabular-nums; }
+.sci-mk em { font-style: normal; font-size: 10.5px; color: #857a8c; font-variant-numeric: tabular-nums; }
+
+/* ── Donut ─────────────────────────────────────────────────────────────── */
+.sci-donut-wrap { display: grid; grid-template-columns: 132px minmax(0,1fr); align-items: center; gap: 18px; position: relative; }
+.sci-dn { width: 132px; height: 132px; grid-row: 1; grid-column: 1; transform: rotate(-90deg); }
+.sci-dn-track { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 15; }
+.sci-dn-arc { fill: none; stroke: var(--c); stroke-width: 15; }
+.sci-dn-mid { grid-row: 1; grid-column: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+.sci-dn-v { font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #f4edf6; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+.sci-dn-l { font-size: 9.5px; color: #877b8f; margin-top: 4px; max-width: 84px; line-height: 1.3; }
+
+/* ── Heat grid: two categorical axes, one magnitude, five steps ─────────── */
+.sci-heat { display: flex; flex-direction: column; gap: 4px; }
+.sci-heat-row { display: grid; grid-template-columns: 38px repeat(6, minmax(0,1fr)); gap: 4px; align-items: center; }
+.sci-heat-rl { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9.5px; font-weight: 700; color: #857a8c; }
+.sci-heat-cl { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; color: #857a8c; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sci-heat-head { margin-bottom: 2px; }
+.sci-heat-c { position: relative; height: 26px; border-radius: var(--radius-xs, 5px); background: rgba(255,255,255,.04); overflow: hidden; }
+.sci-heat-c i { position: absolute; inset: 0; background: var(--chart-c); border-radius: inherit; }
+.sci-heat-0 i { opacity: 0; }
+.sci-heat-1 i { opacity: .2; }
+.sci-heat-2 i { opacity: .38; }
+.sci-heat-3 i { opacity: .56; }
+.sci-heat-4 i { opacity: .76; }
+.sci-heat-5 i { opacity: 1; }
+.sci-heat-c:hover { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
+.sci-heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 8px; font-size: 9.5px; color: #857a8c; }
+.sci-heat-legend .sci-heat-c { width: 20px; height: 11px; }
+
+/* ── Platform scorecard ────────────────────────────────────────────────────
+   A table that is also five small bar charts. Each cell's bar is measured
+   against its own COLUMN, never a shared maximum: cadence and interactions
+   share no unit, and one scale would flatten cadence to nothing. */
+.sci-chart-wide { overflow-x: auto; }
+.sci-sc { min-width: 620px; display: flex; flex-direction: column; gap: 3px; }
+.sci-sc-row { display: grid; grid-template-columns: minmax(110px, 1.15fr) repeat(5, minmax(0, 1fr)); gap: 8px; align-items: center; width: 100%; text-align: left; }
+.sci-sc-head { padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 4px; }
+.sci-sc-h { display: inline-flex; align-items: center; gap: 3px; background: none; border: none; padding: 4px 2px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; font-weight: 700; letter-spacing: var(--ls-caps, .06em); text-transform: uppercase; color: #857a8c; cursor: pointer; transition: color .15s; }
+.sci-sc-h:hover { color: #eee6f0; }
+.sci-sc-h.active { color: #fdba74; }
+.sci-sc-arrow { font-size: 8px; }
+.sci-sc-body { background: none; border: none; border-radius: var(--radius-sm, 8px); padding: 7px 6px; cursor: pointer; font-family: inherit; transition: background .15s; }
+.sci-sc-body:hover { background: color-mix(in srgb, var(--chart-c) 10%, transparent); }
+.sci-sc-name { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #e7dfea; min-width: 0; }
+.sci-sc-ic { width: 15px; height: 15px; flex-shrink: 0; color: var(--pf-color, #8b86a0); }
+.sci-sc-ic svg { width: 100%; height: 100%; }
+.sci-sc-c { display: flex; flex-direction: column; gap: 5px; padding: 4px 10px 4px 0; }
+/* Number over a rule, not a number inside a filled box. The first build put
+   the bar behind the value as a rounded wash and every cell read as a form
+   field waiting to be typed into; a bar under the number is unmistakably a
+   measurement of it. */
+.sci-sc-track { height: 3px; border-radius: var(--radius-pill, 80px); background: rgba(255,255,255,.07); overflow: hidden; }
+.sci-sc-bar { display: block; height: 100%; border-radius: var(--radius-pill, 80px); background: color-mix(in srgb, var(--chart-c) 68%, transparent); }
+.sci-sc-v { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #d6c9db; font-variant-numeric: tabular-nums; }
+.sci-sc-na { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #948899; padding: 4px 10px 4px 0; }
+
+/* ── Format filter chips over the post grid ───────────────────────────── */
+.sci-fchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.sci-fchip { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 11px; font-weight: 600; color: #a99fb0; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); border-radius: var(--radius-pill, 80px); padding: 5px 12px; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.sci-fchip:hover { color: #eee6f0; background: rgba(255,255,255,.07); }
+.sci-fchip b { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; color: #948899; font-variant-numeric: tabular-nums; }
+/* The active chip wears its own format's hue, the same one that format has in
+   every chart in the pane, so the filter and the charts agree on what is what. */
+.sci-fchip.active { color: color-mix(in srgb, var(--c, #fb923c) 55%, #ffffff); background: color-mix(in srgb, var(--c, #fb923c) 16%, transparent); border-color: color-mix(in srgb, var(--c, #fb923c) 42%, transparent); }
+.sci-fchip.active b { color: color-mix(in srgb, var(--c, #fb923c) 45%, #ffffff); }
+
+/* Reddit's charts sit inside its own panel and already have a heading, so
+   they drop the card frame and keep only the plot. */
+.rd-chart { padding: 0; border: none; background: none; margin: 0; }
+
+/* Motion is an entrance, never information. Anyone who has asked for less of
+   it gets the finished chart immediately instead of a still frame. */
+@media (prefers-reduced-motion: reduce) {
+  .sci-chart, .sci-chart.drawn { opacity: 1; transform: none; transition: none; }
+  .sci-chart .sci-tr-line, .sci-chart.drawn .sci-tr-line { stroke-dasharray: none; stroke-dashoffset: 0; transition: none; }
+  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc,
+  .sci-chart .sci-tr-bg, .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl,
+  .sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+  .sci-chart .sci-rd-ghost { opacity: 1; transition: none; }
+  .sci-chart .sci-tr-tail { opacity: .66; transition: none; }
+  .sci-chart .sci-rank-fill, .sci-chart .sci-mixseg, .sci-chart .sci-sc-bar { width: var(--w, 0); transition: none; }
+  .sci-chart .sci-rd-shapes, .sci-chart.drawn .sci-rd-shapes { opacity: 1; transform: none; transition: none; }
+  /* The sweep is the only thing saying "still working", so it is slowed and
+     softened rather than removed: a motionless skeleton reads as a stall. */
+  .sci-skel-sweep { animation-duration: 4.5s; animation-timing-function: ease-in-out; }
+}
+
+/* Below the rail's own width the two columns stop being two columns: the rail
+   becomes a horizontal, scrollable strip of pills across the top of the panes
+   and keeps every item reachable, rather than collapsing into a select or
+   eating half a narrow screen. */
+@media (max-width: 860px) {
+  /* The desktop shell keeps a fixed header and scrolls only the pane. On a
+     phone the header plus the tile band is taller than the whole modal, so
+     `flex: 1; min-height: 0` correctly resolved the shell to ZERO height and
+     the report rendered as an invisible strip. Narrow screens scroll the
+     drawer as one document instead, with the rail stuck to the top of it. */
+  .sci-drawer { display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .sci-drawer::before { display: block; }
+  .sci-shell { display: block; }
+  .sci-panes { overflow: visible; }
+  .sci-nav { position: sticky; top: 0; z-index: 2; background: rgba(17,10,14,.98); flex-direction: row; align-items: center; gap: 6px; padding: 12px 16px; border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; }
+  .sci-nav-item { width: auto; flex-shrink: 0; border-radius: var(--radius-pill, 80px); padding: 7px 13px 7px 8px; }
+  .sci-nav-item.active::before { display: none; }
+  .sci-nav-sep { width: 1px; height: 22px; margin: 0 4px; flex-shrink: 0; }
+  .sci-nav-cap { display: none; }
+  .sci-panes { padding: 20px 20px 40px; }
+}
+@media (max-width: 640px) {
+  .sci-drawer { width: 96vw; height: 94vh; }
+  .sci-rep-head { padding: 22px 20px 14px; }
+  /* Only the first row needs to clear the absolutely-positioned close button;
+     the actions wrap below it. Padding the whole header would squeeze them. */
+  .sci-rep-id { padding-right: 40px; }
+  .sci-rep-actions { padding-right: 0; }
+  .sci-rep-band { padding: 0 20px 16px; }
+  /* Tiles fill the column here rather than capping at 236px and leaving a
+     dead strip down the right of a 390px screen. */
+  .sci-tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .sci-accs { grid-template-columns: 1fr; }
+  /* Side by side, the key would squeeze the polygon into a sliver. Under this
+     width it goes below the plot and packs across instead of down. */
+  .sci-rd-wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sci-rd-key { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
+  /* Two tiles across at 390px would put five axis labels into 90px each. */
+  .sci-rd-grid { grid-template-columns: minmax(0, 1fr); }
+  /* The label wraps to two lines at this width, and a chip pinned right on
+     line one leaves the section name hanging alone under it. Below 640px the
+     chip drops onto its own line and packs left with the glyph. */
+  .sci-section-label { flex-wrap: wrap; }
+  .sci-seclink { margin-left: 0; max-width: 100%; }
+  .sci-form { flex-direction: column; align-items: stretch; }
+  .sci-btn { width: 100%; }
+}
+
+/* ── Print ──────────────────────────────────────────────────────────────────
+   Cutting the report into panes would otherwise cost Ctrl+F and Save-as-PDF,
+   since only one pane is in the layout at a time. Print flattens all of them
+   back into one document, one platform per page, and reveals the pane titles
+   that the rail carries on screen. */
+@media print {
+  .bg-grid, .sci-aurora, .sci-grain, .topbar, .main, .sci-drawer-close,
+  .sci-nav, .sci-rep-actions, .sci-posts-more, .sci-seg { display: none !important; }
+  .sci-drawer-overlay { position: static !important; opacity: 1 !important; background: none !important; backdrop-filter: none !important; pointer-events: auto !important; }
+  .sci-drawer { position: static !important; transform: none !important; opacity: 1 !important; width: auto !important; height: auto !important; max-height: none !important; border: none !important; box-shadow: none !important; background: #fff !important; display: block !important; }
+  .sci-shell { display: block !important; }
+  .sci-panes { overflow: visible !important; padding: 0 !important; }
+  .sci-pane { display: block !important; animation: none !important; }
+  .sci-pane + .sci-pane { break-before: page; page-break-before: always; padding-top: 18px; }
+  .sci-pane-title { display: block !important; font-family: 'Bricolage Grotesque', sans-serif; font-size: 19px; font-weight: 700; text-transform: capitalize; color: #1c1420; border-bottom: 2px solid #c2410c; padding-bottom: 6px; margin-bottom: 16px; }
+  .sci-tile { opacity: 1 !important; transform: none !important; }
+  .sci-postcard, .rd-thread, .rd-theme, .sci-claim { break-inside: avoid; page-break-inside: avoid; }
+
+  /* Charts only draw themselves on the pane a reader is looking at, so on
+     paper every chart in every other pane would print as a blank card with a
+     zero-width bar in it. Print forces the finished state, and re-inks the
+     labels: they are tuned for a near-black panel and are invisible on white. */
+  .sci-tip { display: none !important; }
+  .sci-chart { opacity: 1 !important; transform: none !important; break-inside: avoid; page-break-inside: avoid; background: none !important; border-color: #d8d2dc !important; --chart-c: var(--pf-color, #c2410c); }
+  .sci-chart .sci-tr-line { stroke-dasharray: none !important; stroke-dashoffset: 0 !important; }
+  .sci-chart .sci-tr-area, .sci-chart .sci-tr-pt, .sci-chart .sci-dn-arc,
+  .sci-chart .sci-tr-avg, .sci-chart .sci-tr-avgl, .sci-chart .sci-tr-tail,
+  .sci-chart .sci-rd-ring, .sci-chart .sci-rd-spoke, .sci-chart .sci-rd-ax,
+  .sci-chart .sci-rd-ghost { opacity: 1 !important; }
+  .sci-chart .sci-rd-shapes { opacity: 1 !important; transform: none !important; }
+  /* The dot floor is a screen texture. On paper it prints as a grey haze under
+     the series and costs ink for nothing. */
+  .sci-tr-bg { display: none !important; }
+  .sci-tr-g0 { stop-opacity: .3 !important; }
+  .sci-tr-g1 { stop-opacity: .04 !important; }
+  .sci-tr-avg { stroke: rgba(0,0,0,.32) !important; }
+  .sci-tr-avgl, .sci-rd-ax { fill: #4a3f52 !important; }
+  .sci-tr-pt, .sci-rd-pt { stroke: #ffffff !important; }
+  .sci-rd-ring, .sci-rd-spoke { stroke: #ddd7e0 !important; }
+  .sci-rd-ghost { stroke: #b7afbd !important; }
+  .sci-rd-cap { color: #1c1420 !important; }
+  .sci-rd-tile { break-inside: avoid; page-break-inside: avoid; }
+  .sci-rd-edge { stroke: #c9c2ce !important; }
+  /* Nothing to print: a skeleton is a statement about a run still in flight. */
+  .sci-chart-skel { display: none !important; }
+  .sci-chart .sci-rank-fill, .sci-chart .sci-mixseg, .sci-chart .sci-sc-bar { width: var(--w, 0) !important; }
+  .sci-chart-ht h5, .sci-mk b, .sci-dn-v, .sci-sc-name, .sci-sc-v { color: #1c1420 !important; }
+  .sci-chart-ht p, .sci-chart-note, .sci-rank-l, .sci-rank-v, .sci-mk,
+  .sci-heat-rl, .sci-heat-cl, .sci-heat-legend, .sci-sc-h, .sci-dn-l { color: #4a3f52 !important; }
+  .sci-tr-axis, .sci-tr-lab { fill: #4a3f52 !important; }
+  .sci-tr-grid { stroke: #ddd7e0 !important; }
+  .sci-rank-track, .sci-mixbar, .sci-heat-c, .sci-sc-track { background: #ece7ee !important; }
+  .sci-c0 { --c: #c2410c; } .sci-c1 { --c: #0891b2; } .sci-c2 { --c: #9d174d; }
+  .sci-c3 { --c: #16a34a; } .sci-c4 { --c: #6b21a8; } .sci-c5 { --c: #a16207; }
+  /* Backgrounds are what a bar chart IS. Without this most browsers strip
+     every fill and print six identically empty segments. */
+  .sci-mixseg, .sci-rank-fill, .sci-sc-bar, .sci-heat-c i, .sci-mk i, .sci-rd-sw {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sci-fchips { display: none !important; }
+
+  /* The section chips go: on paper they name a destination without showing
+     one, which is an instruction to click something that is not there. The
+     account directory stays and carries the real URLs as text, so the printed
+     report is still a usable list of where these accounts are. */
+  .sci-seclink { display: none !important; }
+  .sci-accs { grid-template-columns: repeat(2, 1fr) !important; }
+  .sci-acc { break-inside: avoid; page-break-inside: avoid; background: none !important; border-color: #d8d2dc !important; }
+  .sci-acc::before { background: #c2410c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sci-acc-ic { color: #4a3f52 !important; background: none !important; border-color: #d8d2dc !important; }
+  .sci-acc-n { color: #1c1420 !important; }
+  .sci-acc-s, .sci-acc-u, .sci-acc-go, .sci-phero-url { color: #4a3f52 !important; }
+}
+
+/* ═══ LIGHT THEME ═══ */
+[data-theme="light"] body { color: #1c1420; }
+[data-theme="light"] .topbar { background: rgba(255,255,255,.86); border-bottom-color: rgba(18,26,54,.08); }
+[data-theme="light"] .bc a { color: #8b7f92; }
+[data-theme="light"] .bc a:hover { color: #362a3d; }
+[data-theme="light"] .bc-sep { color: #d8cfdd; }
+[data-theme="light"] .bc-cur { color: #c2410c; }
+[data-theme="light"] .user-pill { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .user-name { color: #5c5163; }
+[data-theme="light"] .user-avatar { color: #fff; }
+[data-theme="light"] .user-dropdown { background: rgba(255,255,255,.98); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .dd-name { color: #1c1420; }
+[data-theme="light"] .dd-email, [data-theme="light"] .pill-chevron { color: #8b7f92; }
+[data-theme="light"] .dd-item { color: #5c5163; }
+[data-theme="light"] .dd-item:hover { background: rgba(18,26,54,.05); color: #1c1420; }
+
+[data-theme="light"] .eyebrow { color: #7a3a10; background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .ph h1 { color: #1c1420; }
+[data-theme="light"] .ph p { color: #5c5163; }
+[data-theme="light"] .ph-plat-ic { background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); color: #7a6d80; }
+
+[data-theme="light"] .sci-card { background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.75)); border-color: rgba(18,26,54,.1); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 24px 60px -34px rgba(30,40,80,.25); }
+[data-theme="light"] .sci-field label { color: #8b7f92; }
+[data-theme="light"] .sci-field input { background: rgba(255,255,255,.8); border-color: rgba(18,26,54,.14); color: #1c1420; }
+[data-theme="light"] .sci-field input::placeholder { color: #b4a8ba; }
+[data-theme="light"] .sci-btn { color: #2c0d02; }
+[data-theme="light"] .sci-running-note { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.08); color: #5c5163; }
+
+[data-theme="light"] .sci-suggest-row { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-suggest-row:hover { background: rgba(255,255,255,.9); }
+[data-theme="light"] .sci-suggest-name { color: #1c1420; }
+[data-theme="light"] .sci-suggest-meta { color: #8b7f92; }
+[data-theme="light"] .sci-suggest-site { color: #b4a8ba; }
+[data-theme="light"] .sci-suggest-loading, [data-theme="light"] .sci-suggest-empty { color: #8b7f92; }
+[data-theme="light"] .sci-suggest-error { background: #fffbeb; border-color: rgba(180,120,10,.35); }
+[data-theme="light"] .sci-suggest-error-msg { color: #4a3c44; }
+[data-theme="light"] .sci-suggest-error-detail { color: #6f6068; background: rgba(36,24,32,.06); }
+[data-theme="light"] .sci-suggest-check-btn { background: rgba(180,120,10,.1); border-color: rgba(180,120,10,.35); color: #8a5806; }
+[data-theme="light"] .sci-suggest-fallback-note { color: #b45309; }
+
+[data-theme="light"] .pf-chip { background: rgba(255,255,255,.55); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .pf-name { color: #1c1420; }
+[data-theme="light"] .pf-status { color: #8b7f92; }
+
+[data-theme="light"] .sci-card-head h2 { color: #1c1420; }
+[data-theme="light"] .sci-card-head .cnt, [data-theme="light"] .sci-empty { color: #8b7f92; }
+[data-theme="light"] .sci-run-row:hover { background: rgba(18,26,54,.04); }
+[data-theme="light"] .r-name { color: #1c1420; }
+[data-theme="light"] .r-meta { color: #8b7f92; }
+[data-theme="light"] .sci-run-arrow { color: #b4a8ba; }
+
+[data-theme="light"] .sci-drawer { background: rgba(255,255,255,.98); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-drawer-close { background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.12); color: #5c5163; }
+[data-theme="light"] .sci-drawer-close:hover { background: rgba(18,26,54,.1); color: #1c1420; }
+
+/* Every platform-hue mix in this file lightens toward white so it clears the
+   contrast floor on the dark ground. On paper that is exactly backwards, so
+   each one is re-mixed toward the ink colour instead -- same variable, other
+   direction. Anything left un-mirrored renders near-white text on white. */
+[data-theme="light"] .sci-rep-txt h3 { color: #1c1420; }
+[data-theme="light"] .sci-rep-chip { color: #5c5163; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rep-band { border-bottom-color: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-rail { border-color: rgba(18,26,54,.12); background: rgba(18,26,54,.03); }
+[data-theme="light"] .sci-rail-a { color: color-mix(in srgb, var(--pf-color, #6f6376) 76%, #140c18); background: color-mix(in srgb, var(--pf-color, #8b86a0) 11%, transparent); }
+[data-theme="light"] .sci-rail-a:hover { background: color-mix(in srgb, var(--pf-color, #c2410c) 22%, transparent); }
+[data-theme="light"] .sci-act { background: rgba(18,26,54,.035); border-color: rgba(18,26,54,.12); color: #5c5163; }
+[data-theme="light"] .sci-act:hover { background: rgba(18,26,54,.075); color: #1c1420; border-color: rgba(194,65,12,.4); }
+[data-theme="light"] .sci-tile { background: rgba(255,255,255,.68); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-tile-v { color: #1c1420; }
+[data-theme="light"] .sci-tiles-plat .sci-tile-v { color: color-mix(in srgb, var(--pf-color, #1c1420) 74%, #140c18); }
+[data-theme="light"] .sci-tile-u, [data-theme="light"] .sci-tile-l { color: #6f6376; }
+[data-theme="light"] .sci-tile-n { color: #7d7185; }
+
+[data-theme="light"] .sci-nav { border-right-color: rgba(18,26,54,.08); }
+@media (max-width: 860px) { [data-theme="light"] .sci-nav { background: rgba(255,255,255,.98); border-bottom-color: rgba(18,26,54,.08); } }
+[data-theme="light"] .sci-nav-item { color: #6f6376; }
+[data-theme="light"] .sci-nav-item:hover { background: rgba(18,26,54,.045); color: #241a28; }
+[data-theme="light"] .sci-nav-item.active { background: color-mix(in srgb, var(--pf-color, #c2410c) 11%, transparent); border-color: color-mix(in srgb, var(--pf-color, #c2410c) 30%, transparent); color: color-mix(in srgb, var(--pf-color, #c2410c) 68%, #140c18); }
+[data-theme="light"] .sci-nav-count { color: #6f6376; background: rgba(18,26,54,.06); }
+[data-theme="light"] .sci-nav-item.active .sci-nav-count { color: color-mix(in srgb, var(--pf-color, #c2410c) 62%, #140c18); }
+[data-theme="light"] .sci-nav-empty .sci-nav-dot { background: rgba(18,26,54,.22); }
+[data-theme="light"] .sci-nav-sep { background: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-nav-cap { color: #6f6376; }
+
+[data-theme="light"] .sci-phero { border-bottom-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-phero-txt h3 { color: #1c1420; }
+[data-theme="light"] .sci-phero-meta { color: #6f6376; }
+[data-theme="light"] .sci-phero-handle { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-phero-go { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-phero-url { color: #6f6376; }
+[data-theme="light"] .sci-plat-vendor { color: #6f6376; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
+
+[data-theme="light"] .sci-pcard { background: rgba(255,255,255,.66); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-pcard-ic { color: color-mix(in srgb, var(--pf-color, #6f6376) 76%, #140c18); }
+[data-theme="light"] .sci-pcard-n { color: #1c1420; }
+[data-theme="light"] .sci-pcard-v { color: #6f6376; }
+[data-theme="light"] .sci-pcard-x { color: color-mix(in srgb, var(--pf-color, #c2410c) 72%, #140c18); }
+[data-theme="light"] .sci-pcard-go { color: #6f6376; border-left-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-pcard-go:hover { color: #1c1420; }
+
+[data-theme="light"] .sci-acc { background: linear-gradient(140deg, color-mix(in srgb, var(--pf-color, #c2410c) 9%, transparent), rgba(255,255,255,.7) 64%); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-acc-ic { color: color-mix(in srgb, var(--pf-color, #c2410c) 76%, #140c18); background: color-mix(in srgb, var(--pf-color, #c2410c) 12%, transparent); border-color: color-mix(in srgb, var(--pf-color, #c2410c) 26%, transparent); }
+[data-theme="light"] .sci-acc-n { color: #1c1420; }
+[data-theme="light"] .sci-acc-s { color: #5c5163; }
+[data-theme="light"] .sci-acc-u { color: #6f6376; }
+[data-theme="light"] .sci-acc-go { color: color-mix(in srgb, var(--pf-color, #c2410c) 70%, #140c18); }
+[data-theme="light"] .sci-acc-off { background: rgba(18,26,54,.025); }
+[data-theme="light"] .sci-acc-off::before { background: #a99fb0; }
+[data-theme="light"] .sci-acc-off .sci-acc-ic { color: #6f6376; background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-acc-off .sci-acc-n { color: #40353f; }
+[data-theme="light"] .sci-acc-off .sci-acc-s { color: #6f6376; }
+
+[data-theme="light"] .sci-pane-empty { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.14); }
+[data-theme="light"] .sci-pane-empty-h { color: #241a28; }
+[data-theme="light"] .sci-pane-empty p, [data-theme="light"] .sci-pane-note { color: #5c5163; }
+[data-theme="light"] .sci-pane-note { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-cross-lede { color: #40353f; background: linear-gradient(120deg, rgba(251,146,60,.11), rgba(168,85,247,.08)); border-color: rgba(244,114,182,.26); }
+[data-theme="light"] .sci-theme-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.1); color: #443a4a; }
+[data-theme="light"] .sci-section-label { color: #6b5f72; }
+[data-theme="light"] .sci-section-label > span:first-child { color: #c2410c; }
+[data-theme="light"] .sci-seclink { color: #5c5163; border-color: rgba(18,26,54,.13); background: rgba(18,26,54,.03); }
+[data-theme="light"] .sci-seclink:hover { color: #1c1420; background: color-mix(in srgb, var(--pf-color, #c2410c) 10%, transparent); }
+[data-theme="light"] .sci-seclink-ic { color: color-mix(in srgb, var(--pf-color, #c2410c) 74%, #140c18); }
+[data-theme="light"] .sci-summary-list li { color: #443a4a; }
+[data-theme="light"] .sci-strategy { background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(244,114,182,.05)); border-color: rgba(168,85,247,.22); }
+[data-theme="light"] .sci-strategy-label { color: #9333ea; }
+[data-theme="light"] .sci-strategy-label span { color: #7e22ce; }
+[data-theme="light"] .sci-strategy-list li { color: #362a3d; }
+[data-theme="light"] .sci-postcard { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-postcard-title { color: #1c1420; }
+[data-theme="light"] .sci-postcard-date { color: #6a5f73; }
+[data-theme="light"] .sci-metric-chip { color: #6b5f72; }
+[data-theme="light"] .sci-metric-ic { color: #7a6f83; }
+[data-theme="light"] .sci-postcard-view { color: color-mix(in srgb, var(--pf-color, #7dd3fc) 72%, #23111c); }
+[data-theme="light"] .sci-postcard-type { color: color-mix(in srgb, var(--pf-color, #fb923c) 70%, #23111c); background: color-mix(in srgb, var(--pf-color, #fb923c) 12%, transparent); border-color: color-mix(in srgb, var(--pf-color, #fb923c) 30%, transparent); }
+[data-theme="light"] .sci-seg { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-seg-btn { color: #574d61; }
+[data-theme="light"] .sci-seg-btn:hover { color: #1c1420; }
+[data-theme="light"] .sci-posts-count { color: #6a5f73; }
+[data-theme="light"] .sci-posts-more { border-color: rgba(18,26,54,.14); color: #8b7f92; }
+[data-theme="light"] .sci-posts-more:hover { background: rgba(18,26,54,.04); color: #1c1420; }
+[data-theme="light"] .sci-claim { background: rgba(18,26,54,.03); border-color: rgba(18,26,54,.09); color: #362a3d; }
+[data-theme="light"] .sci-cite-chip { background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.12); }
+[data-theme="light"] .sci-chip-txt { color: #443a4a; }
+[data-theme="light"] .sci-banner { color: #443a4a; }
+[data-theme="light"] .sci-banner b { color: #1c1420; }
+[data-theme="light"] .fm-bar { background: rgba(18,26,54,.08); }
+[data-theme="light"] .fm-legend { color: #6a5f72; }
+[data-theme="light"] .sci-datasrc-tag { color: #7a6f82; background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.09); }
+[data-theme="light"] .sci-datasrc-refresh { background: rgba(18,26,54,.04); border-color: rgba(18,26,54,.1); color: #5c5163; }
+[data-theme="light"] .sci-datasrc-refresh:hover { background: rgba(18,26,54,.08); color: #1c1420; }
+[data-theme="light"] .sci-datasrc-name { color: #1c1420; }
+[data-theme="light"] .sci-datasrc-status.ok { color: #16a34a; }
+[data-theme="light"] .sci-datasrc-status.warn { color: #92600a; }
+[data-theme="light"] .sci-datasrc-connect { background: rgba(180,120,10,.1); border-color: rgba(180,120,10,.35); color: #8a5806; }
+[data-theme="light"] .sci-datasrc-empty { color: #8b7f92; }
+[data-theme="light"] .sci-datasrc-note { color: #a89bb0; }
+
+/* ── Reddit conversation ───────────────────────────────────────────────────
+   Given its own visual register rather than the per-platform one above,
+   because it is a different KIND of information: the six platform sections
+   are the company's own creative, this is the market talking back. It reads
+   as an inset panel with Reddit's own orange-red rail so a skimmer can never
+   confuse a community complaint for the brand's own copy. */
+.rd-section { margin: 8px 22px 26px; padding: 22px 24px 20px; border-radius: var(--radius-lg, 18px);
+  border: 1px solid rgba(255,69,0,.22); background: linear-gradient(170deg, rgba(255,69,0,.075), rgba(255,255,255,.018) 42%, rgba(255,255,255,.014));
+  box-shadow: 0 20px 50px -38px rgba(255,69,0,.5); }
+.rd-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.rd-head-ic { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px;
+  background: rgba(255,69,0,.14); border: 1px solid rgba(255,69,0,.32); color: #ff6a33; }
+.rd-head-ic svg { width: 19px; height: 19px; }
+.rd-head h3 { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 16.5px; font-weight: 700; color: #f8eee9; margin: 0 0 3px; }
+.rd-head-sub { font-size: 12.5px; line-height: 1.55; color: #a4959c; max-width: 68ch; }
+
+.rd-verdict { position: relative; font-size: 15px; line-height: 1.6; color: #f4e8e2; font-weight: 500;
+  padding: 14px 18px 14px 40px; margin-bottom: 16px; border-radius: var(--radius-md, 12px);
+  background: rgba(255,69,0,.07); border: 1px solid rgba(255,69,0,.18); }
+.rd-verdict-q { position: absolute; left: 14px; top: 6px; font-family: 'Bricolage Grotesque', serif; font-size: 34px; line-height: 1; color: rgba(255,106,51,.5); }
+
+.rd-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 10px; margin-bottom: 16px; }
+.rd-stat { background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); border-radius: var(--radius-md, 12px); padding: 12px 14px; }
+.rd-stat-v { font-family: 'Bricolage Grotesque', var(--au-display, sans-serif); font-size: 20px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rd-stat-l { font-size: 10.5px; color: #9a8c92; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); margin-top: 3px; }
+
+.rd-community { display: block; text-decoration: none; padding: 13px 16px; margin-bottom: 16px;
+  border-radius: var(--radius-md, 12px); border: 1px dashed rgba(255,69,0,.3); background: rgba(255,69,0,.045); transition: background .18s ease, border-color .18s ease; }
+.rd-community:hover { background: rgba(255,69,0,.08); border-color: rgba(255,69,0,.45); }
+.rd-community-n { font-size: 14px; font-weight: 700; color: #ff8354; }
+.rd-community-d { font-size: 12.5px; line-height: 1.5; color: #b3a4aa; margin-top: 3px; }
+.rd-community-s { font-size: 11px; color: #9a8c92; margin-top: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.rd-community-note { font-size: 9.5px; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em); font-weight: 700;
+  color: #b09aa2; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-pill, 80px); padding: 2px 8px; }
+
+.rd-block { margin-bottom: 20px; }
+.rd-block-h { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: var(--ls-caps, .08em); text-transform: uppercase; color: #b0a2a8; margin-bottom: 10px; }
+
+/* Sentiment: a single 100% stacked bar. Every segment is also named and
+   counted in the legend below it, so the split survives colorblindness,
+   greyscale printing and forced-colors mode. */
+.rd-sent-bar { display: flex; gap: 2px; height: 12px; border-radius: var(--radius-pill, 80px); overflow: hidden; background: rgba(255,255,255,.05); }
+.rd-sent-seg { display: block; height: 100%; }
+.rd-sent-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.rd-sent-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #b3a4aa; }
+.rd-sent-key b { color: #f2e8ec; font-variant-numeric: tabular-nums; }
+.rd-sent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rd-sent-foot { font-size: 11px; color: #92858b; margin-top: 8px; line-height: 1.5; }
+
+.rd-subs { display: flex; flex-direction: column; gap: 7px; }
+.rd-sub-row { display: grid; grid-template-columns: minmax(80px, 34%) 1fr auto; align-items: center; gap: 10px; text-decoration: none; }
+.rd-sub-name { font-size: 12px; color: #d8c9cf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-sub-row:hover .rd-sub-name { color: #ff8354; }
+.rd-sub-track { height: 8px; border-radius: var(--radius-pill, 80px); background: rgba(255,255,255,.055); overflow: hidden; }
+.rd-sub-fill { display: block; height: 100%; border-radius: var(--radius-pill, 80px); background: linear-gradient(90deg, rgba(255,69,0,.55), #ff6a33); }
+.rd-sub-val { font-size: 11.5px; color: #a4959c; font-variant-numeric: tabular-nums; min-width: 22px; text-align: right; }
+
+.rd-tl { display: flex; align-items: flex-end; gap: 4px; height: 104px; padding-top: 6px; }
+.rd-tl-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+.rd-tl-bar { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #ff6a33, rgba(255,69,0,.4)); }
+.rd-tl-lab { font-size: 9px; color: #92858b; margin-top: 6px; white-space: nowrap; transform: rotate(-42deg); transform-origin: center; }
+
+.rd-themes { display: flex; flex-direction: column; gap: 12px; }
+.rd-theme { border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.028);
+  padding: 13px 15px 13px 16px; border-left: 3px solid var(--rd-stance, #94a3b8); }
+.rd-theme-h { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 6px; }
+.rd-stance { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps, .06em);
+  color: var(--rd-stance, #94a3b8); border: 1px solid currentColor; border-radius: var(--radius-pill, 80px); padding: 2px 8px; }
+.rd-theme-t { font-size: 13.5px; font-weight: 700; color: #f3ebee; }
+.rd-theme-d { font-size: 13px; line-height: 1.58; color: #cdbfc5; }
+
+.rd-refs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+/* The mood stripe is carried on a custom property, not on a `border-left`
+   in the .rd-ref-* rules. A later `[data-theme="light"] .rd-ref{border-color}`
+   is a shorthand and outranks a plain class selector, so it silently erased
+   every sentiment stripe in light mode -- routing the colour through a
+   variable makes the two rules compose instead of collide. */
+.rd-ref { display: block; max-width: 300px; text-decoration: none; padding: 8px 11px; border-radius: 9px;
+  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08);
+  border-left: 2px solid var(--rd-mood, rgba(255,255,255,.08)); transition: border-color .18s ease, background .18s ease; }
+.rd-ref:hover { background: rgba(255,255,255,.06); border-color: rgba(255,69,0,.4); }
+.rd-ref-sub { display: block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.06em); color: #ff8354; }
+.rd-ref-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 11.5px; line-height: 1.45; color: #ddd0d5; margin: 3px 0 4px; }
+.rd-ref-meta { display: block; font-size: 10px; color: #92858b; font-variant-numeric: tabular-nums; }
+.rd-ref-positive { --rd-mood: #4ade80; }
+.rd-ref-negative { --rd-mood: #f87171; }
+.rd-ref-mixed { --rd-mood: #fbbf24; }
+.rd-ref-neutral { --rd-mood: #94a3b8; }
+
+.rd-comps { display: flex; flex-direction: column; gap: 11px; }
+.rd-comp { border-radius: var(--radius-md, 12px); border: 1px solid rgba(192,132,252,.22); background: rgba(192,132,252,.05); padding: 12px 15px; }
+.rd-comp-n { font-size: 13.5px; font-weight: 700; color: #d8b4fe; }
+.rd-comp-c { font-size: 12.5px; line-height: 1.55; color: #cdbfc5; margin-top: 4px; }
+
+.rd-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rd-list li { position: relative; padding-left: 16px; font-size: 13px; line-height: 1.58; color: #d3c6cb; }
+.rd-list li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: #ff6a33; }
+.rd-list-op li::before { border-radius: 1px; transform: rotate(45deg); background: #4ade80; }
+
+.rd-threads { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 11px; }
+.rd-thread { display: flex; flex-direction: column; gap: 6px; text-decoration: none; padding: 12px 14px;
+  border-radius: var(--radius-md, 12px); border: 1px solid rgba(255,255,255,.08);
+  border-left: 2px solid var(--rd-mood, rgba(255,255,255,.08)); background: rgba(255,255,255,.03);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.rd-thread:hover { border-color: rgba(255,69,0,.42); background: rgba(255,69,0,.055); transform: translateY(-1px); }
+.rd-thread-top { display: flex; align-items: center; gap: 8px; }
+.rd-thread-sub { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.06em); color: #ff8354; }
+.rd-mood { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: var(--ls-caps,.05em); border-radius: var(--radius-pill,80px); padding: 1px 7px; }
+.rd-mood-positive { color: #86efac; background: rgba(74,222,128,.13); }
+.rd-mood-negative { color: #fca5a5; background: rgba(248,113,113,.13); }
+.rd-mood-mixed { color: #fcd34d; background: rgba(251,191,36,.13); }
+.rd-mood-neutral { color: #cbd5e1; background: rgba(148,163,184,.13); }
+.rd-thread-when { margin-left: auto; font-size: 10px; color: #92858b; white-space: nowrap; }
+.rd-thread-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 13px; line-height: 1.45; color: #ece1e5; font-weight: 500; }
+.rd-thread-foot { display: flex; align-items: center; gap: 11px; font-size: 10.5px; color: #9a8c92;
+  font-variant-numeric: tabular-nums; padding-top: 9px; margin-top: auto; border-top: 1px solid rgba(255,255,255,.055); }
+.rd-thread-go { margin-left: auto; color: #ff8354; font-size: 12px; }
+
+.rd-empty { text-align: center; padding: 26px 18px; color: #9a8c92; font-size: 13px; line-height: 1.6;
+  border-radius: var(--radius-md, 12px); background: rgba(255,255,255,.025); border: 1px dashed rgba(255,255,255,.11); }
+
+@media (max-width: 780px) {
+  .rd-section { margin-left: 14px; margin-right: 14px; padding: 18px 16px; }
+  .rd-threads { grid-template-columns: 1fr; }
+}
+
+/* Light mode: the panel keeps Reddit's orange rail but drops to a warm
+   paper ground, and every muted grey is re-picked against it -- the dark
+   greys above sit at ~3:1 on white and fail the 4.5:1 body-text floor. */
+[data-theme="light"] .rd-section { border-color: rgba(255,69,0,.28); background: linear-gradient(170deg, rgba(255,69,0,.07), rgba(255,255,255,.72) 45%, rgba(255,255,255,.8)); box-shadow: 0 20px 50px -40px rgba(255,69,0,.4); }
+[data-theme="light"] .rd-head h3 { color: #2a1a14; }
+[data-theme="light"] .rd-head-sub { color: #6a5a60; }
+[data-theme="light"] .rd-head-ic { color: #c2410c; background: rgba(255,69,0,.1); }
+[data-theme="light"] .rd-verdict { color: #2c1c16; background: rgba(255,69,0,.06); border-color: rgba(255,69,0,.2); }
+[data-theme="light"] .rd-verdict-q { color: rgba(194,65,12,.45); }
+[data-theme="light"] .rd-stat { background: rgba(255,255,255,.7); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .rd-stat-v { color: #1c1420; }
+[data-theme="light"] .rd-stat-l, [data-theme="light"] .rd-block-h { color: #6a5f66; }
+[data-theme="light"] .rd-community { background: rgba(255,69,0,.05); border-color: rgba(255,69,0,.3); }
+[data-theme="light"] .rd-community-n { color: #c2410c; }
+[data-theme="light"] .rd-community-d { color: #5c5163; }
+[data-theme="light"] .rd-community-s { color: #6a5f66; }
+[data-theme="light"] .rd-community-note { color: #6a5f66; background: rgba(18,26,54,.05); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .rd-sent-bar { background: rgba(18,26,54,.07); }
+[data-theme="light"] .rd-sent-key { color: #5c5163; }
+[data-theme="light"] .rd-sent-key b { color: #1c1420; }
+[data-theme="light"] .rd-sent-foot { color: #6a5f66; }
+[data-theme="light"] .rd-sub-name { color: #40353f; }
+[data-theme="light"] .rd-sub-track { background: rgba(18,26,54,.075); }
+[data-theme="light"] .rd-sub-val { color: #6a5f66; }
+[data-theme="light"] .rd-tl-lab { color: #6a5f66; }
+[data-theme="light"] .rd-theme { background: rgba(255,255,255,.72); border-color: rgba(18,26,54,.1);
+  border-left-color: var(--rd-stance, rgba(18,26,54,.1)); }  /* shorthand above would erase the stance rail */
+[data-theme="light"] .rd-theme-t { color: #1c1420; }
+[data-theme="light"] .rd-theme-d { color: #4a3f4d; }
+[data-theme="light"] .rd-ref { background: rgba(255,255,255,.75); border-color: rgba(18,26,54,.1); border-left-color: var(--rd-mood, rgba(18,26,54,.1)); }
+[data-theme="light"] .rd-ref:hover { background: #fff; }
+[data-theme="light"] .rd-ref-sub { color: #c2410c; }
+[data-theme="light"] .rd-ref-title { color: #40353f; }
+[data-theme="light"] .rd-ref-meta { color: #6a5f66; }
+[data-theme="light"] .rd-comp { background: rgba(168,85,247,.06); border-color: rgba(168,85,247,.25); }
+[data-theme="light"] .rd-comp-n { color: #7e22ce; }
+[data-theme="light"] .rd-comp-c { color: #4a3f4d; }
+[data-theme="light"] .rd-list li { color: #4a3f4d; }
+[data-theme="light"] .rd-thread { background: rgba(255,255,255,.75); border-color: rgba(18,26,54,.1); border-left-color: var(--rd-mood, rgba(18,26,54,.1)); }
+[data-theme="light"] .rd-thread:hover { background: #fff; border-color: rgba(255,69,0,.4); }
+[data-theme="light"] .rd-thread-sub, [data-theme="light"] .rd-thread-go { color: #c2410c; }
+[data-theme="light"] .rd-thread-title { color: #241a28; }
+[data-theme="light"] .rd-thread-when, [data-theme="light"] .rd-thread-foot { color: #6a5f66; }
+[data-theme="light"] .rd-thread-foot { border-top-color: rgba(18,26,54,.09); }
+[data-theme="light"] .rd-mood-positive { color: #166534; background: rgba(74,222,128,.18); }
+[data-theme="light"] .rd-mood-negative { color: #b91c1c; background: rgba(248,113,113,.18); }
+[data-theme="light"] .rd-mood-mixed { color: #854d0e; background: rgba(251,191,36,.22); }
+[data-theme="light"] .rd-mood-neutral { color: #475569; background: rgba(148,163,184,.2); }
+[data-theme="light"] .rd-empty { color: #5c5163; background: rgba(255,255,255,.6); border-color: rgba(18,26,54,.13); }
+.rd-block-h { display: flex; align-items: baseline; gap: 10px; }
+.rd-tl-peak { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 10px; font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: #8e8187; font-variant-numeric: tabular-nums; }
+[data-theme="light"] .rd-tl-peak { color: #6a5f66; }
+
+/* Stance chips in light mode: the dark-ground hues measure ~2.7:1 on paper,
+   so each stance gets its own darker step plus a tint behind it. The left
+   rail keeps the brighter hue, where it is a graphic and not text. */
+[data-theme="light"] .rd-stance { background: rgba(18,26,54,.04); }
+[data-theme="light"] .rd-stance-praise .rd-stance { color: #15803d; background: rgba(74,222,128,.14); }
+[data-theme="light"] .rd-stance-complaint .rd-stance { color: #b91c1c; background: rgba(248,113,113,.14); }
+[data-theme="light"] .rd-stance-question .rd-stance { color: #1d4ed8; background: rgba(96,165,250,.14); }
+[data-theme="light"] .rd-stance-comparison .rd-stance { color: #7e22ce; background: rgba(192,132,252,.14); }
+[data-theme="light"] .rd-stance-neutral .rd-stance { color: #475569; background: rgba(148,163,184,.16); }
+/* Informational, not a warning: see the Reddit branch in renderReport. */
+.sci-banner.sci-banner-info { border-color: rgba(255,69,0,.26); background: rgba(255,69,0,.05); }
+[data-theme="light"] .sci-banner.sci-banner-info { border-color: rgba(255,69,0,.3); background: rgba(255,69,0,.055); }
+
+/* Measured additions: each of these sat below 4.5:1 on the paper ground.
+   The status pill's greens and ambers were picked for a black panel; the
+   platform-hue chips need mixing toward the ink, not toward white. */
+[data-theme="light"] .status-pill.st-done { color: #166534; background: rgba(74,222,128,.2); }
+[data-theme="light"] .status-pill.st-running { color: #92400e; background: rgba(251,191,36,.24); }
+[data-theme="light"] .status-pill.st-error { color: #b91c1c; background: rgba(248,113,113,.2); }
+[data-theme="light"] .sci-postcard-plat { color: color-mix(in srgb, var(--pf-color, #c2410c) 68%, #140c18); }
+[data-theme="light"] .sci-postcard-type { color: color-mix(in srgb, var(--pf-color, #c2410c) 66%, #140c18); }
+[data-theme="light"] .sci-postcard-view { color: color-mix(in srgb, var(--pf-color, #c2410c) 66%, #140c18); }
+[data-theme="light"] .sci-seg-btn.active { color: color-mix(in srgb, var(--pf-color, #c2410c) 62%, #140c18); }
+[data-theme="light"] .sci-tile-n { color: #6f6376; }
+[data-theme="light"] .sci-rh-peak, [data-theme="light"] .sci-rh-lab { color: #6a5f72; }
+[data-theme="light"] .sci-posts-count, [data-theme="light"] .sci-nav-count { color: #6a5f72; }
+
+/* ── Charts on paper ───────────────────────────────────────────────────────
+   Not an inversion. Every categorical step is re-picked for the white ground
+   and re-checked for adjacent-pair separation there, because the dark set was
+   chosen against a near-black panel and sits between 1.4:1 and 2.6:1 on
+   paper -- legible as a mark, invisible as a distinction. The overview's own
+   accent moves with them. */
+[data-theme="light"] .sci-chart, [data-theme="light"] .sci-hi-scope { --chart-c: var(--pf-color, #c2410c); --sci-plot-ink: #ffffff; }
+[data-theme="light"] .sci-c0 { --c: #c2410c; }
+[data-theme="light"] .sci-c1 { --c: #0891b2; }
+[data-theme="light"] .sci-c2 { --c: #9d174d; }
+[data-theme="light"] .sci-c3 { --c: #16a34a; }
+[data-theme="light"] .sci-c4 { --c: #6b21a8; }
+[data-theme="light"] .sci-c5 { --c: #a16207; }
+
+[data-theme="light"] .sci-tip { background: rgba(255,255,255,.98); border-color: rgba(18,26,54,.14); box-shadow: 0 14px 40px rgba(18,26,54,.18); color: #362a3d; }
+[data-theme="light"] .sci-tip b { color: #140c18; }
+[data-theme="light"] .sci-tip i { color: #6a5f72; }
+[data-theme="light"] .sci-tip s { color: #c2410c; }
+
+[data-theme="light"] .sci-chart { border-color: rgba(18,26,54,.09); background: rgba(255,255,255,.6); }
+[data-theme="light"] .sci-chart-ht h5 { color: #241a29; }
+[data-theme="light"] .sci-chart-ht p { color: #6f6376; }
+[data-theme="light"] .sci-chart-note { border-top-color: rgba(18,26,54,.08); color: #6a5f72; }
+
+[data-theme="light"] .sci-tr-grid { stroke: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-tr-axis, [data-theme="light"] .sci-tr-lab { fill: #6a5f72; }
+[data-theme="light"] .sci-tr-g0 { stop-opacity: .3; }
+[data-theme="light"] .sci-tr-g1 { stop-opacity: .03; }
+[data-theme="light"] .sci-tr-dg { fill: rgba(18,26,54,.14); }
+[data-theme="light"] .sci-tr-avg { stroke: rgba(18,26,54,.52); }
+[data-theme="light"] .sci-tr-avgl { fill: #6a5f72; }
+[data-theme="light"] .sci-tr-pt { stroke-width: 2; }
+
+/* Radar. The dark steps lighten each brand hue toward white to lift it off a
+   near-black panel; on white that same step is the one that disappears, so
+   every one of them is re-mixed toward ink instead. */
+[data-theme="light"] .sci-rd-ring { stroke: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rd-edge { stroke: rgba(18,26,54,.2); }
+[data-theme="light"] .sci-rd-spoke { stroke: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-rd-ax { fill: #5f5468; }
+[data-theme="light"] .sci-rd-poly { fill: color-mix(in srgb, var(--pf-color, #c2410c) 14%, transparent);
+  stroke: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); }
+[data-theme="light"] .sci-rd-pt { fill: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); stroke: #ffffff; }
+[data-theme="light"] .sci-rd-sw { background: color-mix(in srgb, var(--pf-color, #c2410c) 82%, #140c18); }
+[data-theme="light"] .sci-rd-ghost { stroke: rgba(18,26,54,.56); }
+[data-theme="light"] .sci-rd-cap { color: #443a4b; }
+
+[data-theme="light"] .sci-skel-plot { background-color: rgba(18,26,54,.028);
+  background-image: radial-gradient(rgba(18,26,54,.12) 1px, transparent 1px); }
+[data-theme="light"] .sci-skel-ic { background: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-skel-n { background: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-skel-t { background: rgba(18,26,54,.06); }
+[data-theme="light"] .sci-skel-svg path { fill: rgba(194,65,12,.06); stroke: rgba(194,65,12,.24); }
+[data-theme="light"] .sci-skel-sweep { background: linear-gradient(105deg, transparent 38%, rgba(18,26,54,.07) 50%, transparent 62%); }
+[data-theme="light"] .sci-tr-cross { stroke: color-mix(in srgb, var(--chart-c) 70%, #140c18); }
+[data-theme="light"] .sci-tr-dot { fill: color-mix(in srgb, var(--chart-c) 78%, #140c18); stroke: #ffffff; }
+
+[data-theme="light"] .sci-rank-l { color: #4a3f52; }
+[data-theme="light"] .sci-rank-track { background: rgba(18,26,54,.07); }
+[data-theme="light"] .sci-rank-v { color: #574c5f; }
+[data-theme="light"] a.sci-rank-row:hover { background: rgba(18,26,54,.04); }
+
+[data-theme="light"] .sci-mixbar { background: rgba(18,26,54,.07); }
+[data-theme="light"] .sci-mk { color: #574c5f; }
+[data-theme="light"] .sci-mk b { color: #241a29; }
+[data-theme="light"] .sci-mk em { color: #6a5f72; }
+[data-theme="light"] .sci-dn-track { stroke: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-dn-v { color: #241a29; }
+[data-theme="light"] .sci-dn-l { color: #6f6376; }
+
+[data-theme="light"] .sci-heat-c { background: rgba(18,26,54,.045); }
+[data-theme="light"] .sci-heat-rl, [data-theme="light"] .sci-heat-cl,
+[data-theme="light"] .sci-heat-legend { color: #6a5f72; }
+[data-theme="light"] .sci-heat-c:hover { box-shadow: inset 0 0 0 1.5px rgba(20,12,24,.45); }
+
+[data-theme="light"] .sci-sc-head { border-bottom-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-sc-h { color: #6a5f72; }
+[data-theme="light"] .sci-sc-h:hover { color: #241a29; }
+[data-theme="light"] .sci-sc-h.active { color: #c2410c; }
+[data-theme="light"] .sci-sc-name { color: #241a29; }
+[data-theme="light"] .sci-sc-v { color: #3d3345; }
+[data-theme="light"] .sci-sc-track { background: rgba(18,26,54,.08); }
+[data-theme="light"] .sci-sc-na { color: #6f6376; }
+
+[data-theme="light"] .sci-fchip { color: #574c5f; background: rgba(18,26,54,.03); border-color: rgba(18,26,54,.1); }
+[data-theme="light"] .sci-fchip:hover { color: #241a29; background: rgba(18,26,54,.06); }
+[data-theme="light"] .sci-fchip b { color: #6a5f72; }
+[data-theme="light"] .sci-fchip.active { color: color-mix(in srgb, var(--c, #c2410c) 72%, #140c18); background: color-mix(in srgb, var(--c, #c2410c) 12%, transparent); border-color: color-mix(in srgb, var(--c, #c2410c) 40%, transparent); }
+[data-theme="light"] .sci-fchip.active b { color: color-mix(in srgb, var(--c, #c2410c) 60%, #140c18); }
+
+/* ── Charts, narrow ──────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  /* The trend keeps its aspect at any width, so below ~500px the axis labels
+     shrink past legibility. Letting the plot scroll its own box keeps the
+     marks at a readable size instead of making the whole chart a thumbnail. */
+  .sci-tr-wrap { overflow-x: auto; }
+  .sci-tr { min-width: 460px; }
+  .sci-rank-row { grid-template-columns: minmax(64px, 108px) minmax(0,1fr) 46px; gap: 8px; }
+  .sci-rank-posts .sci-rank-row { grid-template-columns: minmax(90px, 150px) minmax(0,1fr) 46px; }
+  .sci-donut-wrap { grid-template-columns: 108px minmax(0,1fr); gap: 12px; }
+  .sci-dn { width: 108px; height: 108px; }
+  .sci-heat-row { grid-template-columns: 30px repeat(6, minmax(0,1fr)); gap: 3px; }
+  .sci-heat-cl { font-size: 7.5px; }
+  .sci-chart { padding: 14px 13px 13px; }
+  /* A table that scrolls sideways with no edge to it just looks cut off. The
+     fade is the only cue that there are three more columns; it sits on the
+     card, not inside the scroller, so it stays pinned as the table moves. */
+  .sci-chart-wide::after { content: ''; position: absolute; top: 60px; right: 1px; bottom: 44px; width: 34px; pointer-events: none; border-radius: 0 var(--radius-lg, 16px) var(--radius-lg, 16px) 0; background: linear-gradient(90deg, rgba(20,12,24,0), rgba(20,12,24,.92)); }
+}
+@media (max-width: 700px) {
+  [data-theme="light"] .sci-chart-wide::after { background: linear-gradient(90deg, rgba(252,252,254,0), rgba(252,252,254,.95)); }
+}
+
+/* The full trail does not fit a 62px bar on a phone: it wrapped and pushed the
+   account pill past the right edge (22px, and a line box taller than the bar of overflow at 390px). The ancestors are
+   what a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. Same rule as event_conference_intelligence.css. */
+@media (max-width: 640px) {
+  .topbar .bc a, .topbar .bc .bc-sep { display: none; }
+  .topbar .bc { margin-left: 12px; padding-left: 0; border-left: none; min-width: 0; }
+  .topbar .tl { min-width: 0; }
+  .topbar .bc-cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

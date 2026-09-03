@@ -1,0 +1,2800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Social Creative Intelligence Analyst, Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <link rel="stylesheet" href="/static/css/social_creative_intelligence.css?v=1">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="sci-aurora"><div class="b b1"></div><div class="b b2"></div><div class="b b3"></div></div>
+  <div class="sci-grain"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Social Creative Intelligence Analyst</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>B2B Agents · Cross-platform creative analysis</div>
+        <h1>See what their <em>creative</em> is actually doing.</h1>
+        <p>Give it a company name or URL. It finds the company's organic presence across seven platforms, then actually looks at every image and video to describe what the creative shows, and synthesizes what's working, cited back to real posts.</p>
+        <div class="ph-platforms" aria-hidden="true">
+          <div class="ph-plat-ic" title="Instagram" style="color:#e1306c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg></div>
+          <div class="ph-plat-ic" title="LinkedIn" style="color:#0a66c2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8" cy="8.3" r="1" fill="currentColor" stroke="none"/><path d="M8 11.3v6.2M12.6 17.5v-3.6c0-1.6 1-2.5 2.2-2.5s2 .9 2 2.5v3.6"/></svg></div>
+          <div class="ph-plat-ic" title="X" style="color:#cbd5e1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 16M19 4L5 20"/></svg></div>
+          <div class="ph-plat-ic" title="TikTok" style="color:#fe2c55"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5v11.2a3.3 3.3 0 11-2.7-3.24M14 3.5c.5 2.6 2.4 4.5 4.8 4.9"/></svg></div>
+          <div class="ph-plat-ic" title="YouTube" style="color:#ff0033"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.7" y="6" width="18.6" height="12" rx="3.6"/><path d="M10.3 9.6l5 2.4-5 2.4z" fill="currentColor" stroke="none"/></svg></div>
+          <div class="ph-plat-ic" title="Facebook" style="color:#1877f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21v-7.2h2.4l.4-2.8h-2.8v-1.8c0-.8.2-1.4 1.4-1.4h1.5V5.3A20 20 0 0015.6 5c-2.3 0-3.9 1.4-3.9 4v2h-2.4v2.8h2.4V21"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sci-card">
+      <div class="sci-card-pad">
+        <form class="sci-form" id="analyzeForm" onsubmit="return startAnalysis(event)">
+          <div class="sci-field">
+            <label for="companyName">Company name</label>
+            <input type="text" id="companyName" placeholder="e.g. Acme Inc." required autocomplete="off" oninput="onCompanyNameInput()" />
+          </div>
+          <div class="sci-field">
+            <label for="companyUrl">Website (optional)</label>
+            <input type="text" id="companyUrl" placeholder="acme.com" />
+          </div>
+          <button type="submit" class="sci-btn" id="analyzeBtn">Analyze →</button>
+        </form>
+
+        <div class="sci-suggest-panel" id="sciSuggestPanel" style="display:none"></div>
+
+        <div id="runningWrap" style="display:none;margin-top:20px">
+          <div class="sci-running-note"><span class="sci-spinner"></span><span>Identifying platforms and collecting posts. This runs in the background and can take a few minutes &mdash; you can leave this page; your run will be here in History when it's done.</span></div>
+          <div class="sci-platform-grid" id="platformGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dataSourcesPanel"></div>
+
+    <div class="sci-card">
+      <div class="sci-card-head">
+        <h2>History</h2>
+        <span class="cnt">{{ runs|length }} run{{ '' if runs|length == 1 else 's' }}</span>
+      </div>
+      <div class="sci-run-list" id="historyList">
+        {% if runs %}
+          {% for r in runs %}
+          {% set st = 'st-running' if r.status == 'running' else ('st-error' if r.status == 'error' else 'st-done') %}
+          <div class="sci-run-row" onclick="viewRun({{ r.id }})">
+            <div class="sci-run-mono{{ '' if r.company_logo else ' sci-run-nologo' }}">
+              {% if r.company_logo %}<img src="{{ r.company_logo }}" alt="" loading="lazy" onerror="this.closest('.sci-run-mono').classList.add('sci-run-nologo');this.remove()">{% endif %}
+              <span class="sci-run-initial">{{ (r.company_name or '?')[0]|upper }}</span>
+            </div>
+            <div class="sci-run-info">
+              <div class="r-name">{{ r.company_name }}</div>
+              <div class="r-meta" data-created="{{ r.created_at }}">{{ r.created_at }}</div>
+            </div>
+            <span class="status-pill {{ st }}"><span class="d"></span>{{ r.status }}</span>
+            <span class="sci-run-arrow">→</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="sci-empty">No analyses yet &mdash; run one above and it'll show up here.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="sci-drawer-overlay" id="drawerOverlay" onclick="if(event.target===this) closeReport()">
+    <div class="sci-drawer" id="drawerPanel"></div>
+  </div>
+
+  {% include 'ppc_chat_widget.html' %}
+
+  <script>
+    function toggleMenu() {
+      var pill=document.getElementById('userPill'), dd=document.getElementById('userDropdown');
+      pill.classList.toggle('open',!dd.classList.contains('open')); dd.classList.toggle('open');
+    }
+    document.addEventListener('click',function(e){ var m=document.getElementById('userMenu'); if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');} });
+  </script>
+
+  <script>
+    var POLL_TIMER = null;
+    var BASE = '/p2/b2b-agents/social-creative-intelligence';
+    var IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+
+    var PLATFORM_META = {
+      instagram: {color:'#e1306c', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>'},
+      linkedin: {color:'#0a66c2', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8" cy="8.3" r="1" fill="currentColor" stroke="none"/><path d="M8 11.3v6.2M12.6 17.5v-3.6c0-1.6 1-2.5 2.2-2.5s2 .9 2 2.5v3.6"/></svg>'},
+      x: {color:'#cbd5e1', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 16M19 4L5 20"/></svg>'},
+      tiktok: {color:'#fe2c55', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5v11.2a3.3 3.3 0 11-2.7-3.24M14 3.5c.5 2.6 2.4 4.5 4.8 4.9"/></svg>'},
+      youtube: {color:'#ff0033', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.7" y="6" width="18.6" height="12" rx="3.6"/><path d="M10.3 9.6l5 2.4-5 2.4z" fill="currentColor" stroke="none"/></svg>'},
+      reddit: {color:'#ff4500', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.3"/><circle cx="9.3" cy="12.4" r="1" fill="currentColor" stroke="none"/><circle cx="14.7" cy="12.4" r="1" fill="currentColor" stroke="none"/><path d="M9.4 16.1c1.5 1 3.7 1 5.2 0"/><path d="M15.6 5.7l.9 3.9"/><circle cx="16.1" cy="4.6" r="1.3"/></svg>'},
+      facebook: {color:'#1877f2', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 21v-7.2h2.4l.4-2.8h-2.8v-1.8c0-.8.2-1.4 1.4-1.4h1.5V5.3A20 20 0 0015.6 5c-2.3 0-3.9 1.4-3.9 4v2h-2.4v2.8h2.4V21"/></svg>'}
+    };
+    var DEFAULT_META = {color:'#8b86a0', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/></svg>'};
+    var PLATFORM_ORDER = ['instagram','linkedin','x','tiktok','youtube','facebook','reddit'];
+
+    // Platform names are stored lowercase, and CSS capitalize turns them into
+    // "Linkedin", "Tiktok" and "Youtube" -- three brands spelled wrong in every
+    // heading. These are proper nouns, so they get a real table and the
+    // capitalize rule is off wherever this is used.
+    var PLATFORM_LABEL = {instagram:'Instagram', linkedin:'LinkedIn', x:'X', tiktok:'TikTok',
+      youtube:'YouTube', facebook:'Facebook', reddit:'Reddit'};
+
+    function platformMeta(p){ return PLATFORM_META[p] || DEFAULT_META; }
+    function platformLabel(p){
+      var s = String(p == null ? '' : p);
+      return PLATFORM_LABEL[s] || (s.charAt(0).toUpperCase() + s.slice(1));
+    }
+    function esc(s){return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function monogram(name){ var s = String(name||'?').trim(); return (s[0]||'?').toUpperCase(); }
+
+    // ── Company disambiguation -- shown as the user types, so an ambiguous
+    // name (e.g. "apple") can be resolved to one real company + domain
+    // before the seven-platform identify step has to guess. Same pattern as
+    // the LinkedIn Strategy Researcher's company search, minus its own
+    // mode picker (SCI has none): picking a card just fills the two form
+    // fields, which stay editable -- there's no hard requirement to pick
+    // one, since SCI (unlike LSR) has to work for companies Arena's own
+    // database doesn't know about too. ──────────────────────────────────
+    function debounce(fn, ms){
+      var t = null;
+      return function(){ var a = arguments; clearTimeout(t); t = setTimeout(function(){ fn.apply(null, a); }, ms); };
+    }
+
+    function sciSuggestRow(c, i){
+      var initial = esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase());
+      var logo = '<div class="sci-suggest-logo' + (c.logo ? '' : ' sci-suggest-nologo') + '">' +
+        (c.logo ? '<img src="' + esc(c.logo) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-suggest-logo\').classList.add(\'sci-suggest-nologo\');this.remove()">' : '') +
+        '<span class="sci-suggest-initial">' + initial + '</span></div>';
+      var meta = c.from_history ? 'Analyzed before' : [c.industry, c.location].filter(Boolean).join(' · ');
+      return '<div class="sci-suggest-row" onclick="pickCompany(' + i + ')">' + logo +
+        '<div class="sci-suggest-info"><div class="sci-suggest-name">' + esc(c.name) + '</div>' +
+        (meta ? '<div class="sci-suggest-meta">' + esc(meta) + '</div>' : '') + '</div>' +
+        (c.website ? '<div class="sci-suggest-site">' + esc(c.website) + '</div>' : '') + '</div>';
+    }
+
+    // Admin-only diagnostic: the vendor's own body + a self-test call. SCI's
+    // company search is native (tracker/sci_company_search.py, backed by
+    // Apollo -- see that module's docstring for why it doesn't depend on
+    // Arena's own workspace staying healthy the way linkedin_playbook_studio's
+    // search does), so this checks THAT integration.
+    function sciAdminDiagControl(){
+      if(!IS_ADMIN) return '';
+      return '<button type="button" class="sci-suggest-check-btn" id="sciProviderCheckBtn" onclick="runSciProviderCheck()">Run provider check</button>' +
+        '<pre class="sci-suggest-error-detail" id="sciProviderCheckOut" style="display:none"></pre>';
+    }
+
+    function runSciProviderCheck(){
+      var b = document.getElementById('sciProviderCheckBtn'), out = document.getElementById('sciProviderCheckOut');
+      if(!b || !out) return;
+      b.disabled = true; b.textContent = 'Checking…';
+      fetch('/p2/admin/external-usage/sci-company-search-check', {method: 'POST'})
+        .then(function(r){ return r.json(); }).then(function(d){
+          b.disabled = false; b.textContent = 'Run provider check';
+          out.style.display = 'block';
+          out.textContent =
+            'Key configured: ' + (d.configured ? 'yes (' + d.key_len + ' chars)' : 'NO') + '\n' +
+            'Probe: ' + (d.probe || '?') + ' → ' + (d.companies || 0) + ' companies' +
+            (d.sample && d.sample.length ? ' (' + d.sample.join(', ') + ')' : '') + '\n' +
+            'Attempts: ' + (d.attempts || 0) + ' · ' + (d.elapsed_ms || 0) + 'ms' +
+            (d.http_status ? ' · HTTP ' + d.http_status : '') + '\n' +
+            (d.source ? 'Rows found under: ' + d.source + '\n' : '') +
+            (d.error ? '\n' + d.error : '') + (d.detail ? '\n' + d.detail : '');
+        }).catch(function(e){
+          b.disabled = false; b.textContent = 'Run provider check';
+          out.style.display = 'block'; out.textContent = 'Could not run the check: ' + e;
+        });
+    }
+
+    // Admin-only diagnostic for the IDENTIFY step (Claude + web_search) --
+    // shown on a run where every platform came back handle_not_found, since
+    // that shape (all of them failing at once) usually means the vendor call
+    // itself broke rather than this company genuinely having no accounts.
+    function sciIdentifyDiagControl(){
+      if(!IS_ADMIN) return '';
+      return '<button type="button" class="sci-suggest-check-btn" id="sciIdentifyCheckBtn" onclick="runSciIdentifyCheck()">Check identification step</button>' +
+        '<pre class="sci-suggest-error-detail" id="sciIdentifyCheckOut" style="display:none"></pre>';
+    }
+
+    function runSciIdentifyCheck(){
+      var b = document.getElementById('sciIdentifyCheckBtn'), out = document.getElementById('sciIdentifyCheckOut');
+      if(!b || !out) return;
+      b.disabled = true; b.textContent = 'Checking…';
+      fetch('/p2/admin/external-usage/sci-identify-check', {method: 'POST'})
+        .then(function(r){ return r.json(); }).then(function(d){
+          b.disabled = false; b.textContent = 'Check identification step';
+          out.style.display = 'block';
+          out.textContent =
+            'Key configured: ' + (d.configured ? 'yes (' + d.key_len + ' chars)' : 'NO') + '\n' +
+            'Probe against Nike: ' + (d.ok ? 'found ' + Object.keys(d.found || {}).length + ' platform(s)' : 'found nothing') + '\n' +
+            (d.web_search_tool ? 'web_search tool version in use: ' + d.web_search_tool + '\n' : '') +
+            (d.elapsed_ms ? 'Elapsed: ' + d.elapsed_ms + 'ms\n' : '') +
+            (d.reasoning ? '\n' + d.reasoning : '') + (d.error ? '\n' + d.error : '') +
+            // The reply body itself, when the probe found nothing. Without
+            // it, "the model answered and we mis-read it" and "the model
+            // never answered" look identical from here, which is how a
+            // fragmented-response bug survived two rounds of fixes.
+            (d.last_response ? '\n\n--- last reply from the model ---\n' +
+              'text blocks: ' + d.last_response.text_block_count +
+              '  stop_reason: ' + d.last_response.stop_reason +
+              '  chars: ' + d.last_response.chars + '\n' +
+              (d.last_response.excerpt || '(empty)') : '');
+        }).catch(function(e){
+          b.disabled = false; b.textContent = 'Check identification step';
+          out.style.display = 'block'; out.textContent = 'Could not run the check: ' + e;
+        });
+    }
+
+    // Admin-only "Data sources" panel: which platforms have a Unipile
+    // account connected right now, and a one-click hosted-auth link to
+    // connect the rest. A live read (unipile-check calls
+    // tracker/unipile_client.list_accounts() fresh, no local table) so this
+    // never drifts the way a cached "connected" flag could -- see
+    // tracker/unipile_client.is_available's docstring. Only LinkedIn and
+    // Instagram show here: Facebook/TikTok/X collect through Apify only,
+    // Unipile doesn't cover them for this feature.
+    var UNIPILE_PLATFORMS = ['linkedin', 'instagram'];
+
+    function renderDataSourcesPanel(){
+      if(!IS_ADMIN) return;
+      var panel = document.getElementById('dataSourcesPanel');
+      if(!panel) return;
+      panel.innerHTML = '<div class="sci-card sci-datasrc">' +
+        '<div class="sci-card-head"><h2>Data sources <span class="sci-datasrc-tag">admin only</span></h2>' +
+        '<button type="button" class="sci-datasrc-refresh" id="dsRefreshBtn" onclick="loadDataSources()">Refresh</button></div>' +
+        '<div class="sci-datasrc-body" id="dsBody"><div class="sci-datasrc-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Checking Unipile…</div></div>' +
+      '</div>';
+      loadDataSources();
+    }
+
+    // `working` is the count of accounts that can actually serve a request;
+    // `listed` counts every account Unipile still returns for the platform,
+    // including ones whose login has lapsed. They are reported separately on
+    // purpose: a lapsed account is listed forever, so collapsing the two
+    // numbers would print "17 accounts connected" on a workspace where six
+    // of them fail every call.
+    function dsRow(platform, working, listed){
+      var meta = platformMeta(platform);
+      var stale = Math.max(0, listed - working);
+      var statusHtml;
+      if(working > 0){
+        statusHtml = '<span class="sci-datasrc-status ok">' + working + ' account' + (working === 1 ? '' : 's') + ' working' +
+          (stale ? ', ' + stale + (stale === 1 ? ' needs' : ' need') + ' reconnecting' : '') + '</span>';
+      } else if(listed > 0){
+        statusHtml = '<span class="sci-datasrc-status warn">' + listed + ' account' + (listed === 1 ? '' : 's') + ' signed out</span>' +
+          '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Reconnect ' + esc(platform) + '</button>';
+      } else {
+        statusHtml = '<button type="button" class="sci-datasrc-connect" onclick="connectUnipile([\'' + platform.toUpperCase() + '\'])">Connect ' + esc(platform) + '</button>';
+      }
+      return '<div class="sci-datasrc-row" data-platform="' + esc(platform) + '"><span class="sci-datasrc-ic">' + meta.icon + '</span>' +
+        '<span class="sci-datasrc-name">' + esc(platform) + '</span>' + statusHtml + '</div>';
+    }
+
+    function loadDataSources(){
+      var body = document.getElementById('dsBody'), btn = document.getElementById('dsRefreshBtn');
+      if(!body) return;
+      if(btn) btn.disabled = true;
+      fetch('/p2/admin/external-usage/unipile-check', {method: 'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(btn) btn.disabled = false;
+          if(!d.configured){
+            body.innerHTML = '<div class="sci-datasrc-empty">UNIPILE_API_KEY is not set on this deployment.</div>';
+            return;
+          }
+          if(!d.ok){
+            body.innerHTML = '<div class="sci-datasrc-empty">' + esc(d.error || 'Unipile is unavailable right now.') + '</div>';
+            return;
+          }
+          var listed = d.by_platform || {}, working = d.connected_by_platform || {};
+          body.innerHTML = UNIPILE_PLATFORMS.map(function(p){
+            return dsRow(p, working[p] || 0, listed[p] || 0);
+          }).join('') + '<div class="sci-datasrc-note">Facebook, TikTok and X collect through Apify once its key is configured &mdash; Unipile only covers LinkedIn and Instagram here.</div>';
+        })
+        .catch(function(){
+          if(btn) btn.disabled = false;
+          body.innerHTML = '<div class="sci-datasrc-empty">Could not reach the Unipile check.</div>';
+        });
+    }
+
+    function connectUnipile(providers){
+      fetch('/p2/admin/external-usage/unipile-connect', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({providers: providers}),
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d.error || !d.url){ alert('Could not start the connect flow: ' + (d.error || 'no URL returned')); return; }
+        window.open(d.url, '_blank', 'noopener');
+      }).catch(function(){ alert('Could not start the connect flow.'); });
+    }
+
+    function renderCompanySuggestions(companies, error, q){
+      var panel = document.getElementById('sciSuggestPanel');
+      window.__sciCompanies = companies || [];
+      var html = '';
+      if(error){
+        html += '<div class="sci-suggest-error">' +
+          '<div class="sci-suggest-error-msg">' + esc(error.message || 'Company search is unavailable right now — you can still fill this in manually.') + '</div>' +
+          (error.detail ? '<pre class="sci-suggest-error-detail">' + esc(error.detail) + '</pre>' : '') +
+          sciAdminDiagControl() + '</div>';
+      }
+      if(companies && companies.length){
+        if(error) html += '<div class="sci-suggest-fallback-note">Companies you have analyzed before are shown below.</div>';
+        html += '<div class="sci-suggest-list">' + companies.map(sciSuggestRow).join('') + '</div>';
+      } else if(!error){
+        html += '<div class="sci-suggest-empty">No matches for "' + esc(q || '') + '" — you can still type the exact name and analyze it directly.</div>';
+      }
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+    }
+
+    var PICKED_LOGO = null;
+
+    function runCompanySearch(){
+      PICKED_LOGO = null; // the name field changed since any earlier pick, so its logo no longer applies
+      var q = (document.getElementById('companyName').value || '').trim();
+      var panel = document.getElementById('sciSuggestPanel');
+      if(q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="sci-suggest-loading"><span class="sci-spinner" style="width:14px;height:14px;border-width:2px"></span>Searching…</div>';
+      fetch(BASE + '/search?q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data){ renderCompanySuggestions(data.companies || [], data.error || null, q); })
+        .catch(function(){ renderCompanySuggestions([], {message: 'The search request itself failed to complete.'}, q); });
+    }
+    var onCompanyNameInput = debounce(runCompanySearch, 350);
+
+    function pickCompany(idx){
+      var c = (window.__sciCompanies || [])[idx];
+      if(!c) return;
+      document.getElementById('companyName').value = c.name;
+      document.getElementById('companyUrl').value = c.website || '';
+      PICKED_LOGO = c.logo || null;
+      var panel = document.getElementById('sciSuggestPanel');
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+
+    function startAnalysis(evt){
+      evt.preventDefault();
+      var name = document.getElementById('companyName').value.trim();
+      var url = document.getElementById('companyUrl').value.trim();
+      if(!name) return false;
+      document.getElementById('sciSuggestPanel').style.display = 'none';
+      document.getElementById('analyzeBtn').disabled = true;
+      fetch(BASE + '/analyze', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({company_name: name, company_url: url, company_logo: PICKED_LOGO || ''}),
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if(data.error){
+          alert(data.error);
+          document.getElementById('analyzeBtn').disabled = false;
+          return;
+        }
+        document.getElementById('runningWrap').style.display = 'block';
+        pollRun(data.run_id);
+      }).catch(function(){
+        document.getElementById('analyzeBtn').disabled = false;
+      });
+      return false;
+    }
+
+    function renderPlatforms(platforms){
+      var grid = document.getElementById('platformGrid');
+      var byName = {};
+      (platforms || []).forEach(function(p){ byName[p.platform] = p; });
+      var order = PLATFORM_ORDER.filter(function(p){ return byName[p]; }).concat(
+        (platforms || []).map(function(p){ return p.platform; }).filter(function(p){ return PLATFORM_ORDER.indexOf(p) < 0; })
+      );
+      grid.innerHTML = order.map(function(name){
+        var p = byName[name], meta = platformMeta(name);
+        return '<div class="pf-chip" data-status="' + esc(p.status) + '" data-platform="' + esc(name) + '">' +
+          '<div class="pf-chip-ic">' + meta.icon + '</div>' +
+          '<div class="pf-chip-txt"><span class="pf-name">' + esc(platformLabel(name)) + '</span>' +
+          '<span class="pf-status">' + esc((p.status || '').replace(/_/g, ' ')) + '</span></div>' +
+          (p.post_count ? '<span class="pf-count">' + p.post_count + '</span>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    function pollRun(runId){
+      if(POLL_TIMER) clearTimeout(POLL_TIMER);
+      function check(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){ return r.json(); }).then(function(data){
+            renderPlatforms(data.platforms);
+            if(data.status === 'running'){ POLL_TIMER = setTimeout(check, 4000); return; }
+            document.getElementById('analyzeBtn').disabled = false;
+            location.reload();
+          }).catch(function(){ POLL_TIMER = setTimeout(check, 6000); });
+      }
+      check();
+    }
+
+    var NO_ACTIVITY_STATUSES = {no_presence:1, handle_not_found:1, scrape_failed:1, error:1, low_activity:1};
+    var STATUS_LABEL = {no_presence:'No organic presence found', handle_not_found:'Account not confidently identified',
+      scrape_failed:'Collection failed', error:'Failed', low_activity:'Low posting activity'};
+    var VENDOR_LABEL = {unipile:'via Unipile', apify:'via Apify', youtube_api:'via YouTube API', reddit_api:'via Reddit API'};
+    // Short forms for the overview's launcher cards, which are far too narrow
+    // for STATUS_LABEL's full sentence -- it truncated to "...iden..." on every
+    // card. The full wording still shows on the platform's own pane.
+    var STATUS_SHORT = {no_presence:'No presence found', handle_not_found:'No account found',
+      scrape_failed:'Collection failed', error:'Failed', low_activity:'Low activity'};
+    var VIEW_GLYPH = '↗';
+
+    // Categorical hues live in CSS as .sci-c0 … .sci-c5 (each sets --c), never
+    // as an inline style: the dark steps are chosen against the dark panel and
+    // measure far under 3:1 on paper, so light mode re-steps every one of them,
+    // and an inline colour would win over that override. Both sets were run
+    // through an adjacent-pair CVD check (OKLab dE under simulated deuter-,
+    // prot- and tritanopia) rather than eyeballed; the previous set had two
+    // adjacent pairs a tritanope could not separate at all.
+    //
+    // Assignment is by identity and fixed for the whole report: a post format
+    // keeps its hue in every chart in every pane (FORMAT_CI), so the reader
+    // learns the key once. Never cycled past six -- the 7th format folds into
+    // the ramp's last step rather than inventing a hue.
+    var CAT_N = 6;
+    var FORMAT_CI = {};    // post_type -> palette index, stable across panes
+    var CHART_UID = 0;
+
+    // Which run's data the "Top performing posts" toolbars (sort/show-all)
+    // read from -- set once per renderReport() call, so a sort click can
+    // re-render just its own platform section without a second fetch.
+    var CURRENT_RUN = null;
+    var POST_SORT = {};    // platform -> 'top' | 'recent'
+    var POST_SHOWALL = {}; // platform -> bool
+    var POST_FILTER = {};  // platform -> post_type | null
+    var TREND_METRIC = {}; // chart scope -> 'n' | 'inter' | 'views'
+    var SCORE_SORT = {key: 'count', dir: -1};
+
+    var METRIC_ICONS = {
+      likes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2s-7.2-4.4-9.6-8.9C.9 7.9 2.4 4.6 5.6 3.8c2-.5 4 .3 5.2 2 .5.7 1 .7 1.5 0 1.2-1.7 3.2-2.5 5.2-2 3.2.8 4.7 4.1 3.2 7.5-2.4 4.5-9.6 8.9-9.6 8.9z"/></svg>',
+      comments: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8 8 0 01-11.6 7.1L4 20l1.4-4.2A8 8 0 1121 11.5z"/></svg>',
+      shares: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12V8a2 2 0 012-2h9M11 2l4 4-4 4M20 12v4a2 2 0 01-2 2H9M13 22l-4-4 4-4"/></svg>',
+      views: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+    };
+
+    // ── Small formatting helpers ────────────────────────────────────────────
+    function fmtNum(n){
+      if(n == null || isNaN(n)) return null;
+      n = Number(n);
+      if(Math.abs(n) >= 1000000) return (n/1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + 'M';
+      if(Math.abs(n) >= 1000) return (n/1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K';
+      return String(n);
+    }
+    function fmtDate(iso){
+      if(!iso) return '';
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    }
+    // Compact "3mo"/"2w"/"5d" style age, for post-card footers -- fmtDate's
+    // full date is still one hover (the card's title attribute) away.
+    function relTime(iso){
+      if(!iso) return '';
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return '';
+      var s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+      var units = [[31536000,'y'],[2592000,'mo'],[604800,'w'],[86400,'d'],[3600,'h'],[60,'m']];
+      for(var i=0;i<units.length;i++){ var v = Math.floor(s/units[i][0]); if(v>=1) return v+units[i][1]; }
+      return 'now';
+    }
+    function fmtFullNum(n){ return Number(n).toLocaleString('en-US'); }
+    // A run's raw timestamp (e.g. "2026-08-26T09:38:07.479941+00:00") is
+    // useless at a glance and indistinguishable between several runs done
+    // minutes apart on the same day. Same-day rows show just a clock time
+    // (each is already distinct); anything older gets a short date, falling
+    // back to a full year once it's not this year -- same convention Slack/
+    // Gmail use. The full precise timestamp is always still one hover away.
+    function historyTimestamp(iso){
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return {short: '', full: ''};
+      var full = d.toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit'});
+      var now = new Date(), time = d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+      var yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      var short;
+      if(d.toDateString() === now.toDateString()) short = time;
+      else if(d.toDateString() === yesterday.toDateString()) short = 'Yesterday, ' + time;
+      else if(d.getFullYear() === now.getFullYear()) short = d.toLocaleDateString(undefined, {month:'short', day:'numeric'}) + ', ' + time;
+      else short = d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+      return {short: short, full: full};
+    }
+    function renderHistoryTimestamps(){
+      var els = document.querySelectorAll('.r-meta[data-created]');
+      for(var i = 0; i < els.length; i++){
+        var t = historyTimestamp(els[i].getAttribute('data-created'));
+        if(t.short){ els[i].textContent = t.short; els[i].title = t.full; }
+      }
+    }
+    renderHistoryTimestamps();
+
+    function toPoints(v){
+      if(Array.isArray(v)) return v.filter(function(x){ return x; });
+      if(typeof v === 'string' && v.trim()) return [v.trim()];
+      return [];
+    }
+
+    // ── Mechanical, client-side pattern reads over the raw posts -- accurate
+    // and instant regardless of what the AI narrative says, and the source
+    // for every chart/card below. Mirrors tracker/sci_classify.py's logic. ──
+    function engagementScore(metrics){
+      if(!metrics) return 0;
+      var s = 0;
+      Object.keys(metrics).forEach(function(k){ if(typeof metrics[k] === 'number') s += metrics[k]; });
+      return s;
+    }
+    function platformPosts(platform){
+      return ((CURRENT_RUN && CURRENT_RUN.posts) || []).filter(function(p){ return p.platform === platform; });
+    }
+    function sortedPlatformPosts(platform){
+      var posts = platformPosts(platform).slice();
+      if((POST_SORT[platform] || 'top') === 'recent'){
+        posts.sort(function(a,b){ return new Date(b.posted_at || 0) - new Date(a.posted_at || 0); });
+      } else {
+        posts.sort(function(a,b){ return engagementScore(b.metrics) - engagementScore(a.metrics); });
+      }
+      return posts;
+    }
+    function postThemeWords(post){
+      var a = post.creative_analysis;
+      if(!a || a.error) return [];
+      var words = [];
+      ['subject','setting','style','tone','format_technique'].forEach(function(k){
+        var v = a[k];
+        if(typeof v === 'string' && v.trim()) words.push(v.trim().toLowerCase());
+      });
+      ['subjects','settings'].forEach(function(k){
+        var v = a[k];
+        if(Array.isArray(v)) v.forEach(function(x){ var s = String(x||'').trim().toLowerCase(); if(s) words.push(s); });
+      });
+      return words;
+    }
+    function topThemes(posts, platform, n){
+      var counts = {};
+      (posts || []).filter(function(p){ return p.platform === platform && p.creative_analysis_status === 'ok'; })
+        .forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
+      return Object.keys(counts).sort(function(a,b){ return counts[b] - counts[a]; }).slice(0, n || 8);
+    }
+
+    // ── Real thumbnails, resolved per-platform from the raw scraped item --
+    // media_urls[0] is often a playable video file (fine for vision, useless
+    // in an <img>), so this looks for the platform's own cover/display image
+    // instead. Returns null (never a broken-image glyph) when none exists. ──
+    function postThumbnail(post){
+      var raw = post.raw || {}, platform = post.platform;
+      if(platform === 'youtube'){
+        var thumbs = (raw.snippet || {}).thumbnails || {};
+        var order = ['maxres','standard','high','medium','default'];
+        for(var i=0;i<order.length;i++){ var t = thumbs[order[i]]; if(t && t.url) return t.url; }
+        return null;
+      }
+      if(platform === 'reddit'){
+        return raw.thumbnail_url || null;
+      }
+      if(platform === 'instagram'){
+        return raw.displayUrl || ((post.post_type === 'image' && post.media_urls && post.media_urls[0]) || null);
+      }
+      if(platform === 'facebook'){
+        var photo = raw.photo_image, media0 = (raw.media && raw.media[0]) || {};
+        return (photo && photo.uri) || raw.picture || raw.photoUrl ||
+          (media0.photo_image && media0.photo_image.uri) || media0.thumbnail || null;
+      }
+      if(platform === 'tiktok'){
+        var vm = raw.videoMeta || {};
+        return vm.coverUrl || vm.originCover || vm.dynamicCover || (raw.covers && raw.covers.default) || null;
+      }
+      if(platform === 'x'){
+        var media = raw.media || (raw.extendedEntities && raw.extendedEntities.media) || [];
+        for(var j=0;j<media.length;j++){ if(media[j].media_url_https) return media[j].media_url_https; }
+        return null;
+      }
+      if(platform === 'linkedin'){
+        // Unipile and the Apify actor describe a LinkedIn post's media
+        // completely differently, and both shapes land in this one field, so
+        // both are read. Unipile: attachments[] of {type:'img'|'video', url},
+        // where only the img rows are displayable -- a video row's url is the
+        // mp4 itself, which is exactly the mistake that once put a broken
+        // image on every video card. Apify: a flat images/imageUrls array.
+        var atts = raw.attachments || [];
+        for(var k=0;k<atts.length;k++){
+          var at = atts[k] || {};
+          if(at.url && !at.unavailable && (at.type || '').toLowerCase() === 'img') return at.url;
+        }
+        if(raw.article && raw.article.picture_url) return raw.article.picture_url;
+        var imgs = raw.images || raw.imageUrls || [];
+        if(imgs.length){ var im = imgs[0]; return (typeof im === 'string') ? im : (im && im.url) || null; }
+        return null;
+      }
+      return (post.post_type === 'image' && post.media_urls && post.media_urls[0]) || null;
+    }
+    function postTitle(post){
+      var raw = post.raw || {};
+      if(post.platform === 'youtube' && raw.snippet && raw.snippet.title) return raw.snippet.title;
+      if(post.platform === 'reddit' && raw.title) return raw.title;
+      var cap = (post.caption || '').split('\n')[0].trim();
+      if(cap) return cap.length > 90 ? cap.slice(0, 88) + '…' : cap;
+      return (post.platform || 'post') + ' · ' + (post.post_type || 'post');
+    }
+    function metricChips(metrics){
+      if(!metrics) return '';
+      var order = [['views','views'],['likes','likes'],['comments','comments'],['shares','shares']];
+      return order.map(function(pair){
+        var v = metrics[pair[0]];
+        if(typeof v !== 'number') return '';
+        return '<span class="sci-metric-chip" title="' + fmtFullNum(v) + ' ' + pair[1] + '"><span class="sci-metric-ic">' + METRIC_ICONS[pair[0]] + '</span>' + fmtNum(v) + '</span>';
+      }).join('');
+    }
+    // "carousel" is the only post_type that needs a friendlier label than a
+    // plain capitalized post_type -- everything else already reads fine
+    // uppercased by .sci-postcard-type's own CSS.
+    function postFormatLabel(post){
+      var t = post.post_type || 'post';
+      if(t === 'carousel') return 'Multi-image';
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+
+    function renderPostCard(post, showPlatform){
+      var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
+      // A post with no image is not a broken image. Rendering the 16:9 media
+      // box for a text-only post gave every text LinkedIn and X post a large
+      // empty rectangle with a logo floating in it, which reads as a thumbnail
+      // that failed to load. Those cards drop the box entirely and spend the
+      // height on the words, which are the whole post.
+      var media = thumb
+        ? '<div class="sci-postcard-media"><img src="' + esc(thumb) + '" alt="" loading="lazy" ' +
+          'onerror="this.closest(\'.sci-postcard\').classList.add(\'sci-postcard-text\');' +
+          'this.closest(\'.sci-postcard-media\').remove()"></div>'
+        : '';
+      var when = relTime(post.posted_at);
+      return '<a class="sci-postcard' + (thumb ? '' : ' sci-postcard-text') + '" href="' + esc(post.post_url || '#') +
+        '" target="_blank" rel="noopener" data-platform="' + esc(post.platform) + '">' +
+        media +
+        '<div class="sci-postcard-body">' +
+          // Format label sits BELOW the thumbnail as its own chip rather than
+          // overlaid on it: an overlay competes with the image for the eye and
+          // is unreadable over a busy frame, which most video stills are.
+          '<div class="sci-postcard-tags">' +
+            (showPlatform ? '<span class="sci-postcard-plat"><span class="sci-postcard-plat-ic">' + meta.icon + '</span>' +
+              esc(platformLabel(post.platform)) + '</span>' : '') +
+            '<span class="sci-postcard-type">' + esc(postFormatLabel(post)) + '</span>' +
+          '</div>' +
+          '<div class="sci-postcard-title">' + esc(title) + '</div>' +
+          '<div class="sci-postcard-foot">' +
+            (when ? '<span class="sci-postcard-date" title="' + esc(fmtDate(post.posted_at)) + '">' + esc(when) + '</span>' : '') +
+            metricChips(post.metrics) +
+            (post.post_url ? '<span class="sci-postcard-view">View ' + VIEW_GLYPH + '</span>' : '') +
+          '</div>' +
+        '</div></a>';
+    }
+
+    // ── "Top performing posts" toolbar: Top/Most-recent sort + a capped grid
+    // with a "Show all" expand -- reads live from CURRENT_RUN so a toggle
+    // click only needs to swap this one platform's #sci-postsec-<platform>. ──
+    function renderPostsSection(platform){
+      var everything = sortedPlatformPosts(platform);
+      if(!everything.length) return '';
+      // Format filter chips. They read straight off what this platform
+      // actually published, so a company that never posted a carousel never
+      // gets a carousel chip that filters to nothing. The chips carry their
+      // own counts, which makes the row a small format breakdown in itself.
+      var counts = {};
+      everything.forEach(function(p){ var t = p.post_type || 'post'; counts[t] = (counts[t] || 0) + 1; });
+      var types = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var active = POST_FILTER[platform];
+      if(active && !counts[active]){ active = null; POST_FILTER[platform] = null; }
+      var all = active ? everything.filter(function(p){ return (p.post_type || 'post') === active; }) : everything;
+
+      var chips = types.length > 1 ? '<div class="sci-fchips">' +
+        '<button type="button" class="sci-fchip' + (active ? '' : ' active') +
+          '" onclick="setPostFilter(\'' + platform + '\',\'\')">All<b>' + everything.length + '</b></button>' +
+        types.map(function(t){
+          return '<button type="button" class="sci-fchip sci-c' + formatCi(t) + (active === t ? ' active' : '') +
+            '" onclick="setPostFilter(\'' + platform + '\',\'' + esc(t) + '\')">' +
+            esc(postFormatLabel({post_type: t})) + '<b>' + counts[t] + '</b></button>';
+        }).join('') + '</div>' : '';
+
+      var showAll = !!POST_SHOWALL[platform];
+      var limit = showAll ? all.length : Math.min(24, all.length);
+      var shown = all.slice(0, limit);
+      var mode = POST_SORT[platform] || 'top';
+      var bar = '<div class="sci-posts-bar"><div class="sci-seg">' +
+        '<button type="button" class="sci-seg-btn' + (mode === 'top' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'top\')">Top</button>' +
+        '<button type="button" class="sci-seg-btn' + (mode === 'recent' ? ' active' : '') + '" onclick="setPostSort(\'' + platform + '\',\'recent\')">Most recent</button>' +
+        '</div><span class="sci-posts-count">Showing ' + shown.length + ' of ' + all.length + ' post' + (all.length === 1 ? '' : 's') +
+        (active ? ' · ' + esc(postFormatLabel({post_type: active})) + ' only' : '') + '</span></div>';
+      var grid = '<div class="sci-postcard-grid">' + shown.map(function(p){ return renderPostCard(p); }).join('') + '</div>';
+      var more = (!showAll && all.length > limit) ?
+        '<button type="button" class="sci-posts-more" onclick="showAllPlatformPosts(\'' + platform + '\')">Show all ' + all.length + ' posts</button>' : '';
+      return '<div class="sci-postsec" id="sci-postsec-' + esc(platform) + '">' + chips + bar + grid + more + '</div>';
+    }
+    function repaintPosts(platform){
+      var el = document.getElementById('sci-postsec-' + platform);
+      if(el) el.outerHTML = renderPostsSection(platform);
+    }
+    function setPostSort(platform, mode){
+      POST_SORT[platform] = mode;
+      repaintPosts(platform);
+    }
+    function setPostFilter(platform, type){
+      POST_FILTER[platform] = type || null;
+      // Filtering resets the cap. Carrying "show all" across a filter change
+      // means picking a format silently expands to every post of it, which is
+      // not what the click asked for.
+      POST_SHOWALL[platform] = false;
+      repaintPosts(platform);
+    }
+    function showAllPlatformPosts(platform){
+      POST_SHOWALL[platform] = true;
+      repaintPosts(platform);
+    }
+
+    function renderPostChip(post){
+      if(!post) return '';
+      var thumb = postThumbnail(post), meta = platformMeta(post.platform), title = postTitle(post);
+      var thumbHtml = '<span class="sci-chip-thumb' + (thumb ? '' : ' sci-chip-noimg') + '" data-platform="' + esc(post.platform) + '">' +
+        (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" onerror="this.closest(\'.sci-chip-thumb\').classList.add(\'sci-chip-noimg\');this.remove()">' : '') +
+        '<span class="sci-chip-ic">' + meta.icon + '</span></span>';
+      var inner = thumbHtml + '<span class="sci-chip-txt">' + esc(title) + '</span>';
+      return post.post_url
+        ? '<a class="sci-cite-chip" href="' + esc(post.post_url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+        : '<span class="sci-cite-chip">' + inner + '</span>';
+    }
+
+    function renderClaims(claims, postsById){
+      return (claims || []).map(function(c){
+        var cites = (c.post_ids || []).map(function(id){ return renderPostChip(postsById[id]); }).join('');
+        return '<div class="sci-claim">' + esc(c.text) +
+          (cites ? '<div class="sci-claim-cites">' + cites + '</div>' : '') + '</div>';
+      }).join('');
+    }
+
+    // A null platform means "every platform at once", for the overview's
+    // whole-footprint format mix.
+    function computeFormatMix(posts, platform){
+      var counts = {}, total = 0;
+      (posts || []).forEach(function(p){
+        if(platform && p.platform !== platform) return;
+        var t = p.post_type || 'post';
+        counts[t] = (counts[t] || 0) + 1; total++;
+      });
+      return {counts: counts, total: total};
+    }
+
+    // ══ Chart toolkit ═══════════════════════════════════════════════════════
+    //
+    // Four primitives cover every chart in the report: a trend (magnitude over
+    // time), ranked bars (magnitude by category), a mix (parts of a whole) and
+    // a heat grid (magnitude across two categorical axes). Each one is built
+    // as a string like everything else here, and each one is hoverable.
+    //
+    // Two rules hold across all of them, and they are the reason the charts
+    // are readable rather than decorative:
+    //   * ONE value axis, always. Two measures of different scale become two
+    //     charts or a toggle between them, never two y-scales on one plot.
+    //   * Colour encodes identity or magnitude, never rank. A filter that
+    //     drops a series must not repaint the ones that survive, so hues are
+    //     assigned from a fixed map (FORMAT_CI) and not from array position.
+
+    // One tooltip node for the whole report, driven by data-tip. Charts are
+    // re-rendered wholesale on every toggle, so per-element listeners would
+    // leak on each click; a single delegated listener survives any re-render.
+    //
+    // data-hi is the companion: hovering any element tagged with a key dims
+    // everything in the same chart that is NOT that key. It is what makes a
+    // legend row and its bar segment feel like one object.
+    var TIP_EL = null;
+    function sciChartsInit(){
+      if(TIP_EL) return;
+      TIP_EL = document.createElement('div');
+      TIP_EL.className = 'sci-tip';
+      TIP_EL.setAttribute('role', 'tooltip');
+      document.body.appendChild(TIP_EL);
+      var cur = null, curHi = null;
+
+      function place(e){
+        var pad = 14, w = TIP_EL.offsetWidth, h = TIP_EL.offsetHeight;
+        var x = e.clientX + pad, y = e.clientY + pad;
+        if(x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+        if(y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+        TIP_EL.style.transform = 'translate(' + Math.max(8, x) + 'px,' + Math.max(8, y) + 'px)';
+      }
+      function hideTip(){ cur = null; TIP_EL.classList.remove('on'); }
+      function clearHi(){
+        if(!curHi) return;
+        curHi.chart.classList.remove('hi-live');
+        curHi.chart.querySelectorAll('.hi-on').forEach(function(n){ n.classList.remove('hi-on'); });
+        curHi = null;
+      }
+
+      document.addEventListener('mouseover', function(e){
+        var t = e.target;
+        var el = (t && t.closest) ? t.closest('[data-tip]') : null;
+        if(el !== cur){
+          cur = el;
+          if(!el) TIP_EL.classList.remove('on');
+          else { TIP_EL.innerHTML = el.getAttribute('data-tip'); TIP_EL.classList.add('on'); place(e); }
+        }
+        var hiEl = (t && t.closest) ? t.closest('[data-hi]') : null;
+        var chart = hiEl && hiEl.closest ? hiEl.closest('.sci-chart, .sci-hi-scope') : null;
+        var key = hiEl ? hiEl.getAttribute('data-hi') : null;
+        if(curHi && curHi.key === key && curHi.chart === chart) return;
+        clearHi();
+        if(!chart || !key) return;
+        chart.classList.add('hi-live');
+        chart.querySelectorAll('[data-hi="' + key.replace(/"/g, '') + '"]').forEach(function(n){ n.classList.add('hi-on'); });
+        curHi = {key: key, chart: chart};
+      });
+      // A tooltip left floating over a scrolled-away chart points at nothing,
+      // so scrolling anywhere dismisses it rather than chasing the element.
+      document.addEventListener('scroll', function(){ hideTip(); clearHi(); }, true);
+      document.addEventListener('mousemove', function(e){ if(cur) place(e); });
+      window.addEventListener('blur', function(){ hideTip(); clearHi(); });
+    }
+    sciChartsInit();
+
+    // Tooltip bodies are built here, not in each chart, so every tooltip in the
+    // report has the same shape: a title line, then labelled rows.
+    //
+    // Escaped TWICE on purpose, and the order matters. The values are escaped
+    // first so a caption containing "<" survives as text; the finished markup
+    // is escaped again because it has to live inside an HTML attribute, and
+    // getAttribute hands back exactly one layer of decoding to innerHTML. Skip
+    // the inner pass and a post caption becomes markup in the tooltip.
+    function tipHtml(title, rows){
+      var html = '<b>' + esc(title) + '</b>' + (rows || []).map(function(r){
+        return '<i>' + esc(r[0]) + '</i><s>' + esc(r[1]) + '</s>';
+      }).join('');
+      return esc(html);
+    }
+
+    function chartCard(o){
+      if(!o.body) return '';
+      return '<div class="sci-chart' + (o.cls ? ' ' + o.cls : '') + '"' +
+        (o.id ? ' id="' + esc(o.id) + '"' : '') + '>' +
+        '<div class="sci-chart-head"><div class="sci-chart-ht">' +
+          '<h5>' + esc(o.title) + '</h5>' +
+          (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') +
+        '</div>' + (o.controls || '') + '</div>' +
+        o.body + (o.note ? '<div class="sci-chart-note">' + esc(o.note) + '</div>' : '') +
+      '</div>';
+    }
+
+    // `pre` is an already-quoted leading argument, for controls that belong to
+    // one scope (a platform, a chart id) rather than to the page.
+    // Side-by-side pair that collapses to nothing when neither half has
+    // anything to show. Without this an empty wrapper is still a truthy
+    // string, and renderSection dutifully draws a heading over blank space.
+    function duo(){
+      var parts = [].slice.call(arguments).filter(Boolean);
+      if(!parts.length) return '';
+      return '<div class="sci-chart-duo' + (parts.length === 1 ? ' sci-chart-solo' : '') + '">' +
+        parts.join('') + '</div>';
+    }
+
+    function segControl(opts, active, fn, pre){
+      var lead = pre != null ? "'" + pre + "'," : '';
+      return '<div class="sci-seg sci-seg-sm">' + opts.map(function(o){
+        return '<button type="button" class="sci-seg-btn' + (o.k === active ? ' active' : '') +
+          '" onclick="' + fn + '(' + lead + '\'' + o.k + '\')">' + esc(o.label) + '</button>';
+      }).join('') + '</div>';
+    }
+
+    // Axis maxima are rounded up to a 1/2/5 step so the gridline labels read as
+    // round numbers. A raw max puts the top gridline at "37" and makes every
+    // value look precise to a digit the data does not have.
+    function niceMax(v){
+      if(!(v > 0)) return 1;
+      var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+      var n = v / mag;
+      var step = n <= 1 ? 1 : (n <= 2 ? 2 : (n <= 5 ? 5 : 10));
+      return step * mag;
+    }
+
+    // ── Trend: one series, magnitude over time ───────────────────────────────
+    // Points are pre-bucketed by the caller; empty buckets arrive as zeros and
+    // are plotted as zeros. Dropping them would draw a straight line over a
+    // silence, and a silence in a publishing calendar is the finding.
+    // Gradients and patterns are referenced by id, and one pane can draw several
+    // trends. A shared id means the second chart silently repaints the first,
+    // so every chart stamps its own.
+    var SVG_UID = 0;
+
+    function trendSvg(pts, o){
+      o = o || {};
+      if(!pts || pts.length < 2) return '';
+      var uid = 'sci-t' + (++SVG_UID);
+      var W = 960, H = 210, PL = 46, PR = 12, PT = 12, PB = 26;
+      var iw = W - PL - PR, ih = H - PT - PB, base = PT + ih;
+      var raw = Math.max.apply(null, pts.map(function(p){ return p.value; }));
+      if(!(raw > 0)) return '';
+      var top = niceMax(raw);
+      var X = function(i){ return PL + iw * i / (pts.length - 1); };
+      var Y = function(v){ return base - (v / top) * ih; };
+      var last = pts.length - 1;
+
+      // Three gridlines, unless the midpoint would print the same number as a
+      // neighbour. On a chart whose peak is 1 post a week, [0, 0.5, 1] renders
+      // as "0 / 1 / 1" and the axis looks broken.
+      var seen = {}, ticks = [];
+      [0, top / 2, top].forEach(function(v){
+        var lab = fmtNum(Math.round(v));
+        if(seen[lab]) return;
+        seen[lab] = 1; ticks.push(v);
+      });
+      var grid = '';
+      ticks.forEach(function(v){
+        var y = Y(v).toFixed(1);
+        grid += '<line class="sci-tr-grid" x1="' + PL + '" y1="' + y + '" x2="' + (PL + iw) + '" y2="' + y + '"/>' +
+          '<text class="sci-tr-axis" x="' + (PL - 8) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" text-anchor="end">' +
+          esc(fmtNum(Math.round(v))) + '</text>';
+      });
+
+      // The final bucket is the week or month we are standing in, and it has not
+      // finished happening. Drawn solid it reads as a collapse in output, so the
+      // last leg is dashed. Every period behind it is closed and stays solid.
+      var solidTo = (o.partial && pts.length > 2) ? last - 1 : last;
+      var seg = function(a, b){
+        var d = '';
+        for(var i = a; i <= b; i++){
+          d += (i === a ? 'M' : 'L') + X(i).toFixed(1) + ' ' + Y(pts[i].value).toFixed(1) + ' ';
+        }
+        return d.trim();
+      };
+      var line = seg(0, solidTo);
+      var tail = solidTo < last ? seg(solidTo, last) : '';
+      var area = seg(0, last) + ' L' + X(last).toFixed(1) + ' ' + base +
+        ' L' + X(0).toFixed(1) + ' ' + base + ' Z';
+
+      var step = pts.length <= 8 ? 1 : (pts.length <= 16 ? 2 : Math.ceil(pts.length / 8));
+      var labels = pts.map(function(p, i){
+        if(i % step !== 0) return '';
+        var anchor = i === 0 ? 'start' : (i === pts.length - 1 ? 'end' : 'middle');
+        return '<text class="sci-tr-lab" x="' + X(i).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="' + anchor + '">' +
+          esc(p.label) + '</text>';
+      }).join('');
+
+      // Marks stay visible only while there is room for them; past ~40 buckets
+      // a dot per point is a smear, and the hover layer carries the detail.
+      var dots = pts.length <= 30 ? pts.map(function(p, i){
+        return '<circle class="sci-tr-pt" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="3.1"/>';
+      }).join('') : '';
+
+      // The series' own average, so a bucket can be read against this company's
+      // normal rather than against nothing. Suppressed on short series, where
+      // "the average of three numbers" is not a baseline, and when it would land
+      // on the top gridline and print two labels over each other.
+      var avg = '';
+      if(pts.length >= 4){
+        var mean = pts.reduce(function(a, p){ return a + p.value; }, 0) / pts.length;
+        if(mean > 0 && mean < top * 0.93){
+          var ay = Y(mean);
+          avg = '<line class="sci-tr-avg" x1="' + PL + '" y1="' + ay.toFixed(1) + '" x2="' + (PL + iw) +
+              '" y2="' + ay.toFixed(1) + '"/>' +
+            '<text class="sci-tr-avgl" x="' + (PL + iw) + '" y="' + (ay - 5).toFixed(1) +
+              '" text-anchor="end">avg ' + esc(fmtNum(Math.round(mean))) + '</text>';
+        }
+      }
+
+      // A full-height invisible column per point: the hit target is the whole
+      // band, not the 3px mark, so the crosshair is catchable with a real hand.
+      var half = iw / (pts.length - 1) / 2;
+      var hits = pts.map(function(p, i){
+        var x0 = Math.max(PL, X(i) - half), x1 = Math.min(PL + iw, X(i) + half);
+        return '<g class="sci-tr-col" data-tip="' + p.tip + '">' +
+          '<rect class="sci-tr-hit" x="' + x0.toFixed(1) + '" y="' + PT + '" width="' + (x1 - x0).toFixed(1) + '" height="' + ih + '"/>' +
+          '<line class="sci-tr-cross" x1="' + X(i).toFixed(1) + '" y1="' + PT + '" x2="' + X(i).toFixed(1) + '" y2="' + base + '"/>' +
+          '<circle class="sci-tr-dot" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.value).toFixed(1) + '" r="5"/>' +
+        '</g>';
+      }).join('');
+
+      // The fill fades toward the baseline instead of sitting as one flat tint,
+      // and the plot floor carries a dot grid that fades out at both edges, so
+      // the series is bounded by its own data rather than by a drawn box. The
+      // colour lives in the stops, not on the path: a CSS `fill` on .sci-tr-area
+      // would beat the paint-server reference in the markup.
+      var defs = '<defs>' +
+        '<linearGradient id="' + uid + '-fill" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop class="sci-tr-g0" offset="0"/><stop class="sci-tr-g1" offset="1"/>' +
+        '</linearGradient>' +
+        '<pattern id="' + uid + '-dots" width="13" height="13" patternUnits="userSpaceOnUse">' +
+          '<circle class="sci-tr-dg" cx="1.3" cy="1.3" r="1.05"/></pattern>' +
+        '<linearGradient id="' + uid + '-edge" x1="0" y1="0" x2="1" y2="0">' +
+          '<stop offset="0" stop-color="#000000"/><stop offset="0.1" stop-color="#ffffff"/>' +
+          '<stop offset="0.9" stop-color="#ffffff"/><stop offset="1" stop-color="#000000"/>' +
+        '</linearGradient>' +
+        '<mask id="' + uid + '-edgem"><rect x="' + PL + '" y="' + PT + '" width="' + iw +
+          '" height="' + ih + '" fill="url(#' + uid + '-edge)"/></mask>' +
+      '</defs>';
+
+      return '<div class="sci-tr-wrap"><svg class="sci-tr" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+        'aria-label="' + esc(o.aria || 'Trend chart') + '">' +
+        defs +
+        '<rect class="sci-tr-bg" x="' + PL + '" y="' + PT + '" width="' + iw + '" height="' + ih +
+          '" fill="url(#' + uid + '-dots)" mask="url(#' + uid + '-edgem)"/>' +
+        grid + avg +
+        '<path class="sci-tr-area" d="' + area + '" fill="url(#' + uid + '-fill)"/>' +
+        '<path class="sci-tr-line" d="' + line + '" pathLength="1"/>' +
+        (tail ? '<path class="sci-tr-tail" d="' + tail + '"/>' : '') +
+        dots + labels + hits +
+      '</svg></div>';
+    }
+
+    // ── Ranked bars: magnitude by category, biggest first ────────────────────
+    // Horizontal, because the labels are words. A vertical bar chart with
+    // category names under it either rotates the text or truncates it.
+    function rankBars(rows, o){
+      o = o || {};
+      var real = (rows || []).filter(function(r){ return r && r.value > 0; });
+      if(!real.length) return '';
+      var max = Math.max.apply(null, real.map(function(r){ return r.value; }));
+      return '<div class="sci-rank' + (o.cls ? ' ' + o.cls : '') + '">' + real.map(function(r){
+        var pct = max ? Math.max((r.value / max) * 100, 1.5) : 0;
+        var tag = r.href ? 'a' : 'div';
+        var attrs = r.href ? ' href="' + esc(r.href) + '" target="_blank" rel="noopener"' : '';
+        return '<' + tag + ' class="sci-rank-row"' + attrs +
+          (r.tip ? ' data-tip="' + r.tip + '"' : '') +
+          (r.hi ? ' data-hi="' + esc(r.hi) + '"' : '') + '>' +
+          '<span class="sci-rank-l">' + esc(r.label) + '</span>' +
+          '<span class="sci-rank-track"><span class="sci-rank-fill' +
+            (r.ci != null ? ' sci-c' + r.ci : '') + '" style="--w:' + pct.toFixed(2) + '%"></span></span>' +
+          '<span class="sci-rank-v">' + esc(r.display != null ? r.display : fmtNum(r.value)) + '</span>' +
+        '</' + tag + '>';
+      }).join('') + '</div>';
+    }
+
+    // ── Mix: one 100% bar plus a key, both hoverable as one object ───────────
+    // Every segment is named and counted in the key, so the split survives
+    // being read by someone who cannot separate two of the hues.
+    function mixBar(segs, o){
+      o = o || {};
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      if(!total) return '';
+      var bar = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        return '<span class="sci-mixseg sci-c' + s.ci + '" style="--w:' + pct.toFixed(2) + '%"' +
+          ' data-hi="' + esc(s.key) + '" data-tip="' + tipHtml(s.label, [
+            [o.unit || 'Posts', fmtFullNum(s.value)], ['Share', pct.toFixed(1) + '%']]) + '"></span>';
+      }).join('');
+      var key = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        return '<span class="sci-mk" data-hi="' + esc(s.key) + '">' +
+          '<i class="sci-c' + s.ci + '"></i>' + esc(s.label) +
+          '<b>' + fmtNum(s.value) + '</b><em>' + pct.toFixed(0) + '%</em></span>';
+      }).join('');
+      return '<div class="sci-mix"><div class="sci-mixbar">' + bar + '</div>' +
+        '<div class="sci-mixkey">' + key + '</div></div>';
+    }
+
+    // ── Donut: parts of a whole where the whole is itself the headline ───────
+    // pathLength="100" makes the dash array literally a percentage, so the arc
+    // lengths cannot drift from the numbers printed beside them.
+    function donut(segs, o){
+      o = o || {};
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      if(!total) return '';
+      var off = 0;
+      var arcs = segs.map(function(s){
+        var pct = (s.value / total) * 100;
+        var arc = '<circle class="sci-dn-arc sci-c' + s.ci + '" cx="60" cy="60" r="46" pathLength="100"' +
+          ' stroke-dasharray="' + Math.max(pct - 0.9, 0.4).toFixed(2) + ' ' + (100 - Math.max(pct - 0.9, 0.4)).toFixed(2) + '"' +
+          ' stroke-dashoffset="' + (-off).toFixed(2) + '"' +
+          ' data-hi="' + esc(s.key) + '" data-tip="' + tipHtml(s.label, [
+            [o.unit || 'Count', fmtFullNum(s.value)], ['Share', pct.toFixed(1) + '%']]) + '"/>';
+        off += pct;
+        return arc;
+      }).join('');
+      var key = segs.map(function(s){
+        return '<span class="sci-mk" data-hi="' + esc(s.key) + '">' +
+          '<i class="sci-c' + s.ci + '"></i>' + esc(s.label) +
+          '<b>' + fmtNum(s.value) + '</b><em>' + ((s.value / total) * 100).toFixed(0) + '%</em></span>';
+      }).join('');
+      return '<div class="sci-donut-wrap">' +
+        '<svg class="sci-dn" viewBox="0 0 120 120" role="img" aria-label="' + esc(o.aria || 'Composition') + '">' +
+          '<circle class="sci-dn-track" cx="60" cy="60" r="46"/>' + arcs +
+        '</svg>' +
+        '<div class="sci-dn-mid"><span class="sci-dn-v">' + esc(o.center || fmtNum(total)) + '</span>' +
+          '<span class="sci-dn-l">' + esc(o.centerLabel || '') + '</span></div>' +
+        '<div class="sci-mixkey sci-mixkey-col">' + key + '</div></div>';
+    }
+
+    // ── Heat grid: two categorical axes, one magnitude ───────────────────────
+    // Sequential, one hue, five steps. Continuous alpha looks smoother and
+    // lies: nobody reads a 6% opacity difference, and the legend would have to
+    // claim they can. Five steps is what a reader can actually match back.
+    function heatGrid(cells, rowLabels, colLabels, o){
+      o = o || {};
+      var max = 0;
+      cells.forEach(function(r){ r.forEach(function(c){ if(c.value > max) max = c.value; }); });
+      if(!max) return '';
+      var head = '<div class="sci-heat-row sci-heat-head"><span class="sci-heat-rl"></span>' +
+        colLabels.map(function(l){ return '<span class="sci-heat-cl">' + esc(l) + '</span>'; }).join('') + '</div>';
+      var body = cells.map(function(row, ri){
+        return '<div class="sci-heat-row"><span class="sci-heat-rl">' + esc(rowLabels[ri]) + '</span>' +
+          row.map(function(c){
+            var lvl = c.value ? Math.min(5, Math.ceil((c.value / max) * 5)) : 0;
+            // No separate "peak" marker: the darkest step already IS the peak,
+            // and a ring drawn in the same hue as the cell it rings is a
+            // decoration nobody can see.
+            return '<span class="sci-heat-c sci-heat-' + lvl + '" data-tip="' + c.tip + '"><i></i></span>';
+          }).join('') + '</div>';
+      }).join('');
+      var scale = [0,1,2,3,4,5].map(function(l){ return '<span class="sci-heat-c sci-heat-' + l + '"><i></i></span>'; }).join('');
+      return '<div class="sci-heat">' + head + body +
+        '<div class="sci-heat-legend"><span>' + esc(o.low || 'quiet') + '</span>' + scale +
+        '<span>' + esc(o.high || 'busiest') + '</span></div></div>';
+    }
+
+    // ── Radar: several entities compared on the same handful of measures ─────
+    // Each axis is scaled to its OWN peak, because posts-per-week and average
+    // interactions share no unit and never will. That makes the polygon a
+    // profile rather than a size: a wide shape means "leads on most of these",
+    // never "is bigger". The note under the chart says so, because a radar that
+    // does not say it is inviting exactly the wrong read.
+    //
+    // The caller is responsible for only passing measures that EVERY series
+    // reports. A platform that does not publish view counts would otherwise be
+    // drawn sitting at zero views, which is a different claim entirely.
+    //
+    // Two or three profiles overlay cleanly and comparing them directly is the
+    // whole point. Past that they stop being readable as separate shapes, so
+    // the same data becomes small multiples: one plot each, same axes, same
+    // scale, with the group average ghosted behind every one of them.
+    function radarPlot(shapes, axes, g){
+      var k = axes.length;
+      var ang = function(i){ return -Math.PI / 2 + i * 2 * Math.PI / k; };
+      var pt = function(i, f){
+        return [g.cx + Math.cos(ang(i)) * g.R * f, g.cy + Math.sin(ang(i)) * g.R * f];
+      };
+      var ptsAttr = function(list){
+        return list.map(function(p){ return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+      };
+      var ringAt = function(f){ return ptsAttr(axes.map(function(_, i){ return pt(i, f); })); };
+
+      var rings = g.rings.map(function(f){
+        return '<polygon class="sci-rd-ring' + (f === 1 ? ' sci-rd-edge' : '') + '" points="' + ringAt(f) + '"/>';
+      }).join('');
+      var spokes = axes.map(function(_, i){
+        var p = pt(i, 1);
+        return '<line class="sci-rd-spoke" x1="' + g.cx + '" y1="' + g.cy + '" x2="' +
+          p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>';
+      }).join('');
+      // Anchored by which side of the circle the axis sits on, so a label never
+      // runs back across its own spoke.
+      var labels = !g.labels ? '' : axes.map(function(a, i){
+        var p = pt(i, 1.17), c = Math.cos(ang(i));
+        var anchor = Math.abs(c) < 0.25 ? 'middle' : (c > 0 ? 'start' : 'end');
+        return '<text class="sci-rd-ax" x="' + p[0].toFixed(1) + '" y="' + (p[1] + 3.5).toFixed(1) +
+          '" text-anchor="' + anchor + '">' + esc(a.label) + '</text>';
+      }).join('');
+
+      var ghost = !g.ghost ? '' :
+        '<polygon class="sci-rd-ghost" points="' +
+          ptsAttr(axes.map(function(_, i){ return pt(i, Math.max(g.ghost[i], 0.025)); })) + '"/>';
+
+      // A vertex is never plotted at the exact centre: several series all
+      // bottoming out on one axis would collapse into one unhittable dot.
+      var drawn = shapes.map(function(sr){
+        var vs = axes.map(function(_, i){ return pt(i, Math.max(sr.values[i], 0.025)); });
+        var dots = vs.map(function(p, i){
+          return '<circle class="sci-rd-pt" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) +
+            '" r="' + (g.dot || 3.4) + '" data-tip="' + tipHtml(sr.label, [
+              [axes[i].label, sr.display[i]],
+              ['Share of the best here', Math.round(sr.values[i] * 100) + '%']]) + '"/>';
+        }).join('');
+        return '<g class="sci-rd-s" data-platform="' + esc(sr.key) + '" data-hi="' + esc(sr.key) + '">' +
+          '<polygon class="sci-rd-poly" points="' + ptsAttr(vs) + '"/>' + dots + '</g>';
+      }).join('');
+
+      return '<svg class="sci-rd" viewBox="0 0 ' + g.W + ' ' + g.H + '" role="img" aria-label="' +
+        esc(g.aria || 'Profile') + '">' + rings + spokes + labels + ghost +
+        '<g class="sci-rd-shapes">' + drawn + '</g></svg>';
+    }
+
+    function radarSvg(series, axes, o){
+      o = o || {};
+      if(axes.length < 3 || series.length < 2) return '';
+
+      // Small multiples past three profiles. Same axes, same scale, one plot
+      // each, so the tiles are comparable to each other and not just internally.
+      if(series.length > 3){
+        var avg = axes.map(function(_, i){
+          return series.reduce(function(a, sr){ return a + sr.values[i]; }, 0) / series.length;
+        });
+        return '<div class="sci-rd-grid">' + series.map(function(sr){
+          return '<div class="sci-rd-tile" data-platform="' + esc(sr.key) + '">' +
+            radarPlot([sr], axes, {W: 384, H: 232, cx: 192, cy: 112, R: 70, rings: [0.5, 1],
+              labels: true, ghost: avg, dot: 3, aria: sr.label + ' profile'}) +
+            '<div class="sci-rd-cap"><i class="sci-rd-sw"></i>' + esc(sr.label) + '</div></div>';
+        }).join('') + '</div>';
+      }
+
+      var key = series.map(function(sr){
+        return '<span class="sci-mk" data-hi="' + esc(sr.key) + '" data-platform="' + esc(sr.key) + '">' +
+          '<i class="sci-rd-sw"></i>' + esc(sr.label) + '</span>';
+      }).join('');
+      return '<div class="sci-rd-wrap">' +
+        radarPlot(series, axes, {W: 460, H: 340, cx: 230, cy: 170, R: 104,
+          rings: [0.25, 0.5, 0.75, 1], labels: true,
+          aria: o.aria || 'Platform comparison'}) +
+        '<div class="sci-mixkey sci-mixkey-col sci-rd-key">' + key + '</div></div>';
+    }
+
+    // ── Format mix, now with what each format actually earns ─────────────────
+    // Share and performance are two different questions and two different
+    // scales, so they are two charts side by side rather than one plot with a
+    // second axis. Reading them together is the whole point: a company can
+    // publish 70% carousels that earn a third of what its videos do.
+    function formatSegs(mix){
+      return Object.keys(mix.counts).sort(function(a, b){ return mix.counts[b] - mix.counts[a]; })
+        .map(function(t){
+          return {key: t, label: postFormatLabel({post_type: t}), value: mix.counts[t], ci: formatCi(t)};
+        });
+    }
+    // A pure lookup, never an assignment. The first build assigned lazily on
+    // first ask, which happened to produce the right answer only because the
+    // overview's format block is rendered first and happens to sort by share:
+    // any future chart rendering earlier would have silently repainted every
+    // format in the report. Hues are decided once, in seedFormatHues, and
+    // anything the seeder did not see takes the ramp's last step rather than
+    // colliding with whatever is already at index 0.
+    function formatCi(t){
+      return FORMAT_CI[t] == null ? CAT_N - 1 : FORMAT_CI[t];
+    }
+
+    // Ordered by share of the whole run, so the format a company publishes
+    // most is the one that reads first in every key on every pane.
+    function seedFormatHues(posts){
+      FORMAT_CI = {};
+      var totals = {};
+      (posts || []).forEach(function(p){ var t = p.post_type || 'post'; totals[t] = (totals[t] || 0) + 1; });
+      Object.keys(totals).sort(function(a, b){ return totals[b] - totals[a]; })
+        .forEach(function(t, i){ if(i < CAT_N - 1) FORMAT_CI[t] = i; });
+    }
+    function renderFormatMix(mix){
+      if(!mix.total) return '';
+      return mixBar(formatSegs(mix), {unit: 'Posts'});
+    }
+
+    // Average, not total: a total just restates the mix bar above it and hands
+    // the win to whatever format was published most.
+    function formatPerf(posts, platform){
+      var by = {};
+      (posts || []).forEach(function(p){
+        if(platform && p.platform !== platform) return;
+        var t = p.post_type || 'post';
+        if(!by[t]) by[t] = {n: 0, sum: 0};
+        by[t].n++; by[t].sum += interactionScore(p.metrics);
+      });
+      var rows = Object.keys(by).map(function(t){
+        return {t: t, n: by[t].n, avg: by[t].sum / by[t].n};
+      }).filter(function(r){ return r.avg > 0; })
+        .sort(function(a, b){ return b.avg - a.avg; });
+      if(rows.length < 2) return '';
+      return rankBars(rows.map(function(r){
+        return {label: postFormatLabel({post_type: r.t}), value: r.avg, ci: formatCi(r.t), hi: r.t,
+          display: fmtNum(Math.round(r.avg)),
+          tip: tipHtml(postFormatLabel({post_type: r.t}), [
+            ['Avg interactions', fmtFullNum(Math.round(r.avg))],
+            ['Posts', String(r.n)]])};
+      }));
+    }
+
+    // A pane's format section: the split, and what the split is worth.
+    function renderFormatBlock(posts, platform){
+      var mix = computeFormatMix(posts, platform);
+      // One format is not a mix. A single full-width bar reading "Video 100%"
+      // is a chart that has been given a whole section to restate the
+      // "dominant format" tile three inches above it.
+      if(Object.keys(mix.counts).length < 2) return '';
+      return duo(
+        chartCard({title: 'What they publish', sub: 'Share of every post collected',
+          body: renderFormatMix(mix)}),
+        chartCard({title: 'What it earns', sub: 'Average interactions per post, by format',
+          body: formatPerf(posts, platform),
+          note: 'Views are excluded. A view is delivery, not a response.'})
+      );
+    }
+
+    // ── Recurring creative themes ────────────────────────────────────────────
+    // The old chip row said which themes recur but not how much, so a theme
+    // seen twice looked identical to one seen in half the library. Counted
+    // bars answer "how dominant", which is the actual question.
+    function themeCounts(posts, platform){
+      var counts = {};
+      (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+      }).forEach(function(p){ postThemeWords(p).forEach(function(w){ counts[w] = (counts[w] || 0) + 1; }); });
+      return counts;
+    }
+    function renderThemeChips(posts, platform){
+      var counts = themeCounts(posts, platform);
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      // A theme seen exactly once is not a recurring theme, it is one caption.
+      // Singletons are always dropped, and the card goes with them when fewer
+      // than two themes actually repeat: one bar is not a pattern, and ten
+      // bars all sitting at 1 is a chart saying nothing very loudly.
+      keys = keys.filter(function(k){ return counts[k] > 1; });
+      if(keys.length < 2) return '';
+      keys = keys.slice(0, 10);
+      var described = (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.creative_analysis_status === 'ok';
+      }).length;
+      return rankBars(keys.map(function(k){
+        return {label: k, value: counts[k], display: String(counts[k]),
+          tip: tipHtml(k, [['Appears in', counts[k] + ' of ' + described + ' described creatives'],
+            ['Share', Math.round(counts[k] / Math.max(described, 1) * 100) + '%']])};
+      }), 'sci-rank-theme');
+    }
+
+    // ══ Links out ═════════════════════════════════════════════════════════
+    //
+    // Every URL in this report is one the collection actually returned: a
+    // platform row's profile_url, a post's post_url, the company's own site.
+    // None of them are built from a handle. "https://instagram.com/" + handle
+    // would produce links indistinguishable from real ones that land on a 404
+    // or, worse, on somebody else's account -- and a wrong link costs more
+    // than an absent one, because the reader has no way to tell it is wrong.
+    var GLOBE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8M12 3.6c2.1 2.3 3.2 5.3 3.2 8.4S14.1 18.1 12 20.4c-2.1-2.3-3.2-5.3-3.2-8.4S9.9 5.9 12 3.6z"/></svg>';
+
+    function absUrl(u){
+      var v = String(u == null ? '' : u).trim();
+      if(!v) return null;
+      if(/^https?:\/\//i.test(v)) return v;
+      // A bare domain typed into the form is still a destination. Anything
+      // carrying some other scheme (javascript:, data:) is not, and is dropped
+      // rather than prefixed into a link that would execute on click.
+      if(/^[a-z][a-z0-9+.-]*:/i.test(v)) return null;
+      return 'https://' + v;
+    }
+    function prettyUrl(u){
+      return String(u || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
+    }
+
+    // The account list for a run, in rail order, INCLUDING the platforms we
+    // found nothing on. A directory that quietly omits the four dead ones
+    // reads as "they are on three platforms", which is a different and
+    // unearned claim -- the absence is part of the footprint.
+    function socialAccounts(run){
+      var byName = {};
+      ((run && run.platforms) || []).forEach(function(p){ byName[p.platform] = p; });
+      var names = PLATFORM_ORDER.filter(function(n){ return byName[n]; })
+        .concat(Object.keys(byName).filter(function(n){ return PLATFORM_ORDER.indexOf(n) < 0; }));
+      return names.map(function(n){
+        var pr = byName[n], live = !NO_ACTIVITY_STATUSES[pr.status];
+        return {platform: n, label: platformLabel(n), icon: platformMeta(n).icon,
+          url: live ? absUrl(pr.profile_url) : null,
+          handle: live ? (pr.handle || null) : null,
+          posts: pr.post_count || 0,
+          reason: live ? null : (STATUS_SHORT[pr.status] || String(pr.status || '').replace(/_/g, ' '))};
+      });
+    }
+    // Resolved once per run, for the same reason format hues are: a section
+    // link deep in a pane should not have to re-walk run.platforms, and every
+    // link to a given platform must be the same URL.
+    var ACCOUNT_URL = {};
+    function seedAccountUrls(run){
+      ACCOUNT_URL = {};
+      socialAccounts(run).forEach(function(a){ if(a.url) ACCOUNT_URL[a.platform] = a.url; });
+    }
+    function accountUrl(platform){ return ACCOUNT_URL[platform] || null; }
+
+    // ── Section source links ──────────────────────────────────────────────
+    //
+    // Each section links to the specific thing it is describing, not to a
+    // generic "open profile" repeated eight times down a pane. The cadence
+    // chart goes to the most recent post, the format chart to a post in the
+    // dominant format, the engagement chart to the post that earned the most.
+    // Every one of them is dropped when its exemplar has no URL, so a chip is
+    // never decoration.
+    function linkablePosts(posts, platform){
+      return (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && p.post_url;
+      });
+    }
+    function latestPost(posts, platform){
+      return linkablePosts(posts, platform).filter(function(p){ return p.posted_at; })
+        .sort(function(a, b){ return new Date(b.posted_at) - new Date(a.posted_at); })[0] || null;
+    }
+    function bestPost(posts, platform){
+      return linkablePosts(posts, platform)
+        .sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0] || null;
+    }
+    function dominantFormatPost(posts, platform){
+      var pool = linkablePosts(posts, platform);
+      if(!pool.length) return null;
+      var counts = {};
+      pool.forEach(function(p){ var t = p.post_type || 'post'; counts[t] = (counts[t] || 0) + 1; });
+      var top = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })[0];
+      return pool.filter(function(p){ return (p.post_type || 'post') === top; })
+        .sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0] || null;
+    }
+    // Paired with the themes chart, so it uses the chart's own rule: a theme
+    // seen once is not a theme, and linking "an example of it" would point at
+    // the single post that coined it.
+    function themePost(posts, platform){
+      var counts = themeCounts(posts, platform);
+      var top = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; })[0];
+      if(!top || counts[top] < 2) return null;
+      var p = linkablePosts(posts, platform).filter(function(q){
+        return q.creative_analysis_status === 'ok' && postThemeWords(q).indexOf(top) >= 0;
+      }).sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0];
+      return p ? {post: p, theme: top} : null;
+    }
+
+    function postLink(post, label){
+      if(!post || !post.post_url) return null;
+      return {href: post.post_url, label: label, platform: post.platform,
+        title: platformLabel(post.platform) + ': ' + postTitle(post)};
+    }
+    function profileLink(platform, label){
+      var u = accountUrl(platform);
+      if(!u) return null;
+      return {href: u, label: label || ('Open on ' + platformLabel(platform)),
+        platform: platform, title: prettyUrl(u)};
+    }
+    function siteLink(run, label){
+      var u = absUrl(run && run.company_url);
+      return u ? {href: u, label: label || prettyUrl(u), icon: GLOBE_ICON, title: u} : null;
+    }
+
+    function sectionLink(link){
+      if(!link || !link.href) return '';
+      var ic = link.icon || (link.platform ? platformMeta(link.platform).icon : '');
+      return '<a class="sci-seclink" href="' + esc(link.href) + '" target="_blank" rel="noopener"' +
+        (link.platform ? ' data-platform="' + esc(link.platform) + '"' : '') +
+        (link.title ? ' title="' + esc(link.title) + '"' : '') + '>' +
+        (ic ? '<i class="sci-seclink-ic">' + ic + '</i>' : '') +
+        '<b>' + esc(link.label) + '</b>' + VIEW_GLYPH + '</a>';
+    }
+
+    function renderSection(label, glyph, innerHtml, link){
+      if(!innerHtml) return '';
+      return '<div class="sci-section"><div class="sci-section-label"><span>' + glyph + '</span>' + esc(label) +
+        sectionLink(link) + '</div>' + innerHtml + '</div>';
+    }
+
+    // ── The account directory ─────────────────────────────────────────────
+    // Every way out of this report in one grid: the company's own site, each
+    // account we resolved, and the subreddit the conversation lives in. The
+    // platforms with nothing behind them are listed too, unclickable and
+    // carrying their reason, so the row of links is the whole footprint
+    // rather than the flattering half of it.
+    function accountCard(o){
+      var live = !!o.url, tag = live ? 'a' : 'div';
+      return '<' + tag + ' class="sci-acc' + (live ? '' : ' sci-acc-off') + '"' +
+        (o.platform ? ' data-platform="' + esc(o.platform) + '"' : '') +
+        (live ? ' href="' + esc(o.url) + '" target="_blank" rel="noopener" title="' + esc(o.url) + '"' : '') + '>' +
+        '<span class="sci-acc-ic">' + o.icon + '</span>' +
+        '<span class="sci-acc-txt">' +
+          '<span class="sci-acc-n">' + esc(o.name) + '</span>' +
+          (o.sub ? '<span class="sci-acc-s">' + esc(o.sub) + '</span>' : '') +
+          // The bare URL is printed, not just linked. On paper a link is a
+          // piece of text, and a card that only said "Instagram ↗" would be
+          // an instruction to click something that is not there.
+          (live ? '<span class="sci-acc-u">' + esc(prettyUrl(o.url)) + '</span>' : '') +
+        '</span>' +
+        (live ? '<span class="sci-acc-go">' + VIEW_GLYPH + '</span>' : '') +
+      '</' + tag + '>';
+    }
+    function renderAccounts(run){
+      var cards = [], site = absUrl(run.company_url);
+      if(site){
+        cards.push(accountCard({icon: GLOBE_ICON, name: 'Website',
+          sub: run.company_name || 'Owned site', url: site}));
+      }
+      socialAccounts(run).forEach(function(a){
+        cards.push(accountCard({platform: a.platform, icon: a.icon, name: a.label,
+          sub: a.url ? (a.handle || (a.posts ? a.posts + ' post' + (a.posts === 1 ? '' : 's') + ' collected' : 'Account found'))
+                     : a.reason,
+          url: a.url}));
+      });
+      var pulse = run.reddit_pulse || null;
+      var community = pulse && pulse.community ? absUrl(pulse.community.url) : null;
+      if(community){
+        cards.push(accountCard({platform: 'reddit', icon: platformMeta('reddit').icon,
+          name: pulse.community.name || 'Reddit community',
+          sub: fmtNum(pulse.community.subscribers || 0) + ' members · not a company account',
+          url: community}));
+      }
+      if(!cards.length) return '';
+      return '<div class="sci-accs">' + cards.join('') + '</div>';
+    }
+
+    // The header rail: every live account as one tap, always on screen while
+    // the report is. Icon-only, because it sits beside the company name and a
+    // row of six labelled buttons there would out-shout it.
+    function renderSocialRail(run){
+      var live = socialAccounts(run).filter(function(a){ return a.url; });
+      if(!live.length) return '';
+      return '<div class="sci-rail">' + live.map(function(a){
+        return '<a class="sci-rail-a" href="' + esc(a.url) + '" target="_blank" rel="noopener"' +
+          ' data-platform="' + esc(a.platform) + '"' +
+          ' title="' + esc(a.label + (a.handle ? ' · ' + a.handle : '')) + '"' +
+          ' aria-label="' + esc('Open ' + a.label + ' profile') + '">' + a.icon + '</a>';
+      }).join('') + '</div>';
+    }
+
+    function renderBulletList(points, cls){
+      var pts = toPoints(points);
+      if(!pts.length) return '';
+      return '<ul class="' + cls + '">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>';
+    }
+
+    function renderStrategy(text){
+      var pts = toPoints(text);
+      if(!pts.length) return '';
+      return '<div class="sci-strategy"><div class="sci-strategy-label"><span>◆</span>Messaging &amp; strategy</div>' +
+        '<ul class="sci-strategy-list">' + pts.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul></div>';
+    }
+
+    // ── Cross-platform overview dashboard: stat tiles + a platform post-count
+    // bar chart, both computed straight from run.platforms/posts -- accurate
+    // even before/without a synthesis narrative. ──────────────────────────
+    // ── Stat tiles ──────────────────────────────────────────────────────────
+    // A tile whose value is missing is dropped rather than rendered holding a
+    // dash. An empty tile reads as a broken metric; an absent one reads as
+    // "this platform doesn't report that", which is what is actually true --
+    // YouTube has no share count, X has no view count on every post.
+    function renderTiles(items, cls){
+      var real = (items || []).filter(function(t){ return t && t.value != null && t.value !== ''; });
+      if(!real.length) return '';
+      // A full row of tiles shares the width evenly; one or two would stretch
+      // to 1200px each and read as a broken layout, so those cap their width
+      // and pack left instead.
+      return '<div class="sci-tiles' + (cls ? ' ' + cls : '') +
+        (real.length < 3 ? ' sci-tiles-few' : '') + '">' + real.map(function(t){
+        var word = !/^[\d.,+-]/.test(String(t.value));
+        return '<div class="sci-tile"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' +
+          '<div class="sci-tile-v' + (word ? ' sci-tile-word' : '') + '">' + esc(String(t.value)) +
+            (t.unit ? '<span class="sci-tile-u">' + esc(t.unit) + '</span>' : '') + '</div>' +
+          '<div class="sci-tile-l">' + esc(t.label) + '</div>' +
+          (t.note ? '<div class="sci-tile-n">' + esc(t.note) + '</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    // Interactions deliberately exclude views: a view is a delivery number, not
+    // an audience response, and summing it in makes a video platform's "average
+    // engagement" a restatement of its reach. They are reported as two separate
+    // tiles for the same reason.
+    function interactionScore(metrics){
+      if(!metrics) return 0;
+      var s = 0;
+      ['likes','comments','shares'].forEach(function(k){ if(typeof metrics[k] === 'number') s += metrics[k]; });
+      return s;
+    }
+
+    // Everything here is mechanical -- counted from the collected posts, never
+    // from the model's narrative -- so a platform's numbers stay right even on
+    // a run where synthesis failed outright.
+    function platformStats(platform, posts){
+      var ps = (posts || []).filter(function(p){ return p.platform === platform; });
+      if(!ps.length) return null;
+      var inter = ps.map(function(p){ return interactionScore(p.metrics); });
+      var interTotal = inter.reduce(function(a,b){ return a + b; }, 0);
+      var viewed = ps.filter(function(p){ return p.metrics && typeof p.metrics.views === 'number'; });
+      var viewTotal = viewed.reduce(function(a,p){ return a + p.metrics.views; }, 0);
+
+      var types = {};
+      ps.forEach(function(p){ var t = p.post_type || 'post'; types[t] = (types[t] || 0) + 1; });
+      var topType = Object.keys(types).sort(function(a,b){ return types[b] - types[a]; })[0];
+
+      var times = ps.map(function(p){ return p.posted_at ? new Date(p.posted_at).getTime() : 0; })
+        .filter(function(t){ return t && !isNaN(t); });
+      var perWeek = null, spanDays = null;
+      if(times.length >= 2){
+        spanDays = (Math.max.apply(null, times) - Math.min.apply(null, times)) / 86400000;
+        if(spanDays >= 3) perWeek = ps.length / (spanDays / 7);
+      }
+      var best = ps.slice().sort(function(a,b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })[0];
+      return {
+        count: ps.length,
+        avgInteractions: inter.length ? interTotal / inter.length : null,
+        avgViews: viewed.length ? viewTotal / viewed.length : null,
+        topType: topType, topTypeShare: Math.round(types[topType] / ps.length * 100),
+        perWeek: perWeek, spanDays: spanDays,
+        analyzed: ps.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length,
+        best: best, bestScore: interactionScore(best.metrics)
+      };
+    }
+
+    function platformTiles(platform, stats){
+      if(!stats) return '';
+      return renderTiles([
+        {label: 'Avg interactions', value: stats.avgInteractions != null ? fmtNum(Math.round(stats.avgInteractions)) : null,
+         note: 'likes, comments and shares', title: 'Views are counted separately, not folded in here'},
+        {label: 'Avg views', value: stats.avgViews != null ? fmtNum(Math.round(stats.avgViews)) : null},
+        {label: 'Dominant format', value: stats.topType ? postFormatLabel({post_type: stats.topType}) : null,
+         note: stats.topType ? stats.topTypeShare + '% of everything posted here' : null},
+        {label: 'Cadence', value: stats.perWeek != null ? stats.perWeek.toFixed(1) : null, unit: '/wk',
+         note: stats.spanDays ? 'across ' + Math.round(stats.spanDays) + ' days' : null},
+        {label: 'Best post', value: stats.bestScore ? fmtNum(stats.bestScore) : null,
+         note: 'interactions on the top post'}
+      ], 'sci-tiles-plat');
+    }
+
+    // Overview's platform grid doubles as the launcher: clicking a card is the
+    // same as clicking its rail item, so the rail is discoverable from the
+    // first screen rather than being the only way in.
+    //
+    // The card carries TWO destinations, which is why it is a wrapper holding
+    // a button and an anchor rather than one clickable element. Reading about
+    // a platform and going to the account are different intentions, and a
+    // single card that guesses between them gets one of them wrong every time.
+    // (An <a> cannot legally live inside a <button>, so the split is also the
+    // only markup that works.)
+    function renderPlatformCards(names, byName, posts){
+      return '<div class="sci-pcards">' + names.map(function(n){
+        var pr = byName[n], meta = platformMeta(n), live = !NO_ACTIVITY_STATUSES[pr.status];
+        var stats = platformStats(n, posts);
+        var url = live ? absUrl(pr.profile_url) : null;
+        var line = live
+          ? (pr.post_count || 0) + ' post' + ((pr.post_count === 1) ? '' : 's')
+          : (n === 'reddit' ? 'Conversation only, no account'
+                            : (STATUS_SHORT[pr.status] || String(pr.status || '').replace(/_/g, ' ')));
+        return '<div class="sci-pcard' + (live ? '' : ' sci-pcard-off') + '" data-platform="' + esc(n) + '">' +
+          '<button type="button" class="sci-pcard-main" onclick="switchPane(\'' + esc(n) + '\')">' +
+            '<span class="sci-pcard-ic">' + meta.icon + '</span>' +
+            '<span class="sci-pcard-body"><span class="sci-pcard-n">' + esc(platformLabel(n)) + '</span>' +
+            '<span class="sci-pcard-v">' + esc(line) + '</span></span>' +
+            (stats && stats.avgInteractions ? '<span class="sci-pcard-x">' + fmtNum(Math.round(stats.avgInteractions)) + ' avg</span>' : '') +
+          '</button>' +
+          (url ? '<a class="sci-pcard-go" href="' + esc(url) + '" target="_blank" rel="noopener"' +
+            ' title="' + esc((pr.handle ? pr.handle + ' · ' : '') + prettyUrl(url)) + '"' +
+            ' aria-label="' + esc('Open ' + platformLabel(n) + ' profile') + '">' +
+            VIEW_GLYPH + '</a>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    // ── Reddit conversation ("pulse") ─────────────────────────────────────
+    //
+    // Structurally different from the six owned-content sections above and
+    // rendered to look different on purpose. Those answer "what does this
+    // company publish"; this answers "what does the market say about it",
+    // which exists for companies that have no Reddit account at all. Its own
+    // visual language (outside-in, not brand-colored per platform) is what
+    // stops a reader mistaking community complaints for the brand's own copy.
+
+    // Sentiment is the one place here where color carries meaning, so every
+    // swatch ships with its label and count -- never color alone (a
+    // red/green split is invisible to the most common form of colorblindness).
+    var RD_SENTIMENT = [
+      {key:'positive', label:'Positive', color:'#4ade80'},
+      {key:'mixed',    label:'Mixed',    color:'#fbbf24'},
+      {key:'neutral',  label:'Neutral',  color:'#94a3b8'},
+      {key:'negative', label:'Negative', color:'#f87171'}
+    ];
+    var RD_STANCE = {
+      praise:     {label:'Praise',     color:'#4ade80'},
+      complaint:  {label:'Complaint',  color:'#f87171'},
+      question:   {label:'Question',   color:'#60a5fa'},
+      comparison: {label:'Comparison', color:'#c084fc'},
+      neutral:    {label:'Observation',color:'#94a3b8'}
+    };
+
+    function rdMonthLabel(ym){
+      var parts = String(ym || '').split('-');
+      if(parts.length !== 2) return ym || '';
+      var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var i = parseInt(parts[1], 10) - 1;
+      return (names[i] || parts[1]) + " '" + parts[0].slice(2);
+    }
+
+    function renderRedditSentiment(analysis){
+      var s = (analysis || {}).sentiment || {};
+      var counts = s.counts || {}, total = s.labelled || 0;
+      if(!total) return '';
+      var segs = RD_SENTIMENT.filter(function(x){ return (counts[x.key] || 0) > 0; });
+      var bar = segs.map(function(x){
+        var pct = (counts[x.key] / total) * 100;
+        return '<span class="rd-sent-seg" style="width:' + pct.toFixed(2) + '%;background:' + x.color + '"' +
+          ' data-hi="' + esc(x.key) + '" data-tip="' + tipHtml(x.label, [
+            ['Threads', counts[x.key] + ' of ' + total], ['Share', pct.toFixed(1) + '%']]) + '"></span>';
+      }).join('');
+      var legend = segs.map(function(x){
+        return '<span class="rd-sent-key" data-hi="' + esc(x.key) + '">' +
+          '<span class="rd-sent-dot" style="background:' + x.color + '"></span>' +
+          esc(x.label) + ' <b>' + counts[x.key] + '</b></span>';
+      }).join('');
+      return '<div class="rd-block sci-hi-scope"><div class="rd-block-h">How Reddit feels about them</div>' +
+        '<div class="rd-sent-bar">' + bar + '</div>' +
+        '<div class="rd-sent-legend">' + legend + '</div>' +
+        '<div class="rd-sent-foot">' + total + ' thread' + (total === 1 ? '' : 's') + ' judged toward the company itself, not the thread’s general mood.</div>' +
+        '</div>';
+    }
+
+    function renderRedditSubreddits(pulse){
+      var subs = (pulse.subreddits || []).slice(0, 8);
+      if(!subs.length) return '';
+      var max = Math.max.apply(null, subs.map(function(s){ return s.threads; }));
+      var rows = subs.map(function(s){
+        var pct = max ? (s.threads / max) * 100 : 0;
+        return '<a class="rd-sub-row" href="https://www.reddit.com/r/' + esc(s.name) + '/" target="_blank" rel="noopener"' +
+          ' data-tip="' + tipHtml('r/' + s.name, [['Threads', fmtFullNum(s.threads)],
+            ['Share of all mentions', Math.round(s.threads / Math.max(pulse.thread_count || 1, 1) * 100) + '%']]) + '">' +
+          '<span class="rd-sub-name">r/' + esc(s.name) + '</span>' +
+          '<span class="rd-sub-track"><span class="rd-sub-fill" style="width:' + pct.toFixed(2) + '%"></span></span>' +
+          '<span class="rd-sub-val">' + s.threads + '</span>' +
+        '</a>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Where the conversation happens</div>' +
+        '<div class="rd-subs">' + rows + '</div></div>';
+    }
+
+    function renderRedditTimeline(pulse){
+      var tl = pulse.timeline || [];
+      if(tl.length < 2) return '';
+      var max = Math.max.apply(null, tl.map(function(t){ return t.threads; }));
+      // Three or more months earn the same trend plot as everything else in
+      // the report; two get bars, because a two-point "line" implies a slope
+      // that two observations cannot support.
+      var body = tl.length >= 3
+        ? trendSvg(tl.map(function(t){
+            return {label: rdMonthLabel(t.month), value: t.threads,
+              tip: tipHtml(rdMonthLabel(t.month), [['Threads', fmtFullNum(t.threads)]])};
+          }), {aria: 'Reddit threads per month'})
+        : '<div class="rd-tl">' + tl.map(function(t){
+            var pct = max ? (t.threads / max) * 100 : 0;
+            return '<span class="rd-tl-col" data-tip="' +
+                tipHtml(rdMonthLabel(t.month), [['Threads', fmtFullNum(t.threads)]]) + '">' +
+              '<span class="rd-tl-bar" style="height:' + Math.max(pct, 3).toFixed(2) + '%"></span>' +
+              '<span class="rd-tl-lab">' + esc(rdMonthLabel(t.month)) + '</span></span>';
+          }).join('') + '</div>';
+      // Without a peak label the shape is visible but not the scale, and a
+      // reader cannot tell a busy month of 7 threads from one of 70.
+      return '<div class="rd-block"><div class="rd-block-h">Mention volume by month' +
+        '<span class="rd-tl-peak">peak ' + max + '/mo</span></div>' +
+        '<div class="sci-chart rd-chart drawn">' + body + '</div></div>';
+    }
+
+    function renderRedditThreadRefs(ids, byId, sentiment){
+      var cards = (ids || []).map(function(id){
+        var t = byId[id];
+        if(!t) return '';
+        var mood = (sentiment || {})[id];
+        return '<a class="rd-ref' + (mood ? ' rd-ref-' + esc(mood) : '') + '" href="' + esc(t.url || '#') + '" target="_blank" rel="noopener">' +
+          '<span class="rd-ref-sub">r/' + esc(t.subreddit || '?') + '</span>' +
+          '<span class="rd-ref-title">' + esc(t.title || '') + '</span>' +
+          '<span class="rd-ref-meta">' + fmtNum(t.score || 0) + ' upvotes · ' + fmtNum(t.comments || 0) + ' comments</span>' +
+        '</a>';
+      }).join('');
+      return cards ? '<div class="rd-refs">' + cards + '</div>' : '';
+    }
+
+    function renderRedditThemes(analysis, byId){
+      var themes = (analysis || {}).themes || [];
+      if(!themes.length) return '';
+      var cards = themes.map(function(t){
+        var key = RD_STANCE[t.stance] ? t.stance : 'neutral';
+        var stance = RD_STANCE[key];
+        // The stance also goes on as a class, not just an inline colour:
+        // these hues are tuned for the dark ground and drop to ~2.7:1 on the
+        // light one, so light mode needs its own darker step per stance and
+        // an inline style would be unreachable from CSS.
+        return '<div class="rd-theme rd-stance-' + esc(key) + '" style="--rd-stance:' + stance.color + '">' +
+          '<div class="rd-theme-h">' +
+            '<span class="rd-stance">' + esc(stance.label) + '</span>' +
+            '<span class="rd-theme-t">' + esc(t.label) + '</span>' +
+          '</div>' +
+          '<p class="rd-theme-d">' + esc(t.detail || '') + '</p>' +
+          renderRedditThreadRefs(t.thread_ids, byId, (analysis || {}).thread_sentiment) +
+        '</div>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">What they actually talk about</div>' +
+        '<div class="rd-themes">' + cards + '</div></div>';
+    }
+
+    function renderRedditCompetitors(analysis, byId){
+      var comps = (analysis || {}).competitors || [];
+      if(!comps.length) return '';
+      var rows = comps.map(function(c){
+        return '<div class="rd-comp">' +
+          '<div class="rd-comp-n">' + esc(c.name) + '</div>' +
+          '<div class="rd-comp-c">' + esc(c.context || '') + '</div>' +
+          renderRedditThreadRefs(c.thread_ids, byId, (analysis || {}).thread_sentiment) +
+        '</div>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Who they get compared to</div>' +
+        '<div class="rd-comps">' + rows + '</div></div>';
+    }
+
+    function renderRedditList(title, items, cls){
+      if(!items || !items.length) return '';
+      return '<div class="rd-block"><div class="rd-block-h">' + esc(title) + '</div>' +
+        '<ul class="rd-list ' + (cls || '') + '">' +
+        items.map(function(i){ return '<li>' + esc(i) + '</li>'; }).join('') +
+        '</ul></div>';
+    }
+
+    function renderRedditTopThreads(pulse, analysis){
+      var threads = (pulse.top_threads || []).slice(0, 8);
+      if(!threads.length) return '';
+      var sentiment = (analysis || {}).thread_sentiment || {};
+      var rows = threads.map(function(t){
+        var mood = sentiment[t.id];
+        var ratio = (typeof t.upvote_ratio === 'number') ? Math.round(t.upvote_ratio * 100) + '% upvoted' : '';
+        return '<a class="rd-thread' + (mood ? ' rd-ref-' + esc(mood) : '') + '" href="' + esc(t.url || '#') + '" target="_blank" rel="noopener">' +
+          '<div class="rd-thread-top"><span class="rd-thread-sub">r/' + esc(t.subreddit || '?') + '</span>' +
+            (mood ? '<span class="rd-mood rd-mood-' + esc(mood) + '">' + esc(mood) + '</span>' : '') +
+            '<span class="rd-thread-when">' + esc(relTime(t.posted_at)) + '</span></div>' +
+          '<div class="rd-thread-title">' + esc(t.title || '') + '</div>' +
+          '<div class="rd-thread-foot"><span>' + fmtNum(t.score || 0) + ' upvotes</span><span>' +
+            fmtNum(t.comments || 0) + ' comments</span>' + (ratio ? '<span>' + ratio + '</span>' : '') +
+            '<span class="rd-thread-go">' + VIEW_GLYPH + '</span></div>' +
+        '</a>';
+      }).join('');
+      return '<div class="rd-block"><div class="rd-block-h">Most-engaged threads</div>' +
+        '<div class="rd-threads">' + rows + '</div></div>';
+    }
+
+    function renderRedditPulse(run){
+      var pulse = run.reddit_pulse;
+      if(!pulse) return '';
+      var meta = platformMeta('reddit');
+      var analysis = pulse.analysis || null;
+      var byId = {};
+      (pulse.threads || []).concat(pulse.top_threads || []).forEach(function(t){ if(t && t.id) byId[t.id] = t; });
+
+      var head = '<div class="rd-head"><span class="rd-head-ic">' + meta.icon + '</span>' +
+        '<div><h3>Reddit conversation</h3>' +
+        '<p class="rd-head-sub">Not what this company posts. What Reddit says about it: Unprompted, unmoderated, and the one place a brand cannot edit the copy.</p></div></div>';
+
+      // A note is the whole story when there is one: not configured, search
+      // unavailable, or a genuine zero. None of those are errors, and each
+      // reads very differently to someone deciding whether to trust the gap.
+      if(pulse.note && !pulse.thread_count){
+        return '<div class="rd-section">' + head +
+          '<div class="rd-empty">' + esc(pulse.note) + '</div></div>';
+      }
+
+      var stats = [
+        {label:'Threads', value: fmtNum(pulse.thread_count || 0)},
+        {label:'Comments', value: fmtNum(pulse.comment_total || 0)},
+        {label:'Subreddits', value: fmtNum(pulse.subreddit_count || 0)},
+        {label:'Upvotes', value: fmtNum(pulse.score_total || 0)}
+      ];
+      var tiles = '<div class="rd-stats">' + stats.map(function(s){
+        return '<div class="rd-stat"><div class="rd-stat-v">' + esc(s.value) + '</div>' +
+          '<div class="rd-stat-l">' + esc(s.label) + '</div></div>';
+      }).join('') + '</div>';
+
+      var community = pulse.community ? '<a class="rd-community" href="' + esc(pulse.community.url) + '" target="_blank" rel="noopener">' +
+        '<div class="rd-community-n">' + esc(pulse.community.name) + '</div>' +
+        '<div class="rd-community-d">' + esc(pulse.community.description || pulse.community.title || '') + '</div>' +
+        '<div class="rd-community-s">' + fmtNum(pulse.community.subscribers || 0) + ' members' +
+        '<span class="rd-community-note">community, not a company account</span></div></a>' : '';
+
+      var verdict = (analysis && analysis.verdict) ?
+        '<div class="rd-verdict"><span class="rd-verdict-q">“</span>' + esc(analysis.verdict) + '</div>' : '';
+
+      var body;
+      if(analysis && analysis.error){
+        body = '<div class="rd-empty">' + esc(analysis.error) +
+          ' The counts and threads below were still collected.</div>' +
+          renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) + renderRedditTopThreads(pulse, null);
+      } else {
+        body = renderRedditSentiment(analysis) +
+          renderRedditThemes(analysis, byId) +
+          renderRedditCompetitors(analysis, byId) +
+          // Both blocks run full width. They used to sit side by side, which
+          // was fine for two bar stubs but squeezes the mention-volume trend
+          // into ~280px, where its axis labels render at about three pixels.
+          renderRedditSubreddits(pulse) + renderRedditTimeline(pulse) +
+          renderRedditList('Who is talking', (analysis || {}).audience) +
+          renderRedditList('Openings this suggests', (analysis || {}).opportunities, 'rd-list-op') +
+          renderRedditTopThreads(pulse, analysis);
+      }
+
+      return '<div class="rd-section">' + head + verdict + tiles + community + body + '</div>';
+    }
+
+    // ── The report shell ────────────────────────────────────────────────────
+    //
+    // A left rail of platforms, one pane each, rather than one long scroll.
+    // Seven platforms of posts, format mixes, creative themes and cited
+    // evidence in a single column meant nothing was comparable and everything
+    // was a scroll away; a platform is the unit a reader actually thinks in,
+    // so it is the unit the report is cut into.
+    //
+    // Every pane is built once and lives in the DOM, hidden by CSS. That is
+    // deliberate and not laziness: a sort toggle inside a hidden pane still
+    // finds its own node by id, and @media print can flatten all of them back
+    // into one document, so tabbing does not cost us Ctrl+F or Save-as-PDF.
+
+    var NAV_ICONS = {
+      overview: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="3.4" width="7.2" height="7.2" rx="2.1"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="2.1"/><rect x="3.4" y="13.4" width="7.2" height="7.2" rx="2.1"/><rect x="13.4" y="13.4" width="7.2" height="7.2" rx="2.1"/></svg>',
+      cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5.3" r="2.6"/><circle cx="5.5" cy="17.2" r="2.6"/><circle cx="18.5" cy="17.2" r="2.6"/><path d="M10.4 7.6l-3 7.2M13.6 7.6l3 7.2M8.1 17.2h7.8"/></svg>'
+    };
+
+    function navItem(o){
+      return '<button type="button" class="sci-nav-item' + (o.active ? ' active' : '') +
+        (o.has ? '' : ' sci-nav-empty') + '" data-ns="' + esc(o.ns) + '"' +
+        (o.platform ? ' data-platform="' + esc(o.platform) + '"' : '') +
+        ' onclick="switchPane(\'' + esc(o.ns) + '\')">' +
+        '<span class="sci-nav-ic">' + o.icon + '</span>' +
+        '<span class="sci-nav-label">' + esc(o.label) + '</span>' +
+        (o.count ? '<span class="sci-nav-count">' + o.count + '</span>'
+                 : '<span class="sci-nav-dot" aria-hidden="true"></span>') +
+      '</button>';
+    }
+
+    function paneEmpty(heading, detail, extra){
+      return '<div class="sci-pane-empty">' +
+        '<div class="sci-pane-empty-h">' + esc(heading) + '</div>' +
+        (detail ? '<p>' + esc(detail) + '</p>' : '') + (extra || '') + '</div>';
+    }
+
+    function switchPane(ns){
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      root.querySelectorAll('.sci-nav-item').forEach(function(b){
+        b.classList.toggle('active', b.getAttribute('data-ns') === ns);
+      });
+      root.querySelectorAll('.sci-pane').forEach(function(p){
+        p.classList.toggle('active', p.getAttribute('data-ns') === ns);
+      });
+      var scroller = root.querySelector('.sci-panes');
+      if(scroller) scroller.scrollTop = 0;
+      revealCharts();
+    }
+
+    // Tiles rise in one after another, but only the ones on screen: running
+    // the stagger across every hidden pane at open would burn the effect on
+    // panes nobody is looking at, and land them already-visible later.
+    function revealStatTiles(){
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      var scope = root.querySelector('.sci-pane.active') || root;
+      var band = root.querySelector('.sci-rep-band');
+      var tiles = [].slice.call(scope.querySelectorAll('.sci-tile:not(.visible)'));
+      if(band) tiles = [].slice.call(band.querySelectorAll('.sci-tile:not(.visible)')).concat(tiles);
+      tiles.forEach(function(el, i){ setTimeout(function(){ el.classList.add('visible'); }, i * 55); });
+    }
+
+    // Charts draw themselves in the same way, and for the same reason: only
+    // the visible pane's, so a chart is never already-drawn the first time it
+    // is looked at. A chart that has drawn once keeps .drawn and stays put --
+    // re-running the entrance on every tab switch would turn navigation into
+    // a strobe.
+    function revealCharts(){
+      revealStatTiles();
+      var root = document.getElementById('drawerPanel');
+      if(!root) return;
+      var scope = root.querySelector('.sci-pane.active') || root;
+      [].slice.call(scope.querySelectorAll('.sci-chart:not(.drawn)'))
+        .forEach(function(el, i){ setTimeout(function(){ el.classList.add('drawn'); }, 60 + i * 90); });
+    }
+
+    // ── While a run is still collecting ──────────────────────────────────────
+    // There is nothing to plot yet, and an empty panel reads as "finished, found
+    // nothing". These are placeholders for the charts that are coming, with a
+    // sweep travelling across them, so the panel reads as working. They are
+    // marked drawn on arrival: revealCharts only animates charts that hold data.
+    function skeletonChart(title, kind){
+      // The placeholder takes the shape of the thing it is standing in for: a
+      // curve where a curve is coming, stacked rows where a table is. A generic
+      // grey box would say "loading" without saying loading what.
+      var plot = kind === 'rows'
+        ? [0, 1, 2, 3, 4].map(function(i){
+            return '<span class="sci-skel-row"><i class="sci-skel-ic"></i>' +
+              '<i class="sci-skel-n"></i><i class="sci-skel-t" style="--w:' +
+              (44 + ((i * 37) % 48)) + '%"></i></span>';
+          }).join('')
+        : '<svg class="sci-skel-svg" viewBox="0 0 960 150" preserveAspectRatio="none" aria-hidden="true">' +
+            '<path d="M0 116 C 130 94, 190 44, 300 60 C 410 76, 470 126, 590 106 ' +
+            'C 700 88, 770 32, 960 50 L960 150 L0 150 Z"/></svg>';
+      return '<div class="sci-chart sci-chart-skel drawn">' +
+        '<div class="sci-chart-head"><div class="sci-chart-ht">' +
+          '<h5>' + esc(title) + '</h5><p>Waiting on collected posts</p></div></div>' +
+        '<div class="sci-skel-plot sci-skel-' + kind + '" aria-hidden="true">' + plot +
+          '<span class="sci-skel-sweep"></span></div>' +
+        '<div class="sci-chart-note">Still collecting</div></div>';
+    }
+
+    function overviewPane(run, allPosts, names, byName){
+      var html = '';
+      if(run.status === 'running'){
+        html += '<div class="sci-banner"><span class="bic">⏳</span><div>This run is still in progress. Leave this open and it keeps polling, or come back from History once it finishes.</div></div>';
+      }
+      // Every platform unresolved at once is the shape of the identify step
+      // itself failing (a broken vendor call), not seven independent "this
+      // company has no account here" verdicts -- surface the admin check.
+      if((run.platforms || []).length && (run.platforms || []).every(function(p){ return p.status === 'handle_not_found'; })){
+        html += '<div class="sci-banner sci-banner-none"><span class="bic">⚠</span><div>Every platform failed identification at once. That usually means the identification step itself broke, not that none of these accounts exist.' +
+          sciIdentifyDiagControl() + '</div></div>';
+      }
+      // Each section carries a link to the exact thing it is talking about.
+      // They are computed here, not inside the renderers, so a section whose
+      // exemplar has no URL simply renders without a chip.
+      var newest = latestPost(allPosts), strongest = bestPost(allPosts);
+      var typical = dominantFormatPost(allPosts);
+      var busiest = names.slice().sort(function(a, b){
+        return (byName[b].post_count || 0) - (byName[a].post_count || 0); })[0];
+
+      if(run.status === 'running' && !allPosts.length){
+        html += renderSection('Coming next', '◴',
+          duo(skeletonChart('Publishing rhythm', 'area'), skeletonChart('Platform scorecard', 'rows')));
+      }
+      html += renderSection('Where they show up', '◎', renderPlatformCards(names, byName, allPosts),
+        siteLink(run));
+      html += renderSection('How the platforms compare', '⊞', renderScorecard(run),
+        busiest ? profileLink(busiest, 'Busiest: ' + platformLabel(busiest)) : null);
+      html += renderSection('Cadence and timing', '▨',
+        renderRhythm(allPosts, 'all') + renderClock(allPosts),
+        postLink(newest, 'Most recent post'));
+      html += renderSection('What they publish, everywhere', '▦', renderFormatBlock(allPosts, null),
+        typical ? postLink(typical, 'A typical ' + postFormatLabel(typical)) : null);
+      html += renderSection('How the audience responds', '◍',
+        duo(renderEngageMix(allPosts, null), renderPerfSpread(allPosts, null)),
+        postLink(strongest, 'The post that earned most'));
+      html += renderSection('Strongest posts anywhere', '★', renderTopPostsAnywhere(allPosts),
+        strongest ? profileLink(strongest.platform,
+          'These live on ' + platformLabel(strongest.platform)) : null);
+      html += renderSection('Every account, in one place', '⁂', renderAccounts(run),
+        siteLink(run));
+      if(!allPosts.length && run.status !== 'running'){
+        html += paneEmpty('No posts were collected on this run',
+          'Nothing was published in the window, or no collection vendor is connected for the platforms that were found. Each platform in the rail explains its own case.');
+      }
+      return html;
+    }
+
+    // Publishing volume over time. The one view no per-platform pane can give:
+    // whether a company publishes steadily or in bursts around launches.
+    //
+    // Deliberately ONE series, not a per-platform stack. A stack was the first
+    // build and it encoded platform in hue -- but TikTok (#fe2c55), YouTube
+    // (#ff0033) and Instagram (#e1306c) are three reds nobody can tell apart
+    // when stacked adjacent, so the breakdown was unreadable exactly where it
+    // mattered. Per-platform volume is on the scorecard below; this chart
+    // answers cadence, and answers it in one colour.
+    //
+    // Buckets adapt to the window: a 30-day collection has no months to plot,
+    // and a 100-post YouTube backfill can span a year. Empty buckets are drawn
+    // rather than skipped -- a gap IS the finding, and closing it up would
+    // draw a steady cadence straight over a silence.
+    function weekStart(ms){
+      var d = new Date(ms);
+      d.setUTCHours(0,0,0,0);
+      d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+      return d.getTime();
+    }
+    function bucketPosts(posts){
+      var dated = (posts || []).filter(function(p){
+        var d = p.posted_at ? new Date(p.posted_at) : null;
+        return d && !isNaN(d.getTime());
+      });
+      if(dated.length < 4) return null;
+      var times = dated.map(function(p){ return new Date(p.posted_at).getTime(); });
+      var min = Math.min.apply(null, times), max = Math.max.apply(null, times);
+      var spanDays = (max - min) / 86400000;
+      if(spanDays < 10) return null;
+      var weekly = spanDays <= 140;
+
+      var buckets = [], index = {};
+      if(weekly){
+        for(var t = weekStart(min); t <= max && buckets.length <= 60; t += 7 * 86400000){
+          index[t] = buckets.length;
+          buckets.push({key: t, label: shortDayLabel(t), n: 0, inter: 0, views: 0});
+        }
+      } else {
+        var d0 = new Date(min), y = d0.getUTCFullYear(), m = d0.getUTCMonth();
+        var dEnd = new Date(max), yE = dEnd.getUTCFullYear(), mE = dEnd.getUTCMonth();
+        while((y < yE || (y === yE && m <= mE)) && buckets.length <= 60){
+          var k = y + '-' + ('0' + (m + 1)).slice(-2);
+          index[k] = buckets.length;
+          buckets.push({key: k, label: rdMonthLabel(k), n: 0, inter: 0, views: 0});
+          m++; if(m > 11){ m = 0; y++; }
+        }
+      }
+      if(buckets.length < 3) return null;
+      dated.forEach(function(p){
+        var ms = new Date(p.posted_at).getTime(), d = new Date(ms);
+        var k = weekly ? weekStart(ms) : (d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2));
+        var i = index[k];
+        if(i == null) return;
+        buckets[i].n++;
+        buckets[i].inter += interactionScore(p.metrics);
+        if(p.metrics && typeof p.metrics.views === 'number') buckets[i].views += p.metrics.views;
+      });
+      // Buckets run to the period holding the newest post, which is usually the
+      // period we are standing in -- and that one is not over. Saying so lets
+      // the chart draw its last leg dashed instead of reporting a cliff that is
+      // really just "the week isn't finished".
+      var lastKey = buckets[buckets.length - 1].key, endMs;
+      if(weekly){
+        endMs = lastKey + 7 * 86400000;
+      } else {
+        var kp = String(lastKey).split('-');
+        endMs = Date.UTC(Number(kp[0]), Number(kp[1]), 1);
+      }
+      return {buckets: buckets, weekly: weekly, spanDays: spanDays, partial: Date.now() < endMs};
+    }
+
+    var TREND_METRICS = [
+      {k: 'n',     label: 'Posts',        unit: 'Posts',        round: false},
+      {k: 'inter', label: 'Interactions', unit: 'Interactions', round: true},
+      {k: 'views', label: 'Views',        unit: 'Views',        round: true}
+    ];
+
+    // The metric toggle is not decoration. Volume and response are different
+    // stories and they routinely disagree: a quarter with half the posts and
+    // triple the interactions is the single most useful thing this chart says,
+    // and it is invisible until you can put both on the same time axis one at
+    // a time. Two y-scales on one plot would be the wrong way to show it.
+    function setTrendMetric(scope, metric){
+      TREND_METRIC[scope] = metric;
+      var el = document.getElementById('sci-trend-' + scope);
+      if(el) el.outerHTML = renderRhythm(trendScopePosts(scope), scope);
+      revealCharts();
+    }
+    function trendScopePosts(scope){
+      var all = (CURRENT_RUN && CURRENT_RUN.posts) || [];
+      return scope === 'all' ? all : all.filter(function(p){ return p.platform === scope; });
+    }
+    function renderRhythm(posts, scope){
+      scope = scope || 'all';
+      var b = bucketPosts(posts);
+      if(!b) return '';
+      // A metric with nothing in it is not offered: an all-zero "Views" tab on
+      // LinkedIn is a dead control that teaches the reader the toggle is broken.
+      var avail = TREND_METRICS.filter(function(m){
+        return b.buckets.some(function(bk){ return bk[m.k] > 0; });
+      });
+      if(!avail.length) return '';
+      var want = TREND_METRIC[scope];
+      var metric = avail.filter(function(m){ return m.k === want; })[0] || avail[0];
+      var pts = b.buckets.map(function(bk){
+        return {label: bk.label, value: bk[metric.k],
+          tip: tipHtml(bk.label + (b.weekly ? ' week' : ''), [
+            ['Posts', fmtFullNum(bk.n)],
+            ['Interactions', fmtFullNum(Math.round(bk.inter))]
+          ].concat(bk.views ? [['Views', fmtFullNum(Math.round(bk.views))]] : []))};
+      });
+      var svg = trendSvg(pts, {aria: metric.label + ' per ' + (b.weekly ? 'week' : 'month'),
+        partial: b.partial});
+      if(!svg) return '';
+      var peak = Math.max.apply(null, pts.map(function(p){ return p.value; }));
+      var quiet = pts.filter(function(p){ return !p.value; }).length;
+      return chartCard({
+        id: 'sci-trend-' + scope,
+        title: 'Publishing rhythm',
+        sub: (b.weekly ? 'Per week' : 'Per month') + ' across ' + Math.round(b.spanDays) + ' days',
+        controls: avail.length > 1 ? segControl(avail, metric.k, 'setTrendMetric', scope) : '',
+        body: svg,
+        note: 'Peak ' + fmtNum(Math.round(peak)) + ' ' +
+          (peak === 1 ? metric.unit.toLowerCase().replace(/s$/, '') : metric.unit.toLowerCase()) +
+          ' in one ' + (b.weekly ? 'week' : 'month') +
+          (quiet ? ' · ' + quiet + ' ' + (b.weekly ? 'week' : 'month') + (quiet === 1 ? '' : 's') + ' with nothing published' : '') +
+          (b.partial ? ' · the last ' + (b.weekly ? 'week' : 'month') + ' is still running, so its leg is drawn dashed' : '')
+      });
+    }
+
+    function shortDayLabel(ms){
+      var d = new Date(ms);
+      if(isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric', timeZone: 'UTC'});
+    }
+
+    // ── When they post ───────────────────────────────────────────────────────
+    // Day of week against time of day. Two categorical axes and one count, so
+    // a grid rather than a chart: it makes a posting calendar legible at a
+    // glance in a way no bar chart of 7 or 24 values does, and it is the one
+    // read here that is directly actionable.
+    //
+    // Times are rendered in the READER's zone, not the poster's -- the raw
+    // timestamps are UTC and a "9am" bucket that is really 2am local would be
+    // a confident lie. The subtitle says so rather than leaving it implied.
+    var CLOCK_DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var CLOCK_BLOCKS = [[0,'12–4a'],[4,'4–8a'],[8,'8a–12p'],[12,'12–4p'],[16,'4–8p'],[20,'8p–12a']];
+    function renderClock(posts, o){
+      o = o || {};
+      var dated = (posts || []).filter(function(p){
+        var d = p.posted_at ? new Date(p.posted_at) : null;
+        return d && !isNaN(d.getTime());
+      });
+      if(dated.length < 8) return '';
+      var cells = CLOCK_DAYS.map(function(){
+        return CLOCK_BLOCKS.map(function(){ return {value: 0, inter: 0}; });
+      });
+      dated.forEach(function(p){
+        var d = new Date(p.posted_at);
+        var c = cells[d.getDay()][Math.floor(d.getHours() / 4)];
+        c.value++; c.inter += interactionScore(p.metrics);
+      });
+      // A day nobody ever posts on is a real finding, but seven rows of which
+      // six are empty is not a chart. Rows are kept, columns are not trimmed:
+      // the shape of the week is the point.
+      var used = 0;
+      cells.forEach(function(r){ r.forEach(function(c){ if(c.value) used++; }); });
+      if(used < 4) return '';
+      cells.forEach(function(row, ri){
+        row.forEach(function(c, ci){
+          c.tip = tipHtml(CLOCK_DAYS[ri] + ' ' + CLOCK_BLOCKS[ci][1],
+            c.value ? [['Posts', String(c.value)],
+                       ['Avg interactions', fmtFullNum(Math.round(c.inter / c.value))]]
+                    : [['Posts', 'none']]);
+        });
+      });
+      var body = heatGrid(cells, CLOCK_DAYS, CLOCK_BLOCKS.map(function(b){ return b[1]; }),
+        {low: 'never', high: 'most often'});
+      if(!body) return '';
+      return chartCard({title: o.title || 'When they post', cls: 'sci-chart-clock',
+        sub: 'Posts by day and time of day, in your timezone', body: body});
+    }
+
+    // ── Platform scorecard ───────────────────────────────────────────────────
+    // The comparison the launcher cards cannot make. Every column is its own
+    // scale, so each cell carries a bar measured against that COLUMN's max,
+    // never a shared one: interactions and posts-per-week share no unit and
+    // putting them on one scale would make cadence invisible next to a
+    // five-figure like count.
+    var SCORE_COLS = [
+      {k: 'count',           label: 'Posts',       fmt: function(v){ return String(v); }},
+      {k: 'avgInteractions', label: 'Avg interactions', fmt: function(v){ return fmtNum(Math.round(v)); }},
+      {k: 'avgViews',        label: 'Avg views',   fmt: function(v){ return fmtNum(Math.round(v)); }},
+      {k: 'perWeek',         label: 'Posts / week', fmt: function(v){ return v.toFixed(1); }},
+      {k: 'bestScore',       label: 'Best post',   fmt: function(v){ return fmtNum(v); }}
+    ];
+    // The table is canonical and stays the default. The radar is offered beside
+    // it as a second reading of the same numbers, never as a replacement.
+    var SCORE_VIEW = 'table';
+    function setScoreView(v){
+      SCORE_VIEW = v;
+      var el = document.getElementById('sci-scorecard');
+      if(el && CURRENT_RUN) el.outerHTML = renderScorecard(CURRENT_RUN);
+      revealCharts();
+    }
+    function setScoreSort(key){
+      if(SCORE_SORT.key === key) SCORE_SORT.dir = -SCORE_SORT.dir;
+      else { SCORE_SORT.key = key; SCORE_SORT.dir = -1; }
+      var el = document.getElementById('sci-scorecard');
+      if(el && CURRENT_RUN) el.outerHTML = renderScorecard(CURRENT_RUN);
+      revealCharts();
+    }
+    function renderScorecard(run){
+      var posts = run.posts || [];
+      var rows = (run.platforms || []).map(function(pr){
+        var s = platformStats(pr.platform, posts);
+        return s ? {platform: pr.platform, s: s} : null;
+      }).filter(Boolean);
+      if(rows.length < 2) return '';
+      var maxes = {};
+      SCORE_COLS.forEach(function(c){
+        maxes[c.k] = Math.max.apply(null, rows.map(function(r){ return r.s[c.k] || 0; }));
+      });
+      var sortKey = SCORE_SORT.key, dir = SCORE_SORT.dir;
+      rows.sort(function(a, b){ return ((a.s[sortKey] || 0) - (b.s[sortKey] || 0)) * dir; });
+
+      var head = '<div class="sci-sc-row sci-sc-head"><span class="sci-sc-name">Platform</span>' +
+        SCORE_COLS.map(function(c){
+          return '<button type="button" class="sci-sc-h' + (c.k === sortKey ? ' active' : '') +
+            '" onclick="setScoreSort(\'' + c.k + '\')">' + esc(c.label) +
+            '<span class="sci-sc-arrow">' + (c.k === sortKey ? (dir < 0 ? '▾' : '▴') : '') + '</span></button>';
+        }).join('') + '</div>';
+
+      var tableRows = rows.map(function(r){
+        var meta = platformMeta(r.platform);
+        return '<button type="button" class="sci-sc-row sci-sc-body" data-platform="' + esc(r.platform) + '"' +
+          ' onclick="switchPane(\'' + esc(r.platform) + '\')">' +
+          '<span class="sci-sc-name"><span class="sci-sc-ic">' + meta.icon + '</span>' +
+            esc(platformLabel(r.platform)) + '</span>' +
+          SCORE_COLS.map(function(c){
+            var v = r.s[c.k];
+            if(v == null) return '<span class="sci-sc-c sci-sc-na" data-tip="' +
+              tipHtml(platformLabel(r.platform), [[c.label, 'not reported by this platform']]) + '">–</span>';
+            var pct = maxes[c.k] ? (v / maxes[c.k]) * 100 : 0;
+            return '<span class="sci-sc-c" data-tip="' + tipHtml(platformLabel(r.platform),
+                [[c.label, c.fmt(v)], ['Share of column peak', Math.round(pct) + '%']]) + '">' +
+              '<span class="sci-sc-v">' + esc(c.fmt(v)) + '</span>' +
+              '<span class="sci-sc-track"><span class="sci-sc-bar" style="--w:' + pct.toFixed(1) + '%"></span></span>' +
+            '</span>';
+          }).join('') + '</button>';
+      }).join('');
+
+      // Only measures every compared platform actually reports can become radar
+      // axes. Plotting a platform at zero on a metric it simply does not publish
+      // would draw a company as silent where it is only unmeasured.
+      var radarCols = SCORE_COLS.filter(function(c){
+        return maxes[c.k] > 0 && rows.every(function(r){ return r.s[c.k] != null; });
+      });
+      var canShape = radarCols.length >= 3;
+      var view = canShape ? SCORE_VIEW : 'table';
+
+      var body = view === 'shape'
+        ? radarSvg(rows.map(function(r){
+            return {key: r.platform, label: platformLabel(r.platform),
+              values: radarCols.map(function(c){ return maxes[c.k] ? (r.s[c.k] || 0) / maxes[c.k] : 0; }),
+              display: radarCols.map(function(c){ return c.fmt(r.s[c.k]); })};
+          }), radarCols.map(function(c){ return {label: c.label}; }),
+          {aria: 'Each platform profiled across ' + radarCols.length + ' measures'})
+        : '<div class="sci-sc">' + head + tableRows + '</div>';
+      if(!body) return '';
+
+      // sci-chart-wide is the table's: it turns on horizontal scrolling and, on
+      // a narrow screen, a fade down the right edge that says "there is more
+      // over here". The radar always fits, so on it that fade would be pointing
+      // at nothing.
+      return chartCard({id: 'sci-scorecard', cls: view === 'shape' ? '' : 'sci-chart-wide',
+        title: 'Platform scorecard',
+        sub: view === 'shape'
+          ? 'The same numbers as a profile per platform.'
+          : 'Sort by any column. Each bar is measured against that column.',
+        controls: canShape ? segControl([{k: 'table', label: 'Table'}, {k: 'shape', label: 'Shape'}],
+          view, 'setScoreView') : '',
+        body: body,
+        note: view === 'shape'
+          ? 'Every axis is scaled to whichever platform leads on that measure, so a wide shape means "ahead on most of these", not "bigger". Only measures all of these platforms report are drawn.' +
+            (rows.length > 3 ? ' The dotted outline behind each profile is the average of all ' + rows.length + '.' : '')
+          : 'A dash means the platform does not report that number, not that it is zero.'});
+    }
+
+    // ── Engagement composition ───────────────────────────────────────────────
+    // Where the response actually lands. A like is one tap; a comment or a
+    // share is somebody spending something. The centre number is that ratio,
+    // because it is the read, and the arcs are how it was arrived at.
+    var ENGAGE_PARTS = [{k: 'likes', label: 'Likes', ci: 0}, {k: 'comments', label: 'Comments', ci: 1},
+      {k: 'shares', label: 'Shares', ci: 2}];
+    function renderEngageMix(posts, platform){
+      var totals = {likes: 0, comments: 0, shares: 0};
+      var scoped = (posts || []).filter(function(p){ return !platform || p.platform === platform; });
+      scoped.forEach(function(p){
+        ENGAGE_PARTS.forEach(function(e){
+          if(p.metrics && typeof p.metrics[e.k] === 'number') totals[e.k] += p.metrics[e.k];
+        });
+      });
+      var segs = ENGAGE_PARTS.filter(function(e){ return totals[e.k] > 0; })
+        .map(function(e){ return {key: e.k, label: e.label, value: totals[e.k], ci: e.ci}; });
+      if(segs.length < 2) return '';
+      var total = segs.reduce(function(a, s){ return a + s.value; }, 0);
+      var deep = (totals.comments + totals.shares) / total;
+      return chartCard({title: 'Where the response lands',
+        sub: 'Every like, comment and share collected here',
+        body: donut(segs, {unit: 'Total', center: Math.round(deep * 100) + '%',
+          centerLabel: 'beyond a like', aria: 'Engagement composition'}),
+        note: 'Comments and shares cost the audience something. Likes do not, which is why the split is worth reading.'});
+    }
+
+    // ── Concentration of performance ─────────────────────────────────────────
+    // Ranked bars over the top posts, with the median drawn in. The gap
+    // between the best post and the median is the finding: a library where one
+    // post carries everything is a different problem from one that performs
+    // evenly, and the average alone cannot tell them apart.
+    function renderPerfSpread(posts, platform){
+      var scoped = (posts || []).filter(function(p){
+        return (!platform || p.platform === platform) && interactionScore(p.metrics) > 0;
+      }).sort(function(a, b){ return interactionScore(b.metrics) - interactionScore(a.metrics); });
+      if(scoped.length < 5) return '';
+      var scores = scoped.map(function(p){ return interactionScore(p.metrics); });
+      var mid = Math.floor(scores.length / 2);
+      var median = scores.length % 2 ? scores[mid] : (scores[mid - 1] + scores[mid]) / 2;
+      var top = scoped.slice(0, 10);
+      var topShare = scores.slice(0, Math.max(1, Math.round(scores.length * 0.1)))
+        .reduce(function(a, b){ return a + b; }, 0) / scores.reduce(function(a, b){ return a + b; }, 0);
+      return chartCard({title: 'Which posts carry it',
+        sub: 'Top ' + top.length + ' by interactions, of ' + scoped.length + ' with any response',
+        body: rankBars(top.map(function(p){
+          return {label: postTitle(p), value: interactionScore(p.metrics), href: p.post_url,
+            tip: tipHtml(postTitle(p), [
+              ['Interactions', fmtFullNum(interactionScore(p.metrics))],
+              ['Format', postFormatLabel(p)],
+              ['Posted', fmtDate(p.posted_at) || 'unknown']])};
+        }), 'sci-rank-posts'),
+        note: 'Median post earns ' + fmtNum(Math.round(median)) + '. The top 10% of posts take ' +
+          Math.round(topShare * 100) + '% of all interactions.'});
+    }
+
+    // The best posts regardless of platform, which is the comparison a reader
+    // makes first and no single platform pane can answer.
+    function renderTopPostsAnywhere(posts){
+      var top = (posts || []).slice()
+        .filter(function(p){ return interactionScore(p.metrics) > 0; })
+        .sort(function(a,b){ return interactionScore(b.metrics) - interactionScore(a.metrics); })
+        .slice(0, 6);
+      if(top.length < 2) return '';
+      return '<div class="sci-postcard-grid">' +
+        top.map(function(p){ return renderPostCard(p, true); }).join('') + '</div>';
+    }
+
+    function crossPane(cross, postsById, run){
+      var claims = (cross.claims || []).length
+        ? '<div class="sci-claims">' + renderClaims(cross.claims, postsById) + '</div>' : '';
+      return '<div class="sci-cross-lede">One read across every platform at once, cited back to the individual posts it came from.</div>' +
+        renderSection('Content patterns', '◈', renderBulletList(cross.summary, 'sci-summary-list'),
+          siteLink(run)) +
+        renderStrategy(cross.messaging_and_strategy) +
+        // Evidence gets no chip on purpose. Every line inside it is already a
+        // link to the post it cites; a ninth link in the heading would point
+        // somewhere less specific than the eight below it.
+        renderSection('Evidence from real posts', '◇', claims) +
+        renderSection('Every account, in one place', '⁂', renderAccounts(run));
+    }
+
+    function platformPane(name, run, allPosts, postsById, entry, pr, synthState){
+      var meta = platformMeta(name), stats = platformStats(name, allPosts);
+      var isReddit = (name === 'reddit');
+      // On a platform we could not confidently identify, the handle, the
+      // "open profile" link and the vendor badge are all claims about an
+      // account we just said we do not have. They are suppressed rather than
+      // rendered against whatever half-resolved value is still on the row.
+      var live = !NO_ACTIVITY_STATUSES[pr.status];
+
+      var bits = [];
+      var profile = live ? absUrl(pr.profile_url) : null;
+      // The handle IS the account, so it is the link. It used to be inert text
+      // sitting six pixels from a button that went exactly where a reader
+      // clicking a handle expects to go.
+      if(live && pr.handle){
+        bits.push(profile
+          ? '<a class="sci-phero-handle" href="' + esc(profile) + '" target="_blank" rel="noopener">' + esc(pr.handle) + '</a>'
+          : '<span class="sci-phero-handle">' + esc(pr.handle) + '</span>');
+      }
+      if(pr.post_count) bits.push('<span>' + pr.post_count + ' post' + (pr.post_count === 1 ? '' : 's') + ' collected</span>');
+      if(stats && stats.analyzed) bits.push('<span>' + stats.analyzed + ' creative' + (stats.analyzed === 1 ? '' : 's') + ' described</span>');
+      if(live && VENDOR_LABEL[pr.source_vendor]) bits.push('<span class="sci-plat-vendor">' + VENDOR_LABEL[pr.source_vendor] + '</span>');
+
+      // The URL is spelled out rather than hidden behind the word "profile":
+      // it is the one line of this pane a reader may want to copy, send on, or
+      // read off paper, where no link is clickable at all.
+      if(profile) bits.push('<span class="sci-phero-url">' + esc(prettyUrl(profile)) + '</span>');
+      var link = profile
+        ? '<a class="sci-phero-go" href="' + esc(profile) + '" target="_blank" rel="noopener">' +
+          '<i class="sci-phero-go-ic">' + meta.icon + '</i>Open profile ' + VIEW_GLYPH + '</a>' : '';
+      var hero = '<div class="sci-phero">' +
+        '<span class="sci-phero-ic">' + meta.icon + '</span>' +
+        '<div class="sci-phero-txt"><h3>' + esc(platformLabel(name)) + '</h3>' +
+        (bits.length ? '<div class="sci-phero-meta">' + bits.join('') + '</div>' : '') + '</div>' + link + '</div>';
+
+      var body = '';
+      if(!stats){
+        if(isReddit){
+          // The one platform where "no company account" is the expected
+          // answer rather than a failure: almost no company posts as u/them.
+          // It gets a one-line note, not the full empty-state panel, because
+          // this pane is not empty -- the conversation analysis follows it.
+          body = '<div class="sci-pane-note">No company-owned Reddit account, which is normal. ' +
+            'Companies rarely post as u/them, and Reddit’s value here is the conversation about them, below.</div>';
+        } else {
+          body = paneEmpty(STATUS_LABEL[pr.status] || String(pr.status || '').replace(/_/g, ' '),
+            pr.status_detail || 'Nothing was collected for this platform on this run.');
+        }
+      } else {
+        var own = allPosts.filter(function(p){ return p.platform === name; });
+        var newest = latestPost(own, name), strongest = bestPost(own, name);
+        var typical = dominantFormatPost(own, name), theme = themePost(allPosts, name);
+        body = platformTiles(name, stats) +
+          renderSection('Cadence and timing', '▨',
+            renderRhythm(own, name) + renderClock(own, {title: 'When they post here'}),
+            postLink(newest, 'Most recent post')) +
+          renderSection('Format mix', '▦', renderFormatBlock(allPosts, name),
+            typical ? postLink(typical, 'A typical ' + postFormatLabel(typical)) : null) +
+          renderSection('How the audience responds', '◍',
+            duo(renderEngageMix(allPosts, name), renderPerfSpread(allPosts, name)),
+            postLink(strongest, 'The post that earned most')) +
+          renderSection('Recurring creative themes', '✦',
+            chartCard({title: 'What the creative keeps showing',
+              sub: 'Counted across every image and video we described on ' + platformLabel(name),
+              body: renderThemeChips(allPosts, name)}),
+            theme ? postLink(theme.post, 'A post showing “' + theme.theme + '”') : null) +
+          renderSection('Posts', '▣', renderPostsSection(name),
+            profileLink(name, 'All of them on ' + platformLabel(name)));
+        if(entry){
+          body += renderSection('Content patterns', '◈', renderBulletList(entry.summary, 'sci-summary-list'),
+              profileLink(name)) +
+            renderStrategy(entry.messaging_and_strategy) +
+            renderSection('Evidence from real posts', '◇',
+              (entry.claims && entry.claims.length) ? '<div class="sci-claims">' + renderClaims(entry.claims, postsById) + '</div>' : '');
+        } else if(synthState){
+          body += '<div class="sci-pane-note">' + esc(synthState) + ' The posts and creative themes above were still collected.</div>';
+        }
+      }
+      return hero + body + (isReddit ? renderRedditPulse(run) : '');
+    }
+
+    function reportHead(run, allPosts, names, byName){
+      var statusCls = run.status === 'done' ? 'st-done' : (run.status === 'error' ? 'st-error' : 'st-running');
+      var siteUrl = absUrl(run.company_url);
+      var live = names.filter(function(n){ return !NO_ACTIVITY_STATUSES[byName[n].status]; }).length;
+      var when = historyTimestamp(run.created_at);
+
+      var mono = '<div class="sci-rep-logo sci-rep-nologo"><span>' + esc(monogram(run.company_name)) + '</span></div>';
+      var logo = run.company_logo
+        ? '<div class="sci-rep-logo"><img src="' + esc(run.company_logo) + '" alt="" loading="lazy" ' +
+          'onerror="this.closest(\'.sci-rep-logo\').classList.add(\'sci-rep-nologo\');this.remove()">' +
+          '<span>' + esc(monogram(run.company_name)) + '</span></div>'
+        : mono;
+
+      var chips = '<span class="status-pill ' + statusCls + '"><span class="d"></span>' + esc(run.status) + '</span>' +
+        '<span class="sci-rep-chip">' + live + ' of ' + names.length + ' platforms live</span>' +
+        (when.short ? '<span class="sci-rep-chip" title="' + esc(when.full) + '">Analyzed ' + esc(when.short) + '</span>' : '');
+
+      var actions = renderSocialRail(run) +
+        (siteUrl ? '<a class="sci-act" href="' + esc(siteUrl) + '" target="_blank" rel="noopener">' +
+          '<i class="sci-act-ic">' + GLOBE_ICON + '</i>' + esc(prettyUrl(siteUrl)) + '</a>' : '') +
+        '<button type="button" class="sci-act" onclick="printReport()">⎙ Save as PDF</button>';
+
+      var videoLike = allPosts.filter(function(p){ return ['video','reel','short'].indexOf(p.post_type) >= 0; }).length;
+      var described = allPosts.filter(function(p){ return p.creative_analysis_status === 'ok'; }).length;
+      var pulse = run.reddit_pulse || null;
+      var band = renderTiles([
+        {label: 'Posts analyzed', value: allPosts.length || null},
+        {label: 'Platforms live', value: names.length ? live : null, unit: '/' + names.length},
+        {label: 'Creative described', value: allPosts.length ? Math.round(described / allPosts.length * 100) : null, unit: '%',
+         note: described + ' of ' + allPosts.length + ' images and videos'},
+        {label: 'Video-led', value: allPosts.length ? Math.round(videoLike / allPosts.length * 100) : null, unit: '%',
+         note: 'of everything they published'},
+        {label: 'Reddit threads', value: (pulse && pulse.thread_count) ? fmtNum(pulse.thread_count) : null,
+         note: (pulse && pulse.subreddit_count) ? 'across ' + pulse.subreddit_count + ' subreddits' : null}
+      ], 'sci-tiles-band');
+
+      return '<button class="sci-drawer-close" onclick="closeReport()" aria-label="Close report">✕</button>' +
+        '<div class="sci-rep-head">' +
+          '<div class="sci-rep-id">' + logo +
+            '<div class="sci-rep-txt"><h3>' + esc(run.company_name) + '</h3>' +
+            '<div class="sci-rep-chips">' + chips + '</div></div>' +
+          '</div>' +
+          '<div class="sci-rep-actions">' + actions + '</div>' +
+        '</div>' +
+        (band ? '<div class="sci-rep-band">' + band + '</div>' : '');
+    }
+
+    // Paper is white, so the report prints in the light theme regardless of
+    // which one is on screen. Not a nicety: the dark palette is ink chosen for
+    // a near-black panel, and printing it onto white put the post titles at
+    // 1.3:1 and the stat numbers at 1.0:1 -- a PDF that was fully searchable
+    // and almost entirely invisible. Reusing the light theme rather than
+    // writing a third set of print colours means the printed page inherits
+    // the same measured contrast the light theme already passes.
+    //
+    // Hung off beforeprint/afterprint, not just the button, so Ctrl+P prints
+    // the same document. The exact previous value is restored, including "no
+    // attribute at all", which is what a reader on the system default has.
+    var PRINT_THEME = null;
+    function enterPrintTheme(){
+      if(PRINT_THEME !== null) return;
+      PRINT_THEME = document.documentElement.getAttribute('data-theme') || '';
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.body.classList.add('sci-printing');
+    }
+    function exitPrintTheme(){
+      if(PRINT_THEME === null) return;
+      if(PRINT_THEME) document.documentElement.setAttribute('data-theme', PRINT_THEME);
+      else document.documentElement.removeAttribute('data-theme');
+      PRINT_THEME = null;
+      document.body.classList.remove('sci-printing');
+    }
+    window.addEventListener('beforeprint', enterPrintTheme);
+    window.addEventListener('afterprint', exitPrintTheme);
+    function printReport(){
+      enterPrintTheme();
+      window.print();
+      // Backstop for browsers that fire afterprint unreliably. Without it a
+      // reader who prints from a dark session can be left sitting in light.
+      setTimeout(exitPrintTheme, 600);
+    }
+
+    function renderReport(run){
+      CURRENT_RUN = run;
+      POST_SORT = {};
+      POST_SHOWALL = {};
+      POST_FILTER = {};
+      TREND_METRIC = {};
+      SCORE_SORT = {key: 'count', dir: -1};
+      var postsById = {}, allPosts = run.posts || [];
+      allPosts.forEach(function(p){ postsById[p.id] = p; });
+
+      // Hues are assigned to formats ONCE per run and every chart in every
+      // pane then looks the colour up, rather than taking it from its own
+      // array position. That is what stops "video" being orange on the
+      // overview and cyan on LinkedIn just because LinkedIn posts fewer.
+      seedFormatHues(allPosts);
+      seedAccountUrls(run);
+
+      var synthesis = run.synthesis || null;
+      var synthOk = !!(synthesis && !synthesis.error);
+      var synthPlats = (synthOk && synthesis.platforms) || {};
+      var synthState = synthesis
+        ? (synthesis.error ? 'Synthesis is unavailable for this run (' + synthesis.error + ').' : '')
+        : 'Synthesis has not run yet for this analysis.';
+
+      var byName = {};
+      (run.platforms || []).forEach(function(p){ byName[p.platform] = p; });
+      // Canonical order first, then anything this run turned up that is not in
+      // it, so a newly added platform can never be silently dropped from the
+      // report just because PLATFORM_ORDER is stale.
+      var names = PLATFORM_ORDER.filter(function(n){ return byName[n]; })
+        .concat(Object.keys(byName).filter(function(n){ return PLATFORM_ORDER.indexOf(n) < 0; }));
+
+      var cross = synthOk ? synthesis.cross_platform : null;
+      var hasCross = !!(cross && (toPoints(cross.summary).length ||
+        toPoints(cross.messaging_and_strategy).length || (cross.claims || []).length));
+
+      var nav = '', panes = '';
+      function addPane(ns, label, content, platform){
+        panes += '<section class="sci-pane' + (panes ? '' : ' active') + '" data-ns="' + esc(ns) + '"' +
+          (platform ? ' data-platform="' + esc(platform) + '"' : '') + '>' +
+          '<h4 class="sci-pane-title">' + esc(label) + '</h4>' + content + '</section>';
+      }
+
+      nav += navItem({ns: 'overview', label: 'Overview', icon: NAV_ICONS.overview, has: true, active: true});
+      addPane('overview', 'Overview', overviewPane(run, allPosts, names, byName));
+
+      if(hasCross){
+        nav += navItem({ns: 'cross', label: 'Cross-platform', icon: NAV_ICONS.cross, has: true});
+        addPane('cross', 'Cross-platform synthesis', crossPane(cross, postsById, run));
+      }
+
+      if(names.length){
+        nav += '<div class="sci-nav-sep"></div><div class="sci-nav-cap">Platforms</div>';
+        names.forEach(function(n){
+          var pr = byName[n], meta = platformMeta(n);
+          var pulse = (n === 'reddit') ? run.reddit_pulse : null;
+          var has = !NO_ACTIVITY_STATUSES[pr.status] || !!(pulse && pulse.thread_count);
+          nav += navItem({ns: n, label: platformLabel(n), icon: meta.icon, platform: n,
+            count: pr.post_count || 0, has: has});
+          addPane(n, platformLabel(n), platformPane(n, run, allPosts, postsById, synthPlats[n], pr, synthState), n);
+        });
+      }
+
+      document.getElementById('drawerPanel').innerHTML =
+        reportHead(run, allPosts, names, byName) +
+        '<div class="sci-shell">' +
+          '<nav class="sci-nav" aria-label="Report sections">' + nav + '</nav>' +
+          '<div class="sci-panes">' + panes + '</div>' +
+        '</div>';
+      document.getElementById('drawerOverlay').classList.add('open');
+      revealCharts();
+    }
+
+    function closeReport(){
+      document.getElementById('drawerOverlay').classList.remove('open');
+    }
+
+    function viewRun(runId){
+      fetch(BASE + '/runs/' + runId)
+        .then(function(r){ return r.json(); })
+        .then(renderReport)
+        .catch(function(){ alert('Could not load this run.'); });
+    }
+
+    document.addEventListener('keydown', function(e){
+      if(e.key !== 'Escape') return;
+      var panel = document.getElementById('sciSuggestPanel');
+      if(panel && panel.style.display !== 'none' && panel.innerHTML){ panel.style.display = 'none'; return; }
+      closeReport();
+    });
+
+    renderDataSourcesPanel();
+  </script>
+  <script>
+  (function(){
+    if(window.__kpal)return;window.__kpal=1;
+    var BASE_KP=[
+      {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+      {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+      {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+      {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+      {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+      {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
+      {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
+      {t:'Contact Finder',d:'Apollo-powered search & chat',u:'/p2/b2b-agents/company-people-intelligence',i:'⌕'},
+      {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+      {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
+      {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
+      {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
+      {t:'Social Creative Intelligence Analyst',d:'Cross-platform creative analysis',u:'/p2/b2b-agents/social-creative-intelligence',i:'▣'},
+      {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
+    ];
+    var ITEMS=(window.__KP_ITEMS||[]).concat(BASE_KP);
+    var css=document.createElement('style');
+    css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+      +'#kpal.on{display:block;animation:kpalF .14s ease}'
+      +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+      +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(11,14,28,.96);border:1px solid rgba(251,146,60,.3);border-radius:var(--radius-lg);box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(251,146,60,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+      +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+      +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+      +'.kpal-iw .ic{color:#fb923c;font-size:15px}'
+      +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+      +'#kpal-in::placeholder{color:#4b5572}'
+      +'.kpal-iw kbd{font-family:inherit;font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xs);padding:3px 7px}'
+      +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+      +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:var(--radius-md);cursor:pointer;border:1px solid transparent}'
+      +'.kpal-it .ki{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fdba74;flex-shrink:0}'
+      +'.kpal-it .kt{font-size:13px;font-weight:600;color:#dbe2f1}'
+      +'.kpal-it .kd{font-size:11.5px;color:#55617a;margin-top:1px}'
+      +'.kpal-it.sel{background:linear-gradient(95deg,rgba(251,146,60,.22),rgba(244,114,182,.12));border-color:rgba(251,146,60,.35)}'
+      +'.kpal-it.sel .kt{color:#fff}'
+      +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:13px}'
+      +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4460;display:flex;gap:14px}';
+    document.head.appendChild(css);
+    var ov=document.createElement('div');ov.id='kpal';
+    ov.innerHTML='<div class="kpal-box">'
+      +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+      +'<div id="kpal-list"></div>'
+      +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+    document.body.appendChild(ov);
+    var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+    var cur=[],sel=0;
+    function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function render(){
+      if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+      list.innerHTML=cur.map(function(x,i){
+        return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc2(x.t)+'</div><div class="kd">'+esc2(x.d||'')+'</div></span></div>';
+      }).join('');
+      var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+    }
+    function filter(q){
+      q=(q||'').toLowerCase().trim();
+      cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+      sel=0;render();
+    }
+    function go(x){
+      if(!x)return;
+      closeKpal();
+      if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
+      if(x.u.charAt(0)==='#'){ if(typeof switchTab==='function') switchTab(x.u.slice(1)); return; }
+      if(location.pathname===x.u)return;
+      window.location.href=x.u;
+    }
+    function openKpal(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+    function closeKpal(){ov.classList.remove('on');}
+    inp.addEventListener('input',function(){filter(inp.value);});
+    inp.addEventListener('keydown',function(e){
+      if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+      else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+      else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+    });
+    list.addEventListener('click',function(e){
+      var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+    });
+    ov.addEventListener('mousedown',function(e){if(e.target===ov)closeKpal();});
+    document.addEventListener('keydown',function(e){
+      if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?closeKpal():openKpal();}
+      else if(e.key==='Escape'&&ov.classList.contains('on')){closeKpal();}
+    });
+  })();
+  </script>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Social Creative Intelligence Analyst',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

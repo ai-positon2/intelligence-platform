@@ -1,0 +1,271 @@
+/* ════════════════════════════════════════════════════════════════
+   Intelligence by Position² — first-party visitor analytics (public pages)
+   Captures anonymous, pre-login visitor behaviour and beacons one rich
+   row per page view to /api/atrack. No third-party scripts. Honors DNT.
+   ════════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+  if (window.__P2VT) return;
+  window.__P2VT = 1;
+
+  try {
+    if (navigator.doNotTrack === "1" || window.doNotTrack === "1" ||
+        navigator.globalPrivacyControl === true) return;
+  } catch (e) {}
+
+  var ENDPOINT = window.__P2_ATRACK__ || "/api/atrack";
+
+  function uuid() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0, v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+  function ls(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
+    catch (e) { return null; }
+  }
+  function ss(k, v) {
+    try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); }
+    catch (e) { return null; }
+  }
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+
+  function boot() {
+  var vid = ls("p2_vid"), isNew = false;
+  if (!vid) { vid = uuid(); ls("p2_vid", vid); isNew = true; }
+  // mirror into a first-party cookie so the server can stitch identity on form submit / login
+  try { document.cookie = "p2_vid=" + vid + "; max-age=31536000; path=/; SameSite=Lax"; } catch (e) {}
+
+  var sid = ss("p2_sid");
+  var qp = new URLSearchParams(location.search);
+  function qpv(k) { return qp.get(k) || ""; }
+  if (!sid) {
+    sid = uuid(); ss("p2_sid", sid);
+    ss("p2_sstart", Date.now() + "");
+    ss("p2_landing", location.pathname);
+    ss("p2_ref", document.referrer || "");
+    ss("p2_utm", JSON.stringify({
+      source: qpv("utm_source"), medium: qpv("utm_medium"),
+      campaign: qpv("utm_campaign"), term: qpv("utm_term"), content: qpv("utm_content")
+    }));
+  }
+  var pages = (parseInt(ss("p2_pages"), 10) || 0) + 1;
+  ss("p2_pages", pages + "");
+  var utm = {}; try { utm = JSON.parse(ss("p2_utm") || "{}"); } catch (e) {}
+
+  var t0 = Date.now();
+  var engaged = 0, lastActive = Date.now(), maxScroll = 0, clicks = 0, rage = 0;
+  var lastClick = { t: 0, x: 0, y: 0 };
+  var events = [];
+  var cta = {};
+  var searchTerms = {};
+  var formStage = "";
+  var video = "";
+  var cwv = { lcp: 0, cls: 0, inp: 0 };
+
+  function logEvent(type, label, extra) {
+    if (events.length < 80) {
+      var o = { t: type, l: label, s: Math.round((Date.now() - t0) / 1000) };
+      if (extra) o.x = extra;
+      events.push(o);
+    }
+  }
+  function bumpCta(label) { cta[label] = (cta[label] || 0) + 1; logEvent("cta", label); }
+  function stage(s) {
+    var order = { open: 1, started: 2, submitted: 3 };
+    if ((order[s] || 0) > (order[formStage] || 0)) formStage = s;
+  }
+
+  ["mousemove", "keydown", "scroll", "pointerdown", "touchstart"].forEach(function (ev) {
+    addEventListener(ev, function () { lastActive = Date.now(); }, { passive: true });
+  });
+  setInterval(function () {
+    if (document.visibilityState === "visible" && (Date.now() - lastActive) < 15000) engaged++;
+  }, 1000);
+
+  addEventListener("scroll", function () {
+    var d = document.documentElement, b = document.body;
+    var sh = Math.max(d.scrollHeight, b.scrollHeight) - innerHeight;
+    if (sh <= 0) { maxScroll = 100; return; }
+    var p = Math.round((scrollY / sh) * 100);
+    if (p > maxScroll) maxScroll = Math.min(100, p);
+  }, { passive: true });
+
+  addEventListener("click", function (e) {
+    clicks++;
+    var now = Date.now();
+    if (now - lastClick.t < 800 &&
+        Math.abs(e.clientX - lastClick.x) < 32 && Math.abs(e.clientY - lastClick.y) < 32) {
+      rage++; logEvent("rage", location.pathname);
+    }
+    lastClick = { t: now, x: e.clientX, y: e.clientY };
+
+    var t = e.target;
+    if (t.closest("[data-video]")) { video = video || "opened"; bumpCta("watch_walkthrough"); return; }
+    // Primary CTA: "Sign up" (one-click Google sign-up pop-up). Checked before the
+    // /login link so the modal's fallback link doesn't steal the attribution.
+    if (t.closest("[data-signup]")) { bumpCta("signup"); logEvent("signup", location.pathname); return; }
+    var demo = t.closest("[data-demo]");
+    if (demo) { stage("open"); bumpCta("lead:" + (demo.getAttribute("data-interest") || "Talk to us")); return; }
+    if (t.closest(".g_id_signin, [data-signin], .nv-signin, .nv-drawer-login, a[href='/login']")) { bumpCta("log_in"); return; }
+    var card = t.closest(".acard");
+    if (card) { bumpCta("agent_card:" + ((card.getAttribute("data-name") || "").slice(0, 40))); return; }
+    var a = t.closest("a[href]");
+    if (a) {
+      var href = a.getAttribute("href") || "";
+      if (/^https?:\/\//i.test(href) && host(href) && host(href) !== location.hostname.replace(/^www\./, "")) {
+        bumpCta("outbound:" + host(href));
+      } else if (a.closest("nav")) {
+        logEvent("nav", href);
+      }
+    }
+  }, true);
+
+  ["#dirSearch", "#sigSearch", "input[type=search]"].forEach(function (sel) {
+    document.querySelectorAll(sel).forEach(function (el) {
+      var tmr;
+      el.addEventListener("input", function () {
+        clearTimeout(tmr);
+        tmr = setTimeout(function () {
+          var v = (el.value || "").trim().toLowerCase();
+          if (v.length >= 2) { searchTerms[v] = 1; logEvent("search", v.slice(0, 40)); }
+        }, 600);
+      });
+    });
+  });
+
+  document.addEventListener("focusin", function (e) {
+    if (e.target.closest("#nvfov, form, [data-demo-form]")) stage("started");
+  });
+  document.addEventListener("p2:lead_submit", function () { stage("submitted"); logEvent("conversion", "lead_submit"); });
+
+  try {
+    new PerformanceObserver(function (l) {
+      var es = l.getEntries(); cwv.lcp = Math.round(es[es.length - 1].startTime);
+    }).observe({ type: "largest-contentful-paint", buffered: true });
+  } catch (e) {}
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (en) { if (!en.hadRecentInput) cwv.cls += en.value; });
+    }).observe({ type: "layout-shift", buffered: true });
+  } catch (e) {}
+  try {
+    new PerformanceObserver(function (l) {
+      l.getEntries().forEach(function (en) {
+        var d = en.duration || 0; if (d > cwv.inp) cwv.inp = Math.round(d);
+      });
+    }).observe({ type: "event", buffered: true, durationThreshold: 40 });
+  } catch (e) {}
+
+  var sent = false;
+  function payload() {
+    return {
+      vid: vid, sid: sid, isNew: isNew,
+      page: location.pathname, title: document.title, ref: ss("p2_ref") || "",
+      utm: utm, landing: ss("p2_landing") || location.pathname, pagesInSession: pages,
+      tOnPage: Math.round((Date.now() - t0) / 1000), engaged: engaged, scroll: maxScroll,
+      clicks: clicks, cta: cta, video: video, form: formStage,
+      search: Object.keys(searchTerms).join(" | "), rage: rage,
+      lcp: cwv.lcp, cls: Math.round(cwv.cls * 1000) / 1000, inp: cwv.inp,
+      vw: innerWidth, vh: innerHeight, sw: screen.width, sh: screen.height,
+      lang: navigator.language || "", events: events
+    };
+  }
+  function send() {
+    if (sent || window.__P2VT_KILL) return; sent = true;
+    var body = JSON.stringify(payload());
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "text/plain;charset=UTF-8" }));
+        return;
+      }
+    } catch (e) {}
+    try { fetch(ENDPOINT, { method: "POST", body: body, headers: { "Content-Type": "text/plain" }, keepalive: true }).catch(function () {}); } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") send(); });
+  addEventListener("pagehide", send);
+  } /* end boot */
+
+  /* ── EU/UK consent gate ──
+     Gated visitors (browser timezone in Europe/* or EEA Atlantic zones) get a
+     small consent card (opt-out model): tracking runs by default and stops
+     only on Decline, which also wipes the visitor id and suppresses beacons
+     for the current page. Decline is remembered (re-asked after 12 months).
+     Everyone else tracks as before, with no card. ?p2geo=eu forces the gate for
+     testing; ?p2geo=off bypasses it. */
+  var EXTRA_TZ = { "Atlantic/Reykjavik": 1, "Atlantic/Canary": 1, "Atlantic/Madeira": 1, "Atlantic/Azores": 1, "Atlantic/Faroe": 1 };
+  function inGatedRegion() {
+    try {
+      var q = new URLSearchParams(location.search).get("p2geo");
+      if (q === "eu") return true;
+      if (q === "off") return false;
+    } catch (e) {}
+    try {
+      var tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "";
+      return /^Europe\//.test(tz) || !!EXTRA_TZ[tz];
+    } catch (e) { return true; }
+  }
+  function consentState() {
+    var v = ls("p2_consent") || "", p = v.split(":");
+    if (p[0] !== "yes" && p[0] !== "no") return null;
+    var ts = parseInt(p[1], 10) || 0;
+    if (Date.now() - ts > 31536000000) return null; /* re-ask after 12 months */
+    return p[0];
+  }
+  function showConsentCard() {
+    function mount() {
+      if (document.getElementById("p2cc")) return;
+      var st = document.createElement("style");
+      st.textContent =
+        "#p2cc{position:fixed;right:18px;bottom:18px;z-index:99990;max-width:300px;" +
+        "background:rgba(9,12,24,.93);border:1px solid rgba(124,140,220,.22);border-radius:14px;" +
+        "padding:12px 14px 11px;font-family:'Inter',system-ui,sans-serif;" +
+        "box-shadow:0 12px 40px rgba(2,4,12,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" +
+        "opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}" +
+        "#p2cc.on{opacity:1;transform:none}" +
+        "#p2cc,#p2cc *{cursor:auto!important}" +
+        "#p2cc .k{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:.14em;" +
+        "text-transform:uppercase;color:#7e89b8;margin-bottom:5px}" +
+        "#p2cc .t{font-size:11.5px;line-height:1.5;color:#a6b0d6;margin-bottom:9px}" +
+        "#p2cc .t a{color:#c7d0f2;text-decoration:underline;text-underline-offset:2px}" +
+        "#p2cc .r{display:flex;gap:8px}" +
+        "#p2cc button{font-family:inherit;font-size:11.5px;font-weight:600;border-radius:999px;" +
+        "padding:5px 14px;border:1px solid transparent}" +
+        "#p2cc .ok{background:linear-gradient(120deg,#6366f1,#8b5cf6);color:#fff}" +
+        "#p2cc .no{background:transparent;border-color:rgba(124,140,220,.3);color:#99a4cc}" +
+        "@media (max-width:640px){#p2cc{left:12px;right:12px;bottom:12px;max-width:none}}";
+      var el = document.createElement("div");
+      el.id = "p2cc";
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-label", "Cookie consent");
+      el.innerHTML =
+        '<div class="k">Cookies</div>' +
+        '<div class="t">We use one first-party cookie for anonymous analytics. No ad networks, no third parties. <a href="/privacy">Privacy</a></div>' +
+        '<div class="r"><button class="ok" id="p2ccY">Allow</button><button class="no" id="p2ccN">Decline</button></div>';
+      document.head.appendChild(st);
+      document.body.appendChild(el);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
+      function done(v) {
+        ls("p2_consent", v + ":" + Date.now());
+        el.classList.remove("on");
+        setTimeout(function () { el.remove(); }, 500);
+        if (v === "no") {
+          window.__P2VT_KILL = 1; /* suppress any future beacons this page */
+          try { localStorage.removeItem("p2_vid"); } catch (e) {}
+          try { document.cookie = "p2_vid=; max-age=0; path=/"; } catch (e) {}
+          try { sessionStorage.clear(); } catch (e) {}
+        }
+      }
+      document.getElementById("p2ccY").addEventListener("click", function () { done("yes"); });
+      document.getElementById("p2ccN").addEventListener("click", function () { done("no"); });
+    }
+    if (document.readyState === "loading") addEventListener("DOMContentLoaded", mount); else mount();
+  }
+
+  var __c = consentState();
+  if (__c === "no") { /* respected: no tracking at all */ }
+  else if (!inGatedRegion() || __c === "yes") boot();
+  else { boot(); showConsentCard(); } /* opt-out: track unless/until declined */
+})();

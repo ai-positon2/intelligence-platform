@@ -1,0 +1,46 @@
+# Secrets and config
+config.yaml
+service_account.json
+.env
+
+# Database (committed so Railway chatbot can read them; re-commit after --dashboard-only refresh)
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Reports (optional: commit or ignore)
+# reports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database backups + filesystem orphans
+data/*.bak
+data/*.tmp
+data/*.db-journal
+data/.fuse_hidden*
+
+# Visitor identity graph — runtime store of real visitor PII, must never be committed
+data/identity_graph.db
+data/identity_graph.db-wal
+data/identity_graph.db-shm
+data/identity_graph.db-journal

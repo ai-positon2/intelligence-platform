@@ -1,0 +1,304 @@
+/* ════════════════════════════════════════════════════════════════
+   AURORA — internal app visual elevation layer (loaded LAST).
+   Additive polish on top of ds-tokens / hub / gtm / seo / admin.
+   Theme-aware. Reduced-motion safe. No layout restructuring.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ---- brand accent for the internal app (Arena green ↔ indigo) ---- */
+:root{
+  --au-brand:#4cbf92; --au-brand2:#6ea8ff; --au-brand3:#9b87fd;
+  --au-glow:rgba(76,191,146,.30);
+  --au-ring:0 0 0 2px rgba(110,168,255,.55);
+}
+
+/* (aurora ambient field removed — original page backgrounds preserved) */
+
+/* ════ 2 · Topbar — deeper frost + hairline gradient underline ════ */
+.topbar{
+  background:color-mix(in srgb, var(--bg) 72%, transparent)!important;
+  backdrop-filter:blur(22px) saturate(140%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(140%)!important;
+  border-bottom:1px solid transparent!important;
+  background-image:linear-gradient(color-mix(in srgb,var(--bg) 72%,transparent),color-mix(in srgb,var(--bg) 72%,transparent)),
+    linear-gradient(90deg,transparent,var(--au-glow),transparent)!important;
+  background-origin:border-box!important;background-clip:padding-box,border-box!important;
+}
+.user-pill{transition:transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),background .18s,border-color .18s!important}
+.user-pill:hover{transform:translateY(-1px)}
+
+/* dropdown lift */
+.dd-menu,.tb-dd-menu{box-shadow:0 24px 60px -18px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04)!important;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.dd-item,.tb-dd-item{transition:background .14s,color .14s,padding-left .14s!important}
+.dd-item:hover,.tb-dd-item:hover{padding-left:16px!important}
+/* Consistent SVG menu icons across every page (each page ships its own .dd-item
+   text styling; this locks the shared icon box so the glyphs line up and match). */
+.dd-item-icon,.tb-dd-item .dd-item-icon{width:20px!important;height:20px;display:inline-flex!important;
+  align-items:center;justify-content:center;flex-shrink:0;opacity:.85}
+.dd-item-icon svg{width:17px;height:17px;display:block}
+.dd-item:hover .dd-item-icon{opacity:1}
+/* Canonical menu baseline. Pages that ship their own (near-identical) .dd-item
+   rules override this harmlessly by load order; pages without one (e.g. the
+   LinkedIn dashboard) get a correct, consistent menu from here. */
+.dd-items{padding:6px}
+.dd-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+  font-size:13px;color:#94a3b8;text-decoration:none;cursor:pointer;line-height:1.2}
+.dd-item:hover{background:rgba(255,255,255,.05);color:#e6ebf5}
+.dd-item.active{background:rgba(124,92,255,.18);color:#fff}
+.dd-item.danger{color:#f87171}
+.dd-item.danger:hover{background:rgba(239,68,68,.09);color:#f87171}
+.dd-divider{height:1px;background:rgba(255,255,255,.07);margin:6px 6px}
+[data-theme="light"] .dd-item{color:#4d5680}
+[data-theme="light"] .dd-item:hover{background:rgba(18,26,54,.06);color:#17213a}
+[data-theme="light"] .dd-divider{background:rgba(18,26,54,.10)}
+
+/* ════ 3 · Cards — depth, top-light, cursor spotlight, hover glow ════ */
+.hub-card,.dash-card,.ds-card,.workspace-card,.lx-card{
+  position:relative;isolation:isolate;
+  transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1)),
+             box-shadow .3s ease, border-color .3s ease!important;
+}
+/* inner top highlight — reads as a surface catching light */
+.hub-card::before,.dash-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),inset 0 0 0 1px rgba(255,255,255,.02);
+}
+/* cursor-follow spotlight (fed by aurora.js --mx/--my; falls back to top-center) */
+.hub-card::after,.dash-card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
+  opacity:0;transition:opacity .35s ease;
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%),
+            color-mix(in srgb,var(--card-accent,var(--au-brand)) 26%,transparent),transparent 60%);
+}
+.hub-card:hover::after,.dash-card:hover::after{opacity:.9}
+.hub-card:hover,.dash-card:hover,.ds-card--hover:hover{
+  transform:translateY(-4px)!important;
+  border-color:color-mix(in srgb,var(--card-accent,var(--au-brand)) 55%,transparent)!important;
+  box-shadow:0 26px 60px -22px rgba(0,0,0,.75),
+             0 0 0 1px color-mix(in srgb,var(--card-accent,var(--au-brand)) 30%,transparent),
+             0 18px 50px -30px var(--card-accent,var(--au-glow))!important;
+}
+/* per-card accent hooks (match existing c-* / card-* classes) */
+.c-signals,.card-gtm{--card-accent:#6ea8ff}
+.c-adint{--card-accent:#f5a623}
+.c-visitors{--card-accent:#22d3ee}
+.c-linkedin{--card-accent:#0a91e0}
+.c-sentiment{--card-accent:#2dd4aa}
+.c-job{--card-accent:#b78bfa}
+.c-cpi{--card-accent:#7c83f5}
+.c-lps{--card-accent:#22d3ee}
+.c-gdsc{--card-accent:#4ade80}
+.c-sci{--card-accent:#fb923c}
+.c-evi{--card-accent:#818cf8}
+.card-seo{--card-accent:#4cbf92}
+.dash-card.soon{--card-accent:#8a94be}
+
+/* arrow easing */
+.card-arrow,.dash-arrow{transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1))!important}
+.hub-card:hover .card-arrow,.dash-card:hover .dash-arrow{transform:translateX(6px)}
+
+/* ════ 4 · Numbers — the product's signature (tabular, glowing) ════ */
+.lx-stats2 b,.kpi-val,.stat-val,.ds-stat-val,.cs-kpi .kv,.card-stat span{
+  font-variant-numeric:tabular-nums;letter-spacing: var(--ls-tight);
+}
+.lx-stats2 b,.hero-stat b{color:var(--au-brand2);filter:drop-shadow(0 2px 14px rgba(76,191,146,.22))}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .lx-stats2 b,.hero-stat b{
+    background:linear-gradient(120deg,var(--au-brand),var(--au-brand2) 60%,var(--au-brand3));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+}
+
+/* ════ 5 · Icon chips — makes emoji/SVG icons feel intentional ════ */
+.card-preview-icon,.dash-ic,.dc-ic{
+  transition:transform .3s var(--ease,cubic-bezier(.16,1,.3,1)),filter .3s ease!important;
+}
+.hub-card:hover .card-preview-icon,.dash-card:hover .dash-ic{
+  transform:translateY(-2px) scale(1.06);filter:drop-shadow(0 6px 16px var(--au-glow))
+}
+.au-ic{width:22px;height:22px;display:block;stroke:currentColor;fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.au-icbox{display:inline-flex;align-items:center;justify-content:center;
+  width:46px;height:46px;border-radius: var(--radius-md);
+  color:var(--card-accent,var(--au-brand));
+  background:color-mix(in srgb,var(--card-accent,var(--au-brand)) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--card-accent,var(--au-brand)) 30%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+
+/* ════ 6 · Buttons — magnetic lift + sheen ════ */
+.ds-btn--primary,.btn-primary,.refresh-btn,.cs-reset{
+  transition:transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),box-shadow .25s,filter .25s!important}
+.ds-btn--primary:hover,.btn-primary:hover{transform:translateY(-2px);filter:saturate(112%)}
+.ds-btn--primary::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);
+  transform:translateX(-120%);transition:transform .6s ease}
+.ds-btn--primary{position:relative;overflow:hidden}
+.ds-btn--primary:hover::after{transform:translateX(120%)}
+
+/* ════ 7 · Tables — quiet zebra + row hover + tabular figures ════ */
+table td{transition:background .12s ease}
+tbody tr:hover td{background:color-mix(in srgb,var(--au-brand) 7%,transparent)!important}
+table th{letter-spacing: var(--ls-caps)}
+td.num,.num td,td[data-num]{font-variant-numeric:tabular-nums;text-align:right}
+
+/* ════ 8 · Focus-visible — accessible + on-brand ════ */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
+[tabindex]:focus-visible,.hub-card:focus-visible,.dash-card:focus-visible{
+  outline:none!important;box-shadow:var(--au-ring),0 10px 30px -12px var(--au-glow)!important;
+  border-radius: var(--radius-md);
+}
+
+/* ════ 9 · Selection ════ */
+::selection{background:rgba(76,191,146,.32);color:#fff}
+[data-theme="light"] ::selection{background:rgba(76,191,146,.28);color:#0e1526}
+
+/* ════ 10 · Entrance — cards rise on load (progressive, motion-safe) ════ */
+@keyframes au-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.hub-grid>*, .dash-grid>*, .gtm-grid>*{animation:au-rise .7s var(--ease,cubic-bezier(.16,1,.3,1)) both}
+.hub-grid>*:nth-child(2){animation-delay:.08s}
+.dash-grid>*:nth-child(2),.gtm-grid>*:nth-child(2){animation-delay:.06s}
+.dash-grid>*:nth-child(3),.gtm-grid>*:nth-child(3){animation-delay:.12s}
+.dash-grid>*:nth-child(4),.gtm-grid>*:nth-child(4){animation-delay:.18s}
+.dash-grid>*:nth-child(5),.gtm-grid>*:nth-child(5){animation-delay:.24s}
+.dash-grid>*:nth-child(6),.gtm-grid>*:nth-child(6){animation-delay:.30s}
+
+/* deep-link page title shimmer */
+.page-title,.main-title,.hb-title{background-size:200% auto}
+
+@media (prefers-reduced-motion:reduce){
+  .hub-grid>*,.dash-grid>*,.gtm-grid>*{animation:none!important}
+  .ds-btn--primary::after{display:none}
+  *{scroll-behavior:auto!important}
+}
+
+/* ════ 11 · Crafted icons replace emoji (hub + gtm cards) ════ */
+.card-thumb-icon svg.au-ic{width:58px;height:58px;opacity:1;stroke-width:1.5}
+.card-thumb-icon{opacity:1!important;color:var(--card-accent,var(--au-brand));
+  filter:drop-shadow(0 8px 22px color-mix(in srgb,var(--card-accent,var(--au-brand)) 45%,transparent))!important}
+.dash-card.soon .card-thumb-icon{color:#8a94be}
+.card-preview-icon svg.au-ic{width:62px;height:62px;opacity:1;stroke-width:1.4}
+.card-preview-icon{opacity:1!important;font-size:0!important;
+  color:var(--card-accent,var(--au-brand));
+  filter:drop-shadow(0 10px 26px color-mix(in srgb,var(--card-accent,var(--au-brand)) 45%,transparent))!important}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AURORA v2 — brand parity with the public marketing site.
+   Bricolage display + Instrument Serif italics, glass surfaces,
+   gradient CTAs, eyebrow pills, nebula-friendly transparency,
+   full light-theme coverage.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root{
+  --au-display:'Bricolage Grotesque',var(--font,system-ui),sans-serif;
+  --au-serif:'Instrument Serif',Georgia,serif;
+}
+
+/* (page-shell background overrides removed — keep each page's native background) */
+
+/* ---- 1 · Display typography (titles) ---- */
+.page-title,.main-heading,.hb-title,.heading,
+.main-title,.section-title,.hero-title,
+.au-main h1,.page-header h1{
+  font-family:var(--au-display)!important;
+  font-weight:800!important;letter-spacing:-.028em!important;
+  line-height:1.02!important;
+}
+/* Instrument Serif italic accent — used as <em>/.ital/.au-ital inside titles */
+.page-title em,.page-title .ital,.au-ital,
+h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
+.lx-kinetic-done em,.lx-kinetic-done .ital{
+  font-family:var(--au-serif)!important;font-style:italic!important;
+  font-weight:400!important;letter-spacing: var(--ls-label);
+  background:linear-gradient(100deg,#5fd8cd,#9fb6ec 48%,#b78bfa)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+  padding-right:.08em;
+}
+@supports not ((-webkit-background-clip:text) or (background-clip:text)){
+  .au-ital,.page-title em,h1 em,.heading em,.heading .ital{-webkit-text-fill-color:#9fb6ec;color:#9fb6ec}
+}
+
+/* ---- 2 · Eyebrow pill (mono kicker, matches public .pill-eye) ---- */
+.au-eyebrow{display:inline-flex;align-items:center;gap:9px;
+  font-family:'JetBrains Mono',ui-monospace,'Space Grotesk',monospace;
+  font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;font-weight:600;
+  color:var(--tx2);background:var(--s2);border:1px solid var(--b2);
+  border-radius: var(--radius-pill);padding:7px 15px;margin-bottom:16px}
+.au-eyebrow .d{width:7px;height:7px;border-radius:50%;
+  background:var(--au-brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--au-brand) 22%,transparent);
+  animation:au-pulse 2.4s ease-in-out infinite}
+@keyframes au-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--au-brand) 40%,transparent)}
+  50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--au-brand) 0%,transparent)}}
+
+/* ---- 3 · Glass surfaces (match public .glass) ---- */
+.hub-card,.dash-card,.ds-card,.glass,.stat-card,.kpi,
+.panel,.lx-card,.data-card,.chart-card,.au-glass{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018))!important;
+  border:1px solid var(--b1)!important;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 24px 60px -34px rgba(0,0,0,.85)!important;
+}
+[data-theme="light"] .hub-card,[data-theme="light"] .dash-card,[data-theme="light"] .ds-card,
+[data-theme="light"] .glass,[data-theme="light"] .panel,[data-theme="light"] .kpi,[data-theme="light"] .chart-card,[data-theme="light"] .au-glass{
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.72))!important;
+  border-color:var(--b1)!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 20px 50px -34px rgba(30,40,80,.35)!important;
+}
+
+/* ---- 4 · Gradient primary CTA (match public .btn-grad) ---- */
+.ds-btn--primary,.btn-grad,.au-cta,.refresh-btn.primary{
+  border:0!important;color:#fff!important;border-radius: var(--radius-pill)!important;
+  background:linear-gradient(110deg,#22d3ee,#6366f1 42%,#a855f7 80%,#e879f9)!important;
+  background-size:220% 100%!important;background-position:0% 50%!important;
+  box-shadow:0 10px 30px -10px rgba(99,102,241,.6),inset 0 0 0 1px rgba(255,255,255,.18)!important;
+  transition:background-position .6s ease,transform .18s var(--ease,cubic-bezier(.16,1,.3,1)),box-shadow .25s!important}
+.ds-btn--primary:hover,.btn-grad:hover,.au-cta:hover{background-position:100% 50%!important;transform:translateY(-2px)!important}
+
+/* ---- 5 · Chips / badges refine ---- */
+.ds-chip.is-on,.chip.is-on,.filter.active{
+  background:color-mix(in srgb,var(--au-brand) 16%,transparent)!important;
+  border-color:color-mix(in srgb,var(--au-brand) 55%,transparent)!important;color:var(--au-brand)!important}
+
+/* ---- 6 · Section eyebrows already present get brand dot color ---- */
+.hb-eyebrow,.lx-sec-eyebrow,.section-eyebrow{color:var(--tx3)}
+
+
+/* ---- 8 · Scrollbar (internal shows a slim branded one now) ---- */
+.main::-webkit-scrollbar,.content::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--au-brand) 45%,transparent);border-radius: var(--radius-pill);
+  border:3px solid transparent;background-clip:content-box}
+
+/* ---- 9 · Light-theme aurora field warmth ---- */
+[data-theme="light"] .au-eyebrow{background:rgba(255,255,255,.7)}
+
+@media (prefers-reduced-motion:reduce){
+  .au-eyebrow .d{animation:none}
+}
+
+/* ═══ FIX · light-theme title contrast (LUX kinetic forces near-white) ═══ */
+[data-theme="light"] .lx-kinetic-done,
+[data-theme="light"] .lx-kinetic-done .lxk-w,
+[data-theme="light"] .page-title,
+[data-theme="light"] .main-heading,
+[data-theme="light"] .heading,
+[data-theme="light"] .hb-title{
+  color:#131a30!important;-webkit-text-fill-color:#131a30!important;
+}
+/* keep the Instrument Serif italic accent as a gradient in light theme */
+[data-theme="light"] .page-title em,[data-theme="light"] .heading em,
+[data-theme="light"] .main-heading em,[data-theme="light"] .lx-kinetic-done em,
+[data-theme="light"] .page-title .ital,[data-theme="light"] .heading .ital,
+[data-theme="light"] .au-ital{
+  background:linear-gradient(100deg,#159e94,#5b74d6 48%,#8b5cf6)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;color:transparent!important;
+}
+
+/* ═══ FIX · reveal particle canvas — background on root, body transparent ═══
+   Each page's own bg lives on body which was covering the fixed canvas.
+   Move a base to the root (pages may override via :root for their gradient),
+   make body transparent, and keep the canvas behind content. ═══ */
+html{background:#070912}
+:root[data-theme="light"] html,[data-theme="light"] html{background:#eef1f8}
+body{background:transparent!important}
+#pfx-bg{z-index:-1!important}

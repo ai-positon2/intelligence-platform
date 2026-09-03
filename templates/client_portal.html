@@ -1,0 +1,51 @@
+{% extends "client_base.html" %}
+{% block title %}{{ client.name }} · Intelligence by Position2{% endblock %}
+{% block content %}
+<div class="dash">
+
+  <div class="hero">
+    <div class="hero-main">
+      <h1>Welcome{% if user.given_name %}, {{ user.given_name }}{% endif %}.<br><span class="g">{{ client.tagline }}</span></h1>
+      {% if client.blurb %}<p>{{ client.blurb }}</p>{% endif %}
+    </div>
+    {% if client.logo %}
+    <div class="hero-brand">
+      <img class="cl-logo" src="{{ client.logo }}" alt="{{ client.name }}">
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="sect">
+    <div class="eyebrow">Your agents</div>
+    <h2>Open an agent</h2>
+    <p class="sub">Pick one to see what it does, then run it.</p>
+    <div class="cards">
+      {% for a in agents %}
+      <a class="card" href="/{{ client.slug }}/agents/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
+        <div class="ctop">
+          <div class="cicon">{{ a.icon|safe }}</div>
+          {% if a.connected %}<span class="status live"><span class="dot"></span> Live</span>
+          {% else %}<span class="status soon"><span class="dot"></span> In setup</span>{% endif %}
+        </div>
+        <h3>{{ a.name }}</h3>
+        <div class="role">{{ a.pill1 }}</div>
+        <p>{{ a.lead|nodash }}</p>
+        {% if a.connected and not a.is_dashboard %}
+        {% set used = run_counts.get(a.slug, 0) %}
+        {% set at_cap = used >= run_cap %}
+        <div class="cruns">
+          <div class="cruns-top{{ ' at-cap' if at_cap }}">
+            <span>{{ used }} / {{ run_cap }} runs used</span>
+            <b>{{ 0 if at_cap else (run_cap - used) }} left</b>
+          </div>
+          <div class="cruns-track"><div class="cruns-fill{{ ' at-cap' if at_cap }}" style="width:{{ (used / run_cap * 100) if run_cap else 0 }}%"></div></div>
+        </div>
+        {% endif %}
+        <div class="more">{% if a.is_dashboard %}Open dashboard &rarr;{% elif a.connected %}{% if run_counts.get(a.slug, 0) >= run_cap %}Run limit reached{% else %}Open agent &rarr;{% endif %}{% else %}View agent &rarr;{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

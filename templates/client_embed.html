@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ agent.name }} · {{ client.short }} · Intelligence by Position2</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#040510">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/grid-tokens.css">
+<link rel="stylesheet" href="/static/css/client-portal.css?v=3">
+{% if (agent.connected and embed_url) or is_dashboard %}<style>html,body{height:100%}body{overflow:hidden}</style>{% endif %}
+</head>
+<body style="--brand:{{ client.accent }}; --brand2:{{ client.accent2 }}">
+
+<div class="embed-bar" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
+  <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    Back
+  </a>
+  <span class="cicon">{{ agent.icon|safe }}</span>
+  <span>
+    <span class="en">{{ agent.name }}</span>
+    <span class="er">{{ agent.pill1 }} · {{ client.name }}</span>
+  </span>
+  <span style="flex:1"></span>
+  {% if is_dashboard %}<span class="status live"><span class="dot"></span> Live</span>
+  {% elif agent.connected %}
+    {% if limit_reached %}<span class="eruns at-cap">Run limit reached · {{ runs_used }}/{{ run_cap }}</span>
+    {% else %}<span class="eruns" id="eRunsBadge">{{ runs_used }} / {{ run_cap }} used</span>
+    <span class="status live"><span class="dot"></span> Live</span>{% endif %}
+  {% else %}<span class="status soon"><span class="dot"></span> In setup</span>{% endif %}
+  <a class="btn-ghost" href="/{{ client.slug }}">All agents</a>
+</div>
+
+{% if is_dashboard %}
+  <iframe class="embed-frame" src="{{ dashboard_url }}" title="{{ agent.name }}"
+          allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+{% elif agent.connected and limit_reached %}
+  <div class="limit">
+    <div class="limit-card">
+      <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+      <h2>Run limit reached</h2>
+      <p>You've used all {{ run_cap }} runs available for {{ agent.name }}. This limit is per agent, per account, so your other agents are unaffected.</p>
+      <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">Back to {{ agent.name }}</a>
+    </div>
+  </div>
+{% elif is_external and embed_url %}
+  {# External, Position2-hosted tool: iframe only (its host stays masked behind the
+     portal path). Opening this page must NOT count as a run — only a real analysis
+     starting should. The tool reports that itself via postMessage, same contract
+     shape as a SERP tool but source 'p2-agent' (there's one external tool per embed,
+     so no per-tool slug is needed the way the SERP branch checks agent.seo_slug). #}
+  <iframe class="embed-frame" id="extFrame" src="{{ embed_url }}" title="{{ agent.name }}"
+          allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <script>
+    (function(){
+      var EXPECTED_ORIGIN = {{ ext_origin|tojson }};
+      var logged = false, finished = false;
+      function logRun(){
+        if(logged) return; logged = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/log-run', {method:'POST'})
+          .then(function(r){return r.json();}).then(function(d){
+            if(!d || !d.logged) return;
+            var b = document.getElementById('eRunsBadge');
+            if(b) b.textContent = d.runs_used + ' / ' + d.runs_cap + ' used';
+          }).catch(function(){});
+      }
+      function finishRun(output){
+        if(finished) return; finished = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/finish-run', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({output:output})
+        }).catch(function(){});
+      }
+      window.addEventListener('message', function(e){
+        if(e.origin !== EXPECTED_ORIGIN) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-agent') return;
+        if(d.type === 'agent-run-started') logRun();
+        else if(d.type === 'agent-run-finished' && d.output && typeof d.output === 'object') finishRun(d.output);
+      });
+    })();
+  </script>
+{% elif agent.connected and embed_url %}
+  <iframe class="embed-frame" src="{{ embed_url }}" title="{{ agent.name }}"
+          allow="clipboard-write; clipboard-read" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <script>
+    (function(){
+      var EXPECTED_ORIGIN = {{ serp_origin|tojson }}, EXPECTED_TOOL = {{ agent.seo_slug|tojson }};
+      var logged = false, finished = false;
+      function logRun(){
+        if(logged) return; logged = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/log-run', {method:'POST'})
+          .then(function(r){return r.json();}).then(function(d){
+            if(!d || !d.logged) return;
+            var b = document.getElementById('eRunsBadge');
+            if(b) b.textContent = d.runs_used + ' / ' + d.runs_cap + ' used';
+          }).catch(function(){});
+      }
+      function finishRun(output){
+        if(finished) return; finished = true;
+        fetch('/{{ client.slug }}/agents/{{ agent.slug }}/use/finish-run', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({output:output})
+        }).catch(function(){});
+      }
+      window.addEventListener('message', function(e){
+        if(e.origin !== EXPECTED_ORIGIN) return;
+        var d = e.data;
+        if(!d || d.source !== 'p2-seo-tool' || d.tool !== EXPECTED_TOOL) return;
+        if(d.type === 'agent-run-started') logRun();
+        else if(d.type === 'agent-run-finished' && d.output && typeof d.output === 'object') finishRun(d.output);
+      });
+    })();
+  </script>
+{% else %}
+  <div class="setup" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
+    <div class="setup-card">
+      <span class="cicon">{{ agent.icon|safe }}</span>
+      <h2>{{ agent.name }}</h2>
+      <div class="subx">Dashboard in setup for {{ client.short }}</div>
+      <p>This agent is configured for {{ client.name }} and we're connecting its live dashboard to your data now. Here's what it will do the moment it goes live:</p>
+      <div class="mini">
+        {% for tr in agent.trips %}
+        <div class="m">
+          <p class="mt">{{ tr.t }}</p>
+          <p class="md">{{ tr.d|nodash }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="cta-row" style="justify-content:center; margin-top:26px">
+        <a class="btn-ghost" href="/{{ client.slug }}/agents/{{ agent.slug }}">Back to overview</a>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+{% endif %}
+
+</body>
+</html>

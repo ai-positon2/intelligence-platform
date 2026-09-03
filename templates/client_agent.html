@@ -1,0 +1,64 @@
+{% extends "client_base.html" %}
+{% block title %}{{ agent.name }} · {{ client.name }} · Intelligence by Position2{% endblock %}
+{% block content %}
+<div class="dash">
+  <a class="back" href="/{{ client.slug }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    All agents
+  </a>
+
+  <section class="det" style="--ac:{{ agent.ac }}; --ac2:{{ agent.ac2 }}">
+    <div class="det-head">
+      <span class="cicon">{{ agent.icon|safe }}</span>
+      <div style="flex:1; min-width:260px">
+        {% if agent.connected %}<span class="status live"><span class="dot"></span> Live now</span>
+        {% else %}<span class="status soon"><span class="dot"></span> Dashboard in setup</span>{% endif %}
+        <h1>{{ agent.name }}</h1>
+        <div class="role">{{ agent.pill1 }} · {{ agent.pill2 }}</div>
+      </div>
+    </div>
+
+    <p class="lead">{{ agent.lead|nodash }}</p>
+
+    <div class="trips">
+      {% for tr in agent.trips %}
+      <div class="trip">
+        <p class="t">{{ tr.t }}</p>
+        <p class="d">{{ tr.d|nodash }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="tagrow">
+      {% for t in agent.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+    </div>
+
+    <div class="cta-row">
+      <a class="btn-primary" href="/{{ client.slug }}/agents/{{ agent.slug }}/use">
+        Use agent
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </section>
+
+  {% if related %}
+  <h2 class="section-h">More agents in your workspace</h2>
+  <p class="sub" style="color:var(--tx2);margin:0 0 20px">Everything else configured for {{ client.short }}.</p>
+  <div class="cards">
+    {% for a in related %}
+    <a class="card" href="/{{ client.slug }}/agents/{{ a.slug }}" style="--ac:{{ a.ac }};--ac2:{{ a.ac2 }}">
+      <div class="ctop">
+        <div class="cicon">{{ a.icon|safe }}</div>
+        {% if a.connected %}<span class="status live"><span class="dot"></span> Live</span>
+        {% else %}<span class="status soon"><span class="dot"></span> In setup</span>{% endif %}
+      </div>
+      <h3>{{ a.name }}</h3>
+      <div class="role">{{ a.pill1 }}</div>
+      <p>{{ a.lead|nodash }}</p>
+      <div class="more">{% if a.connected %}Open agent &rarr;{% else %}View agent &rarr;{% endif %}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

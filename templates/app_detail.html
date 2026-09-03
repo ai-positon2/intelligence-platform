@@ -1,0 +1,332 @@
+{% extends "app_base.html" %}
+{% block title %}{{ agent.name }} · Intelligence by Position2{% endblock %}
+{% block styles %}
+<style>
+  .dwrap{ width:100%; max-width:1180px; margin:0 auto; padding:34px 26px 96px; position:relative; z-index:1 }
+
+  .crumb{ display:flex; align-items:center; gap:10px; font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;
+    font-size:11.5px; letter-spacing: var(--ls-caps); text-transform:uppercase; color:var(--tx3) }
+  .crumb a{ color:var(--tx2); text-decoration:none } .crumb a:hover{ color:var(--tx) }
+  .crumb .sep{ opacity:.45 }
+
+  .dhead{ display:flex; align-items:center; gap:26px; margin:26px 0 40px; position:relative }
+  .dicon{ position:relative; width:96px; height:96px; border-radius: var(--radius-xl); flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2));
+    box-shadow:0 18px 55px -14px color-mix(in srgb, var(--ac) 75%, transparent) }
+  .dicon svg{ width:46px; height:46px; stroke:#fff; opacity:.98 }
+  .dicon::after{ content:""; position:absolute; inset:-30%; border-radius:50%;
+    background:radial-gradient(closest-side, color-mix(in srgb, var(--ac) 45%, transparent), transparent 70%);
+    filter:blur(14px); z-index:-1 }
+  .dtitle h1{ margin:0 0 16px; font-size:clamp(34px,5vw,58px); font-weight:700; letter-spacing: var(--ls-tight);
+    line-height:1.02; color:#f2f6ff }
+  .pills{ display:flex; flex-wrap:wrap; gap:12px }
+  .pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 15px; border-radius: var(--radius-pill);
+    border:1px solid var(--line); background:rgba(255,255,255,.03);
+    font-family:ui-monospace,monospace; font-size:11.5px; letter-spacing: var(--ls-caps); text-transform:uppercase; color:var(--tx2) }
+  .pill .d{ width:7px; height:7px; border-radius:50%; background:var(--ac); box-shadow:0 0 8px var(--ac) }
+  .pill.ac{ border-color:color-mix(in srgb, var(--ac) 42%, transparent);
+    color:color-mix(in srgb, var(--ac) 72%, #fff); background:color-mix(in srgb, var(--ac) 10%, transparent) }
+
+  .dgrid{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:stretch }
+
+  .panel{ display:flex; flex-direction:column; background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius: var(--radius-xl); padding:36px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
+  .panel-head{ display:flex; align-items:center; gap:13px; padding-bottom:22px;
+    border-bottom:1px solid var(--line); margin-bottom:24px }
+  .panel-head .pi{ width:40px; height:40px; border-radius: var(--radius-md); flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2)) }
+  .panel-head .pi svg{ width:20px; height:20px; stroke:#fff }
+  .panel-head h2{ margin:0; font-size:20px; font-weight:600; letter-spacing: var(--ls-tight)}
+  .lead{ margin:0 0 32px; font-size:17px; line-height: var(--lh-body); color:#c6cee2 }
+
+  .trips{ flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-content:stretch }
+  .trip{ display:flex; flex-direction:column; justify-content:flex-start; gap:4px; position:relative; overflow:hidden;
+    background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius: var(--radius-lg); padding:30px 24px;
+    transition:border-color .25s ease, transform .25s ease, background .25s ease, box-shadow .25s ease }
+  .trip::after{ content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, var(--ac), transparent 85%); opacity:.7 }
+  .trip:hover{ border-color:color-mix(in srgb, var(--ac) 42%, transparent); transform:translateY(-3px);
+    background:color-mix(in srgb, var(--ac) 7%, rgba(255,255,255,.05));
+    box-shadow:0 20px 44px -22px color-mix(in srgb, var(--ac) 45%, transparent) }
+  .trip-ic{ width:42px; height:42px; border-radius: var(--radius-md); flex:none; margin-bottom:16px;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2));
+    box-shadow:0 12px 28px -10px color-mix(in srgb, var(--ac) 65%, transparent) }
+  .trip-ic svg{ width:20px; height:20px; stroke:#fff }
+  .trip h4{ margin:0 0 12px; font-size:17px; font-weight:700; letter-spacing: var(--ls-tight); color:#f2f6ff }
+  .trip p{ margin:0; font-size:13px; line-height: var(--lh-body); color:var(--tx2) }
+
+  .side{ display:flex; flex-direction:column; gap:20px }
+  .use-card{ display:flex; align-items:center; justify-content:space-between; gap:14px;
+    text-decoration:none; border-radius: var(--radius-lg); padding:22px 24px;
+    background:linear-gradient(135deg, var(--ac), var(--ac2));
+    box-shadow:0 16px 46px -14px color-mix(in srgb, var(--ac) 70%, transparent);
+    transition:transform .2s ease, box-shadow .2s ease }
+  .use-card:hover{ transform:translateY(-3px);
+    box-shadow:0 24px 60px -14px color-mix(in srgb, var(--ac) 82%, transparent) }
+  .use-card.disabled{ background:rgba(255,255,255,.05); box-shadow:none; cursor:default; pointer-events:none;
+    border:1px solid var(--line) }
+  .use-card .uc-title{ font-size:17px; font-weight:700; letter-spacing: var(--ls-tight); color:#05121b }
+  .use-card .uc-sub{ margin-top:3px; font-size:13px; font-weight:500; color:rgba(5,18,27,.72) }
+  .use-card.disabled .uc-title{ color:var(--tx) } .use-card.disabled .uc-sub{ color:var(--tx2) }
+  .use-card .uc-arrow{ width:40px; height:40px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(5,18,27,.16); color:#05121b; font-size:17px }
+  .use-card.disabled .uc-arrow{ background:rgba(255,255,255,.06); color:var(--tx2) }
+  button.use-card{ width:100%; border:0; font:inherit; text-align:left; -webkit-appearance:none }
+  .use-card.requested{ background:rgba(255,255,255,.05); border:1px solid color-mix(in srgb, var(--ac) 35%, var(--line));
+    box-shadow:none; cursor:default; pointer-events:none }
+  .use-card.requested .uc-title{ color:var(--tx) } .use-card.requested .uc-sub{ color:var(--tx2) }
+  .use-card.requested .uc-arrow{ background:color-mix(in srgb, var(--ac) 18%, transparent);
+    color:color-mix(in srgb, var(--ac) 80%, #fff) }
+  .use-card.pending{ opacity:.7; cursor:default }
+  .scard{ background:rgba(12,15,30,.72); border:1px solid var(--line); border-radius: var(--radius-lg); padding:24px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
+  .scard .lbl{ font-family:ui-monospace,monospace; font-size:11.5px; letter-spacing: var(--ls-caps); text-transform:uppercase;
+    color:var(--tx3); margin-bottom:15px }
+  .builtby{ display:flex; align-items:center; gap:13px; padding:13px 15px;
+    border:1px solid var(--line); border-radius: var(--radius-md); background:rgba(255,255,255,.04) }
+  .builtby .bi{ width:38px; height:38px; border-radius: var(--radius-md); flex:none;
+    display:flex; align-items:center; justify-content:center; font-weight:700; color:#04121a;
+    background:linear-gradient(145deg, var(--ac), var(--ac2)) }
+  .builtby b{ font-size:15px; color:var(--tx) }
+  .tags{ display:flex; flex-wrap:wrap; gap:9px }
+  .tag{ padding:8px 14px; border-radius: var(--radius-pill); border:1px solid var(--line);
+    background:rgba(255,255,255,.03); font-size:13px; color:var(--tx2);
+    transition:border-color .2s ease, color .2s ease }
+  .tag:hover{ border-color:color-mix(in srgb, var(--ac) 45%, transparent); color:var(--tx) }
+
+  .runs-row{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px }
+  .runs-row b{ font-family:var(--display,inherit); font-size:24px; font-weight:800; color:var(--tx); letter-spacing: var(--ls-tight)}
+  .runs-row span{ font-size:11.5px; color:var(--tx3) }
+  .runs-track{ height:7px; border-radius: var(--radius-xs); background:rgba(255,255,255,.08); overflow:hidden }
+  .runs-fill{ height:100%; border-radius: var(--radius-xs); background:linear-gradient(90deg,var(--ac),var(--ac2)) }
+  .runs-fill.at-cap{ background:linear-gradient(90deg,#fb7185,#f472b6) }
+  .runs-note{ margin:12px 0 0; font-size:11.5px; color:var(--tx3); line-height: var(--lh-body)}
+  .runs-note.at-cap{ color:#fb7185 }
+
+  @media (max-width:900px){ .dgrid{ grid-template-columns:1fr } .trips{ grid-template-columns:1fr } }
+  @media (max-width:560px){ .dhead{ gap:18px } .dicon{ width:76px; height:76px; border-radius: var(--radius-lg)} .dicon svg{ width:36px; height:36px } }
+
+  .reqmodal-overlay{ position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center;
+    background:rgba(4,5,16,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); padding:20px }
+  .reqmodal-overlay.open{ display:flex }
+  .reqmodal{ width:100%; max-width:440px; background:rgba(14,17,32,.97); border:1px solid var(--line);
+    border-radius: var(--radius-xl); padding:28px; box-shadow:0 40px 90px -30px rgba(0,0,0,.8) }
+  .reqmodal-head{ display:flex; align-items:flex-start; gap:14px; margin-bottom:18px; position:relative }
+  .reqmodal-icon{ width:42px; height:42px; border-radius: var(--radius-md); flex:none; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2)) }
+  .reqmodal-icon svg{ width:20px; height:20px; stroke:#fff }
+  .reqmodal-head h3{ margin:0 0 4px; font-size:17px; font-weight:700; color:#f2f6ff; letter-spacing: var(--ls-tight)}
+  .reqmodal-head p{ margin:0; font-size:13px; color:var(--tx2); line-height: var(--lh-body)}
+  .reqmodal-close{ position:absolute; top:-8px; right:-8px; width:28px; height:28px; border-radius:50%; border:0;
+    background:rgba(255,255,255,.06); color:var(--tx2); font-size:17px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:.2s }
+  .reqmodal-close:hover{ background:rgba(255,255,255,.12); color:var(--tx) }
+  .reqmodal textarea{ width:100%; resize:vertical; min-height:96px; border-radius: var(--radius-md); border:1px solid var(--line);
+    background:rgba(255,255,255,.03); color:var(--tx); font:inherit; font-size:13px; padding:14px; outline:none;
+    transition:border-color .2s ease; box-sizing:border-box }
+  .reqmodal textarea:focus{ border-color:color-mix(in srgb, var(--ac) 55%, var(--line)) }
+  .reqmodal textarea::placeholder{ color:var(--tx3) }
+  .reqmodal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:18px }
+  .reqmodal-cancel{ padding:11px 18px; border-radius: var(--radius-md); border:1px solid var(--line); background:rgba(255,255,255,.03);
+    color:var(--tx2); font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:.2s }
+  .reqmodal-cancel:hover{ color:var(--tx); background:rgba(255,255,255,.06) }
+  .reqmodal-send{ padding:11px 20px; border-radius: var(--radius-md); border:0; font:inherit; font-size:13px; font-weight:700;
+    color:#05121b; cursor:pointer; background:linear-gradient(135deg, var(--ac), var(--ac2)); transition:transform .2s ease, opacity .2s ease }
+  .reqmodal-send:hover{ transform:translateY(-1px) }
+  .reqmodal-send:disabled{ opacity:.6; cursor:default; transform:none }
+</style>
+{% endblock %}
+{% block content %}
+<div class="dwrap" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
+
+  <nav class="crumb">
+    <a href="/app">Home</a><span class="sep">&rsaquo;</span><span>{{ agent.name }}</span>
+  </nav>
+
+  <div class="dhead">
+    <div class="dicon">{{ agent.icon|safe }}</div>
+    <div class="dtitle">
+      <h1>{{ agent.name }}</h1>
+      <div class="pills">
+        <span class="pill"><span class="d"></span>{{ agent.pill1 }}</span>
+        <span class="pill ac">{{ agent.pill2 }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dgrid">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="pi"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9L21 9.3l-5.4 4.2L17.6 21 12 16.9 6.4 21l2-7.5L3 9.3l6.6-.4L12 2z"/></svg></div>
+        <h2>Details</h2>
+      </div>
+      <p class="lead">{{ agent.lead }}</p>
+      {% set trip_icons = [
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 000-3l2-1.6-2-3.4-2.4 1a7.7 7.7 0 00-2.6-1.5L14 2.5h-4l-.4 2.5a7.7 7.7 0 00-2.6 1.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 000 3l-2 1.6 2 3.4 2.4-1a7.7 7.7 0 002.6 1.5l.4 2.5h4l.4-2.5a7.7 7.7 0 002.6-1.5l2.4 1 2-3.4-2-1.6z"/></svg>',
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.3"/></svg>'
+      ] %}
+      <div class="trips">
+        {% for t in agent.trips %}
+        <div class="trip">
+          <div class="trip-ic">{{ trip_icons[loop.index0 % 3] | safe }}</div>
+          <h4>{{ t.t }}</h4>
+          <p>{{ t.d }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="side">
+      {% set connected = agent.seo_slug or agent.external_url %}
+      {% set at_cap = connected and not agent.uncapped and runs_used >= runs_cap %}
+      {% if at_cap %}
+      <div class="use-card disabled">
+        <div>
+          <div class="uc-title">Run limit reached</div>
+          <div class="uc-sub">You&rsquo;ve used all {{ runs_cap }} runs for this agent</div>
+        </div>
+        <span class="uc-arrow">&times;</span>
+      </div>
+      {% elif connected %}
+      <a class="use-card" href="/app/{{ agent.slug }}/use">
+        <div>
+          <div class="uc-title">Use this agent</div>
+          <div class="uc-sub">Open {{ agent.name }} &amp; start now</div>
+        </div>
+        <span class="uc-arrow">&rarr;</span>
+      </a>
+      {% elif already_requested %}
+      <div class="use-card requested">
+        <div>
+          <div class="uc-title">Request sent</div>
+          <div class="uc-sub">We&rsquo;ll email you when {{ agent.name }} is live</div>
+        </div>
+        <span class="uc-arrow">&check;</span>
+      </div>
+      {% elif agent.no_request %}
+      <div class="use-card disabled">
+        <div>
+          <div class="uc-title">{{ agent.lock_label or "Not connected yet" }}</div>
+          <div class="uc-sub">Not available to request right now</div>
+        </div>
+        <span class="uc-arrow">&times;</span>
+      </div>
+      {% else %}
+      <button type="button" class="use-card" id="reqAccessBtn" data-slug="{{ agent.slug }}">
+        <div>
+          <div class="uc-title">Request Access</div>
+          <div class="uc-sub">Not connected yet &mdash; ask to be notified</div>
+        </div>
+        <span class="uc-arrow">&rarr;</span>
+      </button>
+      {% endif %}
+      {% if connected and agent.uncapped %}
+      <div class="scard">
+        <div class="lbl">Runs</div>
+        <div class="runs-row"><b>&#8734;</b><span>unlimited &middot; no cap</span></div>
+        <div class="runs-track"><div class="runs-fill" style="width:100%"></div></div>
+        <p class="runs-note">Free for everyone, no run limit on this agent.</p>
+      </div>
+      {% elif connected %}
+      <div class="scard">
+        <div class="lbl">Runs</div>
+        <div class="runs-row"><b>{{ runs_used }}</b><span>of {{ runs_cap }} used &middot; {{ 0 if at_cap else (runs_cap - runs_used) }} left</span></div>
+        <div class="runs-track"><div class="runs-fill{{ ' at-cap' if at_cap }}" style="width:{{ (runs_used / runs_cap * 100) if runs_cap else 0 }}%"></div></div>
+        {% if at_cap %}
+        <p class="runs-note at-cap">You&rsquo;ve reached the run limit for this agent. Limits reset per agent, not shared across agents.</p>
+        {% else %}
+        <p class="runs-note">Each run is one open of the live tool. Limits are per agent, per account.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="scard">
+        <div class="lbl">Built by</div>
+        <div class="builtby"><span class="bi">P</span><b>Position2</b></div>
+      </div>
+      <div class="scard">
+        <div class="lbl">Works with</div>
+        <div class="tags">
+          {% for tg in agent.tags %}<span class="tag">{{ tg }}</span>{% endfor %}
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% if not (agent.seo_slug or agent.external_url) and not already_requested and not agent.no_request %}
+<div class="reqmodal-overlay" id="reqModalOverlay" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
+  <div class="reqmodal" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
+    <div class="reqmodal-head">
+      <div class="reqmodal-icon">{{ agent.icon|safe }}</div>
+      <div>
+        <h3 id="reqModalTitle">Request access to {{ agent.name }}</h3>
+        <p>Optional &mdash; tell us why you need it, and we&rsquo;ll route it faster.</p>
+      </div>
+      <button type="button" class="reqmodal-close" id="reqModalClose" aria-label="Close">&times;</button>
+    </div>
+    <textarea id="reqModalMsg" placeholder="e.g. I want to use this for a client pitch on…" maxlength="600" rows="4"></textarea>
+    <div class="reqmodal-actions">
+      <button type="button" class="reqmodal-cancel" id="reqModalCancel">Cancel</button>
+      <button type="button" class="reqmodal-send" id="reqModalSend">Send request</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if not (agent.seo_slug or agent.external_url) and not already_requested and not agent.no_request %}
+<script>
+  (function(){
+    var btn = document.getElementById('reqAccessBtn');
+    var overlay = document.getElementById('reqModalOverlay');
+    var msg = document.getElementById('reqModalMsg');
+    var sendBtn = document.getElementById('reqModalSend');
+    var cancelBtn = document.getElementById('reqModalCancel');
+    var closeBtn = document.getElementById('reqModalClose');
+    if(!btn || !overlay) return;
+
+    function openModal(){
+      overlay.classList.add('open');
+      msg.value = '';
+      setTimeout(function(){ msg.focus(); }, 30);
+    }
+    function closeModal(){ overlay.classList.remove('open'); }
+
+    btn.addEventListener('click', openModal);
+    cancelBtn.addEventListener('click', closeModal);
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', function(e){ if(e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+
+    sendBtn.addEventListener('click', function(){
+      if(sendBtn.disabled) return;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
+      fetch('/app/' + btn.getAttribute('data-slug') + '/request-access', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: msg.value.trim()})
+      }).then(function(r){ return r.json(); })
+        .then(function(d){
+          closeModal();
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send request';
+          if(!d || !d.ok) return;
+          btn.outerHTML = '<div class="use-card requested">'
+            + '<div><div class="uc-title">Request sent</div>'
+            + '<div class="uc-sub">We&rsquo;ll email you when {{ agent.name }} is live</div></div>'
+            + '<span class="uc-arrow">&check;</span></div>';
+        })
+        .catch(function(){
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send request';
+        });
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

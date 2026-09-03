@@ -1,0 +1,158 @@
+{% extends "app_base.html" %}
+{% block title %}{{ agent.name }} · Intelligence by Position2{% endblock %}
+{% block styles %}
+<style>
+  .eglow{ position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(720px 460px at 14% -6%, color-mix(in srgb, var(--ac) 20%, transparent), transparent 60%),
+      radial-gradient(620px 460px at 100% 8%, color-mix(in srgb, var(--ac2) 16%, transparent), transparent 60%) }
+  .ewrap{ flex:1; display:flex; flex-direction:column; min-height:0; position:relative; z-index:1;
+    padding:32px 34px 34px; gap:20px; max-width:1320px; width:100%; margin:0 auto; box-sizing:border-box }
+  .ebar{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding:14px 20px; border-radius: var(--radius-lg); border:1px solid var(--line);
+    background:rgba(14,17,32,.55); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px) }
+  .ebar .eleft{ display:flex; align-items:center; gap:14px; min-width:0 }
+  .ebar a.back{ display:inline-flex; align-items:center; gap:7px; text-decoration:none; color:var(--tx2);
+    font-size:13px; font-weight:600; padding:8px 14px; border-radius: var(--radius-pill); flex:none;
+    border:1px solid var(--line); background:rgba(255,255,255,.03);
+    transition:border-color .2s ease, background .2s ease, color .2s ease, transform .2s ease }
+  .ebar a.back:hover{ color:var(--tx); border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.06); transform:translateX(-2px) }
+  .ebar .etitle{ display:flex; align-items:center; gap:13px; min-width:0 }
+  .ebar .etxt{ min-width:0 }
+  .ebar .etxt b{ display:block; font-weight:700; color:#f2f6ff; font-size:17px; letter-spacing: var(--ls-tight); line-height: var(--lh-tight)}
+  .ebar .etxt span{ display:block; font-size:11.5px; color:var(--tx2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .ebar .eicon{ width:38px; height:38px; border-radius: var(--radius-md); flex:none; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg, var(--ac), var(--ac2));
+    box-shadow:0 10px 26px -10px color-mix(in srgb, var(--ac) 65%, transparent) }
+  .ebar .eicon svg{ width:18px; height:18px; stroke:#fff }
+  .ebar .elive{ display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:600; letter-spacing: var(--ls-caps);
+    text-transform:uppercase; color:color-mix(in srgb, var(--ac) 75%, #fff); flex:none }
+  .ebar .elive .d{ width:7px; height:7px; border-radius:50%; background:var(--ac); box-shadow:0 0 9px var(--ac); animation:epulse 2s ease-in-out infinite }
+  @keyframes epulse{ 0%,100%{ opacity:1 } 50%{ opacity:.4 } }
+  .ebar .eruns{ display:flex; align-items:center; gap:9px; font-size:11.5px; font-weight:600; color:var(--tx2); flex:none;
+    padding:7px 13px; border-radius: var(--radius-pill); border:1px solid var(--line); background:rgba(255,255,255,.03) }
+  .ebar .eruns.at-cap{ color:#fb7185; border-color:rgba(251,113,133,.3); background:rgba(251,113,133,.08) }
+  .limit-wrap{ flex:1; display:flex; align-items:center; justify-content:center; text-align:center;
+    border-radius: var(--radius-xl); border:1px solid rgba(251,113,133,.25); background:rgba(251,113,133,.06); padding:48px 24px }
+  .limit-box{ max-width:420px }
+  .limit-box .li{ width:56px; height:56px; margin:0 auto 20px; border-radius: var(--radius-lg); display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(145deg,#fb7185,#f472b6); box-shadow:0 16px 40px -14px rgba(251,113,133,.6) }
+  .limit-box .li svg{ width:26px; height:26px; stroke:#fff }
+  .limit-box h2{ margin:0 0 10px; font-size:24px; font-weight:700; color:#fff; letter-spacing: var(--ls-tight)}
+  .limit-box p{ margin:0 0 22px; font-size:15px; color:var(--tx2); line-height: var(--lh-body)}
+  .limit-box a{ display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius: var(--radius-md);
+    text-decoration:none; font-size:13px; font-weight:600; color:var(--tx); border:1px solid var(--line);
+    background:rgba(255,255,255,.04); transition:.2s }
+  .limit-box a:hover{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2) }
+  .frame-wrap{ flex:1; position:relative; min-height:0; background:#0a0d1a;
+    border-radius: var(--radius-xl); border:1px solid color-mix(in srgb, var(--ac) 22%, var(--line)); overflow:hidden;
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02) inset }
+  .frame-wrap::before{ content:""; position:absolute; top:0; left:0; right:0; height:3px; z-index:2;
+    background:linear-gradient(90deg, var(--ac), var(--ac2), transparent 90%) }
+  .frame-loader{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--tx2); font-size:13px; gap:10px; transition:opacity .4s ease }
+  .frame-loader.hidden{ opacity:0; pointer-events:none }
+  .frame-loader .sp{ width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,.18);
+    border-top-color:var(--ac); animation:esp 1s linear infinite }
+  @keyframes esp{ to{ transform:rotate(360deg) } }
+  iframe.tool{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block }
+  @media (max-width:720px){
+    .ewrap{ padding:18px 16px 20px; gap:14px }
+    .ebar .etxt span{ display:none }
+    .ebar .elive{ display:none }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="eglow" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}"></div>
+<div class="ewrap" style="--ac:{{ agent.ac }};--ac2:{{ agent.ac2 }}">
+  <div class="ebar">
+    <div class="eleft">
+      <a class="back" href="/app/{{ agent.slug }}">&larr; Back</a>
+      <div class="etitle">
+        <span class="eicon">{{ agent.icon|safe }}</span>
+        <div class="etxt"><b>{{ agent.name }}</b><span>{{ agent.tagline }}</span></div>
+      </div>
+    </div>
+    {% if limit_reached %}
+    <div class="eruns at-cap">Run limit reached &middot; {{ runs_used }}/{{ runs_cap }}</div>
+    {% elif agent.uncapped %}
+    <div class="eruns">Unlimited runs</div>
+    <div class="elive"><span class="d"></span>Live</div>
+    {% else %}
+    <div class="eruns" id="eRunsBadge">{{ runs_used }} / {{ runs_cap }} used</div>
+    <div class="elive"><span class="d"></span>Live</div>
+    {% endif %}
+  </div>
+  {% if limit_reached %}
+  <div class="limit-wrap">
+    <div class="limit-box">
+      <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+      <h2>Run limit reached</h2>
+      <p>You&rsquo;ve used all {{ runs_cap }} runs available for {{ agent.name }}. This limit is per agent, per account &mdash; your other agents are unaffected.</p>
+      <a href="/app/{{ agent.slug }}">&larr; Back to {{ agent.name }}</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="frame-wrap">
+    <div class="frame-loader" id="floader"><span class="sp"></span> Loading {{ agent.name }}…</div>
+    <iframe class="tool" id="toolFrame" src="{{ embed_url }}" allow="clipboard-write; clipboard-read; fullscreen"></iframe>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function(){
+    var fr=document.getElementById('toolFrame'), ld=document.getElementById('floader');
+    if(fr){ fr.addEventListener('load', function(){ setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 800); }); }
+    setTimeout(function(){ if(ld) ld.classList.add('hidden'); }, 8000);
+  })();
+  {% if not limit_reached and not agent.uncapped %}
+  (function(){
+    /* Opening this page must NOT count as a run, and neither should merely
+       clicking into the tool to fill in a field — only actually clicking its
+       Run/Start/Generate CTA should. The embedded tool (a separate app,
+       cross-origin) tells us exactly when that happens via postMessage —
+       see seo-apps' client/src/lib/agentRunSignal.js, called from each
+       tool's run-start handler right after its own field validation passes.
+       Logs at most once per page view. The client-side "recently run"
+       tracker (History / dashboard activity) is recorded here too, ONLY on
+       a confirmed run — not on page load — so an agent that was merely
+       opened never shows up there either. */
+    var EXPECTED_ORIGIN='{{ serp_origin }}', EXPECTED_TOOL='{{ agent.seo_slug }}';
+    var logged=false, finished=false;
+    function logRun(){
+      if(logged) return;
+      logged=true;
+      fetch('/app/{{ agent.slug }}/use/log-run', {method:'POST'}).then(function(r){return r.json();}).then(function(d){
+        if(!d || !d.logged) return;
+        var badge=document.getElementById('eRunsBadge');
+        if(badge) badge.textContent=d.runs_used+' / '+d.runs_cap+' used';
+        p2RecordAgentVisit({slug:{{ agent.slug|tojson }}, name:{{ agent.name|tojson }}, tagline:{{ agent.tagline|tojson }}, ac:{{ agent.ac|tojson }}, ac2:{{ agent.ac2|tojson }}});
+      }).catch(function(){});
+    }
+    /* The tool sends its full result once the run actually finishes (a
+       separate, later message from 'agent-run-started' above) so it can be
+       saved for the History page — see seo-apps' agentRunSignal.js
+       notifyAgentRunFinished, called from each page's own completion
+       handler. At most once per page view, same guard shape as logRun. */
+    function finishRun(output){
+      if(finished) return;
+      finished=true;
+      fetch('/app/{{ agent.slug }}/use/finish-run', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({output:output})
+      }).catch(function(){});
+    }
+    window.addEventListener('message', function(e){
+      if(e.origin!==EXPECTED_ORIGIN) return;
+      var d=e.data;
+      if(!d || d.source!=='p2-seo-tool' || d.tool!==EXPECTED_TOOL) return;
+      if(d.type==='agent-run-started') logRun();
+      else if(d.type==='agent-run-finished' && d.output && typeof d.output==='object') finishRun(d.output);
+    });
+  })();
+  {% endif %}
+</script>
+{% endblock %}

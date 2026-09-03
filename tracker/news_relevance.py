@@ -1,0 +1,309 @@
+"""Relevance filtering for company news.
+
+Google News returns *everything* that mentions a company — share-price chatter,
+listicles, incidental name-drops — which floods the tracker with low-value
+"News Mention" signals. This module keeps only news that is genuinely about the
+company AND about a real business event, so only relevant signals get stored.
+
+Two layers, applied in order:
+
+1. Heuristic gate (free, always on)
+   Scores each article on company relevance + business-event keywords, and
+   penalises obvious noise (market chatter, SEO listicles, how-to/review junk).
+   Articles below ``min_score`` are dropped.
+
+2. AI gate (optional, batched — one OpenAI call per company)
+   When an OpenAI key is supplied, the heuristic survivors are sent in a single
+   call and Vimi confirms which ones actually matter for B2B buying intent.
+   Fail-open: if anything goes wrong, the heuristic survivors are kept.
+
+The public entry point is :func:`filter_relevant_articles`.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+
+logger = logging.getLogger(__name__)
+
+# ── Business events worth storing ────────────────────────────────────────────
+RELEVANT_KEYWORDS = [
+    # funding / investment
+    "funding", "raise", "raises", "raised", "series a", "series b", "series c",
+    "series d", "seed round", "venture", "investment", "investor", "backed",
+    "capital", "round of", "valuation",
+    # M&A / corporate structure
+    "acquir", "merger", "merges", "buyout", "takeover", "m&a", "acquisition",
+    "majority stake", "to buy", "acquires",
+    # leadership moves
+    "appoint", "names ", "hires", "hired", "joins", "new ceo", "new cfo",
+    "new cto", "new cmo", "new coo", "steps down", "resign", "departs",
+    "promoted", "names new", "chief executive", "chief financial",
+    "chief marketing", "chief technology", "leadership", "board of directors",
+    # growth / product
+    "expand", "expansion", "new office", "opens", "launch", "unveil",
+    "rollout", "new product", "partnership", "partners with", "collaborat",
+    "integration", "go-to-market", "enters", "wins contract", "secures",
+    # restructuring
+    "layoff", "restructur", "cuts jobs", "downsiz", "closure", "shuts down",
+    # public-market events (not price chatter)
+    "ipo", "goes public", "files for", "s-1", "spac", "debt financing",
+    "public offering",
+    # brand / web
+    "rebrand", "relaunch", "new website", "redesign", "new brand", "awarded",
+    "recognized as",
+]
+
+# ── Clear noise: incidental mentions, market chatter, SEO junk ───────────────
+NOISE_PATTERNS = [
+    r"\bshare price\b", r"\bstock (?:price|forecast|to buy|rises|falls|jumps|drops|surges|tumbles)\b",
+    r"\bprice target\b", r"\b(?:buy|sell|hold) rating\b", r"\banalyst(?:s)? (?:rating|note|say|expect)\b",
+    r"\bdividend\b", r"\bmarket cap\b", r"\bearnings per share\b", r"\b52[- ]week\b",
+    r"\b%\s*(?:upside|downside|gain|loss|return)\b", r"\bshould you (?:buy|sell)\b",
+    r"\bstocks? to (?:buy|watch|consider)\b", r"\b(?:best|top)\s+\d+\b",
+    r"\b\d+\s+(?:best|top|things|reasons|ways|stocks)\b", r"\bhow to\b",
+    r"\bbeginner'?s guide\b", r"\bhoroscope\b", r"\brecipe\b",
+    r"\bbox office\b", r"\bvs\.?\s+\w+\s+(?:which|comparison)\b",
+]
+
+_SUFFIXES = ("inc", "llc", "corp", "corporation", "ltd", "limited", "co",
+             "company", "group", "holdings", "plc", "the")
+
+_RELEVANT_RE = [re.compile(re.escape(k)) for k in RELEVANT_KEYWORDS]
+
+# ── "Important news" gate (stricter than RELEVANT_KEYWORDS) ───────────────────
+# News Mention is the catch-all LOW bucket. To keep it signal-rich for sales,
+# a stored News Mention must name a HIGH-VALUE, action-worthy business event in
+# its TITLE (launches/partnerships already have their own signal types). This is
+# deliberately narrower than RELEVANT_KEYWORDS so generic PR / mentions drop out.
+IMPORTANT_NEWS_KEYWORDS = [
+    # funding / investment (capacity + intent to spend)
+    "raises", "raised", "secures funding", "closes funding", "funding round",
+    "series a", "series b", "series c", "series d", "seed round", "venture round",
+    "investment round", "valuation of", "capital raise",
+    # M&A / corporate structure
+    "acquires", "acquired by", "acquisition of", "to acquire", "merger", "merges with",
+    "buyout", "takeover", "majority stake", "spins off",
+    # leadership (esp. growth/marketing buyers)
+    "appoints", "names new", "new ceo", "new cfo", "new cmo", "new coo", "new cto",
+    "chief executive", "chief financial", "chief marketing", "chief operating",
+    "chief technology", "steps down as", "resigns as", "appointed ceo",
+    # footprint / market expansion (corporate, not product lineups)
+    "expands into", "expansion into", "enters the", "new market", "new factory",
+    "new plant", "new facility", "new headquarters", "opens factory", "opens plant",
+    "global expansion", "launches operations",
+    # contracts / wins
+    "wins contract", "secures contract", "awarded contract", "major contract",
+    "multi-year deal", "signs deal",
+    # restructuring / distress (timing + need)
+    "layoff", "lays off", "restructur", "cuts jobs", "downsiz", "shuts down",
+    "bankrupt", "receivership", "insolvency", "files for bankruptcy",
+    # public-market / brand
+    "ipo", "goes public", "files for ipo", "spac", "rebrand", "rebrands",
+]
+_IMPORTANT_RE = [re.compile(re.escape(k)) for k in IMPORTANT_NEWS_KEYWORDS]
+
+# Extra low-value noise (commerce / reviews / rumor) — dropped from News Mention.
+EXTRA_NOISE_PATTERNS = [
+    r"coupon", r"promo code", r"discount code", r"% off",
+    r"on sale", r"price drop", r"deal of the day", r"best deals?",
+    r"review", r"hands[- ]on", r"unboxing", r"rumou?r", r"leak(?:ed|s)?",
+    r"giveaway", r"sweepstakes", r"sponsored", r"podcast", r"episode",
+    r"explained", r"roundup", r"tutorial", r"guide", r"tips",
+]
+_EXTRA_NOISE_RE = [re.compile(p) for p in EXTRA_NOISE_PATTERNS]
+
+
+def is_important_news(text: str) -> bool:
+    """True only if the headline names a high-value business event and is not
+    commerce/review/rumor noise. Used to gate the News Mention bucket."""
+    t = _norm(text or "")
+    if not t:
+        return False
+    if any(r.search(t) for r in _NOISE_RE) or any(r.search(t) for r in _EXTRA_NOISE_RE):
+        return False
+    return any(r.search(t) for r in _IMPORTANT_RE)
+
+# ── Signal-type classification (keyword-only, no LLM, zero cost) ──────────────
+# Splits the generic "News Mention" stream into first-class signal types.
+# M&A / IPO / funding deliberately stay as News Mention here (those HIGH signals
+# are sourced from curated Google Sheets, per the tracker design).
+PRODUCT_LAUNCH_KEYWORDS = [
+    "launch", "launches", "launched", "launching", "unveil", "unveils", "unveiled",
+    "rollout", "roll out", "rolls out", "new product", "introduc", "debut", "debuts",
+    "releases", "release of", "now available", "general availability",
+    "new feature", "new version", "new app", "new platform", "new tool",
+    "next-generation", "next generation", "product update", "new offering",
+]
+PARTNERSHIP_KEYWORDS = [
+    "partnership", "partners with", "partner with", "partnered with", "collaborat",
+    "alliance", "joins forces", "teams up", "team up", "strategic partner",
+    "signs deal with", "signs agreement", "agreement with", "joint venture",
+    "to power", "selects", "chosen by",
+]
+_PRODUCT_RE     = [re.compile(re.escape(k)) for k in PRODUCT_LAUNCH_KEYWORDS]
+_PARTNERSHIP_RE = [re.compile(re.escape(k)) for k in PARTNERSHIP_KEYWORDS]
+
+# ── Position2 relevance lens ─────────────────────────────────────────────────
+# Position2 sells digital-marketing services (PPC, paid social, SEO/GEO,
+# creative & ad production, performance marketing, web). A signal only earns a
+# first-class type if it gives a salesperson a pitch hook. Otherwise it falls
+# back to a plain News Mention (LOW) instead of inflating the new tiles.
+
+# Product "launches" that are really minor technical/version updates → not a pitch hook.
+PRODUCT_EXCLUDE_KEYWORDS = [
+    "driver", "firmware", "bios", "sdk", "api ", "patch", "hotfix", "bug fix",
+    "bugfix", "security update", "security patch", "kernel", "beta", "release candidate",
+    "maintenance", "minor update", "point release", "update v", "version update",
+    "vulnerability", "cve", "changelog", "service pack",
+]
+# Partnerships that are pure tech/component/supply/infra → no marketing hook.
+PARTNERSHIP_TECH_EXCLUDE = [
+    "powered by", "chipset", "processor", "cpu", "gpu", "silicon", "semiconductor",
+    "foundry", "wafer", "reference design", "component supply", "supply agreement",
+    "manufacturing agreement", "fabrication", "soc", "embeds", "embed ", "api integration",
+    "technology integration", "technical integration", "connectivity", "data center infrastructure",
+]
+# Marketing/GTM/brand/channel context → confirms a partnership is pitch-relevant.
+MARKETING_RELEVANT_KEYWORDS = [
+    "co marketing", "brand", "campaign", "retail", "retailer", "distribution",
+    "distributor", "channel", "go to market", "sponsor", "sponsorship", "marketing",
+    "advertising", "agency", "launch", "consumer", "ecommerce", "e commerce",
+    "store", "omnichannel", "loyalty", "promotion", "audience", "content",
+    "media", "creator", "influencer",
+]
+_PRODUCT_EXCLUDE_RE = [re.compile(re.escape(k)) for k in PRODUCT_EXCLUDE_KEYWORDS]
+_PARTNER_TECH_EXCLUDE_RE = [re.compile(re.escape(k)) for k in PARTNERSHIP_TECH_EXCLUDE]
+_MARKETING_RE = [re.compile(re.escape(k)) for k in MARKETING_RELEVANT_KEYWORDS]
+
+
+def classify_signal_type(article: dict) -> tuple[str, str]:
+    """Return (signal_type, severity) for a news article using keywords only.
+
+    Partnership is checked before Product Launch (a "launches partnership"
+    headline is a partnership first). Falls back to ("News Mention", "LOW").
+    """
+    text = _norm((article.get("title", "") or "") + " " + (article.get("summary", "") or ""))
+    has_marketing = any(r.search(text) for r in _MARKETING_RE)
+
+    # Partnership: keep only if it carries a marketing/GTM/brand/channel angle and
+    # is not a pure tech/component/supply integration.
+    if any(r.search(text) for r in _PARTNERSHIP_RE):
+        is_tech = any(r.search(text) for r in _PARTNER_TECH_EXCLUDE_RE)
+        if is_tech and not has_marketing:
+            return ("News Mention", "LOW")
+        return ("Partnership", "MEDIUM")
+
+    # Product Launch: drop minor technical/version updates (driver/firmware/patch…).
+    if any(r.search(text) for r in _PRODUCT_RE):
+        if any(r.search(text) for r in _PRODUCT_EXCLUDE_RE):
+            return ("News Mention", "LOW")
+        return ("Product Launch", "MEDIUM")
+
+    return ("News Mention", "LOW")
+_NOISE_RE = [re.compile(p) for p in NOISE_PATTERNS]
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9& ]", " ", (s or "").lower())
+
+
+def _company_tokens(name: str) -> list[str]:
+    n = _norm(name)
+    words = [w for w in n.split() if w not in _SUFFIXES]
+    long = [w for w in words if len(w) >= 4]
+    return long or words or [n.strip()]
+
+
+def score_article(company_name: str, article: dict) -> tuple[int, bool]:
+    """Return (score, name_present). Higher = more relevant."""
+    title = _norm(article.get("title", ""))
+    summary = _norm(article.get("summary", ""))
+    text = title + " " + summary
+
+    toks = _company_tokens(company_name)
+    name_present = any(t in text for t in toks) if toks else True
+    name_in_title = any(t in title for t in toks) if toks else False
+
+    score = 0
+    if name_in_title:
+        score += 2
+    if any(r.search(title) for r in _RELEVANT_RE):
+        score += 3
+    elif any(r.search(summary) for r in _RELEVANT_RE):
+        score += 1
+    noise_hits = sum(1 for r in _NOISE_RE if r.search(text))
+    score -= min(noise_hits * 4, 8)
+    return score, name_present
+
+
+def _ai_keep_indices(company_name: str, candidates: list[dict], ai_key: str,
+                     model: str = "gpt-4o-mini") -> list[int] | None:
+    """One batched OpenAI call. Returns indices to keep, or None on failure."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return None
+    listing = "\n".join(
+        "%d. %s" % (i, (a.get("title", "") or "")[:140]) for i, a in enumerate(candidates)
+    )
+    system = (
+        "You are Vimi, a B2B sales-intelligence filter for Position2 (a digital "
+        "marketing agency). From a list of news headlines about a company, return "
+        "ONLY the ones that signal a real business event a sales team would act on "
+        "— funding, M&A, leadership change, expansion, product launch, partnership, "
+        "restructuring, IPO, rebrand. Drop share-price/market chatter, listicles, "
+        "how-to/review content, and incidental mentions. "
+        'Return ONLY JSON: {"keep":[<indices>]}'
+    )
+    user = "Company: %s\nHeadlines:\n%s" % (company_name, listing)
+    try:
+        oai = OpenAI(api_key=ai_key)
+        resp = oai.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+            max_completion_tokens=200,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        m = re.search(r"\{.*\}", raw, re.S)
+        if not m:
+            return None
+        keep = json.loads(m.group(0)).get("keep", [])
+        return [int(i) for i in keep if isinstance(i, (int, float))]
+    except Exception as exc:  # fail-open
+        logger.warning("[NEWS] AI relevance filter failed for %s: %s", company_name, exc)
+        return None
+
+
+def filter_relevant_articles(company_name: str, articles: list[dict],
+                             ai_key: str = "", model: str = "gpt-4o-mini",
+                             min_score: int = 2) -> list[dict]:
+    """Keep only business-relevant articles, best-first.
+
+    Heuristic gate always runs; the AI gate runs only when ``ai_key`` is set and
+    there are survivors. Order is preserved by descending relevance score so the
+    single stored News Mention is the most significant one.
+    """
+    if not articles:
+        return []
+
+    scored = []
+    for a in articles:
+        sc, name_present = score_article(company_name, a)
+        if name_present and sc >= min_score:
+            scored.append((sc, a))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    survivors = [a for _, a in scored]
+
+    if not survivors:
+        return []
+
+    if ai_key:
+        keep = _ai_keep_indices(company_name, survivors, ai_key, model)
+        if keep is not None:
+            survivors = [survivors[i] for i in keep if 0 <= i < len(survivors)] or survivors
+
+    return survivors

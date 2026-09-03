@@ -1,0 +1,2487 @@
+/* event_conference_intelligence - page styles
+   Brand: sky -> indigo -> violet (#38bdf8 -> #6366f1 -> #8b5cf6), matching
+   this agent's dash-card (b2b_agents.html .c-evi) and its APP_AGENTS accent.
+   Deliberately cool: every warm family is already claimed (.c-sci orange,
+   .c-adint amber, .c-gdsc lime), and starting on sky rather than teal keeps
+   it apart from .c-lps.
+
+   Follows the same convention as 42_north_dental_slot_checker.css and
+   social_creative_intelligence.css: this page defines its own .main/.card/
+   .topbar rather than assuming a shared base, because there isn't one. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Ground on html:root, not body. aurora-app.css loads AFTER this file and
+   carries body{background:transparent!important} plus html{background:#070912},
+   so a body background is discarded and a bare :root loses the later-wins
+   tiebreak. html:root scores 0,0,2 against that 0,0,1 and wins either way.
+   background-color is its own line after the gradient shorthand because a
+   shorthand listing only images resets background-color to transparent, and
+   without it macOS overscroll paints the browser's white canvas past the
+   document edge on a fast scroll. Both bugs are already documented in
+   [[feedback-platform-css-gotchas]]. */
+html:root {
+  background:
+    radial-gradient(ellipse 76% 46% at 12% -2%, rgba(56,189,248,.13) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 40% at 92% 44%, rgba(99,102,241,.12) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 55% at 50% 104%, rgba(49,26,120,.30) 0%, transparent 68%),
+    linear-gradient(160deg, #070c18 0%, #0a0d1e 44%, #080a16 100%);
+  background-color: #080a16;
+  background-attachment: fixed;
+}
+html:root[data-theme="light"] {
+  background:
+    radial-gradient(ellipse 76% 46% at 12% -2%, rgba(56,189,248,.16) 0%, transparent 60%),
+    radial-gradient(ellipse 56% 40% at 92% 44%, rgba(99,102,241,.13) 0%, transparent 55%),
+    linear-gradient(160deg, #f6f8fd 0%, #eef2fb 50%, #f7f9fe 100%);
+  background-color: #f6f8fd;
+  background-attachment: fixed;
+}
+
+:root {
+  --evi-a1: #38bdf8;
+  --evi-a2: #6366f1;
+  --evi-a3: #8b5cf6;
+  /* Gradient-on-text stops. Same as the accents in dark, overridden in light. */
+  --evi-g1: #38bdf8; --evi-g2: #6366f1; --evi-g3: #8b5cf6;
+  --evi-ink: #e8ecf8;
+  --evi-ink-2: #a9b4d8;
+  --evi-ink-3: #808cb0;
+  --evi-line: rgba(255,255,255,.09);
+  --evi-line-2: rgba(255,255,255,.06);
+  --evi-panel: rgba(13,17,33,.72);
+  --evi-panel-2: rgba(18,23,42,.6);
+  --evi-ok: #4ade80;
+  --evi-warn: #fbbf24;
+  --evi-bad: #fb7185;
+}
+:root[data-theme="light"] {
+  /* Deeper stops for anything that paints the accent gradient onto text.
+     The dark-theme sky/violet washes out to near-invisible on a white ground. */
+  --evi-g1: #0284c7; --evi-g2: #4f46e5; --evi-g3: #7c3aed;
+  --evi-ink: #131a2e;
+  --evi-ink-2: #4a5578;
+  --evi-ink-3: #5f6a88;
+  --evi-line: rgba(20,30,60,.12);
+  --evi-line-2: rgba(20,30,60,.07);
+  --evi-panel: rgba(255,255,255,.86);
+  --evi-panel-2: rgba(248,250,255,.8);
+  --evi-ok: #15803d;
+  --evi-warn: #a16207;
+  --evi-bad: #be123c;
+}
+
+body {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--evi-ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── chrome ─────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 62px; padding: 0 var(--bleed);
+  border-bottom: 1px solid var(--evi-line);
+  background: var(--evi-panel); backdrop-filter: blur(14px);
+  position: sticky; top: 0; z-index: 60;
+}
+.topbar .tl { display: flex; align-items: center; gap: 18px; min-width: 0; }
+.topbar .bc { display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+  color: var(--evi-ink-3); min-width: 0; }
+.topbar .bc a { color: var(--evi-ink-2); text-decoration: none; }
+.topbar .bc a:hover { color: var(--evi-a1); }
+.topbar .bc-cur { color: var(--evi-ink); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bc-sep { color: var(--evi-ink-3); opacity: .6; }
+/* On a phone the full trail does not fit a 62px bar: it wraps to several
+   lines and pushes the account pill off the right edge. The ancestors are the
+   part a back gesture already covers, so below 640px only the page you are on
+   survives, ellipsised. */
+@media (max-width: 640px) {
+  .topbar .bc a, .topbar .bc .bc-sep { display: none; }
+  .topbar .tl { gap: 12px; min-width: 0; }
+  .topbar .bc { min-width: 0; }
+}
+
+/* The user menu. Defined here rather than assumed from a shared sheet: these
+   classes come from the shared _admin_menu.html include, but no stylesheet
+   this page loads defines them, so without this block the dropdown renders
+   permanently open (it has no display:none to start from). Same reason
+   social_creative_intelligence.css carries its own copy. */
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.user-menu { position: relative; }
+.user-pill {
+  display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none;
+  background: rgba(255,255,255,.04); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-pill, 80px); padding: 4px 14px 4px 4px;
+  transition: background .15s, border-color .15s;
+}
+.user-pill:hover, .user-pill.open { background: rgba(255,255,255,.08);
+  border-color: rgba(99,102,241,.4); }
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a3));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 700; color: #05132a;
+}
+.user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-name { font-size: 13px; font-weight: 500; color: var(--evi-ink-2); }
+.pill-chevron { font-size: 10px; color: var(--evi-ink-3); margin-left: 2px;
+  transition: transform .2s; }
+.user-pill.open .pill-chevron { transform: rotate(180deg); }
+.user-dropdown {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0; width: 220px;
+  z-index: 9999; background: rgba(10,13,30,.97); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 12px); overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,.6); backdrop-filter: blur(20px);
+}
+.user-dropdown.open { display: block; }
+.dd-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--evi-line-2); }
+.dd-name { font-size: 13px; font-weight: 600; color: var(--evi-ink); margin-bottom: 2px; }
+.dd-email { font-size: 11.5px; color: var(--evi-ink-3); }
+.dd-items { padding: 6px; }
+.dd-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; width: 100%;
+  border-radius: var(--radius-sm, 8px); font-size: 13px; color: var(--evi-ink-2);
+  text-decoration: none; transition: background .12s, color .12s;
+}
+.dd-item:hover { background: rgba(255,255,255,.05); color: var(--evi-ink); }
+.dd-item-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.dd-divider { height: 1px; background: var(--evi-line-2); margin: 4px 6px; }
+.dd-item.danger:hover { background: rgba(239,68,68,.08); color: #f87171; }
+:root[data-theme="light"] .user-pill { background: rgba(18,26,54,.04); }
+:root[data-theme="light"] .user-dropdown { background: rgba(255,255,255,.98); }
+:root[data-theme="light"] .dd-item:hover { background: rgba(18,26,54,.05); }
+:root[data-theme="light"] .user-avatar { color: #fff; }
+
+.main {
+  position: relative; z-index: 1; width: 100%;
+  max-width: 1320px; margin: 0 auto;
+  padding: 36px var(--margin) 72px;
+}
+
+/* The dot grid. `.bg-grid` was already in the markup with nothing styling it,
+   so the page rendered on flat colour. Masked to a soft ellipse so the texture
+   reads under the hero and fades out before the fold rather than tiling to the
+   bottom of a long report. */
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(124,160,255,.16) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(ellipse 90% 62% at 50% 6%, #000 8%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 62% at 50% 6%, #000 8%, transparent 78%);
+}
+:root[data-theme="light"] .bg-grid {
+  background-image: radial-gradient(circle, rgba(40,60,130,.14) 1px, transparent 1px);
+}
+
+/* ── hero ───────────────────────────────────────────────────────────── */
+/* One column since the scoring card came out of it. The headline gets the
+   room that frees up, and the deck is two lines so the play cards underneath
+   are the first thing the eye lands on rather than the last. */
+/* Capped on the h1 rather than the whole hero, so the headline breaks over two
+   lines and the deck under it keeps a readable measure without either one
+   dictating the other's width. `balance` evens the two lines where supported
+   and is ignored where it is not. */
+.evi-hero { margin-bottom: calc(var(--gutter) + 12px); }
+.evi-hero h1 { margin-bottom: 18px; max-width: 15ch; text-wrap: balance; }
+.evi-hero p { max-width: 52ch; }
+.evi-hero .eyebrow {
+  display: inline-flex; align-items: center; gap: 9px; font-size: 10.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--evi-ink-2);
+  font-weight: 600; margin-bottom: 16px; padding: 6px 14px 6px 11px;
+  border-radius: var(--radius-pill, 80px);
+  background: linear-gradient(95deg, rgba(56,189,248,.10), rgba(139,92,246,.08));
+  border: 1px solid rgba(99,102,241,.24);
+}
+.evi-hero .eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--evi-a1); box-shadow: 0 0 10px var(--evi-a1);
+}
+.evi-hero h1 {
+  font-family: 'Bricolage Grotesque', serif; font-size: clamp(30px, 3.5vw, 44px);
+  font-weight: 700; letter-spacing: -.02em; line-height: 1.08; margin-bottom: 12px;
+}
+.evi-hero h1 em {
+  font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;
+  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g2) 55%, var(--evi-g3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.evi-hero p { color: var(--evi-ink-2); font-size: 15.5px; line-height: 1.7; }
+
+/* The accent hairline along a panel's top edge, the treatment the other agent
+   pages use to mark their primary surface. */
+.evi-card-main::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2) 52%, var(--evi-a3));
+  opacity: .85;
+}
+
+/* ── page layout: form beside a sticky rail ─────────────────────────── */
+.evi-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--gutter); align-items: start;
+}
+@media (max-width: 1100px) { .evi-layout { grid-template-columns: 1fr; } }
+.evi-rail { display: flex; flex-direction: column; gap: var(--gutter);
+  position: sticky; top: calc(62px + var(--gutter)); }
+@media (max-width: 1100px) { .evi-rail { position: static; } }
+.evi-rail .evi-card + .evi-card { margin-top: 0; }
+.evi-rail .evi-card-pad { padding: 18px 18px 16px; }
+
+.evi-cost { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.evi-cost li { font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
+  padding-left: 14px; position: relative; }
+.evi-cost li::before { content: ""; position: absolute; left: 0; top: 6px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--evi-a2); opacity: .7; }
+.evi-cost li b { color: var(--evi-ink-2); font-weight: 600; }
+
+/* ── the plays ─────────────────────────────────────────────────────
+   These carry the page. The mode chosen here decides what every field below
+   means, so they are given more weight than anything else on screen: their own
+   hue each, a filled icon, the step number, and the action they will run
+   spelled out along the bottom edge.
+
+   Each card owns --p1/--p2 and every accent inside it is drawn from those two,
+   so a card is recoloured in one place rather than in eight rules. The hues run
+   the page's own sky-to-violet ramp, plus a teal so the fourth is not a repeat. */
+/* The row divides itself between however many plays the page ships. It was
+   a four-track grid, and the day the fourth play was retired that left a
+   quarter of the row empty. `auto-fit` does not fix it either: the 1fr
+   distribution is computed before the empty track collapses, so three cards
+   still came out four-wide with dead space on the right. Flex has no track
+   count to get wrong. */
+.evi-plays {
+  display: flex; flex-wrap: wrap;
+  gap: var(--gutter); margin-bottom: calc(var(--gutter) + 8px);
+}
+
+.evi-play {
+  --p1: var(--evi-a1); --p2: var(--evi-a2);
+  /* Share the row equally, wrap below the basis. Height comes from the
+     container's default stretch, so the cards stay level with each other. */
+  flex: 1 1 260px; min-width: 0;
+  position: relative; isolation: isolate; overflow: hidden;
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  padding: 22px 20px 0;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid var(--evi-line);
+  background:
+    radial-gradient(ellipse 130% 90% at 0% 0%,
+      color-mix(in srgb, var(--p1) 9%, transparent), transparent 62%),
+    var(--evi-panel);
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  transition: border-color .22s var(--ease, ease), transform .22s var(--ease, ease),
+              box-shadow .22s var(--ease, ease), background .22s;
+}
+.evi-play.p-recommend { --p1: #38bdf8; --p2: #6366f1; }
+.evi-play.p-lookup    { --p1: #22d3ee; --p2: #38bdf8; }
+.evi-play.p-discover  { --p1: #818cf8; --p2: #a78bfa; }
+.evi-play.p-workroom  { --p1: #2dd4aa; --p2: #22d3ee; }
+
+/* The hairline reads as a lit edge rather than a border: dim at rest, full
+   when the play is the one selected. */
+.evi-play::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; z-index: 2;
+  background: linear-gradient(90deg, var(--p1), var(--p2));
+  opacity: .34; transition: opacity .22s;
+}
+/* A wash of the card's own hue that lifts on hover and stays up when selected,
+   so the colour is part of the surface rather than a border trick. */
+.evi-play::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--p1) 15%, transparent),
+    color-mix(in srgb, var(--p2) 7%, transparent) 58%, transparent 88%);
+  opacity: 0; transition: opacity .22s;
+}
+.evi-play:hover {
+  transform: translateY(-3px); border-color: color-mix(in srgb, var(--p1) 40%, var(--evi-line));
+  box-shadow: 0 20px 46px rgba(0,0,0,.34),
+              0 0 0 1px color-mix(in srgb, var(--p1) 16%, transparent);
+}
+.evi-play:hover::after { opacity: .55; }
+.evi-play:hover::before { opacity: .7; }
+.evi-play:focus-visible { outline: 2px solid var(--p1); outline-offset: 3px; }
+
+/* Visually hidden, still read aloud. The arrow in the line below is a
+   picture of a word, and a screen reader that announces "rightwards arrow"
+   in the middle of a sentence is being told less than a sighted reader. */
+.evi-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* What you hand this play and what it hands back, on one line under the
+   title. Two of these four cards read as "find me events" from the title
+   alone; what you START FROM is the only thing that separates them, so it
+   gets its own line rather than being the fourth clause of a sentence.
+
+   This replaced a 01 to 04 step number, which looked like an order and was
+   not one: these are four alternatives, and the only real dependency between
+   them runs the wrong way round for the numbering. */
+.evi-play .pio {
+  position: relative; z-index: 1;
+  /* Two rows on every card, not just the ones whose text is long enough to
+     wrap. Left to wrap on its own, one card in four sat on a single line and
+     the row below it started three pixels higher than its neighbours, which
+     is the sort of difference you feel without being able to name. */
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  margin-bottom: 12px; padding: 7px 12px;
+  border-radius: var(--radius-md, 12px);
+  font-size: 11.5px; line-height: 1.35;
+  background: color-mix(in srgb, var(--p1) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p1) 20%, transparent);
+  transition: background .22s, border-color .22s;
+}
+/* The arrow lives INSIDE the result, not between the two halves. At four
+   cards across, this line wraps, and with the arrow as a sibling the break
+   fell after it: "an event name ->" on one line and the answer orphaned on
+   the next. */
+.evi-play .pio .a { color: var(--evi-ink-3); }
+.evi-play .pio .b {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  color: var(--evi-ink-2); font-weight: 650;
+}
+.evi-play .pio .b i {
+  font-style: normal; font-size: 12px; line-height: 1; color: var(--p1);
+}
+.evi-play:hover .pio, .evi-play[aria-selected="true"] .pio {
+  background: color-mix(in srgb, var(--p1) 15%, transparent);
+  border-color: color-mix(in srgb, var(--p1) 34%, transparent);
+}
+.evi-play[aria-selected="true"] .pio .b { color: var(--evi-ink); }
+
+.evi-play .pi {
+  position: relative; z-index: 1;
+  width: 42px; height: 42px; border-radius: var(--radius-md, 12px);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #06121f; margin-bottom: 15px;
+  background: linear-gradient(140deg, var(--p1), var(--p2));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--p1) 34%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.34);
+  transition: transform .22s var(--ease, ease), box-shadow .22s;
+}
+.evi-play .pi svg { width: 21px; height: 21px; }
+.evi-play:hover .pi { transform: scale(1.06) rotate(-3deg); }
+:root[data-theme="light"] .evi-play .pi { color: #fff; }
+
+.evi-play .pn {
+  position: relative; z-index: 1;
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 17.5px; font-weight: 700; color: var(--evi-ink);
+  letter-spacing: -.02em; line-height: 1.22; margin-bottom: 9px;
+  /* Two lines' worth whether the title needs them or not, so the cards
+     line their rows up with each other instead of each starting wherever its
+     own title happened to end. */
+  min-height: 2.44em;
+  text-wrap: balance;
+}
+.evi-play .pd {
+  position: relative; z-index: 1;
+  font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3);
+  margin-bottom: 18px;
+}
+
+/* The action the card will run, on the bottom edge. It is the same string the
+   run button shows, read from this element's own data-action, so a play cannot
+   promise one thing on the card and another on the button. */
+.evi-play .pgo {
+  position: relative; z-index: 1; margin-top: auto;
+  align-self: stretch; display: flex; align-items: center; gap: 7px;
+  padding: 13px 0; border-top: 1px solid var(--evi-line-2);
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--evi-ink-3); transition: color .22s;
+}
+.evi-play .pgo i {
+  font-style: normal; font-size: 13px;
+  transform: translateX(-3px); opacity: 0; transition: transform .22s, opacity .22s;
+}
+.evi-play:hover .pgo { color: var(--p1); }
+.evi-play:hover .pgo i { transform: translateX(0); opacity: 1; }
+
+/* Selected. The one card that is currently steering the form, so it is lit
+   rather than merely outlined. */
+.evi-play[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--p1) 55%, transparent);
+  box-shadow: 0 22px 50px rgba(0,0,0,.36),
+              0 0 0 1px color-mix(in srgb, var(--p1) 28%, transparent),
+              0 0 34px -6px color-mix(in srgb, var(--p1) 34%, transparent);
+}
+.evi-play[aria-selected="true"]::before { opacity: 1; }
+.evi-play[aria-selected="true"]::after { opacity: 1; }
+.evi-play[aria-selected="true"] .pd { color: var(--evi-ink-2); }
+.evi-play[aria-selected="true"] .pgo {
+  color: var(--p1); border-top-color: color-mix(in srgb, var(--p1) 24%, transparent);
+}
+.evi-play[aria-selected="true"] .pgo i { transform: translateX(0); opacity: 1; }
+.evi-play[aria-selected="true"] .pi { box-shadow:
+  0 8px 24px color-mix(in srgb, var(--p1) 46%, transparent),
+  inset 0 1px 0 rgba(255,255,255,.4); }
+
+@media (max-width: 620px) { .evi-play { flex-basis: 100%; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .evi-play, .evi-play .pi, .evi-play .pgo i, .evi-play .pio { transition: none; }
+  .evi-play:hover { transform: none; }
+  .evi-play:hover .pi { transform: none; }
+}
+
+/* ── field groups ───────────────────────────────────────────────────── */
+/* Each mode's field container is a grid so the gap between a group heading and
+   the fields under it comes from one rule. These were plain blocks relying on
+   a `style="margin-top:14px"` on every second row, which is what let a heading
+   land flush against the label beneath it. */
+#recommendFields, #profileForm, #lookupFields, #discoverFields, #workroomFields {
+  display: grid; gap: 15px; align-content: start;
+}
+.evi-group { display: flex; flex-direction: column; gap: 4px;
+  margin-top: 9px; padding-top: 19px; border-top: 1px solid var(--evi-line-2); }
+#profileForm > .evi-group:first-child {
+  margin-top: 0; padding-top: 0; border-top: none;
+}
+.evi-group .gh {
+  display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .11em; text-transform: uppercase; color: var(--evi-ink-2);
+  padding-left: 10px; position: relative;
+}
+/* The tick bar Contact Finder uses on its group labels, so a reader can see
+   where one group of fields stops and the next begins. */
+.evi-group .gh::before {
+  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 12px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--evi-a1), var(--evi-a3));
+}
+.evi-group .gs { font-size: 11.5px; color: var(--evi-ink-3); padding-left: 10px; }
+.evi-row.evi-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .evi-row.evi-row-3 { grid-template-columns: 1fr; } }
+
+/* ── cards + form ───────────────────────────────────────────────────── */
+.evi-card {
+  position: relative; background: var(--evi-panel); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-lg, 16px); overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0,0,0,.28);
+}
+.evi-card-main { background:
+  radial-gradient(ellipse 90% 60% at 0% 0%, rgba(56,189,248,.06), transparent 58%),
+  var(--evi-panel); }
+.evi-card + .evi-card { margin-top: 20px; }
+.evi-card-pad { padding: 24px 26px; }
+
+.evi-form { display: grid; gap: 14px; grid-template-columns: 1fr; }
+.evi-row { display: grid; gap: 14px; grid-template-columns: 2fr 1fr; }
+@media (max-width: 720px) { .evi-row { grid-template-columns: 1fr; } }
+.evi-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.evi-field label { font-size: 12px; font-weight: 600; color: var(--evi-ink-2); }
+.evi-field input, .evi-field textarea {
+  font: inherit; font-size: 14px; color: var(--evi-ink);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 10px); padding: 11px 13px; outline: none;
+  transition: border-color .18s, box-shadow .18s; width: 100%;
+}
+.evi-field textarea { min-height: 78px; resize: vertical; line-height: 1.55; }
+.evi-field input:focus, .evi-field textarea:focus {
+  border-color: rgba(99,102,241,.55); box-shadow: 0 0 0 3px rgba(99,102,241,.14);
+}
+.evi-field .hint { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+
+/* ── drafting the profile from the client's own site ──────────────────
+   The form proposes; the person confirms. Everything in this block exists to
+   keep those two things looking different from each other. */
+
+.evi-draftbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 14px;
+}
+.evi-draftbar .evi-btn { padding: 12px 22px; font-size: 13.5px; }
+.evi-draftbar .evi-btn:disabled {
+  opacity: .6; cursor: progress; transform: none; box-shadow: none;
+}
+.evi-draftbar .dh {
+  font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  max-width: 42ch; min-width: 0;
+}
+
+/* The way past a read that will not happen: no website, a site that refuses
+   us, or somebody who simply knows the answers. Styled as a quiet aside
+   rather than a second button, because it is the path most people should not
+   take and one of two equal-looking buttons is a decision nobody asked for. */
+.evi-link {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--evi-ink-3);
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--evi-line);
+}
+.evi-link:hover { color: var(--evi-a1); text-decoration-color: currentColor; }
+.evi-link:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 3px; }
+/* Its own row, always. Left to wrap naturally it landed at the end of the
+   hint paragraph and read as the last few words of that sentence. */
+.evi-draftbar .evi-link { flex: 0 0 100%; text-align: left; margin-top: 2px; }
+
+/* Three fields that are genuinely optional, folded so they do not read as
+   three more things to answer. */
+.evi-optional { margin-top: 22px; }
+.evi-optional > summary {
+  cursor: pointer; list-style: none; display: flex;
+  flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding-bottom: 9px; border-bottom: 1px solid var(--evi-line-2);
+}
+.evi-optional > summary::-webkit-details-marker { display: none; }
+.evi-optional > summary::before {
+  content: "\203a"; color: var(--evi-ink-3); font-size: 15px; line-height: 1;
+  transition: transform .16s ease; transform-origin: 50% 55%;
+}
+.evi-optional[open] > summary::before { transform: rotate(90deg); }
+.evi-optional > summary:hover .gh { color: var(--evi-ink); }
+/* The same label treatment the other group headings get. `.gh` and `.gs` are
+   scoped to `.evi-group`, so without this the one heading that is a summary
+   renders as plain sentence-case text next to five small-caps siblings.
+   No tick bar: the chevron already marks this row, and two markers on one
+   line read as a mistake. */
+.evi-optional > summary .gh {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--evi-ink-2);
+}
+.evi-optional > summary .gs { font-size: 11.5px; color: var(--evi-ink-3); }
+.evi-optional > .evi-row { margin-top: 16px; }
+
+/* The fold itself. It carries no styling of its own on purpose: what is
+   inside it has to look identical whether it arrived open or closed. */
+#profileRest[hidden] { display: none; }
+
+/* What was read, shown before anything that was written from it. The company
+   sentence is deliberately the largest thing here: two firms sharing a name is
+   the failure mode that produces a complete, confident, well-sourced profile
+   of the wrong business, and one glance at this line is the cheapest way to
+   catch it. */
+.evi-read {
+  margin-top: 14px; padding: 15px 17px;
+  border-radius: var(--radius-md, 12px);
+  background: linear-gradient(102deg, rgba(56,189,248,.09), rgba(139,92,246,.06));
+  border: 1px solid rgba(99,102,241,.24);
+}
+.evi-read .rh {
+  display: block; font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-a1); margin-bottom: 8px;
+}
+.evi-read .rs {
+  margin: 0; font-size: 14px; line-height: 1.55; color: var(--evi-ink);
+  font-weight: 550;
+}
+.evi-read .rc, .evi-read .rn {
+  margin: 7px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
+}
+/* The classification reasoning in full. A step up in weight from the other
+   notes here, because it is the one paragraph in this block that a person is
+   being asked to agree or disagree with. */
+.evi-read .rw {
+  margin: 11px 0 0; font-size: 12px; line-height: 1.6; color: var(--evi-ink-2);
+  padding-top: 10px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-read .rw b { color: var(--evi-ink); font-weight: 600; }
+.evi-read .rl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.evi-read .rl a {
+  font-size: 11px; color: var(--evi-ink-2); text-decoration: none;
+  padding: 4px 9px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.evi-read .rl a:hover { border-color: rgba(99,102,241,.45); color: var(--evi-ink); }
+
+/* Per field: what was read, or that nothing was. A blank box on a form reads
+   as something the user forgot, and the whole value of the draft is knowing
+   which fields were confirmed and which were left for you. */
+.evi-field .ev { font-size: 11px; line-height: 1.5; color: var(--evi-ink-3); }
+.evi-field .ev.read { color: var(--evi-ink-3); }
+.evi-field .ev.read::before {
+  content: "Read: "; font-weight: 700; color: var(--evi-ok);
+}
+.evi-field .ev.gap::before {
+  content: "Blank: "; font-weight: 700; color: var(--evi-warn);
+}
+.evi-field .ev.kept::before {
+  content: "Yours: "; font-weight: 700; color: var(--evi-a1);
+}
+
+/* A suggested classification is NOT a chosen one, and the two must never look
+   alike. Chosen is a solid border over a filled card. Suggested is a dashed
+   outline and an argument, and it becomes solid only once somebody clicks it,
+   so the card visibly changes state at the moment the person decides rather
+   than at the moment the model did. */
+.evi-class[data-suggested] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--evi-a1) 48%, transparent);
+}
+.evi-class[data-suggested][aria-checked="true"] { border-style: solid; }
+.evi-class .cs {
+  margin-top: 9px; padding-top: 9px; font-size: 11px; line-height: 1.5;
+  color: var(--evi-ink-2); border-top: 1px dashed var(--evi-line-2);
+}
+.evi-class[aria-checked="true"] .cs { border-top-color: rgba(99,102,241,.3); }
+
+.evi-btn {
+  appearance: none; border: none; cursor: pointer; font: inherit;
+  font-size: 14.5px; font-weight: 600; color: #fff; padding: 14px 30px;
+  border-radius: var(--radius-pill, 80px); justify-self: start;
+  background: linear-gradient(95deg, var(--evi-a1), var(--evi-a2) 60%, var(--evi-a3));
+  box-shadow: 0 10px 30px rgba(99,102,241,.34); transition: transform .18s, box-shadow .18s;
+}
+.evi-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 40px rgba(99,102,241,.46); }
+.evi-btn-ghost { border-radius: var(--radius-md, 12px); padding: 11px 20px;
+  font-size: 13.5px; }
+.evi-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+  margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-actions-note { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  max-width: 34ch; }
+.evi-btn[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
+.evi-btn-ghost {
+  background: var(--evi-panel-2); color: var(--evi-ink-2);
+  border: 1px solid var(--evi-line); box-shadow: none;
+}
+.evi-btn-ghost:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+
+/* ── the coverage banner: the most important element on the page ─────── */
+.evi-coverage {
+  display: flex; gap: 13px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--radius-md, 10px);
+  background: linear-gradient(95deg, rgba(56,189,248,.10), rgba(139,92,246,.07));
+  border: 1px solid rgba(99,102,241,.26); margin-bottom: 18px;
+}
+.evi-coverage .ic { flex-shrink: 0; color: var(--evi-a1); margin-top: 1px; }
+.evi-coverage .tx { font-size: 12.8px; line-height: 1.6; color: var(--evi-ink-2); min-width: 0; }
+.evi-coverage .tx b { color: var(--evi-ink); font-weight: 600; }
+
+/* ── stats ──────────────────────────────────────────────────────────── */
+.evi-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.evi-stat {
+  padding: 14px 16px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-stat .v { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.evi-stat .l { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-stat.warn .v { color: var(--evi-warn); }
+
+/* ── roster ─────────────────────────────────────────────────────────── */
+.evi-rolebar { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 14px; }
+.evi-chip {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 13px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  color: var(--evi-ink-2); transition: .16s;
+}
+.evi-chip[aria-pressed="true"] {
+  color: #fff; border-color: rgba(99,102,241,.45);
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(139,92,246,.2));
+}
+:root[data-theme="light"] .evi-chip[aria-pressed="true"] { color: #1b2440; }
+.evi-chip .n { opacity: .65; font-weight: 500; margin-left: 5px; }
+
+/* The roster is the one surface that can arrive with four hundred rows and
+   company names of any length, both of them read off third-party pages. So:
+   a height-constrained scroll container (without one the sticky header had
+   nothing to stick inside and never engaged), an OPAQUE header (the panel
+   token is semi-transparent, so rows scrolled through the old one), a fixed
+   layout with real column widths, and per-cell ellipsis. */
+.evi-tablewrap {
+  overflow: auto; max-height: min(560px, 58vh);
+  border-radius: var(--radius-md, 10px); border: 1px solid var(--evi-line-2);
+  overscroll-behavior: contain;
+}
+table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 13px; min-width: 720px; table-layout: fixed; }
+.evi-table th {
+  text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 600; padding: 11px 14px;
+  border-bottom: 1px solid var(--evi-line);
+  background: var(--evi-panel-solid, #141a2e);
+  position: sticky; top: 0; z-index: 2;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+}
+:root[data-theme="light"] .evi-table th { background: #eef1f8; }
+.evi-table td { padding: 11px 14px; border-bottom: 1px solid var(--evi-line-2);
+  vertical-align: top; overflow: hidden; text-overflow: ellipsis; }
+.evi-table tbody tr:nth-child(even) td { background: rgba(127,140,180,.035); }
+.evi-table td:nth-child(1) { width: 34%; }
+.evi-table td:nth-child(2) { width: 13%; }
+.evi-table td:nth-child(3) { width: 26%; }
+.evi-table .num { font-variant-numeric: tabular-nums; }
+.evi-table tr:last-child td { border-bottom: none; }
+.evi-table tbody tr:hover { background: rgba(99,102,241,.06); }
+.evi-org { font-weight: 600; color: var(--evi-ink); }
+.evi-dom { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 2px; }
+.evi-dom a { color: var(--evi-a1); text-decoration: none; }
+.evi-dom a:hover { text-decoration: underline; }
+
+/* Role pills. Colour separates them at a glance; the LABEL is what carries
+   the claim, and it comes from event_intel_store.ROLE_LABELS so there is one
+   place in the codebase that decides what a row is called. */
+.evi-role {
+  display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  white-space: nowrap;
+}
+.evi-role.r-exhibitor { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.3); }
+.evi-role.r-sponsor { background: rgba(139,92,246,.16); color: #c4b5fd; border: 1px solid rgba(139,92,246,.3); }
+.evi-role.r-speaker { background: rgba(74,222,128,.14); color: #86efac; border: 1px solid rgba(74,222,128,.28); }
+.evi-role.r-partner { background: rgba(251,191,36,.14); color: #fcd34d; border: 1px solid rgba(251,191,36,.28); }
+.evi-role.r-media { background: rgba(148,163,184,.16); color: #cbd5e1; border: 1px solid rgba(148,163,184,.3); }
+.evi-role.r-attendee_declared { background: rgba(244,114,182,.16); color: #f9a8d4; border: 1px solid rgba(244,114,182,.32); }
+:root[data-theme="light"] .evi-role.r-exhibitor { color: #0369a1; }
+:root[data-theme="light"] .evi-role.r-sponsor { color: #6d28d9; }
+:root[data-theme="light"] .evi-role.r-speaker { color: #15803d; }
+:root[data-theme="light"] .evi-role.r-partner { color: #a16207; }
+:root[data-theme="light"] .evi-role.r-media { color: #475569; }
+:root[data-theme="light"] .evi-role.r-attendee_declared { color: #be185d; }
+
+.evi-contacts { margin-top: 7px; display: flex; flex-direction: column; gap: 3px; }
+.evi-contact { font-size: 11.5px; color: var(--evi-ink-2); }
+.evi-contact .t { color: var(--evi-ink-3); }
+.evi-contact a { color: var(--evi-a1); text-decoration: none; }
+
+.evi-src-link { font-size: 11px; color: var(--evi-ink-3); text-decoration: none; }
+.evi-src-link:hover { color: var(--evi-a1); text-decoration: underline; }
+
+/* ── source ledger ──────────────────────────────────────────────────── */
+.evi-sources { display: flex; flex-direction: column; gap: 8px; }
+.evi-source {
+  display: flex; gap: 11px; align-items: flex-start; padding: 11px 13px;
+  border-radius: var(--radius-sm, 8px); background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2);
+}
+.evi-source .st {
+  flex-shrink: 0; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+}
+.evi-source .st.ok { background: rgba(74,222,128,.14); color: var(--evi-ok); }
+.evi-source .st.blocked { background: rgba(251,191,36,.14); color: var(--evi-warn); }
+.evi-source .st.not_found, .evi-source .st.error { background: rgba(251,113,133,.14); color: var(--evi-bad); }
+/* Column, not the default row: the URL and the outcome line are two separate
+   facts, and side by side they read as one run-on string. */
+.evi-source .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.evi-source .u { font-size: 12px; color: var(--evi-ink-2); word-break: break-all; }
+.evi-source .u a { color: var(--evi-ink-2); text-decoration: none; }
+.evi-source .u a:hover { color: var(--evi-a1); }
+.evi-source .n { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 3px; line-height: 1.5; }
+
+/* ── events (discover mode) ─────────────────────────────────────────────
+   Three views of one set of events, drawn from the same numbers: the mix
+   at the top, the calendar in the middle, the cards below. Every colour in
+   all three comes from the fit band, so a marker on the rail, a bar in the
+   spread and the ring on a card are recognisably the same event. */
+
+/* Band colours. Declared once and consumed by .f-* below, so the rail, the
+   spread and the gauge cannot drift apart. */
+:root {
+  --evi-f-hi: #38bdf8;
+  --evi-f-mid: #6366f1;
+  --evi-f-low: #8b5cf6;
+  --evi-f-weak: #64748b;
+  --evi-f-na: #4b5675;
+}
+:root[data-theme="light"] {
+  --evi-f-hi: #0284c7;
+  --evi-f-mid: #4f46e5;
+  --evi-f-low: #7c3aed;
+  --evi-f-weak: #64748b;
+  --evi-f-na: #94a3b8;
+}
+.f-hi { --band: var(--evi-f-hi); }
+.f-mid { --band: var(--evi-f-mid); }
+.f-low { --band: var(--evi-f-low); }
+.f-weak { --band: var(--evi-f-weak); }
+.f-na { --band: var(--evi-f-na); }
+
+/* ── the chart kit ──────────────────────────────────────────────────────
+   Donut, bars, columns, funnel and ring. All five read --band off a .f-*
+   or .t-* class on the element itself, which is the same mechanism the
+   calendar rail and the fit gauge already use, so a colour cannot mean one
+   thing in a chart and another on the card the chart points at.
+
+   Every draw-in below animates from a `from` keyframe only. The value each
+   one animates TO is the element's own inline width/height/dasharray, so
+   one keyframe serves a hundred different bars without any of them being
+   told what their final size is twice. */
+
+/* Every draw-in below is armed by script one frame AFTER the chart is
+   written, never by the stylesheet on its own. A keyframe that grows a bar
+   from zero renders as an empty axis anywhere the timeline does not run: a
+   background tab, a print, a screenshot taken before first paint. Arming
+   from inside a requestAnimationFrame callback means the chart is drawn
+   finished by default and only ever animated on a screen that is painting.
+   Nothing here is load-bearing for whether a number can be read. */
+@keyframes evi-arc-draw { from { stroke-dasharray: 0 400; } }
+@keyframes evi-grow-w { from { width: 0; } }
+@keyframes evi-grow-h { from { height: 0; } }
+@keyframes evi-rise { from { opacity: 0; transform: translateY(7px); } }
+
+/* Tier bands. P1/P2/P3 are the recommendation's own words for the same job
+   the fit bands do in the other two reports, so they feed the same variable
+   rather than carrying colours of their own. */
+.t-P1 { --band: var(--evi-f-hi); }
+.t-P2 { --band: var(--evi-f-mid); }
+.t-P3 { --band: var(--evi-f-weak); }
+.f-ok { --band: var(--evi-ok); }
+.f-warn { --band: var(--evi-warn); }
+.f-bad { --band: var(--evi-bad); }
+
+/* -- donut ------------------------------------------------------------- */
+.evi-donut { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.evi-donut .dw { position: relative; width: 108px; height: 108px; flex-shrink: 0; }
+.evi-donut svg { width: 100%; height: 100%; display: block; }
+.evi-donut .tr {
+  fill: none; stroke: var(--evi-line); stroke-width: 12;
+}
+.evi-donut .sg {
+  fill: none; stroke: var(--band, var(--evi-f-na)); stroke-width: 12;
+}
+.evi-anim .evi-donut .sg {
+  animation: evi-arc-draw .7s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .09s);
+}
+.evi-donut .dc {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px; pointer-events: none;
+}
+.evi-donut .dc b {
+  font-size: 27px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--evi-ink);
+}
+.evi-donut .dc i {
+  font-style: normal; font-size: 9.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--evi-ink-3); text-align: center;
+  max-width: 74px; line-height: 1.25;
+}
+
+.evi-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; min-width: 0; flex: 1 1 180px; }
+.evi-legend .lg {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  color: var(--evi-ink-2); background: none; border: 0; padding: 2px 0;
+  font-family: inherit; text-align: left;
+}
+.evi-legend button.lg { cursor: pointer; }
+.evi-legend button.lg:hover { color: var(--evi-ink); }
+.evi-legend button.lg[aria-pressed="true"] { color: var(--evi-ink); font-weight: 650; }
+.evi-legend .lg i {
+  width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0;
+  background: var(--band, var(--evi-f-na));
+}
+.evi-legend button.lg[aria-pressed="true"] i {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--band, var(--evi-f-na)) 26%, transparent);
+}
+
+/* -- labelled bars ----------------------------------------------------- */
+.evi-bars { display: flex; flex-direction: column; gap: 11px; }
+.evi-bars .br {
+  display: grid; gap: 3px 12px; align-items: center;
+  grid-template-columns: minmax(96px, 150px) 1fr auto;
+}
+.evi-anim .evi-bars .br {
+  animation: evi-rise .4s ease-out both; animation-delay: calc(var(--i, 0) * .05s);
+}
+.evi-bars .bl { font-size: 12.5px; font-weight: 620; color: var(--evi-ink); }
+.evi-bars .bt {
+  position: relative; height: 9px; border-radius: 5px;
+  background: var(--evi-line-2); overflow: hidden;
+}
+.evi-bars .bt .fl {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px;
+  background: var(--band, var(--evi-a2));
+}
+.evi-anim .evi-bars .bt .fl {
+  animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .05s + .08s);
+}
+/* The quota mark. A bar that reaches it met what was asked of it, and one
+   that stops short is short by a visible distance rather than by a number
+   the reader has to subtract. */
+.evi-bars .bt .gl {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; z-index: 2;
+  background: var(--evi-ink-2); opacity: .55;
+}
+/* Only a bar measured against a quota carries a verdict colour. A bar that
+   is just a count of something, an industry, a company size, is drawn in
+   the page accent: green would tell the reader that having four of a thing
+   is good, which is not a claim this chart is in a position to make. */
+.evi-bars .br.met { --band: var(--evi-ok); }
+.evi-bars .br.short { --band: var(--evi-warn); }
+.evi-bars .br.error { --band: var(--evi-bad); }
+.evi-bars .bn {
+  font-size: 12px; font-variant-numeric: tabular-nums; color: var(--evi-ink);
+  font-weight: 650; white-space: nowrap;
+}
+.evi-bars .bn i { font-style: normal; color: var(--evi-ink-3); font-weight: 500; }
+.evi-bars .bw {
+  grid-column: 1 / -1; font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55;
+}
+.evi-bars .bw b { color: var(--evi-bad); font-weight: 650; }
+@media (max-width: 620px) {
+  .evi-bars .br { grid-template-columns: 1fr auto; }
+  .evi-bars .bt { grid-column: 1 / -1; order: 3; }
+  .evi-bars .bw { order: 4; }
+}
+
+/* -- column spread ----------------------------------------------------- */
+.evi-cols { display: flex; flex-direction: column; gap: 9px; }
+.evi-cols .cwrap { padding-top: 12px; }
+.evi-cols .cs {
+  position: relative; display: flex; align-items: flex-end;
+  /* Packed from the left, not spread across the width. `space-between` puts
+     all the slack between the columns, which is invisible at eleven columns
+     and absurd at two: a live report showed one kept event and one cut one
+     as two lonely blocks pinned to opposite edges of an empty band, which
+     reads as a broken chart rather than as two events. */
+  justify-content: flex-start; gap: 5px; height: 138px;
+}
+/* Capped, then spread. Eleven columns filling a 1000px drawer are ninety
+   pixels wide each, which reads as a wall of blocks rather than as a
+   distribution; capped and evenly spaced, the same eleven read as a chart
+   and forty still fit. */
+.evi-cols .cx {
+  flex: 1 1 0; min-width: 5px; max-width: 34px; height: 100%;
+  display: flex; align-items: flex-end;
+  background: none; border: 0; padding: 0; font: inherit;
+}
+/* A handful of columns get to be wider. The 34px cap exists so that forty
+   columns read as a distribution; at two or three it makes them look like
+   an accident. */
+.evi-cols.few .cx { max-width: 72px; }
+.evi-cols button.cx { cursor: pointer; }
+.evi-cols .cl {
+  display: block; width: 100%; border-radius: 3px 3px 1px 1px;
+  background: var(--band, var(--evi-f-na));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  transition: filter .14s ease, transform .14s ease;
+}
+.evi-anim .evi-cols .cl {
+  animation: evi-grow-h .55s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .028s);
+}
+/* A stub, not a zero. Hatched so it cannot be mistaken for a very low score
+   at a glance, which is the one misreading this column has to survive. */
+.evi-cols .cl.na {
+  background: repeating-linear-gradient(45deg,
+    var(--evi-f-na) 0 3px, transparent 3px 6px);
+  box-shadow: inset 0 0 0 1px var(--evi-line);
+}
+.evi-cols button.cx:hover .cl, .evi-cols button.cx:focus-visible .cl {
+  filter: brightness(1.28); transform: translateY(-2px);
+}
+.evi-cols button.cx:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-cols .fo {
+  position: absolute; left: 0; right: 0; height: 0;
+  border-top: 1px dashed var(--evi-ink-3); opacity: .75;
+  pointer-events: none; z-index: 3;
+}
+.evi-cols .fo b {
+  position: absolute; right: 0; top: -7px; font-size: 9.5px; font-weight: 650;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--evi-ink-3);
+  background: var(--evi-panel); padding: 1px 5px; border-radius: 4px;
+}
+.evi-cols .cn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
+.evi-cols .cn b { color: var(--evi-ink); font-weight: 650; }
+
+/* -- funnel ------------------------------------------------------------ */
+.evi-funnel { display: flex; flex-direction: column; gap: 10px; }
+.evi-anim .evi-funnel .fs {
+  animation: evi-rise .42s ease-out both; animation-delay: calc(var(--i, 0) * .07s);
+}
+.evi-funnel .fb {
+  height: 30px; border-radius: 7px; display: flex; align-items: center;
+  padding: 0 11px; min-width: 44px;
+  background: linear-gradient(96deg,
+    color-mix(in srgb, var(--band, var(--evi-a2)) 78%, transparent),
+    color-mix(in srgb, var(--band, var(--evi-a2)) 34%, transparent));
+  border: 1px solid color-mix(in srgb, var(--band, var(--evi-a2)) 40%, transparent);
+}
+.evi-anim .evi-funnel .fb {
+  animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both;
+  animation-delay: calc(var(--i, 0) * .07s + .05s);
+}
+.evi-funnel .fb b {
+  font-size: 15px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.evi-funnel .fl { font-size: 12px; color: var(--evi-ink-2); margin-top: 4px; }
+.evi-funnel .fn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+
+/* -- single-arc stat --------------------------------------------------- */
+.evi-ring { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.evi-ring .rw { position: relative; display: block; width: 74px; height: 74px; flex-shrink: 0; }
+.evi-ring svg { width: 100%; height: 100%; display: block; }
+.evi-ring .tr { fill: none; stroke: var(--evi-line); stroke-width: 8; }
+.evi-ring .vl {
+  fill: none; stroke: var(--band, var(--evi-f-na)); stroke-width: 8;
+  stroke-linecap: round;
+}
+.evi-anim .evi-ring .vl {
+  animation: evi-arc-draw .8s cubic-bezier(.22,.85,.3,1) both;
+}
+.evi-ring .rn {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.evi-ring .rv { display: flex; align-items: baseline; gap: 1px; }
+.evi-ring .rn b {
+  font-size: 22px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--evi-ink);
+}
+.evi-ring .rn i {
+  font-style: normal; font-size: 10px; color: var(--evi-ink-3); line-height: 1;
+}
+.evi-ring .rl {
+  font-size: 12px; color: var(--evi-ink-2); line-height: 1.45; min-width: 0;
+}
+.evi-ring .rl i {
+  display: block; font-style: normal; font-size: 11px; color: var(--evi-ink-3);
+  margin-top: 2px;
+}
+
+/* Nothing above moves for a reader who has asked the OS for less motion.
+   Scoped to this file's own animations by name so it cannot switch off a
+   spinner that is reporting that a 40 minute run is still alive. */
+@media (prefers-reduced-motion: reduce) {
+  .evi-anim .evi-donut .sg, .evi-anim .evi-bars .br, .evi-anim .evi-bars .bt .fl,
+  .evi-anim .evi-cols .cl, .evi-anim .evi-funnel .fs, .evi-anim .evi-funnel .fb,
+  .evi-anim .evi-ring .vl {
+    animation: none !important;
+  }
+}
+
+/* ── the roster panels ──────────────────────────────────────────────────
+   Flex, not grid. Three panels in a four-track grid keep the width four
+   would have had and leave a dead column on the right, and auto-fit does
+   not fix it: the 1fr distribution is settled before an empty track
+   collapses. Flex has no track count to get wrong. */
+.evi-panels { display: flex; flex-wrap: wrap; gap: var(--gutter, 14px); }
+.evi-panel {
+  flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 17px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-panel h4 {
+  font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-panel .pn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; margin-top: auto; }
+.evi-panel .pn b { color: var(--evi-warn); font-weight: 650; }
+@media (max-width: 620px) { .evi-panel { flex-basis: 100%; } }
+
+/* Role bands, taken off the table's own role pills so a slice of the donut
+   and the pill on the row it stands for are the same colour. */
+.rb-exhibitor { --band: #38bdf8; }
+.rb-sponsor { --band: #8b5cf6; }
+.rb-speaker { --band: #4ade80; }
+.rb-partner { --band: #fbbf24; }
+.rb-media { --band: #94a3b8; }
+.rb-declared { --band: #f472b6; }
+:root[data-theme="light"] .rb-exhibitor { --band: #0284c7; }
+:root[data-theme="light"] .rb-sponsor { --band: #7c3aed; }
+:root[data-theme="light"] .rb-speaker { --band: #15803d; }
+:root[data-theme="light"] .rb-partner { --band: #a16207; }
+:root[data-theme="light"] .rb-media { --band: #64748b; }
+:root[data-theme="light"] .rb-declared { --band: #be185d; }
+
+/* ── the event, at the top of a lookup ─────────────────────────────────── */
+.evi-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.evi-hero-ev {
+  display: flex; flex-direction: column; gap: 11px; margin-bottom: 18px;
+  padding: 17px 19px 16px; border-radius: var(--radius-md, 12px);
+  background:
+    linear-gradient(150deg, rgba(56,189,248,.09), transparent 62%),
+    var(--evi-panel-2);
+  border: 1px solid var(--evi-line);
+}
+.evi-anim .evi-hero-ev { animation: evi-rise .45s ease-out both; }
+.evi-hero-ev .hn {
+  font-family: 'Bricolage Grotesque', 'Space Grotesk', sans-serif;
+  font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2;
+  color: var(--evi-ink); display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px;
+}
+.evi-hero-ev .he {
+  font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--evi-ink-3);
+  padding: 2px 8px; border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--evi-line); background: var(--evi-panel);
+}
+.evi-hero-ev .ha { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.6; }
+.evi-hero-ev .hl {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--evi-a1); text-decoration: none;
+}
+.evi-hero-ev .hl:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .evi-anim .evi-hero-ev { animation: none; } }
+
+/* ── at a glance ─────────────────────────────────────────────────────── */
+.evi-glance { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 780px) { .evi-glance { grid-template-columns: 1fr; } }
+.evi-tile {
+  display: flex; flex-direction: column; gap: 9px; min-width: 0;
+  padding: 15px 17px 14px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-tile.on { border-color: rgba(99,102,241,.4); }
+.evi-tile .tl {
+  font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-tile .tv {
+  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  background: linear-gradient(100deg, var(--evi-g1), var(--evi-g3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  margin-top: auto;
+}
+.evi-tile .tn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
+.evi-tile .tn b { color: var(--evi-ink); font-weight: 650; }
+
+/* One bar per event, in the order of the list below, and each one is the way
+   into its own card. Heights are the score itself, so the chart is the
+   numbers and not a ranking of them: two events both at 96 draw two equal
+   bars rather than a first and a second. */
+.evi-tile .tbars {
+  display: flex; align-items: flex-end; gap: 4px; height: 46px; margin-top: auto;
+}
+.evi-tile .tbars button {
+  appearance: none; padding: 0; border: 0; font: inherit; cursor: pointer;
+  flex: 1 1 0; min-width: 4px; border-radius: 3px 3px 1px 1px;
+  background: var(--band, var(--evi-f-na));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+  transition: filter .14s ease, transform .14s ease;
+}
+.evi-tile .tbars button:hover, .evi-tile .tbars button:focus-visible {
+  filter: brightness(1.28); transform: translateY(-2px); outline: none;
+}
+.evi-tile .tbars button:focus-visible { box-shadow: 0 0 0 2px var(--evi-a1); }
+.evi-tile .tstack {
+  display: flex; gap: 3px; height: 12px; margin-top: auto; border-radius: 999px;
+}
+.evi-tile .tstack button {
+  appearance: none; padding: 0; border: 0; font: inherit; cursor: pointer;
+  min-width: 6px; border-radius: 999px;
+  transition: filter .14s ease, box-shadow .14s ease;
+}
+.evi-tile .tstack button:hover { filter: brightness(1.25); }
+.evi-tile .tstack button:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--evi-a1);
+}
+/* A slice that is not the one being filtered on steps back rather than
+   disappearing, so the mix on screen is still the mix of the whole set. */
+.evi-tile.on .tstack button[aria-pressed="false"] { filter: saturate(.25) opacity(.5); }
+.evi-tile.on .tlegend .lg[aria-pressed="false"] { opacity: .55; }
+.s-in_person { background: var(--evi-f-hi); }
+.s-hybrid { background: var(--evi-f-mid); }
+.s-virtual { background: var(--evi-f-low); }
+.s-unknown { background: var(--evi-f-na); }
+.evi-tile .tlegend { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.evi-tile .lg {
+  appearance: none; border: 0; background: none; padding: 2px 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; font: inherit;
+  font-size: 11.5px; color: var(--evi-ink-3); white-space: nowrap;
+  transition: color .14s ease, opacity .14s ease;
+}
+.evi-tile .lg:hover { color: var(--evi-ink); }
+.evi-tile .lg[aria-pressed="true"] { color: var(--evi-ink); font-weight: 650; }
+.evi-tile .lg:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-tile .lg i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.evi-tile .lg.s-in_person { background: none; }
+.evi-tile .lg.s-hybrid { background: none; }
+.evi-tile .lg.s-virtual { background: none; }
+.evi-tile .lg.s-unknown { background: none; }
+.evi-tile .lg.s-in_person i { background: var(--evi-f-hi); }
+.evi-tile .lg.s-hybrid i { background: var(--evi-f-mid); }
+.evi-tile .lg.s-virtual i { background: var(--evi-f-low); }
+.evi-tile .lg.s-unknown i { background: var(--evi-f-na); }
+
+/* ── the calendar rail ───────────────────────────────────────────────── */
+/* Wide content scrolls in its own box; the page body never does. Every
+   position on the rail is a percentage of its width, so below the minimum
+   the markers pile into one smudge and the month labels print over each
+   other. Scrolling keeps the spacing the lane algorithm assumed. */
+/* NOT .evi-rail. That name is already taken by the page's own right-hand
+   <aside class="evi-rail">, and using it here silently handed the sidebar a
+   640px min-width and this calendar the sidebar's sticky positioning. The
+   drawer-only preview could not see it because it renders no page chrome. */
+.evi-calwrap { overflow-x: auto; overflow-y: hidden; }
+.evi-cal {
+  position: relative; min-width: 640px; padding: 14px 12px 0;
+  border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+}
+.evi-cal .grid { position: absolute; inset: 14px 12px 26px; pointer-events: none; }
+.evi-cal .grid span {
+  position: absolute; top: 0; bottom: 0; width: 1px; background: var(--evi-line-2);
+}
+/* Where now is. Drawn under the markers so it never hides one, and only
+   drawn at all when today falls inside the span the events cover. */
+.evi-cal .now {
+  position: absolute; top: 8px; bottom: 26px; width: 0;
+  border-left: 1px dashed rgba(56,189,248,.55); pointer-events: none;
+}
+.evi-cal .now b {
+  position: absolute; top: -4px; left: 5px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--evi-a1);
+}
+.evi-cal .marks { position: relative; margin: 8px 0 4px; }
+/* The true run of a multi-day event. A one-day event draws a hairline that
+   the marker covers, which is correct: there is nothing to span. */
+.evi-cal .sp {
+  position: absolute; height: 8px; border-radius: 999px;
+  background: var(--band, var(--evi-f-na)); opacity: .38;
+}
+.evi-cal .mk {
+  position: absolute; transform: translateX(-50%);
+  appearance: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
+  width: 26px; height: 26px; border-radius: 50%; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #061021; background: var(--band, var(--evi-f-na));
+  border: 2px solid var(--evi-panel);
+  box-shadow: 0 2px 10px rgba(2,8,24,.5);
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+:root[data-theme="light"] .evi-cal .mk { color: #fff; border-color: #fff; }
+.evi-cal .mk:hover, .evi-cal .mk:focus-visible {
+  transform: translateX(-50%) scale(1.16); box-shadow: 0 3px 16px rgba(56,189,248,.45);
+  outline: none;
+}
+/* Outside the filter, not gone from the calendar. See the note in
+   railHtml(): dropping points would change the span, the lanes and the
+   month axis, so the same run would draw a different shape per chip. */
+.evi-cal .mk.out { filter: saturate(.15) opacity(.42); }
+.evi-cal .mk.out:hover { filter: none; }
+.evi-cal .sp.out { opacity: .12; }
+.evi-cal .axis {
+  position: relative; height: 26px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-cal .axis .tk { position: absolute; top: 0; }
+.evi-cal .axis .tk::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 1px; height: 5px;
+  background: var(--evi-line);
+}
+.evi-cal .axis .tk b {
+  position: absolute; top: 7px; left: 3px; white-space: nowrap;
+  font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--evi-ink-3);
+}
+/* Events with no announced date. Never drawn on the rail at a guessed
+   position: named beside it instead, which is the honest shape of the gap. */
+.evi-undated {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 10px;
+  padding: 11px 14px; border-radius: var(--radius-sm, 8px);
+  border: 1px solid rgba(251,191,36,.28); background: rgba(251,191,36,.07);
+  font-size: 12px; line-height: 1.55; color: var(--evi-ink-2);
+}
+.evi-undated svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px;
+  color: var(--evi-warn); }
+.evi-undated b { color: var(--evi-ink); font-weight: 650; }
+.evi-undated .un {
+  appearance: none; border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: inherit; color: var(--evi-ink);
+  text-decoration: underline; text-decoration-color: rgba(251,191,36,.5);
+  text-underline-offset: 3px;
+}
+.evi-undated .un:hover { color: var(--evi-warn); text-decoration-color: currentColor; }
+.evi-undated .un:focus-visible { outline: 2px solid var(--evi-warn); outline-offset: 2px; }
+
+/* ── the list header ─────────────────────────────────────────────────── */
+.evi-listbar {
+  display: flex; align-items: flex-end; gap: 10px 16px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.evi-listbar .rb {
+  flex: 1 1 300px; min-width: 0; font-size: 12px; line-height: 1.5;
+  color: var(--evi-ink-3);
+}
+/* margin-left rather than justify-content: space-between, which parks the
+   control at the LEFT of the second line the moment the note beside it wraps. */
+.evi-seg {
+  display: inline-flex; flex-shrink: 0; margin-left: auto; padding: 3px; gap: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+}
+.evi-seg button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
+  padding: 5px 13px; border-radius: var(--radius-pill, 999px);
+  border: 1px solid transparent; background: none; color: var(--evi-ink-3);
+}
+.evi-seg button:hover { color: var(--evi-ink); }
+.evi-seg button[aria-pressed="true"] {
+  color: var(--evi-ink); background: rgba(99,102,241,.18);
+  border-color: rgba(99,102,241,.38);
+}
+.evi-seg button:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 1px; }
+
+/* A list quietly shorter than the count above it is a bug this page has
+   shipped once already. When a filter is on it says so, and says how to
+   stop, in the same place the list starts. */
+.evi-filterbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px 14px; flex-wrap: wrap; margin-bottom: 12px;
+  padding: 9px 14px; border-radius: var(--radius-sm, 8px);
+  font-size: 12px; color: var(--evi-ink-2);
+  background: rgba(99,102,241,.09); border: 1px solid rgba(99,102,241,.26);
+}
+.evi-filterbar b { color: var(--evi-ink); font-weight: 700; }
+.evi-filterbar button {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
+  padding: 5px 12px; border-radius: var(--radius-pill, 999px);
+  color: var(--evi-ink); background: rgba(99,102,241,.18);
+  border: 1px solid rgba(99,102,241,.42);
+}
+.evi-filterbar button:hover { background: rgba(99,102,241,.3); }
+.evi-filterbar button:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 1px; }
+
+/* ── the cards ───────────────────────────────────────────────────────── */
+.evi-events { display: grid; gap: 12px; }
+.evi-ev {
+  display: grid; gap: 0 15px; align-items: start;
+  grid-template-columns: 30px minmax(0, 1fr) 78px;
+  padding: 16px 18px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  border-left: 3px solid var(--band, var(--evi-f-na));
+  scroll-margin: 24px;
+  transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
+}
+.evi-ev.lit {
+  border-color: var(--band, var(--evi-a1));
+  box-shadow: 0 0 0 1px var(--band, var(--evi-a1)), 0 6px 26px rgba(56,189,248,.22);
+}
+/* The whole card opens the event's page. The title inside is still a real
+   anchor, which is the keyboard and screen-reader route to the same place,
+   so this is a mouse shortcut and nothing more. Deliberately NOT a stretched
+   ::after overlay: that would make the quotes in the card unselectable, and
+   being able to copy them is most of why they are there. */
+.evi-ev.link { cursor: pointer; }
+.evi-ev.link:hover {
+  border-color: var(--evi-line); border-left-color: var(--band, var(--evi-f-na));
+  box-shadow: 0 6px 26px rgba(2,8,24,.42);
+  transform: translateY(-1px);
+}
+:root[data-theme="light"] .evi-ev.link:hover { box-shadow: 0 6px 22px rgba(30,45,90,.12); }
+.evi-ev.link:hover .nm a { color: var(--evi-a1); }
+.evi-ev.link:hover .nm a svg { opacity: 1; }
+.evi-ev .rk {
+  font-size: 12.5px; font-weight: 700; line-height: 26px; text-align: center;
+  width: 26px; height: 26px; border-radius: 50%; color: var(--evi-ink-3);
+  background: rgba(255,255,255,.05); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-ev .rk { background: rgba(20,30,60,.05); }
+.evi-ev .bd { min-width: 0; }
+.evi-ev .nm {
+  font-size: 16px; font-weight: 700; letter-spacing: -.012em; line-height: 1.3;
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+}
+.evi-ev .nm a {
+  color: inherit; text-decoration: none; display: inline-flex; align-items: baseline; gap: 6px;
+}
+.evi-ev .nm a:hover { color: var(--evi-a1); }
+.evi-ev .nm a svg { width: 12px; height: 12px; flex-shrink: 0; opacity: .45;
+  align-self: center; }
+.evi-ev .nm a:hover svg { opacity: 1; }
+.evi-ev .nm .ed {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--evi-ink-3); padding: 2px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(255,255,255,.05); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-ev .nm .ed { background: rgba(20,30,60,.05); }
+.evi-ev .org { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-ev .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.evi-tag {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  font-size: 11.5px; font-weight: 550; line-height: 1.35; color: var(--evi-ink-2);
+  padding: 4px 9px; border-radius: var(--radius-xs, 5px);
+  background: rgba(255,255,255,.045); border: 1px solid var(--evi-line-2);
+}
+:root[data-theme="light"] .evi-tag { background: rgba(20,30,60,.04); }
+.evi-tag svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--evi-ink-3); }
+.evi-tag.go {
+  color: var(--evi-a1); border-color: rgba(56,189,248,.3); background: rgba(56,189,248,.09);
+}
+.evi-tag.go svg { color: var(--evi-a1); }
+.evi-tag.warn {
+  color: var(--evi-warn); border-color: rgba(251,191,36,.3); background: rgba(251,191,36,.08);
+}
+.evi-tag.warn svg { color: var(--evi-warn); }
+/* A fact the organiser has not published. Deliberately dimmer than a stated
+   one: an unstated format must not read as a stated one. */
+.evi-tag.mut { color: var(--evi-ink-3); border-style: dashed; background: none; }
+.evi-ev .why { font-size: 13px; color: var(--evi-ink-2); line-height: 1.62; margin-top: 11px; }
+.evi-ev .aud {
+  font-size: 12.2px; color: var(--evi-ink-3); line-height: 1.6; margin-top: 7px;
+}
+
+/* The score, as an arc. The number on its own made 96 and 62 look like the
+   same sort of answer until you read them.
+
+   The number is positioned against .ring, which is exactly the size of the
+   circle. It used to be absolutely placed against the whole gauge column,
+   which is wider, so it sat thirteen pixels left of the arc it was
+   reporting, and at the mobile breakpoint it sat somewhere else again. */
+.evi-gauge {
+  width: 78px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.evi-gauge .ring {
+  position: relative; display: block; width: 52px; height: 52px; flex-shrink: 0;
+}
+.evi-gauge svg { width: 100%; height: 100%; display: block; }
+.evi-gauge circle { fill: none; stroke-width: 5; stroke-linecap: round; }
+.evi-gauge .tr { stroke: var(--evi-line); }
+.evi-gauge .vl { stroke: var(--band, var(--evi-f-na)); }
+.evi-gauge .n {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--evi-ink);
+  /* Tabular figures. Proportional digits make 96 and 11 different widths, so
+     a column of gauges wobbles against its own rings. */
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.evi-gauge .fl {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--evi-ink-3); text-align: center; line-height: 1.3;
+}
+/* Whether YOUR accounts are on this roster. The two states of this line
+   read almost identically in words and mean opposite things, so the left
+   accent is what tells them apart. It used to be declared only on the two
+   overrides and never on the base rule, so there was no border to recolour
+   and both states rendered the same. */
+.evi-overlap {
+  margin-top: 11px; font-size: 12px; line-height: 1.55; color: var(--evi-ink-2);
+  padding: 8px 12px; border-radius: var(--radius-xs, 5px);
+  border-left: 2px solid var(--evi-a1); background: rgba(56,189,248,.07);
+}
+.evi-overlap b { color: var(--evi-a1); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .evi-ev { grid-template-columns: 26px minmax(0, 1fr); }
+  .evi-gauge {
+    grid-column: 1 / -1; flex-direction: row; width: auto; gap: 9px;
+    justify-content: flex-start; margin-top: 12px;
+  }
+  /* Only the ring resizes. The number is inside it and follows. */
+  .evi-gauge .ring { width: 42px; height: 42px; }
+  .evi-gauge .n { font-size: 14px; }
+  .evi-cal .mk { width: 22px; height: 22px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evi-ev, .evi-cal .mk, .evi-tile .tbars button, .evi-tile .tstack button,
+  .evi-tile .lg { transition: none; }
+  .evi-ev.link:hover, .evi-tile .tbars button:hover { transform: none; }
+}
+
+/* ── history ────────────────────────────────────────────────────────── */
+.evi-runs { display: flex; flex-direction: column; gap: 8px; }
+/* In the rail these are 300px wide, so the title and its meta line each get a
+   row of their own and the status sits at the top right. Laid out on one flex
+   line they wrapped mid-phrase and left the badge floating. */
+.evi-run {
+  position: relative; display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 12px 11px 15px;
+  border-radius: var(--radius-md, 12px); background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2); cursor: pointer; transition: .16s;
+  text-align: left; width: 100%; font: inherit; color: inherit;
+}
+/* A colour spine per play, so the four kinds of run are told apart down the
+   list without reading each label. */
+.evi-run::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--evi-ink-3); opacity: .45;
+}
+.evi-run.m-recommend::before { background: var(--evi-a2); opacity: .9; }
+.evi-run.m-lookup::before { background: var(--evi-a1); opacity: .9; }
+.evi-run.m-discover::before { background: var(--evi-a3); opacity: .9; }
+.evi-run.m-workroom::before { background: var(--evi-ok); opacity: .8; }
+.evi-run:hover { border-color: rgba(99,102,241,.38); background: rgba(99,102,241,.07); }
+.evi-run .rl { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.evi-run .q { font-weight: 600; font-size: 13px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi-run .sub { font-size: 11px; color: var(--evi-ink-3); line-height: 1.45; }
+.evi-run .sub .k { color: var(--evi-ink-2); font-weight: 600; }
+.evi-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px); flex-shrink: 0;
+}
+.evi-badge.complete { background: rgba(74,222,128,.14); color: var(--evi-ok); }
+.evi-badge.running { background: rgba(56,189,248,.14); color: var(--evi-a1); }
+.evi-badge.failed { background: rgba(251,113,133,.14); color: var(--evi-bad); }
+
+/* ── drawer ─────────────────────────────────────────────────────────── */
+.evi-scrim {
+  position: fixed; inset: 0; z-index: 200; background: rgba(3,6,18,.74);
+  backdrop-filter: blur(7px); display: none; padding: 3vh 3vw;
+}
+.evi-scrim.on { display: block; }
+.evi-drawer {
+  max-width: 1120px; margin: 0 auto; height: 94vh; display: flex; flex-direction: column;
+  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-lg, 16px); overflow: hidden;
+  box-shadow: 0 40px 120px rgba(0,0,0,.6);
+}
+:root[data-theme="light"] .evi-drawer { background: #fff; }
+.evi-drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; border-bottom: 1px solid var(--evi-line); flex-shrink: 0;
+}
+.evi-drawer-head h2 { font-family: 'Bricolage Grotesque', serif; font-size: 21px;
+  font-weight: 700; letter-spacing: -.015em; }
+.evi-drawer-head .sub { font-size: 12.5px; color: var(--evi-ink-3); margin-top: 4px; }
+.evi-drawer-body { padding: 20px 22px 34px; overflow-y: auto; flex: 1; min-height: 0; }
+.evi-x {
+  appearance: none; border: 1px solid var(--evi-line); background: var(--evi-panel-2);
+  color: var(--evi-ink-2); cursor: pointer; font: inherit; font-size: 18px; line-height: 1;
+  width: 34px; height: 34px; border-radius: var(--radius-sm, 8px); flex-shrink: 0;
+}
+.evi-x:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+
+.evi-sec { margin-top: 26px; }
+.evi-sec:first-child { margin-top: 0; }
+.evi-sec h3 {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 700; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 9px;
+}
+.evi-sec h3::after { content: ""; flex: 1; height: 1px; background: var(--evi-line-2); }
+
+/* The empty state is not a gap in the page, it is one of its answers.
+   "Nothing cleared 70. That is the answer, not a failure." is rendered
+   through this class, and it used to be bare grey text on nothing. An agent
+   whose value is that it says what it could not find cannot render those
+   sentences as if something had gone wrong. */
+.evi-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 9px; padding: 34px 30px; min-height: min(300px, 40vh);
+  text-align: center; color: var(--evi-ink-3); font-size: 13px; line-height: 1.6;
+  border: 1px dashed var(--evi-line); border-radius: var(--radius-md, 10px);
+  background: linear-gradient(180deg, rgba(99,102,241,.05), rgba(99,102,241,0));
+}
+.evi-empty .ic {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin-bottom: 3px; border-radius: 50%;
+  font-size: 17px; color: var(--evi-a2);
+  background: rgba(99,102,241,.11); border: 1px solid rgba(99,102,241,.2);
+}
+.evi-empty b {
+  display: block; color: var(--evi-ink); font-size: 14px; font-weight: 650;
+  letter-spacing: -.01em;
+}
+.evi-empty span:not(.ic) { max-width: 46ch; }
+
+/* The stage list. A run can sit here for minutes, and the backend names every
+   stage it goes through, so the page shows the whole sequence and marks it
+   off rather than swapping one sentence in and out. */
+.evi-steps { list-style: none; margin: 11px 0 0; padding: 0 0 0 3px;
+  display: flex; flex-direction: column; gap: 7px; }
+.evi-steps li { display: flex; align-items: center; gap: 9px;
+  font-size: 12px; color: var(--evi-ink-3);
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  letter-spacing: -.01em; transition: color .25s ease; }
+.evi-steps .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--evi-line); transition: background .25s ease, box-shadow .25s ease; }
+.evi-steps li.done { color: var(--evi-ink-2); }
+.evi-steps li.done .dot { background: var(--evi-a2); }
+.evi-steps li.now { color: var(--evi-ink); font-weight: 600; }
+.evi-steps li.now .dot { background: var(--evi-a1);
+  box-shadow: 0 0 0 4px rgba(99,102,241,.18); animation: evi-pulse 1.5s ease-in-out infinite; }
+@keyframes evi-pulse {
+  50% { box-shadow: 0 0 0 7px rgba(99,102,241,.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evi-steps li.now .dot { animation: none; }
+  .evi-spinner { animation-duration: 2s; }
+}
+.evi-spinner {
+  width: 13px; height: 13px; border: 2px solid rgba(99,102,241,.25);
+  border-top-color: var(--evi-a2); border-radius: 50%; display: inline-block;
+  animation: evi-spin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes evi-spin { to { transform: rotate(360deg); } }
+.evi-running {
+  display: flex; align-items: center; gap: 11px; padding: 13px 15px;
+  border-radius: var(--radius-md, 10px); background: var(--evi-panel-2);
+  border: 1px solid rgba(99,102,241,.24); font-size: 13px; color: var(--evi-ink-2);
+  margin-top: 18px;
+}
+.evi-err {
+  padding: 13px 15px; border-radius: var(--radius-md, 10px); font-size: 13px;
+  background: rgba(251,113,133,.09); border: 1px solid rgba(251,113,133,.28);
+  color: var(--evi-ink-2); line-height: 1.6; margin-top: 16px;
+}
+.evi-err[hidden] { display: none; }
+/* Sits between the question and its options rather than under a button four
+   hundred pixels away, so it is tighter than a standalone error block. */
+#classError { margin: 2px 0 10px; font-size: 12.5px; padding: 11px 13px; }
+/* The group takes focus when the save is refused, so a keyboard user lands on
+   the question and not on the paragraph about it. It is a container, so the
+   ring goes round the options rather than round nothing. */
+#classGroup:focus { outline: none; }
+#classGroup:focus-visible {
+  outline: 2px solid var(--evi-a1); outline-offset: 6px; border-radius: 14px;
+}
+
+/* The drawer had no rule at any width, so on a phone it rendered as a
+   ~367px desktop sheet at 94vh holding a 720px-min table: about 2.2x
+   horizontal scroll with no ellipsis and no visible scrollbar. Below 720px it
+   becomes what it should be, a full-height sheet. */
+@media (max-width: 720px) {
+  .evi-scrim { padding: 0; align-items: flex-end; }
+  .evi-drawer { max-width: none; width: 100%; height: 100vh; max-height: 100vh;
+    border-radius: 0; border-left: none; border-right: none; }
+  .evi-drawer-body { padding-left: 16px; padding-right: 16px; overscroll-behavior: contain; }
+  .evi-tablewrap { max-height: none; }
+  .evi-empty { min-height: 200px; padding: 26px 18px; }
+}
+@media (max-width: 560px) {
+  .evi-steps li { font-size: 11px; }
+}
+
+/* The drawer used to appear by switching display, with no transition, where
+   both comparator pages animate theirs in. */
+.evi-drawer { animation: evi-rise .22s cubic-bezier(.2,.7,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .evi-drawer { animation: none; } }
+@keyframes evi-rise {
+  from { opacity: 0; transform: translateY(12px) scale(.995); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Print: the roster travels, the chrome does not. The coverage banner is
+   kept deliberately, because a printed roster with the caveat stripped off
+   is exactly the artefact this agent exists to not produce. */
+@media print {
+  html:root, html:root[data-theme="light"] { background: #fff; }
+  .topbar, .evi-modes, .evi-btn, .evi-rolebar, .evi-x, .evi-seg, #eviHistoryCard { display: none !important; }
+  .evi-scrim { position: static; background: none; backdrop-filter: none; padding: 0; display: block; }
+  .evi-drawer { height: auto; max-width: none; border: none; box-shadow: none; }
+  .evi-drawer-body { overflow: visible; }
+  .evi-card, .evi-drawer, .evi-stat, .evi-source, .evi-ev, .evi-tile, .evi-cal,
+  .evi-panel, .evi-hero-ev, .evi-window { background: #fff; border-color: #d8dde8; }
+  /* A print can start while a draw-in is halfway through, and a bar caught at
+     40% of its width prints at 40% of its width. Nothing here animates on
+     paper. */
+  .evi-anim * { animation: none !important; }
+  /* The charts are the one place on this page where colour carries meaning
+     rather than decoration, so the blanket ink rule above must not repaint
+     them. A donut whose every slice prints the same dark grey is a picture
+     of nothing. */
+  .evi-donut .sg, .evi-ring .vl, .evi-cols .cl, .evi-bars .bt .fl,
+  .evi-funnel .fb, .evi-legend .lg i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* The rail's numbers sit on a coloured disc, and the blanket dark-ink
+     rule above would print them dark-on-dark. */
+  .evi-cal .mk { color: #fff !important; border-color: #fff; box-shadow: none; }
+  .evi-coverage { background: #f4f7ff; border-color: #b9c6ea; }
+  * { color: #10162a !important; }
+  .evi-table { min-width: 0; font-size: 11px; }
+  .evi-src-link::after { content: " (" attr(href) ")"; font-size: 9px; color: #5b6480 !important; }
+
+  /* ── the report has to actually be on the paper ──────────────────────
+     Everything below is one bug, found by printing the page rather than
+     looking at it: three blank pages, at exactly the height of the report
+     that should have been on them.
+
+     `.evi-drawer` draws in with `animation: evi-rise` and
+     `animation-fill-mode: both`, whose `from` keyframe is `opacity: 0`. A
+     print taken before that 220ms animation has run applies the `from`
+     frame and paints nothing, while the element keeps every pixel of its
+     layout height. The existing freeze rule only reached `.evi-anim *`,
+     which is the charts inside the report and not the report itself.
+
+     It is a race, which is why it survived: print a report you have been
+     reading for a while and the animation is long finished. Print one you
+     just opened, or print from anything headless, and the pages come out
+     empty. */
+  .evi-scrim, .evi-scrim *, .evi-drawer, .evi-drawer * {
+    animation: none !important; opacity: 1 !important;
+  }
+  /* And once it is visible it has to be whole. `.evi-drawer` keeps
+     `overflow: hidden` from the screen rule, so the flex body inside it was
+     clipped at the bottom of the first box: a live report ended mid-word in
+     the middle of a sentence, with half a page of white under it. */
+  .evi-drawer { overflow: visible; display: block; }
+  .evi-drawer-body {
+    overflow: visible; flex: none; min-height: 0; max-height: none;
+  }
+  .evi-drawer-head { position: static; }
+
+  /* Gradient text, printed.
+     `background-clip: text` with `color: transparent` paints the letters out
+     of a background, and Chrome's print dialog has background graphics OFF
+     by default. With no background there is nothing to clip, so the words
+     print as nothing: a live PDF read "Know who is        before you book
+     the booth", with the subject of the sentence missing. Solid ink here,
+     which needs no background to exist. */
+  .evi-hero h1 em, .evi-tile .tv {
+    background: none !important;
+    -webkit-background-clip: border-box !important;
+    background-clip: border-box !important;
+    color: #3b3f9e !important;
+  }
+
+  /* What a person is printing.
+     A printed report opened on this page arrived behind two pages of the
+     landing copy: the headline, the three cards explaining the three plays,
+     the intake form and the pricing panel. None of that is the document
+     they meant to send anyone. Hidden only while a report is open, so
+     printing the page itself still prints the page. */
+  body.evi-reading .evi-hero,
+  body.evi-reading .evi-plays,
+  body.evi-reading .evi-card-main,
+  body.evi-reading .evi-costcard,
+  body.evi-reading .evi-runs,
+  body.evi-reading .bg-grid { display: none !important; }
+  /* The scrim is the page now, so it must not reserve the margins the
+     screen gives it, and neither must the emptied page behind it. Without
+     the second rule the report started a third of the way down page one,
+     under the space the hidden landing copy used to pad. */
+  body.evi-reading .evi-scrim { padding: 0; }
+  body.evi-reading .main { padding: 0; min-height: 0; }
+
+  /* Chrome's print dialog leaves "Background graphics" OFF by default, which
+     is how the PDF that started all of this was made. Every fill on the page
+     disappears in that mode, so anything carrying meaning in a fill needs a
+     border to fall back on: a funnel bar, a category bar and a score bar are
+     all shapes whose length IS the number, and with no fill they printed as
+     nothing at all. */
+  .evi-funnel .fb, .evi-bars .bt .fl, .evi-cols .cl, .evi-donut .sg,
+  .evi-ring .vl, .evi-sub .st span {
+    outline: 1px solid #6b6fbf; outline-offset: -1px;
+  }
+  /* The three sub-score bars are two nested divs where only the inner one
+     has a width, so with no fill the whole breakdown printed as three
+     numbers and no bars at all. The track gets a line too, or a 30/40 and a
+     38/40 look identical. */
+  .evi-sub .st { outline: 1px solid #c9cde6; outline-offset: -1px; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   The recommendation report and the work-the-room play.
+
+   One rule governs everything below: the honest caveat has to be as
+   beautiful as the headline, or nobody reads it. An agent whose whole value
+   is that it says what it could not measure cannot render those sentences as
+   small grey afterthoughts under a confident number. So the coverage
+   shortfall, the refused bonus, the rewritten draft and the cut tail all get
+   real design, and the scores they qualify sit next to them rather than
+   above them.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── the executive summary ──────────────────────────────────────────── */
+.evi-exec {
+  position: relative; overflow: hidden;
+  padding: 26px 26px 22px; margin-bottom: 26px;
+  border-radius: var(--radius-lg, 16px);
+  border: 1px solid rgba(99,102,241,.24);
+  background:
+    radial-gradient(ellipse 70% 120% at 6% 0%, rgba(56,189,248,.13), transparent 62%),
+    radial-gradient(ellipse 60% 130% at 96% 100%, rgba(139,92,246,.12), transparent 60%),
+    var(--evi-panel-2);
+}
+/* A hairline of the brand gradient along the top edge. One decorative
+   element on the page, on the one block that earns it. */
+.evi-exec::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(95deg, var(--evi-a1), var(--evi-a2) 55%, var(--evi-a3));
+  opacity: .85;
+}
+.evi-exec .ex-eyebrow {
+  font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-a1); margin-bottom: 10px;
+}
+.evi-exec .ex-title {
+  font-family: 'Bricolage Grotesque', serif; font-size: clamp(21px, 2.6vw, 28px);
+  font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin-bottom: 12px;
+}
+.evi-exec .ex-profile {
+  font-size: 14.5px; line-height: 1.65; color: var(--evi-ink-2); max-width: 72ch;
+}
+.evi-exec .ex-where {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md, 10px);
+  background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.2);
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-where b { color: var(--evi-ink); }
+/* The result of the whole run, in three numbers. These were small outline
+   pills sitting under a paragraph, which is not the weight they carry. */
+.evi-exec .ex-counts {
+  display: grid; gap: 10px; margin-top: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.evi-exec .ex-counts span {
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  gap: 2px; padding: 14px 16px 13px; border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line);
+  font-size: 12px; color: var(--evi-ink-3);
+}
+.evi-exec .ex-counts span::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--evi-ink-3); opacity: .5;
+}
+.evi-exec .ex-counts .c-p1::before { background: var(--evi-a1); opacity: 1; }
+.evi-exec .ex-counts .c-p2::before { background: var(--evi-a3); opacity: 1; }
+.evi-exec .ex-counts b {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 30px; font-weight: 700; color: var(--evi-ink);
+  letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums;
+}
+.evi-exec .ex-counts .c-p1 b { color: var(--evi-a1); }
+.evi-exec .ex-counts .c-p2 b { color: var(--evi-a3); }
+.evi-exec .ex-counts i {
+  font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ink-3); opacity: .8; margin-top: 3px;
+}
+:root[data-theme="light"] .evi-exec .ex-counts .c-p1 b { color: var(--evi-g1); }
+:root[data-theme="light"] .evi-exec .ex-counts .c-p2 b { color: var(--evi-g3); }
+.evi-exec .ex-method { margin-top: 16px; }
+.evi-exec .ex-method summary,
+.evi-cand .cwhy summary {
+  cursor: pointer; font-size: 12px; font-weight: 600; color: var(--evi-a1);
+  list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 0; user-select: none;
+}
+.evi-exec .ex-method summary::-webkit-details-marker,
+.evi-cand .cwhy summary::-webkit-details-marker { display: none; }
+.evi-exec .ex-method summary::before,
+.evi-cand .cwhy summary::before {
+  content: "▸"; font-size: 10px; transition: transform .18s;
+}
+.evi-exec .ex-method[open] summary::before,
+.evi-cand .cwhy[open] summary::before { transform: rotate(90deg); }
+.evi-exec .ex-method p {
+  font-size: 12.8px; line-height: 1.65; color: var(--evi-ink-3);
+  margin-top: 8px; max-width: 74ch;
+}
+
+/* Assumptions. Given the same weight as the counts above them on purpose:
+   this is the block that says what the analysis could not see. */
+.evi-exec .ex-assume {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-exec .ex-assume h4 {
+  font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); margin-bottom: 10px;
+}
+.evi-exec .ex-assume ul { list-style: none; display: grid; gap: 8px; }
+.evi-exec .ex-assume li {
+  position: relative; padding-left: 18px; font-size: 12.8px;
+  line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-assume li::before {
+  content: ""; position: absolute; left: 0; top: 8px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--evi-warn); opacity: .8;
+}
+
+/* ── top five ───────────────────────────────────────────────────────── */
+.evi-top { list-style: none; counter-reset: top; display: grid; gap: 10px; }
+.evi-top li {
+  counter-increment: top; position: relative;
+  padding: 15px 18px 15px 52px; border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s, transform .18s;
+}
+.evi-top li:hover { border-color: rgba(99,102,241,.3); transform: translateX(2px); }
+.evi-top li::before {
+  content: counter(top); position: absolute; left: 16px; top: 15px; z-index: 1;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--evi-a1), var(--evi-a2));
+}
+/* The whole entry is the control when it has somewhere to go, so the target
+   is the card rather than a link at the end of the sentence. */
+.evi-top .tw {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.evi-top li.go:hover { border-color: color-mix(in srgb, var(--band, var(--evi-a2)) 45%, transparent); }
+.evi-top .tw:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 4px; border-radius: 8px; }
+.evi-top .ts i { font-style: normal; font-weight: 500; color: var(--evi-ink-3); }
+/* The score as a length as well as a number, against the same 110 the
+   spread above uses, so the two charts agree about what a 99 looks like. */
+.evi-top .tb {
+  height: 4px; border-radius: 3px; background: var(--evi-line-2);
+  overflow: hidden; margin-top: 8px;
+}
+.evi-top .tb span {
+  display: block; height: 100%; border-radius: 3px;
+  background: var(--band, var(--evi-a2));
+}
+.evi-anim .evi-top .tb span { animation: evi-grow-w .6s cubic-bezier(.22,.85,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .evi-anim .evi-top .tb span { animation: none; } }
+.evi-top .tn {
+  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+}
+.evi-top .ts {
+  flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--evi-a1);
+  font-variant-numeric: tabular-nums;
+}
+.evi-top .tm { font-size: 11.5px; color: var(--evi-ink-3); margin-top: 3px; }
+.evi-top .tc {
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2); margin-top: 8px;
+}
+
+/* ── a scored candidate ─────────────────────────────────────────────── */
+.evi-cands { display: grid; gap: 14px; }
+.evi-cand {
+  position: relative; padding: 18px 20px 16px 22px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s, box-shadow .18s;
+}
+.evi-cand:hover { border-color: rgba(99,102,241,.28); box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+/* Tier as a spine down the left edge rather than only a badge. The tier is
+   the single most consequential number here and it should be readable while
+   scrolling past at speed. */
+.evi-cand::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: var(--radius-md, 12px) 0 0 var(--radius-md, 12px);
+}
+.evi-cand.t-P1::before { background: linear-gradient(180deg, var(--evi-a1), var(--evi-a2)); }
+.evi-cand.t-P2::before { background: rgba(139,92,246,.5); }
+.evi-cand.t-P3::before { background: var(--evi-line); }
+
+.evi-cand .ct { display: flex; flex-direction: column; gap: 4px; }
+.evi-cand .cn {
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  font-size: 16px; font-weight: 600; letter-spacing: -.015em;
+}
+.evi-cand .cn a { color: var(--evi-ink); text-decoration: none; }
+.evi-cand .cn a:hover { color: var(--evi-a1); }
+.evi-cand .cn .tier {
+  flex-shrink: 0; font-size: 10px; font-weight: 800; letter-spacing: .06em;
+  padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.16); color: var(--evi-ink-3);
+  border: 1px solid var(--evi-line);
+}
+.evi-cand.t-P1 .cn .tier {
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(99,102,241,.22));
+  color: #7dd3fc; border-color: rgba(56,189,248,.36);
+}
+.evi-cand.t-P2 .cn .tier {
+  background: rgba(139,92,246,.16); color: #c4b5fd; border-color: rgba(139,92,246,.3);
+}
+:root[data-theme="light"] .evi-cand.t-P1 .cn .tier { color: #0369a1; }
+:root[data-theme="light"] .evi-cand.t-P2 .cn .tier { color: #6d28d9; }
+.evi-cand .cn .ed { font-size: 12px; font-weight: 500; color: var(--evi-ink-3); }
+.evi-cand .cm { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
+
+/* Format and confidence: two facts that qualify every other fact on the card,
+   so they sit above the score rather than inside the disclosure. "Format not
+   stated" is styled as an absence, not as a value, because an event nobody
+   confirmed is in person is a different thing from one that is. */
+.evi-cand .cflags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.evi-cand .cfl {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 2.5px 8px; border-radius: 999px;
+  color: var(--evi-ink-2); background: var(--evi-panel);
+  border: 1px solid var(--evi-line-2);
+}
+.evi-cand .cfl.mut {
+  color: var(--evi-ink-3); background: transparent;
+  border-style: dashed; border-color: var(--evi-line);
+}
+.evi-cand .cfl.warn {
+  color: var(--evi-warn); background: rgba(251,191,36,.10);
+  border-color: rgba(251,191,36,.28);
+}
+
+/* The pages the confirmation opened. Inside the disclosure with the reasoning,
+   because that is where a reader who wants to check the score is already
+   looking. */
+.evi-cand .csrc {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--evi-line-2);
+  font-size: 11.5px;
+}
+.evi-cand .csrc b { color: var(--evi-ink-2); font-weight: 600; }
+.evi-cand .csrc a {
+  color: var(--evi-ink-3); text-decoration: none;
+  border-bottom: 1px dotted var(--evi-line);
+}
+.evi-cand .csrc a:hover { color: var(--evi-a1); border-bottom-color: currentColor; }
+
+/* The score block. Three bars and the refused-or-granted bonus, never just a
+   total: the breakdown IS the audit trail, and hiding it behind a disclosure
+   would make the headline the only thing anyone reads. */
+.evi-cand .cscore {
+  display: grid; gap: 9px; margin: 14px 0 12px;
+  grid-template-columns: auto 1fr; align-items: start;
+  padding: 13px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line-2);
+}
+/* The total is a ring now, and it has to hold the whole left column against
+   the three sub-scores on the right. Without the span it takes one grid cell
+   and the bars wrap around it. */
+.evi-cand .cscore .evi-ring {
+  grid-row: 1 / span 4; align-self: center;
+  padding-right: 16px; margin-right: 4px; border-right: 1px solid var(--evi-line-2);
+  max-width: 190px;
+}
+
+.evi-sub { display: grid; gap: 4px; }
+.evi-sub .sl {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; color: var(--evi-ink-3); font-weight: 500;
+}
+.evi-sub .sl b {
+  font-size: 12px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.evi-sub .sl i { font-style: normal; font-weight: 500; color: var(--evi-ink-3); }
+.evi-sub .st {
+  height: 5px; border-radius: 3px; overflow: hidden;
+  background: var(--evi-line-2);
+}
+.evi-sub .st span {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--evi-a1), var(--evi-a2));
+  transition: width .5s cubic-bezier(.22,.9,.3,1);
+  /* banded below: a fill that is the same colour at 90% of the max and at 20%
+     of it tells the reader nothing the number did not already say */
+}
+
+/* The matchmaking bonus, granted or refused. A refusal states its reason on
+   screen, because "+10 was not applied" without a why is indistinguishable
+   from a bug. */
+.evi-cand .mm {
+  grid-column: 2; font-size: 11px; line-height: 1.5; color: var(--evi-ink-3);
+  padding: 7px 10px; border-radius: var(--radius-sm, 8px);
+  background: var(--evi-line-2); border: 1px solid transparent;
+}
+.evi-cand .mm.on {
+  color: var(--evi-ok); background: rgba(74,222,128,.1);
+  border-color: rgba(74,222,128,.24); font-weight: 600;
+}
+.evi-cand .mm span {
+  display: block; font-weight: 400; color: var(--evi-ink-3); margin-top: 3px;
+}
+.evi-cand .cd {
+  font-size: 13.5px; line-height: 1.65; color: var(--evi-ink-2); max-width: 76ch;
+}
+.evi-cand .cd b { color: var(--evi-ink); font-weight: 600; }
+.evi-cand .cwhy { margin-top: 10px; }
+.evi-cand .cwhy p {
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3);
+  margin-top: 7px; max-width: 78ch;
+}
+.evi-cand .cwhy p b { color: var(--evi-ink-2); }
+.evi-cand .cwhy .gaps b { color: var(--evi-warn); }
+
+/* ── category coverage ──────────────────────────────────────────────── */
+.evi-shortfall { display: grid; gap: 8px; }
+.evi-shortfall .sf {
+  display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: 4px 14px;
+  padding: 12px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  border-left: 3px solid var(--evi-line);
+}
+.evi-shortfall .sf.empty { border-left-color: var(--evi-warn); }
+/* A failed search is a hole in the analysis, not a finding about the market,
+   and it is coloured as the more serious of the two. */
+.evi-shortfall .sf.error { border-left-color: var(--evi-bad); }
+.evi-shortfall .k { font-size: 13px; font-weight: 600; color: var(--evi-ink); }
+.evi-shortfall .v {
+  font-size: 12px; font-weight: 700; color: var(--evi-ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.evi-shortfall .w {
+  grid-column: 1 / -1; font-size: 12px; line-height: 1.55; color: var(--evi-ink-3);
+}
+.evi-shortfall .sf.error .w b { color: var(--evi-bad); }
+
+/* ── the cut list ───────────────────────────────────────────────────── */
+.evi-cut { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.evi-cut .cutp {
+  display: inline-flex; align-items: baseline; gap: 7px;
+  padding: 6px 11px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  font-size: 12px; color: var(--evi-ink-3);
+}
+.evi-cut .cutp b {
+  font-size: 11px; font-weight: 700; color: var(--evi-ink-2);
+  font-variant-numeric: tabular-nums; opacity: .8;
+}
+
+/* Candidates a confirming search ruled out.
+
+   Deliberately not the pill above. A pill holds a name and a number, and the
+   only part of a ruled-out candidate worth reading is the reason: "the 2026
+   edition was the last one" and "no edition falls inside the client's window"
+   are different facts about the client's year, and a row that showed just the
+   name would flatten them into the same shrug. So the name and its category
+   share the top line and the reason gets the width of the row underneath. */
+.evi-ruled { display: grid; gap: 7px; margin-top: 12px; }
+.evi-ruled .rr {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--evi-panel-2);
+  border: 1px solid var(--evi-line-2);
+  border-left: 2px solid color-mix(in srgb, var(--evi-warn) 55%, transparent);
+}
+.evi-ruled .rn {
+  grid-column: 1; font-size: 12.5px; font-weight: 650;
+  color: var(--evi-ink-2); min-width: 0; overflow-wrap: anywhere;
+}
+.evi-ruled .rc {
+  grid-column: 2; justify-self: end; align-self: baseline;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--evi-ink-3); opacity: .72; white-space: nowrap;
+}
+.evi-ruled .rw {
+  grid-column: 1 / -1; font-size: 12px; line-height: 1.55;
+  color: var(--evi-ink-3); overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .evi-ruled .rr { grid-template-columns: minmax(0, 1fr); }
+  .evi-ruled .rc { grid-column: 1; justify-self: start; }
+}
+.evi-note {
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3);
+  max-width: 80ch; margin-bottom: 4px;
+}
+
+/* ── the classification / event-class picker ────────────────────────── */
+.evi-classes {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 620px) { .evi-classes { grid-template-columns: 1fr; } }
+.evi-class {
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 14px 15px; border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.evi-class:hover { border-color: rgba(99,102,241,.35); transform: translateY(-1px); }
+.evi-class[aria-checked="true"] {
+  border-color: rgba(99,102,241,.55);
+  background: linear-gradient(140deg, rgba(56,189,248,.14), rgba(139,92,246,.1));
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+}
+.evi-class .cl { font-size: 13.5px; font-weight: 600; color: var(--evi-ink); }
+.evi-class .cw { font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  margin-bottom: 9px; }
+.evi-class .co {
+  align-self: flex-start; margin-top: auto; padding-top: 0;
+  font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.14); color: var(--evi-ink-3);
+}
+.evi-class[aria-checked="true"] .co {
+  background: rgba(56,189,248,.18); color: var(--evi-a1);
+}
+/* Five classes. Beside the rail the form column is not wide enough for five
+   readable cards, so they run 3 + 2 rather than being squeezed onto one line
+   or dealt 4 + 1 with a hole in the row. */
+.evi-eclasses { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 820px) { .evi-eclasses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .evi-eclasses { grid-template-columns: 1fr; } }
+.evi-field select {
+  font: inherit; font-size: 14px; color: var(--evi-ink);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  border-radius: var(--radius-md, 10px); padding: 11px 13px; outline: none;
+  width: 100%; cursor: pointer; transition: border-color .18s, box-shadow .18s;
+}
+.evi-field select:focus {
+  border-color: rgba(99,102,241,.55); box-shadow: 0 0 0 3px rgba(99,102,241,.14);
+}
+.evi-field input[type="date"] { color-scheme: dark; }
+:root[data-theme="light"] .evi-field input[type="date"] { color-scheme: light; }
+
+/* ── work the room ──────────────────────────────────────────────────── */
+
+/* The follow-up window. Loud on purpose: the play is built around 48 to 72
+   hours, and a user who believes they are inside it when they are not will
+   send an opener whose whole premise is stale. */
+.evi-window {
+  display: flex; align-items: center; gap: 16px;
+  padding: 15px 18px; margin-bottom: 18px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--evi-line); border-left-width: 3px;
+  background: var(--evi-panel-2);
+}
+.evi-window .wr { flex-shrink: 0; }
+.evi-window .wr .evi-ring .rl { display: none; }
+.evi-window .wb { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+@media (max-width: 560px) { .evi-window { flex-direction: column; align-items: flex-start; } }
+.evi-window .wt {
+  font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; color: var(--evi-ink);
+}
+.evi-window .wn { font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-2); }
+.evi-window.ok { border-left-color: var(--evi-ok);
+  background: linear-gradient(95deg, rgba(74,222,128,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.ok .wt { color: var(--evi-ok); }
+.evi-window.warn { border-left-color: var(--evi-warn);
+  background: linear-gradient(95deg, rgba(251,191,36,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.warn .wt { color: var(--evi-warn); }
+.evi-window.bad { border-left-color: var(--evi-bad);
+  background: linear-gradient(95deg, rgba(251,113,133,.09), transparent 60%), var(--evi-panel-2); }
+.evi-window.bad .wt { color: var(--evi-bad); }
+.evi-window.idle { border-left-color: var(--evi-line); }
+
+/* The declared event class and the play that follows from it, inside the
+   workroom report. Named .evi-classplay, not .evi-play: that shorter name
+   belongs to the mode cards in the hero, and while both were called
+   .evi-play every rule written for one silently applied to the other. */
+.evi-classplay {
+  padding: 16px 18px; margin-bottom: 18px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(99,102,241,.22);
+  background:
+    radial-gradient(ellipse 60% 140% at 4% 0%, rgba(56,189,248,.1), transparent 60%),
+    var(--evi-panel-2);
+}
+.evi-classplay .pl {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 15px; font-weight: 700; letter-spacing: -.015em; color: var(--evi-ink);
+}
+.evi-classplay .ps {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: var(--radius-pill, 999px);
+  background: rgba(56,189,248,.16); color: var(--evi-a1);
+  border: 1px solid rgba(56,189,248,.28);
+}
+.evi-classplay .pw { font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 7px; }
+.evi-classplay .pp { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
+.evi-classplay .pp b { color: var(--evi-ink); }
+
+.evi-coverage.warn {
+  background: linear-gradient(95deg, rgba(251,191,36,.1), rgba(251,113,133,.06));
+  border-color: rgba(251,191,36,.3);
+}
+.evi-coverage.warn .ic { color: var(--evi-warn); font-weight: 800; }
+
+/* One company, one draft. */
+.evi-outs { display: grid; gap: 12px; }
+.evi-out {
+  position: relative; padding: 16px 18px 15px 20px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  transition: border-color .18s;
+}
+.evi-out:hover { border-color: rgba(99,102,241,.26); }
+.evi-out::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: var(--radius-md, 12px) 0 0 var(--radius-md, 12px);
+  background: var(--evi-line);
+}
+.evi-out.s-ok::before { background: linear-gradient(180deg, var(--evi-a1), var(--evi-a2)); }
+/* A rewritten draft is marked at the spine, not only in the footnote. The
+   whole point is that it cannot be skimmed past. */
+.evi-out.s-rewritten_no_booth_note::before,
+.evi-out.s-rewritten_aggressive::before { background: var(--evi-bad); }
+.evi-out.s-account_play::before { background: var(--evi-warn); }
+
+.evi-out .ot {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+}
+.evi-out .on {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-width: 0;
+  font-size: 15px; font-weight: 600; letter-spacing: -.015em; color: var(--evi-ink);
+}
+.evi-out .orl {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(148,163,184,.14); color: var(--evi-ink-3);
+  border: 1px solid var(--evi-line-2); white-space: nowrap;
+}
+.evi-out .ofit { flex-shrink: 0; }
+/* The label sits under the number inside the ring's own box rather than
+   beside it: the card's header row is already a name and a role and has no
+   room for a third column of words. */
+.evi-out .ofit .evi-ring { flex-direction: column; gap: 0; }
+.evi-out .ofit .evi-ring .rw { width: 58px; height: 58px; }
+.evi-out .ofit .evi-ring .rn b { font-size: 17px; }
+.evi-out .ofit .evi-ring .rn i { display: none; }
+.evi-out .ofit .evi-ring .rl {
+  font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--evi-ink-3); font-weight: 600; text-align: center;
+}
+.evi-out .op { font-size: 12.5px; color: var(--evi-ink-2); margin-top: 4px; }
+.evi-out .ofn { font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-3); margin-top: 8px; }
+.evi-out .oa { font-size: 13px; line-height: 1.62; color: var(--evi-ink-2); margin-top: 9px; }
+.evi-out .oa b { color: var(--evi-ink); font-weight: 600; }
+
+/* The booth note the user wrote. Rendered as a quotation from them, because
+   it is the only thing on the card that licenses a draft to claim a
+   conversation, and it should be obvious which cards have one. */
+.evi-out .obn {
+  margin-top: 11px; padding: 10px 13px; border-radius: var(--radius-sm, 8px);
+  border-left: 2px solid var(--evi-ok); background: rgba(74,222,128,.07);
+  font-size: 12.3px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-out .obn b { color: var(--evi-ok); font-weight: 700; }
+
+.evi-out .oo {
+  margin-top: 12px; padding: 13px 15px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-panel); border: 1px solid var(--evi-line-2);
+}
+.evi-out .ool {
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); margin-bottom: 7px;
+}
+.evi-out .oo p {
+  font-size: 13.5px; line-height: 1.7; color: var(--evi-ink);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Why a draft was thrown away. Same visual weight as the opener above it:
+   a rewrite the reader skims past is a silent edit with extra steps. */
+.evi-out .ow {
+  margin-top: 11px; padding: 11px 14px; border-radius: var(--radius-sm, 8px);
+  background: rgba(251,113,133,.07); border: 1px solid rgba(251,113,133,.22);
+}
+.evi-out.s-account_play .ow {
+  background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.24);
+}
+.evi-out.s-ok .ow {
+  background: var(--evi-line-2); border-color: transparent;
+}
+.evi-out .owt {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--evi-bad); margin-bottom: 5px;
+}
+.evi-out.s-account_play .owt { color: var(--evi-warn); }
+.evi-out .own { font-size: 12.2px; line-height: 1.6; color: var(--evi-ink-2); }
+.evi-out .owf { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.evi-out .owf code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
+  padding: 3px 8px; border-radius: var(--radius-xs, 5px);
+  background: rgba(251,113,133,.12); color: var(--evi-bad);
+  border: 1px solid rgba(251,113,133,.24);
+}
+
+/* Provenance, on a roster row that was recovered by search rather than read
+   from the event's own page. A weaker grade of evidence, marked as one. */
+.evi-prov {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: var(--radius-xs, 5px);
+  margin-left: 6px; white-space: nowrap;
+  background: rgba(251,191,36,.13); color: var(--evi-warn);
+  border: 1px solid rgba(251,191,36,.26);
+}
+.evi-source.recovered .st { color: var(--evi-warn); }
+
+@media (max-width: 640px) {
+  .evi-cand .cscore { grid-template-columns: 1fr; }
+  .evi-cand .cscore .evi-ring {
+    grid-row: auto; border-right: none; padding-right: 0; margin-right: 0;
+    border-bottom: 1px solid var(--evi-line-2); padding-bottom: 10px; max-width: none;
+  }
+  .evi-cand .mm { grid-column: 1; }
+  .evi-out .ot { flex-direction: column; }
+  .evi-out .ofit { text-align: left; }
+}
+.evi-field select option[disabled] { color: var(--evi-ink-3); }
+.evi-field select:has(option[disabled]:checked) { color: var(--evi-ink-3); font-style: italic; }
+
+/* What you decided about an event last time, and the control to change it. */
+.evi-dec {
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--evi-line-2);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  justify-content: space-between;
+}
+.evi-dec .dp {
+  font-size: 12px; line-height: 1.55; color: var(--evi-ink-3); min-width: 0; flex: 1;
+}
+.evi-dec .dp b { color: var(--evi-warn); font-weight: 700; }
+.evi-dec .db { display: flex; gap: 6px; flex-wrap: wrap; }
+.evi-dec .dbtn {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line);
+  color: var(--evi-ink-3); transition: .16s; white-space: nowrap;
+}
+.evi-dec .dbtn:hover { color: var(--evi-ink); border-color: rgba(99,102,241,.4); }
+.evi-dec .dbtn.on {
+  color: #fff; border-color: rgba(99,102,241,.5);
+  background: linear-gradient(95deg, rgba(56,189,248,.24), rgba(139,92,246,.2));
+}
+:root[data-theme="light"] .evi-dec .dbtn.on { color: #1b2440; }
+
+/* The budget the user recorded. Deliberately in the summary block and never
+   beside a score: a number placed next to a score is a number that starts
+   moving it. */
+.evi-exec .ex-budget {
+  margin-top: 12px; padding: 11px 14px; border-radius: var(--radius-md, 10px);
+  background: var(--evi-line-2); border: 1px dashed var(--evi-line);
+  font-size: 12.5px; line-height: 1.6; color: var(--evi-ink-2);
+}
+.evi-exec .ex-budget b { color: var(--evi-ink); }
+.evi-exec .ex-budget i { font-style: normal; color: var(--evi-ink-3); }
+
+/* "We read this and found none" against "we did not read this" are now two
+   chips in the card's own tag row rather than two paragraphs under it, so
+   these two overrides have nothing left to select. Their job moved to
+   .evi-tag.mut and .evi-tag.warn, which are still coloured apart for the
+   same reason: the two states read identically in words and mean opposite
+   things. */
+
+/* An event the client has already paid for. Marked wherever it appears, so it
+   is never read as an event that earned its place on the list. */
+.evi-cand .cn .cmt {
+  flex-shrink: 0; font-size: 9.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; padding: 3px 7px; border-radius: var(--radius-xs, 5px);
+  background: rgba(251,191,36,.15); color: var(--evi-warn);
+  border: 1px solid rgba(251,191,36,.3); white-space: nowrap;
+}
+.evi-exec .ex-committed {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md, 10px);
+  background: rgba(251,191,36,.09); border: 1px solid rgba(251,191,36,.26);
+  font-size: 13px; line-height: 1.6; color: var(--evi-ink-2);
+}
+/* The user's own note can end without punctuation, so the caveat gets its own
+   line rather than running on from whatever they typed. */
+.evi-exec .ex-budget i { display: block; margin-top: 4px; }
+
+/* ── the locked profile, restated ───────────────────────────────────── */
+.evi-psum {
+  margin-top: 16px; padding: 16px 18px; border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--evi-line); background:
+    radial-gradient(ellipse 100% 120% at 0% 0%, rgba(56,189,248,.07), transparent 60%),
+    var(--evi-panel-2);
+}
+.evi-psum[hidden] { display: none; }
+.ps-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px;
+  margin-bottom: 10px; }
+.ps-name { font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+.ps-site { font-size: 11.5px; color: var(--evi-ink-3); word-break: break-all; }
+.ps-lock {
+  margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ok); padding: 3px 9px;
+  border-radius: var(--radius-pill, 80px); background: rgba(74,222,128,.12);
+  border: 1px solid rgba(74,222,128,.26); flex-shrink: 0;
+}
+.ps-class { font-size: 12.5px; line-height: 1.55; color: var(--evi-ink-3);
+  padding-bottom: 12px; border-bottom: 1px solid var(--evi-line-2); }
+.ps-class b { color: var(--evi-ink-2); font-weight: 600; }
+.ps-or {
+  display: inline-block; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--evi-a1);
+  padding: 3px 8px; border-radius: var(--radius-xs, 4px);
+  background: rgba(56,189,248,.12); border: 1px solid rgba(56,189,248,.24);
+}
+.ps-grid { display: grid; gap: 10px 22px; margin-top: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.ps-grid dt { font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-ink-3); margin-bottom: 3px; }
+.ps-grid dd { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.45; }
+.ps-standing { margin-top: 13px; padding-top: 12px;
+  border-top: 1px solid var(--evi-line-2);
+  display: flex; flex-direction: column; gap: 7px; }
+.ps-standing p { font-size: 11.8px; line-height: 1.55; color: var(--evi-ink-2); }
+.ps-standing b { color: var(--evi-ink); font-weight: 600; }
+.ps-standing i { font-style: normal; color: var(--evi-ink-3); display: block;
+  font-size: 11px; margin-top: 2px; }
+
+/* Score strength bands. Set on the bar by its own percentage of the maximum,
+   so a weak dimension is legible as weak at a glance rather than only after
+   reading two numbers at the end of the row. */
+.evi-sub.s-mid .st span {
+  background: linear-gradient(90deg, rgba(56,189,248,.72), rgba(99,102,241,.62));
+}
+.evi-sub.s-lo .st span {
+  background: linear-gradient(90deg, rgba(245,166,35,.85), rgba(245,166,35,.55));
+}
+.evi-sub.s-lo .sl b { color: var(--evi-warn); }

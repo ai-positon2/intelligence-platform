@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}var toTop=function(){window.scrollTo(0,0);};window.addEventListener('load',toTop);window.addEventListener('pageshow',function(e){if(e.persisted)toTop();});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intelligence Hub</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/hub.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <script src="/static/js/aurora.js?v=1" defer></script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="user-avatar">
+            {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+            {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+          </div>
+          <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="pinwrap hub-pin">
+    <section class="hb-hero">
+      <div class="eyebrow">Position2 Intelligence Platform</div>
+      <h1 class="main-heading">What are you<br/>working on <em>today?</em></h1>
+      <p class="main-sub">Choose a workspace to access your dashboards.</p>
+      <div class="hb-cue"><span></span></div>
+    </section>
+    </div>
+
+    <section class="hb-disc">
+      <div class="hb-eyebrow">One intelligence layer</div>
+    <div class="hub-grid" data-cz-reveal>
+
+      <!-- B2B Agents (formerly "GTM"; card-gtm is the CSS hook, not the name) -->
+      <a href="/p2/b2b-agents" class="hub-card card-gtm">
+        <div class="card-preview">
+          <div class="card-preview-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></div>
+          <div class="card-status-badge badge-live">
+            <span class="badge-dot pulse"></span> Active
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-category">Go-To-Market</div>
+          <div class="card-title">B2B Agents</div>
+          <div class="card-desc">
+            Buyer signals, job-change alerts, competitor ad intelligence, anonymous visitor
+            de-anonymisation, LinkedIn engagement, appointment availability, cross-platform
+            creative analysis, and live contact lookup.
+          </div>
+          <div class="card-footer">
+            <div class="card-meta">
+              <!-- Counts the cards on /p2/b2b-agents: all 10 are live as of
+                   2026-08-31 (Event & Conference Intelligence added).
+                   test_hub_card_counts.py fails if these drift from the dashboard
+                   page again. Was 9/9 before this, 8/8 before the Slot Checker,
+                   6/6 before LinkedIn Strategy Researcher, and 7/6 until LinkedIn
+                   Social Researcher was hidden on 2026-08-14, which is also why
+                   the description no longer says "and strategy research". -->
+              <div class="card-stat"><span>10</span> dashboards</div>
+              <div class="card-stat"><span>10</span> live</div>
+            </div>
+            <div class="card-cta">Open <span class="card-arrow">→</span></div>
+          </div>
+        </div>
+      </a>
+
+      <!-- SEO -->
+      <a href="/p2/seo" class="hub-card card-seo">
+        <div class="card-preview">
+          <div class="card-preview-icon"><svg class="au-ic" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 20A7 7 0 0 1 4 13c0-6 7-9 15-9 0 8-4 13-8 13Z"/><path d="M4 20c2-4 5-7 9-9"/></svg></div>
+          <div class="card-status-badge badge-live">
+            <span class="badge-dot pulse"></span> Active
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-category">Organic Growth</div>
+          <div class="card-title">SEO</div>
+          <div class="card-desc">
+            SEO &amp; GEO audits, content research, article briefs, keyword research,
+            agent readiness, image alt audits, knowledge base, and team insights.
+          </div>
+          <div class="card-footer">
+            <div class="card-meta">
+              <div class="card-stat"><span>16</span> dashboards</div>
+              <div class="card-stat"><span>16</span> live</div>
+            </div>
+            <div class="card-cta">Open <span class="card-arrow">→</span></div>
+          </div>
+        </div>
+      </a>
+
+    </div>
+    </section>
+
+    <section class="lx-sec" data-cz-reveal>
+      <div class="lx-sec-eyebrow">By the numbers</div>
+      <div class="lx-stats2">
+        {# Counted from the Signal Tracker dashboards themselves, not typed in here,
+           so it cannot drift the next time a dashboard is rebuilt. Omitted rather
+           than guessed if none of them could be read. #}
+        {% if tracked_companies %}
+        <div><b data-lxn="{{ tracked_companies }}" data-lxs="+">0</b><span>companies tracked</span></div>
+        {% endif %}
+        <div><b data-lxn="300" data-lxs="+">0</b><span>live signals</span></div>
+        {# Live dashboards across both workspaces: 10 on /p2/b2b-agents (Event
+           & Conference Intelligence added 2026-08-31) + 16 SEO tools.
+           Was 25 before this, 24 before Social Creative Intelligence, 23
+           before the Slot Checker, and 22 before LinkedIn Strategy Researcher. #}
+        <div><b data-lxn="26">0</b><span>dashboards</span></div>
+        <div><b class="grad-k">Vimi</b><span>ai on every page</span></div>
+      </div>
+    </section>
+    <p class="footer-note">Position2 · Internal use only</p>
+  </div>
+
+  <script>
+    // ── User menu dropdown ──
+    function toggleMenu() {
+      var pill = document.getElementById('userPill');
+      var dd   = document.getElementById('userDropdown');
+      var open = dd.classList.contains('open');
+      if (open) { pill.classList.remove('open'); dd.classList.remove('open'); }
+      else       { pill.classList.add('open');    dd.classList.add('open'); }
+    }
+    document.addEventListener('click', function(e) {
+      var menu = document.getElementById('userMenu');
+      if (menu && !menu.contains(e.target)) {
+        document.getElementById('userPill').classList.remove('open');
+        document.getElementById('userDropdown').classList.remove('open');
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.getElementById('userPill').classList.remove('open');
+        document.getElementById('userDropdown').classList.remove('open');
+      }
+    });
+
+    // ── Page tracking ──
+    (function(){
+      var _start = Date.now(), _sent = false;
+      function _send(){
+        if(_sent) return; _sent = true;
+        var s = Math.round((Date.now()-_start)/1000);
+        fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({page: window.location.pathname, title: 'Hub', seconds: s,
+          email: '{{ user.email if user else "" }}'}), keepalive: true}).catch(function(){});
+      }
+      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _send(); });
+      window.addEventListener('beforeunload', _send);
+    })();
+  </script>
+<script>
+/* ════ Platform command palette — Ctrl/Cmd+K ════ */
+(function(){
+  if(window.__kpal)return;window.__kpal=1;
+  var BASE=[
+    {t:'Hub',d:'Platform home',u:'/p2/hub',i:'⌂'},
+    {t:'B2B Agents',d:'Go-to-market intelligence',u:'/p2/b2b-agents',i:'◎'},
+    {t:'SEO Tools',d:'Organic intelligence',u:'/p2/seo',i:'⌕'},
+    {t:'ABM Signal Tracker — Healthcare',d:'Company signals & insights',u:'/p2/abm-signal-tracker/healthcare',i:'☆'},
+    {t:'ABM Signal Tracker — CSG',d:'Company signals & insights',u:'/p2/abm-signal-tracker/csg',i:'☆'},
+    {t:'LinkedIn Intelligence',d:'People, companies & posts',u:'/p2/b2b-agents/linkedin-intelligence',i:'⦿'},
+    {t:'Ad Intelligence',d:'Competitor ad monitoring',u:'/p2/b2b-agents/ad-intelligence',i:'◈'},
+    {t:'Anonymous Visitors',d:'Website visitor signals',u:'/p2/b2b-agents/anonymous-visitors',i:'◌'},
+    {t:'Job Change Alert',d:'Decision-maker job changes',u:'/p2/b2b-agents/job-change-alert',i:'⇉'},
+    {t:'LinkedIn Strategy Researcher',d:'Competitive strategy playbooks',u:'/p2/b2b-agents/linkedin-strategy-researcher',i:'▤'},
+    {t:'42 North Dental Slot Checker',d:'Appointment availability',u:'/p2/b2b-agents/42-north-dental-slot-checker',i:'◷'},
+    {t:'Social Creative Intelligence Analyst',d:'Cross-platform creative analysis',u:'/p2/b2b-agents/social-creative-intelligence',i:'▣'},
+    {t:'Switch Account',d:'Healthcare / CSG picker',u:'/p2/abm-signal-tracker/accounts',i:'⇄'}
+  ];
+  var ITEMS=(window.__KP_ITEMS||[]).concat(BASE);
+  var css=document.createElement('style');
+  css.textContent='#kpal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(2,4,14,.72);backdrop-filter:blur(8px)}'
+    +'#kpal.on{display:block;animation:kpalF .14s ease}'
+    +'@keyframes kpalF{from{opacity:0}to{opacity:1}}'
+    +'.kpal-box{position:absolute;top:16%;left:50%;transform:translateX(-50%);width:min(580px,92vw);background:rgba(11,14,28,.96);border:1px solid rgba(129,140,248,.3);border-radius:var(--radius-lg);box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 60px rgba(99,102,241,.12);overflow:hidden;animation:kpalIn .22s cubic-bezier(.22,1.3,.36,1)}'
+    +'@keyframes kpalIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}'
+    +'.kpal-iw{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.07)}'
+    +'.kpal-iw .ic{color:#7c83f5;font-size:15px}'
+    +'#kpal-in{flex:1;background:none;border:none;outline:none;color:#e8ecf8;font-family:inherit;font-size:15px}'
+    +'#kpal-in::placeholder{color:#4b5572}'
+    +'.kpal-iw kbd{font-family:inherit;font-size:10px;font-weight:700;color:#55617a;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xs);padding:3px 7px}'
+    +'#kpal-list{max-height:330px;overflow-y:auto;padding:7px}'
+    +'.kpal-it{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:var(--radius-md);cursor:pointer;border:1px solid transparent}'
+    +'.kpal-it .ki{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(99,102,241,.12);border:1px solid rgba(129,140,248,.22);display:flex;align-items:center;justify-content:center;font-size:13px;color:#a5b4fc;flex-shrink:0}'
+    +'.kpal-it .kt{font-size:13px;font-weight:600;color:#dbe2f1}'
+    +'.kpal-it .kd{font-size:11.5px;color:#55617a;margin-top:1px}'
+    +'.kpal-it.sel{background:linear-gradient(95deg,rgba(79,70,229,.22),rgba(124,58,237,.12));border-color:rgba(129,140,248,.35)}'
+    +'.kpal-it.sel .kt{color:#fff}'
+    +'.kpal-empty{padding:26px;text-align:center;color:#55617a;font-size:13px}'
+    +'.kpal-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.06);font-size:10px;color:#3b4763;display:flex;gap:14px}'
+    +'#kpal-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99998;background:rgba(11,14,28,.95);border:1px solid rgba(129,140,248,.35);color:#a9b4d8;border-radius:var(--radius-pill);font-size:11.5px;padding:9px 18px;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:kpalF .3s ease}'
+    +'#kpal-toast b{color:#c7d2fe}';
+  document.head.appendChild(css);
+  var ov=document.createElement('div');ov.id='kpal';
+  ov.innerHTML='<div class="kpal-box">'
+    +'<div class="kpal-iw"><span class="ic">⌘</span><input id="kpal-in" placeholder="Jump to any tool or section…" autocomplete="off"><kbd>ESC</kbd></div>'
+    +'<div id="kpal-list"></div>'
+    +'<div class="kpal-foot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div></div>';
+  document.body.appendChild(ov);
+  var inp=document.getElementById('kpal-in'),list=document.getElementById('kpal-list');
+  var cur=[],sel=0;
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function render(){
+    if(!cur.length){list.innerHTML='<div class="kpal-empty">No matches — try fewer letters</div>';return;}
+    list.innerHTML=cur.map(function(x,i){
+      return '<div class="kpal-it'+(i===sel?' sel':'')+'" data-i="'+i+'"><span class="ki">'+x.i+'</span><span style="min-width:0"><div class="kt">'+esc(x.t)+'</div><div class="kd">'+esc(x.d||'')+'</div></span></div>';
+    }).join('');
+    var s=list.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+  }
+  function filter(q){
+    q=(q||'').toLowerCase().trim();
+    cur=!q?ITEMS.slice():ITEMS.filter(function(x){return (x.t+' '+(x.d||'')).toLowerCase().indexOf(q)>=0;});
+    sel=0;render();
+  }
+  function go(x){
+    if(!x)return;
+    close();
+    if(x.u==='!vimi'){if(window.irChat)window.irChat();return;}
+    if(x.u.charAt(0)==='#'){location.hash=x.u;return;}
+    if(location.pathname===x.u)return;
+    window.location.href=x.u;
+  }
+  function open(){ov.classList.add('on');inp.value='';filter('');setTimeout(function(){inp.focus();},30);}
+  function close(){ov.classList.remove('on');}
+  inp.addEventListener('input',function(){filter(inp.value);});
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,cur.length-1);render();}
+    else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render();}
+    else if(e.key==='Enter'){e.preventDefault();go(cur[sel]);}
+  });
+  list.addEventListener('click',function(e){
+    var it=e.target.closest('.kpal-it');if(it)go(cur[parseInt(it.getAttribute('data-i'),10)]);
+  });
+  ov.addEventListener('mousedown',function(e){if(e.target===ov)close();});
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='k'){e.preventDefault();ov.classList.contains('on')?close():open();}
+    else if(e.key==='Escape'&&ov.classList.contains('on')){close();}
+  });
+  try{
+    if(!localStorage.getItem('kpal_hint_v1')){
+      localStorage.setItem('kpal_hint_v1','1');
+      var t=document.createElement('div');t.id='kpal-toast';
+      t.innerHTML='Pro tip: press <b>Ctrl K</b> to jump anywhere on the platform';
+      document.body.appendChild(t);
+      setTimeout(function(){t.style.opacity='0';t.style.transition='opacity .5s';},6000);
+      setTimeout(function(){t.remove();},6700);
+    }
+  }catch(e){}
+})();
+</script>
+<script>(function(){document.querySelectorAll('.hub-card').forEach(function(c){c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();c.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');c.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');});});})();</script>
+<script>
+window.__LUX_CFG={kinetic:'.main-heading',ghost:'POSITION2',
+  marquee:'SIGNAL INTELLIGENCE ✦ VIMI AI ✦ PAID MEDIA ✦ ORGANIC GROWTH ✦ VISITOR IDENTITY ✦',
+  marqueeHost:'.main',tilt:'.hub-card',tiltDeg:3.5,
+  reveal:[],status:1,statusHost:'.topbar-right'};
+</script>
+<script>
+/* ════ LUX kit — kinetic type, scroll reveals, tilt, halo, ghost, marquee, status ════ */
+(function(){
+  if(window.__luxkit)return;window.__luxkit=1;
+  var CFG=window.__LUX_CFG||{};
+
+  /* ---- styles ---- */
+  var css=document.createElement('style');
+  css.textContent=
+    '.lxk-m{display:inline-block;overflow:hidden;vertical-align:bottom;padding-bottom:.10em;margin-bottom:-.10em}'
+   +'.lxk-w{display:inline-block;transform:translateY(112%);animation:lxkRise .8s cubic-bezier(.22,1,.36,1) forwards}'
+   +'@keyframes lxkRise{to{transform:translateY(0)}}'
+   +'.lx-kinetic-done{animation:none !important;opacity:1 !important;background:none !important;-webkit-text-fill-color:#f1f5f9 !important;color:#f1f5f9 !important}'
+   +'.lx-rv{opacity:0;transform:translateY(26px) scale(.985);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);animation:none !important}'
+   +'.lx-rv.lx-in{opacity:1;transform:none}'
+   +'#lx-halo{position:fixed;width:340px;height:340px;border-radius:50%;pointer-events:none;z-index:3;background:radial-gradient(circle,rgba(129,140,248,.09),transparent 65%);transform:translate(-50%,-50%);transition:opacity .3s;opacity:0;mix-blend-mode:screen}'
+   +'#lx-ghost{position:fixed;left:-10px;bottom:40px;z-index:0;font-size:clamp(110px,16vw,210px);font-weight:700;letter-spacing:var(--ls-tight);line-height:1;color:transparent;-webkit-text-stroke:1px rgba(129,140,248,.07);pointer-events:none;user-select:none;white-space:nowrap;transition:transform .6s cubic-bezier(.22,1,.36,1)}'
+   +'.lx-band{position:relative;z-index:1;margin:64px auto 0;padding:18px 0;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;width:100%}'
+   +'.lx-band .mq{display:flex;white-space:nowrap;width:max-content;animation:lxScroll 38s linear infinite}'
+   +'.lx-band .mq span{font-size:13px;font-weight:700;letter-spacing:var(--ls-caps);color:transparent;-webkit-text-stroke:1px rgba(139,148,190,.32)}'
+   +'@keyframes lxScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}'
+   +'.lx-status{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;color:#8b96b8;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius-pill);padding:6px 13px;margin-right:12px;font-variant-numeric:tabular-nums}'
+   +'.lx-status em{font-style:normal;color:#525d80;text-transform:uppercase;font-size:10px;letter-spacing:var(--ls-caps);font-weight:600}'
+   +'.lx-status .d{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.8);animation:lxPulse 2.2s infinite}'
+   +'@keyframes lxPulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}'
+   +'@media (prefers-reduced-motion:reduce){.lxk-w{animation-duration:.01s}.lx-band .mq{animation:none}.lx-rv{transition:none;opacity:1;transform:none}}'
+   +'@media (max-width:600px){ .topbar{padding:0 16px} .lx-status{padding:5px 10px;margin-right:8px;font-size:10px} .lx-status em{display:none} .user-name{display:none} }';
+  document.head.appendChild(css);
+
+  /* ---- kinetic heading ---- */
+  function kinetic(sel){
+    var el=document.querySelector(sel);if(!el||el.__lxk)return;el.__lxk=1;
+    var idx=0,frag=document.createDocumentFragment();
+    function mk(content,isNode){
+      var m=document.createElement('span');m.className='lxk-m';
+      var w=document.createElement('span');w.className='lxk-w';
+      w.style.animationDelay=(0.10+idx*0.065)+'s';idx++;
+      if(isNode)w.appendChild(content);else w.textContent=content;
+      m.appendChild(w);return m;
+    }
+    Array.prototype.slice.call(el.childNodes).forEach(function(ch){
+      if(ch.nodeType===3){
+        ch.textContent.split(/(\s+)/).forEach(function(tk){
+          if(!tk)return;
+          if(/^\s+$/.test(tk)){frag.appendChild(document.createTextNode(' '));return;}
+          frag.appendChild(mk(tk,false));
+        });
+      }else if(ch.nodeType===1&&ch.tagName==='BR'){frag.appendChild(document.createElement('br'));}
+      else if(ch.nodeType===1){frag.appendChild(mk(ch.cloneNode(true),true));}
+    });
+    el.innerHTML='';el.appendChild(frag);el.classList.add('lx-kinetic-done');
+  }
+  if(CFG.kinetic)kinetic(CFG.kinetic);
+
+  /* ---- scroll reveals ---- */
+  function reveal(sels){
+    var els=[];
+    sels.forEach(function(q){
+      document.querySelectorAll(q).forEach(function(e,i){
+        e.classList.add('lx-rv');e.style.transitionDelay=Math.min(i*70,420)+'ms';els.push(e);
+      });
+    });
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('lx-in');});return;}
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('lx-in');io.unobserve(en.target);}});
+    },{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+    els.forEach(function(e){io.observe(e);});
+  }
+  if(CFG.reveal&&CFG.reveal.length)reveal(CFG.reveal);
+
+  /* ---- 3D tilt ---- */
+  function tilt(sel,deg){
+    if(!(window.matchMedia&&window.matchMedia('(pointer:fine)').matches))return;
+    document.querySelectorAll(sel).forEach(function(c){
+      c.addEventListener('mousemove',function(e){
+        if(!c.__lxa){c.style.animation='none';c.__lxa=1;}
+        var r=c.getBoundingClientRect();
+        var cx=(e.clientX-r.left)/r.width-.5,cy=(e.clientY-r.top)/r.height-.5;
+        c.style.transform='perspective(950px) rotateY('+(cx*deg)+'deg) rotateX('+(-cy*deg)+'deg) translateY(-4px)';
+      });
+      c.addEventListener('mouseleave',function(){c.style.transform='';});
+    });
+  }
+  if(CFG.tilt)tilt(CFG.tilt,CFG.tiltDeg||4);
+
+  /* ---- ghost watermark + parallax ---- */
+  var ghost=null;
+  if(CFG.ghost){
+    ghost=document.createElement('div');ghost.id='lx-ghost';ghost.textContent=CFG.ghost;
+    document.body.appendChild(ghost);
+  }
+
+  /* ---- cursor halo ---- */
+  if(CFG.halo!==false&&window.matchMedia&&window.matchMedia('(pointer:fine)').matches){
+    var halo=document.createElement('div');halo.id='lx-halo';document.body.appendChild(halo);
+    var w=window.innerWidth,h=window.innerHeight;
+    window.addEventListener('resize',function(){w=window.innerWidth;h=window.innerHeight;});
+    document.addEventListener('mousemove',function(e){
+      halo.style.left=e.clientX+'px';halo.style.top=e.clientY+'px';halo.style.opacity='1';
+      if(ghost){
+        var dx=(e.clientX/w-.5),dy=(e.clientY/h-.5);
+        ghost.style.transform='translate('+(dx*-20)+'px,'+(dy*-12)+'px)';
+      }
+    });
+    document.addEventListener('mouseleave',function(){halo.style.opacity='0';});
+  }
+
+  /* ---- marquee band ---- */
+  if(CFG.marquee){
+    var host=document.querySelector(CFG.marqueeHost||'.main')||document.body;
+    var band=document.createElement('div');band.className='lx-band';
+    var tx=CFG.marquee+' ';
+    band.innerHTML='<div class="mq"><span>'+tx+tx+'</span><span>'+tx+tx+'</span></div>';
+    host.appendChild(band);
+  }
+
+  /* ---- live status pill ---- */
+  if(CFG.status){
+    var slot=document.querySelector(CFG.statusHost||'.topbar-right');
+    if(slot){
+      var p=document.createElement('div');p.className='lx-status';
+      p.innerHTML='<span class="d"></span><em>live</em>';
+      slot.insertBefore(p,slot.firstChild);
+    }
+  }
+
+  /* ---- stat count-ups (any [data-lxn]) ---- */
+  document.querySelectorAll('[data-lxn]').forEach(function(el){
+    var target=parseInt(el.getAttribute('data-lxn'),10),suf=el.getAttribute('data-lxs')||'';
+    var fired=false;
+    function run(){
+      if(fired)return;fired=true;
+      var t0=null;
+      function step(ts){
+        if(!t0)t0=ts;
+        var p=Math.min(1,(ts-t0)/1200);p=1-Math.pow(1-p,3);
+        el.textContent=Math.round(target*p).toLocaleString('en-US')+(p>=1?suf:'');
+        if(p<1)requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es,io){es.forEach(function(en){if(en.isIntersecting){run();io.disconnect();}});},{threshold:.4}).observe(el);
+    }else setTimeout(run,500);
+  });
+})();
+</script>
+<script>
+/* ===== CINEMA kit — inertia smooth scroll, progress, parallax, reveals ===== */
+(function(){
+  if(window.__cinema)return;window.__cinema=1;
+  var RM=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  var bar=document.createElement('div');bar.className='cz-prog';
+  (document.body||document.documentElement).appendChild(bar);
+  function setProg(y){
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    bar.style.width=(h>0?Math.min(100,Math.max(0,(y/h)*100)):0)+'%';
+  }
+
+  var pars=[];
+  function collect(){
+    pars=[];
+    document.querySelectorAll('[data-cz-par]').forEach(function(el){
+      el.classList.add('cz-par');
+      pars.push({el:el,sp:parseFloat(el.getAttribute('data-cz-par'))||0.1});
+    });
+  }
+  function applyPar(){
+    var vh=window.innerHeight;
+    for(var i=0;i<pars.length;i++){
+      var p=pars[i],r=p.el.getBoundingClientRect();
+      var d=(r.top+r.height/2)-vh/2;
+      p.el.style.transform='translate3d(0,'+(-d*p.sp).toFixed(2)+'px,0)';
+    }
+  }
+  function frame(y){setProg(y);if(!RM&&pars.length)applyPar();}
+
+  // reveal engine for opt-in [data-cz-reveal]
+  function reveals(){
+    var els=document.querySelectorAll('[data-cz-reveal]');
+    if(!els.length)return;
+    els.forEach(function(e,i){e.classList.add('cz-reveal');
+      var d=e.getAttribute('data-cz-reveal');if(d&&d!=='')e.style.transitionDelay=d+'ms';});
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('cz-in');});return;}
+    var io=new IntersectionObserver(function(es){es.forEach(function(en){
+      if(en.isIntersecting){en.target.classList.add('cz-in');io.unobserve(en.target);}});},
+      {threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){io.observe(e);});
+  }
+
+  function autoPrevent(){
+    ['#kpal-list','.kpal-box','[data-lenis-stop]'].forEach(function(s){
+      document.querySelectorAll(s).forEach(function(e){e.setAttribute('data-lenis-prevent','');});
+    });
+  }
+
+  function go(){
+    collect();reveals();autoPrevent();
+    var L=window.Lenis||(window.lenis&&window.lenis.default)||null;
+    if(!L||RM){
+      window.addEventListener('scroll',function(){frame(window.scrollY||window.pageYOffset||0);},{passive:true});
+      window.addEventListener('resize',function(){collect();frame(window.scrollY||0);});
+      frame(window.scrollY||0);return;
+    }
+    var lenis=new L({duration:1.15,
+      easing:function(t){return Math.min(1,1.001-Math.pow(2,-10*t));},
+      smoothWheel:true,wheelMultiplier:1,touchMultiplier:1.5,gestureOrientation:'vertical'});
+    window.__lenis=lenis;
+    lenis.on('scroll',function(e){frame(e.scroll||e.animatedScroll||0);});
+    function raf(t){lenis.raf(t);requestAnimationFrame(raf);}
+    requestAnimationFrame(raf);
+    window.addEventListener('resize',function(){collect();});
+    document.addEventListener('click',function(e){
+      var a=e.target.closest&&e.target.closest('a[href^="#"]');
+      if(!a)return;var id=a.getAttribute('href');if(!id||id.length<2)return;
+      var t=document.querySelector(id);if(!t)return;
+      e.preventDefault();lenis.scrollTo(t,{offset:-78,duration:1.3});
+    });
+    frame(0);
+  }
+
+  function boot(){
+    if(RM){go();return;}
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/lenis@1/dist/lenis.min.js';
+    s.onload=go;s.onerror=go;
+    document.head.appendChild(s);
+    setTimeout(function(){if(!window.__lenis&&!window.__czfb){window.__czfb=1;go();}},2500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+})();
+</script>
+
+
+<script>(function(){if(window.__amb)return;window.__amb=1;
+var a=document.createElement('div');a.className='amb-aurora';
+a.innerHTML='<div class="amb-b amb-b1"></div><div class="amb-b amb-b2"></div><div class="amb-b amb-b3"></div>';
+var g=document.createElement('div');g.className='amb-grain';
+function mt(){var b=document.body;if(!b){return setTimeout(mt,40);}b.insertBefore(g,b.firstChild);b.insertBefore(a,b.firstChild);}
+mt();})();</script>
+
+
+<script>(function(){
+function build(){
+  var hero=document.querySelector('.hb-hero');if(!hero){return setTimeout(build,60);}
+  if(hero.querySelector('.hb-radar'))return;
+  var d=document.createElement('div');d.className='hb-radar';
+  d.innerHTML=''
+   +'<svg viewBox="0 0 400 400" aria-hidden="true">'
+   +'<defs>'
+   +'<radialGradient id="hbsw" cx="50%" cy="50%" r="50%">'
+   +'<stop offset="0%" stop-color="rgba(129,140,248,.30)"/>'
+   +'<stop offset="100%" stop-color="rgba(129,140,248,0)"/>'
+   +'</radialGradient>'
+   +'<radialGradient id="hbcore" cx="50%" cy="50%" r="50%">'
+   +'<stop offset="0%" stop-color="rgba(167,139,250,.9)"/>'
+   +'<stop offset="100%" stop-color="rgba(99,102,241,0)"/>'
+   +'</radialGradient>'
+   +'</defs>'
+   +'<g class="hb-spin">'
+   +'<circle cx="200" cy="200" r="70" fill="none" stroke="rgba(129,140,248,.16)" stroke-width="1"/>'
+   +'<circle cx="200" cy="200" r="120" fill="none" stroke="rgba(129,140,248,.13)" stroke-width="1" stroke-dasharray="2 7"/>'
+   +'<circle cx="200" cy="200" r="170" fill="none" stroke="rgba(34,211,238,.10)" stroke-width="1"/>'
+   +'</g>'
+   +'<g class="hb-spin2">'
+   +'<circle cx="200" cy="200" r="195" fill="none" stroke="rgba(139,92,246,.10)" stroke-width="1" stroke-dasharray="1 10"/>'
+   +'</g>'
+   +'<g class="hb-sweep"><path d="M200 200 L200 25 A175 175 0 0 1 360 150 Z" fill="url(#hbsw)"/></g>'
+   +'<circle cx="200" cy="200" r="34" fill="url(#hbcore)"/>'
+   +'<circle class="hb-nd" cx="200" cy="80" r="3.5" fill="#a5b4fc"/>'
+   +'<circle class="hb-nd b" cx="318" cy="248" r="3" fill="#67e8f9"/>'
+   +'<circle class="hb-nd c" cx="96" cy="262" r="3" fill="#c4b5fd"/>'
+   +'<circle class="hb-nd" cx="286" cy="120" r="2.5" fill="#a5b4fc"/>'
+   +'<circle class="hb-nd b" cx="120" cy="120" r="2.5" fill="#67e8f9"/>'
+   +'</svg>';
+  hero.insertBefore(d,hero.firstChild);
+}
+build();})();</script>
+
+<script>(function(){var r=null,tx=0,ty=0,cx=0,cy=0;
+function loop(){cx+=(tx-cx)*.06;cy+=(ty-cy)*.06;if(r)r.style.transform='translate(-50%,-50%) translate('+cx.toFixed(2)+'px,'+cy.toFixed(2)+'px)';requestAnimationFrame(loop);}
+function init(){r=document.querySelector('.hb-radar');if(!r){return setTimeout(init,80);}
+if(window.matchMedia&&window.matchMedia('(pointer:fine)').matches){
+document.addEventListener('mousemove',function(e){tx=(e.clientX/window.innerWidth-.5)*42;ty=(e.clientY/window.innerHeight-.5)*32;});
+requestAnimationFrame(loop);}}
+init();})();</script>
+<script>(function(){
+function start(){
+  var wrap=document.querySelector('.hub-pin');if(!wrap){return setTimeout(start,80);}
+  var hero=wrap.querySelector('.hb-hero');
+  var head=hero.querySelector('.main-heading'),eye=hero.querySelector('.eyebrow'),sub=hero.querySelector('.main-sub'),cue=hero.querySelector('.hb-cue');
+  var tag=document.createElement('div');tag.className='hb-pintag';tag.textContent='One intelligence layer';hero.appendChild(tag);
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce||window.innerHeight<600)return;
+  function cl(v){return v<0?0:v>1?1:v;}
+  function tick(){
+    var r=wrap.getBoundingClientRect();
+    var total=wrap.offsetHeight-window.innerHeight;
+    var p=total>0?cl(-r.top/total):0;
+    var radar=hero.querySelector('.hb-radar'),svg=radar&&radar.querySelector('svg');
+    if(svg){svg.style.transformOrigin='center';svg.style.transform='scale('+(0.7+p*0.7).toFixed(3)+')';}
+    if(radar)radar.style.opacity=(0.35+p*0.55).toFixed(3);
+    var fade=cl((p-0.6)/0.4);
+    if(head){head.style.transform='translateY('+(-p*48).toFixed(1)+'px) scale('+(1-p*0.07).toFixed(3)+')';head.style.opacity=(1-fade).toFixed(3);}
+    var ef=(1-cl(p/0.5)).toFixed(3);
+    if(eye)eye.style.opacity=ef;
+    if(sub)sub.style.opacity=ef;
+    if(cue)cue.style.opacity=(1-cl(p/0.3)).toFixed(3);
+    var tin=cl((p-0.42)/0.3)*(1-fade);
+    tag.style.opacity=tin.toFixed(3);
+    tag.style.transform='translateX(-50%) translateY('+(20-tin*20).toFixed(1)+'px)';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+start();})();</script>
+
+
+
+
+  <script>window.VIMI_NAME = {{ (user.given_name or user.name or 'there')|tojson|safe }};</script>
+  {% include 'ppc_chat_widget.html' %}
+
+  <!-- Vimi — transient greeting bubble (opens the Vimi chatbot) -->
+  <style>
+    #vimi{position:fixed;right:100px;bottom:33px;z-index:9998;font-family:'Space Grotesk',system-ui,sans-serif}
+    .vimi-pill{display:flex;align-items:center;gap:11px;max-width:360px;
+      background:linear-gradient(120deg,rgba(20,23,42,.97),rgba(13,16,32,.97));
+      border:1px solid rgba(129,140,248,.34);border-radius: var(--radius-pill);padding:8px 14px 8px 9px;
+      box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 26px rgba(99,102,241,.16);backdrop-filter:blur(10px);
+      cursor:pointer;transform:translateY(14px) scale(.96);opacity:0;transition:transform .4s cubic-bezier(.2,1.2,.3,1),opacity .35s,box-shadow .25s}
+    #vimi.show .vimi-pill{transform:translateY(0) scale(1);opacity:1}
+    #vimi.gone{display:none}
+    .vimi-pill:hover{box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 34px rgba(99,102,241,.3);border-color:rgba(129,140,248,.55)}
+    .vimi-pill::after{content:"";position:absolute;right:-6px;top:50%;margin-top:-7px;width:14px;height:14px;
+      background:linear-gradient(135deg,rgba(20,23,42,.97),rgba(13,16,32,.97));border-top:1px solid rgba(129,140,248,.34);border-right:1px solid rgba(129,140,248,.34);transform:rotate(45deg)}
+    .vimi-ic{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 14px rgba(99,102,241,.45)}
+    .vimi-tx{min-width:0;line-height: var(--lh-tight)}
+    .vimi-tx .h{font-size:13px;font-weight:700;color:#fff;white-space:nowrap}
+    .vimi-tx .q{font-size:11.5px;color:#aab2d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .vimi-x{flex-shrink:0;width:22px;height:22px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:#8b94be;
+      font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;margin-left:2px}
+    .vimi-x:hover{background:rgba(255,255,255,.14);color:#fff}
+    @media (max-width:560px){ #vimi{right:84px;bottom:30px}.vimi-pill{max-width:calc(100vw - 110px)}.vimi-tx .h,.vimi-tx .q{white-space:normal}}
+  </style>
+  <div id="vimi">
+    <div class="vimi-pill" id="vimiPill" title="Chat with Vimi">
+      <span class="vimi-ic">
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" repeatCount="indefinite"/></ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="60 12 12" to="-300 12 12" dur="22s" repeatCount="indefinite"/></ellipse>
+          <ellipse cx="12" cy="12" rx="10" ry="3.6" stroke="#fff" stroke-width="1.5"><animateTransform attributeName="transform" type="rotate" from="-60 12 12" to="300 12 12" dur="30s" repeatCount="indefinite"/></ellipse>
+          <circle cx="12" cy="12" r="2.4" fill="#fff"><animate attributeName="r" values="2.4;2.9;2.4" dur="3s" repeatCount="indefinite"/></circle>
+        </svg>
+      </span>
+      <span class="vimi-tx">
+        <span class="h">Hi {{ user.given_name or user.name or 'there' }} <span style="font-weight:400">👋</span></span>
+        <span class="q" id="vimiQ">How are you today?</span>
+      </span>
+      <button class="vimi-x" id="vimiX" aria-label="Dismiss">✕</button>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var box=document.getElementById('vimi'),pill=document.getElementById('vimiPill'),
+        x=document.getElementById('vimiX'),q=document.getElementById('vimiQ');
+    var lines=['How are you today?','What are you looking for?','What can I help you find?','What do you need help with?'];
+    q.textContent=lines[Math.floor(Math.random()*lines.length)];
+    try{ localStorage.setItem('vimi_login_name',(window.VIMI_NAME||'').toString()); }catch(e){}
+    setTimeout(function(){box.classList.add('show');},700);
+    function openChat(e){
+      if(e&&e.stopPropagation)e.stopPropagation();          // don't let the click reach the widget's close-on-outside handler
+      box.classList.remove('show');box.classList.add('gone');
+      var n=0;
+      function go(){
+        if(typeof window.ppcOpen==='function'){window.ppcOpen();return;}
+        var b=document.getElementById('ppc-btn');
+        if(b){b.click();return;}
+        if(n++<25)setTimeout(go,100);
+      }
+      setTimeout(go,0);                                      // defer so the originating click finishes bubbling first
+    }
+    pill.addEventListener('click',openChat);
+    x.addEventListener('click',function(e){e.stopPropagation();box.classList.remove('show');setTimeout(function(){box.classList.add('gone');},350);});
+  })();
+  </script>
+
+<script>(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href],a.tb-dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');a.style.background='rgba(124,92,255,.18)';a.style.color='#fff';}});}catch(e){}})();</script>
+</body>
+</html>

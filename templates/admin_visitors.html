@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Anonymous Traffic · Intelligence by Position²</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#040510;--ink:#eef1fb;--dim:#aab2d5;--dim2:#7c84a8;--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);
+--card:rgba(255,255,255,.025);--cyan:#22d3ee;--violet:#8b5cf6;--indigo:#6366f1;--lime:#a3e635;--amber:#fbbf24;--pink:#e879f9;--emerald:#34d399;
+--display:'Bricolage Grotesque',sans-serif;--serif:'Instrument Serif',serif;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height: var(--lh-body);-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+radial-gradient(60% 50% at 15% 0%,rgba(99,102,241,.16),transparent 60%),
+radial-gradient(50% 45% at 90% 10%,rgba(34,211,238,.12),transparent 60%),
+radial-gradient(55% 50% at 70% 100%,rgba(139,92,246,.12),transparent 60%)}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--margin) 80px}
+.topbar{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);background:rgba(4,5,16,.72);border-bottom:1px solid var(--line);
+display:flex;align-items:center;gap:14px;padding:14px var(--bleed);margin-bottom:26px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;letter-spacing: var(--ls-tight)}
+.brand .dot{width:26px;height:26px;border-radius: var(--radius-sm);display:grid;place-items:center;background:linear-gradient(135deg,var(--cyan),var(--violet));font-size:15px}
+.crumb{font-family:var(--mono);font-size:11.5px;color:var(--dim2);letter-spacing: var(--ls-caps);text-transform:uppercase}
+.spacer{flex:1}
+.btn{font-family:var(--mono);font-size:11.5px;letter-spacing: var(--ls-caps);color:var(--dim);border:1px solid var(--line2);
+border-radius: var(--radius-sm);padding:8px 13px;background:var(--card);cursor:pointer;transition:.16s}
+.btn:hover{color:#fff;border-color:var(--cyan);box-shadow:0 0 22px -8px var(--cyan)}
+.hero{padding:6px 0 22px}
+.hero h1{font-family:var(--display);font-weight:800;letter-spacing: var(--ls-tight);font-size:30px;margin:0 0 6px}
+.hero h1 em{font-family:var(--serif);font-style:italic;font-weight:400;background:linear-gradient(120deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--dim);margin:0;max-width:760px}
+.note{margin:14px 0;padding:14px 16px;border:1px dashed var(--line2);border-radius: var(--radius-md);color:var(--dim);font-size:13px;background:rgba(255,255,255,.02)}
+.grid{display:grid;gap:var(--gutter)}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius: var(--radius-lg);padding:18px}
+.kpi b{display:block;font-family:var(--display);font-weight:800;font-size:30px;letter-spacing: var(--ls-tight);line-height: var(--lh-tight)}
+.kpi span{display:block;font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;color:var(--dim2);margin-top:9px}
+.kpi small{display:block;color:var(--dim);font-size:11.5px;margin-top:5px}
+.kpi{cursor:pointer;transition:border-color .15s ease,transform .15s ease,background .15s ease}
+.kpi:hover{border-color:var(--line2);transform:translateY(-2px);background:rgba(255,255,255,.045)}
+.sect{margin-top:30px}
+.sect h2{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing: var(--ls-tight);margin:0 0 13px;display:flex;align-items:center;gap:9px}
+.sect h2::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 9px var(--cyan)}
+.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:860px){.two,.three{grid-template-columns:1fr}}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.bar .lab{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink)}
+.bar .track{grid-column:1/-1;height:7px;border-radius: var(--radius-xs);background:rgba(255,255,255,.06);overflow:hidden}
+.bar .fill{height:100%;border-radius: var(--radius-xs);background:linear-gradient(90deg,var(--cyan),var(--violet))}
+.bar .n{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.spark{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:8px}
+.spark .col{flex:1;min-width:3px;background:linear-gradient(180deg,var(--cyan),var(--violet));border-radius: var(--radius-xs) var(--radius-xs) 0 0;opacity:.85;position:relative}
+.spark .col:hover{opacity:1}
+.spark .col span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--dim2);white-space:nowrap;opacity:0}
+.spark .col:hover span{opacity:1}
+.xlab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim2);margin-top:6px}
+.funnel{display:flex;gap:10px}
+.funnel .step{flex:1;text-align:center;padding:16px 8px;border-radius: var(--radius-md);border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.funnel .step b{display:block;font-family:var(--display);font-size:24px;font-weight:800}
+.funnel .step span{font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;color:var(--dim2)}
+.funnel .step.win{border-color:rgba(129,140,248,.5);background:rgba(129,140,248,.08)}
+.funnel .step.win b{color:#a5b4fc}
+.funnel-note{margin:12px 2px 0;font-size:12px;line-height:1.5;color:var(--dim2)}
+.funnel-note b{color:var(--ink)}
+.cwv{display:flex;gap:12px;flex-wrap:wrap}
+.cwv .m{flex:1;min-width:120px;text-align:center;padding:14px;border-radius: var(--radius-md);border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.cwv .m b{font-family:var(--display);font-size:24px;font-weight:800;display:block}
+.cwv .m span{font-family:var(--mono);font-size:10px;color:var(--dim2);letter-spacing: var(--ls-caps)}
+.cwv .good{color:var(--emerald)}.cwv .ni{color:var(--amber)}.cwv .bad{color:#fb7185}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;color:var(--dim2);padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+tr:hover td{background:rgba(255,255,255,.02);color:var(--ink)}
+.pill{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius: var(--radius-lg);border:1px solid var(--line2)}
+.pill.new{color:var(--emerald);border-color:rgba(52,211,153,.4)}
+.pill.sub{color:var(--lime);border-color:rgba(163,230,53,.4)}
+.empty{color:var(--dim2);padding:18px;text-align:center;font-size:13px}
+.tbl-wrap{overflow:auto;max-height:520px;border-radius: var(--radius-md)}
+.muted{color:var(--dim2)}
+/* drawer (KPI details) */
+.overlay{position:fixed;inset:0;background:rgba(2,3,10,.6);backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:.22s;z-index:60}
+.overlay.open{opacity:1;visibility:visible}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(460px,94vw);background:#080a17;border-left:1px solid var(--line2);
+  box-shadow:-30px 0 80px -30px rgba(0,0,0,.8);transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:61;
+  display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer .dh{padding:22px 22px 18px;border-bottom:1px solid var(--line);position:relative}
+.drawer .dh h3{margin:0;font-family:var(--display);font-weight:700;font-size:20px}
+.drawer .close{position:absolute;top:16px;right:18px;font-size:20px;color:var(--dim2);cursor:pointer;background:none;border:0}
+.drawer .close:hover{color:#fff}
+.drawer .kdesc{color:var(--dim);font-size:13px;line-height: var(--lh-body);margin:14px 0 0}
+.drawer .tline{padding:20px 22px;overflow:auto;flex:1}
+.drawer .kstats{display:flex;flex-wrap:wrap;gap:10px}
+.drawer .kstat{flex:1;min-width:100px;border:1px solid var(--line);border-radius: var(--radius-md);padding:12px 13px;background:rgba(255,255,255,.02)}
+.drawer .kstat b{display:block;font-family:var(--display);font-weight:800;font-size:20px}
+.drawer .kstat span{display:block;font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;color:var(--dim2);margin-top:4px}
+.drawer .ksect{margin-top:22px}
+.drawer .ksect h4{font-family:var(--display);font-weight:700;font-size:13px;margin:0 0 10px;color:var(--ink)}
+/* visitor journey timeline (shared drawer, click a row in Identified visitors) */
+.drawer .dh .top{display:flex;align-items:center;gap:13px}
+.drawer .dh .mavatar{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:17px;font-weight:800;font-family:var(--display)}
+.drawer .dh .em{color:var(--dim2);font-size:13px;font-family:var(--mono)}
+.drawer .dh .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line2);border-radius: var(--radius-lg);padding:4px 9px}
+.chip.member{color:var(--lime);border-color:rgba(163,230,53,.4)}
+.chip.staff{color:#a5b4fc;border-color:rgba(99,102,241,.4)}
+.tl-item{display:grid;grid-template-columns:22px 1fr;gap:12px;position:relative;padding-bottom:18px}
+.tl-item:not(:last-child)::before{content:'';position:absolute;left:10px;top:20px;bottom:0;width:2px;background:var(--line)}
+.tl-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;z-index:1;
+  background:rgba(34,211,238,.16);color:var(--cyan);border:1px solid rgba(34,211,238,.5)}
+.tl-item.signin .tl-dot{background:rgba(163,230,53,.16);color:var(--lime);border-color:rgba(163,230,53,.6)}
+.tl-item.post .tl-dot{background:rgba(139,92,246,.16);color:var(--violet);border-color:rgba(139,92,246,.5)}
+.tl-c b{display:block;font-size:13px;color:var(--ink);font-weight:600;white-space:normal}
+.tl-c small{display:block;color:var(--dim2);font-size:11.5px;font-family:var(--mono);margin-top:2px}
+.tl-c .k{font-family:var(--mono);font-size:10px;letter-spacing: var(--ls-caps);text-transform:uppercase;margin-right:6px}
+.tl-c .k.view{color:var(--cyan)}.tl-c .k.signin{color:var(--lime)}.tl-c .k.post{color:var(--violet)}
+#identified tbody tr{cursor:pointer}
+.status-pill{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius: var(--radius-lg);border:1px solid var(--line2);color:var(--dim2)}
+.status-pill.member{color:var(--lime);border-color:rgba(163,230,53,.4);background:rgba(163,230,53,.08)}
+.status-pill.staff{color:#a5b4fc;border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.08)}
+/* KPI-card drill-down: real visitor list inside the drawer */
+.klink{display:inline-block;margin-bottom:12px;color:var(--cyan);font-family:var(--mono);font-size:11.5px;letter-spacing: var(--ls-caps);cursor:pointer}
+.klink:hover{text-decoration:underline}
+.vlist{display:flex;flex-direction:column;gap:2px;margin-top:2px;max-height:340px;overflow:auto}
+.vrow{display:flex;align-items:center;gap:11px;padding:9px 6px;border-radius: var(--radius-sm);cursor:pointer;transition:background .12s}
+.vrow:hover{background:rgba(255,255,255,.045)}
+.vrow .va{width:28px;height:28px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--violet),var(--cyan));color:#04121a;font-size:10px;font-weight:800;font-family:var(--display)}
+.vrow .vmain{flex:1;min-width:0}
+.vrow .vmain b{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .vmain small{display:block;color:var(--dim2);font-size:10px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.vrow .vmeta{flex:none;font-family:var(--mono);font-size:10px;color:var(--dim2)}
+.vlist-more{padding:8px 6px;font-size:11.5px;color:var(--dim2)}
+</style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <script src="/static/js/aurora.js?v=1" defer></script>
+  <script src="/static/js/pfx_bg.js?v=3" defer></script>
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="tl">
+    <a href="/p2/hub" class="brand"><div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div></a>
+    <div class="bc"><a href="/p2/hub">Hub</a><span class="bc-sep">›</span><a href="/p2/admin/internal-usage">Admin</a><span class="bc-sep">›</span><span class="bc-cur">Anonymous Traffic</span></div>
+  </div>
+  <div class="tr">
+    <button class="btn" id="refreshBtn" onclick="load(true)">↻ Refresh</button>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="avatar">{% if user and user.picture %}<img src="{{ user.picture }}" alt="" />{% else %}{{ ((user.name or 'A')[:2]|upper) if user else 'A' }}{% endif %}</div>
+        <span class="uname">{{ (user.given_name or user.name or 'Admin') if user else 'Admin' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header"><div class="dd-name">{{ (user.name or 'User') if user else 'User' }}</div><div class="dd-email">{{ user.email if user else '' }}</div></div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="hero">
+    <h1>Anonymous <em>traffic</em></h1>
+    <p>Behaviour of people on the public marketing &amp; login pages <b>before they sign in</b> — sources, engagement, intent signals and conversions. Bots are excluded from headline metrics.</p>
+  </div>
+
+  <div id="emptyNote" class="note" style="display:none"></div>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">Identified visitors &amp; companies <span class="muted" style="font-weight:400;font-size:11.5px">· click for full journey</span></h2>
+      <div class="tbl-wrap" style="max-height:380px"><table id="identified">
+        <thead><tr><th>Visitor</th><th>Name</th><th>Company</th><th>Source</th><th>Status</th><th>Pages</th></tr></thead>
+        <tbody></tbody></table></div></div>
+    <div class="card"><h2 style="margin-top:0">Top companies <span class="muted" style="font-weight:400;font-size:11.5px">· reverse-IP / form</span></h2><div class="bars" id="companies"></div></div>
+  </div>
+
+  <div class="sect"><h2>Visits over time</h2><div class="card"><div class="spark" id="series"></div><div class="xlab" id="seriesX"></div></div></div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">Top pages</h2><div class="bars" id="topPages"></div></div>
+    <div class="card"><h2 style="margin-top:0">Top referrers</h2><div class="bars" id="referrers"></div></div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">Campaign source (UTM)</h2><div class="bars" id="utmSource"></div></div>
+    <div class="card"><h2 style="margin-top:0">Campaign name (UTM)</h2><div class="bars" id="utmCampaign"></div></div>
+  </div>
+
+  <div class="sect grid three">
+    <div class="card"><h2 style="margin-top:0">Device</h2><div class="bars" id="devices"></div></div>
+    <div class="card"><h2 style="margin-top:0">OS</h2><div class="bars" id="oses"></div></div>
+    <div class="card"><h2 style="margin-top:0">Browser</h2><div class="bars" id="browsers"></div></div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">Scroll depth</h2><div class="bars" id="scroll"></div></div>
+    <div class="card"><h2 style="margin-top:0">Core Web Vitals (avg)</h2><div class="cwv" id="cwv"></div></div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">CTA clicks by type</h2><div class="bars" id="cta"></div></div>
+    <div class="card"><h2 style="margin-top:0">Lead-form interests</h2><div class="bars" id="leadInterests"></div></div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card">
+      <h2 style="margin-top:0">Sign-up funnel</h2>
+      <div class="funnel" id="signupFunnel"></div>
+      <p class="funnel-note" id="signupNote"></p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Lead-form funnel</h2>
+      <div class="funnel" id="funnel"></div>
+      <p class="funnel-note">Contextual "Talk to us", custom-agent, report &amp; DPA requests that open the contact form.</p>
+    </div>
+  </div>
+
+  <div class="sect grid two">
+    <div class="card"><h2 style="margin-top:0">On-site searches</h2><div class="bars" id="search"></div></div>
+    <div class="card"><h2 style="margin-top:0">Landing pages</h2><div class="bars" id="landing"></div></div>
+  </div>
+
+  <div class="sect"><div class="card"><h2 style="margin-top:0">Rage-click pages (UX friction)</h2><div class="bars" id="rage"></div></div></div>
+
+  <div class="sect"><h2>Recent visitor activity</h2>
+    <div class="card" style="padding:6px"><div class="tbl-wrap"><table id="recent">
+      <thead><tr><th>Time</th><th>Visitor</th><th>Who</th><th>Page</th><th>Landing</th><th>Referrer</th><th>Device</th><th>Engaged</th><th>Scroll</th><th>Pages</th><th>Flags</th></tr></thead>
+      <tbody></tbody></table></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <button class="close" onclick="closeDrawer()">✕</button>
+  <div class="dh" id="drawerHead"></div>
+  <div class="tline" id="drawerTline"></div>
+</aside>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function bars(id, arr, opts){
+  opts=opts||{};var el=document.getElementById(id);if(!el)return;
+  if(!arr||!arr.length){el.innerHTML='<div class="empty">No data yet</div>';return;}
+  var max=Math.max.apply(null,arr.map(function(x){return x[1];}))||1;
+  el.innerHTML=arr.map(function(x){
+    var pct=Math.round(x[1]/max*100);
+    return '<div class="bar"><div class="lab" title="'+esc(x[0])+'">'+esc(x[0]||'—')+'</div>'+
+      '<div class="n">'+x[1]+(opts.suffix||'')+'</div>'+
+      '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+  }).join('');
+}
+function kcard(key,b,label,small){
+  return '<div class="card kpi" onclick="openKpiDrawer(\''+key+'\')"><b>'+esc(b)+'</b><span>'+esc(label)+'</span>'+(small?'<small>'+esc(small)+'</small>':'')+'</div>';
+}
+function miniBars(arr,suffix){
+  if(!arr||!arr.length)return '<div class="empty">No data yet</div>';
+  var max=Math.max.apply(null,arr.map(function(x){return x[1];}))||1;
+  return '<div class="bars">'+arr.map(function(x){
+    var pct=Math.round(x[1]/max*100);
+    return '<div class="bar"><div class="lab" title="'+esc(x[0])+'">'+esc(x[0]||'—')+'</div>'+
+      '<div class="n">'+x[1]+(suffix||'')+'</div>'+
+      '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div></div>';
+  }).join('')+'</div>';
+}
+var LAST_DATA=null;
+var KPI_INFO={
+  pageviews:{
+    title:'Page views',
+    desc:'Every anonymous page view recorded on the public marketing & login pages, before sign-in. Bots are excluded.',
+    render:function(d){return '<div class="ksect"><h4>Top pages</h4>'+miniBars(d.top_pages)+'</div>';}
+  },
+  visitors:{
+    title:'Unique visitors',
+    desc:'Distinct anonymous browser IDs (a first-party cookie), not distinct people — the same person on two devices counts twice, and a cleared cookie makes a returning visitor look new. Click anyone below to see their full journey.',
+    render:function(d){
+      var k=d.kpis||{};var av=d.all_visitors||[];
+      return '<div class="kstats">'+
+          '<div class="kstat"><b>'+(k.new||0)+'</b><span>New</span></div>'+
+          '<div class="kstat"><b>'+(k.returning||0)+'</b><span>Returning</span></div>'+
+        '</div>'+
+        '<div class="ksect"><h4>Device</h4>'+miniBars(d.devices)+'</div>'+
+        '<div class="ksect"><h4>Visitors ('+(k.visitors||av.length)+')</h4>'+vrowList(pairsAll(av),'openAllVisitorDrawer','visitors')+'</div>';
+    }
+  },
+  sessions:{
+    title:'Sessions',
+    desc:'One browsing visit (resets after a period of inactivity). Bounce rate is the share of sessions that viewed only one page before leaving.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats"><div class="kstat"><b>'+(k.bounce_rate||0)+'%</b><span>Bounce rate</span></div></div>'+
+        '<div class="ksect"><h4>Landing pages</h4>'+miniBars(d.top_landing)+'</div>';
+    }
+  },
+  avg_engaged:{
+    title:'Avg engaged time',
+    desc:'Average active (not idle) time per session, vs. average raw time on page — engaged time discounts tabs left open in the background.',
+    render:function(d){
+      var k=d.kpis||{};
+      return '<div class="kstats">'+
+          '<div class="kstat"><b>'+(k.avg_engaged||'—')+'</b><span>Avg engaged</span></div>'+
+          '<div class="kstat"><b>'+(k.avg_time||'—')+'</b><span>Avg on page</span></div>'+
+        '</div>'+
+        '<div class="ksect"><h4>Scroll depth</h4>'+miniBars(d.scroll)+'</div>';
+    }
+  },
+  signup:{
+    title:'Sign-up clicks',
+    desc:'Clicks on the primary "Sign up" button, which opens the one-click Google sign-up pop-up. The funnel shows how many of those anonymous visitors went on to actually sign in.',
+    render:function(d){
+      var sf=d.signup_funnel||{};var k=d.kpis||{};
+      return '<div class="kstats"><div class="kstat"><b>'+(k.signup_cvr||0)+'%</b><span>Click → sign-in</span></div></div>'+
+        '<div class="ksect"><h4>Sign-up funnel</h4><div class="funnel" style="margin-top:2px">'+
+          '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
+          '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>'+
+        '</div></div>'+
+        '<div class="ksect"><h4>All CTA clicks by type</h4>'+miniBars(d.cta_groups)+'</div>';
+    }
+  },
+  conversions:{
+    title:'Lead requests',
+    desc:'Visitors who submitted the contact / lead form — the contextual "Talk to us", custom-agent, report and DPA requests — as a share of all visitors. The funnel below shows where people drop off before submitting.',
+    render:function(d){
+      var f=d.form_funnel||{};
+      return '<div class="ksect"><h4>Lead-form funnel</h4><div class="funnel" style="margin-top:2px">'+
+          '<div class="step"><b>'+(f.opened||0)+'</b><span>Opened</span></div>'+
+          '<div class="step"><b>'+(f.started||0)+'</b><span>Started</span></div>'+
+          '<div class="step win"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>'+
+        '</div></div>'+
+        '<div class="ksect"><h4>By interest</h4>'+miniBars(d.lead_interests)+'</div>';
+    }
+  },
+  video_sessions:{
+    title:'Watched walkthrough',
+    desc:'Sessions where the product-walkthrough video was played, at least briefly, on the marketing site — broken down by which page it played on.',
+    render:function(d){return '<div class="ksect"><h4>Pages where the video played</h4>'+miniBars(d.video_pages)+'</div>';}
+  },
+  signed_in:{
+    title:'Signed in later',
+    desc:'Anonymous visitors whose first-party cookie (p2_vid) was later carried into a Google sign-in — either a public /app member sign-up or an @position2.com staff login. Click anyone below to see their full pre-login → sign-in → post-login timeline.',
+    render:function(d){
+      var k=d.kpis||{};var av=(d.all_visitors||[]).filter(function(x){return x.converted;});
+      return '<div class="kstats"><div class="kstat"><b>'+(k.signed_in_rate||0)+'%</b><span>Of all visitors</span></div></div>'+
+        '<div class="ksect"><h4>Who signed in ('+av.length+')</h4>'+vrowList(pairsFiltered(d.all_visitors||[],function(x){return x.converted;}),'openAllVisitorDrawer','signed_in')+'</div>';
+    }
+  },
+  identified:{
+    title:'Identified visitors',
+    desc:'Visitors matched to a real name/company — either via reverse-IP lookup, by submitting the access-request form, signing in later, or a provider posting to /api/identify. Everyone else stays anonymous by design.',
+    render:function(d){
+      return '<div class="ksect"><h4>People ('+(d.identified||[]).length+')</h4>'+vrowList(pairsAll(d.identified||[]),'openVisitorDrawer','identified')+'</div>'+
+        '<div class="ksect"><h4>Top companies</h4>'+miniBars(d.top_companies)+'</div>';
+    }
+  },
+  companies:{
+    title:'Companies seen',
+    desc:'Distinct companies detected across all visitors via reverse-IP lookup on their network address — broader than "Identified visitors", which requires a name too.',
+    render:function(d){return '<div class="ksect"><h4>All companies</h4>'+miniBars(d.top_companies)+'</div>';}
+  }
+};
+function openKpiDrawer(key){
+  var info=KPI_INFO[key];if(!info||!LAST_DATA)return;
+  document.getElementById('drawerHead').innerHTML='<h3>'+esc(info.title)+'</h3><p class="kdesc">'+esc(info.desc)+'</p>';
+  document.getElementById('drawerTline').innerHTML=info.render(LAST_DATA);
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+var IDENTIFIED=[],ALL_VISITORS=[];
+function initials(n){n=(n||'').trim();if(!n)return '?';var p=n.split(/\s+/);return ((p[0][0]||'')+(p[1]?p[1][0]:'')).toUpperCase();}
+// {v,i} pairs preserve each visitor's index in its source array, so a filtered/sliced
+// list can still open the right record via openAllVisitorDrawer(i)/openVisitorDrawer(i).
+function pairsAll(arr){return (arr||[]).map(function(v,i){return {v:v,i:i};});}
+function pairsFiltered(arr,fn){return pairsAll(arr).filter(function(p){return fn(p.v);});}
+function vrowList(pairs,opener,backKey,limit){
+  if(!pairs||!pairs.length)return '<div class="empty">No visitors yet.</div>';
+  var lim=limit||150,shown=pairs.slice(0,lim);
+  var html=shown.map(function(p){
+    var x=p.v;
+    var status=x.status?('<span class="chip '+x.status+'" style="padding:2px 7px;font-size:10px">'+(x.status==='staff'?'staff':'member')+'</span>'):'';
+    return '<div class="vrow" onclick="'+opener+'('+p.i+',\''+backKey+'\')">'+
+      '<div class="va">'+esc(initials(x.name||x.vid))+'</div>'+
+      '<div class="vmain"><b>'+esc(x.name||('Visitor '+x.vid))+status+'</b><small>'+esc(x.company||x.email||('vid '+x.vid))+'</small></div>'+
+      '<div class="vmeta">'+(x.pages||0)+' pg</div></div>';
+  }).join('');
+  if(pairs.length>shown.length)html+='<div class="vlist-more">Showing '+shown.length+' of '+pairs.length+'</div>';
+  return '<div class="vlist">'+html+'</div>';
+}
+function openVisitorDrawer(i,backKey){renderVisitorInto(IDENTIFIED[i],backKey);}
+function openAllVisitorDrawer(i,backKey){renderVisitorInto(ALL_VISITORS[i],backKey);}
+var CUR_VISITOR=null;
+function fmtRev(r){if(!r)return'';var m=String(r).match(/([\d,.]+)/);return m?('$'+m[1]):r;}
+function enrichPanel(v){
+  if(!v||!v.ip||!v.domain)return'';
+  var desc=v.description?'<p class="kdesc" style="margin-top:0">'+esc(v.description)+'</p>':'';
+  if(v.enrichment_source==='apollo'){
+    var bc=(v.buying_committee||[]);
+    return '<div class="ksect"><h4>Firmographics <span class="muted" style="font-weight:400;font-size:11.5px">· Apollo-deepened</span></h4>'+
+      desc+
+      '<div class="kstats">'+
+        (v.employees?'<div class="kstat"><b>'+esc(v.employees)+'</b><span>Employees</span></div>':'')+
+        (v.revenue?'<div class="kstat"><b>'+esc(fmtRev(v.revenue))+'</b><span>Revenue</span></div>':'')+
+      '</div>'+
+      (bc.length?'<div class="ksect"><h4>Buying committee</h4><div class="vlist">'+bc.map(function(p){
+        return '<div class="vrow" style="cursor:default"><div class="va">'+esc(initials(p.full_name||''))+'</div>'+
+          '<div class="vmain"><b>'+esc(p.full_name||'Unknown')+'</b><small>'+esc(p.title||'')+'</small></div>'+
+          (p.linkedin_url?'<a class="vmeta" href="'+esc(p.linkedin_url)+'" target="_blank" onclick="event.stopPropagation()">↗</a>':'')+
+        '</div>';
+      }).join('')+'</div></div>':'')+
+    '</div>';
+  }
+  // not yet Apollo-deepened -- either never enriched, or free-tier only
+  // (e.g. a prior click ran before APOLLO_API_KEY was configured).
+  return '<div class="ksect"><h4>Firmographics'+
+    (v.enrichment_source==='free'?' <span class="muted" style="font-weight:400;font-size:11.5px">· free-tier</span>':'')+
+    '</h4>'+desc+
+    '<p class="kdesc" style="margin-top:0">'+
+    (v.enrichment_source==='free'?'Free-tier data only'+(v.industry?' — industry: '+esc(v.industry):''):'Not enriched yet')+
+    '. Precise employee count, revenue, and a real buying committee require an Apollo lookup.</p>'+
+    '<button class="btn" id="deepenBtn" onclick="deepenVisitor()">💎 Enrich further</button>'+
+    '<div id="deepenStatus" style="margin-top:8px;font-size:11.5px;color:var(--dim2)"></div>'+
+  '</div>';
+}
+function deepenVisitor(){
+  var v=CUR_VISITOR;if(!v||!v.ip)return;
+  var btn=document.getElementById('deepenBtn'),st=document.getElementById('deepenStatus');
+  if(btn){btn.disabled=true;btn.textContent='Enriching…';}
+  fetch('/p2/admin/anonymous-traffic/deepen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:v.ip})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){if(st)st.textContent='⚠ '+d.error;if(btn){btn.disabled=false;btn.textContent='💎 Enrich further (spends 1 Apollo credit)';}return;}
+      Object.assign(v,d.record||{});
+      renderVisitorInto(v);
+    })
+    .catch(function(){if(st)st.textContent='⚠ Request failed.';if(btn){btn.disabled=false;btn.textContent='💎 Enrich further (spends 1 Apollo credit)';}});
+}
+function renderVisitorInto(v,backKey){
+  if(!v)return;
+  CUR_VISITOR=v;
+  var statusChip=v.status?('<span class="chip '+v.status+'">'+(v.status==='staff'?'@position2.com staff':'Public member')+'</span>'):'';
+  var back=backKey?('<a class="klink" onclick="openKpiDrawer(\''+backKey+'\')">← Back</a>'):'';
+  document.getElementById('drawerHead').innerHTML=
+    back+
+    '<div class="top"><div class="mavatar">'+esc(initials(v.name||v.vid))+'</div><div><h3>'+esc(v.name||('Visitor '+v.vid))+'</h3>'+
+    '<div class="em">'+esc(v.email||'no email on file')+'</div></div></div>'+
+    '<div class="meta">'+
+      statusChip+
+      (v.company?'<span class="chip">🏢 '+esc(v.company)+'</span>':'')+
+      '<span class="chip">'+v.pages+' pre-login page'+(v.pages===1?'':'s')+'</span>'+
+      (v.device?'<span class="chip">'+esc(v.device)+'</span>':'')+
+      (v.source?'<span class="chip">↗ '+esc(v.source)+'</span>':'')+
+    '</div>';
+  var tl=v.timeline||[];
+  var tlHtml=tl.length?tl.map(function(e){
+    var kl=e.kind==='signin'?'signin':(e.kind==='post'?'post':'view');
+    var kt=e.kind==='signin'?'sign-in':(e.kind==='post'?'after login':'pre-login');
+    var ic=e.kind==='signin'?'★':(e.kind==='post'?'●':'○');
+    return '<div class="tl-item '+kl+'"><div class="tl-dot">'+ic+'</div><div class="tl-c">'+
+      '<b><span class="k '+kl+'">'+kt+'</span>'+esc(e.label)+'</b>'+
+      '<small>'+esc(e.t)+(e.meta?' · '+esc(e.meta):'')+'</small></div></div>';
+  }).join(''):'<div class="empty">No tracked activity found for this visitor.</div>';
+  document.getElementById('drawerTline').innerHTML=enrichPanel(v)+'<div class="ksect"><h4>Journey</h4>'+tlHtml+'</div>';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer(){document.getElementById('overlay').classList.remove('open');document.getElementById('drawer').classList.remove('open');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
+function load(force){
+  var btn=document.getElementById('refreshBtn');if(btn)btn.textContent='…';
+  fetch('/p2/admin/anonymous-traffic/data'+(force?'?fresh=1':''),{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(btn)btn.textContent='↻ Refresh';
+    LAST_DATA=d;
+    var k=d.kpis||{};
+    var note=document.getElementById('emptyNote');
+    if(!d.configured){note.style.display='block';note.textContent='⚠ Sheets not configured (GOOGLE_SA_JSON / LOGIN_LOG_SHEET_ID missing) — analytics cannot be stored or read yet.';}
+    else if(!k.pageviews){note.style.display='block';note.textContent='No visitor data yet. Once the public site is live with the tracker and visitors browse, this dashboard fills automatically (data lands in the “Visitor Analytics” sheet tab).';}
+    else{note.style.display='none';}
+    document.getElementById('kpis').innerHTML=
+      kcard('pageviews',k.pageviews||0,'Page views')+
+      kcard('visitors',k.visitors||0,'Unique visitors',(k.new||0)+' new · '+(k.returning||0)+' returning')+
+      kcard('sessions',k.sessions||0,'Sessions','Bounce '+(k.bounce_rate||0)+'%')+
+      kcard('avg_engaged',k.avg_engaged||'—','Avg engaged','Avg on page '+(k.avg_time||'—'))+
+      kcard('signup',(k.signup_clicks||0),'Sign-up clicks',(k.signup_cvr||0)+'% → sign-in')+
+      kcard('conversions',(k.conversions||0),'Lead requests',(k.conv_rate||0)+'% of visitors')+
+      kcard('video_sessions',k.video_sessions||0,'Watched walkthrough')+
+      kcard('signed_in',k.signed_in||0,'Signed in later',(k.signed_in_rate||0)+'% of visitors')+
+      kcard('identified',k.identified||0,'Identified visitors')+
+      kcard('companies',k.companies||0,'Companies seen');
+    // time series
+    var s=d.series||[],sx=document.getElementById('seriesX');
+    var smax=Math.max.apply(null,s.map(function(x){return x[1];}))||1;
+    document.getElementById('series').innerHTML=s.map(function(x){
+      var h=Math.round(x[1]/smax*100);
+      return '<div class="col" style="height:'+Math.max(h,2)+'%"><span>'+x[1]+'</span></div>';
+    }).join('')||'<div class="empty">No data yet</div>';
+    sx.innerHTML=s.length?('<span>'+esc(s[0][0])+'</span><span>'+esc(s[s.length-1][0])+'</span>'):'';
+    // breakdowns
+    bars('topPages',d.top_pages);bars('referrers',d.referrers);
+    bars('utmSource',d.utm_source);bars('utmCampaign',d.utm_campaign);
+    bars('devices',d.devices);bars('oses',d.oses);bars('browsers',d.browsers);
+    bars('scroll',d.scroll);bars('cta',d.cta_groups);bars('search',d.search);
+    bars('leadInterests',d.lead_interests);
+    bars('landing',d.top_landing);bars('rage',d.rage);bars('companies',d.top_companies);
+    var idb=document.querySelector('#identified tbody');var idr=d.identified||[];
+    IDENTIFIED=idr;ALL_VISITORS=d.all_visitors||[];
+    idb.innerHTML=idr.length?idr.map(function(x,i){
+      var status=x.status?'<span class="status-pill '+x.status+'">'+(x.status==='staff'?'→ Staff':'→ Member')+'</span>':'<span class="status-pill">—</span>';
+      return '<tr onclick="openVisitorDrawer('+i+')"><td class="muted">'+esc(x.vid)+'</td><td>'+esc(x.name||'—')+'</td><td>'+esc(x.company||'—')+'</td><td><span class="pill'+(x.source==='Lead form'?' sub':'')+'">'+esc(x.source||'—')+'</span></td><td>'+status+'</td><td>'+esc(x.pages)+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">No identified visitors yet — they appear when reverse-IP is enabled, someone submits the access form, signs in later, or a provider posts to /api/identify.</td></tr>';
+    // lead-form funnel
+    var f=d.form_funnel||{};
+    document.getElementById('funnel').innerHTML=
+      '<div class="step"><b>'+(f.opened||0)+'</b><span>Opened</span></div>'+
+      '<div class="step"><b>'+(f.started||0)+'</b><span>Started</span></div>'+
+      '<div class="step win"><b>'+(f.submitted||0)+'</b><span>Submitted</span></div>';
+    // sign-up funnel (primary CTA → Google sign-in)
+    var sf=d.signup_funnel||{};
+    document.getElementById('signupFunnel').innerHTML=
+      '<div class="step"><b>'+(sf.clicked||0)+'</b><span>Clicked Sign up</span></div>'+
+      '<div class="step win"><b>'+(sf.signed_in||0)+'</b><span>Signed in</span></div>';
+    document.getElementById('signupNote').innerHTML=
+      'Primary CTA across the marketing pages. <b>'+(k.signup_cvr||0)+'%</b> of Sign-up clickers went on to sign in with Google.';
+    // cwv
+    var v=d.cwv||{};
+    function rate(metric,val){
+      if(metric==='lcp')return val<=2500?'good':val<=4000?'ni':'bad';
+      if(metric==='cls')return val<=0.1?'good':val<=0.25?'ni':'bad';
+      return val<=200?'good':val<=500?'ni':'bad';
+    }
+    document.getElementById('cwv').innerHTML=
+      '<div class="m"><b class="'+rate('lcp',v.lcp||0)+'">'+(v.lcp||0)+'ms</b><span>LCP</span></div>'+
+      '<div class="m"><b class="'+rate('cls',v.cls||0)+'">'+(v.cls||0)+'</b><span>CLS</span></div>'+
+      '<div class="m"><b class="'+rate('inp',v.inp||0)+'">'+(v.inp||0)+'ms</b><span>INP</span></div>';
+    // recent
+    var tb=document.querySelector('#recent tbody');
+    var rows=d.recent||[];
+    tb.innerHTML=rows.length?rows.map(function(x){
+      var flags=[];
+      if(x.new==='Yes')flags.push('<span class="pill new">new</span>');
+      if(x.form==='submitted')flags.push('<span class="pill sub">converted</span>');
+      else if(x.form)flags.push('<span class="pill">'+esc(x.form)+'</span>');
+      return '<tr><td class="muted">'+esc(x.ts)+'</td><td class="muted">'+esc(x.vid)+'</td>'+
+        '<td>'+esc(x.who||x.company||'—')+'</td>'+
+        '<td title="'+esc(x.page)+'">'+esc(x.page)+'</td><td class="muted">'+esc(x.landing)+'</td>'+
+        '<td>'+esc(x.ref)+'</td><td>'+esc(x.device)+'</td><td>'+esc(x.engaged)+'</td>'+
+        '<td>'+esc(x.scroll)+'%</td><td>'+esc(x.pages)+'</td><td>'+flags.join(' ')+'</td></tr>';
+    }).join(''):'<tr><td colspan="11" class="empty">No activity yet</td></tr>';
+  }).catch(function(){if(btn)btn.textContent='↻ Refresh';
+    document.getElementById('emptyNote').style.display='block';
+    document.getElementById('emptyNote').textContent='Failed to load analytics data.';});
+}
+load();
+</script>
+<script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Anonymous Traffic',seconds:s,email:''}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+<script>
+function toggleMenu(){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');var o=d.classList.contains('open');p.classList.toggle('open',!o);d.classList.toggle('open',!o);}
+document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userPill').classList.remove('open');document.getElementById('userDropdown').classList.remove('open');}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){var p=document.getElementById('userPill'),d=document.getElementById('userDropdown');if(p)p.classList.remove('open');if(d)d.classList.remove('open');}});
+(function(){try{var p=location.pathname;document.querySelectorAll('a.dd-item[href]').forEach(function(a){if(a.getAttribute('href')===p){a.classList.add('active');}});}catch(e){}})();
+</script>
+</body>
+</html>

@@ -1,0 +1,3582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Event &amp; Conference Intelligence, Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-components.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/grid-tokens.css">
+  <link rel="stylesheet" href="/static/css/event_conference_intelligence.css?v=2">
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;width:auto;height:auto"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/b2b-agents">B2B Agents</a><span class="bc-sep">›</span>
+        <span class="bc-cur">Event &amp; Conference Intelligence</span>
+      </div>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <div class="user-pill" id="userPill" onclick="toggleMenu()">
+        <div class="user-avatar">
+          {% if user.picture %}<img src="{{ user.picture }}" alt="" />
+          {% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}
+        </div>
+        <span class="user-name">{{ user.given_name or user.name or 'User' }}</span>
+        <span class="pill-chevron">▼</span>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="dd-name">{{ user.name or 'User' }}</div>
+          <div class="dd-email">{{ user.email }}</div>
+        </div>
+        <div class="dd-items">{% include "_admin_menu.html" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="evi-hero">
+      <div class="eyebrow"><span class="dot"></span>B2B Agents · Field marketing intelligence</div>
+      <h1>Know who is <em>in the room</em> before you book the booth.</h1>
+      <p>
+        Three ways to use it, one event calendar. Lists get cut rather than
+        padded, and every row says where it came from.
+      </p>
+    </div>
+
+    <!-- The three plays. These were a row of text pills, which made the
+             single most important structural choice on the page the least
+             visible thing on it. Each is now a card that says what the play
+             does, so the mode is chosen on what it produces rather than on a
+             two-word label. Ids, roles and aria-selected are unchanged: the
+             script still drives these as tabs.
+
+             Every card carries one line saying what you hand it and what it
+             hands back, in place of a step number that implied an order these
+             do not run in.
+
+             The titles are three different questions: which events, who is
+             there, what to say afterwards. The pair that used to collapse
+             into each other was this first card and a faster unscored version
+             of the same thing, and that faster one is retired, so the titles
+             can now say plainly what each play answers instead of working to
+             tell two similar plays apart.
+
+             The wording is deliberately plain, and no card runs past two
+             short sentences. ICP, cut everything under the
+             bar, the 48 hour window and one opener per company were all
+             correct and all meaningless to somebody opening this page for the
+             first time. The app's own word, roster, is kept but explained in
+             the sentence that introduces it, because it is the word every
+             later screen uses. Twenty to forty minutes stays on the first
+             card: it is the one fact that decides whether somebody presses it
+             now or comes back later. -->
+    <div class="evi-plays" role="tablist" aria-label="Mode">
+      <button class="evi-play p-recommend" role="tab" id="modeRecommend"
+              aria-selected="true" data-play="recommend" data-action="Score the calendar"
+              onclick="setMode('recommend')">
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M9 14.5l2.2 2.2L15.5 12"/></svg>
+        </span>
+        <span class="pn">Which events are worth going to</span>
+        <span class="pio"><span class="a">a client profile</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>a shortlist you can defend</span></span>
+        <span class="pd">Tell us who your client sells to and we search the whole calendar, rank what we find, and say why each event made the cut or missed it. Twenty to forty minutes.</span>
+        <span class="pgo" aria-hidden="true">Score the calendar<i>&rarr;</i></span>
+      </button>
+      <button class="evi-play p-lookup" role="tab" id="modeLookup"
+              aria-selected="false" data-play="lookup" data-action="Build the roster"
+              onclick="setMode('lookup')">
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h10M4 12h10M4 18.5h7"/><circle cx="18.5" cy="17" r="3"/><path d="M20.8 19.4L23 21.5"/></svg>
+        </span>
+        <span class="pn">Who will be at an event</span>
+        <span class="pio"><span class="a">an event name</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>who will be there</span></span>
+        <span class="pd">Name any conference and we build its roster: the exhibitors, sponsors, speakers and partners it lists in public.</span>
+        <span class="pgo" aria-hidden="true">Build the roster<i>&rarr;</i></span>
+      </button>
+      <button class="evi-play p-workroom" role="tab" id="modeWorkroom"
+              aria-selected="false" data-play="workroom" data-action="Work the room"
+              onclick="setMode('workroom')">
+        <span class="pi" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5a2 2 0 012-2h13a2 2 0 012 2v8a2 2 0 01-2 2H9l-4.5 3.5v-3.5a1 1 0 00-1-1z"/><path d="M8 9h8M8 12.5h5"/></svg>
+        </span>
+        <span class="pn">What to say afterwards</span>
+        <span class="pio"><span class="a">a roster</span><span class="evi-sr">gives you</span><span class="b"><i aria-hidden="true">&rarr;</i>one message per company</span></span>
+        <span class="pd">Take a roster you already built here and get one short, specific opening message per company, while the event is still recent enough to mention.</span>
+        <span class="pgo" aria-hidden="true">Work the room<i>&rarr;</i></span>
+      </button>
+    </div>
+
+    <div class="evi-layout">
+      <div class="evi-card evi-card-main">
+        <div class="evi-card-pad">
+        <form class="evi-form" id="eviForm" onsubmit="return startRun(event)">
+          <div id="recommendFields">
+            <div class="evi-field">
+              <label for="profilePick">Client profile</label>
+              {# The stored value is an enum key. Printing it raw put
+                 "b2b_to_marketing" in front of the user; the readable label is
+                 already on the classifications list the route sends. #}
+              <select id="profilePick" onchange="onProfilePick()">
+                {% for p in profiles %}
+                {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
+                <option value="{{ p.id }}">{{ p.client_name }} &middot; {{ cl.label if cl else p.classification }}</option>
+                {% endfor %}
+                <option value="new">+ Lock a new client profile</option>
+              </select>
+              <span class="hint">
+                Nothing is searched or scored until a profile is locked. Which side
+                of the event floor gets measured depends on it, and it is never assumed.
+              </span>
+            </div>
+
+            <!-- What a locked profile actually says. Choosing a saved profile
+                 used to hide the intake form and show nothing in its place, so
+                 the terms every score is about to be measured against were
+                 off screen. These are the stored values, not a restatement. -->
+            {% for p in profiles %}
+            {% set cl = classifications | selectattr('key', 'equalto', p.classification) | first %}
+            <div class="evi-psum" data-profile="{{ p.id }}" hidden>
+              <div class="ps-head">
+                <span class="ps-name">{{ p.client_name }}</span>
+                {% if p.website %}<span class="ps-site">{{ p.website }}</span>{% endif %}
+                {% if cl %}<span class="ps-or">{{ cl.orientation }}-driven</span>{% endif %}
+                <span class="ps-lock">Locked</span>
+              </div>
+              {% if cl %}
+              <div class="ps-class"><b>{{ cl.label }}.</b> {{ cl.where }}</div>
+              {% endif %}
+              <dl class="ps-grid">
+                {% for lbl, val in [
+                     ('Buyer roles', p.buyer_roles), ('Verticals', p.verticals),
+                     ('Deal size', p.acv_band), ('Sales cycle', p.sales_cycle),
+                     ('Geography', p.geo_scope),
+                     ('Window', (p.window_months ~ ' months') if p.window_months else None),
+                     ('Max listed', p.max_events)] %}
+                {% if val %}<div><dt>{{ lbl }}</dt><dd>{{ val }}</dd></div>{% endif %}
+                {% endfor %}
+              </dl>
+              {% if p.force_include or p.force_exclude or p.budget_note %}
+              <div class="ps-standing">
+                {% if p.force_include %}
+                <p><b>Already committed.</b> {{ p.force_include | replace('\n', ', ') }}
+                  <i>Kept on the list whatever it scores, and marked.</i></p>
+                {% endif %}
+                {% if p.force_exclude %}
+                <p><b>Never suggest.</b> {{ p.force_exclude | replace('\n', ', ') }}</p>
+                {% endif %}
+                {% if p.budget_note %}
+                <p><b>Budget.</b> {{ p.budget_note }}
+                  <i>Shown beside events, never used to score one.</i></p>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+
+            <div id="profileForm" style="display:none">
+              <div class="evi-group">
+                <span class="gh">Who is this for</span>
+                <span class="gs">Two things to start. We read their site and fill
+                  in the rest for you to check.</span>
+              </div>
+              <div class="evi-row">
+                <div class="evi-field">
+                  <label for="clientName">Client name</label>
+                  <input type="text" id="clientName" autocomplete="off"
+                         placeholder="e.g. Northwind Analytics" />
+                </div>
+                <div class="evi-field">
+                  <label for="clientSite">Client website</label>
+                  <input type="text" id="clientSite" autocomplete="off"
+                         placeholder="https://northwind.example" />
+                </div>
+              </div>
+              <div class="evi-draftbar">
+                <button type="button" class="evi-btn" id="draftBtn"
+                        onclick="draftProfile()">Read the site and fill this in</button>
+                <span class="dh">We fetch a handful of their pages and read
+                  them, usually in under a minute. Nothing is saved until you
+                  lock the profile, and you can change anything it writes.</span>
+                <button type="button" class="evi-link" id="manualBtn"
+                        onclick="revealRest(true)">or fill it in myself</button>
+              </div>
+              <div id="draftError" class="evi-err" style="display:none;margin-top:12px"></div>
+              <div id="draftRead" class="evi-read" hidden></div>
+
+            <!-- Everything below stays folded away until there is something to
+                 check. The form asked for twelve fields and a classification
+                 before it had done anything for you, which is what a first-time
+                 reader met and what made the play look like paperwork. It is
+                 the same fields; what changed is that they arrive filled in,
+                 as a thing to correct rather than a thing to compose. -->
+            <div id="profileRest" hidden>
+
+              <div class="evi-group">
+                <span class="gh">Which side of the floor</span>
+                <span class="gs">This one is yours to answer, and it is the only
+                  one we will not guess. It decides which crowd every score
+                  measures.</span>
+              </div>
+              <div class="evi-field" id="classField">
+                <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
+                <!-- The one unanswered question that can stop a save, so it
+                     carries its own message. It used to surface four hundred
+                     pixels lower as the server's enum list, next to a button,
+                     nowhere near the thing it was about. -->
+                <div id="classError" class="evi-err" hidden></div>
+                <div class="evi-classes" role="radiogroup" aria-label="Classification"
+                     id="classGroup" tabindex="-1">
+                  {% for c in classifications %}
+                  <button type="button" class="evi-class" role="radio"
+                          aria-checked="false"
+                          data-classification="{{ c.key }}"
+                          onclick="pickClass('{{ c.key }}')">
+                    <span class="cl">{{ c.label }}</span>
+                    <span class="cw">{{ c.where }}</span>
+                    <!-- Before the chip, so the chip stays the last line of
+                         every card and the four line up across the row. -->
+                    <span class="cs" hidden></span>
+                    <span class="co">{{ c.orientation }}-driven</span>
+                  </button>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="evi-group">
+                <span class="gh">Who they sell to</span>
+                <span class="gs">Correct anything that looks wrong. A blank
+                  field is one their site does not answer.</span>
+              </div>
+              <div class="evi-row">
+                <div class="evi-field">
+                  <label for="buyerRoles">Buyer roles</label>
+                  <input type="text" id="buyerRoles" placeholder="VP Marketing, CMO, Head of Growth" />
+                  <span class="ev" data-ev="buyer_roles" hidden></span>
+                </div>
+                <div class="evi-field">
+                  <label for="verticals">Target verticals</label>
+                  <input type="text" id="verticals" placeholder="fintech, insurtech" />
+                  <span class="ev" data-ev="verticals" hidden></span>
+                </div>
+              </div>
+              <div class="evi-row">
+                <div class="evi-field">
+                  <label for="acvBand">Deal size</label>
+                  <input type="text" id="acvBand" placeholder="$40k to $120k" />
+                  <span class="ev" data-ev="acv_band" hidden></span>
+                </div>
+                <div class="evi-field">
+                  <label for="salesCycle">Sales cycle</label>
+                  <input type="text" id="salesCycle" placeholder="3 to 6 months" />
+                  <span class="ev" data-ev="sales_cycle" hidden></span>
+                </div>
+              </div>
+              <div class="evi-group">
+                <span class="gh">How far to look</span>
+              </div>
+              <div class="evi-row">
+                <div class="evi-field">
+                  <label for="geoScope">Geographic scope</label>
+                  <input type="text" id="geoScope" placeholder="North America and UK" />
+                  <span class="ev" data-ev="geo_scope" hidden></span>
+                </div>
+                <div class="evi-field">
+                  <label for="windowMonths">Time window, months</label>
+                  <input type="text" id="windowMonths" placeholder="12" />
+                </div>
+              </div>
+              <details class="evi-optional">
+                <summary><span class="gh">Standing instructions</span>
+                  <span class="gs">Optional. Carried into every run on this
+                    profile.</span></summary>
+              <div class="evi-row evi-row-3">
+                <div class="evi-field">
+                  <label for="forceInclude">Already committed to these</label>
+                  <textarea id="forceInclude" placeholder="Money20/20&#10;SaaStr Annual"></textarea>
+                  <span class="hint">
+                    Scored alongside everything else and kept on the list whatever
+                    they score, marked. If something you have already paid for does
+                    not clear the bar, that is the most useful thing this can tell
+                    you, so it is never quietly dropped.
+                  </span>
+                </div>
+                <div class="evi-field">
+                  <label for="forceExclude">Do not suggest these</label>
+                  <textarea id="forceExclude" placeholder="Dreamforce&#10;CES"></textarea>
+                  <span class="hint">Already attended, known duds, or disqualified.</span>
+                </div>
+                <div class="evi-field">
+                  <label for="budgetNote">Budget, for context only</label>
+                  <textarea id="budgetNote" placeholder="about $40k for the year"></textarea>
+                  <span class="hint">
+                    Shown beside each event and never used to score one. A cheap event
+                    reaching the wrong buyers is worse than an expensive one reaching
+                    the right ones.
+                  </span>
+                </div>
+              </div>
+              </details>
+              <button type="button" class="evi-btn evi-btn-ghost" style="margin-top:16px"
+                      onclick="saveProfile()" id="saveProfileBtn">Lock this profile</button>
+              <div id="profileError" class="evi-err" style="display:none;margin-top:12px"></div>
+            </div>
+            </div>
+          </div>
+
+          <div id="lookupFields" style="display:none">
+            <div class="evi-row">
+              <div class="evi-field">
+                <label for="eventName">Event or conference name</label>
+                <input type="text" id="eventName" autocomplete="off"
+                       placeholder="e.g. SaaStr Annual, Web Summit, HIMSS" />
+              </div>
+              <div class="evi-field">
+                <label for="eventYear">Edition or year (optional)</label>
+                <input type="text" id="eventYear" placeholder="2026" autocomplete="off" />
+                <span class="hint">Left blank, it resolves the next upcoming edition.</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="workroomFields" style="display:none">
+            <div class="evi-row">
+              <div class="evi-field">
+                <label for="sourceRun">Which roster are you working?</label>
+                {% set rosters = runs | selectattr('status', 'equalto', 'complete')
+                                     | selectattr('participant_count') | list %}
+                <select id="sourceRun">
+                  {% if not rosters %}
+                  <option value="" disabled selected>No harvested rosters yet</option>
+                  {% endif %}
+                  {% for r in rosters %}{% if r.mode in ('lookup', 'discover') %}
+                  <option value="{{ r.id }}">{{ r.event_name or r.query }} &middot; {{ r.participant_count }} listed</option>
+                  {% endif %}{% endfor %}
+                </select>
+                <span class="hint">
+                  This play works a roster you have already harvested. Run
+                  &ldquo;Who will be at an event&rdquo; on it first.
+                </span>
+              </div>
+              <div class="evi-field">
+                <label for="wrProfile">Client profile</label>
+                <select id="wrProfile">
+                  {% if not profiles %}
+                  <option value="" disabled selected>No locked profile yet</option>
+                  {% endif %}
+                  {% for p in profiles %}
+                  <option value="{{ p.id }}">{{ p.client_name }}</option>
+                  {% endfor %}
+                </select>
+                <span class="hint">Used to qualify the roster to an ICP and cut the tail.</span>
+              </div>
+            </div>
+
+            <div class="evi-field" style="margin-top:18px">
+              <label>What was your relationship to this event?</label>
+              <div class="evi-classes evi-eclasses" role="radiogroup" aria-label="Event class">
+                {% for c in event_classes %}
+                <button type="button" class="evi-class" role="radio"
+                        aria-checked="false"
+                        data-eventclass="{{ c.key }}"
+                        onclick="pickEventClass('{{ c.key }}')">
+                  <span class="cl">{{ c.label }}</span>
+                  <span class="cw">{{ c.why }}</span>
+                  <span class="co">{{ c.signal }} signal</span>
+                </button>
+                {% endfor %}
+              </div>
+              <span class="hint">
+                Never assumed. Whether you had a booth decides the whole play, and
+                guessing it writes a competitor follow-up in the voice of one to
+                your own guests.
+              </span>
+            </div>
+
+            <div class="evi-row" style="margin-top:16px">
+              <div class="evi-field">
+                <label for="boothNotes">Booth notes, one company per line</label>
+                <textarea id="boothNotes" rows="4"
+                          placeholder="Acme Inc: asked about SOC2, wants the benchmark deck&#10;Globex: pricing for 200 seats"></textarea>
+                <span class="hint">
+                  <b>This is the only thing that licenses a draft to reference a
+                  conversation.</b> Any opener that claims you spoke to a company
+                  with no note here is thrown away and replaced, and the report
+                  says which ones and why.
+                </span>
+              </div>
+              <div class="evi-field">
+                <label for="endsOn">Event end date (optional)</label>
+                <input type="date" id="endsOn" />
+                <span class="hint">
+                  Sets the 48 to 72 hour follow-up window. Left blank, the date on
+                  the roster run is used, and if there is none the window is
+                  reported as unknown rather than assumed open.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- The run sits in its own footer strip rather than loose under the
+               last field, so a long intake form has a visible end to it. -->
+          <div class="evi-actions">
+            <button type="submit" class="evi-btn" id="runBtn">Run →</button>
+            <span class="evi-actions-note">Runs in the background. You can leave
+              this page and pick the result up under Your runs.</span>
+          </div>
+        </form>
+
+          <div id="runningWrap" style="display:none">
+            <div class="evi-running">
+              <span class="evi-spinner"></span>
+              <span id="runningText">Working. This runs in the background, so you can leave
+                this page and find the result in History when it is done.</span>
+            </div>
+            <ol id="runningSteps" class="evi-steps" aria-label="Run progress"></ol>
+          </div>
+          <div id="formError" class="evi-err" style="display:none"></div>
+        </div>
+      </div>
+
+      <aside class="evi-rail">
+        <div class="evi-card" id="eviHistoryCard">
+          <div class="evi-card-pad">
+            <div class="evi-sec">
+              <h3>Your runs</h3>
+              <div class="evi-runs" id="runsList">
+                {% if runs %}
+                  {% for r in runs %}
+                  {# Each play produces a different kind of run, so each says
+                     what it actually was. The old line read every non-lookup
+                     run as an "audience search", which called a scored
+                     calendar and a set of drafted openers the same thing, and
+                     printed "0 listed" beside both.
+
+                     `discover` is a retired play and its label stays: runs
+                     made before it was retired are still in this list, and
+                     dropping the key would print them with no kind at all. #}
+                  {% set kinds = {'recommend': 'Scored calendar',
+                                  'lookup': 'Event roster',
+                                  'discover': 'Audience search (retired)',
+                                  'workroom': 'Room worked'} %}
+                  <button class="evi-run m-{{ r.mode }}" type="button"
+                          onclick="openRun({{ r.id }})">
+                    <span class="rl">
+                      <span class="q">{{ r.event_name or r.query }}</span>
+                      <span class="sub">
+                        <span class="k">{{ kinds.get(r.mode, r.mode) }}</span>
+                        {%- if r.participant_count %} · {{ r.participant_count }} listed{% endif %}
+                        {%- if r.credits_spent %} · {{ r.credits_spent }} Apollo credit{{ '' if r.credits_spent == 1 else 's' }}{% endif %}
+                      </span>
+                    </span>
+                    <span class="evi-badge {{ r.status }}">{{ r.status }}</span>
+                  </button>
+                  {% endfor %}
+                {% else %}
+                  <div class="evi-empty">No runs yet. Pick a play above and run it.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- What a run costs, stated before it is started rather than after.
+             Only company resolution reaches a billed endpoint, and it is a
+             separate button inside a finished roster, so nothing on this form
+             can spend a credit. -->
+        <div class="evi-card evi-costcard">
+          <div class="evi-card-pad">
+            <div class="evi-sec">
+              <h3>What a run spends</h3>
+              <ul class="evi-cost">
+                <li><b>Nothing here.</b> Scoring, roster harvesting and openers
+                  read public pages and cost no Apollo credits.</li>
+                <li><b>Matching companies in Apollo</b> is the only billed step,
+                  about 1 credit per request of up to 25 domains, and it is a
+                  button inside a finished roster.</li>
+                <li><b>Finding people</b> at companies already matched is free.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="evi-scrim" id="drawer" onmousedown="if(event.target===this)closeDrawer()">
+    <div class="evi-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="evi-drawer-head">
+        <div style="min-width:0">
+          <h2 id="drawerTitle">Loading</h2>
+          <div class="sub" id="drawerSub"></div>
+        </div>
+        <button class="evi-x" onclick="closeDrawer()" aria-label="Close">×</button>
+      </div>
+      <div class="evi-drawer-body" id="drawerBody"></div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    var BASE = '/p2/b2b-agents/event-conference-intelligence';
+    var mode = 'recommend', poll = null, current = null, activeRoles = null;
+    var pickedClass = null, pickedEventClass = null;
+
+    /* `many` for the words an "s" does not pluralise. Without it the only
+       way to say "6 discovery categories" was to add the s and then patch it
+       back out, which is a spelling bug waiting for the first reader who
+       hits a count of one. */
+    function plural(n, word, many){
+      return n + ' ' + (Number(n) === 1 ? word : (many || word + 's'));
+    }
+
+    function esc(s){
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    /* Every href rendered below goes through this. A roster is assembled from
+       third-party pages, so a URL in it is untrusted input: without an
+       explicit scheme allow-list, a `javascript:` value harvested from a page
+       becomes a live XSS sink the moment it is written into an href. Returns
+       null for anything that is not plain http(s), and callers render text
+       instead of a link. Same rule as the SCI report's absUrl(). */
+    function safeUrl(u){
+      if (!u) return null;
+      var s = String(u).trim();
+      if (!/^https?:\/\//i.test(s)) return null;
+      return s;
+    }
+
+    var MODES = ['recommend', 'lookup', 'workroom'];
+    var FIELDS = {recommend: 'recommendFields', lookup: 'lookupFields',
+                  workroom: 'workroomFields'};
+    var TABS = {recommend: 'modeRecommend', lookup: 'modeLookup',
+                workroom: 'modeWorkroom'};
+
+    function setMode(m){
+      mode = m;
+      MODES.forEach(function(k){
+        document.getElementById(TABS[k]).setAttribute('aria-selected', k === m);
+        document.getElementById(FIELDS[k]).style.display = k === m ? '' : 'none';
+      });
+      // The label on the button that runs a play and the label on the card
+      // that selects it are the same fact, so it is stored once, on the card
+      // itself. A second table here drifts the moment a play is reworded, and
+      // two of the four modes were already showing a generic "Run" because of
+      // it. The fallback never fires in the page; it exists so a missing
+      // attribute shows a usable word rather than "null", and the test for
+      // this asserts the real label, so it cannot hide the failure.
+      var card = document.getElementById(TABS[m]);
+      var action = card && card.getAttribute('data-action');
+      document.getElementById('runBtn').textContent = (action || 'Run') + ' \u2192';
+    }
+    window.setMode = setMode;
+
+    /* Step 0 of the rubric. The four options come from the server, which reads
+       them off the rubric module, so this list can never drift into offering a
+       fifth classification the scorer would refuse. */
+    /* Both radiogroups render as .evi-class, so each picker queries its OWN
+       data attribute rather than the shared class. A document-wide query here
+       clears the other group's selection, which is invisible until a run is
+       refused for a classification the user can see is highlighted. */
+    function pickClass(key){
+      pickedClass = key;
+      var ce = document.getElementById('classError');
+      if (ce) { ce.hidden = true; ce.textContent = ''; }
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-classification]'), function(b){
+          b.setAttribute('aria-checked', b.getAttribute('data-classification') === key);
+        });
+      renderSuggestion();
+    }
+    window.pickClass = pickClass;
+
+    function pickEventClass(key){
+      pickedEventClass = key;
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-eventclass]'), function(b){
+          b.setAttribute('aria-checked', b.getAttribute('data-eventclass') === key);
+        });
+    }
+    window.pickEventClass = pickEventClass;
+
+    function onProfilePick(){
+      var v = document.getElementById('profilePick').value;
+      document.getElementById('profileForm').style.display = v === 'new' ? '' : 'none';
+      // Show the terms of the profile that is actually selected, and only
+      // that one.
+      var sums = document.querySelectorAll('[data-profile]');
+      for (var i = 0; i < sums.length; i++) {
+        sums[i].hidden = sums[i].getAttribute('data-profile') !== v;
+      }
+    }
+    window.onProfilePick = onProfilePick;
+
+    /* Neither radiogroup pre-checks a card, because both of them ask a
+       question this agent refuses to answer on the user's behalf. Read the
+       checked card back rather than trusting a variable nothing has set. */
+    function checkedValue(attr){
+      /* Only a genuinely checked option counts. The fallback that used to sit
+         here returned the FIRST option whether or not anyone had chosen it,
+         which meant the two questions this agent refuses to guess at, which
+         side of the floor to score and what your relationship to the event
+         was, always arrived answered. The guards downstream could not fire,
+         and the first event class is "Our own event", so an unanswered form
+         drafted follow-ups to a competitor's guests in the voice of their
+         host. */
+      var on = document.querySelector('[' + attr + '][aria-checked="true"]');
+      return on ? on.getAttribute(attr) : null;
+    }
+
+    function initForm(){
+      pickedClass = pickedClass || checkedValue('data-classification');
+      pickedEventClass = pickedEventClass || checkedValue('data-eventclass');
+      // Runs unconditionally: with no saved profiles the select's only option
+      // is "new" and `change` never fires, so this is the only thing that
+      // opens the intake form.
+      onProfilePick();
+      // The play card that renders as selected and the label on the button
+      // that runs it are the same fact. Left to the template alone the card
+      // said "Which events to attend" while the button said "Run".
+      setMode(mode);
+    }
+
+    /* ── reading a client's site to fill this form in ──────────────────
+
+       Thirteen fields, only two of them required, and the person filling them
+       in is usually answering questions about somebody else's business. Most
+       of the answers are on the client's own website, so this goes and reads
+       it and hands back a draft to correct rather than a form to author.
+
+       Three rules hold the whole thing together.
+
+       It PROPOSES. Nothing here saves anything: the draft lands in the form
+       the user was already looking at, every value it wrote is visible, and
+       the existing lock button is still the only way a profile is created.
+
+       It never overwrites what somebody typed. A field the user has already
+       filled is left exactly as they left it and reported as kept, because a
+       tool that quietly replaces your answer is the black box this is meant
+       to be the opposite of.
+
+       And it does NOT answer the classification. `checkedValue` refuses to
+       return an option nobody chose, after a version of this form pre-checked
+       the first card and every unanswered form arrived answered. So a drafted
+       classification renders as a suggestion carrying its reasoning, and does
+       not set aria-checked. The card still has to be clicked. That is the
+       difference between a model arguing for an answer and the system
+       deciding which side of the floor to score. */
+
+    var DRAFT_FIELDS = {buyer_roles: 'buyerRoles', verticals: 'verticals',
+                        acv_band: 'acvBand', sales_cycle: 'salesCycle',
+                        geo_scope: 'geoScope'};
+
+    /* A pasted "northwind.example" is a scheme away from working and the
+       server refuses it, correctly, because the site is the only thing that
+       separates two companies with one name. Fixing it here beats bouncing
+       the user off a validation message, and the corrected value goes back
+       into the field so nothing happens behind their back. */
+    function normaliseSite(v){
+      v = (v || '').trim();
+      if (!v) return '';
+      return /^https?:\/\//i.test(v) ? v : 'https://' + v;
+    }
+
+    function evNode(field){
+      return document.querySelector('[data-ev="' + field + '"]');
+    }
+
+    function setEv(field, cls, text){
+      var n = evNode(field);
+      if (!n) return;
+      n.className = 'ev ' + cls;
+      n.textContent = text;
+      n.hidden = !text;
+    }
+
+    function clearDraftMarks(){
+      Object.keys(DRAFT_FIELDS).forEach(function(f){ setEv(f, '', ''); });
+      var read = document.getElementById('draftRead');
+      read.hidden = true;
+      read.innerHTML = '';
+      /* Walk the cards, not their slots. Reaching a card through its own
+         `.cs` child means a card with no slot rendered takes the clear down
+         with it, and it is the card that owns the mark being cleared. */
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-classification]'), function(card){
+          card.removeAttribute('data-suggested');
+          card.removeAttribute('data-suggest-why');
+          card.removeAttribute('data-suggest-confidence');
+          var n = card.querySelector('.cs');
+          if (n) { n.hidden = true; n.textContent = ''; }
+        });
+    }
+
+    function showDraftError(msg, sources){
+      var e = document.getElementById('draftError');
+      e.innerHTML = esc(msg) + (sources && sources.length
+        ? ' <a href="' + esc(sources[0]) + '" target="_blank" rel="noopener">' +
+          'See the page we read</a>.'
+        : '');
+      e.style.display = '';
+      /* A failed read must not be a dead end. The rest of the form opens so
+         the profile can still be filled in by hand, and the error stays on
+         screen above it rather than being cleared by the reveal. */
+      revealRest(false);
+    }
+
+    /* The fold. Everything past the name and the website waits here until
+       there is something to check, because a first-time reader who meets
+       twelve empty fields and a classification has met paperwork, not a tool.
+
+       `focus` is false when the draft opened it: the page has just written
+       into those fields and moving the cursor would fight the reader's eye.
+       It is true only when somebody asked to fill it in themselves. */
+    function revealRest(focus){
+      var rest = document.getElementById('profileRest');
+      if (!rest) return;
+      var wasHidden = rest.hidden;
+      rest.hidden = false;
+      var manual = document.getElementById('manualBtn');
+      if (manual) manual.hidden = true;
+      if (focus && wasHidden) {
+        var first = document.getElementById('buyerRoles');
+        if (first && first.focus) first.focus();
+      }
+    }
+    window.revealRest = revealRest;
+
+    function applyDraft(d){
+      clearDraftMarks();
+
+      var kept = [];
+      Object.keys(DRAFT_FIELDS).forEach(function(f){
+        var el = document.getElementById(DRAFT_FIELDS[f]);
+        if (!el) return;
+        var value = (d.draft || {})[f];
+        if (el.value.trim()) {
+          // Theirs, not ours. Say so rather than leaving them to wonder
+          // whether the draft agreed with them or never looked.
+          kept.push(f);
+          setEv(f, 'kept', 'Kept what you typed.');
+          return;
+        }
+        if (value) {
+          el.value = value;
+          setEv(f, 'read', (d.evidence || {})[f] || '');
+        } else {
+          setEv(f, 'gap', 'Their site does not say. Add it if you know it.');
+        }
+      });
+
+      var read = document.getElementById('draftRead');
+      var html = '<span class="rh">What we read</span>';
+      if (d.what_they_sell) {
+        html += '<p class="rs">' + esc(d.what_they_sell) + '</p>' +
+          '<p class="rc">If that is not your client, the name matched a ' +
+          'different company. Correct the website and read it again.</p>';
+      }
+      /* The reasoning in full. The card beside the four options gets one
+         sentence of it, because a paragraph there tripled that card's height
+         and left the other three looking broken. This is where the rest of
+         it lives, next to the sentence about what the company sells that it
+         follows from. */
+      if (d.classification_why) {
+        var cl = CLASSIFICATION_LABELS[d.classification] || d.classification;
+        html += '<p class="rw"><b>Why we read them as ' + esc(cl || 'that') +
+          '.</b> ' + esc(d.classification_why) + '</p>';
+      }
+      if (d.note) html += '<p class="rn">' + esc(d.note) + '</p>';
+      if (kept.length) {
+        html += '<p class="rn">' + esc(plural(kept.length, 'field')) +
+          ' you had already filled in were left alone.</p>';
+      }
+      if ((d.sources || []).length) {
+        html += '<div class="rl">' + d.sources.map(function(u){
+          return '<a href="' + esc(u) + '" target="_blank" rel="noopener">' +
+            esc(shortUrl(u)) + '</a>';
+        }).join('') + '</div>';
+      }
+      /* The pages we tried and could not read.
+         Without this, a blank deal size is just blank. With it, "we asked for
+         their pricing page and it refused us" is on screen next to the field
+         it explains, and the reader knows whether to go and look themselves
+         or to accept that the answer is not published. */
+      var missed = (d.pages || []).filter(function(p){ return p.status !== 'ok'; });
+      if (missed.length) {
+        html += '<p class="rn"><b>' + esc(plural(missed.length, 'page')) +
+          ' we tried could not be read.</b> ' + missed.map(function(p){
+            /* Not wrapped in brackets: fetch_page's notes are whole
+               sentences that already end in a full stop, and the bracketed
+               version rendered "(Server refused the request (HTTP 403).)". */
+            return esc(shortUrl(p.url)) + (p.note ? ': ' + esc(p.note) : '.');
+          }).join(' ') + '</p>';
+      }
+      read.innerHTML = html;
+      read.hidden = false;
+
+      suggestClass(d.classification, d.classification_why,
+                   d.classification_confidence);
+      // Last, so the fields and the suggested card are already written when
+      // the block appears and nothing is seen filling itself in.
+      revealRest(false);
+    }
+
+    function shortUrl(u){
+      try {
+        var a = String(u).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+        return a.length > 48 ? a.slice(0, 47) + '…' : a;
+      } catch (e) { return String(u); }
+    }
+
+    /* A suggestion, drawn as a suggestion. It marks the card and prints the
+       reasoning; it does NOT set aria-checked, so `checkedValue` keeps
+       returning null and the form stays unanswered until somebody clicks. */
+    function suggestClass(key, why, confidence){
+      if (!key) return;
+      var card = document.querySelector('[data-classification="' + key + '"]');
+      if (!card) return;
+      if (!card.querySelector('.cs')) return;
+      card.setAttribute('data-suggested', '1');
+      /* The reasoning ALONE. It used to be stored with "Our reading, medium
+         confidence." glued to the front, which made that the first sentence,
+         so trimming the card to one sentence would have kept the label and
+         thrown the reason away. */
+      card.setAttribute('data-suggest-why', why || '');
+      card.setAttribute('data-suggest-confidence', confidence || '');
+      renderSuggestion();
+    }
+
+    /* The call to action belongs to the moment before the decision.
+
+       Left standing, "Click to confirm" sits under a card the user has just
+       clicked, which reads as though the click did not take. The reasoning
+       stays either way, including when somebody picks a DIFFERENT card: what
+       we read is worth keeping on screen next to the answer they gave. */
+    /* One sentence, and never more than will fit in a card.
+
+       The full reasoning runs to a paragraph, and printed in full it tripled
+       the height of one card in a four-card grid, which left the other three
+       with a hole above their footer and made the group look broken. The
+       whole of it is still on the page, under What we read, where there is
+       room for prose. */
+    var SUGGEST_CHARS = 150;
+
+    function firstSentence(text, cap){
+      var t = String(text || '').trim();
+      if (!t) return '';
+      // A full stop that ends a sentence, not one inside "e.g." or a decimal.
+      var m = t.match(/^[\s\S]*?[.!?](?=\s+[A-Z(]|$)/);
+      var out = (m ? m[0] : t).trim();
+      if (out.length <= cap) return out;
+      var cut = out.slice(0, cap), at = cut.lastIndexOf(' ');
+      if (at > cap * 0.6) cut = cut.slice(0, at);
+      return cut.replace(/[\s,;:.]+$/, '') + '\u2026';
+    }
+
+    function renderSuggestion(){
+      var card = document.querySelector('[data-suggested]');
+      if (!card) return;
+      var n = card.querySelector('.cs');
+      if (!n) return;
+      var why = card.getAttribute('data-suggest-why') || '';
+      var conf = card.getAttribute('data-suggest-confidence') || '';
+      var decided = !!document.querySelector(
+        '[data-classification][aria-checked="true"]');
+      var head = 'Our reading' + (conf ? ', ' + conf + ' confidence' : '');
+      n.textContent = head + '. ' + firstSentence(why, SUGGEST_CHARS) +
+        (decided ? '' : ' Click to confirm.');
+      n.hidden = !(why || conf);
+    }
+
+    /* A counting clock, because the wait varies with somebody else's server.
+
+       Measured drafts land in about fifteen seconds, but they are six HTTP
+       fetches against a site we do not control followed by a model call, and
+       a slow origin can stretch that. A button showing a number is
+       distinguishable from a page that has hung; one repeating the same three
+       words is not. */
+    var DRAFT_CLOCK = null;
+
+    function startDraftClock(btn){
+      stopDraftClock(btn, true);
+      var t0 = Date.now();
+      function tick(){
+        var s = Math.round((Date.now() - t0) / 1000);
+        btn.textContent = 'Reading the site\u2026 ' + s + 's';
+      }
+      tick();
+      if (typeof setInterval === 'function') DRAFT_CLOCK = setInterval(tick, 1000);
+    }
+
+    function stopDraftClock(btn, keepDisabled){
+      if (DRAFT_CLOCK !== null && typeof clearInterval === 'function') {
+        clearInterval(DRAFT_CLOCK);
+      }
+      DRAFT_CLOCK = null;
+      if (!keepDisabled) {
+        btn.disabled = false;
+        btn.textContent = 'Read the site and fill this in';
+      }
+    }
+
+    function draftProfile(){
+      var btn = document.getElementById('draftBtn');
+      var err = document.getElementById('draftError');
+      err.style.display = 'none';
+
+      var nameEl = document.getElementById('clientName');
+      var siteEl = document.getElementById('clientSite');
+      var name = nameEl.value.trim();
+      var site = normaliseSite(siteEl.value);
+      siteEl.value = site;
+      if (!name || !site) {
+        showDraftError('A client name and a website are both needed. The site ' +
+                       'is the only thing that tells two companies with the ' +
+                       'same name apart.');
+        return Promise.resolve();
+      }
+
+      btn.disabled = true;
+      startDraftClock(btn);
+      // Returned so a test can wait for it. Nothing in the page uses the
+      // return value; a probe that guessed at how many microtasks the chain
+      // takes would pass or fail on the shape of the code rather than on what
+      // it does.
+      return fetch(BASE + '/profiles/draft', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_name: name, website: site})
+      }).then(function(r){
+        return r.json().then(function(j){ return {ok: r.ok, j: j}; });
+      }).then(function(res){
+        stopDraftClock(btn);
+        if (!res.ok) {
+          showDraftError(res.j.error || 'The site could not be read.',
+                         res.j.sources);
+          return;
+        }
+        applyDraft(res.j);
+      }).catch(function(e){
+        stopDraftClock(btn);
+        showDraftError(e.message || 'The site could not be read.');
+      });
+    }
+    window.draftProfile = draftProfile;
+
+    /* The one question that can stop a save, answered where it is asked.
+
+       Pressing Lock without it used to POST anyway and paint the server's own
+       message under the button: `Unknown classification ''. It must be one
+       of: b2c_general, b2c_booth_density, ...`. That message is right for an
+       API client and wrong for a person: it names internal keys, it is far
+       from the question, and it does not say what to do. The server keeps it
+       and keeps refusing, which is the hard stop the play depends on. It just
+       stops being the first thing a person meets. */
+    function classificationMissing(){
+      var box = document.getElementById('classError');
+      var suggested = document.querySelector('[data-suggested]');
+      var label = suggested ? (suggested.querySelector('.cl') || {}).textContent : '';
+      box.textContent = 'One thing left: choose where this client\u2019s buyers '
+        + 'stand at an event. It is the only answer we will not guess, because '
+        + 'it decides which crowd every score measures.'
+        + (label ? ' We read them as \u201c' + label.trim() + '\u201d. Click that '
+                 + 'card if you agree.' : '');
+      box.hidden = false;
+      var group = document.getElementById('classGroup');
+      if (group) {
+        if (group.scrollIntoView) group.scrollIntoView({block: 'center'});
+        if (group.focus) group.focus();
+      }
+    }
+
+    function saveProfile(){
+      var err = document.getElementById('profileError');
+      err.style.display = 'none';
+      if (!pickedClass) { classificationMissing(); return; }
+      var body = {
+        client_name: document.getElementById('clientName').value.trim(),
+        website: document.getElementById('clientSite').value.trim(),
+        classification: pickedClass,
+        buyer_roles: document.getElementById('buyerRoles').value.trim(),
+        verticals: document.getElementById('verticals').value.trim(),
+        acv_band: document.getElementById('acvBand').value.trim(),
+        sales_cycle: document.getElementById('salesCycle').value.trim(),
+        geo_scope: document.getElementById('geoScope').value.trim(),
+        window_months: document.getElementById('windowMonths').value.trim(),
+        force_include: document.getElementById('forceInclude').value.trim(),
+        force_exclude: document.getElementById('forceExclude').value.trim(),
+        budget_note: document.getElementById('budgetNote').value.trim()
+      };
+      var btn = document.getElementById('saveProfileBtn');
+      btn.disabled = true;
+      fetch(BASE + '/profiles', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+        .then(function(res){
+          btn.disabled = false;
+          if (!res.ok) { throw new Error(res.j.error || 'The profile could not be saved.'); }
+          var sel = document.getElementById('profilePick');
+          var o = document.createElement('option');
+          o.value = res.j.profile.id;
+          /* The label, not the enum key. A freshly saved profile used to
+             read "Northwind - b2b_to_marketing" in a list whose other options
+             read "B2B, selling to marketing, growth or sales". */
+          o.textContent = res.j.profile.client_name + ' \u00b7 ' +
+            (CLASSIFICATION_LABELS[res.j.profile.classification] ||
+             res.j.profile.classification);
+          sel.insertBefore(o, sel.firstChild);
+          sel.value = String(res.j.profile.id);
+          onProfilePick();
+        })
+        .catch(function(e){
+          btn.disabled = false;
+          // The guard above means this should be unreachable for the
+          // classification. It is handled anyway, because "unreachable" here
+          // rests on the page and the server agreeing about a list of keys,
+          // and if they ever disagree the person must still be told what to
+          // do rather than shown the keys.
+          if (/classification/i.test(e.message || '')) {
+            classificationMissing();
+            return;
+          }
+          err.textContent = e.message;
+          err.style.display = '';
+        });
+    }
+    window.saveProfile = saveProfile;
+
+    function showFormError(msg){
+      var el = document.getElementById('formError');
+      el.textContent = msg;
+      el.style.display = msg ? '' : 'none';
+    }
+
+    function startRun(e){
+      e.preventDefault();
+      showFormError('');
+      var body = { mode: mode };
+      if (mode === 'recommend') {
+        var pid = document.getElementById('profilePick').value;
+        if (!pid || pid === 'new') {
+          // The form is already open (initForm on load, and the select's own
+          // change handler after that), so this puts the cursor in it. A
+          // refusal that does not show the way out is a dead end with a
+          // paragraph attached.
+          var name = document.getElementById('clientName');
+          if (name) { name.focus(); name.scrollIntoView({block: 'center'}); }
+          showFormError('Fill in the client profile below and press "Lock this ' +
+                        'profile" first. Which side of the event floor gets ' +
+                        'scored depends on it, and it is never assumed.');
+          return false;
+        }
+        body.profile_id = parseInt(pid, 10);
+      } else if (mode === 'workroom') {
+        var srcSel = document.getElementById('sourceRun');
+        var wrp = document.getElementById('wrProfile');
+        if (!srcSel.value) {
+          showFormError('Run "Who will be at an event" on it first. This play ' +
+                        'works a roster you already have.'); return false;
+        }
+        if (!wrp.value) {
+          showFormError('Lock a client profile first. There is no way to qualify a ' +
+                        'roster to an ICP without one.'); return false;
+        }
+        var ec = pickedEventClass || checkedValue('data-eventclass');
+        if (!ec) {
+          showFormError('Say what your relationship to this event was.'); return false;
+        }
+        body.source_run_id = parseInt(srcSel.value, 10);
+        body.profile_id = parseInt(wrp.value, 10);
+        body.event_class = ec;
+        body.booth_notes = document.getElementById('boothNotes').value;
+        body.ends_on = document.getElementById('endsOn').value;
+      } else {
+        body.query = document.getElementById('eventName').value.trim();
+        body.year = document.getElementById('eventYear').value.trim();
+        if (!body.query) { showFormError('Enter an event name.'); return false; }
+      }
+      var btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      document.getElementById('runningWrap').style.display = '';
+      document.getElementById('runningText').textContent =
+        mode === 'recommend'
+          ? 'Searching all six event categories. This takes a few minutes and runs in the background, so you can leave this page.'
+        : mode === 'lookup'
+          ? 'Resolving the event and reading the pages it publishes. This runs in the background, so you can leave this page.'
+          : 'Qualifying the roster and drafting an opener for each company. This runs in the background, so you can leave this page.';
+
+      fetch(BASE + '/run', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+        .then(function(res){
+          if (!res.ok) { throw new Error(res.j.error || 'The run could not be started.'); }
+          watch(res.j.run_id, mode);
+        })
+        .catch(function(err){
+          btn.disabled = false;
+          document.getElementById('runningWrap').style.display = 'none';
+          showFormError(err.message);
+        });
+      return false;
+    }
+    window.startRun = startRun;
+
+    /* One key per pipeline stage. `discovering` used to appear twice here, and
+       the second literal silently won, so recommend runs showed the discover
+       message. The recommend pipeline now reports `discovering_categories`. */
+    var STAGES = {
+      discovering_categories: 'Searching all six event categories, one at a time.',
+      auditing: 'Weighing every famous name against a more targeted alternative.',
+      scoring: 'Scoring each event on relevance, decision-maker access and engagement.',
+      ranking: 'Ranking, and cutting everything below 70.',
+      resolving: 'Identifying the event and confirming which edition it is.',
+      harvesting: 'Reading the pages the event publishes its participants on.',
+      reading_roster: 'Reading the roster you already harvested.',
+      qualifying: 'Qualifying each company to the ICP and drafting an opener.',
+      checking_drafts: 'Throwing away every draft that claims a conversation nobody recorded.',
+      saving: 'Saving the drafts.',
+      resolving_companies: 'Matching companies in Apollo.',
+      done: 'Finishing up.'
+    };
+
+    /* The stages each mode actually goes through, in order. Drawn up front so
+       a run that takes minutes shows what it is working through and what is
+       left, rather than one spinner and one sentence. Keys match the STAGES
+       table above, which matches what the pipeline reports. */
+    var STAGE_ORDER = {
+      recommend: ['discovering_categories', 'auditing', 'scoring', 'ranking'],
+      lookup: ['resolving', 'harvesting'],
+      workroom: ['reading_roster', 'qualifying', 'checking_drafts', 'saving']
+    };
+    var SHORT = {
+      discovering_categories: 'Search six categories', auditing: 'Audit the famous names',
+      scoring: 'Score every event', ranking: 'Rank and cut below 70',
+      resolving: 'Identify the event', harvesting: 'Read the published pages',
+      reading_roster: 'Read the roster',
+      qualifying: 'Qualify and draft', checking_drafts: 'Check every draft',
+      saving: 'Save the drafts'
+    };
+
+    function renderSteps(mode, stage){
+      var el = document.getElementById('runningSteps');
+      var order = STAGE_ORDER[mode] || [];
+      if (!order.length) { el.innerHTML = ''; return; }
+      var at = order.indexOf(stage);
+      el.innerHTML = order.map(function(key, i){
+        var state = at < 0 ? 'pending'
+                  : (i < at ? 'done' : (i === at ? 'now' : 'pending'));
+        return '<li class="' + state + '"><span class="dot"></span>' +
+               '<span class="tx">' + esc(SHORT[key] || key) + '</span></li>';
+      }).join('');
+    }
+
+    function watch(runId, mode){
+      /* Recursive setTimeout, not setInterval: a status call slower than the
+         interval used to stack a second request on top of the first. And a
+         failure exit, because .catch(function(){}) meant a route that 404s or
+         redirects to a login page polled forever with the Run button disabled
+         and no way out of it but a reload. */
+      if (poll) { clearTimeout(poll); poll = null; }
+      var misses = 0;
+      renderSteps(mode, null);
+
+      function stop(){ if (poll) { clearTimeout(poll); poll = null; } }
+
+      function tick(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){
+            if (!r.ok) { throw new Error('status ' + r.status); }
+            return r.json();
+          })
+          .then(function(s){
+            misses = 0;
+            if (s.stage && STAGES[s.stage]) {
+              document.getElementById('runningText').textContent = STAGES[s.stage];
+            }
+            renderSteps(mode, s.stage);
+            if (s.status === 'complete' || s.status === 'failed') {
+              stop();
+              document.getElementById('runBtn').disabled = false;
+              document.getElementById('runningWrap').style.display = 'none';
+              openRun(runId);
+              return;
+            }
+            poll = setTimeout(tick, 2500);
+          })
+          .catch(function(){
+            misses += 1;
+            if (misses >= 5) {
+              stop();
+              document.getElementById('runBtn').disabled = false;
+              document.getElementById('runningText').textContent =
+                'Lost contact with the run. It may still be going: reload the ' +
+                'page and open it under Your runs.';
+              return;
+            }
+            poll = setTimeout(tick, 2500 * misses);
+          });
+      }
+      tick();
+    }
+
+    /* Whether a report is open on top of the page.
+       Print needs to know. Somebody printing this page is printing the
+       report, not the three cards explaining what the agent does, and CSS
+       inside the drawer cannot see far enough up the tree to say so. Set in
+       one place next to the class that opens the drawer, so the two cannot
+       drift apart. */
+    function readingMode(on){
+      document.body.classList.toggle('evi-reading', !!on);
+    }
+
+    /* Print in the light palette, whatever the reader is using.
+       The dark palette is a design for a backlit screen: its card fills are
+       near-black and its ink is near-white. On paper the print rules turn
+       every colour to dark ink and the fills stay dark, so the labels under
+       the summary's big numbers came out grey-on-charcoal and the report
+       read as damaged. Swapping the attribute hands the whole job to the
+       light palette that already exists, rather than restating three dozen
+       surfaces inside @media print and missing one. */
+    var _printTheme = null;
+    window.addEventListener('beforeprint', function(){
+      var r = document.documentElement;
+      _printTheme = r.getAttribute('data-theme');
+      r.setAttribute('data-theme', 'light');
+    });
+    window.addEventListener('afterprint', function(){
+      var r = document.documentElement;
+      /* Absent is not the same as dark: with no attribute the palette falls
+         back to the sheet's own default, and writing "dark" here would pin a
+         reader to it. */
+      if (_printTheme === null) r.removeAttribute('data-theme');
+      else r.setAttribute('data-theme', _printTheme);
+      _printTheme = null;
+    });
+
+    function openRun(runId){
+      document.getElementById('drawer').classList.add('on');
+      readingMode(true);
+      document.getElementById('drawerTitle').textContent = 'Loading';
+      document.getElementById('drawerSub').textContent = '';
+      document.getElementById('drawerBody').innerHTML =
+        '<div class="evi-empty"><span class="ic"><span class="evi-spinner"></span></span>' +
+        '<b>Loading this run</b>' +
+        '<span id="drawerLive" role="status" aria-live="polite">Reading what it ' +
+        'stored.</span></div>';
+      activeRoles = null;
+      /* Per-run state, not per-session: a reader who sorted one roster by
+         date should not find the next run they open already sorted. */
+      EVENT_SORT = 'ranked';
+      FORMAT_FILTER = null;
+      fetch(BASE + '/runs/' + runId)
+        .then(function(r){ return r.json(); })
+        .then(function(run){
+          current = run;
+          render(run);
+          /* A run opened from history may still be going. Without this the
+             drawer showed a stage sentence that never changed and a spinner
+             that never resolved, which is precisely the path the form's own
+             copy sends people down. */
+          if (run.status === 'running' || run.status === 'queued') {
+            watchDrawer(runId, run.mode);
+          }
+        })
+        .catch(function(){
+          document.getElementById('drawerBody').innerHTML =
+            '<div class="evi-err">This run could not be loaded.</div>';
+        });
+    }
+    window.openRun = openRun;
+
+    /* Polling for a run being watched from the drawer rather than the form.
+       Separate handle so closing the drawer stops it and a form run started
+       meanwhile is not cancelled by it. */
+    var drawerPoll = null;
+    function stopDrawerWatch(){
+      if (drawerPoll) { clearTimeout(drawerPoll); drawerPoll = null; }
+    }
+    function watchDrawer(runId, mode){
+      stopDrawerWatch();
+      var misses = 0;
+      function tick(){
+        fetch(BASE + '/runs/' + runId + '/status')
+          .then(function(r){
+            if (!r.ok) { throw new Error('status ' + r.status); }
+            return r.json();
+          })
+          .then(function(s){
+            misses = 0;
+            if (s.status === 'complete' || s.status === 'failed') {
+              stopDrawerWatch();
+              openRun(runId);
+              return;
+            }
+            var live = document.getElementById('drawerLive');
+            if (live && s.stage && STAGES[s.stage]) {
+              live.textContent = STAGES[s.stage];
+            }
+            drawerPoll = setTimeout(tick, 2500);
+          })
+          .catch(function(){
+            misses += 1;
+            if (misses >= 5) { stopDrawerWatch(); return; }
+            drawerPoll = setTimeout(tick, 2500 * misses);
+          });
+      }
+      drawerPoll = setTimeout(tick, 2500);
+    }
+    window.watchDrawer = watchDrawer;
+
+    function closeDrawer(){
+      document.getElementById('drawer').classList.remove('on');
+      readingMode(false);
+      /* A run being watched from the drawer keeps polling until the drawer is
+         closed. Leaving it running would keep hitting the status route for a
+         run nobody is looking at any more. */
+      stopDrawerWatch();
+      current = null;
+    }
+    window.closeDrawer = closeDrawer;
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && document.getElementById('drawer').classList.contains('on')) {
+        closeDrawer();
+      }
+    });
+
+    function fmtDate(d){
+      if (!d) return '';
+      var p = String(d).slice(0, 10).split('-');
+      if (p.length !== 3) return String(d);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var mi = parseInt(p[1], 10) - 1;
+      return (months[mi] || p[1]) + ' ' + parseInt(p[2], 10) + ', ' + p[0];
+    }
+
+    function eventLine(ev){
+      var bits = [];
+      if (ev.edition) bits.push(esc(ev.edition));
+      var when = ev.starts_on ? fmtDate(ev.starts_on) +
+        (ev.ends_on && ev.ends_on !== ev.starts_on ? ' to ' + fmtDate(ev.ends_on) : '') : '';
+      if (when) bits.push(esc(when));
+      if (ev.location) bits.push(esc(ev.location));
+      if (ev.format) bits.push(esc(ev.format.replace('_', ' ')));
+      return bits.join(' · ');
+    }
+
+    /* The coverage banner. Deliberately built from the run's own numbers, and
+       deliberately not suppressible: a roster with the caveat stripped off is
+       exactly the artefact this agent exists to not produce. */
+    function coverage(run){
+      var s = run.summary || {};
+      var unread = s.sources_unreadable || 0;
+      var parts = [];
+      parts.push('<b>What this is.</b> ' + esc(s.roster_note ||
+        'This is what the event publishes openly, not its attendee list.'));
+      if (s.sources_tried) {
+        parts.push('Read ' + (s.sources_read || 0) + ' of ' + s.sources_tried +
+          ' published page' + (s.sources_tried === 1 ? '' : 's') + '.');
+      }
+      if (unread) {
+        parts.push('<b>' + unread + ' page' + (unread === 1 ? '' : 's') +
+          ' could not be read</b>, so this roster is incomplete by an unknown amount. ' +
+          'Every attempt is listed under Sources below.');
+      }
+      if (s.declared_attendees) {
+        parts.push(s.declared_attendees + ' row' + (s.declared_attendees === 1 ? '' : 's') +
+          ' came from someone publicly saying they are attending.');
+      }
+      return '<div class="evi-coverage">' +
+        '<span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/>' +
+        '<path d="M12 16v-4M12 8h.01"/></svg></span>' +
+        '<span class="tx">' + parts.join(' ') + '</span></div>';
+    }
+
+    function stats(run){
+      var s = run.summary || {};
+      var cells = [
+        {v: s.participants || 0, l: 'Listed participants'},
+        {v: s.organisations || 0, l: 'Distinct organisations'},
+        {v: s.resolvable_domains || 0, l: 'With a published website'},
+        {v: s.sources_unreadable || 0, l: 'Pages unreadable', warn: (s.sources_unreadable || 0) > 0}
+      ];
+      if (run.credits_spent) cells.push({v: run.credits_spent, l: 'Apollo credits spent'});
+      return '<div class="evi-stats">' + cells.map(function(c){
+        return '<div class="evi-stat' + (c.warn ? ' warn' : '') + '">' +
+          '<div class="v">' + esc(c.v) + '</div><div class="l">' + esc(c.l) + '</div></div>';
+      }).join('') + '</div>';
+    }
+
+    function roleBar(run){
+      var counts = (run.summary || {}).by_role || {};
+      var labels = run.role_labels || {};
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      if (!keys.length) return '';
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      var chips = ['<button class="evi-chip" type="button" aria-pressed="' +
+        (activeRoles === null) + '" onclick="eviFilter(null)">All<span class="n">' +
+        total + '</span></button>'];
+      keys.forEach(function(k){
+        chips.push('<button class="evi-chip" type="button" aria-pressed="' +
+          (activeRoles === k) + '" onclick="eviFilter(\'' + esc(k) + '\')">' +
+          esc(labels[k] || k) + '<span class="n">' + counts[k] + '</span></button>');
+      });
+      return '<div class="evi-rolebar">' + chips.join('') + '</div>';
+    }
+
+    window.eviFilter = function(role){
+      activeRoles = role;
+      if (current) render(current);
+    };
+
+    function contactsHtml(p){
+      var ap = p.apollo || {};
+      var contacts = ap.contacts || [];
+      if (!contacts.length) return '';
+      return '<div class="evi-contacts">' + contacts.map(function(c){
+        var li = safeUrl(c.linkedin);
+        var nm = li ? '<a href="' + esc(li) + '" target="_blank" rel="noopener noreferrer">' +
+          esc(c.name || 'View') + '</a>' : esc(c.name || '');
+        return '<div class="evi-contact">' + nm +
+          (c.title ? ' <span class="t">' + esc(c.title) + '</span>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    function rosterTable(run){
+      var labels = run.role_labels || {};
+      var rows = (run.participants || []).filter(function(p){
+        return activeRoles === null || p.role === activeRoles;
+      });
+      if (!rows.length) {
+        return '<div class="evi-empty">Nothing listed under this filter.</div>';
+      }
+      var body = rows.map(function(p){
+        var site = safeUrl(p.org_domain ? 'https://' + p.org_domain : null);
+        var src = safeUrl(p.source_url);
+        var ap = p.apollo || {};
+        var firmo = [];
+        if (ap.industry) firmo.push(esc(ap.industry));
+        if (ap.employees) firmo.push(esc(ap.employees) + ' staff');
+        if (ap.location) firmo.push(esc(ap.location));
+        return '<tr>' +
+          '<td><div class="evi-org">' + esc(p.org_name) + '</div>' +
+            (site ? '<div class="evi-dom"><a href="' + esc(site) +
+              '" target="_blank" rel="noopener noreferrer">' + esc(p.org_domain) + '</a></div>'
+             : '<div class="evi-dom">no website published</div>') +
+          '</td>' +
+          '<td><span class="evi-role r-' + esc(p.role) + '">' +
+            esc(labels[p.role] || p.role) + '</span>' +
+            (p.provenance === 'search'
+              ? '<span class="evi-prov" title="The event page could not be read, ' +
+                'so this was found published elsewhere. The source link is the ' +
+                'page it was actually seen on.">via search</span>' : '') +
+            (p.tier ? '<div class="evi-dom">' + esc(p.tier) + '</div>' : '') +
+            (p.booth ? '<div class="evi-dom">Booth ' + esc(p.booth) + '</div>' : '') +
+          '</td>' +
+          '<td>' + (p.person_name ? esc(p.person_name) : '') +
+            (p.person_title ? '<div class="evi-dom">' + esc(p.person_title) + '</div>' : '') +
+            contactsHtml(p) +
+          '</td>' +
+          '<td>' + (firmo.length ? firmo.join('<br>') :
+            (p.resolution === 'no_match' ? '<span class="evi-dom">no Apollo match</span>' :
+             '<span class="evi-dom">not looked up</span>')) + '</td>' +
+          '<td>' + (src ? '<a class="evi-src-link" href="' + esc(src) +
+            '" target="_blank" rel="noopener noreferrer">source</a>' : '') + '</td>' +
+          '</tr>';
+      }).join('');
+      return '<div class="evi-tablewrap"><table class="evi-table"><thead><tr>' +
+        '<th>Organisation</th><th>Listed as</th><th>Person</th>' +
+        '<th>Firmographics</th><th>From</th></tr></thead><tbody>' +
+        body + '</tbody></table></div>';
+    }
+
+    function sourcesHtml(run){
+      var srcs = run.sources || [];
+      if (!srcs.length) return '<div class="evi-empty">No pages were attempted.</div>';
+      return '<div class="evi-sources">' + srcs.map(function(s){
+        var u = safeUrl(s.url);
+        return '<div class="evi-source">' +
+          '<span class="st ' + esc(s.status) + '">' + esc(s.status.replace('_', ' ')) + '</span>' +
+          '<span class="body"><span class="u">' +
+            (u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
+                 esc(s.url) + '</a>' : esc(s.url)) + '</span>' +
+          '<span class="n">' + esc(s.kind || '') +
+            (s.rows_found ? ' · ' + s.rows_found + ' listed' : '') +
+            (s.http_status ? ' · HTTP ' + s.http_status : '') +
+            (s.note ? ' · ' + esc(s.note) : '') + '</span></span></div>';
+      }).join('') + '</div>';
+    }
+
+    /* ── the event set, drawn ────────────────────────────────────────────
+       Six events used to arrive as six paragraphs, and the three things a
+       reader actually compares across them, when it lands, how well it
+       fits, and whether it is a room they can physically walk into, were
+       each buried mid-sentence. So the set is drawn before it is read, out
+       of the same numbers the cards below carry and no others.
+
+       Nothing here estimates. An event with no announced date is never
+       placed on the rail at a plausible-looking position; it is listed
+       beside the rail and said to be undated, for the same reason the
+       roster never fills a blank cell with a likely value. A format the
+       organiser has not stated is its own segment in the mix, not folded
+       into "in person" because most events are. */
+
+    /* One table for the bands, so the gauge on a card, the colour of its
+       bar in the spread and the colour of its marker on the rail cannot
+       drift into disagreeing about what a 70 is. */
+    var FIT_BANDS = [{k: 'hi', min: 85, l: 'strong fit'},
+                     {k: 'mid', min: 70, l: 'good fit'},
+                     {k: 'low', min: 55, l: 'fair fit'},
+                     {k: 'weak', min: 0, l: 'weak fit'}];
+
+    function fitOf(ev){
+      var n = ev && ev.fit_score;
+      if (n == null || n === '') return null;
+      n = Number(n);
+      return isNaN(n) ? null : n;
+    }
+
+    function fitBand(n){
+      if (n == null) return null;
+      for (var i = 0; i < FIT_BANDS.length; i++) {
+        if (n >= FIT_BANDS[i].min) return FIT_BANDS[i];
+      }
+      return FIT_BANDS[FIT_BANDS.length - 1];
+    }
+
+    function bandClass(n){
+      var b = fitBand(n);
+      return b ? 'f-' + b.k : 'f-na';
+    }
+
+    /* Dates arrive as YYYY-MM-DD and are compared as whole UTC days. A bare
+       new Date('2026-07-07') is midnight UTC, which is the previous evening
+       everywhere west of Greenwich, so every American reader would have seen
+       this rail draw July 7 on July 6. */
+    function dayNum(d){
+      if (!d) return null;
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));
+      if (!m) return null;
+      var n = Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000;
+      return isNaN(n) ? null : n;
+    }
+
+    function todayNum(){
+      var n = new Date();
+      return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000;
+    }
+
+    function endDay(ev){
+      var s = dayNum(ev.starts_on), e = dayNum(ev.ends_on);
+      return (e != null && s != null && e > s) ? e : s;
+    }
+
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    /* "Jul 7 to 12, 2026" rather than "Jul 7, 2026 to Jul 12, 2026". The
+       repeated month and year carried no information and cost the chip two
+       lines at the width these sit at. */
+    function dateRangeText(ev){
+      var s = dayNum(ev.starts_on);
+      if (s == null) return '';
+      var e = endDay(ev);
+      var sd = new Date(s * 86400000);
+      var one = MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ', ' + sd.getUTCFullYear();
+      if (e == null || e === s) return one;
+      var ed = new Date(e * 86400000);
+      if (ed.getUTCFullYear() !== sd.getUTCFullYear()) {
+        return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ', ' + sd.getUTCFullYear() +
+               ' to ' + MONTHS[ed.getUTCMonth()] + ' ' + ed.getUTCDate() + ', ' + ed.getUTCFullYear();
+      }
+      if (ed.getUTCMonth() !== sd.getUTCMonth()) {
+        return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ' to ' +
+               MONTHS[ed.getUTCMonth()] + ' ' + ed.getUTCDate() + ', ' + ed.getUTCFullYear();
+      }
+      return MONTHS[sd.getUTCMonth()] + ' ' + sd.getUTCDate() + ' to ' + ed.getUTCDate() +
+             ', ' + sd.getUTCFullYear();
+    }
+
+    /* How far off it is, in the unit a reader would use out loud. Returns
+       null when there is no start date, because "unknown" and "soon" are
+       not the same answer and a blank chip is the honest one. */
+    function countdownText(ev){
+      var s = dayNum(ev.starts_on);
+      if (s == null) return null;
+      var t = todayNum(), e = endDay(ev);
+      if (s <= t && e != null && e >= t) return 'happening now';
+      var d = s - t;
+      if (d < 0) return 'already finished';
+      if (d === 0) return 'today';
+      if (d === 1) return 'tomorrow';
+      if (d < 28) return 'in ' + d + ' days';
+      var mo = Math.round(d / 30.44);
+      if (mo < 24) return 'in about ' + mo + ' month' + (mo === 1 ? '' : 's');
+      return 'in about ' + (Math.round(d / 36.525) / 10) + ' years';
+    }
+
+    var FORMAT_LABEL = {in_person: 'In person', hybrid: 'Hybrid', virtual: 'Virtual'};
+
+    function formatKey(ev){
+      var f = String((ev && ev.format) || '').toLowerCase().replace(/[\s\-]+/g, '_');
+      return FORMAT_LABEL[f] ? f : 'unknown';
+    }
+
+    /* Web-search replies wrap anything lifted from a page in an inline
+       cite tag. It reached the database as written and this view escaped
+       and printed it, so readers saw the tag rather than the quotation it
+       was wrapping. New runs are cleaned before they are stored, but every
+       run already saved still carries the raw markup and cannot be re-fetched
+       without paying for the search again, so the same recovery runs here:
+       the tag becomes the quotation it always meant.
+
+       Returns HTML. Everything that was not a cite tag is escaped first, so
+       nothing else in the model's prose can reach the page as markup. */
+    function citeText(s){
+      if (s == null) return '';
+      var src = String(s), out = '', i = 0, m;
+      var re = /<cite\b[^>]*>([\s\S]*?)<\/cite>/gi;
+      while ((m = re.exec(src)) !== null) {
+        out += esc(src.slice(i, m.index));
+        var q = m[1].replace(/<\/?cite\b[^>]*>/gi, '').trim()
+                    .replace(/^["'“‘]+/, '')
+                    .replace(/["'”’]+$/, '');
+        if (q) out += '“' + esc(q) + '”';
+        i = m.index + m[0].length;
+      }
+      out += esc(src.slice(i));
+      /* An opener with no closer, or a closer on its own, is markup the
+         reader must never see even though there is no quotation to recover
+         from it. */
+      return out.replace(/&lt;\/?cite\b[\s\S]*?&gt;/gi, '');
+    }
+
+    /* The anchor a rail marker jumps to. Derived from the event id where
+       there is one so it survives a re-sort, and from the position where
+       there is not. */
+    function evAnchor(ev, i){
+      return 'eviev-' + (ev && ev.id != null ? String(ev.id) : 'p' + i);
+    }
+
+    /* A jump into a card the format filter is currently hiding. Clearing
+       the filter is the only honest way to honour the click: scrolling to
+       nothing looks like a broken control. */
+    window.eviReveal = function(anchor){
+      if (FORMAT_FILTER && !document.getElementById(anchor)) {
+        FORMAT_FILTER = null;
+        redrawRun();
+      }
+      window.eviJump(anchor);
+    };
+
+    window.eviJump = function(anchor){
+      var el = document.getElementById(anchor);
+      if (!el) return;
+      el.scrollIntoView({block: 'center', behavior: 'smooth'});
+      el.classList.add('lit');
+      setTimeout(function(){ el.classList.remove('lit'); }, 1400);
+    };
+
+    var TAG_ICON = {
+      when: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/>' +
+            '<path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+      soon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      where: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+             'stroke-linecap="round"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/>' +
+             '<circle cx="12" cy="10" r="2.5"/></svg>',
+      form: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/>' +
+            '<path d="M8 21h8M12 17v4"/></svg>',
+      size: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><path d="M17 20v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>' +
+            '<circle cx="9.5" cy="7" r="3.5"/><path d="M22 20v-2a4 4 0 00-3-3.9"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round"><path d="M12 3l9 16H3l9-16z"/><path d="M12 9v4M12 16h.01"/></svg>'
+    };
+
+    function tag(kind, icon, text, title){
+      if (!text) return '';
+      return '<span class="evi-tag' + (kind ? ' ' + kind : '') + '"' +
+        (title ? ' title="' + esc(title) + '"' : '') + '>' +
+        (TAG_ICON[icon] || '') + '<span>' + esc(text) + '</span></span>';
+    }
+
+    /* The score as a ring. The number alone made 96 and 82 look like the
+       same kind of answer at a glance; the arc is the part that reads from
+       across the room. */
+    function fitGauge(n){
+      if (n == null) return '';
+      var b = fitBand(n), r = 21, c = 2 * Math.PI * r;
+      var on = Math.max(0, Math.min(100, n)) / 100 * c;
+      /* The number lives INSIDE a box the size of the ring, not absolutely
+         placed against the whole gauge column. The column is wider than the
+         ring, so a number centred on the column sat left of the arc it was
+         reporting, and on a narrower ring at the mobile breakpoint it sat
+         somewhere else again. */
+      return '<div class="evi-gauge ' + bandClass(n) + '" role="img" aria-label="Fit ' +
+        esc(n) + ' out of 100, ' + esc(b ? b.l : '') + '">' +
+        '<span class="ring">' +
+        '<svg viewBox="0 0 52 52" aria-hidden="true">' +
+        '<circle class="tr" cx="26" cy="26" r="' + r + '"/>' +
+        '<circle class="vl" cx="26" cy="26" r="' + r + '" stroke-dasharray="' +
+        on.toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 26 26)"/></svg>' +
+        '<span class="n">' + esc(n) + '</span></span>' +
+        '<span class="fl">' + esc(b ? b.l : '') + '</span></div>';
+    }
+
+    /* -- the chart kit ---------------------------------------------------
+       Five shapes shared by all three reports: a donut, a labelled bar set,
+       a column spread, a funnel and a single-arc stat. They exist so that a
+       roster read by one play and a category quota counted by another are
+       not two different visual languages, and so that everything drawn is
+       drawn from the same stored rows the tables underneath are built from.
+
+       One rule holds across all five, and it is the same rule the rest of
+       this agent runs on. What is MISSING gets a segment of its own. A
+       roster donut that quietly leaves out the companies nobody could look
+       up draws a cleaner run than the one that happened. So "not stated",
+       "could not be read" and "not scored" are drawn, in a muted band, and
+       are never folded into a neighbour or dropped for being awkward.
+
+       Every animation here is a draw-in with only a `from` keyframe, so the
+       value it animates TO is whatever the element's own inline style says.
+       That is what keeps one shared @keyframes honest across a hundred
+       different bar widths, and it is why nothing here needs a second pass
+       over the DOM after render() to start moving. */
+
+    /* Charts are written finished and the animation is armed one frame
+       later, never the other way round.
+
+       A background tab does not run requestAnimationFrame and its document
+       timeline does not advance, so a bar grown from a `from` keyframe sits
+       at zero for as long as nobody is looking, which is also exactly when a
+       screenshot or a print is taken. Arming from inside a frame callback
+       means the finished chart is the default rendering and the animation is
+       something that only ever happens on a screen that is painting.
+
+       Armed once per report rather than once per render: the filters in
+       these views re-enter render(), and replaying every bar each time
+       somebody presses a role chip is a flinch, not a flourish. */
+    var ANIM_FOR = null;
+
+    function armAnim(key){
+      var el = document.getElementById('drawerBody');
+      if (!el || !el.classList) return;
+      if (ANIM_FOR === key) return;
+      ANIM_FOR = key;
+      el.classList.remove('evi-anim');
+      if (typeof requestAnimationFrame !== 'function') return;
+      requestAnimationFrame(function(){
+        if (ANIM_FOR === key) el.classList.add('evi-anim');
+      });
+    }
+
+    /* Segments with nothing in them are dropped: a zero has no area to draw
+       and an empty legend entry is noise. Everything above zero survives,
+       muted bands included. */
+    function liveSegs(segs){
+      return (segs || []).filter(function(s){ return Number(s.n) > 0; });
+    }
+
+    function segLegend(segs, opts){
+      opts = opts || {};
+      return '<div class="evi-legend">' + segs.map(function(s){
+        var lbl = s.label + ' ' + s.n;
+        if (!opts.pick) {
+          return '<span class="lg ' + esc(s.cls) + '"><i></i>' + esc(lbl) + '</span>';
+        }
+        return '<button type="button" class="lg ' + esc(s.cls) + '" aria-pressed="' +
+          (opts.on === s.k) + '" title="' + esc(opts.hint ? opts.hint(s) : lbl) +
+          '" onclick="' + esc(opts.pick(s)) + '"><i></i>' + esc(lbl) + '</button>';
+      }).join('') + '</div>';
+    }
+
+    /* A donut. The number in the hole is the one number the chart is about,
+       and the segments always sum to it, so the picture can be checked
+       against the number without leaving the picture. */
+    function evDonut(segs, centre, centreLabel, opts){
+      segs = liveSegs(segs);
+      opts = opts || {};
+      var total = segs.reduce(function(n, s){ return n + Number(s.n); }, 0);
+      if (!total) return '';
+      var r = 42, C = 2 * Math.PI * r, off = 0;
+      var arcs = segs.map(function(s, i){
+        var len = (Number(s.n) / total) * C;
+        var a = '<circle class="sg ' + esc(s.cls) + '" cx="50" cy="50" r="' + r +
+          '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) +
+          '" stroke-dashoffset="' + (-off).toFixed(2) + '" style="--i:' + i + '">' +
+          '<title>' + esc(s.label + ': ' + s.n) + '</title></circle>';
+        off += len;
+        return a;
+      }).join('');
+      return '<div class="evi-donut">' +
+        '<div class="dw"><svg viewBox="0 0 100 100" role="img" aria-label="' +
+        esc(segs.map(function(x){ return x.label + ' ' + x.n; }).join(', ')) + '">' +
+        '<circle class="tr" cx="50" cy="50" r="' + r + '"/>' +
+        '<g transform="rotate(-90 50 50)">' + arcs + '</g></svg>' +
+        '<span class="dc"><b>' + esc(centre) + '</b><i>' + esc(centreLabel || '') +
+        '</i></span></div>' + segLegend(segs, opts) + '</div>';
+    }
+
+    /* Labelled horizontal bars against a common maximum. Used wherever the
+       comparison is "how much of what was asked for did we get", which is
+       category coverage and nothing else so far. A row can carry a state,
+       and a row whose search FAILED is drawn in the bad band rather than as
+       a short bar, because a short bar reads as a finding about the market
+       and this one is a hole in the analysis. */
+    function evBars(rows){
+      rows = rows || [];
+      if (!rows.length) return '';
+      var max = rows.reduce(function(m, r){
+        return Math.max(m, Number(r.max) || 0, Number(r.n) || 0); }, 1);
+      return '<div class="evi-bars">' + rows.map(function(r, i){
+        var n = Number(r.n) || 0, of = Number(r.max) || 0;
+        var w = Math.max(2, (n / max) * 100);
+        var goal = of ? (of / max) * 100 : 0;
+        /* A row can report a word rather than a count. Some categories are
+           known to have met their quota without the run having stored how
+           many they found, and printing the quota as if it were the count
+           would be inventing a number to fill a column. */
+        var reads = r.text != null
+          ? '<b>' + esc(r.text) + '</b>'
+          : esc(n) + (of ? '<i> of ' + esc(of) + '</i>' : '');
+        return '<div class="br ' + esc(r.state || '') + '" style="--i:' + i + '">' +
+          '<div class="bl">' + esc(r.label) + '</div>' +
+          '<div class="bt">' +
+            (goal ? '<span class="gl" style="left:' + goal.toFixed(2) + '%"></span>' : '') +
+            '<span class="fl" style="width:' + w.toFixed(2) + '%"></span></div>' +
+          '<div class="bn">' + reads + '</div>' +
+          (r.note ? '<div class="bw">' + r.note + '</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    /* One column per row, in the order the list below is in, so the shape of
+       the spread and the order of the cards are the same fact. `floor`, when
+       given, is drawn as a line across the columns: it is a real number the
+       run cut on, not a visual flourish, and drawing it is what makes the
+       gap between the kept and the cut legible.
+
+       An item with no value gets a stub column in the muted band and is
+       counted in the note, never a zero-height column. Zero is a score. Not
+       scored is not. */
+    function evCols(items, opts){
+      items = items || [];
+      opts = opts || {};
+      if (items.length < 2) return '';
+      var top = items.reduce(function(m, it){
+        return Math.max(m, Number(it.n) || 0); }, 0) || 1;
+      var scale = Math.max(top, Number(opts.max) || 0);
+      var missing = 0;
+      var cols = items.map(function(it, i){
+        var has = it.n != null && it.n !== '';
+        if (!has) missing += 1;
+        var h = has ? Math.max(8, (Number(it.n) / scale) * 100) : 6;
+        var lbl = it.label + (has ? ': ' + it.n : ': not scored');
+        var body = '<span class="cl ' + esc(it.cls || 'f-na') + (has ? '' : ' na') +
+          '" style="height:' + h.toFixed(2) + '%;--i:' + i + '"></span>';
+        /* Not every column has somewhere to go. The cut list is stored as
+           names and totals with no card of its own, and a button that does
+           nothing when pressed is worse than a shape that never offered. */
+        var j = opts.jump ? opts.jump(it, i) : null;
+        if (!j) {
+          return '<span class="cx" title="' + esc(lbl) + '">' + body + '</span>';
+        }
+        return '<button type="button" class="cx" title="' + esc(lbl) +
+          '" aria-label="' + esc(lbl) + '" onclick="' + esc(j) + '">' +
+          body + '</button>';
+      }).join('');
+      var floor = (opts.floor != null && scale)
+        ? '<span class="fo" style="bottom:' +
+          Math.min(100, (opts.floor / scale) * 100).toFixed(2) + '%"><b>' +
+          esc(opts.floorLabel || ('the bar, ' + opts.floor)) + '</b></span>' : '';
+      var note = opts.note || '';
+      if (missing) {
+        note += (note ? ' ' : '') + plural(missing, 'stub') +
+          ' at the foot of the chart ' + (missing === 1 ? 'is an item' : 'are items') +
+          ' with no score, drawn short rather than as a zero.';
+      }
+      /* The line goes INSIDE the column box. Positioned against the padded
+         wrapper instead, its percentage was measured against a taller box
+         than the columns were, so the bar it drew sat a few pixels above the
+         height it was describing. */
+      return '<div class="evi-cols' + (items.length <= 4 ? ' few' : '') + '">' +
+        '<div class="cwrap"><div class="cs">' + floor + cols + '</div></div>' +
+        (note ? '<div class="cn">' + note + '</div>' : '') + '</div>';
+    }
+
+    /* A funnel: each step as a share of the first, so the drop between two
+       steps is the thing you see. Steps are given, never derived, because
+       the difference between "cut" and "never looked at" is exactly what a
+       derived funnel would smooth over. */
+    function evFunnel(steps){
+      steps = (steps || []).filter(function(s){ return s.n != null; });
+      if (steps.length < 2) return '';
+      var first = Number(steps[0].n) || 1;
+      return '<div class="evi-funnel">' + steps.map(function(s, i){
+        var w = Math.max(6, (Number(s.n) / first) * 100);
+        return '<div class="fs ' + esc(s.cls || '') + '" style="--i:' + i + '">' +
+          '<div class="fb" style="width:' + w.toFixed(2) + '%"><b>' + esc(s.n) +
+          '</b></div><div class="fl">' + esc(s.label) + '</div>' +
+          (s.note ? '<div class="fn">' + esc(s.note) + '</div>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    /* One value on one arc, big. `max` is stated rather than assumed: the
+       recommendation scores out of 110 and a fit scores out of 100, and an
+       arc that silently rescaled one to the other would be lying about both. */
+    function evRing(value, max, label, cls, sub){
+      if (value == null) return '';
+      var r = 40, C = 2 * Math.PI * r;
+      var on = Math.max(0, Math.min(1, Number(value) / (max || 100))) * C;
+      return '<div class="evi-ring ' + esc(cls || 'f-na') + '" role="img" aria-label="' +
+        esc(value + ' out of ' + max + ', ' + label) + '">' +
+        '<span class="rw"><svg viewBox="0 0 100 100" aria-hidden="true">' +
+        '<circle class="tr" cx="50" cy="50" r="' + r + '"/>' +
+        '<circle class="vl" cx="50" cy="50" r="' + r + '" stroke-dasharray="' +
+        on.toFixed(2) + ' ' + C.toFixed(2) + '" transform="rotate(-90 50 50)"/></svg>' +
+        /* The number is centred inside a box the exact size of the ring, and
+           the value and its denominator share a baseline inside THAT. The
+           previous version centred them with a line-height, which held at
+           one ring size and drifted the moment a card asked for a smaller
+           one. Same bug the fit gauge had, same fix. */
+        '<span class="rn"><span class="rv"><b>' + esc(value) + '</b><i>/' +
+        esc(max) + '</i></span></span>' +
+        '</span><span class="rl">' + esc(label) +
+        (sub ? '<i>' + esc(sub) + '</i>' : '') + '</span></div>';
+    }
+
+    /* ── at a glance ───────────────────────────────────────────────────── */
+    function glanceHtml(rows, sm){
+      var tiles = [];
+      var scored = rows.map(function(r){ return fitOf(r.ev); })
+                       .filter(function(n){ return n != null; });
+
+      var sampled = (sm.harvested_events != null)
+        ? sm.harvested_events : ((sm.harvested_event_ids || []).length);
+      tiles.push('<div class="evi-tile"><div class="tl">Events found</div>' +
+        '<div class="tv">' + rows.length + '</div><div class="tn">' +
+        (sampled ? esc(sampled + ' of them had a roster read')
+                 : 'No roster was sampled on this run') + '</div></div>');
+
+      if (scored.length) {
+        var srt = scored.slice().sort(function(a, b){ return a - b; });
+        var top = srt[srt.length - 1];
+        var mid = srt.length % 2
+          ? srt[(srt.length - 1) / 2]
+          : Math.round((srt[srt.length / 2 - 1] + srt[srt.length / 2]) / 2);
+        tiles.push('<div class="evi-tile"><div class="tl">Fit spread</div>' +
+          '<div class="tbars">' + rows.map(function(r, i){
+            var n = fitOf(r.ev);
+            var lbl = r.ev.name + (n == null ? ': not scored' : ': ' + n + ' fit');
+            return '<button type="button" class="' + bandClass(n) + '" style="height:' +
+              (n == null ? 5 : Math.max(9, Math.min(100, n))) + '%" title="' +
+              esc(lbl) + '" aria-label="' + esc(lbl) + '" onclick="eviReveal(\'' +
+              esc(evAnchor(r.ev, i)) + '\')"></button>';
+          }).join('') + '</div>' +
+          '<div class="tn"><b>' + esc(top) + '</b> best, <b>' + esc(mid) +
+          '</b> median. One bar per event, in the order below. Pick one to ' +
+          'jump to it.</div></div>');
+      }
+
+      var mix = {in_person: 0, hybrid: 0, virtual: 0, unknown: 0};
+      rows.forEach(function(r){ mix[formatKey(r.ev)] += 1; });
+      var segs = ['in_person', 'hybrid', 'virtual', 'unknown'].filter(function(k){
+        return mix[k] > 0;
+      });
+      function fmtLabel(k){ return FORMAT_LABEL[k] || 'Format not stated'; }
+      function fmtHint(k){
+        return (FORMAT_FILTER === k ? 'Showing only ' : 'Show only ') + fmtLabel(k) +
+               ' (' + mix[k] + ')';
+      }
+      tiles.push('<div class="evi-tile' + (FORMAT_FILTER ? ' on' : '') +
+        '"><div class="tl">How you attend</div>' +
+        '<div class="tstack" role="group" aria-label="Filter by format">' +
+        segs.map(function(k){
+          return '<button type="button" class="s-' + k + '" style="flex-grow:' + mix[k] +
+            '" aria-pressed="' + (FORMAT_FILTER === k) + '" title="' + esc(fmtHint(k)) +
+            '" aria-label="' + esc(fmtHint(k)) + '" onclick="eviFormatFilter(\'' + k +
+            '\')"></button>';
+        }).join('') + '</div><div class="tlegend">' + segs.map(function(k){
+          return '<button type="button" class="lg s-' + k + '" aria-pressed="' +
+            (FORMAT_FILTER === k) + '" title="' + esc(fmtHint(k)) + '" onclick="' +
+            'eviFormatFilter(\'' + k + '\')"><i></i>' +
+            esc((FORMAT_LABEL[k] || 'Not stated') + ' ' + mix[k]) + '</button>';
+        }).join('') + '</div></div>');
+
+      return '<div class="evi-sec"><h3>At a glance</h3>' +
+        '<div class="evi-glance">' + tiles.join('') + '</div></div>';
+    }
+
+    /* -- the roster, drawn -----------------------------------------------
+       A roster arrives as a table of forty rows, and the three questions
+       somebody actually opens it with, who is in it, whether we could read
+       the pages, and what these companies do, are each answerable only by
+       reading forty rows and counting. So they are counted here, from the
+       same rows the table below is built from.
+
+       The second panel is the one that matters most and is the one a
+       prettier report would leave out. Pages that could not be read are
+       drawn at the same size as pages that could, in the bad band, because
+       the size of that slice IS the size of the doubt about everything else
+       on this screen. */
+
+    var ROLE_BAND = {exhibitor: 'rb-exhibitor', sponsor: 'rb-sponsor',
+                     speaker: 'rb-speaker', partner: 'rb-partner',
+                     media: 'rb-media', attendee_declared: 'rb-declared'};
+
+    var SOURCE_LABEL = {ok: 'Read', recovered: 'Recovered by search',
+                        blocked: 'Blocked', not_found: 'Not found',
+                        error: 'Failed'};
+    /* Recovered is deliberately NOT in the good band. The page could not be
+       read and a model reassembled the list from search results, which is
+       weaker evidence than a page we parsed, and the store keeps them apart
+       for exactly that reason. */
+    var SOURCE_BAND = {ok: 'f-ok', recovered: 'f-warn', blocked: 'f-bad',
+                       not_found: 'f-na', error: 'f-bad'};
+
+    function srcLabel(k){
+      return SOURCE_LABEL[k] || String(k || '').replace(/_/g, ' ');
+    }
+
+    function panel(title, body, note){
+      if (!body) return '';
+      return '<div class="evi-panel"><h4>' + esc(title) + '</h4>' + body +
+        (note ? '<p class="pn">' + note + '</p>' : '') + '</div>';
+    }
+
+    function rolePanel(run){
+      var counts = (run.summary || {}).by_role || {};
+      var labels = run.role_labels || {};
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      if (!keys.length) return '';
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      var segs = keys.map(function(k){
+        return {k: k, n: counts[k], label: labels[k] || k,
+                cls: ROLE_BAND[k] || 'f-na'};
+      });
+      var declared = counts.attendee_declared || 0;
+      return panel('Who is on it',
+        evDonut(segs, total, 'listed', {
+          on: activeRoles,
+          pick: function(sg){ return "eviFilter('" + sg.k + "')"; },
+          hint: function(sg){
+            return (activeRoles === sg.k ? 'Showing only ' : 'Show only ') +
+              (labels[sg.k] || sg.k) + ' (' + sg.n + ')'; }
+        }),
+        'Every slice is a published listing. ' +
+        (declared
+          ? esc(plural(declared, 'row')) + ' came from someone saying publicly that ' +
+            'they are going, which is the only slice here that is not the ' +
+            'organiser&rsquo;s own list. '
+          : '') +
+        'It is not an attendee list. Pick a slice to filter the table.');
+    }
+
+    function tierPanel(run){
+      var rows = run.participants || [];
+      var withTier = rows.filter(function(p){ return p.tier; });
+      if (!withTier.length) return '';
+      var counts = {};
+      withTier.forEach(function(p){ counts[p.tier] = (counts[p.tier] || 0) + 1; });
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var segs = keys.map(function(k, i){
+        return {k: k, n: counts[k], label: k,
+                cls: ['f-hi', 'f-mid', 'f-low', 'f-weak'][i] || 'f-na'};
+      });
+      var none = rows.length - withTier.length;
+      if (none > 0) {
+        segs.push({k: '_none', n: none, label: 'No tier published', cls: 'f-na'});
+      }
+      /* The centre is the whole roster, not the tiered part of it. The
+         segments have to sum to the number in the hole or the picture and
+         the number disagree, and the muted slice is most of this one. */
+      return panel('What they paid for',
+        evDonut(segs, rows.length, 'on the roster'),
+        'Sponsorship tier as the organiser published it. A tier is a budget ' +
+        'somebody already signed off, which is the closest thing on this page ' +
+        'to a spending signal. The muted slice is rows with no tier on the ' +
+        'listing, not rows that paid nothing.');
+    }
+
+    function sourcePanel(run){
+      var srcs = run.sources || [];
+      if (!srcs.length) return '';
+      var counts = {};
+      srcs.forEach(function(x){ counts[x.status] = (counts[x.status] || 0) + 1; });
+      var keys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+      var segs = keys.map(function(k){
+        return {k: k, n: counts[k], label: srcLabel(k), cls: SOURCE_BAND[k] || 'f-na'};
+      });
+      var unread = srcs.length - (counts.ok || 0);
+      return panel('Pages we could open',
+        evDonut(segs, srcs.length, 'attempted'),
+        unread
+          ? '<b>' + esc(plural(unread, 'page')) + ' did not come back readable.</b> ' +
+            'The roster is short by whatever was on ' +
+            (unread === 1 ? 'it' : 'them') + ', and there is no way to know how ' +
+            'much that is. Every attempt is listed under Sources at the foot of ' +
+            'this report.'
+          : 'Every page the harvester tried came back readable, so this roster ' +
+            'is as complete as what the event has published.');
+    }
+
+    function firmoPanel(run){
+      var rows = run.participants || [];
+      var inds = {}, looked = 0;
+      rows.forEach(function(p){
+        var ind = (p.apollo || {}).industry;
+        if (!ind) return;
+        looked += 1;
+        inds[ind] = (inds[ind] || 0) + 1;
+      });
+      if (!looked) return '';
+      var keys = Object.keys(inds).sort(function(a, b){ return inds[b] - inds[a]; });
+      var top = keys.slice(0, 6);
+      var bars = top.map(function(k){
+        return {label: k, n: inds[k], max: 0};
+      });
+      var rest = keys.length - top.length;
+      return panel('What they do',
+        evBars(bars),
+        'Industry as Apollo records it, for the ' + esc(looked) + ' of ' +
+        esc(rows.length) + ' organisations that have been matched. ' +
+        (rest ? esc(plural(rest, 'other industry', 'other industries')) + ' had one row each. ' : '') +
+        'The other ' + esc(rows.length - looked) + ' have not been looked up, so ' +
+        'they are absent from this chart rather than counted as unknown.');
+    }
+
+    function rosterGlance(run){
+      var panels = [rolePanel(run), tierPanel(run), sourcePanel(run), firmoPanel(run)]
+                     .filter(Boolean);
+      if (!panels.length) return '';
+      return '<div class="evi-sec"><h3>The shape of this roster</h3>' +
+        '<div class="evi-panels">' + panels.join('') + '</div></div>';
+    }
+
+    /* The event itself, at the top, because a lookup drawer opens on one
+       event and the reader's first question is when it is and whether there
+       is still time to do anything about it. Built out of the same tag row
+       the discover cards use, so the two never disagree about what a
+       stated size or an unstated format looks like. */
+    function eventHero(ev){
+      if (!ev || !ev.name) return '';
+      var tags = [];
+      var when = dateRangeText(ev);
+      tags.push(when ? tag('', 'when', when)
+                     : tag('mut', 'when', 'No date announced',
+                           'The organiser has not published a date for this edition.'));
+      var soon = countdownText(ev);
+      if (soon) tags.push(tag(soon === 'already finished' ? 'warn' : 'go', 'soon', soon));
+      if (ev.location) tags.push(tag('', 'where', ev.location));
+      var fk = formatKey(ev);
+      tags.push(fk === 'unknown'
+        ? tag('mut', 'form', 'Format not stated',
+              'The organiser has not said whether this runs in person.')
+        : tag('', 'form', FORMAT_LABEL[fk] || fk));
+      if (ev.stated_size) {
+        tags.push(tag('mut', 'size', ev.stated_size, 'The organiser’s own claim.'));
+      }
+      var site = safeUrl(ev.website);
+      return '<div class="evi-hero-ev">' +
+        '<div class="hn">' + esc(ev.name) +
+          (ev.edition ? '<span class="he">' + esc(ev.edition) + '</span>' : '') + '</div>' +
+        '<div class="evi-tags">' + tags.join('') + '</div>' +
+        (ev.audience_note ? '<p class="ha">' + esc(citeText(ev.audience_note)) + '</p>' : '') +
+        (site ? '<a class="hl" href="' + esc(site) + '" target="_blank" ' +
+                'rel="noopener noreferrer">' + esc(ev.organizer || 'Event site') +
+                '<i aria-hidden="true">&#8599;</i></a>' : '') +
+      '</div>';
+    }
+
+    /* ── the calendar rail ─────────────────────────────────────────────── */
+    /* Markers are laid out in percentages of the rail rather than pixels,
+       because the rail is whatever the drawer is wide. The separation below
+       is the one number that has to assume a width: it is the room a marker
+       needs so two of them do not overlap, expressed as a share of a rail
+       of 640px, which is the minimum width the rail scrolls at. Being
+       generous here costs an extra lane and nothing else; being mean costs
+       an unreadable pile of markers. */
+    var MK_HALF_PCT = 2.2;
+
+    /* `opts` exists so the recommendation can put its ranked list on the
+       same calendar without a second rail being written. Every default is
+       what this function did when it only served the event set, so passing
+       nothing is the old behaviour exactly.
+
+         band(r)   the colour class. Defaults to the fit band, which is
+                   wrong for a recommendation: those score out of 110 and
+                   carry a tier, and rescaling one to the other would put a
+                   99 in the same colour as a 90.
+         anchor(r) the id on the card this marker jumps to.
+         title(r)  the hover and screen-reader text.
+         head      the section heading.
+    */
+    function railHtml(rows, opts){
+      opts = opts || {};
+      var bandOf = opts.band || function(r){ return bandClass(fitOf(r.ev)); };
+      var anchorOf = opts.anchor || function(r){ return evAnchor(r.ev, r.rank - 1); };
+      var titleOf = opts.title || function(r){
+        var n = fitOf(r.ev);
+        return r.ev.name + ' \u00b7 ' + dateRangeText(r.ev) +
+          (n == null ? '' : ' \u00b7 ' + n + ' fit');
+      };
+      var dated = [], undated = [];
+      rows.forEach(function(r){
+        (dayNum(r.ev.starts_on) == null ? undated : dated).push(r);
+      });
+      if (dated.length < 2) return '';
+
+      var t = todayNum();
+      var lo = t, hi = -Infinity;
+      dated.forEach(function(r){
+        var s = dayNum(r.ev.starts_on), e = endDay(r.ev);
+        if (s < lo) lo = s;
+        if (e > hi) hi = e;
+      });
+      if (hi <= lo) hi = lo + 30;
+
+      var loD = new Date(lo * 86400000), hiD = new Date(hi * 86400000);
+      var from = Date.UTC(loD.getUTCFullYear(), loD.getUTCMonth(), 1) / 86400000;
+      var to = Date.UTC(hiD.getUTCFullYear(), hiD.getUTCMonth() + 1, 1) / 86400000;
+      var span = to - from;
+      if (span <= 0) return '';
+      function pct(d){ return ((d - from) / span) * 100; }
+
+      var ticks = [], cur = from, guard = 0;
+      while (cur < to && guard++ < 80) {
+        var cd = new Date(cur * 86400000);
+        ticks.push({at: pct(cur), m: cd.getUTCMonth(), y: cd.getUTCFullYear()});
+        cur = Date.UTC(cd.getUTCFullYear(), cd.getUTCMonth() + 1, 1) / 86400000;
+      }
+      /* At most nine labels on the rail. Ten monthly labels fit across a
+         desktop drawer and collide into each other on the narrow one the
+         rail scrolls inside, and a month label printed over the next one
+         is worse than no month label. */
+      var every = Math.ceil(ticks.length / 9);
+      var axis = ticks.map(function(k, i){
+        var show = (i % every === 0);
+        return '<span class="tk' + (show ? '' : ' q') + '" style="left:' +
+          k.at.toFixed(3) + '%">' + (show
+            ? '<b>' + MONTHS[k.m] + (k.m === 0 || i === 0 ? ' ' + k.y : '') + '</b>'
+            : '') + '</span>';
+      }).join('');
+
+      var placed = dated.slice().sort(function(a, b){
+        return dayNum(a.ev.starts_on) - dayNum(b.ev.starts_on);
+      });
+      var laneRight = [];
+      placed.forEach(function(r){
+        var s = dayNum(r.ev.starts_on), e = endDay(r.ev);
+        if (e == null || e < s) e = s;
+        var L = pct(s), R = pct(e + 1), C = (L + R) / 2;
+        var from_ = Math.min(L, C - MK_HALF_PCT), to_ = Math.max(R, C + MK_HALF_PCT);
+        var lane = 0;
+        while (laneRight[lane] != null && laneRight[lane] > from_) lane += 1;
+        laneRight[lane] = to_;
+        r._L = L; r._W = Math.max(R - L, 0.35); r._C = C; r._lane = lane;
+      });
+
+      var lanes = laneRight.length;
+      /* Under a format filter the markers DIM rather than disappear. The
+         rail is a calendar: dropping points out of it would silently change
+         the span, the lanes and the month axis, so the same run would draw a
+         different shape depending on which chip was pressed. */
+      var marks = placed.map(function(r){
+        var cls = bandOf(r);
+        var out = FORMAT_FILTER && formatKey(r.ev) !== FORMAT_FILTER;
+        var title = titleOf(r) +
+          (out ? ' · outside the format you are filtering on' : '');
+        return '<span class="sp ' + cls + (out ? ' out' : '') + '" style="left:' +
+          r._L.toFixed(3) + '%;width:' + r._W.toFixed(3) + '%;top:' +
+          (r._lane * 30 + 11) + 'px"></span>' +
+          '<button type="button" class="mk ' + cls + (out ? ' out' : '') +
+          '" style="left:' + r._C.toFixed(3) +
+          '%;top:' + (r._lane * 30) + 'px" title="' + esc(title) +
+          '" aria-label="' + esc(title) + '" onclick="eviReveal(\'' +
+          esc(anchorOf(r)) + '\')">' + esc(r.rank) + '</button>';
+      }).join('');
+
+      var nowAt = pct(t);
+      var now = (nowAt >= 0 && nowAt <= 100)
+        ? '<span class="now" style="left:' + nowAt.toFixed(3) + '%"><b>today</b></span>' : '';
+
+      var tail = '';
+      if (undated.length) {
+        tail = '<div class="evi-undated">' + TAG_ICON.warn + '<span><b>' +
+          esc(plural(undated.length, 'event')) + ' not on the rail.</b> ' +
+          undated.slice(0, 4).map(function(r){
+            return '<button type="button" class="un" onclick="eviReveal(\'' +
+              esc(anchorOf(r)) + '\')">' + esc(r.ev.name) + '</button>';
+          }).join(', ') +
+          (undated.length > 4 ? ' and ' + (undated.length - 4) + ' more' : '') +
+          (undated.length === 1 ? ' has ' : ' have ') +
+          'no announced date, so nothing is drawn at a guessed one.</span></div>';
+      }
+
+      /* The rail scrolls inside its own box below about 700px rather than
+         squeezing. Every position on it is a percentage, so a rail narrow
+         enough piles five markers into one smudge and prints the month
+         labels over each other; a minimum width is the only thing that
+         keeps the spacing the lane algorithm assumed. */
+      return '<div class="evi-sec"><h3>' + esc(opts.head || 'When they land') + '</h3>' +
+        '<div class="evi-calwrap"><div class="evi-cal" style="--lanes:' + lanes + '">' +
+        '<div class="grid">' + ticks.map(function(k, i){
+          return '<span style="left:' + k.at.toFixed(3) + '%"></span>';
+        }).join('') + '</div>' + now +
+        '<div class="marks" style="height:' + (lanes * 30 - 8) + 'px">' + marks + '</div>' +
+        '<div class="axis">' + axis + '</div></div></div>' + tail + '</div>';
+    }
+
+    /* ── the cards ─────────────────────────────────────────────────────── */
+    function eventCard(r, overlap, sampled, knowSampled){
+      var ev = r.ev, n = fitOf(ev), cls = bandClass(n);
+      var site = safeUrl(ev.website);
+      var hits = overlap[String(ev.id)] || [];
+
+      var tags = [];
+      var when = dateRangeText(ev);
+      tags.push(when ? tag('', 'when', when)
+                     : tag('mut', 'when', 'No date announced',
+                           'The organiser has not published a date for the next edition.'));
+      var soon = countdownText(ev);
+      if (soon) {
+        tags.push(tag(soon === 'already finished' ? 'warn' : 'go', 'soon', soon));
+      }
+      if (ev.location) tags.push(tag('', 'where', ev.location));
+      var fk = formatKey(ev);
+      tags.push(fk === 'unknown'
+        ? tag('mut', 'form', 'Format not stated',
+              'The organiser does not say whether this runs in person, online or both.')
+        : tag('', 'form', FORMAT_LABEL[fk]));
+      if (ev.stated_size) {
+        tags.push(tag('', 'size', ev.stated_size,
+                      'The number the event publishes about itself. Nothing here estimates one.'));
+      }
+      if (String(ev.confidence || '').toLowerCase() === 'low') {
+        tags.push(tag('warn', 'warn', 'Low confidence',
+                      'The search was not able to confirm this one as firmly as the rest.'));
+      }
+      /* Whether this roster was read is a per-event fact and has to travel on
+         the event. It used to travel as a sentence, which meant the same
+         twenty words printed under four cards in a row and read as padding.
+         The two states stay visually apart, because "we read it and none of
+         yours were there" and "we never read it" mean opposite things. */
+      if (knowSampled && !hits.length) {
+        tags.push(sampled[String(ev.id)]
+          ? tag('mut', 'size', 'Roster read, none of yours',
+                'This roster was read in full and none of your target accounts are on it.')
+          : tag('warn', 'warn', 'Roster not read',
+                'This roster was not read, so whether your target accounts are on it is '
+                + 'unknown. Only the best-fitting few are sampled.'));
+      }
+
+      var ed = ev.edition ? String(ev.edition).trim() : '';
+      if (ed && when && when.indexOf(ed) >= 0) ed = '';
+
+      /* The whole card opens the event's own page. The title below is still
+         a real anchor, which is the keyboard and screen-reader route to the
+         same place; this is the mouse shortcut, so it is hidden from the
+         accessibility tree rather than announced twice. */
+      return '<article class="evi-ev ' + cls + (site ? ' link' : '') + '" id="' +
+        esc(evAnchor(ev, r.rank - 1)) + '"' +
+        (site ? ' data-site="' + esc(site) + '" onclick="eviOpenCard(this, event)"' : '') +
+        '>' +
+        '<div class="rk">' + esc(r.rank) + '</div>' +
+        '<div class="bd">' +
+          '<h4 class="nm">' + (site
+            ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' +
+              esc(ev.name) + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="2" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9"/>' +
+              '<path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>'
+            : esc(ev.name)) +
+            (ed ? '<span class="ed">' + esc(ed) + '</span>' : '') + '</h4>' +
+          (ev.organizer ? '<div class="org">organised by ' + esc(ev.organizer) + '</div>' : '') +
+          '<div class="tags">' + tags.join('') + '</div>' +
+          (ev.fit_reasoning ? '<p class="why">' + citeText(ev.fit_reasoning) + '</p>' : '') +
+          (ev.audience_note ? '<p class="aud">' + citeText(ev.audience_note) + '</p>' : '') +
+          (hits.length
+            ? '<div class="evi-overlap"><b>' + hits.length +
+              '</b> of your target accounts are in this roster: ' +
+              esc(hits.slice(0, 8).join(', ')) +
+              (hits.length > 8 ? ' and ' + (hits.length - 8) + ' more' : '') + '</div>'
+            : '') +
+        '</div>' + fitGauge(n) + '</article>';
+    }
+
+    /* Ranked order is what the form promised and stays the default. Date
+       order answers a different question ("what is next?") and is the one
+       thing a reader was doing by hand, so it is a toggle rather than a
+       second copy of the list. Neither order invents a position for an
+       event with no date: undated events keep their ranked places at the
+       end of the date view and are labelled there. */
+    var EVENT_SORT = 'ranked';
+
+    /* Every control in this view changes what is drawn, so they all go
+       through one redraw that puts the reader back where they were. A
+       control that scrolls the drawer to the top as a side effect of being
+       pressed is a control nobody presses twice. */
+    function redrawRun(){
+      if (!current) return;
+      var body = document.getElementById('drawerBody');
+      var keep = body ? body.scrollTop : 0;
+      render(current);
+      if (body) body.scrollTop = keep;
+    }
+
+    window.eviSortEvents = function(k){
+      if (k === EVENT_SORT || !current) return;
+      EVENT_SORT = k;
+      redrawRun();
+    };
+
+    /* Clicking a slice of the format chart narrows the list to it, and
+       clicking it again clears. The charts above keep showing the WHOLE set
+       either way: a chart that silently redrew itself around the filter it
+       is offering would make the filter impossible to reason about. */
+    var FORMAT_FILTER = null;
+
+    window.eviFormatFilter = function(k){
+      if (!current) return;
+      FORMAT_FILTER = (FORMAT_FILTER === k) ? null : k;
+      redrawRun();
+    };
+
+    window.eviClearFilter = function(){
+      FORMAT_FILTER = null;
+      redrawRun();
+    };
+
+    /* A card is a link surface as well as a card. The title stays a real
+       anchor, which is what keyboard and screen-reader users follow; this is
+       the mouse shortcut over the same destination.
+
+       Two things it must not break. Text selection: these cards exist to be
+       quoted, and a click that ends a drag is a selection rather than a
+       click. And the controls inside them, which have their own jobs. */
+    window.eviOpenCard = function(el, ev){
+      var url = el && el.getAttribute('data-site');
+      if (!url) return;
+      var sel = window.getSelection ? String(window.getSelection()) : '';
+      if (sel && sel.replace(/\s+/g, '').length > 1) return;
+      var t = ev && ev.target;
+      while (t && t !== el) {
+        var tag = (t.tagName || '').toLowerCase();
+        if (tag === 'a' || tag === 'button' || tag === 'input') return;
+        t = t.parentNode;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    function eventsHtml(run){
+      var evs = (run.events || []).slice();
+      /* In lookup mode the one subject event IS the drawer's heading, so
+         listing it again is a duplicate and the section is suppressed. In
+         discover mode the heading is the query, and a search that found
+         exactly one event was rendering that event as nothing at all. */
+      if (!evs.length) return '';
+      if (run.mode !== 'discover' && evs.length < 2) return '';
+
+      var sm = run.summary || {};
+      var overlap = sm.target_overlap || {};
+
+      /* Render in the order the pipeline ranked, so the list on screen is
+         the one the form promised: ordered by how many of YOUR accounts are
+         in each roster, not by discovery order. */
+      var order = sm.event_order || null;
+      if (order && order.length) {
+        var pos = {};
+        order.forEach(function(id, i){ pos[String(id)] = i; });
+        evs.sort(function(a, b){
+          var pa = pos[String(a.id)], pb = pos[String(b.id)];
+          if (pa == null && pb == null) return 0;
+          if (pa == null) return 1;
+          if (pb == null) return -1;
+          return pa - pb;
+        });
+      }
+
+      /* The rank badge is the position in the ranking, so it is stamped
+         here and travels with the event through a re-sort. A card that
+         reads "3" under a date sort is still the third best fit. */
+      var rows = evs.map(function(ev, i){ return {ev: ev, rank: i + 1}; });
+
+      var shown = rows.slice();
+      if (FORMAT_FILTER) {
+        shown = shown.filter(function(r){ return formatKey(r.ev) === FORMAT_FILTER; });
+      }
+      if (EVENT_SORT === 'date') {
+        shown.sort(function(a, b){
+          var da = dayNum(a.ev.starts_on), db = dayNum(b.ev.starts_on);
+          if (da == null && db == null) return a.rank - b.rank;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return da - db || (a.rank - b.rank);
+        });
+      }
+
+      /* Which rosters were actually read. An event nobody sampled must
+         never render the same as one sampled and found to contain none of
+         your accounts. */
+      var sampled = {};
+      (sm.harvested_event_ids || []).forEach(function(id){ sampled[String(id)] = 1; });
+      var knowSampled = (sm.harvested_event_ids || []).length > 0;
+
+      var rb = [];
+      if (sm.ranked_by) rb.push(esc(sm.ranked_by));
+      if (knowSampled) {
+        rb.push('Only the best-fitting rosters are read in full. The rest are marked ' +
+                'unread rather than assumed empty.');
+      }
+      /* When a filter is on, say what is being hidden and how to stop. A
+         list that is quietly shorter than the count above it is the bug the
+         recommend view already had once. */
+      var filtered = FORMAT_FILTER
+        ? '<div class="evi-filterbar"><span>Showing <b>' + shown.length + '</b> of ' +
+          rows.length + ', ' + esc((FORMAT_LABEL[FORMAT_FILTER] ||
+            'format not stated').toLowerCase()) + ' only.</span>' +
+          '<button type="button" onclick="eviClearFilter()">Show all ' +
+          rows.length + '</button></div>'
+        : '';
+
+      var head = '<div class="evi-sec"><h3>Events found</h3>' +
+        '<div class="evi-listbar">' +
+        (rb.length ? '<span class="rb">' + rb.join(' ') + '</span>' : '<span></span>') +
+        '<span class="evi-seg" role="group" aria-label="Order these events">' +
+        [{k: 'ranked', l: 'By fit'}, {k: 'date', l: 'By date'}].map(function(o){
+          return '<button type="button" aria-pressed="' + (EVENT_SORT === o.k) +
+            '" onclick="eviSortEvents(\'' + o.k + '\')">' + o.l + '</button>';
+        }).join('') + '</span></div>' + filtered;
+
+      return glanceHtml(rows, sm) + railHtml(rows) + head +
+        '<div class="evi-events">' + (shown.length
+          ? shown.map(function(r){
+              return eventCard(r, overlap, sampled, knowSampled);
+            }).join('')
+          : '<div class="evi-empty"><span class="ic">&#9788;</span>' +
+            '<b>Nothing in that format</b><span>None of these events is ' +
+            esc((FORMAT_LABEL[FORMAT_FILTER] || 'unstated').toLowerCase()) +
+            '. Show all ' + rows.length + ' to bring them back.</span></div>') +
+        '</div></div>';
+    }
+
+    function resolveBar(run){
+      var s = run.summary || {};
+      var est = s.cost_estimate || {};
+      if (!est.domains) return '';
+      var already = (run.participants || []).some(function(p){
+        return p.resolution && p.resolution !== 'unresolved';
+      });
+      if (already) {
+        return '<div class="evi-sec"><h3>Company data</h3>' +
+          '<div class="evi-empty" style="padding:16px">Companies have been matched in ' +
+          'Apollo for this run' + (run.credits_spent ? ', costing ' + run.credits_spent +
+          ' credit' + (run.credits_spent === 1 ? '' : 's') : '') + '. Contacts shown are ' +
+          'from Apollo\'s free people search; revealing email or phone is a separate, ' +
+          'billed action in Contact Finder.</div></div>';
+      }
+      return '<div class="evi-sec"><h3>Company data</h3>' +
+        '<div class="evi-coverage"><span class="ic">' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' +
+        '</span><span class="tx">' + esc(est.note || '') + '</span></div>' +
+        '<button class="evi-btn" type="button" onclick="eviResolve(' + run.id + ')" ' +
+        'id="resolveBtn">Match ' + est.domains + ' compan' +
+        (est.domains === 1 ? 'y' : 'ies') + ' in Apollo</button></div>';
+    }
+
+    window.eviResolve = function(runId){
+      var btn = document.getElementById('resolveBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Matching...'; }
+      fetch(BASE + '/runs/' + runId + '/resolve', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+      }).then(function(r){ return r.json(); })
+        .then(function(){ openRun(runId); })
+        .catch(function(){
+          if (btn) { btn.disabled = false; btn.textContent = 'Match companies in Apollo'; }
+        });
+    };
+
+    /* ── the recommendation report ──────────────────────────────────────
+       Five elements, in the order the rubric's own output contract sets, and
+       nothing else. Everything rendered here came out of the run summary,
+       which was assembled from stored rows rather than written by a model, so
+       nothing on screen can disagree with the table under it. */
+
+    function bar(label, value, max){
+      var pct = max ? Math.round((value / max) * 100) : 0;
+      var band = pct >= 75 ? 's-hi' : pct >= 50 ? 's-mid' : 's-lo';
+      return '<div class="evi-sub ' + band + '">' +
+        '<div class="sl">' + esc(label) + '<b>' + esc(value) + '<i>/' + max + '</i></b></div>' +
+        '<div class="st"><span style="width:' + pct + '%"></span></div></div>';
+    }
+
+    function candidateRow(c, prior, labels, idx){
+      prior = prior || null; labels = labels || {};
+      var site = safeUrl(c.website);
+      var when = c.starts_on
+        ? fmtDate(c.starts_on) + (c.ends_on && c.ends_on !== c.starts_on
+            ? ' to ' + fmtDate(c.ends_on) : '')
+        : 'dates not announced';
+      var where = [c.city, c.country].filter(Boolean).join(', ') || 'location unconfirmed';
+      var gaps = c.gaps || [];
+      /* The id is what the calendar marker and the column in the spread
+         both jump to, so it is derived from the row's position in the kept
+         list and from nothing else. */
+      return '<div class="evi-cand ' + tierClass(c.tier) + '" id="' +
+        esc(candAnchor(idx || 0)) + '">' +
+        '<div class="ct">' +
+          '<div class="cn">' +
+            '<span class="tier">' + esc(c.tier || '') + '</span>' +
+            (c.committed ? '<span class="cmt">already committed</span>' : '') +
+            (site ? '<a href="' + esc(site) + '" target="_blank" rel="noopener noreferrer">' +
+                    esc(c.name) + '</a>' : esc(c.name)) +
+            (c.edition ? ' <span class="ed">' + esc(c.edition) + '</span>' : '') +
+          '</div>' +
+          '<div class="cm">' + esc(when) + ' &middot; ' + esc(where) +
+            (c.days ? ' &middot; ' + esc(c.days) + ' day' + (c.days === 1 ? '' : 's') : '') +
+            ' &middot; ' + esc(CATEGORY_LABELS[c.category] || c.category) +
+            (c.attendees ? ' &middot; ' + esc(c.attendees) + ' (their claim)' : '') +
+            (c.booths ? ' &middot; ' + esc(c.booths) : '') +
+          '</div>' +
+          /* Whether it runs in person is decision-relevant on its own: an 82
+             you fly to and an 82 you watch are not the same proposition.
+             Discovery has always read it; until the column existed it was
+             thrown away at write time. Unknown says so rather than defaulting
+             to in person, and low confidence is shown next to it because it
+             qualifies every fact on this row. */
+          '<div class="cflags">' +
+            (function(){
+              var fk = formatKey(c);
+              return fk === 'unknown'
+                ? '<span class="cfl mut" title="The organiser does not say ' +
+                  'whether this runs in person, online or both.">Format not stated</span>'
+                : '<span class="cfl">' + esc(FORMAT_LABEL[fk]) + '</span>';
+            })() +
+            (String(c.confidence || '').toLowerCase() === 'low'
+              ? '<span class="cfl warn" title="The search could not confirm ' +
+                'this one as firmly as the rest, so weigh the facts on this ' +
+                'card accordingly.">Low confidence</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="cscore">' +
+          evRing(c.total, 110, TIER_LABEL[c.tier] || 'scored',
+                 tierClass(c.tier)) +
+          bar('Relevance', c.relevance, 40) +
+          bar('DM access', c.dm_access, 40) +
+          bar('Engagement', c.engagement, 20) +
+          '<div class="mm' + (c.matchmaking ? ' on' : '') + '">' +
+            (c.matchmaking ? '+10 matchmaking' : 'no matchmaking bonus') +
+            '<span>' + esc(c.matchmaking_reason || '') + '</span></div>' +
+        '</div>' +
+        (c.description ? '<p class="cd">' + esc(c.description) + ' ' +
+          '<b>' + esc(c.client_line || '') + '</b></p>' : '') +
+        '<details class="cwhy"><summary>Why these scores</summary>' +
+          ['relevance', 'dm_access', 'engagement'].map(function(k){
+            return c[k + '_note']
+              ? '<p><b>' + esc(SUB_LABELS[k]) + '.</b> ' + esc(c[k + '_note']) + '</p>' : '';
+          }).join('') +
+          (c.audit_note ? '<p><b>Famous-event audit.</b> ' + esc(c.audit_note) + '</p>' : '') +
+          (c.cost_note ? '<p><b>Cost, context only.</b> ' + esc(c.cost_note) +
+            ' This never moved a score.</p>' : '') +
+          (gaps.length ? '<p class="gaps"><b>Not measured.</b> ' +
+            gaps.map(esc).join(' ') + '</p>' : '') +
+          /* The pages the confirmation actually opened. A score you cannot
+             trace back to a page is a score you have to take on trust, and
+             these were collected on every candidate from the first version
+             and shown on none of them. */
+          (function(){
+            var srcs = (c.sources || []).filter(safeUrl);
+            if (!srcs.length) return '';
+            return '<div class="csrc"><b>Checked against</b>' + srcs.map(function(u){
+              return '<a href="' + esc(safeUrl(u)) + '" target="_blank" ' +
+                'rel="noopener noreferrer">' + esc(shortUrl(u)) + '</a>';
+            }).join('') + '</div>';
+          })() +
+        '</details>' +
+        /* What you already decided about this event, and the control to
+           change it. A previous rejection is shown, never used to hide the
+           event: what was right to skip last quarter may not be right now,
+           and that is the user's call. */
+        '<div class="evi-dec">' +
+          (prior
+            ? '<div class="dp"><b>' + esc(labels[prior.decision] || prior.decision) +
+              '</b>' + (prior.note ? ' ' + esc(prior.note) : '') + '</div>'
+            : '') +
+          '<div class="db">' +
+            ['going', 'skipped', 'went'].map(function(d){
+              /* The name travels in a data attribute, through esc(), and the
+                 handler is delegated below. It used to be interpolated with
+                 JSON.stringify into an onclick inside a double-quoted
+                 attribute: JSON.stringify emits its own double quotes, so the
+                 attribute ended at the first one and the handler was the
+                 fragment "recordOutcome(this," on every row. Event names are
+                 written by web search and a model, so the same expression also
+                 let a name containing a quote add attributes of its own. */
+              return '<button type="button" class="dbtn' +
+                (prior && prior.decision === d ? ' on' : '') +
+                '" data-outcome="' + d + '" data-event="' + esc(c.name) + '">' +
+                esc(labels[d] || d) + '</button>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    /* One decision, recorded against the EVENT rather than this run, so the
+       next recommendation that surfaces it knows. Failure is shown on the
+       button rather than swallowed: a control that silently does nothing is
+       worse than one that says it could not. */
+    function recordOutcome(btn, name, decision){
+      var row = btn.parentNode;
+      Array.prototype.forEach.call(row.children, function(b){
+        b.classList.toggle('on', b === btn); });
+      fetch(BASE + '/outcomes', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({event_name: name, decision: decision,
+                              run_id: current ? current.id : null})
+      }).then(function(r){ if (!r.ok) throw new Error('save failed'); })
+        .catch(function(){
+          btn.classList.remove('on');
+          btn.textContent = 'Could not save';
+        });
+    }
+    window.recordOutcome = recordOutcome;
+
+    /* One delegated listener for every decision button, present and future.
+       Rows are re-rendered from JS on every run, so binding per button would
+       have to be redone on each render and would be forgotten once. */
+    document.addEventListener('click', function(ev){
+      var t = ev.target;
+      var btn = t && t.closest ? t.closest('.dbtn') : null;
+      if (!btn || !btn.hasAttribute('data-outcome')) { return; }
+      recordOutcome(btn, btn.getAttribute('data-event'),
+                    btn.getAttribute('data-outcome'));
+    });
+
+    var SUB_LABELS = {relevance: 'Relevance', dm_access: 'Decision-maker access',
+                      engagement: 'Engagement mode'};
+    var TIER_LABEL = {P1: 'must-attend', P2: 'strong', P3: 'below the bar'};
+    /* Rendered from the rubric rather than typed, on the same grounds as the
+       label tables around it: the number the report prints as the bar and the
+       number the scorer cuts on have to be the same one. */
+    var RANK_FLOOR = {{ rubric.floor }};
+    var CLASSIFICATION_LABELS = {
+      {%- for c in classifications %}
+      {{ c.key|tojson }}: {{ c.label|tojson }}{{ ',' if not loop.last }}
+      {%- endfor %}
+    };
+    var CATEGORY_LABELS = {
+      {%- for c in categories %}
+      {{ c.key|tojson }}: {{ c.label|tojson }}{{ ',' if not loop.last }}
+      {%- endfor %}
+    };
+
+    /* -- the recommendation, drawn ---------------------------------------
+       The report already had every number it needed and drew none of them.
+       A year of dated events arrived as a list of paragraphs, which is the
+       one shape that makes "when is this all happening" unanswerable, and
+       the bar the whole run cuts on was a sentence rather than a line.
+
+       Three drawings, from the same stored rows the list below is built
+       from: what happened to everything found, when the survivors land, and
+       where each of them sits against the bar. */
+
+    function tierClass(t){
+      return 't-' + (t === 'P1' || t === 'P2' ? t : 'P3');
+    }
+
+    function candAnchor(i){ return 'cand-' + (i + 1); }
+
+    /* Found, scored, cleared. Each step is a subset of the one above it, so
+       the funnel is a real containment rather than three numbers drawn in
+       descending order. The gap between found and scored is accounted for in
+       words rather than in a fourth bar, because the pieces of it are
+       reported separately below and a bar would imply they add up to it. */
+    function verdictHtml(s, counts) {
+      var found = Number(s.discovered) || 0;
+      var scored = (Number(counts.kept) || 0) + (Number(counts.excluded) || 0);
+      var cleared = Number(counts.kept) || 0;
+      if (!found && !scored) return '';
+      var gaps = [];
+      if (counts.finished) gaps.push(plural(counts.finished, 'edition') + ' already over');
+      if ((s.unscored || []).length) {
+        gaps.push(plural(s.unscored.length, 'event') + ' never scored');
+      }
+      if (counts.over_cap) gaps.push(counts.over_cap + ' over the cap you set');
+      return evFunnel([
+        {n: found,
+         /* Not "the six searches". A run makes one finding call per category
+            and then one confirmation call per candidate, so the number of
+            searches is neither six nor knowable from here. What is fixed, and
+            what the reader actually wants, is how many kinds of event were
+            looked for. */
+         label: 'Found across the ' +
+           plural(Object.keys(CATEGORY_LABELS).length,
+                  'discovery category', 'discovery categories'),
+         cls: 'f-mid',
+         note: gaps.length ? 'Including ' + gaps.join(', ') + '.' : ''},
+        {n: scored, label: 'Scored against the rubric', cls: 'f-mid'},
+        {n: cleared, label: 'Cleared the bar of ' + RANK_FLOOR, cls: 't-P1',
+         note: 'Everything below is what these ' + cleared + ' are.'}
+      ]);
+    }
+
+    /* The kept list on a calendar. Same rail the event set uses, so an
+       undated event is listed beside it rather than plotted at a guess, and
+       the same marker press jumps to the same kind of card. */
+    function planRail(kept){
+      var rows = kept.map(function(c, i){
+        return {ev: {name: c.name, starts_on: c.starts_on, ends_on: c.ends_on},
+                c: c, i: i, rank: i + 1};
+      });
+      return railHtml(rows, {
+        head: 'When they land',
+        band: function(r){ return tierClass(r.c.tier); },
+        anchor: function(r){ return candAnchor(r.i); },
+        title: function(r){
+          return r.c.name + ' · ' + dateRangeText(r.ev) + ' · ' +
+                 r.c.total + ' of 110' + (r.c.tier ? ' · ' + r.c.tier : '');
+        }
+      });
+    }
+
+    /* Every scored event on one axis, with the bar drawn across it. The cut
+       ones are here on purpose: without them the chart shows a tidy list of
+       winners, and the single most useful thing about a floor is seeing what
+       it stopped. Heights are a share of 110, the real maximum, rather than
+       of the best score found, so a weak year draws as a low chart. */
+    function spreadHtml(kept, s){
+      var items = kept.map(function(c, i){
+        return {n: c.total, label: c.name, cls: tierClass(c.tier), _i: i, _kept: true};
+      }).concat((s.excluded || []).map(function(e){
+        return {n: e.total, label: e.name + ' (cut)', cls: 't-P3', _kept: false};
+      }));
+      if (items.length < 2) return '';
+      items.sort(function(a, b){ return (Number(b.n) || 0) - (Number(a.n) || 0); });
+      var body = evCols(items, {
+        max: 110, floor: RANK_FLOOR,
+        floorLabel: 'the bar, ' + RANK_FLOOR,
+        jump: function(it){
+          return it._kept ? "eviReveal('" + candAnchor(it._i) + "')" : null; },
+        note: 'One column per scored event, out of the 110 a perfect one would ' +
+              'score. Everything under the line was cut. Pick a column above ' +
+              'the line to jump to it.'
+      });
+      if (!body) return '';
+      return '<div class="evi-sec"><h3>Against the bar</h3>' + body + '</div>';
+    }
+
+    /* Six searches, one per kind of event, and whether each came back with
+       what was asked of it. This is the honesty centre of the whole report:
+       a category that returned nothing because the market has nothing looks
+       identical, in a list of events, to a category whose search crashed.
+
+       So a failed search is drawn in the bad band with the reason under it,
+       a short one in the warning band, and a category that met its quota
+       without the run recording HOW many it found reports the word rather
+       than a number. Filling that column with the quota would be inventing a
+       count to make a chart look complete, which is the exact move this
+       agent exists to not make. */
+    /* The two-stage search, drawn as what happened to each candidate.
+
+       Discovery names candidates and then confirms each one with a separate
+       search that did not propose it. Only the survivors reach the list, so a
+       reader shown one event has no way to tell whether one was all there
+       ever was or the only one of eleven that held up. Those are very
+       different reports and they used to look identical.
+
+       The three outcomes are kept apart for the reason the whole module is
+       built around. A candidate a search RULED OUT is a fact about the
+       client's year. A candidate nothing could check is a hole. Adding them
+       together would let the second wear the first's clothes.
+
+       A run recorded before discovery was split carries no candidate count at
+       all. It gets no funnel, rather than one built from the numbers that do
+       exist: "named 3, confirmed 3" is a claim that run never made.
+
+       Two guards cover that case on purpose, and neither is redundant on its
+       own terms: the filter is the rule (only measured categories count) and
+       the zero check is the degenerate case (every measured category named
+       nothing). Breaking either alone changes no output, which is worth
+       knowing before someone deletes one as dead code. Breaking BOTH draws a
+       fabricated funnel over an old run, and that is what the test pins. */
+    function searchFunnelHtml(s){
+      var statuses = s.statuses || {};
+      var keys = Object.keys(statuses).filter(function(k){
+        return statuses[k] && statuses[k].proposed != null;
+      });
+      if (!keys.length) return '';
+
+      var named = 0, confirmed = 0, kept = 0, ruled = [];
+      keys.forEach(function(k){
+        var st = statuses[k];
+        named += Number(st.proposed) || 0;
+        confirmed += Number(st.found) || 0;
+        kept += Number(st.kept != null ? st.kept : st.found) || 0;
+        (st.rejected || []).forEach(function(r){
+          ruled.push({name: r.name, reason: r.reason,
+                      label: CATEGORY_LABELS[k] || st.label || k});
+        });
+      });
+      if (!named) return '';
+
+      /* Exact, not estimated. Every candidate ends in one of three places, so
+         the ones nothing could check are what is left over. */
+      var unchecked = Math.max(0, named - confirmed - ruled.length);
+      var merged = Math.max(0, confirmed - kept);
+
+      var lost = [];
+      if (ruled.length) lost.push(plural(ruled.length, 'candidate') + ' ruled out');
+      if (unchecked) lost.push(unchecked + ' that could not be checked');
+
+      var html = '<div class="evi-sec"><h3>What the search looked at</h3>' +
+        '<div class="evi-note">Every candidate is confirmed by a second search ' +
+        'that did not propose it, so an event reaches this list only when ' +
+        'something other than the finder went and looked.</div>' +
+        evFunnel([
+          {n: named, label: 'Named by the search', cls: 'f-mid'},
+          {n: confirmed, label: 'Confirmed by a second search',
+           cls: confirmed ? 'f-hi' : 'f-bad',
+           note: lost.length ? lost.join(', ') : ''},
+          {n: kept, label: 'Kept as candidates', cls: kept ? 'f-hi' : 'f-bad',
+           note: merged ? plural(merged, 'event') +
+                 ' already listed under another category' : ''}
+        ]);
+
+      if (unchecked) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+          '<b>' + esc(plural(unchecked, 'candidate')) + ' could not be checked ' +
+          'at all.</b> Those are missing from this list because the check ' +
+          'failed, not because they were found wanting.</span></div>';
+      }
+      if (ruled.length) {
+        html += '<div class="evi-ruled">' + ruled.map(function(r){
+          return '<div class="rr"><span class="rn">' + esc(r.name) + '</span>' +
+            '<span class="rc">' + esc(r.label) + '</span>' +
+            '<span class="rw">' + esc(r.reason) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      return html + '</div>';
+    }
+
+    function coverageHtml(s){
+      var rows = s.shortfall || [];
+      var statuses = s.statuses || {};
+      var byCat = {};
+      rows.forEach(function(r){ byCat[r.category] = r; });
+      var quotas = rows.map(function(r){ return Number(r.quota) || 0; })
+                       .filter(function(q){ return q > 0; });
+      var quota = quotas.length ? Math.max.apply(null, quotas) : 0;
+
+      var keys = Object.keys(CATEGORY_LABELS);
+      Object.keys(statuses).forEach(function(k){
+        if (keys.indexOf(k) < 0) keys.push(k);
+      });
+      rows.forEach(function(r){
+        if (keys.indexOf(r.category) < 0) keys.push(r.category);
+      });
+      if (!keys.length) return '';
+
+      var bars = keys.map(function(k){
+        var sf = byCat[k], st = statuses[k] || {};
+        var label = CATEGORY_LABELS[k] || (sf && sf.label) || k;
+        if (sf) {
+          return {label: label, n: Number(sf.found) || 0, max: Number(sf.quota) || 0,
+                  state: sf.status === 'error' ? 'error' : 'short',
+                  note: (sf.status === 'error'
+                          ? '<b>The search did not run.</b> ' : '') + esc(sf.why || '')};
+        }
+        if (st.kept != null) {
+          return {label: label, n: Number(st.kept) || 0, max: quota, state: 'met'};
+        }
+        return {label: label, n: quota || 1, max: quota, state: 'met',
+                text: 'met the quota'};
+      });
+
+      var failed = rows.filter(function(r){ return r.status === 'error'; }).length;
+      var short = rows.length - failed;
+      var verdict = failed
+        /* "1 search did not run" reads as one query out of dozens. What did
+           not run is a whole kind of event, and the count is of categories. */
+        ? '<b>' + esc(plural(failed, 'category search', 'category searches')) +
+          ' did not run</b>, so this list ' +
+          'is missing a kind of event rather than having found none. That is a ' +
+          'hole in the analysis, not a finding about the market.'
+        : (short
+            ? esc(plural(short, 'category', 'categories')) +
+              ' came back under quota after ' +
+              'searching. An empty category is a fact about this client&rsquo;s market.'
+            : 'Every category returned what was asked of it, so no kind of event ' +
+              'is missing from this list.');
+
+      return '<div class="evi-sec"><h3>Category coverage</h3>' +
+        evBars(bars) +
+        '<div class="evi-note" style="margin-top:12px">' + verdict +
+        ' Categories are searched one at a time and are never merged, which is ' +
+        'what stops the famous names crowding out the narrower summits, the ' +
+        'free sponsor-funded days and the side events.</div></div>' +
+        searchFunnelHtml(s);
+    }
+
+    function recommendHtml(run){
+      var s = run.summary || {};
+      var cands = run.candidates || [];
+      if (s.no_candidates) {
+        return '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+          esc(s.note) + '</span></div>' + coverageHtml(s);
+      }
+      var counts0 = s.counts || {};
+      // One authority for how long the list is. The summary's count comes from
+      // rank(); a second client-side slice using a defaulted max_events can
+      // disagree with the number printed directly above it.
+      var keepN = counts0.kept != null ? counts0.kept
+                : ((run.profile || {}).max_events || 15);
+      // A committed event below the bar is P3 by definition, and showing it is
+      // the entire point. Filtering P3 unconditionally hid the one row this
+      // feature exists to surface.
+      var kept = cands.filter(function(c){
+        return c.tier !== 'P3' || c.committed;
+      }).slice(0, keepN);
+      var counts = counts0;
+      var outc = s.outcomes || {};
+      var byName = outc.by_name || {};
+      var decLabels = outc.labels || {};
+
+      var html = '<div class="evi-exec">' +
+        '<div class="ex-eyebrow">Executive summary</div>' +
+        '<h2 class="ex-title">' + esc(s.title || '') + '</h2>' +
+        '<p class="ex-profile">' + esc(s.client_profile || '') + '</p>' +
+        (s.where_buyers ? '<div class="ex-where"><b>' +
+          esc(s.classification_label || '') + '.</b> ' + esc(s.where_buyers) +
+          '</div>' : '') +
+        /* The budget the user recorded. Shown because the field promises it
+           is, and shown HERE rather than beside a score, because putting a
+           number next to a score is how it starts influencing one. */
+        ((run.profile || {}).budget_note
+          ? '<div class="ex-budget"><b>Budget you recorded.</b> ' +
+            esc(run.profile.budget_note) +
+            '<i>Never used to score an event. Each event\'s own published ' +
+            'cost is under "Why these scores".</i></div>' : '') +
+        (s.committed_note ? '<div class="ex-committed">' +
+          esc(s.committed_note) + '</div>' : '') +
+        '<div class="ex-counts">' +
+          '<span class="c-p1"><b>' + (counts.P1 || 0) + '</b>must-attend<i>P1</i></span>' +
+          '<span class="c-p2"><b>' + (counts.P2 || 0) + '</b>strong<i>P2</i></span>' +
+          '<span class="c-cut"><b>' + (counts.excluded || 0) + '</b>scored and cut' +
+            '<i>below ' + RANK_FLOOR + '</i></span>' +
+        '</div>' +
+        verdictHtml(s, counts) +
+        '<details class="ex-method"><summary>How these were scored</summary><p>' +
+          esc(s.methodology || '') + '</p></details>' +
+        '<div class="ex-assume"><h4>Assumptions and what was not measured</h4><ul>' +
+          (s.assumptions || []).map(function(a){
+            return '<li>' + esc(a) + '</li>'; }).join('') +
+        '</ul></div>' +
+      '</div>';
+
+      html += planRail(kept);
+      html += spreadHtml(kept, s);
+
+      if ((s.top_five || []).length) {
+        /* The five and the ranked list are the same events written twice, and
+           the top five used to be a dead end: the reader met a name here and
+           had to go and find it again below to see why it scored what it did.
+           Matching on the stored name is what links them, and a name that is
+           NOT in the kept list, which can happen when the cap cuts the list
+           shorter than five, renders as plain text rather than as a control
+           that goes nowhere. */
+        var atName = {};
+        kept.forEach(function(c, i){ atName[c.name] = i; });
+        html += '<div class="evi-sec"><h3>Top five</h3><ol class="evi-top">' +
+          s.top_five.map(function(t){
+            var at = atName[t.name];
+            var pct = Math.max(0, Math.min(100, (Number(t.total) || 0) / 110 * 100));
+            var body = '<div class="tn">' + esc(t.name) +
+              '<span class="ts">' + esc(t.total) + '<i>/110</i></span></div>' +
+              '<div class="tb"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+              '<div class="tm">' + esc(t.where) + ' &middot; ' + esc(t.when) + '</div>' +
+              '<div class="tc">' + esc(t.case) + '</div>';
+            return '<li class="' + tierClass(t.tier) + (at == null ? '' : ' go') + '">' +
+              (at == null ? body
+                : '<button type="button" class="tw" onclick="eviReveal(\'' +
+                  esc(candAnchor(at)) + '\')" aria-label="Jump to ' + esc(t.name) +
+                  ' in the ranked list">' + body + '</button>') + '</li>';
+          }).join('') + '</ol></div>';
+      }
+
+      html += '<div class="evi-sec"><h3>The ranked list</h3>' +
+        (kept.length
+          ? '<div class="evi-cands">' + kept.map(function(c, i){
+              return candidateRow(c, byName[c.name], decLabels, i); }).join('') + '</div>'
+          : '<div class="evi-empty">Nothing cleared ' + RANK_FLOOR + '. That is the answer, not a ' +
+            'failure: the list is not padded to a target count.</div>') +
+        (outc.note ? '<div class="evi-note" style="margin-top:12px">' +
+          esc(outc.note) + '</div>' : '') +
+        '<div style="margin-top:14px">' +
+        '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
+        'href="' + BASE + '/runs/' + run.id + '/candidates.csv">Download scored list CSV</a>' +
+        '</div></div>';
+
+      if ((s.excluded || []).length) {
+        html += '<div class="evi-sec"><h3>Scored and cut</h3>' +
+          '<div class="evi-note">Below ' + RANK_FLOOR + '. Shown so that "nothing else was found" ' +
+          'and "more were found and none cleared the bar" are not the same picture.' +
+          '</div><div class="evi-cut">' + s.excluded.map(function(e){
+            return '<span class="cutp">' + esc(e.name) + '<b>' + esc(e.total) +
+              '</b></span>'; }).join('') + '</div></div>';
+      }
+      if ((s.finished || []).length) {
+        html += '<div class="evi-sec"><h3>Already over</h3>' +
+          '<div class="evi-note">Found for this profile, then kept out of the ' +
+          'ranking because the edition has already ended. A recommendation is a ' +
+          'claim about the future, so these are reported rather than scored ' +
+          'against a date nobody can attend. Where one is an annual fixture, ' +
+          'the next edition is the thing to look for.' +
+          '</div><div class="evi-cut">' + s.finished.map(function(e){
+            return '<span class="cutp">' + esc(e.name) +
+              '<b>ended ' + esc(e.ends_on || '?') + '</b></span>'; }).join('') +
+          '</div></div>';
+      }
+      if ((s.unscored || []).length) {
+        html += '<div class="evi-sec"><h3>Not scored</h3><div class="evi-note">' +
+          'Left out of the ranking rather than ranked low.</div><div class="evi-cut">' +
+          s.unscored.map(function(e){
+            return '<span class="cutp">' + esc(e.name) + '</span>'; }).join('') +
+          '</div></div>';
+      }
+      html += coverageHtml(s);
+      return html;
+    }
+
+    function renderRecommend(run){
+      var s = run.summary || {};
+      document.getElementById('drawerTitle').textContent =
+        (run.profile || {}).client_name || run.query;
+      document.getElementById('drawerSub').textContent =
+        run.status === 'complete'
+          ? plural((s.counts || {}).kept || 0, 'event') + ' cleared the bar of '
+            + (s.discovered || 0) + ' found'
+          : (STAGES[run.stage] || 'Working.');
+      var html = '';
+      if (run.status === 'failed') {
+        html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
+      } else if (run.status === 'running') {
+        html += '<div class="evi-running"><span class="evi-spinner"></span><span>' +
+          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+      } else {
+        html += recommendHtml(run);
+      }
+      document.getElementById('drawerBody').innerHTML = html;
+      armAnim('recommend:' + run.id + ':' + run.status);
+    }
+
+    /* ── work the room ──────────────────────────────────────────────────
+       The one thing this view must never do is present a rewritten draft as
+       if the model had written it that way. Every rewrite shows its reason
+       and the exact phrase that triggered it, because a silent edit to a
+       message someone is about to send under their own name is the failure
+       this whole play exists to prevent. */
+
+    /* Rendered, not typed. The pipeline decides at 48 and 72 hours and the
+       report used to say those numbers in prose of its own; an arc drawn
+       against a hardcoded 72 beside a pipeline cutting at something else is
+       a picture that disagrees with the run it is describing. */
+    var WINDOW_PRIME_H = {{ window.prime }};
+    var WINDOW_TOTAL_H = {{ window.total }};
+
+    var WINDOW_TONE = {prime: 'ok', closing: 'warn', expired: 'bad', early: 'idle'};
+    var WINDOW_BAND = {prime: 'f-ok', closing: 'f-warn', expired: 'f-bad', early: 'f-na'};
+    var DRAFT_LABEL = {
+      rewritten_no_booth_note: 'Opener replaced: claimed a conversation',
+      rewritten_aggressive: 'Opener replaced: displacement language',
+      account_play: 'Account play, no named person'
+    };
+
+    function windowHtml(w){
+      if (!w) return '';
+      var tone = WINDOW_TONE[w.state] || 'idle';
+      var head = !w.known ? 'Follow-up window unknown'
+        : w.state === 'prime' ? 'Inside the ' + WINDOW_PRIME_H + '-hour window'
+        : w.state === 'closing' ? 'The ' + WINDOW_TOTAL_H + '-hour window is closing'
+        : w.state === 'early' ? 'This event has not ended yet'
+        : 'The ' + WINDOW_TOTAL_H + '-hour window has passed';
+      /* The arc is drawn only when the hours are known. An unknown window
+         with a ring at zero would read as "no time has passed", which is the
+         opposite of what not knowing means. An expired one is drawn full
+         rather than overflowing: past the end of the window, how far past is
+         in the sentence beside it. */
+      var ring = '';
+      if (w.known && w.hours != null && w.state !== 'early') {
+        ring = evRing(Math.round(Number(w.hours)), WINDOW_TOTAL_H,
+                      'hours since it ended',
+                      WINDOW_BAND[w.state] || 'f-na',
+                      w.state === 'expired'
+                        ? 'The window was ' + WINDOW_TOTAL_H + ' hours'
+                        : 'Of the ' + WINDOW_TOTAL_H + ' the play is built for');
+      }
+      return '<div class="evi-window ' + tone + '">' +
+        (ring ? '<div class="wr">' + ring + '</div>' : '') +
+        '<div class="wb"><div class="wt">' + esc(head) + '</div>' +
+        '<div class="wn">' + esc(w.note || '') + '</div></div></div>';
+    }
+
+    function outAnchor(i){ return 'out-' + (i + 1); }
+
+    function outreachCard(r, labels, idx){
+      labels = labels || {};
+      var status = r.draft_status || 'ok';
+      var flagged = r.draft_flagged || [];
+      return '<div class="evi-out s-' + esc(status) + '" id="' +
+        esc(outAnchor(idx || 0)) + '">' +
+        '<div class="ot">' +
+          '<div class="on">' + esc(r.org_name) +
+            (r.role ? '<span class="orl">' + esc(labels[r.role] || r.role) +
+              '</span>' : '') + '</div>' +
+          (r.fit != null
+            ? '<div class="ofit">' +
+              evRing(r.fit, 100, 'fit', bandClass(r.fit)) + '</div>'
+            : '') +
+        '</div>' +
+        (r.person_name
+          ? '<div class="op">' + esc(r.person_name) +
+            (r.person_title ? ' &middot; ' + esc(r.person_title) : '') + '</div>'
+          : '') +
+        (r.fit_note ? '<p class="ofn">' + esc(r.fit_note) + '</p>' : '') +
+        (r.angle ? '<p class="oa"><b>Angle.</b> ' + esc(r.angle) + '</p>' : '') +
+        (r.booth_note
+          ? '<div class="obn"><b>Your booth note.</b> ' + esc(r.booth_note) + '</div>'
+          : '') +
+        (r.opener ? '<div class="oo"><div class="ool">Opener</div>' +
+          '<p>' + esc(r.opener) + '</p></div>' : '') +
+        (status !== 'ok' && DRAFT_LABEL[status]
+          ? '<div class="ow"><div class="owt">' + esc(DRAFT_LABEL[status]) + '</div>' +
+            '<div class="own">' + esc(r.draft_reason || r.account_note || '') + '</div>' +
+            (flagged.length
+              ? '<div class="owf">' + flagged.map(function(f){
+                  return '<code>' + esc(f) + '</code>'; }).join('') + '</div>'
+              : '') + '</div>'
+          : '') +
+        (status === 'ok' && r.account_note
+          ? '<div class="ow"><div class="own">' + esc(r.account_note) + '</div></div>'
+          : '') +
+      '</div>';
+    }
+
+    /* -- the room, drawn -------------------------------------------------
+       Same three questions as the recommendation, asked of a roster instead
+       of a calendar: what happened to everyone on it, how they sit against
+       the floor, and what kind of listing they were. The floor is the run's
+       own number rather than a constant here, because a workroom run stores
+       the floor it actually cut on. */
+    function roomFunnel(s, c, rows){
+      var roster = Number(c.roster) || 0;
+      var qualified = rows.filter(function(r){ return !r.unqualified && r.fit != null;
+        }).length;
+      var kept = Number(c.kept) || 0;
+      if (!roster && !qualified) return '';
+      var unq = rows.filter(function(r){ return r.unqualified; }).length;
+      return evFunnel([
+        {n: roster, label: 'On the roster you pointed at', cls: 'f-mid',
+         note: unq ? plural(unq, 'company', 'companies') + ' could not be qualified at all, so ' +
+                     (unq === 1 ? 'it is' : 'they are') + ' unscored rather than ' +
+                     'scored low.' : ''},
+        {n: qualified, label: 'Qualified and scored', cls: 'f-mid'},
+        {n: kept, label: 'Cleared the floor of ' + (s.floor || 55), cls: 'f-ok',
+         note: 'These are the ones with a draft below.'}
+      ]);
+    }
+
+    function roomSpread(kept, cut, floor){
+      var items = kept.map(function(r, i){
+        return {n: r.fit, label: r.org_name, cls: bandClass(r.fit), _i: i, _kept: true};
+      }).concat(cut.map(function(r){
+        return {n: r.fit, label: r.org_name + ' (cut)', cls: 'f-weak', _kept: false};
+      }));
+      if (items.length < 2) return '';
+      items.sort(function(a, b){ return (Number(b.n) || 0) - (Number(a.n) || 0); });
+      return evCols(items, {
+        max: 100, floor: floor, floorLabel: 'the floor, ' + floor,
+        jump: function(it){
+          return it._kept ? "eviReveal('" + outAnchor(it._i) + "')" : null; },
+        note: 'One column per company that got a score, out of 100. Everything ' +
+              'under the line was cut. Pick a column above it to jump to the draft.'
+      });
+    }
+
+    function roomRoles(rows, labels){
+      var counts = {};
+      rows.forEach(function(r){
+        if (!r.role) return;
+        counts[r.role] = (counts[r.role] || 0) + 1;
+      });
+      var keys = Object.keys(counts);
+      if (keys.length < 2) return '';
+      keys.sort(function(a, b){ return counts[b] - counts[a]; });
+      var total = keys.reduce(function(n, k){ return n + counts[k]; }, 0);
+      return evDonut(keys.map(function(k){
+        return {k: k, n: counts[k], label: (labels || {})[k] || k,
+                cls: ROLE_BAND[k] || 'f-na'};
+      }), total, 'with a draft');
+    }
+
+    function renderWorkroom(run){
+      var s = run.summary || {};
+      var rows = run.outreach || [];
+      var c = s.counts || {};
+      document.getElementById('drawerTitle').textContent =
+        s.event_name || run.query || 'Work the room';
+      document.getElementById('drawerSub').textContent =
+        run.status === 'complete'
+          ? (c.kept || 0) + ' of ' + (c.roster || 0) + ' companies cleared the ICP floor'
+          : (STAGES[run.stage] || 'Working.');
+
+      var html = '';
+      if (run.status === 'failed') {
+        html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
+        document.getElementById('drawerBody').innerHTML = html;
+        return;
+      }
+      if (run.status === 'running') {
+        html += '<div class="evi-running"><span class="evi-spinner"></span><span>' +
+          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+      }
+      if (s.no_roster) {
+        html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+          esc(s.note) + '</span></div>';
+        document.getElementById('drawerBody').innerHTML = html;
+        return;
+      }
+
+      html += windowHtml(s.window);
+
+      html += '<div class="evi-classplay">' +
+        '<div class="pl">' + esc(s.event_class_label || '') +
+          '<span class="ps">' + esc(s.event_class_signal || '') + ' signal</span></div>' +
+        '<p class="pw">' + esc(s.event_class_why || '') + '</p>' +
+        '<p class="pp"><b>The play.</b> ' + esc(s.play || '') + '</p>' +
+      '</div>';
+
+      html += '<div class="evi-stats">' +
+        [{v: c.kept || 0, l: 'worth contacting'},
+         {v: c.cut || 0, l: 'cut below the ICP floor'},
+         {v: s.rewritten_count || 0, l: 'drafts rewritten', warn: !!s.rewritten_count},
+         {v: s.booth_notes_given || 0, l: 'booth notes you wrote'}].map(function(x){
+          return '<div class="evi-stat' + (x.warn ? ' warn' : '') + '">' +
+            '<div class="v">' + esc(x.v) + '</div>' +
+            '<div class="l">' + esc(x.l) + '</div></div>';
+        }).join('') + '</div>';
+
+      html += '<div class="evi-coverage warn"><span class="ic">!</span><span class="tx">' +
+        esc(s.send_note || '') + ' ' + esc((s.repeats || {}).crm_note || '') +
+        '</span></div>';
+
+      var floorN = s.floor || 55;
+      var keptRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
+                                                     r.fit >= floorN; });
+      var cutRows = rows.filter(function(r){ return !r.unqualified && r.fit != null &&
+                                                    r.fit < floorN; });
+      var funnel = roomFunnel(s, c, rows);
+      var roles = roomRoles(keptRows, run.role_labels);
+      if (funnel || roles) {
+        html += '<div class="evi-sec"><h3>What happened to the roster</h3>' +
+          '<div class="evi-panels">' +
+          (funnel ? '<div class="evi-panel"><h4>From roster to drafts</h4>' + funnel +
+            '</div>' : '') +
+          (roles ? '<div class="evi-panel"><h4>How they were listed</h4>' + roles +
+            '<p class="pn">The role each company was published under at the event. ' +
+            'A sponsor bought its way onto the page and an exhibitor booked a stand, ' +
+            'which are different sizes of commitment and worth different openers.' +
+            '</p></div>' : '') +
+          '</div></div>';
+      }
+      var spread = roomSpread(keptRows, cutRows, floorN);
+      if (spread) {
+        html += '<div class="evi-sec"><h3>Against the floor</h3>' + spread + '</div>';
+      }
+
+      if ((s.qualify_errors || []).length) {
+        html += '<div class="evi-coverage warn"><span class="ic">!</span>' +
+          '<span class="tx"><b>Part of the qualification pass did not run.</b> ' +
+          esc(s.qualify_errors.join(' ')) +
+          ' Companies below marked &ldquo;not qualified&rdquo; may be a ' +
+          'failure to look rather than a judgement about them.</span></div>';
+      }
+      if (s.rewritten_count) {
+        html += '<div class="evi-sec"><h3>What was thrown away</h3>' +
+          '<div class="evi-note">' + esc(s.rewritten_count) + ' draft' +
+          (s.rewritten_count === 1 ? '' : 's') + ' claimed something that is not on ' +
+          'record. Each one was replaced with an opener that only says what is ' +
+          'known, and both the phrase and the reason are shown on the company below.' +
+          '</div></div>';
+      }
+
+      var repeats = (s.repeats || {}).repeats || [];
+      if (repeats.length) {
+        html += '<div class="evi-sec"><h3>Seen before</h3>' +
+          '<div class="evi-note">These companies were on the floor at other events ' +
+          'you have looked at. Buying floor space across your market repeatedly is a ' +
+          'different signal from turning up once.</div><div class="evi-cut">' +
+          repeats.map(function(r){
+            return '<span class="cutp" title="' + esc(r.events.join(', ')) + '">' +
+              esc(r.org) + '<b>' + esc(r.count) + '</b></span>';
+          }).join('') + '</div></div>';
+      }
+
+      /* The same three lists the charts above were drawn from. Computed
+         once: a chart and a list that each filter the rows themselves are
+         two chances to disagree about where the floor is. */
+      var kept = keptRows, cut = cutRows;
+      var unq = rows.filter(function(r){ return r.unqualified; });
+
+      html += '<div class="evi-sec"><h3>Worth contacting</h3>' +
+        (kept.length
+          ? '<div class="evi-outs">' + kept.map(function(r, i){
+              return outreachCard(r, run.role_labels || {}, i); }).join('') + '</div>'
+          : '<div class="evi-empty">Nothing on this roster cleared the ICP floor. ' +
+            'That is the answer, not a failure.</div>') +
+        '<div style="margin-top:14px">' +
+        '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
+        'href="' + BASE + '/runs/' + run.id + '/outreach.csv">Download drafts CSV</a></div>' +
+        '</div>';
+
+      if (cut.length) {
+        html += '<div class="evi-sec"><h3>Cut below the ICP floor</h3>' +
+          '<div class="evi-note">Events attract an enormous non-ICP tail. These are ' +
+          'shown so the tail is visible rather than quietly dropped.</div>' +
+          '<div class="evi-cut">' + cut.map(function(r){
+            return '<span class="cutp">' + esc(r.org_name) + '<b>' + esc(r.fit) +
+              '</b></span>'; }).join('') + '</div></div>';
+      }
+      if (unq.length) {
+        html += '<div class="evi-sec"><h3>Not qualified</h3><div class="evi-note">' +
+          'The qualification pass returned nothing for these, so they are unscored ' +
+          'rather than scored low.</div><div class="evi-cut">' +
+          unq.map(function(r){
+            return '<span class="cutp">' + esc(r.org_name) + '</span>'; }).join('') +
+          '</div></div>';
+      }
+      document.getElementById('drawerBody').innerHTML = html;
+      armAnim('workroom:' + run.id + ':' + run.status);
+    }
+
+    /* Lookup, plus the retired discover play. No new discover run can be
+       started, but the ones already in the table are still openable from
+       history and still valid as a workroom source, so this reads them. The
+       two differ in one place only: the drawer heading is the event in a
+       lookup and the query in a discover, because a discover run had no one
+       subject event. */
+    function render(run){
+      if (run.mode === 'recommend') { return renderRecommend(run); }
+      if (run.mode === 'workroom') { return renderWorkroom(run); }
+      var evs = run.events || [];
+      var ev = evs[0] || {};
+      var s = run.summary || {};
+      document.getElementById('drawerTitle').textContent =
+        (run.mode === 'discover' ? run.query : (ev.name || run.query));
+      document.getElementById('drawerSub').innerHTML =
+        run.mode === 'discover'
+          ? esc(plural(s.discovered_events || evs.length, 'event') + ' found' +
+                (s.harvested_events
+                  ? ', ' + plural(s.harvested_events, 'roster') + ' sampled' : ''))
+          : eventLine(ev) + (ev.organizer ? ' · organised by ' + esc(ev.organizer) : '');
+
+      var html = '';
+      if (run.status === 'failed') {
+        html += '<div class="evi-err">' + esc(run.error || 'This run failed.') + '</div>';
+      }
+      if (run.status === 'running') {
+        html += '<div class="evi-running"><span class="evi-spinner"></span>' +
+          '<span id="drawerLive" role="status" aria-live="polite">' +
+          esc(STAGES[run.stage] || 'Working.') + '</span></div>';
+      }
+      if (s.no_pages) {
+        html += '<div class="evi-coverage"><span class="ic">i</span><span class="tx">' +
+          esc(s.no_pages_note) + '</span></div>';
+      }
+      /* The event first, then the caveat, then the numbers, then the shape,
+         then the table. A reader who stops after the first screen should
+         have the date, the honesty note and the size of the roster; a
+         reader who stops after the second should also know how much of it
+         could not be read. The table is for the reader who did not stop. */
+      if (run.mode !== 'discover') { html = eventHero(evs[0]) + html; }
+      if ((run.participants || []).length || s.sources_tried) {
+        html += coverage(run);
+        html += stats(run);
+      }
+      html += eventsHtml(run);
+      html += rosterGlance(run);
+      if ((run.participants || []).length) {
+        html += '<div class="evi-sec"><h3>Roster</h3>' + roleBar(run) + rosterTable(run) +
+          '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
+          '<a class="evi-btn evi-btn-ghost" style="text-decoration:none;display:inline-block" ' +
+          'href="' + BASE + '/runs/' + run.id + '/export.csv">Download CSV</a></div></div>';
+        html += resolveBar(run);
+      } else if (run.status === 'complete' && !s.no_pages && !s.no_events) {
+        html += '<div class="evi-empty">No participants were published on the pages that ' +
+          'could be read. Check Sources below to see what was tried.</div>';
+      }
+      if ((run.sources || []).length) {
+        html += '<div class="evi-sec"><h3>Sources (' + (run.sources || []).length +
+          ' page' + ((run.sources || []).length === 1 ? '' : 's') + ' attempted)</h3>' +
+          sourcesHtml(run) + '</div>';
+      }
+      document.getElementById('drawerBody').innerHTML = html ||
+        '<div class="evi-empty"><span class="ic">&#9788;</span>' +
+        '<b>No events matched</b><span>' +
+        esc(s.note || s.discover_note ||
+            'Nothing to show for this run.') + '</span></div>';
+      armAnim(run.mode + ':' + run.id + ':' + run.status);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initForm);
+    } else {
+      initForm();
+    }
+  })();
+
+  /* 'open', not 'on': the stylesheet's .user-dropdown.open is what reveals it,
+     and the two must agree or the menu never opens. */
+  function toggleMenu(){
+    var pill = document.getElementById('userPill'), dd = document.getElementById('userDropdown');
+    pill.classList.toggle('open', !dd.classList.contains('open'));
+    dd.classList.toggle('open');
+  }
+  function closeUserMenu(){
+    document.getElementById('userPill').classList.remove('open');
+    document.getElementById('userDropdown').classList.remove('open');
+  }
+  document.addEventListener('click', function(e){
+    var m = document.getElementById('userMenu');
+    if (m && !m.contains(e.target)) closeUserMenu();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeUserMenu();
+  });
+  </script>
+
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Event & Conference Intelligence',seconds:s,email:{{ (user.email if user else "")|tojson }}}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

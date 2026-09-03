@@ -1,0 +1,29 @@
+requests>=2.31.0
+openai>=1.40.0
+anthropic>=0.122.0
+pdfplumber>=0.10.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-pptx>=0.6.23
+Pillow>=10.0.0
+reportlab>=4.0.0
+flask>=3.0.0
+gunicorn>=21.2.0
+pyyaml>=6.0
+feedparser>=6.0.11
+typer>=0.12.0
+rich>=13.7.0
+pytest>=8.0.0
+pandas>=2.0.0
+# Google Sheets integration
+google-auth>=2.29.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.127.0
+gspread>=6.0.0
+# Postgres (agent run-history storage)
+psycopg2-binary>=2.9.9
+# Social Creative Intelligence Analyst: resolves a YouTube watch-page URL to
+# a direct, ffmpeg-readable stream URL for video-frame extraction (Apify
+# scraper output for other platforms is already a direct CDN URL and needs
+# no resolution step).
+yt-dlp>=2024.8.6

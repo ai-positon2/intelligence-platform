@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>(function(){try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}window.addEventListener('load',function(){window.scrollTo(0,0);});})();</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ client.name }} · Client Usage — Admin</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ds-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/grid-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <script src="/static/js/theme.js"></script>
+  <link rel="stylesheet" href="/static/css/aurora-app.css?v=2">
+  <style>
+    .cd-hero{display:flex;align-items:center;gap:16px}
+    .cd-logo{width:56px;height:56px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 30% 25%,color-mix(in srgb,var(--ac) 34%,transparent),transparent 70%),#0f1424;border:1px solid rgba(255,255,255,.08)}
+    .cd-logo img{max-width:38px;max-height:32px;object-fit:contain}
+    .cd-logo span{font-size:20px;font-weight:700;color:#e6ebf5}
+
+    /* ══ KPI hero cards — each one gets its own accent (--kc), icon badge,
+       breathing glow and a one-shot hover sheen instead of the flat generic
+       indigo look every other admin page's .stat-card shares. ══ */
+    /* 7 cards in a fixed-column grid strands a lonely, oversized-gap last row
+       (e.g. 6+1). Flexbox with grow instead: each row's cards stretch to
+       fill the full row width evenly, whatever the count in that row, so a
+       4+3 (or 5+2, 3+4 on a narrower screen) split always looks intentional
+       and evenly spaced instead of leaving dead space beside a stray card. */
+    .stats-row{display:flex !important;flex-wrap:wrap;gap:18px}
+    .stats-row .stat-card{flex:1 1 240px;min-width:0}
+    .stat-card.kc{padding-top:24px !important}
+    .stat-card.kc .kc-ico{position:absolute;top:18px;right:18px;width:32px;height:32px;border-radius:9px;
+      display:flex;align-items:center;justify-content:center;z-index:2;
+      background:color-mix(in srgb,var(--kc) 16%,transparent);
+      border:1px solid color-mix(in srgb,var(--kc) 34%,transparent);color:var(--kc);
+      transition:transform .25s cubic-bezier(.16,1,.3,1),background .25s}
+    .stat-card.kc .kc-ico svg{width:16px;height:16px}
+    .stat-card.kc::before{background:linear-gradient(90deg,var(--kc),color-mix(in srgb,var(--kc) 45%,#fff)) !important}
+    .stat-card.kc .sc-glow{background:var(--kc) !important;opacity:.14;width:150px;height:150px;top:-48px;right:-36px;
+      animation:kcBreathe 6.5s ease-in-out infinite}
+    .stat-card.kc{background:
+        radial-gradient(130% 150% at 100% -10%,color-mix(in srgb,var(--kc) 9%,transparent),transparent 58%),
+        rgba(13,15,24,.85) !important;
+      isolation:isolate}
+    .stat-card.kc::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+      background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.07) 50%,transparent 60%);
+      transform:translateX(-120%);transition:transform .65s ease}
+    .stat-card.kc:hover::after{transform:translateX(120%)}
+    .stat-card.kc:hover{border-color:color-mix(in srgb,var(--kc) 55%,rgba(255,255,255,.14)) !important;
+      box-shadow:0 22px 54px -26px rgba(0,0,0,.85),0 0 46px -16px color-mix(in srgb,var(--kc) 55%,transparent) !important}
+    .stat-card.kc:hover .kc-ico{transform:scale(1.08) rotate(-4deg);background:color-mix(in srgb,var(--kc) 30%,transparent)}
+    .stat-card.kc:hover .stat-label{color:color-mix(in srgb,var(--kc) 55%,#93a0c6)}
+    .stat-card.kc .stat-value{position:relative;z-index:2;
+      background:linear-gradient(120deg,#fff 10%,color-mix(in srgb,var(--kc) 65%,#fff) 110%) !important;
+      -webkit-background-clip:text !important;background-clip:text !important;-webkit-text-fill-color:transparent !important}
+    .stat-card.kc .stat-label,.stat-card.kc .stat-small{position:relative;z-index:2}
+    @keyframes kcBreathe{0%,100%{opacity:.11}50%{opacity:.24}}
+    [data-theme="light"] .stat-card.kc .kc-ico{color:color-mix(in srgb,var(--kc) 70%,#17213a)}
+    [data-theme="light"] .stat-card.kc .stat-value{
+      background:linear-gradient(120deg,#17213a,color-mix(in srgb,var(--kc) 65%,#17213a)) !important;
+      -webkit-background-clip:text !important;background-clip:text !important;-webkit-text-fill-color:transparent !important}
+    /* segment split */
+    .seg-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px}
+    @media(max-width:840px){.seg-grid{grid-template-columns:1fr}}
+    .seg{border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+    .seg-head{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px}
+    .seg-dot{width:11px;height:11px;border-radius:50%;background:var(--sc);box-shadow:0 0 0 4px color-mix(in srgb,var(--sc) 20%,transparent)}
+    .seg-title{font-size:14px;font-weight:600;color:#f1f5f9}
+    .seg-sub{font-size:11.5px;color:#5a6488;margin-top:1px}
+    .seg-metrics{margin-left:auto;display:flex;gap:18px;text-align:right}
+    .seg-metrics b{display:block;font-size:18px;font-weight:700;color:#fff;line-height:1}
+    .seg-metrics small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin-top:4px}
+    .seg-body{padding:8px 8px 10px;max-height:440px;overflow-y:auto}
+    .prow{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;transition:background .12s}
+    .prow:hover{background:rgba(255,255,255,.04)}
+    .pav{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--sc),color-mix(in srgb,var(--sc) 40%,#6366f1))}
+    .pav img{width:100%;height:100%;object-fit:cover}
+    .pname{font-size:13px;font-weight:600;color:#e6ebf5;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pmail{font-size:11px;color:#5a6488;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono,monospace)}
+    .pmeta{margin-left:auto;text-align:right;flex-shrink:0}
+    .pmeta b{font-size:14px;font-weight:700;color:#fff}
+    .pmeta small{display:block;font-size:10px;color:#64748b;margin-top:2px}
+    .seg-empty{padding:34px;text-align:center;color:#5a6488;font-size:12.5px}
+    /* segment metric tabs (Logins / Page views / Agent runs): the tab is also the total */
+    .seg-tabs{display:flex;gap:6px;padding:12px 12px 4px}
+    .seg-tab{flex:1;padding:9px 11px;border-radius:11px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .08s;font-family:inherit}
+    .seg-tab:hover{background:rgba(255,255,255,.055)}
+    .seg-tab:active{transform:scale(.98)}
+    .seg-tab b{display:block;font-size:17px;font-weight:700;color:#e6ebf5;line-height:1;font-variant-numeric:tabular-nums}
+    .seg-tab small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#5a6488;margin-top:5px}
+    .seg-tab.on{border-color:color-mix(in srgb,var(--sc) 55%,transparent);background:color-mix(in srgb,var(--sc) 15%,transparent)}
+    .seg-tab.on b{color:var(--sc)}
+    .seg-tab.on small{color:color-mix(in srgb,var(--sc) 72%,#5a6488)}
+    /* richer person row: ranked proportional bar under name */
+    .pinfo{min-width:0;flex:1}
+    .pbar{height:4px;border-radius:3px;background:rgba(255,255,255,.06);margin-top:7px;overflow:hidden}
+    .pbar span{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--sc,#818cf8),color-mix(in srgb,var(--sc,#818cf8) 40%,#fff));transition:width .35s cubic-bezier(.16,1,.3,1)}
+    .pmeta b{font-variant-numeric:tabular-nums}
+    .pmeta b.zero{color:#3d4763}
+    /* agent breakdown in the person drawer */
+    .ab-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;color:#cbd5e1}
+    .ab-row:last-child{border-bottom:none}
+    .ab-row b{color:#fff;font-variant-numeric:tabular-nums}
+    .tev.run{--evc:#34d399}
+    [data-theme="light"] .seg-tab:not(.on) b{color:#17213a}
+    [data-theme="light"] .pbar{background:rgba(18,26,54,.08)}
+    [data-theme="light"] .ab-row{color:#3a4566}
+    /* timeline bars */
+    .tl-wrap{display:flex;align-items:flex-end;gap:5px;height:120px;padding-top:8px}
+    .tl-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0}
+    .tl-bar{width:100%;border-radius:3px 3px 0 0}
+    .tl-p2{background:linear-gradient(180deg,#818cf8,#6366f1)}
+    .tl-cli{background:linear-gradient(180deg,var(--ac),color-mix(in srgb,var(--ac) 55%,#000))}
+    .tl-lbl{font-size:9px;color:#475569;text-align:center;margin-top:6px;white-space:nowrap;overflow:hidden}
+    .lgd{display:flex;gap:16px;font-size:11px;color:#94a3b8;margin-top:12px}
+    .lgd i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+    .barlist{display:flex;flex-direction:column;gap:9px}
+    .brow{display:flex;align-items:center;gap:10px;font-size:12px}
+    .brow .bn{width:96px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .brow .bt{flex:1;height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+    .brow .bf{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+    .brow .bv{width:34px;text-align:right;color:#94a3b8;font-weight:600}
+    [data-theme="light"] .seg{background:#fff;border-color:rgba(18,26,54,.10)}
+    [data-theme="light"] .seg-title,[data-theme="light"] .pname,[data-theme="light"] .pmeta b{color:#17213a}
+    [data-theme="light"] .prow:hover{background:rgba(18,26,54,.04)}
+    /* clickable affordance */
+    .prow,.clik{cursor:pointer}
+    .prow{position:relative}
+    .prow::after{content:"›";position:absolute;right:8px;color:#475569;opacity:0;transition:opacity .15s,transform .15s;transform:translateX(-4px)}
+    .prow:hover::after{opacity:1;transform:translateX(0)}
+    .stat-card.clik{transition:transform .2s cubic-bezier(.16,1,.3,1),border-color .2s,box-shadow .2s}
+    .stat-card.clik:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ac) 45%,rgba(255,255,255,.14));box-shadow:0 18px 40px -22px rgba(0,0,0,.75)}
+    tr.clik{cursor:pointer}
+    tr.clik:hover td{background:rgba(255,255,255,.04)}
+    /* drawer */
+    .cu-ovl{position:fixed;inset:0;background:rgba(4,6,16,.62);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s;z-index:80}
+    .cu-ovl.on{opacity:1;pointer-events:auto}
+    .cu-dr{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);z-index:81;display:flex;flex-direction:column;
+      background:linear-gradient(180deg,#0d1120,#0a0d18);border-left:1px solid rgba(255,255,255,.09);
+      box-shadow:-30px 0 80px -30px rgba(0,0,0,.8);transform:translateX(100%);transition:transform .28s cubic-bezier(.16,1,.3,1)}
+    .cu-dr.on{transform:translateX(0)}
+    .dr-head{padding:20px 22px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:flex-start;gap:14px;flex-shrink:0}
+    .dr-av{width:46px;height:46px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#fff;overflow:hidden;background:linear-gradient(135deg,var(--sc,#818cf8),color-mix(in srgb,var(--sc,#818cf8) 40%,#6366f1))}
+    .dr-av img{width:100%;height:100%;object-fit:cover}
+    .dr-ic{width:46px;height:46px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.28);color:#a5b4fc}
+    .dr-name{font-size:16px;font-weight:600;color:#f1f5f9;line-height:1.25}
+    .dr-mail{font-size:12px;color:#5a6488;font-family:var(--mono,monospace);margin-top:2px;word-break:break-all}
+    .dr-x{margin-left:auto;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);color:#94a3b8;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:15px;flex-shrink:0}
+    .dr-x:hover{background:rgba(255,255,255,.1);color:#fff}
+    .dr-badge{display:inline-block;font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;margin-top:8px;border:1px solid}
+    .dr-mini{display:flex;gap:8px;padding:14px 22px;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;flex-shrink:0}
+    .dr-m{flex:1;min-width:72px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:9px 11px}
+    .dr-m b{display:block;font-size:17px;font-weight:700;color:#fff;line-height:1}
+    .dr-m small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#5a6488;margin-top:5px}
+    .dr-body{flex:1;overflow-y:auto;padding:16px 22px 30px}
+    .dr-sec{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#5a6488;margin:4px 0 14px}
+    /* timeline */
+    .tml{position:relative;padding-left:26px}
+    .tml::before{content:"";position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:linear-gradient(180deg,rgba(129,140,248,.4),rgba(129,140,248,.05))}
+    .tev{position:relative;padding:0 0 18px}
+    .tev:last-child{padding-bottom:0}
+    .tev::before{content:"";position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%;background:#0d1120;border:2px solid var(--evc,#818cf8);box-shadow:0 0 0 3px rgba(129,140,248,.12)}
+    .tev.login{--evc:#f5a623}
+    .tev-top{display:flex;align-items:baseline;gap:8px}
+    .tev-ttl{font-size:13px;font-weight:600;color:#e6ebf5;line-height:1.3}
+    .tev-time{margin-left:auto;font-size:11px;color:#64748b;white-space:nowrap;font-family:var(--mono,monospace)}
+    .tev-url{font-size:11px;color:#64748b;font-family:var(--mono,monospace);margin-top:3px;word-break:break-all}
+    .tev-dur{display:inline-block;font-size:10px;color:#a5b4fc;background:rgba(129,140,248,.12);border-radius:6px;padding:2px 7px;margin-top:6px}
+    .tev-who{font-size:11.5px;color:#94a3b8;margin-top:2px}
+    .dr-empty{padding:40px 10px;text-align:center;color:#5a6488;font-size:12.5px}
+    [data-theme="light"] .cu-dr{background:linear-gradient(180deg,#fff,#f6f8fc);border-color:rgba(18,26,54,.1)}
+    [data-theme="light"] .dr-name,[data-theme="light"] .tev-ttl,[data-theme="light"] .dr-m b{color:#17213a}
+    [data-theme="light"] .tev::before{background:#fff}
+  </style>
+</head>
+<body data-slug="{{ client_slug }}" data-ac="{{ client.accent }}" data-ac2="{{ client.accent2 }}">
+  <div class="topbar">
+    <div class="tl">
+      <a href="/p2/hub" class="brand">
+        <div class="brand-icon" style="background:#151b2e;box-shadow:none;border-radius:var(--radius-md);overflow:hidden;display:inline-flex;align-items:center;justify-content:center;padding:5px 8px"><img src="/static/logo-lockup.svg?v=1" alt="arena by Position2" style="display:block;width:auto;height:36px;object-fit:contain"></div>
+      </a>
+      <div class="bc">
+        <a href="/p2/hub">Hub</a><span class="bc-sep">›</span>
+        <a href="/p2/admin/client-usage">Client Usage</a><span class="bc-sep">›</span>
+        <span class="bc-cur">{{ client.short }}</span>
+      </div>
+    </div>
+    <div class="tr">
+      <div class="user-menu" id="userMenu">
+        <div class="user-pill" id="userPill" onclick="toggleMenu()">
+          <div class="avatar">{% if user.picture %}<img src="{{ user.picture }}" alt="" />{% else %}{{ (user.name or 'U')[:2]|upper }}{% endif %}</div>
+          <span class="uname">{{ user.given_name or user.name or 'Admin' }}</span>
+          <span class="pill-chevron">▼</span>
+        </div>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="dd-header">
+            <div class="dd-name">{{ user.name or 'User' }}</div>
+            <div class="dd-email">{{ user.email }}</div>
+          </div>
+          <div class="dd-items">{% include "_admin_menu.html" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="eyebrow">Admin · Client Portal Analytics</div>
+        <div class="cd-hero" style="--ac:{{ client.accent }}">
+          <div class="cd-logo">{% if client.logo %}<img src="{{ client.logo }}" alt="{{ client.short }}">{% else %}<span>{{ client.short[:2]|upper }}</span>{% endif %}</div>
+          <div>
+            <h1 style="margin:0">{{ client.name }}</h1>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#64748b">Portal activity at <b style="color:#94a3b8">/{{ client_slug }}</b>, split by who's using it.</p>
+          </div>
+        </div>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)"><span class="refresh-icon" id="refreshIcon">↻</span> Refresh</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card kc clik" style="--kc:#818cf8" onclick="openFeed()" title="See the full activity feed">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <div class="stat-label">Page Views</div>
+        <div class="stat-value" id="k-views"><span class="skel" style="width:48px;height:36px;display:inline-block"></span></div>
+        <div class="stat-small" style="color:#a5b4fc">View all activity →</div>
+      </div>
+      <div class="stat-card kc clik" style="--kc:#c084fc" onclick="openPeople()" title="See everyone">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="stat-label">People</div>
+        <div class="stat-value" id="k-people"><span class="skel" style="width:36px;height:36px;display:inline-block"></span></div>
+        <div class="stat-small" id="k-people-sub"></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#f5a623">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3-3.5 3.5"/></svg></div>
+        <div class="stat-label">Logins</div>
+        <div class="stat-value" id="k-logins"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#34d399">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
+        <div class="stat-label">Agent Runs</div>
+        <div class="stat-value" id="k-runs"><span class="skel" style="width:40px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#22d3ee">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+        <div class="stat-label">Time on Portal</div>
+        <div class="stat-value" id="k-time"><span class="skel" style="width:56px;height:36px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#4ade80">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></div>
+        <div class="stat-label">First Activity</div>
+        <div class="stat-value" id="k-first" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div>
+      </div>
+      <div class="stat-card kc" style="--kc:#fb7185">
+        <div class="sc-glow"></div>
+        <div class="kc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <div class="stat-label">Last Activity</div>
+        <div class="stat-value" id="k-last" style="font-size:20px"><span class="skel" style="width:80px;height:24px;display:inline-block"></span></div>
+      </div>
+    </div>
+
+    <div class="seg-grid" id="segGrid">
+      <div class="seg" style="--sc:#818cf8"><div class="seg-body"><div class="skel" style="height:200px"></div></div></div>
+      <div class="seg" style="--sc:{{ client.accent }}"><div class="seg-body"><div class="skel" style="height:200px"></div></div></div>
+    </div>
+
+    <div class="grid-2" style="margin-top:18px">
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="card-title-icon">📈</span> Activity per Day</div><span class="card-meta">Position2 vs {{ client.short }}</span></div>
+        <div class="card-body"><div id="timeline-wrap"><div class="skel" style="height:120px"></div></div>
+          <div class="lgd"><span><i style="background:#6366f1"></i>Position2 team</span><span><i style="background:{{ client.accent }}"></i>{{ client.short }} team</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="card-title-icon">🌐</span> Browsers &amp; Devices</div></div>
+        <div class="card-body"><div id="bd-wrap"><div class="skel" style="height:120px"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-head"><div class="card-title"><span class="card-title-icon">📊</span> Top Pages</div><span class="card-meta">most-visited pages in this portal</span></div>
+      <div class="card-body"><div id="pages-wrap"><div class="skel" style="height:120px"></div></div></div>
+    </div>
+  </div>
+
+  <div class="cu-ovl" id="cuOvl" onclick="closeDrawer()"></div>
+  <div class="cu-dr" id="cuDr" role="dialog" aria-modal="true">
+    <div id="drHead"></div>
+    <div class="dr-body" id="drBody"></div>
+  </div>
+
+  <script>
+    function toggleMenu(){var d=document.getElementById('userDropdown'),p=document.getElementById('userPill');var o=d.classList.contains('open');d.classList.toggle('open',!o);p.classList.toggle('open',!o);}
+    document.addEventListener('click',function(e){var m=document.getElementById('userMenu');if(m&&!m.contains(e.target)){document.getElementById('userDropdown').classList.remove('open');document.getElementById('userPill').classList.remove('open');}});
+
+    var SLUG=document.body.getAttribute('data-slug');
+    var AC=document.body.getAttribute('data-ac')||'#5b9dff', AC2=document.body.getAttribute('data-ac2')||'#8b5cf6';
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function ini(n){return (n||'?').trim().split(/\s+/).map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2);}
+    function shortDate(s){if(!s)return '—';var m=String(s).slice(5,10);return m||s;}
+
+    /* Each segment table has three tabs: Logins, Page views, Agent runs. The tab is
+       ALSO the segment total; picking one re-ranks the list by that metric and swaps
+       each row's headline number + caption. Tab choice is per-segment. */
+    var METRICS=[
+      {id:'logins',key:'logins',label:'Logins',
+       cap:function(p){return p.last_login?('last seen '+shortDate(p.last_login)):(p.logins?'signed in':'never signed in');}},
+      {id:'views',key:'views',label:'Page views',
+       cap:function(p){return (p.duration||'0s')+' · '+shortDate(p.last_seen);}},
+      {id:'runs',key:'agent_runs',label:'Agent runs',
+       cap:function(p){return (p.agent_breakdown&&p.agent_breakdown.length)?('mostly '+p.agent_breakdown[0].name):'no runs yet';}}
+    ];
+    function metricById(id){for(var i=0;i<METRICS.length;i++)if(METRICS[i].id===id)return METRICS[i];return METRICS[1];}
+    var TAB_STATE={p2:'views',client:'views',other:'views'};
+    var SEGREFS={};
+
+    function personRow2(p,m,max,color){
+      var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
+      var val=p[m.key]||0;
+      var w=max>0?(val>0?Math.max(6,Math.round(val/max*100)):0):0;
+      return '<div class="prow" style="--sc:'+color+'" onclick="openPerson(\''+esc(p.email).replace(/'/g,"\\'")+'\')">'
+        +'<div class="pav">'+av+'</div>'
+        +'<div class="pinfo">'
+          +'<div class="pname">'+esc(p.name)+'</div>'
+          +'<div class="pmail">'+esc(p.email)+'</div>'
+          +'<div class="pbar"><span style="width:'+w+'%"></span></div>'
+        +'</div>'
+        +'<div class="pmeta"><b'+(val?'':' class="zero"')+'>'+val+'</b><small>'+esc(m.cap(p))+'</small></div>'
+        +'</div>';
+    }
+    function segPanel(segKey, seg, color, subtitle){
+      SEGREFS[segKey]={seg:seg,color:color,subtitle:subtitle};
+      var ppl=(seg&&seg.people)||[];
+      var tabId=TAB_STATE[segKey]||'views', m=metricById(tabId);
+      var totals={logins:seg.logins||0,views:seg.views||0,runs:seg.runs||0};
+      var tabs=METRICS.map(function(x){
+        return '<button class="seg-tab'+(x.id===tabId?' on':'')+'" style="--sc:'+color+'" '
+          +'onclick="event.stopPropagation();setTab(\''+segKey+'\',\''+x.id+'\')">'
+          +'<b>'+(totals[x.id]||0)+'</b><small>'+x.label+'</small></button>';
+      }).join('');
+      var sorted=ppl.slice().sort(function(a,b){return (b[m.key]||0)-(a[m.key]||0);});
+      var max=sorted.reduce(function(mx,p){return Math.max(mx,p[m.key]||0);},0);
+      var rows=sorted.length?sorted.map(function(p){return personRow2(p,m,max,color);}).join('')
+                            :'<div class="seg-empty">No activity from this group yet.</div>';
+      return '<div class="seg" id="seg-'+segKey+'" style="--sc:'+color+'">'
+        +'<div class="seg-head">'
+          +'<span class="seg-dot"></span>'
+          +'<div><div class="seg-title">'+esc(seg.label)+'</div><div class="seg-sub">'+subtitle+'</div></div>'
+          +'<div class="seg-metrics"><div><b>'+ppl.length+'</b><small>People</small></div>'
+            +'<div><b>'+esc(seg.time||'0s')+'</b><small>Time</small></div></div>'
+        +'</div>'
+        +'<div class="seg-tabs">'+tabs+'</div>'
+        +'<div class="seg-body">'+rows+'</div>'
+        +'</div>';
+    }
+    function setTab(segKey,id){
+      TAB_STATE[segKey]=id;
+      var ref=SEGREFS[segKey], el=document.getElementById('seg-'+segKey);
+      if(!ref||!el)return;
+      var tmp=document.createElement('div');
+      tmp.innerHTML=segPanel(segKey,ref.seg,ref.color,ref.subtitle);
+      el.replaceWith(tmp.firstElementChild);
+    }
+    function renderTimeline(tl){
+      if(!tl||!tl.length)return '<div class="seg-empty">No activity yet.</div>';
+      var days=tl.slice(-24);
+      var max=1;days.forEach(function(d){max=Math.max(max,d.p2+d.client+d.other);});
+      var H=104;
+      return '<div class="tl-wrap">'+days.map(function(d){
+        var tot=d.p2+d.client+d.other;
+        var h2=Math.round(d.p2/max*H), hc=Math.round((d.client+d.other)/max*H);
+        return '<div class="tl-col" title="'+d.date+' · P2 '+d.p2+' · '+esc(SLUG)+' '+(d.client+d.other)+'">'
+          +(hc?'<div class="tl-bar tl-cli" style="height:'+hc+'px"></div>':'')
+          +(h2?'<div class="tl-bar tl-p2" style="height:'+h2+'px"></div>':'')
+          +'<div class="tl-lbl">'+shortDate(d.date)+'</div></div>';
+      }).join('')+'</div>';
+    }
+    function barList(obj){
+      var ks=Object.keys(obj||{});if(!ks.length)return '<div class="seg-empty">No data.</div>';
+      var max=Math.max.apply(null,ks.map(function(k){return obj[k];}));
+      return '<div class="barlist" style="--ac:'+AC+';--ac2:'+AC2+'">'+ks.map(function(k){
+        return '<div class="brow"><span class="bn">'+esc(k)+'</span><span class="bt"><span class="bf" style="width:'+Math.round(obj[k]/max*100)+'%"></span></span><span class="bv">'+obj[k]+'</span></div>';
+      }).join('')+'</div>';
+    }
+    function pagesTable(pg){
+      if(!pg||!pg.length)return '<div class="seg-empty">No page views yet.</div>';
+      var b=pg.map(function(p){
+        return '<tr class="clik" onclick="openPage(\''+esc(p.url).replace(/'/g,"\\'")+'\')"><td style="font-weight:600;color:#e2e8f0">'+esc(p.title||p.url)+'</td>'
+          +'<td style="font-family:var(--mono,monospace);font-size:11px;color:#64748b">'+esc(p.url)+'</td>'
+          +'<td style="text-align:right">'+p.views+'</td>'
+          +'<td style="text-align:right;color:#94a3b8">'+(p.viewers||0)+'</td>'
+          +'<td style="text-align:right;color:#94a3b8">'+esc(p.duration||'')+'</td></tr>';
+      }).join('');
+      return '<div class="tbl-wrap"><table><thead><tr><th>Page</th><th>URL</th><th style="text-align:right">Views</th><th style="text-align:right">People</th><th style="text-align:right">Time</th></tr></thead><tbody>'+b+'</tbody></table></div>';
+    }
+
+    function setK(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+    var DATA={}, PEOPLE={};
+    function render(D){
+      DATA=D||{}; PEOPLE={};
+      ((D.segments&&['p2','client','other'])||[]).forEach(function(s){((D.segments[s]||{}).people||[]).forEach(function(p){PEOPLE[(p.email||'').toLowerCase()]=p;});});
+      var k=D.kpis||{};
+      setK('k-views',(k.total_views||0).toLocaleString());
+      setK('k-people',k.total_people||0);
+      setK('k-logins',(k.total_logins||0).toLocaleString());
+      setK('k-runs',(k.total_runs||0).toLocaleString());
+      setK('k-time',k.total_time||'0s');
+      setK('k-first',k.first_activity||'—');
+      setK('k-last',k.last_activity||'—');
+      var sub=document.getElementById('k-people-sub');
+      if(sub)sub.textContent=(k.p2_people||0)+' Position2 · '+(k.client_people||0)+' '+(D.client&&D.client.short||'client');
+      var seg=D.segments||{};
+      var html=segPanel('p2',seg.p2||{label:'Position2 team',people:[]},'#818cf8','@position2.com')
+              +segPanel('client',seg.client||{label:'Client team',people:[]},AC,(D.client&&D.client.domains||[]).join(', '));
+      if(seg.other&&seg.other.people&&seg.other.people.length)
+        html+=segPanel('other',seg.other,'#94a3b8','Other email domains');
+      document.getElementById('segGrid').innerHTML=html;
+      document.getElementById('timeline-wrap').innerHTML=renderTimeline(D.timeline);
+      var bd='';
+      if(D.browsers&&Object.keys(D.browsers).length)bd+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin:2px 0 10px">Browsers</div>'+barList(D.browsers);
+      if(D.devices&&Object.keys(D.devices).length)bd+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#5a6488;margin:16px 0 10px">Devices</div>'+barList(D.devices);
+      document.getElementById('bd-wrap').innerHTML=bd||'<div class="seg-empty">No data yet.</div>';
+      document.getElementById('pages-wrap').innerHTML=pagesTable(D.top_pages);
+    }
+    /* ── activity drawer ── */
+    var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtTs(ts){
+      if(!ts)return '';
+      var m=String(ts).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+      if(!m)return String(ts).slice(0,16);
+      return MON[(+m[2])-1]+' '+(+m[3])+', '+m[4]+':'+m[5];
+    }
+    function segColor(s){return s==='p2'?'#818cf8':(s==='other'?'#94a3b8':AC);}
+    function segLabel(s){return s==='p2'?'Position2':(s==='other'?'Other':(DATA.client&&DATA.client.short)||'Client');}
+    function badge(s){var c=segColor(s);return '<span class="dr-badge" style="color:'+c+';border-color:'+c+'55;background:'+c+'1a">'+esc(segLabel(s))+' team</span>';}
+    function evItem(e){
+      var login=e.kind==='login', run=e.kind==='run', noUrl=login||run;
+      var ttl=login?'Signed in':(e.title||e.url||'Page view');
+      return '<div class="tev '+(login?'login':(run?'run':''))+'">'
+        +'<div class="tev-top"><span class="tev-ttl">'+esc(ttl)+'</span><span class="tev-time">'+fmtTs(e.ts)+'</span></div>'
+        +(e.url&&!noUrl?'<div class="tev-url">'+esc(e.url)+'</div>':'')
+        +(e.who?'<div class="tev-who">'+e.who+'</div>':'')
+        +(e.duration&&!noUrl?'<span class="tev-dur">⏱ '+esc(e.duration)+' on page</span>':'')
+        +'</div>';
+    }
+    function openDrawer(headHtml, bodyHtml){
+      document.getElementById('drHead').innerHTML=headHtml;
+      document.getElementById('drBody').innerHTML=bodyHtml;
+      document.getElementById('cuDr').classList.add('on');
+      document.getElementById('cuOvl').classList.add('on');
+    }
+    function closeDrawer(){document.getElementById('cuDr').classList.remove('on');document.getElementById('cuOvl').classList.remove('on');}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer();});
+
+    function openPerson(email){
+      var p=PEOPLE[(email||'').toLowerCase()];if(!p)return;
+      var c=segColor(p.segment);
+      var av=p.picture?('<img src="'+esc(p.picture)+'" alt="">'):esc(ini(p.name));
+      var head='<div class="dr-head" style="--sc:'+c+'">'
+        +'<div class="dr-av">'+av+'</div>'
+        +'<div style="min-width:0;flex:1"><div class="dr-name">'+esc(p.name)+'</div><div class="dr-mail">'+esc(p.email)+'</div>'+badge(p.segment)+'</div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>'
+        +'<div class="dr-mini">'
+          +'<div class="dr-m"><b>'+(p.logins||0)+'</b><small>Logins</small></div>'
+          +'<div class="dr-m"><b>'+(p.views||0)+'</b><small>Page views</small></div>'
+          +'<div class="dr-m"><b>'+(p.agent_runs||0)+'</b><small>Agent runs</small></div>'
+          +'<div class="dr-m"><b>'+esc(p.duration||'0s')+'</b><small>Time</small></div>'
+          +'<div class="dr-m"><b>'+(p.pages_count||0)+'</b><small>Pages</small></div>'
+        +'</div>';
+      var ab=(p.agent_breakdown||[]);
+      var abHtml=ab.length?('<div class="dr-sec" style="margin-top:20px">Agents used</div>'
+        +ab.map(function(a){return '<div class="ab-row"><span>'+esc(a.name)+'</span><b>'+a.count+'</b></div>';}).join('')):'';
+      var ev=(p.events||[]);
+      var body=abHtml
+        +'<div class="dr-sec"'+(ab.length?' style="margin-top:22px"':'')+'>Activity timeline · '+ev.length+' events</div>'
+        +(ev.length?'<div class="tml">'+ev.map(evItem).join('')+'</div>':'<div class="dr-empty">No recorded activity.</div>');
+      openDrawer(head, body);
+    }
+    function openPage(url){
+      var evs=(DATA.recent||[]).filter(function(e){return e.kind==='view'&&e.url===url;});
+      var title=(evs[0]&&evs[0].title)||url;
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 18v-5M13 18V8M18 18v-8"/></svg></div>'
+        +'<div style="min-width:0;flex:1"><div class="dr-name">'+esc(title)+'</div><div class="dr-mail">'+esc(url)+'</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var body='<div class="dr-sec">'+evs.length+' views · who viewed &amp; when</div>'
+        +(evs.length?'<div class="tml">'+evs.map(function(e){return evItem({kind:'view',ts:e.ts,title:e.name,url:'',duration:e.duration,who:esc(e.email)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No views recorded.</div>');
+      openDrawer(head, body);
+    }
+    function openFeed(){
+      var evs=(DATA.recent||[]);
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>'
+        +'<div style="flex:1"><div class="dr-name">All activity</div><div class="dr-mail">'+((DATA.client&&DATA.client.name)||'')+' portal</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var body='<div class="dr-sec">'+evs.length+' events · newest first</div>'
+        +(evs.length?'<div class="tml">'+evs.map(function(e){var noUrl=(e.kind==='login'||e.kind==='run');return evItem({kind:e.kind,ts:e.ts,title:(e.kind==='login'?'Signed in':(e.title||e.url)),url:(noUrl?'':e.url),duration:e.duration,who:esc(e.name)+' · '+segLabel(e.segment)});}).join('')+'</div>':'<div class="dr-empty">No activity yet.</div>');
+      openDrawer(head, body);
+    }
+    function openPeople(){
+      var all=[];['p2','client','other'].forEach(function(s){(((DATA.segments||{})[s])||{}).people&&DATA.segments[s].people.forEach(function(p){all.push(p);});});
+      all.sort(function(a,b){return b.views-a.views;});
+      var head='<div class="dr-head"><div class="dr-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7.5" r="3"/><path d="M22 19v-1a4 4 0 0 0-3-3.87M16 4.63a4 4 0 0 1 0 7.75"/></svg></div>'
+        +'<div style="flex:1"><div class="dr-name">Everyone</div><div class="dr-mail">'+all.length+' people on this portal</div></div>'
+        +'<button class="dr-x" onclick="closeDrawer()">✕</button></div>';
+      var mv=metricById('views');
+      var mx=all.reduce(function(m,p){return Math.max(m,p.views||0);},0);
+      var body='<div class="dr-sec">Tap anyone to see their timeline</div>'
+        +(all.length?all.map(function(p){return personRow2(p,mv,mx,segColor(p.segment));}).join(''):'<div class="dr-empty">No one yet.</div>');
+      openDrawer(head, body);
+    }
+
+    function loadData(fresh){
+      var ic=document.getElementById('refreshIcon');if(ic)ic.style.animation='spin 1s linear infinite';
+      fetch('/p2/admin/client-usage/'+SLUG+'/data'+(fresh?'?fresh=1':''))
+        .then(function(r){return r.json();}).then(function(j){render(j||{});})
+        .catch(function(){})
+        .then(function(){if(ic)ic.style.animation='';});
+    }
+    loadData(false);
+  </script>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}.refresh-icon{display:inline-block}</style>
+  <script>(function(){if(window.__trk)return;window.__trk=1;var _s=Date.now(),_d=false;function f(){if(_d)return;_d=true;var s=Math.round((Date.now()-_s)/1000);fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:location.pathname,title:'Client Usage · {{ client.short }}',seconds:s,email:'{{ user.email if user else "" }}'}),keepalive:true}).catch(function(){});}document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')f();});window.addEventListener('beforeunload',f);})();</script>
+</body>
+</html>

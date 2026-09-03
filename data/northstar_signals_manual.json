@@ -1,0 +1,678 @@
+{
+  "_readme": "Manually researched signals for the NorthStar Anesthesia ABM Signal Tracker, gathered via real web research (batch-by-batch, 5 companies at a time) while the permanent Sheets-based signal pipeline is being wired up. Each entry becomes one row in the 'alerts_sent' table via seed_northstar_signals.py. signal_type must be one of the canonical strings tracker/signal_score.py and tracker/dashboard_builder.py expect: 'Funding Round', 'Acquisition / M&A', 'IPO Signal', 'C-Suite Join', 'C-Suite Exit', 'News Mention', 'Product Launch', 'Partnership', 'Creative Hiring' (this last one is displayed to NorthStar as 'Anesthesiologists' via the hiring_opts override in build_northstar_dashboard.py -- the stored key stays 'Creative Hiring' so the shared scoring engine needs only one constant). confidence (HIGH/MEDIUM/LOW, from the research pass) is written straight into the 'severity' column -- it is the closest available proxy for alert importance and is what actually drives the dashboard's H/M/L counts.",
+  "batches_loaded": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "companies_covered": [
+    "AMSURG",
+    "AdventHealth",
+    "Atlas Healthcare Partners",
+    "Banner Health",
+    "Baptist Health South Florida",
+    "Broward Health",
+    "Central Ohio Urology Group",
+    "Cleveland Clinic Florida",
+    "Cullman Regional Medical Center",
+    "Doctors Hospital Of Augusta",
+    "FLOWERS HOSPITAL",
+    "Findlay Surgery Center",
+    "GRAND VIEW HEALTH",
+    "HEALTH FIRST",
+    "HONORHEALTH",
+    "Houston Methodist",
+    "Kelsey Seybold",
+    "Magee-Womens Hospital Of Upmc",
+    "Miami Jewish Health",
+    "Novant Health",
+    "OPTIM HEALTH SYSTEM",
+    "Orlando Health Jewett Orthopedic Institute",
+    "Physicians Outpatient Surgery Center",
+    "Promedica",
+    "REGENCY HOSPITAL COMPANY",
+    "Riddle Surgical Center",
+    "South Texas Spine & Surgical Hospital",
+    "Southwest Surgical Associates",
+    "St Clair Health (AKA St Clair Hospital)",
+    "TEXAS ORTHOPEDIC HOSPITAL",
+    "Texas Health Resources",
+    "United Surgical Partners International",
+    "University Medical Center of El Paso (UMC)",
+    "Wilmington Surgical Associates",
+    "Wyandot Memorial Hospital"
+  ],
+  "signals": [
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner Gateway Medical Center (Gilbert, AZ) offering CRNAs a $50K sign-on bonus and $260K+ annual comp for an employed practice opportunity.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.asahq.org/job/crnas-50k-sign-on-bonus-260k-annually-employed-practice-opportunity-with-banner-health-at-banner-gateway-medical-center/73970880/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner University Medicine Tucson (w/ U. of Arizona) actively interviewing anesthesiologists at $530K+/yr, plus recruiting a CRNA Manager at $275K+.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.asahq.org/job/anesthesiologist-community-practice-opportunity-banner-university-medical-center-tucson-az/75130429/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Banner Health Community Hospital (Torrington, CO) recruiting CRNAs for an independent rural-hospital anesthesia practice at ~$375K.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://thecrna.com/crna-banner-health-community-hospital-in-torrington-375k-independent-practice-rural-hospital/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Banner Health",
+      "signal_type": "Product Launch",
+      "signal_detail": "Upgrading its entire surgical robot fleet to 49 Intuitive da Vinci 5 systems across AZ/CO/WY -- one of the largest such investments by any US health system.",
+      "signal_date": "2026-02-18",
+      "source_url": "https://www.modernhealthcare.com/medical-devices/mh-banner-health-intuitive-surgical-robots-da-vinci-5/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Orlando Health Jewett Orthopedic Institute",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Recruiting anesthesiologists dedicated exclusively to Jewett Orthopedic Institute via multiple concurrent postings across physician job boards, one of them seeking a full team on an M-F schedule with no call/nights/weekends plus a starting bonus. Sustained team-level need, not a single vacancy, at a high-volume orthopedic facility.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.jamanetwork.com/job/110259555/anesthesiologist-for-orlando-health-jewett-orthopedic-institute/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "HEALTH FIRST",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Open Director of Perioperative Services role for Holmes Regional Medical Center (515-bed, 16-OR facility) in Melbourne, FL, listed via Whitman Partners.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://whitmanpartners.com/job/director-of-perioperative-services-21524-health-first-holmes-regional-medical-center/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Own careers site has an open, actively-recruiting CRNA - Anesthesiology role at Springwoods Village ($191,500-$261,500), with further CRNA listings at the Main Campus, indicating a multi-site rather than single-vacancy anesthesia need.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://kelsey-seyboldproviders.com/job/crna-anesthesiology-kelsey-seybold-clinic-2320168/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Kelsey Seybold",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Separately recruiting a Physician - Anesthesiologist (MD/CRNA Anesthesia Care Team lead model, no call/weekends/holidays) for its Houston ambulatory surgery practice.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.nejmcareercenter.org/job/994988/physician-anesthesiology-kelsey-seybold-clinic/",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Envision Physician Services / Kendall Anesthesia Associates (exclusive anesthesia group at Baptist Hospital of Miami since 1960) is actively recruiting General Anesthesiologists, a Cardiac Anesthesiologist, CRNAs, and a Certified Anesthesiologist Assistant, with sign-on bonuses up to $100,000.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.envisionhealth.com/find-a-career/clinical-job-search/certified-anesthesiology-asst.-miami-fl/jo000012848",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Own careers portal lists open Anesthesia Tech positions in Miami and at the new Boca Raton Regional tower, signaling anesthesia-department staffing growth tied to facility expansion.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.baptisthealth.net/us/en/job/158394/Anesthesia-Tech-Anesthesiology-NEW-TOWER-FT-8-30A-7P",
+      "severity": "LOW"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Carlos Hernandez named CEO of Baptist Health Doctors Hospital and head of Baptist Health Orthopedics, effective May 1, 2026.",
+      "signal_date": "2026-03-23",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Nathaniel Ortiz named CEO of Baptist Health West Kendall Baptist Hospital, effective May 1, 2026.",
+      "signal_date": "2026-03-23",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-announces-key-leadership-appointments-across-several-south-florida-hospitals",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "Product Launch",
+      "signal_detail": "Center for Robotic Heart & Vascular Surgery added AI-powered 'digital twin' 3D heart-modeling software to plan cardiac surgeries in advance.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://baptisthealth.net/baptist-health-news/rise-of-ai-in-heart-care-how-robotic-and-minimally-invasive-surgery-is-getting-smarter",
+      "severity": "LOW"
+    },
+    {
+      "company_name": "Baptist Health South Florida",
+      "signal_type": "News Mention",
+      "signal_detail": "Broke ground on a new Medical Center in Pembroke Pines (60,865 sq-ft, ER and outpatient services), opening early 2027.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://baptisthealth.net/newsroom/press-release/baptist-health-breaks-ground-on-new-medical-center-in-pembroke-pines",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Caitlin Lewis promoted from COO to CEO of AdventHealth East Orlando.",
+      "signal_date": "2026-02-02",
+      "source_url": "https://www.adventhealth.com/news/caitlin-lewis-named-ceo-adventhealth-east-orlando",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "News Mention",
+      "signal_detail": "Announced plans to build a new 80-bed hospital in The Villages, FL amid rapid regional population growth (opening ~2030).",
+      "signal_date": "2026-05-01",
+      "source_url": "https://www.wusf.org/health-news-florida/2026-07-23/adventhealth-plans-to-build-hospital-in-rapidly-growing-the-villages-region",
+      "severity": "LOW"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Partnership",
+      "signal_detail": "Signed a letter of intent with Intermountain Health to form a Denver-area joint venture combining 5 AdventHealth and 3 Intermountain hospitals, expected to close early 2027.",
+      "signal_date": "2026-07-22",
+      "source_url": "https://www.healthcaredive.com/news/intermountain-health-adventhealth-joint-venture-denver-colorado/825867/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Partnership",
+      "signal_detail": "NorthStar Anesthesia is already the CRNA/anesthesia staffing partner at multiple AdventHealth sites (e.g. AdventHealth Central Texas/Killeen, AdventHealth Bolingbrook IL) -- an existing account relationship, not a new prospect target.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://northstaranesthesia.com/job/adventhealth-central-full-time-crna/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "AdventHealth Port Charlotte actively recruiting Board-Certified General Anesthesiologists and a Cardiac Anesthesiologist for its expanding anesthesia department following the 2025 acquisition.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://jobs.adventhealth.com/job/23177894/port-charlotte-fl-general-anesthesiologist-job-with-adventhealth/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "AdventHealth",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "AdventHealth Daytona Beach has an open CRNA position on its own careers site for its growing anesthesia team at the 367-bed hospital.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://jobs.adventhealth.com/job/22998680/crna-anesthesiology-practice-daytona-beach-fl-daytona-beach-fl/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Invested nearly $350M in M&A and de novo development in 2025, adding 35 facilities to end the year with interests in 533 ASCs and 26 surgical hospitals across 37 states; targeting $250M for 2026 M&A.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://www.beckersasc.com/asc-transactions-and-valuation-issues/uspi-splashed-350m-added-35-facilities-in-2025/",
+      "severity": "HIGH"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "News Mention",
+      "signal_detail": "Net operating revenue reached roughly $5.2B in FY2025 with EBITDA margins near 40%; Tenet's 2026 outlook projects USPI revenue of $5.5-5.7B.",
+      "signal_date": "2026-02-01",
+      "source_url": "https://investor.tenethealth.com/press-releases/press-release-details/2026/Tenet-Reports-Strong-Fourth-Quarter-and-FY-2025-Results-Provides-2026-Financial-Outlook/default.aspx",
+      "severity": "MEDIUM"
+    },
+    {
+      "company_name": "United Surgical Partners International",
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Multiple live CRNA and anesthesia-support job postings across its careers site: Dover DE, Tucson AZ (Arizona Digestive Institute), Lake City and Summerfield FL, plus anesthesia techs in Dallas, San Antonio, Fort Worth, Waco, Arlington, Fresno, Tampa, and The Woodlands.",
+      "signal_date": "2026-07-01",
+      "source_url": "https://careers.uspi.com/job/dover/certified-registered-nurse-anesthetist-crna/35934/93928407792",
+      "severity": "HIGH"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Atlas Healthcare Partners launched a new joint venture with Prisma Health to develop and operate more than 15 ambulatory surgery centers across South Carolina (Greenville-Spartanburg, Columbia, Charleston, coastal region) and southeastern Tennessee, transitioning two existing and two new Prisma Health ASCs into the JV. This is a newly named health-system partner distinct from the already-logged Banner Health JV, opening new anesthesia-coverage need across a growing multi-state ASC network.",
+      "signal_date": "2026-02-19",
+      "source_url": "https://www.atlashp.com/prisma-health-atlas-launch-joint-venture-partnership/",
+      "severity": "HIGH",
+      "company_name": "Atlas Healthcare Partners"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Atlas Healthcare Partners and Fairview Health Services announced a new joint venture to develop and operate a network of ambulatory surgery centers across Minnesota and surrounding regions. CEOs Aric Burke (Atlas) and James Hereford (Fairview) both confirmed the JV; specific ASC count/timeline not yet disclosed. New named partner in a market Atlas has not previously served, representing a fresh anesthesia-coverage opportunity separate from the already-logged Banner Health JV.",
+      "signal_date": "2026-04-21",
+      "source_url": "https://www.atlashp.com/fairview-atlas-ambulatory-surgery-center-joint-venture/",
+      "severity": "HIGH",
+      "company_name": "Atlas Healthcare Partners"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Atlas Healthcare Partners, together with Banner Health, acquired the previously independent Surgery Center of Gilbert (near the Mesa-Gilbert border, AZ), rebranding it Banner Surgery Center - Gilbert. The facility has 5 operating rooms and serves Cosmetic, ENT, General Surgery, Orthopedics, Ophthalmology, Total Joint Replacement, and Urology, adding new named OR capacity with anesthesia-coverage need. This is a distinct, dated facility-level acquisition (a formerly independent ASC joining the network), not the previously logged Banner Health/Atlas JV-formation fact.",
+      "signal_date": "2026-03-02",
+      "source_url": "https://www.atlashp.com/expanding-outpatient-care-in-the-east-valley-with-banner-surgery-center-gilbert/",
+      "severity": "HIGH",
+      "company_name": "Atlas Healthcare Partners"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Houston Methodist's Department of Anesthesiology & Critical Care states its anesthesiologists and CRNAs 'collaborate with U.S. Anesthesia Partners' to deliver anesthesia care on the day of surgery, identifying U.S. Anesthesia Partners (USAP) as the incumbent contracted anesthesia group at Houston Methodist Hospital / the Texas Medical Center flagship campus that NorthStar would need to displace.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.houstonmethodist.org/for-health-professionals/department-programs/anesthesiology/",
+      "severity": "HIGH",
+      "company_name": "Houston Methodist"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Houston Methodist Specialty Physician Group has multiple concurrent open anesthesia clinician reqs at its Texas Medical Center campus: three separate Nurse Anesthetist (CRNA) postings (JR-10613, JR-12066, JR-3994) plus an open Cardiothoracic Anesthesiologist role (JR-10232) for the cardiovascular anesthesiology team, indicating a sustained team-level self-staffing need rather than a single vacancy.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.houstonmethodistcareers.org/jobs/crna/houston-methodist-specialty-physician-group/",
+      "severity": "HIGH",
+      "company_name": "Houston Methodist"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Kyle Stanzel, VP/COO of Houston Methodist West Hospital since 2018, was named CEO of Houston Methodist Clear Lake Hospital effective April 6, 2026, succeeding Carl Little, who moved up to CEO of Houston Methodist West - a facility-level leadership change at one of the system's 8 hospitals.",
+      "signal_date": "2026-04-06",
+      "source_url": "https://communityimpact.com/houston/bay-area/government/2026/04/09/houston-methodist-clear-lake-appoints-new-ceo/",
+      "severity": "HIGH",
+      "company_name": "Houston Methodist"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Ascension (nonprofit health system) completed its previously announced $3.9B acquisition of AMSURG, adding AMSURG's 250+ ASCs across 34 states to Ascension's outpatient network (Ascension now operates 300+ ASCs). AMSURG President/CEO Jeff Snodgrass remains in place. This is a full ownership change of the target company itself, which changes the buying committee/procurement structure for any anesthesia coverage decisions going forward.",
+      "signal_date": "2026-06-04",
+      "source_url": "https://amsurg.com/blog/2026/06/04/ascension-and-amsurg-come-together-to-serve-more-communities/",
+      "severity": "HIGH",
+      "company_name": "AMSURG"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "As a condition of clearing the Ascension-AMSURG deal, the FTC required divestiture of 7 ASCs to resolve competitive overlap, including facilities in the Nashville, TN market (going to SCA Health, an Optum subsidiary, plus one Panama City, FL center going to Florida Gastroenterology Center). Nashville is NorthStar Anesthesia's own home market, so these specific facilities are changing ownership away from AMSURG and will need new anesthesia coverage arrangements under SCA Health/Optum.",
+      "signal_date": "2026-06-02",
+      "source_url": "https://www.healthcaredive.com/news/ascension-amsurg-ftc-consent-order-surgery-center-divestitures/821741/",
+      "severity": "HIGH",
+      "company_name": "AMSURG"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "AMSURG expanded its North Carolina footprint by acquiring five GI/endoscopy centers (Wake Forest Endoscopy Center, Wake Endoscopy-Cary, Wake Endoscopy-Raleigh, Clayton Endoscopy Center, Wilson Endoscopy Center), staffed by 15 board-certified gastroenterologists/hepatologists. Lower anesthesia acuity than surgical ASCs (GI sedation vs. general anesthesia), but represents new centers added to the platform needing sedation/anesthesia coverage decisions.",
+      "signal_date": "2026-07-14",
+      "source_url": "https://www.prnewswire.com/news-releases/amsurg-expands-portfolio-with-acquisition-of-five-north-carolina-centers-302825019.html",
+      "severity": "MEDIUM",
+      "company_name": "AMSURG"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Live posting for Full Time and PRN CRNAs at the AMSURG GI Center in The Woodlands, TX. W2 compensation listed at $250,000/year, Monday-Friday schedule with no nights/call/weekends and a potential 4-day week - indicates a sustained, well-funded direct-hire need at this facility rather than a one-off req.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://jobs.practicelink.com/jobs/1402580/anesthesiology/crna/texas/amsurg-the-woodlands-tx-1/",
+      "severity": "HIGH",
+      "company_name": "AMSURG"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Live PRN CRNA opening posted for AMSURG's Melbourne GI Center in Melbourne, FL (no nights/call/weekends, part-time/PRN basis).",
+      "signal_date": "2026-07-07",
+      "source_url": "https://usanesthesiajobs.com/job/54010",
+      "severity": "MEDIUM",
+      "company_name": "AMSURG"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Texas Health Harris Methodist Fort Worth is expanding its Jane and John Justin Tower with 4 new dedicated obstetric operating rooms and a new Surgical Trauma Progressive Care Unit, alongside 71 new patient rooms (opening 2026), vertical build-out on floors 9-12 (completing 2029), and an 86-bed NICU (2030).",
+      "signal_date": "2026-07-14",
+      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2026/Justin-Tower-to-Grow-as-Texas-Health-Fort-Worth-Expands-Womens-Services",
+      "severity": "HIGH",
+      "company_name": "Texas Health Resources"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Texas Health Resources announced a new ground-up hospital on 51 acres in north McKinney, opening early 2029 with 60 beds (plans to double capacity for future growth), including surgical suites, a Women's Services Center with labor/delivery and NICU, cardiology services, and an ED.",
+      "signal_date": "2026-02-24",
+      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2026/Texas-Health-Announces-New-Hospital-Coming-to-North-McKinney",
+      "severity": "HIGH",
+      "company_name": "Texas Health Resources"
+    },
+    {
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "CEO Barclay Berdan announced his retirement after 40 years with Texas Health Resources; he will step down as CEO in September 2026.",
+      "signal_date": "2026-03-30",
+      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2026/Texas-Health-Resources-Announces-Leadership-Transition",
+      "severity": "HIGH",
+      "company_name": "Texas Health Resources"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Winjie Miao named President effective April 5, 2026, positioned to succeed Barclay Berdan as CEO in September 2026, becoming the system's third CEO and first woman in the role. Laura Irvine was named SEVP and Chief Operating and Growth Officer in the same restructuring.",
+      "signal_date": "2026-03-30",
+      "source_url": "https://www.texashealth.org/newsroom/News-Releases/2026/Texas-Health-Resources-Announces-Leadership-Transition",
+      "severity": "HIGH",
+      "company_name": "Texas Health Resources"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Envision Physician Services, Broward Health's anesthesia partner since the Feb 2025 incumbent transition, is still actively recruiting anesthesiologists, CRNAs, and Certified Anesthesiologist Assistants across all four hospitals roughly 18 months later, including an open Chief CRNA (leadership) role at Imperial Point ($150K start bonus plus relocation, overseeing scheduling, staffing, and recruitment for a 6-physician/10-APP team), with $100K-$150K sign-on bonuses system-wide. Sustained multi-site openings this long after the transition indicate anesthesia staffing has not fully stabilized under the current vendor.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.envisionhealth.com/broward-health-anesthesiology",
+      "severity": "HIGH",
+      "company_name": "Broward Health"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Broward Health Medical Center added the da Vinci 5 robotic surgical system (the latest-generation platform, following an earlier rollout at Broward Health Coral Springs), continuing a system-wide robotic fleet upgrade that points to higher-acuity surgical case growth.",
+      "signal_date": "2026-04-14",
+      "source_url": "https://southfloridahospitalnews.com/broward-health-medical-center-advances-surgical-care-with-cutting-edge-da-vinci-5-system/",
+      "severity": "MEDIUM",
+      "company_name": "Broward Health"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Novant Health completed its acquisition of Community Hospital of Stokes, a 53-bed critical access hospital plus a 40-bed skilled nursing unit and affiliated clinics, adding roughly 200 team members to the network. The county board selected Novant as its healthcare partner on March 23, 2026, and the deal closed June 1, 2026, expanding Novant's footprint into Stokes County, NC.",
+      "signal_date": "2026-06-01",
+      "source_url": "https://www.novanthealth.org/newsroom/novant-health-welcomes-community-hospital-of-stokes-celebrates-transformative-investment-in-the-county",
+      "severity": "HIGH",
+      "company_name": "Novant Health"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Novant Health filed a Certificate of Need application to add 225 inpatient beds via a new patient tower at New Hanover Regional Medical Center in Wilmington, NC, focused on heart and vascular care, including new advanced operating rooms, cardiac catheterization labs, and electrophysiology labs, as part of a $1 billion master facility plan.",
+      "signal_date": "2026-06-15",
+      "source_url": "https://www.novanthealth.org/newsroom/releases-20260615",
+      "severity": "MEDIUM",
+      "company_name": "Novant Health"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Novant Health is directly recruiting CRNAs (self-staffing, not through its exclusive Charlotte-market anesthesia group) across multiple facilities and regions simultaneously, including a weekends-only CRNA III role in Winston-Salem plus open CRNA reqs in Wilmington, Huntersville, Matthews, and Kernersville, NC, indicating sustained multi-site anesthesia staffing need outside the Charlotte contract.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://jobs.novanthealth.org/winston-salem-region/jobs/210456?lang=en-us",
+      "severity": "HIGH",
+      "company_name": "Novant Health"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "UMC Main (University Medical Center of El Paso) is directly self-staffing anesthesia: an active full-time CRNA opening lists $260,000/year employed or $301,600/year contracted, welcomes new graduates, and offers up to $10,000 in relocation assistance. Both employed and contracted tracks being offered simultaneously indicates sustained anesthesia coverage need, not a single isolated req.",
+      "signal_date": "2026-06-30",
+      "source_url": "https://jobs.inline.group/umcelpaso/jobs/CRNA-job-in-El-Paso,-TX-31548",
+      "severity": "HIGH",
+      "company_name": "University Medical Center of El Paso (UMC)"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "El Paso County Hospital District created a new hospital-level CEO role and appointed Maria Zampini, previously UMC's longtime COO (since 2013), as CEO of the UMC hospital campus. She reports to Jacob Cintron, President/CEO of the Hospital District. Zampini personally oversaw over $500 million in prior facility and bond construction projects, making her the key operational contact for the current $396.6M expansion program.",
+      "signal_date": "2026-04-17",
+      "source_url": "https://elpasomatters.org/2026/04/16/umc-el-paso-hospital-ceo-maria-mercedes-zampini/",
+      "severity": "HIGH",
+      "company_name": "University Medical Center of El Paso (UMC)"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Dr. Victor Waters, MD, JD was named UMC's new Chief Medical Officer, succeeding retiring Dr. Joel Hendryx. Waters previously served as CMO for Dignity Health Arizona's West Valley/West Gate markets, where he led a Level I trauma center, giving him direct trauma/perioperative operational background relevant to anesthesia coverage decisions.",
+      "signal_date": "2026-02-02",
+      "source_url": "https://kvia.com/news/2026/02/02/umc-announces-new-chief-medical-officer/",
+      "severity": "HIGH",
+      "company_name": "University Medical Center of El Paso (UMC)"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "UMC completed a fleet-wide upgrade to the da Vinci 5 robotic surgical system (Intuitive), becoming the first teaching hospital in Texas to do so, with the only da Vinci 5 platform in El Paso. The system supports cardiovascular, colorectal, gynecologic, thoracic, head & neck, and urology robotic procedures with a dual teaching console, signaling rising surgical volume/acuity and OR throughput investment beyond a single-unit deployment.",
+      "signal_date": "2026-04-08",
+      "source_url": "https://kvia.com/news/top-stories/2026/04/08/umc-el-paso-upgrades-surgical-fleet-with-da-vinci-5-robot/",
+      "severity": "HIGH",
+      "company_name": "University Medical Center of El Paso (UMC)"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "North American Partners in Anesthesia (NAPA) is the confirmed incumbent anesthesia staffing vendor at Optim Medical Center-Tattnall in Reidsville, GA, the facility NorthStar would need to displace. NAPA has posted a recurring stream of distinct CRNA and CAA requisitions (both full-time and per diem) for this single site over an extended period, indicating sustained, ongoing anesthesia staffing need rather than a one-off opening. Schedule is Monday-Friday, predominantly elective orthopedic cases, no nights/weekends/call.",
+      "signal_date": "2026-07-30",
+      "source_url": "https://careers.napaanesthesia.com/us/en/job/JR9516/CAA-Optim-Medical-Center-Tattnall-Per-Diem",
+      "severity": "HIGH",
+      "company_name": "OPTIM HEALTH SYSTEM"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "United Anesthesia Services, P.C. (UAS), the physician-owned Philadelphia-area anesthesia group that staffs Riddle Surgical Center on a contracted basis, has an active CRNA opening specifically for Riddle Surgical Center in Media, PA, live on Glassdoor and cross-posted to ZipRecruiter and Indeed as of today. This confirms UAS as the incumbent anesthesia vendor at the account, the group NorthStar would need to displace or supplement, and shows an open staffing gap there.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.glassdoor.com/job-listing/crna-riddle-surgical-center-united-anesthesia-services-JV_IC1152642_KO0,27_KE28,54.htm?jl=1009746139863",
+      "company_name": "Riddle Surgical Center"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "Select Medical Holdings Corporation, the parent company of Regency Hospital Company, was taken private in a $3.9 billion deal by a consortium led by Robert A. Ortenzio, Martin F. Jackson, and Welsh, Carson, Anderson & Stowe (WCAS). The deal was announced March 2, 2026 at $16.50/share, approved by stockholders June 26, 2026, and closed July 1, 2026, at which point Select Medical stock ceased trading on the NYSE. Current management is expected to remain in place, but new PE ownership of the parent is a reason to re-engage account leadership on contract terms across the Regency Hospital portfolio.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-01",
+      "source_url": "https://www.prnewswire.com/news-releases/select-medical-holdings-corporation-announces-stockholder-approval-of-acquisition-by-consortium-led-by-robert-a-ortenzio-martin-f-jackson-and-wcas-302812357.html",
+      "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "Regency Hospital of Minneapolis (Golden Valley, MN) has an active, open Chief Executive Officer search posted on LinkedIn (posted roughly late June 2026, salary $215,000 to $245,000), with Matt Campbell, J.D. serving only as interim CEO after transferring in from Select Specialty Hospital, Saginaw. The permanent facility CEO seat is vacant as of today.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.linkedin.com/jobs/view/chief-executive-officer-at-regency-hospital-company-4421871831",
+      "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "News Mention",
+      "signal_detail": "Regency Hospital in Meridian, Mississippi (a 40-bed critical illness recovery hospital on the second floor of Anderson Regional Medical Center South) closed around March 13, 2026, per Select Medical chief communication officer Shelly Eckenroth, who called it 'an operational business decision.' Patients were redirected to Ochsner Specialty Hospital in Meridian; this removes one facility from the Regency portfolio and signals possible footprint consolidation elsewhere.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-13",
+      "source_url": "https://meridianstar.com/2026/02/19/regency-hospital-to-close-next-month/",
+      "company_name": "REGENCY HOSPITAL COMPANY"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Cullman Regional Medical Center is actively recruiting a Certified Registered Nurse Anesthetist (CRNA) for its own self-operated anesthesia service (Cullman Regional Anesthesia Services LLC), offering $165,000 to $250,000 annually plus a $25,000 sign-on bonus for a two-year commitment. The role covers a CRNA-only model in Endoscopy, Pain Clinic, MRI/CT Imaging and the Cardiac Lab, indicating the hospital self-staffs anesthesia rather than using an outsourced group, a displaceable/supplementable target for NorthStar.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.linkedin.com/jobs/view/crna-5681-at-cullman-regional-medical-center-3908826451",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Cullman Regional Medical Center named Kim Albright as Chief Financial Officer, returning to the hospital after serving as CFO of Baptist Health Walker Hospital in Jasper, Alabama. She previously held Assistant CFO and Executive Director of Decision Support roles at Cullman Regional. A new CFO is a fresh budget-cycle decision-maker for any anesthesia staffing contract discussion.",
+      "severity": "HIGH",
+      "signal_date": "2026-05-30",
+      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/alabama-hospital-taps-new-cfo-2/",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Cullman Regional partnered with Baptist Health's Cardiovascular Associates (CVA) to open a new Heart & Vascular Clinic on the Cullman Regional campus, which began seeing patients April 27, 2026 (partnership announced May 1, 2026). The clinic adds electrophysiology and vascular disease treatment locally, with the hospital and CVA physicians stating plans to add further cardiovascular and peripheral vascular procedural capabilities, a service line that typically carries anesthesia/sedation demand.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-05-01",
+      "source_url": "https://www.cullmantribune.com/2026/05/01/new-partnership-to-add-advanced-cardiovascular-care-at-cullman-regional/",
+      "company_name": "Cullman Regional Medical Center"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "UPMC's University of Pittsburgh Physicians Department of Anesthesiology and Perioperative Medicine is actively recruiting board-certified/eligible anesthesiologists with obstetric anesthesiology fellowship training or substantial OB anesthesia experience to staff Magee-Womens Hospital of UPMC, which delivers close to 10,000 births a year (45 percent of all Allegheny County births). The listing offers a lucrative incentive bonus, has been reposted across PracticeLink, ASA CareerCenter, AORN and NAPNAP job boards since at least April 12, 2026, and remains open as of late July 2026, pointing to a persistent, self-staffed OB anesthesia vacancy rather than a filled seat.",
+      "severity": "HIGH",
+      "signal_date": "2026-04-12",
+      "source_url": "https://jobs.practicelink.com/jobs/1392152/anesthesiology/physician/pennsylvania/upmc-magee-women-s-hospital/",
+      "company_name": "Magee-Womens Hospital Of Upmc"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "UPMC is directly recruiting several full-time CRNAs for Magee-Womens Hospital of UPMC through University of Pittsburgh Physicians' Anesthesiology Department, citing an expanding OB Service Line and preferring candidates with OB and regional anesthesia skills. The req offers a newly increased salary range, a substantial sign-on bonus and relocation assistance, and is live alongside a separate casual CRNA posting at the same facility as of July 2026, indicating UPMC's self-staffed anesthesia capacity is not keeping pace with OB volume growth.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://careers.upmc.com/job/21041348/crna-upmc-magee-womens-hospital-pittsburgh-pa/",
+      "company_name": "Magee-Womens Hospital Of Upmc"
+    },
+    {
+      "signal_type": "C-Suite Exit",
+      "signal_detail": "HonorHealth announced CEO Todd LaPorte will step down after more than a decade leading the system, effective March 1, 2027, after which he will serve as a strategic advisor to the CEO. Announcement made June 16, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-16",
+      "source_url": "https://www.honorhealth.com/healthy-living/honorhealth-announces-ceo-transition-plan-evp-john-neil-md-mmm-named-successor-todd",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "C-Suite Join",
+      "signal_detail": "Dr. John Neil, MD, MMM, previously EVP, Chief Physician Executive and Chief Strategy Officer, was named CEO-designate and immediately assumed the newly created role of President at HonorHealth, ahead of becoming CEO on March 1, 2027. Announced June 16, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-16",
+      "source_url": "https://www.beckershospitalreview.com/hospital-executive-moves/honorhealth-ceo-to-exit-role-new-leader-named/",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "HonorHealth completed a $170 million renovation and expansion at HonorHealth Deer Valley Medical Center (north Phoenix), adding a new four-story, 166,000-square-foot patient care pavilion with four new operating rooms and expanded pre/post-op areas, growing the hospital from 204 to 238 beds. Announced April 30, 2026, with a ribbon-cutting planned later in 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-04-30",
+      "source_url": "https://www.honorhealth.com/healthy-living/honorhealth-completes-170m-renovation-and-expansion-deer-valley-medical-center",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "HonorHealth unveiled major campus enhancements at HonorHealth Scottsdale Shea Medical Center as part of a roughly $60 million multi-phase project: a new Heart Care Center with cardiovascular ICU and a new outpatient ambulatory surgery facility for cardiovascular procedures, plus a new 400-space parking garage. Announced June 11, 2026.",
+      "severity": "HIGH",
+      "signal_date": "2026-06-11",
+      "source_url": "https://azbigmedia.com/business/health-care/honorhealth-unveils-major-campus-enhancements-at-scottsdale-shea-medical-center/",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "News Mention",
+      "signal_detail": "Fitch downgraded HonorHealth's Issuer Default Rating and revenue bonds to A from A+ with a negative outlook on March 18, 2026, citing higher-than-expected strategic spending and weaker operating results during integration of the Steward Health Care assets, even as the system pursues a roughly $600 million further expansion.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-18",
+      "source_url": "https://www.abc15.com/news/business/fitch-downgrades-honorhealth-rating-as-nonprofit-system-pursues-600m-expansion",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "Valley Anesthesiology Consultants (an Envision Physician Services practice) is confirmed as the exclusive anesthesia group under contract across multiple HonorHealth facilities, including Deer Valley, Sonoran Crossing, Thompson Peak, Scottsdale Shea, and John C. Lincoln North Mountain. As of today it has live open recruiting for a BE/BC anesthesiologist (up to $190K in bonuses) and CRNAs (e.g., $260K-266K base plus $50K start bonus) at Scottsdale Shea to fill its exclusive HonorHealth coverage, identifying the incumbent vendor NorthStar would need to displace.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.envisionhealth.com/find-a-career/clinical-job-search/anesthesiologist-scottsdale-az/jo000012604",
+      "company_name": "HONORHEALTH"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Doctors Hospital of Augusta (HCA) held a topping out ceremony on May 15, 2026, placing the final beam for two new floors as part of its $150 million capital campaign: one floor added to the burn tower (expanding care capacity for pediatric and adult burn patients, the hospital's signature high acuity service line and home to the nation's largest burn center) and one floor added to the South Tower for an expanded inpatient rehab unit. CEO Joanna Conley cited CSRA population growth as the driver. New floors are expected to open by spring 2027, adding 110+ new full time jobs. This is a leading indicator of continued perioperative and burn surgical capacity growth at the flagship facility, worth tracking ahead of the 2027 opening.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-05-15",
+      "source_url": "https://www.wrdw.com/2026/05/15/doctors-hospital-marks-progress-150m-community-campaign/",
+      "company_name": "Doctors Hospital Of Augusta"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Cleveland Clinic confirmed it will begin demolition and site preparation in Q3 2026 for a new 200 bed hospital in West Palm Beach (part of the Cleveland Clinic Florida region, Palm Beach County), plus a separate outpatient center and ambulatory surgery center at 15 CityPlace targeted to open November 2027. The capital campaign has raised over 180 million dollars toward a 500 million dollar goal. This is new surgical capacity being added inside the same Cleveland Clinic Florida region as Weston, Indian River, Tradition, and Martin Health, meaning new OR and perioperative demand a NorthStar rep should track from the ground up.",
+      "severity": "HIGH",
+      "signal_date": "2026-02-22",
+      "source_url": "https://newsroom.clevelandclinic.org/2026/02/22/cleveland-clinic-highlights-growth-and-strategic-momentum-in-palm-beach-county",
+      "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Acquisition / M&A",
+      "signal_detail": "The Orthopaedic Center of Vero Beach joined Cleveland Clinic Indian River Hospital (Vero Beach, FL) on February 2, 2026, bringing joint replacement, sports medicine, and spine surgery physicians in house along with existing robotic hip/knee and augmented reality shoulder navigation capability. This adds an employed surgical volume feeder at Indian River Hospital specifically, worth flagging even though it is a single practice roll-up rather than a hospital-level deal.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-02-02",
+      "source_url": "https://newsroom.clevelandclinic.org/2026/02/02/cleveland-clinic-indian-river-hospital-welcomes-leading-orthopaedic-practice-to-expand-care",
+      "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Cleveland Clinic Florida is self-staffing anesthesia across multiple concurrent open requisitions rather than relying solely on an outside group: Cleveland Clinic Weston Hospital currently has live postings for a General Anesthesiologist, a Cardiac Anesthesiology Physician, a Surgical Intensive Care Unit (SICU) Anesthesiologist, and a Liver Transplant Anesthesiologist, plus a CRNA PRN role advertising a sign on bonus and PSLF eligibility, and a separate CRNA PRN opening at Cleveland Clinic Indian River Hospital in Vero Beach. This is a multi-specialty, multi-facility in house anesthesia hiring push, a clear self-staffing/displaceable signal for a NorthStar pitch naming Weston and Indian River specifically.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://careers.asahq.org/job/physician-anesthesia-surgical-intensive-care-unit-sicu/84295401/",
+      "company_name": "Cleveland Clinic Florida"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Flowers Hospital (Dothan, AL, 235-bed CHS-affiliated regional medical center) is directly recruiting a hospital-employed, full-time Board-Certified or Board-Eligible Anesthesiologist for its perioperative team under a CRNA Medical Direction model, covering cardiac, orthopedic, general, OB, spine, urology, plastic and ENT cases. Compensation offered is W-2 $550,000/year (48 hrs/week, 1 in-house 24-hour call shift plus three 8-hour shifts, 10 weeks vacation) or 1099 at $335/hour. This is self-staffing by the hospital itself, a displaceable/supplementable position for a NorthStar pitch.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.practicematch.com/physicians/job-details.cfm/1076560/anesthesiology/alabama/dothan/flowers-hospital/",
+      "company_name": "FLOWERS HOSPITAL"
+    },
+    {
+      "signal_type": "Creative Hiring",
+      "signal_detail": "Flowers Hospital in Dothan, AL is also actively recruiting CRNAs directly (both a full-time req and a separate PRN req), practicing under the CRNA Medical Direction model, new grads welcome, PRN rate around $150/hour, W-2 or 1099 available. The PRN listing was live on ZipRecruiter (posted roughly 3 weeks prior to this search) with recruiter contact Brooke Grosse, Anesthesia Recruiter for Community Health Systems (CHS), the parent system. Confirms Flowers Hospital is a CHS facility self-staffing its anesthesia department rather than using an outside group, a direct displacement/supplement opportunity for NorthStar.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://www.hospitalrecruiting.com/co/231/flowers-hospital/crna/all/",
+      "company_name": "FLOWERS HOSPITAL"
+    },
+    {
+      "signal_type": "Partnership",
+      "signal_detail": "NorthStar Anesthesia already holds the anesthesia staffing contract at Central Ohio Urology Surgery Center in Gahanna, OH, operating under a Medical Direction model. NorthStar is actively recruiting to fill both a Full-Time CRNA role (four 10-hour shifts per week, $300K+ base plus sign-on bonus) and a PRN CRNA role (2 to 3 days per week) at this facility, per live job postings open as of 2026-07-30. This is an existing account relationship, not a displacement opportunity, and should reframe outreach toward retention/expansion rather than a competitive pitch.",
+      "severity": "HIGH",
+      "signal_date": "2026-07-30",
+      "source_url": "https://northstaranesthesia.com/job/central-ohio-urology-surgery-center-prn-crna/",
+      "company_name": "Central Ohio Urology Group"
+    },
+    {
+      "signal_type": "Product Launch",
+      "signal_detail": "Central Ohio Urology Group announced on March 6, 2026 that it is the first provider in Ohio to offer the HYDROS Robotic System for Aquablation therapy (AI-powered, robotic-assisted waterjet treatment for BPH) inside its Central Ohio Urology Surgery Center ASC in Gahanna. This is a new procedural technology deployment that adds a robotic-assisted case type to the ASC's anesthesia caseload.",
+      "severity": "MEDIUM",
+      "signal_date": "2026-03-06",
+      "source_url": "https://www.centralohiourology.com/central-ohio-urology-group-first-in-ohio-to-offer-hydros-robotic-system-a-cutting-edge-ai-powered-platform-for-aquablation-therapy-to-treat-bph-in-an-ambulatory-surgery-center/",
+      "company_name": "Central Ohio Urology Group"
+    }
+  ],
+  "companies_removed_from_universe": [
+    "Axion Spine Outpatient Surgery Center",
+    "BLANCHARD VALLEY HEALTH SYSTEM",
+    "Baucom & Mina Derm Surgery",
+    "Central Ohio Surgical Inst",
+    "Compass Surgical Partners",
+    "Greater Dayton Surgery Center",
+    "Grove Hill Memorial Hospital",
+    "LasikPlus (AKA LCA - Vision Inc)",
+    "Lecanto Surgery Center",
+    "Lone Star Surgery Pllc",
+    "Midwest Vision Surgery Center - Mvp",
+    "Ohio Surgery Center",
+    "Oral & Facial Surgery",
+    "Rothman Orthopaedic Institute",
+    "Texas Back Institute",
+    "The Ambulatory Surgery Center at St Mary",
+    "Turk'S Head Surgery Center, L.L.C.",
+    "Us Oral Surgery Management"
+  ],
+  "_quality_bar": {
+    "why": "This feed drives real sales outreach for an anesthesia staffing and perioperative management company. A signal earns its place only if it changes who a rep calls, when they call, or what they open with. Volume is not the goal; a short feed of real buying windows beats a long one padded with press releases.",
+    "include_HIGH": [
+      "The account is recruiting anesthesiologists or CRNAs itself (self-staffing, so displaceable or supplementable). Name the facility, comp, and whether it is one req or a team.",
+      "The incumbent anesthesia group or staffing vendor is identified (who NorthStar would displace).",
+      "New or added operating rooms, new surgical hospitals, new ASCs, OR or perioperative capacity expansion.",
+      "Surgical volume or acuity going up: robotic fleet purchases, OR throughput programs, a shift to higher-acuity service lines.",
+      "Ownership change at the account: M&A, merger, JV, PE or health-system takeover. Contracts get reviewed when owners change.",
+      "A new CEO, COO, CFO, CMO, or perioperative/surgical-services leader, or an open vacancy in one of those roles.",
+      "An existing NorthStar relationship or contract at the account (account-team context, and label it as such)."
+    ],
+    "include_MEDIUM": [
+      "Non-OR facility growth attached to a surgical hospital (beds, towers, attached ERs).",
+      "Financial growth or fresh capital that funds surgical expansion.",
+      "Division-level or MSO-level leadership change one step removed from the contract owner.",
+      "A single robot deployment or a single ASC joining a platform.",
+      "Instability worth a call: service-line closure, physician group attrition, ownership litigation."
+    ],
+    "exclude_always": [
+      "Awards, rankings, 'best of' or 'most awarded' lists, Healthgrades/US News/Newsweek/Leapfrog honours, anniversaries, individual physician honours. Recognition is not intent.",
+      "Rollup or summary signals that restate specific signals already logged, and the same job req cross-posted to a second board.",
+      "Events superseded by a later logged event (log the current state, not the whole history).",
+      "Firmographics dressed as events: 'their site says they use X', 'person confirmed in role as of'. If there is no dated event, it is not a signal, and a today-stamped non-event never ages out of the 90-day windows.",
+      "Anything with no path to anesthesia demand: payer or health-plan network contracting, medspa and aesthetics, unrelated compliance settlements, venture investments in unrelated tech, academic faculty posts, PR and research milestones.",
+      "NorthStar's own job reqs logged as the prospect's hiring intent. That inverts the read: it means NorthStar already holds the contract, so log it as Partnership."
+    ],
+    "rules": [
+      "Prefer specifics over aggregates. Facility name, OR count, comp figure, and date are what make a signal usable.",
+      "Every claim needs a real fetchable source URL. An empty category is a good and expected result; reporting nothing beats guessing.",
+      "signal_date must be the date the event happened, not the date it was researched. Use a today-stamp only for a genuinely live job posting.",
+      "Severity is importance to an anesthesia pitch, not confidence in the source. If most rows are HIGH, the tile has stopped filtering anything.",
+      "Exec-change signals carry a finite buying window of roughly 12 to 18 months. Past that, drop them to MEDIUM: knowing who holds the seat is context, not a trigger. Capacity facts (operating rooms, facilities, ownership) do not decay the same way and keep their severity.",
+      "Facility growth is HIGH only when it adds operating rooms or surgical capacity. Outpatient clinics, freestanding ERs, rehab towers, and medical office buildings are footprint, not anesthesia demand.",
+      "Calibrate severity to scale. A 49-robot fleet purchase and one da Vinci at one ASC are not the same signal; a 35-facility M&A year and one ASC joining a platform are not either.",
+      "A CEO transition is legitimately two rows (C-Suite Exit for the outgoing person, C-Suite Join for the incoming one): they are two different contacts. That is not a duplicate.",
+      "Prune as well as add. Re-run the seed with --prune so the JSON stays the single source of truth.",
+      "As of 2026-07-30, per explicit user instruction, this tracker only admits signals whose signal_date falls within the last 6 months (~180 days) of the most recent research/prune pass, not just ones that clear the relevance bar above. Exclude anything older at research time rather than logging and letting severity decay -- and periodically re-run the prune (see seed_northstar_signals.py --prune) so signals that age past the window get removed even if nothing new was added. This mostly supersedes the exec-change 12-18 month decay-to-MEDIUM rule above for admission purposes: anything past 6 months is dropped outright, not downgraded."
+    ]
+  }
+}
