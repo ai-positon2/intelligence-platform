@@ -41,34 +41,25 @@ def test_budget_never_reaches_the_prompt():
     assert "40k" not in b and "budget" not in b.lower()
 
 
-def test_the_category_prompt_names_which_side_of_the_floor_to_look_at():
-    sys_prompt = D._FIND_SYSTEM.format(
-        category_label=R.CATEGORY_LABELS[R.CAT_FREE_VENDOR],
-        category_brief=R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR],
-        profile=D.profile_brief(PROFILE),
-        today="2026-09-02",
-        where_buyers=R.CLASSIFICATION_WHERE_BUYERS_ARE[R.CLASS_B2B_TO_MARKETING])
+def test_the_category_prompt_names_which_side_of_the_floor_to_look_at(monkeypatch):
+    monkeypatch.setattr(D, "_today", lambda: "2026-09-02")
+    sys_prompt = D.find_system(R.CAT_FREE_VENDOR, PROFILE)
     assert "Behind the booths" in sys_prompt
     assert "TODAY IS 2026-09-02" in sys_prompt, (
         "without an anchor the model measures the client's window from "
         "whenever it believes now is")
-    assert "Free vendor conference" in sys_prompt
-    assert "under-utilised" in sys_prompt
+    assert R.CATEGORY_LABELS[R.CAT_FREE_VENDOR] in sys_prompt
+    assert R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR][:40] in sys_prompt
 
 
-def test_the_confirm_prompt_carries_the_same_anchors_as_the_find_prompt():
+def test_the_confirm_prompt_carries_the_same_anchors_as_the_find_prompt(monkeypatch):
     """Both stages search, so both need the date anchor and the side of the
     floor. The confirm prompt was added second and is the one that would
     silently drift."""
-    sys_prompt = D._CONFIRM_SYSTEM.format(
-        event_name="SaaStr Annual",
-        category_label=R.CATEGORY_LABELS[R.CAT_VERTICAL_SUMMIT],
-        category_brief=R.CATEGORY_BRIEF[R.CAT_VERTICAL_SUMMIT],
-        why="dense with the buyer role",
-        website_line="",
-        profile=D.profile_brief(PROFILE),
-        today="2026-09-02",
-        where_buyers=R.CLASSIFICATION_WHERE_BUYERS_ARE[R.CLASS_B2B_TO_MARKETING])
+    monkeypatch.setattr(D, "_today", lambda: "2026-09-02")
+    sys_prompt = D.confirm_system(
+        {"name": "SaaStr Annual", "why": "dense with the buyer role"},
+        R.CAT_VERTICAL_SUMMIT, PROFILE)
     assert "SaaStr Annual" in sys_prompt
     assert "Behind the booths" in sys_prompt
     assert "TODAY IS 2026-09-02" in sys_prompt
@@ -78,11 +69,20 @@ def test_the_confirmer_is_told_it_may_say_no():
     """The whole point of the second stage. A confirmer that reads as an
     advocate would rubber-stamp whatever the finder proposed, and the split
     would buy nothing but latency."""
-    sys_prompt = D._CONFIRM_SYSTEM.format(
-        event_name="X", category_label="L", category_brief="B", why="w",
-        website_line="", profile="p", today="2026-09-02", where_buyers="w")
+    sys_prompt = D.confirm_system({"name": "X"}, R.CAT_EMERGING, PROFILE)
     assert "YOU ARE THE CHECK, NOT THE ADVOCATE" in sys_prompt
     assert "reject_reason" in sys_prompt
+
+
+def test_both_prompts_are_built_by_the_shipped_code_not_by_the_test():
+    """Three tests broke on a new placeholder because each rebuilt the format
+    call by hand. A prompt assembled anywhere but in the module is a prompt
+    nobody is really testing."""
+    import inspect
+    src = inspect.getsource(D)
+    body = src[src.index("def propose_category"):]
+    assert "_FIND_SYSTEM.format" not in body
+    assert "_CONFIRM_SYSTEM.format" not in body
 
 
 # ── dedup keys ────────────────────────────────────────────────────────────
@@ -294,7 +294,8 @@ _CONFIRM_TARGET = re.compile(r"THE EVENT TO CONFIRM: (.+)")
 
 def _stages(monkeypatch, find=None, confirm=None, find_error=None,
             confirm_error=None, find_searches=3, confirm_searches=3,
-            find_text=None, confirm_text=None):
+            find_text=None, confirm_text=None,
+            find_budget=False, confirm_budget=False):
     """Stub both discovery stages.
 
     `find` and `confirm` are the decoded reply bodies. `confirm` may instead
@@ -311,29 +312,172 @@ def _stages(monkeypatch, find=None, confirm=None, find_error=None,
         finding = "YOUR ONLY JOB IS TO NAME CANDIDATES" in system
         if finding:
             if find_error:
-                return _res("", find_error, find_searches)
+                return _res("", find_error, find_searches, find_budget)
             return _res(find_text if find_text is not None else find,
-                        None, find_searches)
+                        None, find_searches, find_budget)
         if confirm_error:
-            return _res("", confirm_error, confirm_searches)
+            return _res("", confirm_error, confirm_searches, confirm_budget)
         if confirm_text is not None:
-            return _res(confirm_text, None, confirm_searches)
+            return _res(confirm_text, None, confirm_searches, confirm_budget)
         body = confirm
         if callable(body):
             m = _CONFIRM_TARGET.search(system)
             body = body(m.group(1).strip() if m else "")
-        return _res(body, None, confirm_searches)
+        return _res(body, None, confirm_searches, confirm_budget)
 
-    def _res(text, error, searches):
+    def _res(text, error, searches, budget):
         return {"text": text, "raw": text, "error": error,
                 "stop_reason": "end_turn", "text_block_count": 1,
                 "tool_version": "v", "tool_errors": [], "usage": {},
                 # A real reply carries the number of searches it ran. Both
                 # stages discard an answer that ran none, so a stub omitting
                 # this is stubbing an ungrounded answer.
-                "search_count": searches}
+                "search_count": searches,
+                # And whether the model wanted a search it was not given.
+                # ask() sets this on every reply, so a stub that leaves it out
+                # is stubbing a reply shape that cannot occur.
+                "budget_spent": budget}
 
     monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+
+
+# ── a spent search budget is not a failed search ─────────────────────────
+#
+# The Beta Bionics regression. `max_uses_exceeded` is how the web_search tool
+# enforces the caller's own max_uses, and every call here saturates its budget
+# by design, so the wrapper used to report a complete reply as a failed search
+# and this module discarded it whole. Four of six categories died that way in
+# one live run, after half an hour of searching, and the run shipped one event.
+
+def test_a_finder_that_spends_its_whole_budget_keeps_the_events_it_found(monkeypatch):
+    """The single most expensive line in this module's history. The finder
+    named a real event, the confirmer confirmed it, and the only thing that
+    went 'wrong' was the finder reaching for a seventh search under a budget
+    of six."""
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "ATTD", "website": "https://attd.example",
+                               "why": "dense with the buyer role"}],
+                             complete=True),
+            confirm=_confirm_reply(_named(name="ATTD")),
+            find_budget=True)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert [e["name"] for e in r["events"]] == ["ATTD"], (
+        "a category that spent its search budget had its events thrown away")
+    assert r["status"] == D.STATUS_OK
+    assert r["budget_spent"] is True
+
+
+def test_a_spent_budget_does_not_downgrade_a_finished_category(monkeypatch):
+    """It is not a status. A category that named its candidates and confirmed
+    them did a complete piece of work, and reporting it as partial would put
+    'this category fell short' in a report about a search that did not."""
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "A", "website": "https://a.example", "why": "w"},
+                              {"name": "B", "website": "https://b.example", "why": "w"}],
+                             complete=True),
+            confirm=lambda nm: _confirm_reply(_named(name=nm)),
+            find_budget=True)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["status"] == D.STATUS_OK
+    assert r["detail"] == ""
+
+
+def test_a_confirmer_that_spends_its_budget_still_confirms(monkeypatch):
+    """Same bug, one stage later, and worse: here the discarded reply is a
+    confirmation of a real event that was about to be dropped from the list."""
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "ATTD", "website": "https://attd.example",
+                               "why": "w"}], complete=True),
+            confirm=_confirm_reply(_named(name="ATTD")),
+            confirm_budget=True)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert [e["name"] for e in r["events"]] == ["ATTD"]
+
+
+def test_a_finder_out_of_searches_says_so_in_our_words_not_as_a_fault(monkeypatch):
+    """When the model itself reports the cap as a cut-off, the reason shown to
+    a client must describe our own budget rather than send somebody hunting
+    for a broken tool."""
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "ATTD", "website": "https://attd.example",
+                               "why": "w"}], complete=False),
+            confirm=_confirm_reply(_named(name="ATTD")),
+            find_budget=True)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["status"] == D.STATUS_PARTIAL
+    assert "all %d of the searches" % D.FIND_MAX_USES in r["detail"]
+    assert "could not finish searching" not in r["detail"]
+
+
+def test_a_failed_search_explains_itself_without_naming_the_error_kind(monkeypatch):
+    """The kind is a machine token. Rendered under a category label in the
+    report it read "Side event: Transport: peer closed connection", a double
+    colon around a word that means nothing to the reader."""
+    _stages(monkeypatch,
+            find_error={"kind": "transport",
+                        "detail": "peer closed connection without a body."})
+    r = D.search_category(R.CAT_SIDE_EVENT, PROFILE)
+    assert r["status"] == D.STATUS_ERROR
+    assert "peer closed connection" in r["detail"]
+    assert not r["detail"].startswith("transport"), (
+        "the error kind leaked into a sentence a client reads")
+    assert r["detail"][0].isupper()
+
+
+def test_a_genuinely_cut_off_finder_still_reads_as_a_gap(monkeypatch):
+    """The other half of the pair. No budget was spent, so the model saying it
+    could not finish means a search actually broke, and that wording has to
+    survive."""
+    _stages(monkeypatch,
+            find=_find_reply([], complete=False),
+            find_budget=False)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["status"] == D.STATUS_ERROR
+    assert "gap in the search" in r["detail"]
+
+
+def test_a_short_category_says_whether_it_had_searches_left(monkeypatch):
+    """The one place the spent budget changes a decision: 'we looked with
+    everything we had' and 'we looked with searches to spare' are different
+    findings, and only the first is worth spending more on."""
+    _stages(monkeypatch, find=_find_reply([], complete=True), find_budget=True)
+    out = D.discover(PROFILE)
+    short = {s["category"]: s for s in out["shortfall"]}
+    row = short[R.CAT_VERTICAL_SUMMIT]
+    assert row["budget_spent"] is True
+    assert "every one of the %d searches" % D.FIND_MAX_USES in row["why"]
+
+
+def test_a_short_category_with_searches_left_does_not_claim_it_ran_out(monkeypatch):
+    _stages(monkeypatch, find=_find_reply([], complete=True), find_budget=False)
+    out = D.discover(PROFILE)
+    row = {s["category"]: s for s in out["shortfall"]}[R.CAT_VERTICAL_SUMMIT]
+    assert row["budget_spent"] is False
+    assert "searches" not in row["why"]
+
+
+def test_the_budget_sentence_is_not_said_twice(monkeypatch):
+    """The detail already names the budget when the model reported the cap as
+    a cut-off. Appending the shortfall sentence on top would print the same
+    fact twice in one paragraph."""
+    _stages(monkeypatch, find=_find_reply([], complete=False), find_budget=True)
+    out = D.discover(PROFILE)
+    row = {s["category"]: s for s in out["shortfall"]}[R.CAT_VERTICAL_SUMMIT]
+    assert "searches it was given" in row["why"]
+    assert "every one of the" not in row["why"], (
+        "the shortfall sentence was appended on top of a detail that had "
+        "already said the same thing")
+
+
+def test_the_prompts_tell_the_model_its_budget_is_not_a_fault():
+    """Half the fix is the prompt. A model told to flag being 'cut off' will
+    flag its own budget cap, and the report then says a category went
+    unsearched when it was searched to the limit we paid for."""
+    find = D.find_system(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert "%d SEARCHES" % D.FIND_MAX_USES in find
+    assert "max_uses_exceeded" in find
+    confirm = D.confirm_system({"name": "X"}, R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert "%d SEARCHES" % D.CONFIRM_MAX_USES in confirm
 
 
 def test_a_category_that_finds_events_reports_ok(monkeypatch):

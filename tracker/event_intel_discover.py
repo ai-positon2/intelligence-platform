@@ -49,6 +49,21 @@ none with an edition in the client's window" is a finding about the market and
 is `empty`. "Three plausible names we could not check" is a hole and is
 `error`. Only the reason tells them apart, so the reason is always recorded.
 
+A SPENT BUDGET IS NONE OF THE FOUR. This is the correction that mattered most
+here. `max_uses_exceeded` is how the web_search tool enforces the caller's own
+`max_uses`, and every call in this module saturates its budget by design, so
+for a while the wrapper classed each of those replies as a failed search and
+this module threw the whole reply away. A live Beta Bionics run lost four of
+its six categories that way, spent half an hour doing it, and produced one
+event. The candidates those searches found had already been named in the reply
+that was discarded.
+
+So a spent budget is not a status. It rides alongside as `budget_spent` and is
+mentioned only where it changes what a reader should conclude: on a category
+that came up short, where "it looked with everything it had" and "it looked
+with searches to spare" are different findings and only the first is worth
+spending more on.
+
 This module produces FACTS ONLY. Nothing here scores anything. Scoring is a
 separate pass over the merged set so that one consistent standard is applied
 to all six categories, rather than each category's finder grading its own
@@ -194,15 +209,26 @@ Respond with ONLY a JSON object, no prose before or after:
 sentence saying why it belongs to the "{category_label}" category \
 specifically. `note` says what you searched and what you could not confirm.
 
+YOUR SEARCH BUDGET IS {max_uses} SEARCHES. That is a deliberate limit, not an \
+accident, and using every one of it is the expected outcome rather than a \
+problem. When you reach for one more the tool will answer with \
+`max_uses_exceeded`. That is this budget being enforced. It is not a fault, \
+it is not the tool breaking, and it does not invalidate anything you found \
+before it. Plan for {max_uses} searches and answer with what they gave you.
+
 `search_complete` is the most important field in this object when it is \
-false. Set it to true ONLY if you were able to run every search you wanted \
-to run. Set it to FALSE if the search tool stopped returning results, refused \
-a call, cut you off, or you otherwise stopped early for any reason. An empty \
-`candidates` array with search_complete true means "I searched this category \
-properly and it genuinely has nothing for this client", and it is reported to \
-the client in exactly those words. The same empty array with search_complete \
-false means "I could not finish looking", which is a completely different \
-statement. Never report an unfinished search as an empty category."""
+false, so it has to mean one thing only. Set it to FALSE only if a search you \
+needed came back BROKEN: rate-limited, unavailable, erroring, or returning \
+nothing where results should have been, or if something stopped you before \
+you could write this answer. Set it to TRUE if your searches worked, \
+including when you used all {max_uses} of them and would have liked more. \
+Running out of a budget is not the same as being cut off, and reporting it as \
+one tells the client their category went unsearched when in fact it was \
+searched to the limit we paid for. An empty `candidates` array with \
+search_complete true means "I searched this category properly and it \
+genuinely has nothing for this client", and it is reported to the client in \
+exactly those words. The same empty array with search_complete false means "a \
+search I needed did not work", which is a completely different statement."""
 
 
 # ── stage two: confirm one name ───────────────────────────────────────────
@@ -285,9 +311,16 @@ of these happened in plain words: the event does not exist, it has been \
 discontinued, it has no edition starting on or after {today}, or you could \
 not find enough to tell. Set `event` to null when you reject.
 
-`facts_complete` is false if the search tool stopped returning results, \
-refused a call or cut you off before you had finished reading this event's \
-own pages. A confirmed event with `facts_complete` false keeps its \
+YOUR SEARCH BUDGET IS {max_uses} SEARCHES for this one event. Using all of \
+them is expected. When you reach for one more the tool answers with \
+`max_uses_exceeded`, which is that budget being enforced rather than anything \
+going wrong, and it takes nothing away from what you already read.
+
+`facts_complete` is false if a search you needed came back BROKEN, \
+rate-limited or unavailable before you had finished reading this event's own \
+pages, or if you ran out of searches with a specific number still unread. It \
+is true if your searches worked and you simply reported the fields this \
+event publishes. A confirmed event with `facts_complete` false keeps its \
 confirmation and is reported as one whose published numbers we could not \
 finish reading. Never pad a field you did not get to; a null there is honest \
 and an invented number is not."""
@@ -559,13 +592,50 @@ def _clean_event(raw: dict, category: str) -> dict | None:
     }
 
 
+def _today() -> str:
+    """Today, as the prompts state it.
+
+    A named seam rather than an inline call, so a test can fix the date
+    without reaching into the datetime module for the whole process.
+    """
+    return datetime.date.today().isoformat()
+
+
 def _prompt_common(profile: dict) -> dict:
     return {
-        "today": datetime.date.today().isoformat(),
+        "today": _today(),
         "profile": profile_brief(profile),
         "where_buyers": rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
             profile.get("classification"), "Confirm with the client."),
     }
+
+
+def find_system(category: str, profile: dict) -> str:
+    """The stage-one system prompt, assembled in one place.
+
+    Tests used to call `_FIND_SYSTEM.format(...)` with a hand-written kwargs
+    list, which broke every time a placeholder was added and told us nothing
+    about the code that ships. Both callers go through here now, so a new
+    placeholder is filled for the tests and for production by the same line.
+    """
+    return _FIND_SYSTEM.format(
+        category_label=rubric.CATEGORY_LABELS[category],
+        category_brief=rubric.CATEGORY_BRIEF[category],
+        max_uses=FIND_MAX_USES,
+        **_prompt_common(profile))
+
+
+def confirm_system(proposal: dict, category: str, profile: dict) -> str:
+    """The stage-two system prompt. See find_system for why this exists."""
+    site = (proposal or {}).get("website") or ""
+    return _CONFIRM_SYSTEM.format(
+        event_name=(proposal or {}).get("name") or "",
+        category_label=rubric.CATEGORY_LABELS[category],
+        category_brief=rubric.CATEGORY_BRIEF[category],
+        why=(proposal or {}).get("why") or "no reason given",
+        website_line=("Their link for it: %s\n" % site) if site else "",
+        max_uses=CONFIRM_MAX_USES,
+        **_prompt_common(profile))
 
 
 def _clean_proposal(raw: dict) -> dict | None:
@@ -613,14 +683,19 @@ def _dedupe_proposals(proposals: list) -> list:
 def propose_category(category: str, profile: dict) -> dict:
     """Stage one: name the candidates in one category. Never raises.
 
-    Returns {"category", "status", "proposals", "note", "detail"}. `status`
-    uses the module's ok / empty / partial / error vocabulary and describes
-    the SEARCH, never the market.
+    Returns {"category", "status", "proposals", "note", "detail",
+    "budget_spent"}. `status` uses the module's ok / empty / partial / error
+    vocabulary and describes the SEARCH, never the market.
+
+    `budget_spent` says the finder reached for one more search than
+    FIND_MAX_USES allowed. It is deliberately NOT a status: a category that
+    named four candidates with its whole budget did a complete piece of work,
+    and downgrading it would put "this category did not run" in a report
+    about a search that ran perfectly. It travels alongside the status
+    instead, and is spent only where it changes what a reader should
+    conclude, which is on a category that came up short.
     """
-    system = _FIND_SYSTEM.format(
-        category_label=rubric.CATEGORY_LABELS[category],
-        category_brief=rubric.CATEGORY_BRIEF[category],
-        **_prompt_common(profile))
+    system = find_system(category, profile)
     user = ("Name up to %d candidate events in the \"%s\" category for this "
             "client. Search actively, and spend your searches on finding "
             "events rather than on studying the ones you have found. If this "
@@ -628,21 +703,33 @@ def propose_category(category: str, profile: dict) -> dict:
             % (PER_CATEGORY, rubric.CATEGORY_LABELS[category]))
 
     res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
+    budget = bool(res.get("budget_spent"))
+
+    def _out(status, proposals, note, detail):
+        return {"category": category, "status": status, "proposals": proposals,
+                "note": note, "detail": detail, "budget_spent": budget}
+
     if res.get("error"):
         err = res["error"]
-        return {"category": category, "status": STATUS_ERROR, "proposals": [],
-                "note": "", "detail": "%s: %s" % (err["kind"], err["detail"])}
+        # The kind is a machine token and belongs in the log, not in a
+        # sentence a client reads. Rendered under a category label it
+        # produced "Side event: Transport: peer closed connection", a double
+        # colon around a word that means nothing to the reader.
+        logger.warning("event_intel_discover: find failed for category %s (%s)",
+                       category, err["kind"])
+        return _out(STATUS_ERROR, [], "",
+                    "The search for this category could not be completed: %s"
+                    % err["detail"])
 
     # The same refusal event_intel_recover applies to a recovered roster, for
     # the same reason and with more at stake: a reply that ran no search is a
     # recollection, and here the thing being recalled is whole conferences
     # rather than rows on a page somebody can check.
     if not res.get("search_count"):
-        return {"category": category, "status": STATUS_ERROR, "proposals": [],
-                "note": "",
-                "detail": ("The model answered this category without running a "
-                           "single search, so its events are recalled rather "
-                           "than confirmed and were discarded.")}
+        return _out(STATUS_ERROR, [], "",
+                    "The model answered this category without running a "
+                    "single search, so its events are recalled rather "
+                    "than confirmed and were discarded.")
 
     parsed = claude_websearch.extract_json(res.get("text") or "",
                                            require="candidates")
@@ -650,9 +737,8 @@ def propose_category(category: str, profile: dict) -> dict:
         logger.warning("event_intel_discover: unparsable find reply for category "
                        "%s (blocks=%s, stop=%s)", category,
                        res.get("text_block_count"), res.get("stop_reason"))
-        return {"category": category, "status": STATUS_ERROR, "proposals": [],
-                "note": "",
-                "detail": "The search ran but its answer could not be read."}
+        return _out(STATUS_ERROR, [], "",
+                    "The search ran but its answer could not be read.")
 
     proposals = []
     for c in (parsed.get("candidates") or []):
@@ -671,27 +757,31 @@ def propose_category(category: str, profile: dict) -> dict:
     # you", when the truth was that the search never finished.
     complete = parsed.get("search_complete")
     if complete is False:
-        detail = ("The model reported that it could not finish searching this "
-                  "category, so an empty result here is a gap in the search "
-                  "rather than a fact about the market.")
+        # Two different sentences, because two different things happened. A
+        # finder that ran out of the searches we gave it stopped where we told
+        # it to stop, and saying "the search was cut off" about our own budget
+        # invites somebody to go hunting for a fault that is not there.
+        detail = (("The finder used all %d of the searches it was given in "
+                   "this category and would have kept looking, so treat this "
+                   "as the first %d searches' worth rather than the whole of "
+                   "what is out there." % (FIND_MAX_USES, FIND_MAX_USES))
+                  if budget else
+                  ("The model reported that it could not finish searching this "
+                   "category, so an empty result here is a gap in the search "
+                   "rather than a fact about the market."))
         if proposals:
-            return {"category": category, "status": STATUS_PARTIAL,
-                    "proposals": proposals, "note": note, "detail": detail}
-        return {"category": category, "status": STATUS_ERROR, "proposals": [],
-                "note": note, "detail": detail}
+            return _out(STATUS_PARTIAL, proposals, note, detail)
+        return _out(STATUS_ERROR, [], note, detail)
 
     if not proposals and complete is None:
         # Nothing found and no declaration either way. Report the thing that
         # could not be measured instead of picking the flattering reading.
-        return {"category": category, "status": STATUS_EMPTY, "proposals": [],
-                "note": note,
-                "detail": ("This category returned no events and did not say "
-                           "whether its search finished, so it cannot be told "
-                           "apart from a search that was cut off.")}
+        return _out(STATUS_EMPTY, [], note,
+                    "This category returned no events and did not say "
+                    "whether its search finished, so it cannot be told "
+                    "apart from a search that was cut off.")
 
-    return {"category": category,
-            "status": STATUS_OK if proposals else STATUS_EMPTY,
-            "proposals": proposals, "note": note, "detail": ""}
+    return _out(STATUS_OK if proposals else STATUS_EMPTY, proposals, note, "")
 
 
 def _unchecked(name: str, reason: str) -> dict:
@@ -715,14 +805,7 @@ def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
     if not name_key(name):
         return _unchecked(name, "The candidate had no usable name.")
 
-    site = (proposal or {}).get("website") or ""
-    system = _CONFIRM_SYSTEM.format(
-        event_name=name,
-        category_label=rubric.CATEGORY_LABELS[category],
-        category_brief=rubric.CATEGORY_BRIEF[category],
-        why=(proposal or {}).get("why") or "no reason given",
-        website_line=("Their link for it: %s\n" % site) if site else "",
-        **_prompt_common(profile))
+    system = confirm_system(proposal, category, profile)
     user = ("Confirm \"%s\" and report what it publishes about itself. If it "
             "is not real, not upcoming, or you cannot tell, say so instead."
             % name)
@@ -794,7 +877,8 @@ def search_category(category: str, profile: dict) -> dict:
     found = propose_category(category, profile)
     proposals = found["proposals"]
     base = {"category": category, "note": found["note"],
-            "proposed": len(proposals), "rejected": []}
+            "proposed": len(proposals), "rejected": [],
+            "budget_spent": found.get("budget_spent", False)}
 
     if not proposals:
         return dict(base, status=found["status"], events=[],
@@ -886,12 +970,16 @@ def discover(profile: dict) -> dict:
                 logger.exception("event_intel_discover: category %s crashed", cat)
                 r = {"category": cat, "status": STATUS_ERROR, "events": [],
                      "note": "", "proposed": 0, "rejected": [],
+                     "budget_spent": False,
                      "detail": "Unexpected failure: %s" % str(e)[:200]}
             by_category[cat] = r["events"]
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
                              "label": rubric.CATEGORY_LABELS[cat],
                              "found": len(r["events"]),
+                             # Whether the finder ran out of the searches it
+                             # was given. Not a status: see propose_category.
+                             "budget_spent": r.get("budget_spent", False),
                              # What the finder named, and what the separate
                              # confirmation ruled out. Reported so the page can
                              # say "we looked at five and kept two" instead of
@@ -931,6 +1019,17 @@ def discover(profile: dict) -> dict:
             s["why"] = ("%s %d of the %d events found here were the same events "
                         "already listed under another category."
                         % (s["why"], st["merged_away"], st["found"]))
+        # A category that came up short after using every search it was given
+        # is a different thing from one that came up short with searches to
+        # spare, and only the first is worth spending more on. Said only on
+        # the categories that fell short, and only when the reason above did
+        # not already say it.
+        s["budget_spent"] = bool(st.get("budget_spent"))
+        if s["budget_spent"] and "searches it was given" not in s["why"]:
+            s["why"] = ("%s It also used every one of the %d searches allowed "
+                        "for finding events here, so there may be more to "
+                        "find than this search could reach."
+                        % (s["why"].rstrip() or "", FIND_MAX_USES)).strip()
         shortfall.append(s)
 
     ran = sum(1 for s in statuses.values() if s["status"] != STATUS_ERROR)
