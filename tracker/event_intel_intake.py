@@ -241,8 +241,23 @@ def _err(kind: str, detail: str, pages=None) -> dict:
 
 
 def _text(raw, cap: int = _CAP) -> str | None:
+    """Trim to `cap`, on a word boundary, and mark the cut.
+
+    A hard slice produced "...no sales-cycle length was published on t" on
+    screen, which reads as a sentence that trailed off rather than as text we
+    trimmed. The reader cannot tell a model that stopped mid-thought from a
+    cap it ran into, and one of those is a reason to go and look.
+    """
     v = str(raw or "").strip()
-    return v[:cap] or None
+    if len(v) <= cap:
+        return v or None
+    cut = v[:cap]
+    at = cut.rfind(" ")
+    # Only honour the boundary if it is near the end. A single very long token
+    # would otherwise throw most of the text away to avoid splitting it.
+    if at > cap * 0.7:
+        cut = cut[:at]
+    return cut.rstrip(" ,;:.\u2014-") + "\u2026"
 
 
 def _host(url: str) -> str:
