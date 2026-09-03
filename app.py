@@ -8709,6 +8709,42 @@ def event_conference_intelligence_profiles():
     return jsonify({"profile": event_intel_store.get_profile(profile_id, email)})
 
 
+@app.route("/p2/b2b-agents/event-conference-intelligence/profiles/draft",
+           methods=["POST"])
+@position2_required
+def event_conference_intelligence_profile_draft():
+    """Read a company's own site and propose the intake it implies.
+
+    Deliberately SAVES NOTHING. It returns a draft the person edits in the
+    form they were already looking at, and the existing profiles route stays
+    the only way a profile is written, so `normalise_profile` remains the one
+    validator. That is what keeps this an accelerator rather than a second,
+    quieter way to create a profile.
+
+    The proposed classification comes back like any other field and the page
+    requires a click on it before the profile can be locked. The rubric
+    refuses to infer that answer because it decides which side of the floor
+    every later score measures; a person confirming a model's reading is not
+    the system inferring it, and a draft that arrived pre-accepted would be.
+
+    Costs one Claude call with web search, and no Apollo credits.
+    """
+    from tracker import event_intel_intake
+    email = ((_get_user() or {}).get("email") or "").lower()
+    if _cpi_rate_limited("evi-draft-profile", email):
+        return jsonify({"error": "Too many drafts in a row. Wait a moment and "
+                                 "try again."}), 429
+    body = request.get_json(silent=True) or {}
+    out = event_intel_intake.draft_profile(body.get("client_name") or "",
+                                           body.get("website") or "")
+    if out.get("error"):
+        kind = out["error"]["kind"]
+        code = 400 if kind in ("bad_request", "wrong_company") else 502
+        return jsonify({"error": out["error"]["detail"], "kind": kind,
+                        "sources": out.get("sources") or []}), code
+    return jsonify(out)
+
+
 @app.route("/p2/b2b-agents/event-conference-intelligence/profiles/<int:profile_id>",
            methods=["POST"])
 @position2_required
@@ -12052,6 +12088,11 @@ _CPI_RATE_LIMITS = {
     "count": (40, 60),          # debounced client-side at 420ms while typing
     "parse-query": (12, 60),    # a deliberate button click, not per-keystroke
     "chat": (20, 60),           # a conversation, several messages a minute
+    # Event & Conference Intelligence reuses this bucket rather than growing a
+    # second copy of the same algorithm. Tighter than the others because one
+    # press reads a website with a live web-search call, and because a form
+    # someone is filling in once does not need a dozen tries a minute.
+    "evi-draft-profile": (6, 60),
 }
 _CPI_RATE_STATE: dict = {}
 _CPI_RATE_LOCK = threading.Lock()

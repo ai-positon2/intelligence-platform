@@ -31,6 +31,7 @@ ROUTES = [
     (BASE + "/profiles", "GET"),
     (BASE + "/profiles", "POST"),
     (BASE + "/profiles/1", "POST"),
+    (BASE + "/profiles/draft", "POST"),
 ]
 
 
@@ -228,11 +229,19 @@ def test_profile_routes_are_position2_gated():
 def test_the_page_offers_exactly_the_four_classifications_the_rubric_knows():
     """Rendered from the rubric's own vocabulary, so the form can never offer a
     fifth option the scorer would refuse."""
+    import re
     from tracker import event_intel_rubric as rubric
     html = _p2().get(BASE).get_data(as_text=True)
     for key in rubric.CLASSIFICATIONS:
         assert key in html, key
-    assert html.count('data-classification="') == len(rubric.CLASSIFICATIONS)
+    # Count the CARDS, by their value, rather than every occurrence of the
+    # attribute name. The page's own script builds a selector out of the same
+    # attribute to find a card, and a raw substring count read that as a fifth
+    # option the scorer would refuse. Comparing sorted lists still catches a
+    # duplicated card, which is what the count was really for.
+    cards = [k for k in re.findall(r'data-classification="([^"]*)"', html)
+             if k in rubric.CLASSIFICATIONS]
+    assert sorted(cards) == sorted(rubric.CLASSIFICATIONS), cards
 
 
 # ── the retired play ──────────────────────────────────────────────────────
@@ -297,3 +306,113 @@ def test_a_stored_run_of_the_retired_play_is_still_a_usable_roster(monkeypatch):
     assert 'value="7"' in html and "Fintech Summit" in html, (
         "a harvested roster from the retired play is no longer offered to "
         "work the room")
+
+
+# ── drafting a profile from a name and a URL ──────────────────────────────
+#
+# The draft route exists to fill a form in, and the one thing it must never
+# become is a second, quieter way to create a profile. Everything below is
+# about that boundary: it saves nothing, it hands back a proposal, and the
+# answer that decides which side of a trade-show floor gets scored comes back
+# as an argument rather than as a decision already taken.
+
+_DRAFT = BASE + "/profiles/draft"
+
+
+def _as_staff():
+    return _client("staffer@position2.com")
+
+
+def test_drafting_a_profile_saves_nothing(monkeypatch):
+    """`normalise_profile` stays the single validator, and a draft the user
+    abandons must leave no profile behind."""
+    from tracker import event_intel_intake
+
+    saved = {"n": 0}
+    monkeypatch.setattr(store, "save_profile",
+                        lambda *a, **k: saved.__setitem__("n", saved["n"] + 1))
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {"buyer_roles": "VP Claims", "verticals": None,
+                  "acv_band": None, "sales_cycle": None, "geo_scope": None},
+        "evidence": {"buyer_roles": "Their customers page names claims leaders."},
+        "unknown": ["acv_band", "geo_scope", "sales_cycle", "verticals"],
+        "what_they_sell": "Analytics for insurance claims teams.",
+        "classification": "b2b_other_function",
+        "classification_why": "They sell to claims operations.",
+        "classification_confidence": "high",
+        "sources": ["https://northwind.example/customers"], "note": "",
+        "error": None})
+
+    r = _as_staff().post(_DRAFT, json={"client_name": "Northwind",
+                                       "website": "https://northwind.example"})
+    assert r.status_code == 200, r.status_code
+    assert saved["n"] == 0, "drafting wrote a profile"
+    body = r.get_json()
+    assert body["draft"]["buyer_roles"] == "VP Claims"
+    assert body["classification_why"]
+    assert "acv_band" in body["unknown"]
+
+
+def test_a_draft_route_answer_never_carries_a_profile_id(monkeypatch):
+    """The page decides whether to save. An id in this reply would mean
+    something already had."""
+    from tracker import event_intel_intake
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {}, "evidence": {}, "unknown": [], "what_they_sell": "x",
+        "classification": None, "classification_why": "", "sources": ["https://a.example"],
+        "classification_confidence": None, "note": "", "error": None})
+    r = _as_staff().post(_DRAFT, json={"client_name": "N", "website": "https://a.example"})
+    assert "profile" not in r.get_json()
+    assert "id" not in r.get_json()
+
+
+def test_a_bad_request_is_a_400_and_an_upstream_failure_is_not(monkeypatch):
+    """A user who typed a bare domain has made a fixable mistake. A search
+    that fell over has not, and telling them apart is what decides whether the
+    page shows a correction or an apology."""
+    from tracker import event_intel_intake
+
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {}, "sources": [],
+        "error": {"kind": "bad_request", "detail": "A website is required."}})
+    assert _as_staff().post(_DRAFT, json={"client_name": "N"}).status_code == 400
+
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {}, "sources": [],
+        "error": {"kind": "transport", "detail": "HTTP 503"}})
+    assert _as_staff().post(_DRAFT, json={"client_name": "N",
+                                          "website": "https://a.example"}).status_code == 502
+
+
+def test_the_wrong_company_comes_back_with_the_page_that_proves_it(monkeypatch):
+    """Told "that is not your client" with no link, a user has no way to tell
+    whether the tool is right."""
+    from tracker import event_intel_intake
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {}, "sources": ["https://northwind.example/about"],
+        "error": {"kind": "wrong_company",
+                  "detail": "That site sells garden furniture."}})
+    r = _as_staff().post(_DRAFT, json={"client_name": "N",
+                                       "website": "https://northwind.example"})
+    assert r.status_code == 400
+    assert r.get_json()["kind"] == "wrong_company"
+    assert r.get_json()["sources"] == ["https://northwind.example/about"]
+
+
+def test_drafting_is_rate_limited(monkeypatch):
+    """One press reads a website with a live search call. Without a limit a
+    held-down button is a bill."""
+    from tracker import event_intel_intake
+    monkeypatch.setattr(event_intel_intake, "draft_profile", lambda n, w: {
+        "draft": {}, "evidence": {}, "unknown": [], "what_they_sell": "x",
+        "classification": None, "classification_why": "",
+        "classification_confidence": None,
+        "sources": ["https://a.example"], "note": "", "error": None})
+    appmod._CPI_RATE_STATE.pop("evi-draft-profile", None)
+    c = _client("ratelimited@position2.com")
+    limit = appmod._CPI_RATE_LIMITS["evi-draft-profile"][0]
+    codes = [c.post(_DRAFT, json={"client_name": "N", "website": "https://a.example"}).status_code
+             for _ in range(limit + 2)]
+    assert codes[:limit] == [200] * limit, codes
+    assert codes[limit:] == [429, 429], codes
+    appmod._CPI_RATE_STATE.pop("evi-draft-profile", None)

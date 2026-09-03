@@ -192,25 +192,9 @@
 
             <div id="profileForm" style="display:none">
               <div class="evi-group">
-                <span class="gh">Step 1 &middot; Which side of the floor</span>
-              </div>
-              <div class="evi-field">
-                <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
-                <div class="evi-classes" role="radiogroup" aria-label="Classification">
-                  {% for c in classifications %}
-                  <button type="button" class="evi-class" role="radio"
-                          aria-checked="false"
-                          data-classification="{{ c.key }}"
-                          onclick="pickClass('{{ c.key }}')">
-                    <span class="cl">{{ c.label }}</span>
-                    <span class="cw">{{ c.where }}</span>
-                    <span class="co">{{ c.orientation }}-driven</span>
-                  </button>
-                  {% endfor %}
-                </div>
-              </div>
-              <div class="evi-group">
-                <span class="gh">Step 2 &middot; Who the client is</span>
+                <span class="gh">Step 1 &middot; Who is this for</span>
+                <span class="gs">Give us a name and a website and we will read the
+                  site and fill the rest of this in for you to check.</span>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
@@ -224,6 +208,36 @@
                          placeholder="https://northwind.example" />
                 </div>
               </div>
+              <div class="evi-draftbar">
+                <button type="button" class="evi-btn" id="draftBtn"
+                        onclick="draftProfile()">Read the site and fill this in</button>
+                <span class="dh">Takes about a minute. Nothing is saved until you
+                  lock the profile, and you can change anything it writes.</span>
+              </div>
+              <div id="draftError" class="evi-err" style="display:none;margin-top:12px"></div>
+              <div id="draftRead" class="evi-read" hidden></div>
+
+              <div class="evi-group">
+                <span class="gh">Step 2 &middot; Which side of the floor</span>
+                <span class="gs">This one is yours to answer. It decides which
+                  crowd every score measures.</span>
+              </div>
+              <div class="evi-field">
+                <label>Where do this client&rsquo;s buyers physically stand at an event?</label>
+                <div class="evi-classes" role="radiogroup" aria-label="Classification">
+                  {% for c in classifications %}
+                  <button type="button" class="evi-class" role="radio"
+                          aria-checked="false"
+                          data-classification="{{ c.key }}"
+                          onclick="pickClass('{{ c.key }}')">
+                    <span class="cl">{{ c.label }}</span>
+                    <span class="cw">{{ c.where }}</span>
+                    <span class="co">{{ c.orientation }}-driven</span>
+                    <span class="cs" hidden></span>
+                  </button>
+                  {% endfor %}
+                </div>
+              </div>
               <div class="evi-group">
                 <span class="gh">Step 3 &middot; Who they sell to</span>
               </div>
@@ -231,20 +245,24 @@
                 <div class="evi-field">
                   <label for="buyerRoles">Buyer roles</label>
                   <input type="text" id="buyerRoles" placeholder="VP Marketing, CMO, Head of Growth" />
+                  <span class="ev" data-ev="buyer_roles" hidden></span>
                 </div>
                 <div class="evi-field">
                   <label for="verticals">Target verticals</label>
                   <input type="text" id="verticals" placeholder="fintech, insurtech" />
+                  <span class="ev" data-ev="verticals" hidden></span>
                 </div>
               </div>
               <div class="evi-row">
                 <div class="evi-field">
                   <label for="acvBand">Deal size</label>
                   <input type="text" id="acvBand" placeholder="$40k to $120k" />
+                  <span class="ev" data-ev="acv_band" hidden></span>
                 </div>
                 <div class="evi-field">
                   <label for="salesCycle">Sales cycle</label>
                   <input type="text" id="salesCycle" placeholder="3 to 6 months" />
+                  <span class="ev" data-ev="sales_cycle" hidden></span>
                 </div>
               </div>
               <div class="evi-group">
@@ -254,6 +272,7 @@
                 <div class="evi-field">
                   <label for="geoScope">Geographic scope</label>
                   <input type="text" id="geoScope" placeholder="North America and UK" />
+                  <span class="ev" data-ev="geo_scope" hidden></span>
                 </div>
                 <div class="evi-field">
                   <label for="windowMonths">Time window, months</label>
@@ -555,6 +574,7 @@
         document.querySelectorAll('[data-classification]'), function(b){
           b.setAttribute('aria-checked', b.getAttribute('data-classification') === key);
         });
+      renderSuggestion();
     }
     window.pickClass = pickClass;
 
@@ -607,6 +627,218 @@
       // said "Which events to attend" while the button said "Run".
       setMode(mode);
     }
+
+    /* ── reading a client's site to fill this form in ──────────────────
+
+       Thirteen fields, only two of them required, and the person filling them
+       in is usually answering questions about somebody else's business. Most
+       of the answers are on the client's own website, so this goes and reads
+       it and hands back a draft to correct rather than a form to author.
+
+       Three rules hold the whole thing together.
+
+       It PROPOSES. Nothing here saves anything: the draft lands in the form
+       the user was already looking at, every value it wrote is visible, and
+       the existing lock button is still the only way a profile is created.
+
+       It never overwrites what somebody typed. A field the user has already
+       filled is left exactly as they left it and reported as kept, because a
+       tool that quietly replaces your answer is the black box this is meant
+       to be the opposite of.
+
+       And it does NOT answer the classification. `checkedValue` refuses to
+       return an option nobody chose, after a version of this form pre-checked
+       the first card and every unanswered form arrived answered. So a drafted
+       classification renders as a suggestion carrying its reasoning, and does
+       not set aria-checked. The card still has to be clicked. That is the
+       difference between a model arguing for an answer and the system
+       deciding which side of the floor to score. */
+
+    var DRAFT_FIELDS = {buyer_roles: 'buyerRoles', verticals: 'verticals',
+                        acv_band: 'acvBand', sales_cycle: 'salesCycle',
+                        geo_scope: 'geoScope'};
+
+    /* A pasted "northwind.example" is a scheme away from working and the
+       server refuses it, correctly, because the site is the only thing that
+       separates two companies with one name. Fixing it here beats bouncing
+       the user off a validation message, and the corrected value goes back
+       into the field so nothing happens behind their back. */
+    function normaliseSite(v){
+      v = (v || '').trim();
+      if (!v) return '';
+      return /^https?:\/\//i.test(v) ? v : 'https://' + v;
+    }
+
+    function evNode(field){
+      return document.querySelector('[data-ev="' + field + '"]');
+    }
+
+    function setEv(field, cls, text){
+      var n = evNode(field);
+      if (!n) return;
+      n.className = 'ev ' + cls;
+      n.textContent = text;
+      n.hidden = !text;
+    }
+
+    function clearDraftMarks(){
+      Object.keys(DRAFT_FIELDS).forEach(function(f){ setEv(f, '', ''); });
+      var read = document.getElementById('draftRead');
+      read.hidden = true;
+      read.innerHTML = '';
+      /* Walk the cards, not their slots. Reaching a card through its own
+         `.cs` child means a card with no slot rendered takes the clear down
+         with it, and it is the card that owns the mark being cleared. */
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-classification]'), function(card){
+          card.removeAttribute('data-suggested');
+          card.removeAttribute('data-suggest-why');
+          var n = card.querySelector('.cs');
+          if (n) { n.hidden = true; n.textContent = ''; }
+        });
+    }
+
+    function showDraftError(msg, sources){
+      var e = document.getElementById('draftError');
+      e.innerHTML = esc(msg) + (sources && sources.length
+        ? ' <a href="' + esc(sources[0]) + '" target="_blank" rel="noopener">' +
+          'See the page we read</a>.'
+        : '');
+      e.style.display = '';
+    }
+
+    function applyDraft(d){
+      clearDraftMarks();
+
+      var kept = [];
+      Object.keys(DRAFT_FIELDS).forEach(function(f){
+        var el = document.getElementById(DRAFT_FIELDS[f]);
+        if (!el) return;
+        var value = (d.draft || {})[f];
+        if (el.value.trim()) {
+          // Theirs, not ours. Say so rather than leaving them to wonder
+          // whether the draft agreed with them or never looked.
+          kept.push(f);
+          setEv(f, 'kept', 'Kept what you typed.');
+          return;
+        }
+        if (value) {
+          el.value = value;
+          setEv(f, 'read', (d.evidence || {})[f] || '');
+        } else {
+          setEv(f, 'gap', 'Their site does not say. Add it if you know it.');
+        }
+      });
+
+      var read = document.getElementById('draftRead');
+      var html = '<span class="rh">What we read</span>';
+      if (d.what_they_sell) {
+        html += '<p class="rs">' + esc(d.what_they_sell) + '</p>' +
+          '<p class="rc">If that is not your client, the name matched a ' +
+          'different company. Correct the website and read it again.</p>';
+      }
+      if (d.note) html += '<p class="rn">' + esc(d.note) + '</p>';
+      if (kept.length) {
+        html += '<p class="rn">' + esc(plural(kept.length, 'field')) +
+          ' you had already filled in were left alone.</p>';
+      }
+      if ((d.sources || []).length) {
+        html += '<div class="rl">' + d.sources.map(function(u){
+          return '<a href="' + esc(u) + '" target="_blank" rel="noopener">' +
+            esc(shortUrl(u)) + '</a>';
+        }).join('') + '</div>';
+      }
+      read.innerHTML = html;
+      read.hidden = false;
+
+      suggestClass(d.classification, d.classification_why,
+                   d.classification_confidence);
+    }
+
+    function shortUrl(u){
+      try {
+        var a = String(u).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+        return a.length > 48 ? a.slice(0, 47) + '…' : a;
+      } catch (e) { return String(u); }
+    }
+
+    /* A suggestion, drawn as a suggestion. It marks the card and prints the
+       reasoning; it does NOT set aria-checked, so `checkedValue` keeps
+       returning null and the form stays unanswered until somebody clicks. */
+    function suggestClass(key, why, confidence){
+      if (!key) return;
+      var card = document.querySelector('[data-classification="' + key + '"]');
+      if (!card) return;
+      if (!card.querySelector('.cs')) return;
+      card.setAttribute('data-suggested', '1');
+      card.setAttribute('data-suggest-why', 'Our reading' +
+        (confidence ? ', ' + confidence + ' confidence' : '') +
+        (why ? '. ' + why : '.'));
+      renderSuggestion();
+    }
+
+    /* The call to action belongs to the moment before the decision.
+
+       Left standing, "Click to confirm" sits under a card the user has just
+       clicked, which reads as though the click did not take. The reasoning
+       stays either way, including when somebody picks a DIFFERENT card: what
+       we read is worth keeping on screen next to the answer they gave. */
+    function renderSuggestion(){
+      var card = document.querySelector('[data-suggested]');
+      if (!card) return;
+      var n = card.querySelector('.cs');
+      if (!n) return;
+      var why = card.getAttribute('data-suggest-why') || '';
+      var decided = !!document.querySelector(
+        '[data-classification][aria-checked="true"]');
+      n.textContent = why + (decided ? '' : ' Click to confirm.');
+      n.hidden = !why;
+    }
+
+    function draftProfile(){
+      var btn = document.getElementById('draftBtn');
+      var err = document.getElementById('draftError');
+      err.style.display = 'none';
+
+      var nameEl = document.getElementById('clientName');
+      var siteEl = document.getElementById('clientSite');
+      var name = nameEl.value.trim();
+      var site = normaliseSite(siteEl.value);
+      siteEl.value = site;
+      if (!name || !site) {
+        showDraftError('A client name and a website are both needed. The site ' +
+                       'is the only thing that tells two companies with the ' +
+                       'same name apart.');
+        return Promise.resolve();
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Reading the site…';
+      // Returned so a test can wait for it. Nothing in the page uses the
+      // return value; a probe that guessed at how many microtasks the chain
+      // takes would pass or fail on the shape of the code rather than on what
+      // it does.
+      return fetch(BASE + '/profiles/draft', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_name: name, website: site})
+      }).then(function(r){
+        return r.json().then(function(j){ return {ok: r.ok, j: j}; });
+      }).then(function(res){
+        btn.disabled = false;
+        btn.textContent = 'Read the site and fill this in';
+        if (!res.ok) {
+          showDraftError(res.j.error || 'The site could not be read.',
+                         res.j.sources);
+          return;
+        }
+        applyDraft(res.j);
+      }).catch(function(e){
+        btn.disabled = false;
+        btn.textContent = 'Read the site and fill this in';
+        showDraftError(e.message || 'The site could not be read.');
+      });
+    }
+    window.draftProfile = draftProfile;
 
     function saveProfile(){
       var err = document.getElementById('profileError');
