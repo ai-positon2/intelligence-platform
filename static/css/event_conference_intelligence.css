@@ -487,6 +487,85 @@ body {
 }
 .evi-field .hint { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
 
+/* ── drafting the profile from the client's own site ──────────────────
+   The form proposes; the person confirms. Everything in this block exists to
+   keep those two things looking different from each other. */
+
+.evi-draftbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 14px;
+}
+.evi-draftbar .evi-btn { padding: 12px 22px; font-size: 13.5px; }
+.evi-draftbar .evi-btn:disabled {
+  opacity: .6; cursor: progress; transform: none; box-shadow: none;
+}
+.evi-draftbar .dh {
+  font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-3);
+  max-width: 42ch; min-width: 0;
+}
+
+/* What was read, shown before anything that was written from it. The company
+   sentence is deliberately the largest thing here: two firms sharing a name is
+   the failure mode that produces a complete, confident, well-sourced profile
+   of the wrong business, and one glance at this line is the cheapest way to
+   catch it. */
+.evi-read {
+  margin-top: 14px; padding: 15px 17px;
+  border-radius: var(--radius-md, 12px);
+  background: linear-gradient(102deg, rgba(56,189,248,.09), rgba(139,92,246,.06));
+  border: 1px solid rgba(99,102,241,.24);
+}
+.evi-read .rh {
+  display: block; font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--evi-a1); margin-bottom: 8px;
+}
+.evi-read .rs {
+  margin: 0; font-size: 14px; line-height: 1.55; color: var(--evi-ink);
+  font-weight: 550;
+}
+.evi-read .rc, .evi-read .rn {
+  margin: 7px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--evi-ink-3);
+}
+.evi-read .rl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.evi-read .rl a {
+  font-size: 11px; color: var(--evi-ink-2); text-decoration: none;
+  padding: 4px 9px; border-radius: var(--radius-pill, 999px);
+  background: var(--evi-panel-2); border: 1px solid var(--evi-line-2);
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.evi-read .rl a:hover { border-color: rgba(99,102,241,.45); color: var(--evi-ink); }
+
+/* Per field: what was read, or that nothing was. A blank box on a form reads
+   as something the user forgot, and the whole value of the draft is knowing
+   which fields were confirmed and which were left for you. */
+.evi-field .ev { font-size: 11px; line-height: 1.5; color: var(--evi-ink-3); }
+.evi-field .ev.read { color: var(--evi-ink-3); }
+.evi-field .ev.read::before {
+  content: "Read: "; font-weight: 700; color: var(--evi-ok);
+}
+.evi-field .ev.gap::before {
+  content: "Blank: "; font-weight: 700; color: var(--evi-warn);
+}
+.evi-field .ev.kept::before {
+  content: "Yours: "; font-weight: 700; color: var(--evi-a1);
+}
+
+/* A suggested classification is NOT a chosen one, and the two must never look
+   alike. Chosen is a solid border over a filled card. Suggested is a dashed
+   outline and an argument, and it becomes solid only once somebody clicks it,
+   so the card visibly changes state at the moment the person decides rather
+   than at the moment the model did. */
+.evi-class[data-suggested] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--evi-a1) 48%, transparent);
+}
+.evi-class[data-suggested][aria-checked="true"] { border-style: solid; }
+.evi-class .cs {
+  margin-top: 9px; padding-top: 9px; font-size: 11px; line-height: 1.5;
+  color: var(--evi-ink-2); border-top: 1px dashed var(--evi-line-2);
+}
+.evi-class[aria-checked="true"] .cs { border-top-color: rgba(99,102,241,.3); }
+
 .evi-btn {
   appearance: none; border: none; cursor: pointer; font: inherit;
   font-size: 14.5px; font-weight: 600; color: #fff; padding: 14px 30px;
