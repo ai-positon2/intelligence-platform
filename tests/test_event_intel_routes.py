@@ -416,3 +416,28 @@ def test_drafting_is_rate_limited(monkeypatch):
     assert codes[:limit] == [200] * limit, codes
     assert codes[limit:] == [429, 429], codes
     appmod._CPI_RATE_STATE.pop("evi-draft-profile", None)
+
+
+def test_the_form_says_what_drafting_actually_does_and_how_long_it_takes():
+    """This copy has been wrong twice, in both directions.
+
+    It first claimed "about a minute" while the search-driven version took up
+    to ten. Then it said "a few minutes" after that version was replaced by
+    one that fetches the pages itself and lands in about fifteen seconds. A
+    hint that overstates the wait is a smaller sin than one that understates
+    it, but both make a working feature feel broken.
+    """
+    import re
+    html = _p2().get(BASE).get_data(as_text=True)
+    assert "Read the site and fill this in" in html, "the draft control is gone"
+    # Scoped to the draft's own hint. The page says "a few minutes" elsewhere
+    # about the RUN, which genuinely does take minutes, and an unscoped match
+    # read that sentence and failed on it.
+    hint = re.search(r'<span class="dh">(.*?)</span>', html, re.S)
+    assert hint, "the draft hint is gone"
+    hint = " ".join(hint.group(1).split())
+    assert "a few minutes" not in hint, hint
+    assert "under a minute" in hint, hint
+    assert "fetch" in hint.lower(), (
+        "the hint no longer says we read their pages, which is the thing that "
+        "makes the wait and the sources make sense: %s" % hint)
