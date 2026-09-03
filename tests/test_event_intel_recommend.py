@@ -202,9 +202,96 @@ def test_the_client_profile_element_reads_as_a_sentence():
     assert cp.endswith(".")
 
 
+# ── a category's own explanation, quoted rather than folded ──────────────
+#
+# The live Beta Bionics report ended its assumptions paragraph mid-word, ran
+# to 180 words, and printed "AWS Summit city tours" as "aws summit city
+# tours". All three came from one line: several 600-character model notes
+# lowercased and folded into a single sentence.
+
+_LIVE_NOTE = (
+    "Searched for AWS/Salesforce/HubSpot/ServiceNow/Databricks/Snowflake free "
+    "city vendor events in connection with Beta Bionics, and separately "
+    "searched for any diabetes tie-in to this event category. Results "
+    "confirmed this category consists of enterprise B2B software vendor "
+    "road-shows (e.g., AWS Summit city tours, Salesforce city events) whose "
+    "audiences are IT and business budget owners for cloud software.")
+
+
+def test_a_quoted_reason_keeps_the_capitals_the_model_wrote():
+    """The failure that made a paying client's report look careless. Folding a
+    note into a sentence needed a lowercase clause, and lowercasing a whole
+    paragraph destroys every brand name in it."""
+    r = REP._reason(_LIVE_NOTE)
+    assert "AWS" in r and "aws" not in r
+
+
+def test_a_quoted_reason_is_capped_and_says_where_it_was_cut():
+    r = REP._reason(_LIVE_NOTE)
+    assert len(r) <= REP.REASON_CHARS + 1
+    assert r.endswith("\u2026"), "a trimmed reason has to show that it was trimmed"
+
+
+def test_a_quoted_reason_never_cuts_mid_word():
+    """'published on t' in a live report reads as a model that stopped
+    mid-thought. It was our own cap, and only one of those two is worth
+    going to investigate."""
+    r = REP._reason("a " + "x" * 400)
+    assert r == "A " + "x" * 198 + "\u2026", r
+
+
+def test_a_short_reason_is_left_alone():
+    assert REP._reason("No edition falls in the window.") == \
+        "No edition falls in the window."
+
+
+def test_a_cut_on_a_sentence_boundary_is_still_marked_as_a_cut():
+    """The one shape that could pass for a complete explanation. The reader
+    sees a tidy full stop and has no way to know a second sentence said what
+    the search actually concluded."""
+    r = REP._reason(_LIVE_NOTE)
+    assert r.endswith("\u2026")
+    assert not r.endswith(".\u2026")
+
+
+def test_a_reason_keeps_whole_sentences_while_they_fit():
+    """A note usually says what it searched first and what it concluded
+    second. Keeping only the first sentence throws away the half a reader
+    actually wants."""
+    r = REP._reason("Searched three listings. No edition falls in the window.")
+    assert r.endswith("window.")
+    assert "Searched three listings." in r
+
+
+def test_a_reason_does_not_split_on_a_full_stop_inside_a_url():
+    r = REP._reason("The organiser publishes it at attd.kenes.com only.")
+    assert r.endswith("only.")
+
+
+def test_a_reason_gets_a_full_stop_it_was_missing():
+    assert REP._reason("No events found").endswith(".")
+
+
+def test_an_empty_reason_stays_empty_rather_than_becoming_a_full_stop():
+    assert REP._reason("") == "" and REP._reason(None) == ""
+
+
+def test_the_assumptions_paragraph_quotes_each_category_after_a_colon():
+    """Not folded into one run-on sentence: one label, one colon, one reason."""
+    s = _summary(shortfall=[
+        {"category": R.CAT_FREE_VENDOR, "label": "Free sponsor-funded event",
+         "status": "empty", "why": _LIVE_NOTE},
+        {"category": R.CAT_EMERGING, "label": "Emerging event",
+         "status": "empty", "why": "Nothing in years one to three here."}])
+    text = " ".join(s["assumptions"])
+    assert "Free sponsor-funded event: Searched for AWS" in text
+    assert "Emerging event: Nothing in years one to three here." in text
+    assert "AWS" in text
+
+
 def test_assumptions_separate_a_failed_category_from_an_empty_one():
     s = _summary(shortfall=[
-        {"category": R.CAT_FREE_VENDOR, "label": "Free vendor conference",
+        {"category": R.CAT_FREE_VENDOR, "label": "Free sponsor-funded event",
          "status": "empty", "why": "No vendor runs city events in this vertical."},
         {"category": R.CAT_SIDE_EVENT, "label": "Side event",
          "status": "error", "why": "transport: HTTP 503"}])
@@ -402,7 +489,7 @@ def test_a_run_that_discovers_nothing_explains_itself(monkeypatch):
         "candidates": [], "by_category": {},
         "statuses": {R.CAT_FREE_VENDOR: {"status": "error"}},
         "shortfall": [{"category": R.CAT_FREE_VENDOR, "status": "error",
-                       "label": "Free vendor conference", "why": "HTTP 503"}],
+                       "label": "Free sponsor-funded event", "why": "HTTP 503"}],
         "categories_searched": 5, "categories_failed": 1, "found": 0})
     P._run_recommend(1, "me@p2.example", PROFILE)
     s = fake.runs[1]["summary"]
