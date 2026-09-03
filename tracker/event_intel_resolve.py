@@ -135,7 +135,12 @@ def resolve_event(query: str, year_hint: str | None = None) -> dict:
     res = claude_websearch.ask(_SYSTEM, user, max_uses=10, max_tokens=6000)
     if res.get("error"):
         err = res["error"]
-        out = _failed("none", "The event lookup could not run (%s)." % err["detail"])
+        # The developer detail goes to the log; the person waiting on the
+        # lookup gets a reason they can read. See claude_websearch.
+        logger.warning("event_intel_resolve: lookup failed for %r (%s: %s)",
+                       query, err["kind"], err["detail"])
+        out = _failed("none", "The event lookup could not run: %s."
+                      % claude_websearch.reader_reason(err))
         out["error"] = err
         return out
 

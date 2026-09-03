@@ -207,7 +207,17 @@ Respond with ONLY a JSON object, no prose before or after:
 
 `name` is the event as it brands itself, without the year. `why` is one \
 sentence saying why it belongs to the "{category_label}" category \
-specifically. `note` says what you searched and what you could not confirm.
+specifically.
+
+`note` is printed in the client's report as the reason this category came \
+back the way it did, so write it as a finding about THEIR MARKET and nothing \
+else: at most two sentences, in the third person, about what this category \
+holds for them or why it holds nothing. Do not narrate what you did, what you \
+intended to do, or what you were unable to do, and do not mention searching, \
+tools, budgets or limits: those are recorded separately and printing them \
+here hands the client a problem they cannot act on. If you have nothing to \
+say about their market, return an empty string. A note that describes your \
+own process is dropped, so it costs you the chance to say anything at all.
 
 YOUR SEARCH BUDGET IS {max_uses} SEARCHES. That is a deliberate limit, not an \
 accident, and using every one of it is the expected outcome rather than a \
@@ -638,6 +648,92 @@ def confirm_system(proposal: dict, category: str, profile: dict) -> str:
         **_prompt_common(profile))
 
 
+# How much of the finder's own note the report carries, and what it drops.
+#
+# `note` is free prose from a model. The prompt asks for "what you searched and
+# what you could not confirm", and the report prints the answer as the reason a
+# category came up short. A live run answered with 600 characters of
+# first-person narration, and every one of them was printed under a heading,
+# cut off mid-word:
+#
+#   "i attempted to research emerging (1st-3rd edition) b2b marketing/growth/
+#    sales events for position2 [dash] candidates i intended to verify included
+#    newer community-driven events such as mops-apalooza ... however, the
+#    web_search tool hit a hard per-turn call limit partway through this
+#    research session and returned 'server tool use limit exceeded' on every su"
+#
+# Length and content are two separate faults and a cap only fixes the first.
+# No cap turns a sentence about our tooling into a sentence about this client's
+# market: a reader told about a "per-turn call limit" has been handed a problem
+# they cannot act on, sitting in the one paragraph that is supposed to be about
+# their market. Those sentences are dropped outright, and what the search could
+# not finish is already said, in this module's own words, by the status and the
+# detail that travel beside the note.
+#
+# Only the note is cleaned this way. A rejection reason is prose from the same
+# model, but it is one reason about one event and it has somewhere else to go:
+# a rejection this filter emptied would have to become "could not be checked",
+# which is a different finding, and making that switch on a keyword match is
+# not a trade this is confident enough to make.
+NOTE_CHARS = 220
+
+_NOTE_PLUMBING = ("web_search", "search tool", "tool call", "tool use",
+                  "per-turn", "per turn", "max_uses", "max_tokens",
+                  "stop_reason", "rate limit", "this turn", "server tool",
+                  "call limit", "token limit", "tool limit",
+                  # Self-narration. The prompt now forbids it, and a model
+                  # that ignores that produces the worst sentence in the
+                  # report: "I attempted to research emerging events for
+                  # position2, candidates i intended to verify included..."
+                  # says nothing about the client's market and takes a
+                  # paragraph to say it. Dropping a sentence too many is the
+                  # safe direction: an emptied note falls back to a sentence
+                  # of this module's own, which is always true.
+                  "i attempted", "i intended", "i tried", "i searched",
+                  "i was unable", "i could not", "i ran out", "i did not",
+                  "i have not", "my search", "let me", "i will")
+
+_NOTE_SENTENCE = re.compile(r"[^.!?]+(?:[.!?]+|$)")
+_NOTE_DASH = re.compile(r"\s*[\u2013\u2014]\s*")
+
+
+def _reader_note(raw) -> str:
+    """The model's note as report copy: no plumbing, capped, punctuated.
+
+    Returns "" when nothing survives, which the callers already handle: an
+    absent note is a category that said nothing, and every one of them has a
+    sentence of our own to fall back on.
+    """
+    text = _NOTE_DASH.sub(", ", " ".join(str(raw or "").split()))
+    if not text:
+        return ""
+    kept, used = [], 0
+    for piece in _NOTE_SENTENCE.findall(text):
+        s = piece.strip()
+        if not s:
+            continue
+        low = s.lower()
+        if any(bit in low for bit in _NOTE_PLUMBING):
+            continue
+        if kept and used + 1 + len(s) > NOTE_CHARS:
+            break
+        used += (1 if kept else 0) + len(s)
+        kept.append(s)
+    if not kept:
+        return ""
+    out = " ".join(kept)
+    if len(out) > NOTE_CHARS:
+        # One sentence longer than the whole allowance. Cut at a word rather
+        # than mid-word: ending a client's report on "on every su" is what
+        # started this.
+        cut = out[:NOTE_CHARS]
+        at = cut.rfind(" ")
+        out = (cut[:at] if at > NOTE_CHARS * 0.6 else cut).rstrip(" ,;:.-") + "\u2026"
+    elif not out.endswith((".", "!", "?", "\u2026")):
+        out += "."
+    return out[0].upper() + out[1:]
+
+
 def _searches_used(res: dict) -> str:
     """How much of the budget the call actually spent, as a sentence.
 
@@ -741,11 +837,17 @@ def propose_category(category: str, profile: dict) -> dict:
         # sentence a client reads. Rendered under a category label it
         # produced "Side event: Transport: peer closed connection", a double
         # colon around a word that means nothing to the reader.
-        logger.warning("event_intel_discover: find failed for category %s (%s)",
-                       category, err["kind"])
+        # Both halves of the failure go somewhere, and to different readers.
+        # The kind and the full detail go to the log, where the stop_reason
+        # and the tool's own error code are the whole point. The report gets
+        # a clause written for a person: `detail` ends with advice like
+        # "Raise max_tokens or lower max_uses", and a live client report
+        # printed that sentence under a category heading.
+        logger.warning("event_intel_discover: find failed for category %s "
+                       "(%s: %s)", category, err["kind"], err["detail"])
         return _out(STATUS_ERROR, [], "",
-                    "The search for this category could not be completed: %s"
-                    % err["detail"])
+                    "The search for this category could not be completed: %s."
+                    % claude_websearch.reader_reason(err))
 
     # The same refusal event_intel_recover applies to a recovered roster, for
     # the same reason and with more at stake: a reply that ran no search is a
@@ -774,7 +876,7 @@ def propose_category(category: str, profile: dict) -> dict:
         if clean:
             proposals.append(clean)
     proposals = _dedupe_proposals(proposals)[:PER_CATEGORY]
-    note = str(parsed.get("note") or "")[:600]
+    note = _reader_note(parsed.get("note"))
 
     # A search that was cut off is not a category that is empty. The model is
     # asked to declare this outright, because the alternative signals are all
@@ -842,7 +944,16 @@ def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
                max_tokens=CONFIRM_MAX_TOKENS)
     if res.get("error"):
         err = res["error"]
-        return _unchecked(name, "%s: %s" % (err["kind"], err["detail"]))
+        # Named on the "could not be checked" list, next to the event, in the
+        # report. The kind is a machine token and the detail is written for
+        # this file's author, so the pair rendered as
+        # "max_tokens: Ran out of output budget before finishing
+        # (stop_reason=max_tokens). Raise max_tokens or lower max_uses."
+        # beside an event name a reader was trying to make a decision about.
+        logger.warning("event_intel_discover: confirm failed for %r (%s: %s)",
+                       name[:80], err["kind"], err["detail"])
+        return _unchecked(name, "The check could not be completed: %s."
+                          % claude_websearch.reader_reason(err))
 
     if not res.get("search_count"):
         return _unchecked(name, "The model answered without running a single "
@@ -1040,9 +1151,23 @@ def discover(profile: dict) -> dict:
         # note is a description of the market. Printing the note for a search
         # that was cut off is how "we could not finish looking" gets rendered
         # as "there is nothing here for you".
-        s["why"] = (st.get("detail") or "The search for this category did not run.") \
-            if s["status"] in (STATUS_ERROR, STATUS_PARTIAL) \
-            else (st.get("note") or "This category returned nothing for this client.")
+        if s["status"] in (STATUS_ERROR, STATUS_PARTIAL):
+            s["why"] = st.get("detail") or "The search for this category did not run."
+        else:
+            # The fallback has to match what was actually found. A category
+            # that found one event and wanted two is short, not empty, and
+            # "this category returned nothing for this client" printed under a
+            # bar reading 1 of 2 contradicts the bar it is explaining. It was
+            # unreachable while every category came back with a note, and
+            # _reader_note made it reachable by design: a note that only
+            # narrated the search is now dropped, and this sentence is what
+            # takes its place.
+            found = int(s.get("found") or 0)
+            s["why"] = st.get("note") or (
+                "This category returned nothing for this client."
+                if not found else
+                "The search finished and found only %s here for this client."
+                % ("one event" if found == 1 else "%d events" % found))
         if s["status"] not in (STATUS_ERROR, STATUS_PARTIAL) and st.get("merged_away"):
             s["why"] = ("%s %d of the %d events found here were the same events "
                         "already listed under another category."
