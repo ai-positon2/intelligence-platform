@@ -536,3 +536,101 @@ def test_the_armer_is_reached_and_needs_a_frame_to_fire(page_script):
     assert got["queued"] == 1, (
         "render() queued %d animation frames, expected exactly one"
         % got["queued"])
+
+
+# ── the search funnel ─────────────────────────────────────────────────────
+#
+# Discovery names candidates and then confirms each with a separate search.
+# Only survivors reach the list, so a reader shown one event cannot tell
+# whether one was all there ever was or the only one of eleven that held up.
+# The funnel is what makes those two reports look different.
+
+def _funnel_bars(body):
+    """The three numbers in the search funnel, and only those.
+
+    The recommendation draws a funnel of its own higher up the page. A bare
+    match on the bar markup reads whichever one comes first, which is how the
+    first version of these tests asserted on the wrong chart.
+    """
+    at = body.index("What the search looked at")
+    return [int(n) for n in
+            re.findall(r'<div class="fb"[^>]*><b>(\d+)</b>', body[at:])]
+
+
+def _statuses(**cats):
+    """statuses as discover() writes them, one entry per named category."""
+    out = {}
+    for cat, (proposed, found, kept, rejected) in cats.items():
+        out[cat] = {"status": "ok", "note": "", "detail": "", "label": cat,
+                    "proposed": proposed, "found": found, "kept": kept,
+                    "rejected": rejected}
+    return out
+
+
+def test_the_funnel_says_how_many_candidates_were_looked_at(page_script):
+    body = _render(page_script, _recommend(
+        [_cand("Kept One", 71, "P2")],
+        statuses=_statuses(
+            industry_flagship=(4, 1, 1, [{"name": "Gone Show",
+                                          "reason": "the 2026 edition was the last"}]),
+            vertical_summit=(3, 1, 1, [{"name": "Wrong Crowd",
+                                        "reason": "no edition in the window"}]))))
+    assert "What the search looked at" in body
+    # 7 named, 2 confirmed, 2 kept. Scoped to this section: the recommendation
+    # draws a funnel of its own further up, and an unscoped match would read
+    # that one's bars and pass on the wrong chart.
+    nums = _funnel_bars(body)
+    assert nums == [7, 2, 2], nums
+    assert "Gone Show" in body and "the 2026 edition was the last" in body
+    assert "Wrong Crowd" in body
+
+
+def test_a_run_recorded_before_the_split_draws_no_funnel(page_script):
+    """The numbers a stored run does not carry are not invented. "named 3,
+    confirmed 3" is a claim that run never made."""
+    body = _render(page_script, _recommend(
+        [_cand("Kept One", 71, "P2")],
+        statuses={"industry_flagship": {"status": "ok", "note": "", "detail": "",
+                                        "label": "Industry flagship", "found": 1,
+                                        "kept": 1}}))
+    assert "What the search looked at" not in body
+
+
+def test_a_candidate_nothing_could_check_is_not_reported_as_ruled_out(page_script):
+    """The distinction the whole module is built around, in the one place a
+    reader actually sees it. Ruled out is a fact about the client's year.
+    Could not be checked is a hole in the analysis."""
+    body = _render(page_script, _recommend(
+        [_cand("Kept One", 71, "P2")],
+        # 4 named, 1 confirmed, 1 ruled out. The other 2 are unchecked.
+        statuses=_statuses(industry_flagship=(4, 1, 1, [
+            {"name": "Gone Show", "reason": "discontinued"}]))))
+    assert "2 candidates could not be checked" in body
+    assert "not because they were found wanting" in body
+    ruled = body[body.index('class="evi-ruled"'):]
+    assert "Gone Show" in ruled
+    assert ruled.count('class="rr"') == 1, (
+        "an unchecked candidate was listed as one a search ruled out")
+
+
+def test_no_warning_when_every_candidate_reached_a_verdict(page_script):
+    """The control. A banner that always fires stops carrying information."""
+    body = _render(page_script, _recommend(
+        [_cand("Kept One", 71, "P2")],
+        statuses=_statuses(industry_flagship=(2, 1, 1, [
+            {"name": "Gone Show", "reason": "discontinued"}]))))
+    assert "could not be checked" not in body
+
+
+def test_the_funnel_never_shows_more_kept_than_confirmed(page_script):
+    """Dedup happens after confirmation, so kept is confirmed minus the events
+    already listed under another category. A funnel that widened would mean
+    the page had invented a row."""
+    body = _render(page_script, _recommend(
+        [_cand("Kept One", 71, "P2")],
+        statuses=_statuses(industry_flagship=(5, 3, 1, []),
+                           vertical_summit=(2, 2, 1, []))))
+    nums = _funnel_bars(body)
+    assert nums == [7, 5, 2], nums
+    assert nums[0] >= nums[1] >= nums[2]
+    assert "3 events already listed under another category" in body

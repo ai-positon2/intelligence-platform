@@ -7,6 +7,7 @@ and that the same event cannot occupy three slots under three labels.
 """
 
 import json
+import re
 
 import pytest
 
@@ -41,7 +42,7 @@ def test_budget_never_reaches_the_prompt():
 
 
 def test_the_category_prompt_names_which_side_of_the_floor_to_look_at():
-    sys_prompt = D._SYSTEM.format(
+    sys_prompt = D._FIND_SYSTEM.format(
         category_label=R.CATEGORY_LABELS[R.CAT_FREE_VENDOR],
         category_brief=R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR],
         profile=D.profile_brief(PROFILE),
@@ -53,6 +54,35 @@ def test_the_category_prompt_names_which_side_of_the_floor_to_look_at():
         "whenever it believes now is")
     assert "Free vendor conference" in sys_prompt
     assert "under-utilised" in sys_prompt
+
+
+def test_the_confirm_prompt_carries_the_same_anchors_as_the_find_prompt():
+    """Both stages search, so both need the date anchor and the side of the
+    floor. The confirm prompt was added second and is the one that would
+    silently drift."""
+    sys_prompt = D._CONFIRM_SYSTEM.format(
+        event_name="SaaStr Annual",
+        category_label=R.CATEGORY_LABELS[R.CAT_VERTICAL_SUMMIT],
+        category_brief=R.CATEGORY_BRIEF[R.CAT_VERTICAL_SUMMIT],
+        why="dense with the buyer role",
+        website_line="",
+        profile=D.profile_brief(PROFILE),
+        today="2026-09-02",
+        where_buyers=R.CLASSIFICATION_WHERE_BUYERS_ARE[R.CLASS_B2B_TO_MARKETING])
+    assert "SaaStr Annual" in sys_prompt
+    assert "Behind the booths" in sys_prompt
+    assert "TODAY IS 2026-09-02" in sys_prompt
+
+
+def test_the_confirmer_is_told_it_may_say_no():
+    """The whole point of the second stage. A confirmer that reads as an
+    advocate would rubber-stamp whatever the finder proposed, and the split
+    would buy nothing but latency."""
+    sys_prompt = D._CONFIRM_SYSTEM.format(
+        event_name="X", category_label="L", category_brief="B", why="w",
+        website_line="", profile="p", today="2026-09-02", where_buyers="w")
+    assert "YOU ARE THE CHECK, NOT THE ADVOCATE" in sys_prompt
+    assert "reject_reason" in sys_prompt
 
 
 # ── dedup keys ────────────────────────────────────────────────────────────
@@ -224,32 +254,104 @@ def test_merge_survives_rows_with_no_usable_name():
 
 # ── one category ──────────────────────────────────────────────────────────
 
-def _stub(monkeypatch, payload=None, error=None, text=None):
+# ── stubbing two stages ───────────────────────────────────────────────────
+#
+# One canned reply can no longer serve a whole category. Finding names and
+# confirming one of them are separate calls parsing different envelopes, so
+# the stub tells them apart the way the module does: by the prompt it sent.
+
+_EVENT = {"name": "Real Event", "starts_on": "2027-03-01",
+          "sources": ["https://example.com/e"], "category_fit": "fits",
+          "confidence": "high"}
+
+
+def _find_reply(candidates, note="n", complete=None):
+    body = {"candidates": candidates, "note": note}
+    if complete is not None:
+        body["search_complete"] = complete
+    return json.dumps(body)
+
+
+def _confirm_reply(event=None, confirmed=True, reject_reason=None,
+                   facts_complete=None):
+    body = {"confirmed": confirmed, "event": event}
+    if reject_reason is not None:
+        body["reject_reason"] = reject_reason
+    if facts_complete is not None:
+        body["facts_complete"] = facts_complete
+    return json.dumps(body)
+
+
+def _named(**over):
+    """One candidate the finder proposes, and the event it confirms to."""
+    ev = dict(_EVENT)
+    ev.update(over)
+    return ev
+
+
+_CONFIRM_TARGET = re.compile(r"THE EVENT TO CONFIRM: (.+)")
+
+
+def _stages(monkeypatch, find=None, confirm=None, find_error=None,
+            confirm_error=None, find_searches=3, confirm_searches=3,
+            find_text=None, confirm_text=None):
+    """Stub both discovery stages.
+
+    `find` and `confirm` are the decoded reply bodies. `confirm` may instead
+    be a callable taking the candidate name, so one test can reject one
+    candidate and confirm another.
+    """
+    if find is None:
+        find = _find_reply([{"name": "Real Event",
+                             "website": "https://example.com/e", "why": "w"}])
+    if confirm is None:
+        confirm = _confirm_reply(_EVENT)
+
     def fake_ask(system, user, **kw):
-        if error:
-            return {"text": "", "error": error}
-        import json
-        return {"text": text if text is not None else json.dumps(payload),
-                "error": None, "text_block_count": 1, "stop_reason": "end_turn",
-                # A real reply carries the number of searches it ran. Discovery
-                # now discards a category answered without one, so a stub that
-                # omits this is stubbing an ungrounded answer.
-                "search_count": kw.pop("search_count", 3)}
+        finding = "YOUR ONLY JOB IS TO NAME CANDIDATES" in system
+        if finding:
+            if find_error:
+                return _res("", find_error, find_searches)
+            return _res(find_text if find_text is not None else find,
+                        None, find_searches)
+        if confirm_error:
+            return _res("", confirm_error, confirm_searches)
+        if confirm_text is not None:
+            return _res(confirm_text, None, confirm_searches)
+        body = confirm
+        if callable(body):
+            m = _CONFIRM_TARGET.search(system)
+            body = body(m.group(1).strip() if m else "")
+        return _res(body, None, confirm_searches)
+
+    def _res(text, error, searches):
+        return {"text": text, "raw": text, "error": error,
+                "stop_reason": "end_turn", "text_block_count": 1,
+                "tool_version": "v", "tool_errors": [], "usage": {},
+                # A real reply carries the number of searches it ran. Both
+                # stages discard an answer that ran none, so a stub omitting
+                # this is stubbing an ungrounded answer.
+                "search_count": searches}
+
     monkeypatch.setattr(claude_websearch, "ask", fake_ask)
 
 
 def test_a_category_that_finds_events_reports_ok(monkeypatch):
-    _stub(monkeypatch, {"events": [{"name": "PMM Summit",
-                                    "website": "https://pmm.example"}],
-                        "note": "found one"})
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "PMM Summit",
+                               "website": "https://pmm.example", "why": "w"}],
+                             note="found one", complete=True),
+            confirm=_confirm_reply(_named(name="PMM Summit")))
     r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
     assert r["status"] == D.STATUS_OK
     assert r["events"][0]["category"] == R.CAT_VERTICAL_SUMMIT
+    assert r["proposed"] == 1
 
 
 def test_a_category_that_genuinely_has_nothing_reports_empty(monkeypatch):
-    _stub(monkeypatch, {"events": [],
-                        "note": "No free vendor conferences serve this niche."})
+    _stages(monkeypatch,
+            find=_find_reply([], note="No free vendor conferences serve this "
+                                      "niche.", complete=True))
     r = D.search_category(R.CAT_FREE_VENDOR, PROFILE)
     assert r["status"] == D.STATUS_EMPTY
     assert "niche" in r["note"]
@@ -259,29 +361,50 @@ def test_a_category_whose_search_failed_reports_error_not_empty(monkeypatch):
     """The distinction the module exists for. 'Nothing serves this niche' is a
     finding about the market; 'the search failed' is a hole in the analysis.
     Both render as an absence unless they are kept apart here."""
-    _stub(monkeypatch, error={"kind": "transport", "detail": "HTTP 503"})
+    _stages(monkeypatch, find_error={"kind": "transport", "detail": "HTTP 503"})
     r = D.search_category(R.CAT_FREE_VENDOR, PROFILE)
     assert r["status"] == D.STATUS_ERROR
     assert "503" in r["detail"]
 
 
 def test_an_unreadable_reply_is_an_error_rather_than_an_empty_category(monkeypatch):
-    _stub(monkeypatch, text="I could not find anything useful, sorry.")
+    _stages(monkeypatch, find_text="I could not find anything useful, sorry.")
     r = D.search_category(R.CAT_EMERGING, PROFILE)
     assert r["status"] == D.STATUS_ERROR
 
 
 def test_clean_event_rejects_a_non_http_website_and_sources(monkeypatch):
-    _stub(monkeypatch, {"events": [{
+    _stages(monkeypatch, confirm=_confirm_reply({
         "name": "X", "website": "javascript:alert(1)",
         "sources": ["https://ok.example", "javascript:x", 7],
         "attendees": "9,000+", "organizer_run": True,
-        "matchmaking_evidence": "Hosted buyer programme."}]})
+        "matchmaking_evidence": "Hosted buyer programme."}))
     ev = D.search_category(R.CAT_EMERGING, PROFILE)["events"][0]
     assert ev["website"] is None
     assert ev["sources"] == ["https://ok.example"]
     assert ev["attendees"] == "9,000+"
     assert ev["organizer_run"] is True
+
+
+def test_a_proposal_carrying_a_javascript_url_never_reaches_the_confirm_prompt(monkeypatch):
+    """The finder's website is interpolated into the confirmer's system
+    prompt. Anything that is not http(s) is dropped at the proposal, for the
+    same reason `_clean_event` drops it at the event."""
+    seen = {}
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "X", "website": "javascript:alert(1)",
+                               "why": "w"}], complete=True))
+    real = claude_websearch.ask
+
+    def spy(system, user, **kw):
+        if "THE EVENT TO CONFIRM" in system:
+            seen["system"] = system
+        return real(system, user, **kw)
+
+    monkeypatch.setattr(claude_websearch, "ask", spy)
+    D.search_category(R.CAT_EMERGING, PROFILE)
+    assert "javascript:" not in seen["system"]
+    assert "Their link for it" not in seen["system"]
 
 
 # ── the whole sweep ───────────────────────────────────────────────────────
@@ -364,37 +487,25 @@ def test_discovery_returns_facts_and_scores_nothing(monkeypatch):
 # finished. This is the exact conflation the six-category split exists to
 # prevent, running in the direction nobody checked.
 
-def _reply(events, note="n", complete=None):
-    body = {"events": events, "note": note}
-    if complete is not None:
-        body["search_complete"] = complete
-    return json.dumps(body)
+_ONE = [{"name": "Real Event", "website": "https://example.com/e", "why": "w"}]
 
 
-def _run_category(monkeypatch, reply, search_count=9):
-    from tracker import event_intel_discover as D
-    monkeypatch.setattr(D.claude_websearch, "ask", lambda *a, **k: {
-        "text": reply, "raw": reply, "error": None, "stop_reason": "end_turn",
-        "text_block_count": 1, "tool_version": "v", "search_count": search_count,
-        "tool_errors": [], "usage": {}})
+def _run_category(monkeypatch, find, confirm=None):
+    _stages(monkeypatch, find=find,
+            confirm=confirm if confirm is not None else _confirm_reply(_EVENT))
     return D.search_category("industry_flagship", {"classification": "b2b_to_marketing"})
 
 
 def test_an_unfinished_search_with_nothing_found_is_an_error_not_an_empty_category(monkeypatch):
-    from tracker import event_intel_discover as D
-    r = _run_category(monkeypatch, _reply([], note="I could not finish.",
-                                          complete=False))
+    r = _run_category(monkeypatch, _find_reply([], note="I could not finish.",
+                                               complete=False))
     assert r["status"] == D.STATUS_ERROR, (
         "a search that was cut off was reported as a category with nothing in it")
     assert "gap in the search" in r["detail"]
 
 
 def test_an_unfinished_search_that_still_found_events_keeps_them_and_says_so(monkeypatch):
-    from tracker import event_intel_discover as D
-    ev = {"name": "Real Event", "starts_on": "2027-03-01",
-          "sources": ["https://example.com/e"], "category_fit": "fits",
-          "confidence": "high"}
-    r = _run_category(monkeypatch, _reply([ev], complete=False))
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=False))
     assert r["status"] == D.STATUS_PARTIAL
     assert len(r["events"]) == 1, "confirmed events were thrown away with the gap"
     assert r["detail"]
@@ -404,9 +515,8 @@ def test_a_finished_search_with_nothing_found_is_still_a_real_empty(monkeypatch)
     """The other half of the distinction. A properly searched category that
     genuinely has nothing must keep saying so, or the fix above would turn
     every honest empty into a scary error."""
-    from tracker import event_intel_discover as D
-    r = _run_category(monkeypatch, _reply([], note="Searched, nothing fits.",
-                                          complete=True))
+    r = _run_category(monkeypatch, _find_reply([], note="Searched, nothing fits.",
+                                               complete=True))
     assert r["status"] == D.STATUS_EMPTY
     assert r["note"] == "Searched, nothing fits."
 
@@ -414,8 +524,7 @@ def test_a_finished_search_with_nothing_found_is_still_a_real_empty(monkeypatch)
 def test_no_completeness_declaration_reports_what_could_not_be_measured(monkeypatch):
     """Silence is not a claim of success. An older reply with no
     search_complete field must not be read as a finished search."""
-    from tracker import event_intel_discover as D
-    r = _run_category(monkeypatch, _reply([], note="nothing"))
+    r = _run_category(monkeypatch, _find_reply([], note="nothing"))
     assert r["status"] == D.STATUS_EMPTY
     assert "did not say" in r["detail"] and "cut off" in r["detail"]
 
@@ -423,18 +532,367 @@ def test_no_completeness_declaration_reports_what_could_not_be_measured(monkeypa
 def test_the_shortfall_reason_for_a_partial_search_describes_the_SEARCH(monkeypatch):
     """The bug as a reader experiences it. `why` must not print the model's
     description of the market when the market was never fully looked at."""
-    from tracker import event_intel_discover as D
-    ev = {"name": "Only One", "starts_on": "2027-03-01",
-          "sources": ["https://example.com/e"], "category_fit": "fits",
-          "confidence": "high"}
-    monkeypatch.setattr(D.claude_websearch, "ask", lambda *a, **k: {
-        "text": _reply([ev], note="This market looks quiet.", complete=False),
-        "raw": "", "error": None, "stop_reason": "end_turn",
-        "text_block_count": 1, "tool_version": "v", "search_count": 9,
-        "tool_errors": [], "usage": {}})
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "Only One", "website": "https://e.example",
+                               "why": "w"}],
+                             note="This market looks quiet.", complete=False),
+            confirm=_confirm_reply(_named(name="Only One")))
     out = D.discover({"classification": "b2b_to_marketing"})
     reasons = {s["category"]: s["why"] for s in out["shortfall"]}
     for cat, why in reasons.items():
         assert "This market looks quiet." not in why, (
             "category %s reported an unfinished search as a fact about the "
             "market" % cat)
+
+
+# ── the two stages ────────────────────────────────────────────────────────
+#
+# The first live end-to-end run gave each category one call with a budget of
+# eight searches to both find events and confirm them. Every one of the six
+# saturated it, five reported nothing, and three events survived the run. The
+# input bill for a server-side search call grows with the square of its search
+# count, so the fix was to split the call rather than raise the budget.
+#
+# These tests pin the split itself and the honesty it has to preserve. The
+# dangerous new failure is the one the third status exists for: a candidate
+# the confirmer SEARCHED and ruled out is a fact about the market, and a
+# candidate it could not check is a hole, and they are now produced by the
+# same code path.
+
+def _budgets(monkeypatch, **kw):
+    """Run one category and record the budget every call was given."""
+    calls = []
+    _stages(monkeypatch, **kw)
+    real = claude_websearch.ask
+
+    def spy(system, user, **kwargs):
+        calls.append({"find": "YOUR ONLY JOB IS TO NAME CANDIDATES" in system,
+                      "max_uses": kwargs.get("max_uses"),
+                      "system": system, "user": user})
+        return real(system, user, **kwargs)
+
+    monkeypatch.setattr(claude_websearch, "ask", spy)
+    return calls
+
+
+def test_no_single_call_is_given_a_budget_big_enough_to_starve_again():
+    """The fix, stated as a number.
+
+    Input cost for one search call grows with the SQUARE of its search count,
+    because every result it has already read is re-sent on every later turn.
+    Eight searches in one call cost between 163k and 549k input tokens in the
+    live run and took up to nineteen minutes. Raising that budget is the one
+    change that cannot work, so no stage may quietly grow back into it.
+    """
+    assert D.FIND_MAX_USES <= 8
+    assert D.CONFIRM_MAX_USES <= 8
+
+
+def test_a_category_now_gets_more_searches_than_the_single_call_ever_did():
+    """The other half. Splitting the call is only a fix if the category ends
+    up able to look HARDER than before, not merely more cheaply."""
+    per_category = D.FIND_MAX_USES + D.CONFIRM_MAX_USES * D.PER_CATEGORY
+    assert per_category > 8, (
+        "the split reduced total search coverage, which is the problem it "
+        "exists to solve")
+
+
+def test_finding_and_confirming_are_separate_calls(monkeypatch):
+    calls = _budgets(monkeypatch,
+                     find=_find_reply(_ONE, complete=True),
+                     confirm=_confirm_reply(_EVENT))
+    D.search_category(R.CAT_EMERGING, PROFILE)
+    assert [c["find"] for c in calls] == [True, False]
+    assert calls[0]["max_uses"] == D.FIND_MAX_USES
+    assert calls[1]["max_uses"] == D.CONFIRM_MAX_USES
+
+
+def test_a_confirmation_never_sees_the_other_candidates(monkeypatch):
+    """Why the split is cheap. Each confirmation carries only its own pages,
+    so a category's input bill grows with the number of candidates instead of
+    with its square. A prompt naming all of them would undo that."""
+    calls = _budgets(monkeypatch,
+                     find=_find_reply(
+                         [{"name": "Alpha Summit", "website": "https://a.example",
+                           "why": "w"},
+                          {"name": "Beta Forum", "website": "https://b.example",
+                           "why": "w"}], complete=True),
+                     confirm=lambda n: _confirm_reply(_named(name=n)))
+    D.search_category(R.CAT_EMERGING, PROFILE)
+    confirms = [c for c in calls if not c["find"]]
+    assert len(confirms) == 2
+    for c in confirms:
+        named = [n for n in ("Alpha Summit", "Beta Forum") if n in c["system"]]
+        assert named == [c["system"].split("THE EVENT TO CONFIRM: ")[1]
+                         .splitlines()[0].strip()], (
+            "a confirmation prompt carried a candidate it was not confirming")
+
+
+def test_candidates_the_confirmer_ruled_out_make_an_empty_category(monkeypatch):
+    """Checked and rejected is a finished piece of work. Three plausible names
+    that all turn out to have no upcoming edition is a real finding about the
+    client's year, not a failed search."""
+    r = _run_category(
+        monkeypatch, _find_reply(_ONE, complete=True),
+        confirm=_confirm_reply(None, confirmed=False,
+                               reject_reason="the 2025 edition was the last one"))
+    assert r["status"] == D.STATUS_EMPTY
+    assert r["rejected"] == [{"name": "Real Event",
+                              "reason": "the 2025 edition was the last one"}]
+    assert "last one" in r["detail"]
+
+
+def test_candidates_the_confirmer_could_not_check_are_an_error_not_an_empty(monkeypatch):
+    """The mirror image, and the one that costs a client money. A confirmation
+    that never ran says nothing about the market, so it must never be able to
+    produce the sentence 'this category has nothing for you'."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
+                      confirm=None)
+    assert r["status"] == D.STATUS_OK  # control: the same shape, confirmed
+
+    _stages(monkeypatch, find=_find_reply(_ONE, complete=True),
+            confirm_error={"kind": "transport", "detail": "HTTP 503"})
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert r["status"] == D.STATUS_ERROR
+    assert r["rejected"] == []
+    assert "could not be checked" in r["detail"] and "503" in r["detail"]
+
+
+def test_a_confirmation_that_cites_nothing_is_not_a_confirmation(monkeypatch):
+    """This stage exists so that 'confirmed' means a second search actually
+    saw the event. A reply with no source is an assertion, and an assertion
+    from a model is the thing the whole module refuses to publish."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
+                      confirm=_confirm_reply(_named(sources=[])))
+    assert r["events"] == []
+    assert r["status"] == D.STATUS_ERROR
+    assert "without citing" in r["detail"]
+
+
+def test_a_confirmation_that_ran_no_search_is_discarded(monkeypatch):
+    """Same refusal the finder already makes. Here the thing being recalled is
+    a whole conference rather than a row on a page somebody can check."""
+    _stages(monkeypatch, find=_find_reply(_ONE, complete=True),
+            confirm=_confirm_reply(_EVENT), confirm_searches=0)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert r["events"] == []
+    assert r["status"] == D.STATUS_ERROR
+    assert "without running a single search" in r["detail"]
+
+
+def test_a_refusal_with_no_reason_is_unchecked_rather_than_a_market_finding(monkeypatch):
+    """A confirmer that says no and will not say why has not told us anything
+    about the market, so its silence must not be promoted into one."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
+                      confirm=_confirm_reply(None, confirmed=False))
+    assert r["status"] == D.STATUS_ERROR
+    assert r["rejected"] == []
+    assert "without saying what it found" in r["detail"]
+
+
+def test_an_event_whose_numbers_were_cut_short_keeps_its_confirmation(monkeypatch):
+    """Confirmed and fully-read are different claims. The event exists and was
+    seen; some of its published numbers were not. Throwing it away would lose
+    a real event, and printing it silently would overstate what we read."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
+                      confirm=_confirm_reply(_EVENT, facts_complete=False))
+    assert len(r["events"]) == 1
+    assert r["events"][0]["facts_complete"] is False
+    assert r["status"] == D.STATUS_PARTIAL
+    assert "could not finish reading" in r["detail"]
+
+
+def test_a_fully_read_event_is_not_flagged_as_partial(monkeypatch):
+    """The control for the test above. If every confirmation were treated as
+    incomplete, the flag would stop meaning anything."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=True),
+                      confirm=_confirm_reply(_EVENT, facts_complete=True))
+    assert r["status"] == D.STATUS_OK
+    assert r["events"][0]["facts_complete"] is True
+    assert r["detail"] == ""
+
+
+def test_one_event_proposed_twice_is_only_confirmed_once(monkeypatch):
+    """A finder asked for four candidates sometimes names the same event twice.
+    Confirming both spends a whole extra call for a row `merge` then throws
+    away."""
+    calls = _budgets(
+        monkeypatch,
+        find=_find_reply([{"name": "SaaStr Annual 2027",
+                           "website": "https://saastr.example", "why": "w"},
+                          {"name": "SaaStr Annual",
+                           "website": "https://saastr.example/", "why": "w"}],
+                         complete=True),
+        confirm=lambda n: _confirm_reply(_named(name=n)))
+    D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len([c for c in calls if not c["find"]]) == 1
+
+
+def test_two_real_events_are_both_confirmed(monkeypatch):
+    """The control. A dedup rule with no counterweight would collapse a
+    category to one event and look like a working saving."""
+    calls = _budgets(
+        monkeypatch,
+        find=_find_reply([{"name": "Money20/20 USA", "website": "https://a.example",
+                           "why": "w"},
+                          {"name": "Money20/20 Europe", "website": "https://b.example",
+                           "why": "w"}], complete=True),
+        confirm=lambda n: _confirm_reply(_named(name=n)))
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert len([c for c in calls if not c["find"]]) == 2
+    assert len(r["events"]) == 2
+
+
+def test_one_candidate_crashing_does_not_cost_the_others(monkeypatch):
+    boom = {"n": 0}
+
+    def confirm(name):
+        boom["n"] += 1
+        if name == "Bad One":
+            raise RuntimeError("kaboom")
+        return _confirm_reply(_named(name=name))
+
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "Bad One", "website": "https://a.example",
+                               "why": "w"},
+                              {"name": "Good One", "website": "https://b.example",
+                               "why": "w"}], complete=True),
+            confirm=confirm)
+    r = D.search_category(R.CAT_EMERGING, PROFILE)
+    assert [e["name"] for e in r["events"]] == ["Good One"]
+    assert r["status"] == D.STATUS_ERROR or r["status"] == D.STATUS_PARTIAL
+    assert "could not be checked" in r["detail"]
+
+
+def test_a_confirmed_event_survives_a_finder_that_was_cut_short(monkeypatch):
+    """A gap in the FINDING must not retroactively discredit an event a
+    separate search confirmed. It shortens the list; it does not make the
+    survivors suspect."""
+    r = _run_category(monkeypatch, _find_reply(_ONE, complete=False),
+                      confirm=_confirm_reply(_EVENT))
+    assert len(r["events"]) == 1
+    assert r["status"] == D.STATUS_PARTIAL
+    assert "could not finish searching" in r["detail"]
+
+
+def test_the_run_never_puts_more_calls_in_flight_than_the_cap(monkeypatch):
+    """Six concurrent multi-search calls reliably tripped rate limiting. The
+    module now makes many more calls than it used to, and they are submitted
+    from two nested pools, so the only thing standing between it and a burst
+    is the semaphore.
+
+    The stubbed call has to actually TAKE time. A first version of this test
+    returned instantly, so no two calls ever overlapped and the measured peak
+    was one whether the semaphore was there or not: it passed with the cap
+    deleted. The floor assertion at the end is what stops that happening
+    again, by failing when the test did not manage to exercise concurrency at
+    all rather than reporting a peak it never reached.
+    """
+    import threading
+    import time
+    live = {"now": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def fake_ask(system, user, **kw):
+        with lock:
+            live["now"] += 1
+            live["peak"] = max(live["peak"], live["now"])
+        try:
+            time.sleep(0.03)
+            finding = "YOUR ONLY JOB IS TO NAME CANDIDATES" in system
+            body = (_find_reply([{"name": "E%d" % i, "website": "https://e%d.example" % i,
+                                  "why": "w"} for i in range(D.PER_CATEGORY)],
+                                complete=True)
+                    if finding else _confirm_reply(_named(name="E")))
+            return {"text": body, "raw": body, "error": None,
+                    "stop_reason": "end_turn", "text_block_count": 1,
+                    "tool_version": "v", "search_count": 3, "tool_errors": [],
+                    "usage": {}}
+        finally:
+            with lock:
+                live["now"] -= 1
+
+    monkeypatch.setattr(claude_websearch, "ask", fake_ask)
+    D.discover({"classification": "b2b_to_marketing"})
+    assert live["peak"] <= D.MAX_INFLIGHT, (
+        "%d calls were in flight at once against a cap of %d"
+        % (live["peak"], D.MAX_INFLIGHT))
+    assert live["peak"] == D.MAX_INFLIGHT, (
+        "this run only ever reached %d concurrent calls, so it never tested "
+        "the cap of %d and would pass with the semaphore deleted"
+        % (live["peak"], D.MAX_INFLIGHT))
+
+
+def test_the_page_can_say_how_many_candidates_were_looked_at(monkeypatch):
+    """Showing two events without saying five were checked lets a reader
+    assume two was all there ever was."""
+    _stages(monkeypatch,
+            find=_find_reply([{"name": "A", "website": "https://a.example", "why": "w"},
+                              {"name": "B", "website": "https://b.example", "why": "w"}],
+                             complete=True),
+            confirm=lambda n: (_confirm_reply(_named(name=n)) if n == "A"
+                               else _confirm_reply(None, confirmed=False,
+                                                   reject_reason="no future edition")))
+    out = D.discover({"classification": "b2b_to_marketing"})
+    st = out["statuses"][R.CAT_INDUSTRY_FLAGSHIP]
+    assert st["proposed"] == 2
+    assert st["found"] == 1
+    assert st["rejected"] == [{"name": "B", "reason": "no future edition"}]
+
+
+def test_the_budget_never_reaches_either_prompt_that_is_actually_sent(monkeypatch):
+    """The wiring, not the template.
+
+    `profile_brief` has always left the budget out, and a test asserting that
+    on a prompt IT built passed happily while the code path that really sends
+    the prompt appended the budget itself. So this one reads the strings that
+    went out.
+
+    The rule matters most at the confirm stage, which is the one that reads an
+    event's published cost. A model that knows the client has $40k will
+    describe a $60k sponsorship differently, and the skill is explicit that a
+    cheap event reaching the wrong buyers is worse than an expensive one
+    reaching the right ones.
+    """
+    sent = []
+    _stages(monkeypatch, find=_find_reply(_ONE, complete=True),
+            confirm=_confirm_reply(_EVENT))
+    real = claude_websearch.ask
+
+    def spy(system, user, **kw):
+        sent.append(system)
+        return real(system, user, **kw)
+
+    monkeypatch.setattr(claude_websearch, "ask", spy)
+    D.search_category(R.CAT_EMERGING, PROFILE)
+
+    assert len(sent) == 2, "expected one find and one confirm"
+    # The value, not the word. The find prompt legitimately says a fake
+    # conference "costs somebody a travel budget", and a test that banned the
+    # word would have to be weakened until it stopped testing anything.
+    for system in sent:
+        assert PROFILE["budget_note"] not in system
+        assert "40k" not in system
+
+
+def test_both_prompts_that_are_sent_carry_todays_date(monkeypatch):
+    """Also the wiring. Every stage that searches measures the client's window
+    from an anchor, and a stage wired without one measures it from whatever
+    the model believes now is."""
+    import datetime
+    sent = []
+    _stages(monkeypatch, find=_find_reply(_ONE, complete=True),
+            confirm=_confirm_reply(_EVENT))
+    real = claude_websearch.ask
+
+    def spy(system, user, **kw):
+        sent.append(system)
+        return real(system, user, **kw)
+
+    monkeypatch.setattr(claude_websearch, "ask", spy)
+    D.search_category(R.CAT_EMERGING, PROFILE)
+
+    today = datetime.date.today().isoformat()
+    assert len(sent) == 2
+    for system in sent:
+        assert today in system

@@ -13,20 +13,41 @@ categories and asked for fifteen events answers mostly out of category one,
 because that is where its recall is densest, and then labels a flagship a
 "vertical summit" to fill the quota. The categories become decoration.
 
-So this runs SIX SEPARATE SEARCHES, one per category, each of which can only
-return events of that one kind and has no way to satisfy itself from another.
-A category that genuinely has nothing has to come back empty and say why.
+So this searches ONE CATEGORY AT A TIME, six times, each search able to
+return only events of that one kind and with no way to satisfy itself from
+another. A category that genuinely has nothing has to come back empty and say
+why.
 
-Three statuses, never collapsed into each other:
+Each category is then TWO stages rather than one, which is the second thing
+this module learned the hard way. The first live end-to-end run gave every
+category a single call and asked it to find events and confirm them out of
+one budget of eight searches. All six saturated that budget, five reported
+nothing, and the run produced three events. A server-side search call re-sends
+everything it has already read on every later turn, so one call's input bill
+grows with the SQUARE of its search count and a bigger budget makes it worse
+rather than better.
 
-    ok      the search ran and found events
+    stage one   name candidates in this category. Names only.
+    stage two   one separate call per candidate, each carrying only the pages
+                it opened itself, to confirm the event and read its numbers.
+
+The same searches, split this way, cost about a quarter as much and run in
+parallel. They also buy something the single call could not have: the finder
+no longer grades its own homework. Confirmation is a search that did not
+propose the event, and it is allowed to say no.
+
+Four statuses, never collapsed into each other:
+
+    ok      the search ran, and what it found was confirmed
     empty   the search ran and this category genuinely has nothing here
+    partial some of it worked, and the report says which part did not
     error   the search did not run
 
-`empty` and `error` are the pair that matters. "No free vendor conference
-serves this niche vertical" is a real finding about the client's market.
-"The free vendor conference search timed out" is a hole in the analysis. They
-render identically as an absence, so the difference is recorded explicitly.
+`empty` and `error` are the pair that matters, and confirmation gives the
+distinction a second place to go wrong. "Three plausible names, all checked,
+none with an edition in the client's window" is a finding about the market and
+is `empty`. "Three plausible names we could not check" is a hole and is
+`error`. Only the reason tells them apart, so the reason is always recorded.
 
 This module produces FACTS ONLY. Nothing here scores anything. Scoring is a
 separate pass over the merged set so that one consistent standard is applied
@@ -40,6 +61,7 @@ import concurrent.futures
 import logging
 import re
 import datetime
+import threading
 from urllib.parse import urlparse
 
 from . import claude_websearch
@@ -56,15 +78,76 @@ STATUS_ERROR = "error"
 # suspect.
 STATUS_PARTIAL = "partial"
 
-# Three concurrent searches. Six at once reliably trips rate limiting, and one
-# at a time turns a recommend run into six sequential multi-search lookups.
-MAX_CONCURRENCY = 3
+# How many web-search calls may be in flight at once, across the whole run.
+#
+# Six concurrent multi-search calls reliably tripped rate limiting, which is
+# why discovery used to run three categories at a time. That limit was always
+# about calls in flight rather than about categories, and this module now
+# makes several small calls per category instead of one large one, so the cap
+# lives on the only thing it was ever really about: the API call itself.
+#
+# The semaphore is held around `ask` and NOTHING else, deliberately. A
+# category waits for its own confirmations to come back, so a category that
+# kept its slot while waiting would deadlock the moment every slot was held
+# by a category doing the same thing.
+MAX_INFLIGHT = 4
+_INFLIGHT = threading.Semaphore(MAX_INFLIGHT)
+
+# Kept as the pool width for categories. Every category can now be submitted
+# at once because _INFLIGHT, not the pool, is what throttles the API.
+MAX_CONCURRENCY = len(rubric.CATEGORIES)
 
 # Asked-for per category. One above the quota of two, so that a single
 # unusable result does not put the category under quota on its own.
 PER_CATEGORY = 4
 
-_SYSTEM = """You find real business events that a specific company should \
+# Search budgets, per call.
+#
+# These numbers are the answer to the first live end-to-end run. That run gave
+# each category ONE call with a budget of eight searches, and asked it to both
+# find events and confirm them. All six saturated the budget. Five categories
+# came back with nothing, one ran out of output tokens mid-answer, and three
+# events survived the whole run.
+#
+# The fix is not a bigger budget. A server-side search call re-sends every
+# result it has already collected on every later turn, so the input bill for a
+# single call grows with the SQUARE of its search count. The six calls in that
+# run spent 163k, 276k, 457k, 549k, 490k and 293k input tokens for eight
+# searches each, and the two slowest took sixteen and nineteen minutes.
+# Doubling to sixteen searches would have cost roughly four times as much per
+# call and taken over an hour.
+#
+# Splitting the same searches across several small calls breaks that square
+# into pieces. Finding names is one call. Confirming each name is its own
+# call, carrying only the pages it opened itself. Sixteen searches spread that
+# way cost about what eight cost in one call, and they run in parallel.
+FIND_MAX_USES = 6
+FIND_MAX_TOKENS = 3000
+CONFIRM_MAX_USES = 6
+CONFIRM_MAX_TOKENS = 4000
+
+# What a confirmation concluded. Three outcomes, never two: an event the
+# confirmer SEARCHED and ruled out is a fact about the market, while an event
+# it could not check is a hole in the analysis. Collapsing them would let a
+# failed confirmation read as "we checked, and it does not qualify".
+CONFIRM_OK = "confirmed"
+CONFIRM_REJECTED = "rejected"
+CONFIRM_UNCHECKED = "unconfirmed"
+
+
+def _ask(system: str, user: str, **kw) -> dict:
+    """claude_websearch.ask, throttled to MAX_INFLIGHT calls in flight."""
+    with _INFLIGHT:
+        return claude_websearch.ask(system, user, **kw)
+
+# ── stage one: find names ─────────────────────────────────────────────────
+#
+# This call does one job: name events that belong to this category and are
+# worth confirming. It does NOT extract published numbers, dates or costs,
+# because that is what used to make one call do eight searches and then run
+# out of room to answer.
+
+_FIND_SYSTEM = """You find real business events that a specific company should \
 consider attending, exhibiting at or sponsoring. You are searching ONE \
 category of event at a time and you must not return events from other \
 categories.
@@ -76,47 +159,115 @@ THE CLIENT
 {profile}
 
 WHERE THIS CLIENT'S BUYERS PHYSICALLY ARE AT AN EVENT: {where_buyers}
-That is not a detail. It decides which side of the floor matters, so when you \
-describe an event, describe the side of it this client would actually work.
+That is not a detail. It decides which side of the floor matters, so judge \
+an event by the side of it this client would actually work.
 
 TODAY IS {today}. Every judgement about whether an event is upcoming, and \
 every reading of the client's time window, is measured from that date and not \
 from your own sense of when now is.
 
+YOUR ONLY JOB IS TO NAME CANDIDATES. Something else confirms them afterwards \
+and reads their published numbers, so do not gather dates, attendee counts, \
+ticket prices or exhibitor counts here. Spend your searches on FINDING events \
+rather than on studying the ones you have already found. Naming six plausible \
+candidates is more useful than fully researching one.
+
 RULES.
-1. Use web search. Do not answer from memory. Every event you return must be \
-one you confirmed exists by visiting a real page during this search, and every \
-URL you return must be one you actually opened. A plausible-sounding \
-conference name that does not exist costs somebody a travel budget. Return at \
-least one URL in `sources` for every event; an event you cannot cite is an \
-event you did not confirm, so leave it out.
+1. Use web search. Do not answer from memory. A plausible-sounding conference \
+name that does not exist costs somebody a travel budget, so every candidate \
+must be one you saw on a real page during this search, and `website` must be \
+a URL you actually opened. A candidate you cannot cite is one you did not \
+find, so leave it out.
 2. Return ONLY events that genuinely belong to the category above. If this \
 category has nothing for this client, return an empty array and explain \
 concretely in `note` what you searched for and why nothing fits. An honest \
 empty category is a finding. A flagship relabelled to fill a quota is not.
-3. Return the next edition that STARTS ON OR AFTER {today}. An edition that \
-has already finished cannot be attended and must not be returned as a \
-recommendation. Where only a past edition exists, say so in `note` and leave \
-the event out; where the next edition is announced but undated, return it with \
-null dates rather than guessing one.
-4. `attendees` and `booths` are the event's OWN published claims, quoted as \
+3. Prefer events whose next edition starts on or after {today}. You are not \
+being asked to verify the date here, only to avoid naming events you already \
+know are finished for good.
+
+Respond with ONLY a JSON object, no prose before or after:
+{{"candidates": [{{"name": str, "website": str|null, "why": str}}], \
+"note": str, "search_complete": true|false}}
+
+`name` is the event as it brands itself, without the year. `why` is one \
+sentence saying why it belongs to the "{category_label}" category \
+specifically. `note` says what you searched and what you could not confirm.
+
+`search_complete` is the most important field in this object when it is \
+false. Set it to true ONLY if you were able to run every search you wanted \
+to run. Set it to FALSE if the search tool stopped returning results, refused \
+a call, cut you off, or you otherwise stopped early for any reason. An empty \
+`candidates` array with search_complete true means "I searched this category \
+properly and it genuinely has nothing for this client", and it is reported to \
+the client in exactly those words. The same empty array with search_complete \
+false means "I could not finish looking", which is a completely different \
+statement. Never report an unfinished search as an empty category."""
+
+
+# ── stage two: confirm one name ───────────────────────────────────────────
+#
+# A separate call per candidate, each carrying only the pages it opened
+# itself. That is what keeps the input bill flat, but it buys something the
+# single-call version could not have: the finder no longer grades its own
+# homework. This module already refused to let each category score its own
+# events, for exactly this reason. Confirmation is the same principle applied
+# one step earlier, and it is allowed to say no.
+
+_CONFIRM_SYSTEM = """You confirm whether ONE named business event is real, \
+upcoming and worth putting in front of a specific company, and you report \
+what that event publishes about itself.
+
+THE EVENT TO CONFIRM: {event_name}
+Someone proposed it as: {category_label} ({category_brief})
+They said: {why}
+{website_line}
+THE CLIENT
+{profile}
+
+WHERE THIS CLIENT'S BUYERS PHYSICALLY ARE AT AN EVENT: {where_buyers}
+When you describe who attends, describe the side of the floor this client \
+would actually work.
+
+TODAY IS {today}. Every judgement about whether an edition is upcoming is \
+measured from that date and not from your own sense of when now is.
+
+YOU ARE THE CHECK, NOT THE ADVOCATE. Whoever proposed this event may simply \
+be wrong: the event may not exist, may have been discontinued, may have no \
+announced future edition, or may belong to a different category. Saying so is \
+a useful answer and it is the answer this step exists to produce. Do not \
+stretch to make a proposal work.
+
+RULES.
+1. Use web search and open the event's own pages. Do not answer from memory. \
+Return at least one URL in `sources`; an event you cannot cite is an event \
+you did not confirm.
+2. Confirm the next edition that STARTS ON OR AFTER {today}. An edition that \
+has already finished cannot be attended. If only a past edition exists, set \
+`confirmed` false and say so. If the next edition is announced but undated, \
+confirm it with null dates rather than guessing one.
+3. `attendees` and `booths` are the event's OWN published claims, quoted as \
 they state them ("12,000+ attendees", "430 exhibitors"), or null. NEVER \
 estimate either. A number you invented is indistinguishable from one they \
 published.
-5. `matchmaking_evidence` must quote or closely paraphrase what the ORGANISER \
+4. `matchmaking_evidence` must quote or closely paraphrase what the ORGANISER \
 says they do. If the only thing on offer is a conference app where attendees \
 book their own meetings (Whova, Brella, Swapcard and the like), say exactly \
 that: it is a real and useful answer. Set `organizer_run` true only when the \
 organiser takes active responsibility for pairing people against stated \
 criteria.
-6. `famous` is honest self-assessment: true if you could have named this event \
+5. `famous` is honest self-assessment: true if you could have named this event \
 without searching. Being famous is not disqualifying, it just gets audited.
-7. `cost_note` is any published cost to attend, exhibit or sponsor, quoted as \
+6. `cost_note` is any published cost to attend, exhibit or sponsor, quoted as \
 published, or null. It is recorded as context for the client's decision and \
 is never used to score anything, so do not soften or inflate it.
+7. If the event is real and upcoming but does NOT belong to the \
+"{category_label}" category, still confirm it and say so plainly in \
+`category_fit`. Miscategorised is not the same as useless.
 
 Respond with ONLY a JSON object, no prose before or after:
-{{"events": [{{"name": str, "edition": str|null, "website": str|null, \
+{{"confirmed": true|false, "reject_reason": str|null, "facts_complete": \
+true|false, "event": {{"name": str, "edition": str|null, "website": str|null, \
 "organizer": str|null, "starts_on": "YYYY-MM-DD"|null, \
 "ends_on": "YYYY-MM-DD"|null, "country": str|null, "city": str|null, \
 "days": int|null, "industry": str|null, "attendees": str|null, \
@@ -124,22 +275,22 @@ Respond with ONLY a JSON object, no prose before or after:
 "in_person"|"virtual"|"hybrid"|null, "cost_note": str|null, \
 "organizer_run": true|false, "matchmaking_evidence": str|null, \
 "famous": true|false, "category_fit": str, "confidence": \
-"high"|"medium"|"low", "sources": [str]}}], "note": str, \
-"search_complete": true|false}}
+"high"|"medium"|"low", "sources": [str]}}}}
 
-`category_fit` is one sentence saying why this event belongs to the \
-"{category_label}" category specifically. `note` says what you searched and \
-what you could not confirm.
+`name` is the event as it brands itself. Correct the proposed name if the \
+real one differs; you are looking at the page and they were not.
 
-`search_complete` is the most important field in this object when it is \
-false. Set it to true ONLY if you were able to run every search you wanted \
-to run. Set it to FALSE if the search tool stopped returning results, refused \
-a call, cut you off, or you otherwise stopped early for any reason. An empty \
-`events` array with search_complete true means "I searched this category \
-properly and it genuinely has nothing for this client", and it is reported to \
-the client in exactly those words. The same empty array with search_complete \
-false means "I could not finish looking", which is a completely different \
-statement. Never report an unfinished search as an empty category."""
+`reject_reason` is required when `confirmed` is false, and it must say which \
+of these happened in plain words: the event does not exist, it has been \
+discontinued, it has no edition starting on or after {today}, or you could \
+not find enough to tell. Set `event` to null when you reject.
+
+`facts_complete` is false if the search tool stopped returning results, \
+refused a call or cut you off before you had finished reading this event's \
+own pages. A confirmed event with `facts_complete` false keeps its \
+confirmation and is reported as one whose published numbers we could not \
+finish reading. Never pad a field you did not get to; a null there is honest \
+and an invented number is not."""
 
 
 def profile_brief(profile: dict) -> str:
@@ -408,29 +559,78 @@ def _clean_event(raw: dict, category: str) -> dict | None:
     }
 
 
-def search_category(category: str, profile: dict) -> dict:
-    """One category, one search. Never raises.
+def _prompt_common(profile: dict) -> dict:
+    return {
+        "today": datetime.date.today().isoformat(),
+        "profile": profile_brief(profile),
+        "where_buyers": rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
+            profile.get("classification"), "Confirm with the client."),
+    }
 
-    Returns {"category", "status", "events", "note", "detail"}. `status`
-    separates "ran and found nothing" from "did not run", because those two
-    are indistinguishable in the output otherwise and mean opposite things.
+
+def _clean_proposal(raw: dict) -> dict | None:
+    """A candidate name, trimmed. Rejects anything with no usable name.
+
+    The website is kept when it is a real http(s) URL and dropped otherwise,
+    exactly as `_clean_event` does, because a proposal carrying
+    `javascript:alert(1)` would hand that string straight to the confirmer's
+    prompt.
     """
-    system = _SYSTEM.format(
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    if not name or not name_key(name):
+        return None
+    site = str(raw.get("website") or "").strip()
+    if not site.lower().startswith(("http://", "https://")):
+        site = ""
+    return {"name": name[:250], "website": site or None,
+            "why": str(raw.get("why") or "").strip()[:300]}
+
+
+def _dedupe_proposals(proposals: list) -> list:
+    """Drop a candidate this category has already named.
+
+    A finder asked for four candidates sometimes returns the same event twice
+    under two brandings. Confirming both costs a whole extra call and then
+    `merge` throws one away, so it is cheaper and clearer to notice here. The
+    test is the one `merge` uses, so the two stages agree about what counts as
+    the same event.
+    """
+    out, seen_sites = [], set()
+    for pr in proposals:
+        if any(names_match(pr["name"], k["name"]) for k in out):
+            continue
+        sk = site_key(pr.get("website") or "")
+        if sk and sk in seen_sites:
+            continue
+        if sk:
+            seen_sites.add(sk)
+        out.append(pr)
+    return out
+
+
+def propose_category(category: str, profile: dict) -> dict:
+    """Stage one: name the candidates in one category. Never raises.
+
+    Returns {"category", "status", "proposals", "note", "detail"}. `status`
+    uses the module's ok / empty / partial / error vocabulary and describes
+    the SEARCH, never the market.
+    """
+    system = _FIND_SYSTEM.format(
         category_label=rubric.CATEGORY_LABELS[category],
         category_brief=rubric.CATEGORY_BRIEF[category],
-        today=datetime.date.today().isoformat(),
-        profile=profile_brief(profile),
-        where_buyers=rubric.CLASSIFICATION_WHERE_BUYERS_ARE.get(
-            profile.get("classification"), "Confirm with the client."))
-    user = ("Find up to %d events in the \"%s\" category for this client. "
-            "Search actively. If this category has nothing for them, return an "
-            "empty array and say why."
+        **_prompt_common(profile))
+    user = ("Name up to %d candidate events in the \"%s\" category for this "
+            "client. Search actively, and spend your searches on finding "
+            "events rather than on studying the ones you have found. If this "
+            "category has nothing for them, return an empty array and say why."
             % (PER_CATEGORY, rubric.CATEGORY_LABELS[category]))
 
-    res = claude_websearch.ask(system, user, max_uses=8, max_tokens=8000)
+    res = _ask(system, user, max_uses=FIND_MAX_USES, max_tokens=FIND_MAX_TOKENS)
     if res.get("error"):
         err = res["error"]
-        return {"category": category, "status": STATUS_ERROR, "events": [],
+        return {"category": category, "status": STATUS_ERROR, "proposals": [],
                 "note": "", "detail": "%s: %s" % (err["kind"], err["detail"])}
 
     # The same refusal event_intel_recover applies to a recovered roster, for
@@ -438,26 +638,28 @@ def search_category(category: str, profile: dict) -> dict:
     # recollection, and here the thing being recalled is whole conferences
     # rather than rows on a page somebody can check.
     if not res.get("search_count"):
-        return {"category": category, "status": STATUS_ERROR, "events": [],
+        return {"category": category, "status": STATUS_ERROR, "proposals": [],
                 "note": "",
                 "detail": ("The model answered this category without running a "
                            "single search, so its events are recalled rather "
                            "than confirmed and were discarded.")}
 
-    parsed = claude_websearch.extract_json(res.get("text") or "", require="events")
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="candidates")
     if not isinstance(parsed, dict):
-        logger.warning("event_intel_discover: unparsable reply for category %s "
-                       "(blocks=%s, stop=%s)", category,
+        logger.warning("event_intel_discover: unparsable find reply for category "
+                       "%s (blocks=%s, stop=%s)", category,
                        res.get("text_block_count"), res.get("stop_reason"))
-        return {"category": category, "status": STATUS_ERROR, "events": [],
+        return {"category": category, "status": STATUS_ERROR, "proposals": [],
                 "note": "",
                 "detail": "The search ran but its answer could not be read."}
 
-    events = []
-    for e in (parsed.get("events") or [])[:PER_CATEGORY]:
-        clean = _clean_event(e, category)
+    proposals = []
+    for c in (parsed.get("candidates") or []):
+        clean = _clean_proposal(c)
         if clean:
-            events.append(clean)
+            proposals.append(clean)
+    proposals = _dedupe_proposals(proposals)[:PER_CATEGORY]
     note = str(parsed.get("note") or "")[:600]
 
     # A search that was cut off is not a category that is empty. The model is
@@ -472,25 +674,190 @@ def search_category(category: str, profile: dict) -> dict:
         detail = ("The model reported that it could not finish searching this "
                   "category, so an empty result here is a gap in the search "
                   "rather than a fact about the market.")
-        if events:
-            # Partial, not worthless: keep what was confirmed and say so.
+        if proposals:
             return {"category": category, "status": STATUS_PARTIAL,
-                    "events": events, "note": note, "detail": detail}
-        return {"category": category, "status": STATUS_ERROR, "events": [],
+                    "proposals": proposals, "note": note, "detail": detail}
+        return {"category": category, "status": STATUS_ERROR, "proposals": [],
                 "note": note, "detail": detail}
 
-    if not events and complete is None:
+    if not proposals and complete is None:
         # Nothing found and no declaration either way. Report the thing that
         # could not be measured instead of picking the flattering reading.
-        return {"category": category, "status": STATUS_EMPTY, "events": [],
+        return {"category": category, "status": STATUS_EMPTY, "proposals": [],
                 "note": note,
                 "detail": ("This category returned no events and did not say "
                            "whether its search finished, so it cannot be told "
                            "apart from a search that was cut off.")}
 
     return {"category": category,
-            "status": STATUS_OK if events else STATUS_EMPTY,
-            "events": events, "note": note, "detail": ""}
+            "status": STATUS_OK if proposals else STATUS_EMPTY,
+            "proposals": proposals, "note": note, "detail": ""}
+
+
+def _unchecked(name: str, reason: str) -> dict:
+    return {"kind": CONFIRM_UNCHECKED, "event": None, "name": name,
+            "reason": reason, "facts_complete": False}
+
+
+def confirm_event(proposal: dict, category: str, profile: dict) -> dict:
+    """Stage two: check one candidate with a search that did not propose it.
+
+    Never raises. Returns {"kind", "event", "name", "reason",
+    "facts_complete"} where kind is one of CONFIRM_OK, CONFIRM_REJECTED or
+    CONFIRM_UNCHECKED.
+
+    The three-way split is the point of the whole stage. An event this call
+    SEARCHED and ruled out is a fact about the client's market and belongs in
+    the report as one. An event it could not check is a hole. Two outcomes
+    would force one of those to wear the other's clothes.
+    """
+    name = (proposal or {}).get("name") or ""
+    if not name_key(name):
+        return _unchecked(name, "The candidate had no usable name.")
+
+    site = (proposal or {}).get("website") or ""
+    system = _CONFIRM_SYSTEM.format(
+        event_name=name,
+        category_label=rubric.CATEGORY_LABELS[category],
+        category_brief=rubric.CATEGORY_BRIEF[category],
+        why=(proposal or {}).get("why") or "no reason given",
+        website_line=("Their link for it: %s\n" % site) if site else "",
+        **_prompt_common(profile))
+    user = ("Confirm \"%s\" and report what it publishes about itself. If it "
+            "is not real, not upcoming, or you cannot tell, say so instead."
+            % name)
+
+    res = _ask(system, user, max_uses=CONFIRM_MAX_USES,
+               max_tokens=CONFIRM_MAX_TOKENS)
+    if res.get("error"):
+        err = res["error"]
+        return _unchecked(name, "%s: %s" % (err["kind"], err["detail"]))
+
+    if not res.get("search_count"):
+        return _unchecked(name, "The model answered without running a single "
+                                "search, so it recalled this event rather than "
+                                "confirming it.")
+
+    parsed = claude_websearch.extract_json(res.get("text") or "",
+                                           require="confirmed")
+    if not isinstance(parsed, dict):
+        logger.warning("event_intel_discover: unparsable confirm reply for %r "
+                       "(blocks=%s, stop=%s)", name[:80],
+                       res.get("text_block_count"), res.get("stop_reason"))
+        return _unchecked(name, "The check ran but its answer could not be read.")
+
+    facts_complete = parsed.get("facts_complete") is not False
+
+    if not parsed.get("confirmed"):
+        reason = str(parsed.get("reject_reason") or "").strip()[:400]
+        if not reason:
+            # Refused without saying why. That is not a finding about the
+            # market, so it must not be recorded as one.
+            return _unchecked(name, "The check refused this event without "
+                                    "saying what it found.")
+        return {"kind": CONFIRM_REJECTED, "event": None, "name": name,
+                "reason": reason, "facts_complete": facts_complete}
+
+    event = _clean_event(parsed.get("event") or {}, category)
+    if event is None:
+        return _unchecked(name, "The check confirmed this event but returned "
+                                "nothing usable to describe it.")
+    if not event["sources"]:
+        # Confirmation that cites nothing is assertion, not confirmation. The
+        # prompt asks for a URL; asking is not the same as getting, and this
+        # stage exists precisely so that "confirmed" means a second search
+        # actually saw the thing.
+        return _unchecked(event["name"], "The check confirmed this event "
+                                         "without citing a single page, so "
+                                         "nothing here can be checked.")
+
+    event["facts_complete"] = facts_complete
+    event["proposed_as"] = (proposal or {}).get("why") or None
+    return {"kind": CONFIRM_OK, "event": event, "name": event["name"],
+            "reason": "", "facts_complete": facts_complete}
+
+
+def search_category(category: str, profile: dict) -> dict:
+    """One category: name candidates, then confirm each one separately.
+
+    Never raises. Returns {"category", "status", "events", "note", "detail",
+    "proposed", "rejected"}. `status` separates "ran and found nothing" from
+    "did not run", because those two are indistinguishable in the output
+    otherwise and mean opposite things.
+
+    `rejected` carries the candidates a confirmation searched and ruled out,
+    with the reason. Those are not noise: three plausible names that all turn
+    out to have no upcoming edition is a real and reportable fact about the
+    client's year, and it used to be invisible because the same call that
+    proposed an event also decided whether to keep it.
+    """
+    found = propose_category(category, profile)
+    proposals = found["proposals"]
+    base = {"category": category, "note": found["note"],
+            "proposed": len(proposals), "rejected": []}
+
+    if not proposals:
+        return dict(base, status=found["status"], events=[],
+                    detail=found["detail"])
+
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(1, len(proposals))) as pool:
+        futures = [pool.submit(confirm_event, pr, category, profile)
+                   for pr in proposals]
+        for pr, fut in zip(proposals, futures):
+            try:
+                results.append(fut.result())
+            except Exception as e:
+                # One candidate crashing must never cost the others.
+                logger.exception("event_intel_discover: confirming %r crashed",
+                                 (pr.get("name") or "")[:80])
+                results.append(_unchecked(pr.get("name") or "",
+                                          "Unexpected failure: %s" % str(e)[:200]))
+
+    events = [r["event"] for r in results if r["kind"] == CONFIRM_OK]
+    rejected = [{"name": r["name"], "reason": r["reason"]}
+                for r in results if r["kind"] == CONFIRM_REJECTED]
+    unchecked = [r for r in results if r["kind"] == CONFIRM_UNCHECKED]
+    base["rejected"] = rejected
+
+    bits = []
+    if unchecked:
+        bits.append("%d of the %d candidates found here could not be checked "
+                    "at all (%s)."
+                    % (len(unchecked), len(proposals),
+                       "; ".join(sorted({u["reason"] for u in unchecked}))[:400]))
+    incomplete = [e for e in events if not e.get("facts_complete")]
+    if incomplete:
+        bits.append("%d confirmed event%s had published numbers we could not "
+                    "finish reading." % (len(incomplete),
+                                         "" if len(incomplete) == 1 else "s"))
+
+    if events:
+        # Confirmed events stand on their own. The status only says whether
+        # anything ELSE about this category fell short, so a shortfall never
+        # casts doubt on an event a search actually confirmed.
+        partial = bool(bits) or found["status"] == STATUS_PARTIAL
+        detail = " ".join(([found["detail"]] if found["status"] == STATUS_PARTIAL
+                           else []) + bits)
+        return dict(base, status=STATUS_PARTIAL if partial else STATUS_OK,
+                    events=events, detail=detail)
+
+    # Nothing survived. Which of the two absences this is depends entirely on
+    # WHY, and the whole module is built around not guessing.
+    if unchecked or found["status"] == STATUS_PARTIAL:
+        detail = " ".join(([found["detail"]] if found["status"] == STATUS_PARTIAL
+                           else []) + bits)
+        return dict(base, status=STATUS_ERROR, events=[], detail=detail)
+
+    # Every candidate was searched and ruled out. That is a finished piece of
+    # work and a real finding: this category has nothing UPCOMING here.
+    return dict(base, status=STATUS_EMPTY, events=[],
+                detail=("%d candidate%s in this category were checked and none "
+                        "qualified. %s"
+                        % (len(rejected), "" if len(rejected) == 1 else "s",
+                           " ".join("%s: %s" % (r["name"], r["reason"])
+                                    for r in rejected)))[:900])
 
 
 def discover(profile: dict) -> dict:
@@ -518,12 +885,20 @@ def discover(profile: dict) -> dict:
                 # One category crashing must never cost the other five.
                 logger.exception("event_intel_discover: category %s crashed", cat)
                 r = {"category": cat, "status": STATUS_ERROR, "events": [],
-                     "note": "", "detail": "Unexpected failure: %s" % str(e)[:200]}
+                     "note": "", "proposed": 0, "rejected": [],
+                     "detail": "Unexpected failure: %s" % str(e)[:200]}
             by_category[cat] = r["events"]
             statuses[cat] = {"status": r["status"], "note": r["note"],
                              "detail": r["detail"],
                              "label": rubric.CATEGORY_LABELS[cat],
-                             "found": len(r["events"])}
+                             "found": len(r["events"]),
+                             # What the finder named, and what the separate
+                             # confirmation ruled out. Reported so the page can
+                             # say "we looked at five and kept two" instead of
+                             # showing two events and letting the reader assume
+                             # two were all there ever was.
+                             "proposed": r.get("proposed", len(r["events"])),
+                             "rejected": r.get("rejected") or []}
 
     candidates = merge(by_category, (profile or {}).get("force_exclude"),
                        (profile or {}).get("force_include"))
