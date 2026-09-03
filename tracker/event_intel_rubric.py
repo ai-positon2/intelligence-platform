@@ -215,7 +215,7 @@ CATEGORY_LABELS = {
     CAT_INDUSTRY_FLAGSHIP: "Industry flagship",
     CAT_VERTICAL_SUMMIT: "Vertical summit",
     CAT_REGIONAL_FLAGSHIP: "Regional flagship",
-    CAT_FREE_VENDOR: "Free vendor conference",
+    CAT_FREE_VENDOR: "Free sponsor-funded event",
     CAT_EMERGING: "Emerging event",
     CAT_SIDE_EVENT: "Side event",
 }
@@ -230,9 +230,19 @@ CATEGORY_BRIEF = {
         ("The leading event in a target geography. Often beats a global on "
          "buyer-density-per-dollar for a geographically concentrated client."),
     CAT_FREE_VENDOR:
-        ("One-day AWS, Snowflake, HubSpot, Salesforce, Databricks or "
-         "ServiceNow city events. Packed with budget owners, free to attend, "
-         "and the most under-utilised circuit in B2B field sales."),
+        ("Events that are free or near-free to attend because a large player "
+         "in this client's market pays for them, so the audience turns up for "
+         "the content rather than for a ticket they bought. Dense with the "
+         "client's buyers and routinely overlooked, because nobody markets an "
+         "event they are giving away. WHAT THIS LOOKS LIKE DEPENDS ENTIRELY "
+         "ON THE MARKET, and searching for the wrong market's version of it "
+         "is how this category comes back empty when it is not: in B2B "
+         "software it is the one-day AWS, Snowflake, HubSpot, Salesforce, "
+         "Databricks or ServiceNow city circuit; in healthcare and consumer "
+         "markets it is manufacturer, hospital, charity and patient-"
+         "association days, free expo halls, and community or education "
+         "events run by the big names in the category. Find this client's "
+         "version. Do not search for another market's."),
     CAT_EMERGING:
         ("Years one to three. Not yet diluted by tourist attendees, often "
          "higher density per head."),

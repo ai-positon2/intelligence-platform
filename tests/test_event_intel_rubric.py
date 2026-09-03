@@ -198,7 +198,14 @@ def test_all_six_discovery_categories_are_present():
 
 
 def test_free_vendor_category_keeps_the_reason_it_exists():
-    assert "under-utilised" in R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR]
+    assert "routinely overlooked" in R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR]
+    # The brief used to name only the B2B software circuit, which made the
+    # category structurally impossible for every other kind of client: a live
+    # run for a B2C insulin-pump maker spent a sixth of its search budget
+    # looking for AWS and Salesforce roadshows, correctly found none, and
+    # reported a hole in the analysis.
+    assert "DEPENDS ENTIRELY" in R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR]
+    assert "patient-" in R.CATEGORY_BRIEF[R.CAT_FREE_VENDOR]
 
 
 def test_shortfall_names_every_category_under_quota():

@@ -59,6 +59,80 @@ def _fmt_when(c: dict) -> str:
     return s or "dates not announced"
 
 
+# How much of a category's own explanation the summary quotes.
+#
+# These reasons come from two places and one of them is a model. A finder's
+# note is up to 600 characters of its own prose, and folding several of them
+# into one sentence produced a live report whose assumptions paragraph ran to
+# 180 words, ended mid-word, and rendered "AWS Summit city tours" as "aws
+# summit city tours" because the sentence it was folded into needed a
+# lowercase clause.
+#
+# So each reason is quoted rather than folded: its own sentence, after a
+# colon, with its own capitalisation left alone.
+REASON_CHARS = 200
+
+
+def _reason(text: str, cap: int = REASON_CHARS) -> str:
+    """One category's explanation, trimmed to whole sentences.
+
+    Whole sentences while they fit, rather than the first sentence alone: a
+    finder's note often puts what it searched in sentence one and what it
+    concluded in sentence two, and keeping only the first throws away the
+    half a reader wants.
+
+    Never cuts mid-word, and marks the cut when it makes one, so a reader can
+    tell a trimmed explanation from a model that stopped mid-thought. Only
+    one of those two is worth going to investigate.
+
+    The first character is capitalised, never lowercased. Uppercasing a
+    leading letter cannot damage anything; lowercasing a clause to fold it
+    into a sentence turned "AWS Summit city tours" into "aws summit city
+    tours" in a live report.
+    """
+    t = " ".join(str(text or "").split())
+    if not t:
+        return ""
+    out = ""
+    for sentence in _SENTENCE.findall(t):
+        # Each match begins with the whitespace that followed the previous
+        # sentence's full stop, so it is stripped before joining. Without
+        # this every sentence break printed a double space.
+        nxt = (out + " " + sentence.strip()).strip()
+        if out and len(nxt) > cap:
+            break
+        out = nxt
+        if len(out) >= cap:
+            break
+    if not out:
+        out = t
+    # Whether anything was left behind. A cut that lands on a sentence
+    # boundary is still a cut, and it is the one shape that could pass for a
+    # complete explanation: the reader sees a tidy full stop and has no way to
+    # know a second sentence said what the search concluded.
+    dropped = len(out) < len(t)
+    if len(out) > cap:
+        cut = out[:cap]
+        at = cut.rfind(" ")
+        if at > cap * 0.6:
+            cut = cut[:at]
+        out = cut.rstrip(" ,;:.-")
+        dropped = True
+    if dropped:
+        out = out.rstrip(" .,;:-") + "\u2026"
+    elif not out.endswith((".", "!", "?", "\u2026")):
+        out += "."
+    return out[0].upper() + out[1:]
+
+
+# A sentence ends at a full stop followed by whitespace and a capital, or at
+# the end of the string. Not at any full stop: "e.g. AWS Summit" and
+# "attd.kenes.com" are not sentence ends, and splitting there would cut a
+# reason in half mid-clause.
+_SENTENCE = __import__("re").compile(
+    r"[\s\S]+?(?:[.!?](?=\s+[A-Z(\"\u201c])|[.!?]$|$)")
+
+
 def _fmt_where(c: dict) -> str:
     return ", ".join([x for x in (c.get("city"), c.get("country")) if x]) or "location unconfirmed"
 
@@ -82,16 +156,17 @@ def assumptions(*, shortfall: list, audit: dict, generic: dict,
     if failed:
         out.append(
             "%d discovery categor%s did not run, so this list is missing a kind "
-            "of event rather than having found none: %s. That is a hole in the "
-            "analysis, not a finding about the market."
+            "of event rather than having found none. That is a hole in the "
+            "analysis, not a finding about the market. %s"
             % (len(failed), "y" if len(failed) == 1 else "ies",
-               "; ".join("%s (%s)" % (s["label"], s["why"]) for s in failed)))
+               " ".join("%s: %s" % (s["label"], _reason(s["why"]))
+                        for s in failed)))
     if empty:
         out.append(
-            "%s came back under the two-event quota after searching: %s."
+            "%s came back under the two-event quota after searching. %s"
             % ("One category" if len(empty) == 1 else "%d categories" % len(empty),
-               "; ".join("%s, %s" % (s["label"], s["why"].rstrip(".").lower())
-                         for s in empty)))
+               " ".join("%s: %s" % (s["label"], _reason(s["why"]))
+                        for s in empty)))
 
     if audit and audit.get("error"):
         # Covers both kinds of failure: the call never happened, and the call
