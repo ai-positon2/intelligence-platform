@@ -985,12 +985,25 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-cols .cn b { color: var(--evi-ink); font-weight: 650; }
 
 /* -- funnel ------------------------------------------------------------ */
-.evi-funnel { display: flex; flex-direction: column; gap: 10px; }
+.evi-funnel { display: flex; flex-direction: column; gap: 8px; }
 .evi-anim .evi-funnel .fs {
   animation: evi-rise .42s ease-out both; animation-delay: calc(var(--i, 0) * .07s);
 }
+/* Bar and label on ONE line. Stacked, three steps took three full-width
+   slabs and most of the height of the summary they were meant to summarise,
+   and two steps of equal size read as a rendering fault rather than as a
+   funnel that did not narrow. The bar's width stays a share of its own
+   cell, so the steps remain proportional to each other. */
+.evi-funnel .fs {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, 38%);
+  grid-template-areas: "bar label" "bar note";
+  align-items: center; column-gap: 14px;
+}
+.evi-funnel .fb { grid-area: bar; align-self: center; }
+.evi-funnel .fl { grid-area: label; margin-top: 0; }
+.evi-funnel .fn { grid-area: note; }
 .evi-funnel .fb {
-  height: 30px; border-radius: 7px; display: flex; align-items: center;
+  height: 26px; border-radius: 7px; display: flex; align-items: center;
   padding: 0 11px; min-width: 44px;
   background: linear-gradient(96deg,
     color-mix(in srgb, var(--band, var(--evi-a2)) 78%, transparent),
@@ -1005,7 +1018,8 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   font-size: 15px; font-weight: 700; color: var(--evi-ink);
   font-variant-numeric: tabular-nums;
 }
-.evi-funnel .fl { font-size: 12px; color: var(--evi-ink-2); margin-top: 4px; }
+.evi-funnel .fl { font-size: 12px; color: var(--evi-ink-2); margin-top: 4px;
+  line-height: 1.35; }
 .evi-funnel .fn { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.5; }
 
 /* -- single-arc stat --------------------------------------------------- */
@@ -1745,6 +1759,22 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   .evi-ring .vl, .evi-sub .st span {
     outline: 1px solid #6b6fbf; outline-offset: -1px;
   }
+  /* The severity dot on a pointer row is the only thing scanned in that
+     column, and it is painted as a background. With graphics off the whole
+     column read as one flat list. */
+  .evi-exec .nr .nd { outline: 3px solid #6b6fbf; outline-offset: -3px; }
+  .evi-exec .nr.n-gap .nd { outline-color: #be123c; }
+  .evi-exec .nr.n-thin .nd { outline-color: #a16207; }
+  /* Opened for the print by beforeprint, so the marker beside a head that
+     is now showing its reason anyway is just noise on paper. */
+  .evi-exec .nr .nmore, .evi-bars .bw.bwd > summary::after { display: none; }
+  /* An ellipsis on screen is a promise that hovering or widening will show
+     the rest. Paper cannot keep that promise, so a truncated event name is
+     just a name the reader does not have. "ATTD 2027 (Advanced
+     Technologies..." printed exactly that way. */
+  .evi-answer .an, .evi-table td, .evi-table th {
+    white-space: normal; overflow: visible; text-overflow: clip;
+  }
   /* The three sub-score bars are two nested divs where only the inner one
      has a width, so with no fill the whole breakdown printed as three
      numbers and no bars at all. The track gets a line too, or a 30/40 and a
@@ -1869,6 +1899,153 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--evi-warn); opacity: .8;
 }
+
+/* ── the answer, before the workings ───────────────────────────────────
+   A reader had to pass the profile, the counts, the funnel, everything that
+   was not measured, the spread and the top five before learning which event
+   to book. This is the answer, first, in one line. */
+.evi-answer {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  margin: 16px 0 18px; padding: 16px 18px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid rgba(99,102,241,.26);
+  background: color-mix(in srgb, var(--evi-panel) 76%, transparent);
+}
+.evi-answer .aw { flex: 1 1 260px; min-width: 0; }
+.evi-answer .ae {
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3); margin-bottom: 6px;
+}
+.evi-answer .al {
+  font-family: 'Bricolage Grotesque', serif; font-weight: 700;
+  font-size: clamp(19px, 2.4vw, 26px); letter-spacing: -.02em;
+  line-height: 1.15; margin-bottom: 12px;
+}
+/* The winner, as a control. A name a reader has to go and find again lower
+   down is the dead end the top-five list used to be. */
+.evi-answer .at {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px;
+  width: 100%; text-align: left; cursor: pointer;
+  padding: 11px 14px; border-radius: 10px; font: inherit;
+  border: 1px solid var(--evi-line-2);
+  border-left: 3px solid var(--band, var(--evi-a2));
+  background: var(--evi-panel-2);
+  transition: border-color .18s, transform .18s;
+}
+.evi-answer .at:hover { transform: translateY(-1px); border-color: var(--evi-a1); }
+.evi-answer .at:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-answer .an {
+  font-weight: 650; font-size: 14px; color: var(--evi-ink); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evi-answer .as { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.evi-answer .as b { font-size: 17px; font-weight: 700; color: var(--evi-ink); }
+.evi-answer .as i { font-style: normal; font-size: 11px; color: var(--evi-ink-3); }
+.evi-answer .am {
+  grid-column: 1 / -1; font-size: 11.5px; color: var(--evi-ink-3);
+}
+.evi-answer .az { font-size: 12.5px; color: var(--evi-ink-2); line-height: 1.6; }
+.evi-answer .ad { flex: 0 0 auto; max-width: 100%; }
+
+/* ── what was not measured, as pointers ────────────────────────────────
+   Fifteen possible paragraphs became a column of one-line heads, each with
+   its full reason one click behind it. The facts are all still here. */
+.evi-exec .ex-notes {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--evi-line-2);
+}
+.evi-exec .ex-notes .nh {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.evi-exec .ex-notes h4 {
+  font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-exec .ntally { display: flex; gap: 6px; flex-wrap: wrap; }
+.evi-exec .ntally .nt {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  font-weight: 650; color: var(--evi-ink-3);
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--evi-line-2); background: var(--evi-panel-2);
+}
+.evi-exec .ntally .nt b {
+  font-size: 12px; font-weight: 700; color: var(--evi-ink);
+  font-variant-numeric: tabular-nums;
+}
+.evi-exec .ntally .n-gap b { color: var(--evi-bad); }
+.evi-exec .ntally .n-thin b { color: var(--evi-warn); }
+
+.evi-exec .nl { display: grid; gap: 6px; }
+.evi-exec .nr {
+  border-radius: 9px; border: 1px solid var(--evi-line-2);
+  background: color-mix(in srgb, var(--evi-panel-2) 70%, transparent);
+}
+.evi-anim .evi-exec .nr {
+  animation: evi-rise .34s ease-out both;
+  animation-delay: calc(var(--i, 0) * .04s);
+}
+.evi-exec .nr > summary,
+.evi-exec .nr:not(details) {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; font-size: 12.8px; line-height: 1.45;
+  color: var(--evi-ink-2); list-style: none;
+}
+.evi-exec .nr > summary { cursor: pointer; }
+.evi-exec .nr > summary::-webkit-details-marker { display: none; }
+.evi-exec .nr > summary:focus-visible {
+  outline: 2px solid var(--evi-a1); outline-offset: 2px; border-radius: 9px;
+}
+/* The severity dot. Colour is the only thing scanned in a column of rows,
+   so it is a shape rather than a word the eye has to read. */
+.evi-exec .nr .nd {
+  flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--evi-ink-3);
+}
+.evi-exec .nr .nx { flex: 1 1 auto; min-width: 0; }
+.evi-exec .nr .nmore {
+  flex: 0 0 auto; font-size: 10px; letter-spacing: .07em;
+  text-transform: uppercase; font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-exec .nr[open] .nmore { color: var(--evi-a1); }
+.evi-exec .nr > p {
+  padding: 0 12px 11px 28px; font-size: 12.4px; line-height: 1.65;
+  color: var(--evi-ink-3);
+}
+.evi-exec .nr.n-gap { border-color: color-mix(in srgb, var(--evi-bad) 34%, transparent); }
+.evi-exec .nr.n-gap .nd { background: var(--evi-bad); }
+.evi-exec .nr.n-gap .nx { color: var(--evi-ink); font-weight: 600; }
+.evi-exec .nr.n-thin { border-color: color-mix(in srgb, var(--evi-warn) 30%, transparent); }
+.evi-exec .nr.n-thin .nd { background: var(--evi-warn); }
+.evi-exec .nr.n-ok .nd { background: var(--evi-ok); }
+
+/* A standing explanation that is identical on every run reads as boilerplate
+   by the third report and gets skipped along with whatever sits next to it.
+   Folded, so the sentence that changes lands on its own. */
+.evi-inline { display: inline-block; }
+.evi-inline > summary {
+  display: inline; cursor: pointer; list-style: none;
+  font-weight: 650; color: var(--evi-a1);
+  text-decoration: underline; text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+.evi-inline > summary::-webkit-details-marker { display: none; }
+.evi-inline > summary:focus-visible { outline: 2px solid var(--evi-a1); outline-offset: 2px; }
+.evi-inline > p { margin-top: 7px; }
+
+/* Category coverage: the bars are the picture, so a reason long enough to be
+   a paragraph goes behind the row that owns it. */
+.evi-bars .bw.bwd { padding: 0; }
+.evi-bars .bw.bwd > summary {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  list-style: none; font-size: 10.5px; letter-spacing: .07em;
+  text-transform: uppercase; font-weight: 700; color: var(--evi-ink-3);
+}
+.evi-bars .bw.bwd > summary::-webkit-details-marker { display: none; }
+.evi-bars .bw.bwd > summary::after { content: "\203a"; font-size: 13px; }
+.evi-bars .bw.bwd[open] > summary { color: var(--evi-a1); }
+.evi-bars .bw.bwd[open] > summary::after { content: "\2039"; }
+.evi-bars .bw.bwd > p { margin-top: 6px; }
 
 /* ── top five ───────────────────────────────────────────────────────── */
 .evi-top { list-style: none; counter-reset: top; display: grid; gap: 10px; }
