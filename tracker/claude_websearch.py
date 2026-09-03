@@ -94,6 +94,17 @@ SEARCH_STARVED_CODES = ("too_many_requests", "unavailable")
 # complete and usable, and the model would have kept going if it could. What
 # the caller does with that is the caller's business, and the two callers here
 # do different things with it.
+#
+# A separate turn-level limit does also exist, and correcting the mistake
+# above must not overcorrect into denying it. A probe at max_uses=1 sat for
+# 471 seconds, ran ONE search, returned NO error block of any kind, and
+# answered "I've hit a hard limit on web search tool calls for this turn and
+# it isn't resetting despite waiting." Nothing in the reply structure said so:
+# no error code, a normal stop_reason, real text. That shape is invisible here
+# and there is nothing honest to key off, because the only statement of what
+# happened is the model's own prose. `search_count` is the one hard number a
+# caller can weigh against the budget it set, which is why it is reported on
+# every reply.
 SEARCH_BUDGET_CODES = ("max_uses_exceeded",)
 
 _RESULT_KEYS = ("text", "raw", "error", "stop_reason", "text_block_count",

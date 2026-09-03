@@ -638,6 +638,32 @@ def confirm_system(proposal: dict, category: str, profile: dict) -> str:
         **_prompt_common(profile))
 
 
+def _searches_used(res: dict) -> str:
+    """How much of the budget the call actually spent, as a sentence.
+
+    Attached to every reply this module cannot use, because the number is the
+    difference between two failures that read identically and are not the
+    same thing. A call that spent its whole budget and still produced nothing
+    usable is a hard category. A call that ran one search out of six and then
+    wrote an apology is a tool that stopped answering, and there is no point
+    re-reading the prompt over it.
+
+    Recorded because it happened. A live probe at a budget of one search sat
+    for 471 seconds, ran ONE search, returned NO error block of any kind, and
+    answered "I've hit a hard limit on web search tool calls for this turn
+    and it isn't resetting despite waiting." Nothing in the reply structure
+    said so. The only hard evidence was the search count.
+
+    It stays a statement of fact rather than a diagnosis: reading intent out
+    of the model's prose is exactly what this module refuses to do elsewhere.
+    """
+    ran = res.get("search_count")
+    if not isinstance(ran, int):
+        return ""
+    return ("It ran %d of the %d searches it was allowed."
+            % (ran, FIND_MAX_USES))
+
+
 def _clean_proposal(raw: dict) -> dict | None:
     """A candidate name, trimmed. Rejects anything with no usable name.
 
@@ -735,10 +761,12 @@ def propose_category(category: str, profile: dict) -> dict:
                                            require="candidates")
     if not isinstance(parsed, dict):
         logger.warning("event_intel_discover: unparsable find reply for category "
-                       "%s (blocks=%s, stop=%s)", category,
-                       res.get("text_block_count"), res.get("stop_reason"))
+                       "%s (blocks=%s, stop=%s, searches=%s of %s)", category,
+                       res.get("text_block_count"), res.get("stop_reason"),
+                       res.get("search_count"), FIND_MAX_USES)
         return _out(STATUS_ERROR, [], "",
-                    "The search ran but its answer could not be read.")
+                    "The search ran but its answer could not be read. %s"
+                    % _searches_used(res))
 
     proposals = []
     for c in (parsed.get("candidates") or []):

@@ -436,6 +436,38 @@ def test_a_genuinely_cut_off_finder_still_reads_as_a_gap(monkeypatch):
     assert "gap in the search" in r["detail"]
 
 
+# ── a limit that arrives with no error block at all ──────────────────────
+#
+# A live probe at a budget of one search sat for 471 seconds, ran ONE search,
+# returned NO error block of any kind, and answered "I've hit a hard limit on
+# web search tool calls for this turn and it isn't resetting despite waiting."
+#
+# There is nothing in the reply structure to key off. The prose says what
+# happened and reading intent out of a model's prose is what this module
+# refuses to do. The one piece of hard evidence is the search count, so that
+# is what gets reported.
+
+def test_an_unusable_reply_says_how_much_of_the_budget_it_spent(monkeypatch):
+    """'The answer could not be read' is the same sentence for a call that
+    spent six searches and one that ran one and then apologised. Only the
+    second is a tool that stopped answering, and the difference decides
+    whether anybody should go and look at the prompt."""
+    _stages(monkeypatch,
+            find_text="I've hit a hard limit on web search tool calls.",
+            find_searches=1)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert r["status"] == D.STATUS_ERROR
+    assert "ran 1 of the %d searches" % D.FIND_MAX_USES in r["detail"]
+
+
+def test_an_unusable_reply_that_did_spend_the_budget_says_that_instead(monkeypatch):
+    _stages(monkeypatch, find_text="not json at all",
+            find_searches=D.FIND_MAX_USES)
+    r = D.search_category(R.CAT_VERTICAL_SUMMIT, PROFILE)
+    assert "ran %d of the %d searches" % (D.FIND_MAX_USES, D.FIND_MAX_USES) \
+        in r["detail"]
+
+
 def test_a_short_category_says_whether_it_had_searches_left(monkeypatch):
     """The one place the spent budget changes a decision: 'we looked with
     everything we had' and 'we looked with searches to spare' are different
