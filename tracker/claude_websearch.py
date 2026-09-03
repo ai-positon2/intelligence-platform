@@ -54,25 +54,51 @@ ERR_TRANSPORT = "transport"
 ERR_MAX_TOKENS = "max_tokens"
 ERR_EMPTY = "empty_response"
 ERR_UNPARSABLE = "unparsable"
-# The server-side web_search tool refused a call and returned an error block
-# in place of results, so the model wrote its answer from whatever it already
-# had. Observed live on 2026-09-02: two of six discovery categories came back
-# reporting that the tool had stopped answering part-way through, one of them
-# after an initial batch of eight parallel queries.
-#
-# max_uses itself is honoured (a probe capping it at 1 billed exactly one
-# search), so this is not a budget the caller can simply lower to avoid. It is
-# a server-side limit across the whole turn, and it can be hit for reasons the
-# caller does not control. What matters here is only that a STARVED search
-# must never be reported as "we looked and found nothing".
+# The web_search tool refused a call and returned an error block in place of
+# results, so the model wrote its answer from whatever it already had. This
+# is the tool failing, and it must never be reported as "we looked and found
+# nothing".
 ERR_SEARCH_LIMIT = "search_limit"
 
-# Error codes the web_search tool returns in place of results. Anything here
-# means the search did not run, as opposed to running and matching nothing.
-SEARCH_STARVED_CODES = ("max_uses_exceeded", "too_many_requests", "unavailable")
+# Error codes that mean the search DID NOT RUN, as opposed to running and
+# matching nothing. `too_many_requests` is rate limiting and `unavailable` is
+# the tool being down; in both cases a query the model wanted answered came
+# back with nothing, and no amount of caller planning would have avoided it.
+#
+# `max_uses_exceeded` is deliberately NOT in this list. See below.
+SEARCH_STARVED_CODES = ("too_many_requests", "unavailable")
+
+# The caller's own budget, spent.
+#
+# This was the most expensive mistake in this module's history, so the
+# reasoning is written down rather than left to be re-derived.
+#
+# `max_uses_exceeded` was originally classed as starvation, on the theory that
+# it came from "a separate server-side limit across the turn" that a caller
+# could not avoid. The evidence for that theory was that max_uses is honoured:
+# a probe capping it at 1 billed exactly one search. That is evidence max_uses
+# is ENFORCED. It says nothing about how, and the how is this: when the model
+# reaches for search N+1 under `max_uses: N`, the tool answers with an error
+# block whose code is `max_uses_exceeded`. It is the enforcement mechanism.
+#
+# Measured directly (max_uses=1, a prompt needing three lookups): one billed
+# search, seven real results, a complete answer naming the URL it found, and
+# FIVE max_uses_exceeded blocks for the searches it went on to attempt.
+#
+# Every caller here also saturates its budget as a matter of course, so
+# treating the code as a failed search discarded the results of very nearly
+# every call that was working correctly. One live discovery run lost four of
+# its six categories that way and produced a single event in half an hour.
+#
+# So a spent budget is reported, and is NOT an error. It says: this reply is
+# complete and usable, and the model would have kept going if it could. What
+# the caller does with that is the caller's business, and the two callers here
+# do different things with it.
+SEARCH_BUDGET_CODES = ("max_uses_exceeded",)
 
 _RESULT_KEYS = ("text", "raw", "error", "stop_reason", "text_block_count",
-                "tool_version", "search_count", "tool_errors", "usage")
+                "tool_version", "search_count", "tool_errors", "usage",
+                "budget_spent")
 
 
 def _search_count(resp, usage: dict) -> int:
@@ -197,12 +223,21 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     order) and `error` (None on success, else a {kind, detail} dict). A
     caller that only checks `text` still behaves correctly, because `text` is
     "" on every failure path.
+
+    `budget_spent` is True when the model reached for one more search than
+    `max_uses` allowed. That is NOT an error and never sets one: the reply is
+    complete and holds every result the searches it did run returned. It only
+    says the model would have kept looking, which is worth a sentence in a
+    report and is worth nothing at all if the reply already answered the
+    question. Expect it to be True on most calls, because these callers size
+    `max_uses` to what they are willing to spend rather than to what a model
+    would ideally use.
     """
     client = _client(timeout)
     if client is None:
         return {"text": "", "raw": "", "stop_reason": None, "text_block_count": 0,
                 "tool_version": None, "search_count": 0, "tool_errors": [],
-                "usage": {},
+                "usage": {}, "budget_spent": False,
                 "error": _err(ERR_NOT_CONFIGURED,
                               "ANTHROPIC_API_KEY is not configured on this deployment.")}
 
@@ -254,7 +289,8 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
             kind = ERR_NO_TOOL_VERSION
         return {"text": "", "raw": "", "stop_reason": None, "text_block_count": 0,
                 "tool_version": None, "search_count": 0, "tool_errors": [],
-                "usage": {}, "error": _err(kind, detail)}
+                "usage": {}, "budget_spent": False,
+                "error": _err(kind, detail)}
 
     # Join EVERY text block, in order. Not content[-1]: with web_search on,
     # the answer is split into one block per cited span and the last one is a
@@ -272,7 +308,12 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
     out = {"text": text, "raw": joined, "stop_reason": stop_reason,
            "text_block_count": len(blocks), "tool_version": used_version,
            "search_count": searches, "tool_errors": tool_errors,
-           "usage": usage, "error": None}
+           "usage": usage,
+           # The model asked for one more search than it was given. Reported
+           # on a successful reply, never as an error: the answer is complete
+           # and every result it did get is in it.
+           "budget_spent": any(c in SEARCH_BUDGET_CODES for c in tool_errors),
+           "error": None}
 
     if any(c in SEARCH_STARVED_CODES for c in tool_errors):
         # Deliberately BEFORE the max_tokens and empty checks. A starved
@@ -283,7 +324,8 @@ def ask(system: str, user: str, *, max_uses: int = 8, max_tokens: int = 8000,
             "The web_search tool stopped returning results part-way through "
             "(%s) after %d searches, so this answer was written from an "
             "incomplete search rather than a finished one."
-            % (", ".join(sorted(set(tool_errors))), searches))
+            % (", ".join(sorted(set(c for c in tool_errors
+                                    if c in SEARCH_STARVED_CODES))), searches))
     elif stop_reason == "max_tokens":
         # Distinct from "we could not read it": it ran out of room mid-answer.
         # Named so it never hides behind a generic unreadable-response string.

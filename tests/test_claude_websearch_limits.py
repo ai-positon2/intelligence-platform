@@ -1,18 +1,26 @@
-"""What ask() does when the web_search tool refuses to keep searching.
+"""What ask() does when the web_search tool returns an error instead of results.
 
-The tool can return an error block instead of results, leaving the model to
-write its answer from whatever it already had. Observed live on 2026-09-02:
-two of six discovery categories reported that the search tool had stopped
-answering part-way through, one after an initial batch of eight parallel
-queries. max_uses itself is honoured (a probe capping it at 1 billed exactly
-one search), so this is a server-side limit across the turn rather than a
-budget the caller can lower to avoid.
+Two very different things arrive by the same route, and telling them apart is
+what this file is for.
 
-The danger is that a starved call looks like a good one from the outside. It
-has text, a normal stop_reason, and a non-zero search count. Only the error
-block distinguishes it, so these tests drive ask() end to end with a faked
-transport rather than testing the block reader on its own: the reader working
-while ask() ignores it is exactly the bug this guards.
+A STARVED search is the tool failing: rate limiting, or the tool being down.
+A query the model wanted answered came back with nothing, and no amount of
+caller planning would have avoided it. That is `too_many_requests` and
+`unavailable`, and the danger is that it looks like a good call from the
+outside: text, a normal stop_reason, a non-zero search count. Only the error
+block distinguishes it.
+
+A SPENT BUDGET is the tool doing its job: `max_uses_exceeded` is how max_uses
+is enforced. It arrives on complete, correct, useful replies, and every caller
+in this repo saturates its budget by design. It used to be classed as
+starvation, which discarded the results of nearly every call that was working;
+one live discovery run lost four of six categories and produced a single
+event in half an hour.
+
+These tests drive ask() end to end over a faked transport rather than testing
+the block reader on its own: the reader working while ask() ignores it, or
+ask() throwing away what the reader correctly read, are both bugs that have
+actually happened here.
 """
 
 import types
@@ -34,13 +42,13 @@ class _ErrItem:
 
 
 def _resp(*, text="Here is what I could find.", tool_error=None,
-          searches=3, stop_reason="end_turn", usage=True):
+          tool_errors=(), searches=3, stop_reason="end_turn", usage=True):
     content = [_Block(type="text", text=text)]
     for _ in range(searches):
         content.append(_Block(type="server_tool_use", name="web_search"))
-    if tool_error:
+    for code in ([tool_error] if tool_error else []) + list(tool_errors):
         content.append(_Block(type="web_search_tool_result",
-                              content=[_ErrItem(tool_error)]))
+                              content=[_ErrItem(code)]))
     r = types.SimpleNamespace(content=content, stop_reason=stop_reason)
     if usage:
         r.usage = types.SimpleNamespace(
@@ -72,18 +80,77 @@ def transport(monkeypatch):
 def test_a_starved_search_is_an_error_even_though_it_returned_text(transport):
     """The regression D5 exposed. Text present, stop_reason end_turn, three
     searches on the clock: every signal a caller checks says success."""
-    transport["resp"] = _resp(tool_error="max_uses_exceeded")
+    transport["resp"] = _resp(tool_error="too_many_requests")
     r = C.ask("s", "u", max_uses=8)
     assert r["error"] is not None, "a cut-off search was reported as a good answer"
     assert r["error"]["kind"] == C.ERR_SEARCH_LIMIT
     assert "incomplete search" in r["error"]["detail"]
 
 
-@pytest.mark.parametrize("code", ["max_uses_exceeded", "too_many_requests",
-                                  "unavailable"])
+@pytest.mark.parametrize("code", ["too_many_requests", "unavailable"])
 def test_every_starvation_code_is_treated_as_a_cut_off_search(transport, code):
     transport["resp"] = _resp(tool_error=code)
     assert C.ask("s", "u")["error"]["kind"] == C.ERR_SEARCH_LIMIT
+
+
+# ── a spent budget is not a failure ──────────────────────────────────────
+#
+# `max_uses_exceeded` used to sit in the starvation list, on the theory that
+# it came from a server-side limit no caller could avoid. It does not. It is
+# how max_uses is enforced: reach for search N+1 under `max_uses: N` and the
+# tool answers with that code.
+#
+# Measured against the live API at max_uses=1 with a prompt needing three
+# lookups: one billed search, seven real results, a complete answer naming
+# the URL it found, and five max_uses_exceeded blocks for the searches it
+# went on to attempt. Every caller in this repo saturates its budget by
+# design, so classing the code as failure threw away the work of nearly
+# every call that was behaving correctly.
+
+def test_a_spent_budget_is_not_an_error_because_it_is_the_budget_working(transport):
+    """The bug that cost a live run four of its six discovery categories and
+    produced one event in half an hour."""
+    transport["resp"] = _resp(tool_error="max_uses_exceeded")
+    r = C.ask("s", "u", max_uses=6)
+    assert r["error"] is None, (
+        "a reply that used its whole search budget was discarded as a failure")
+    assert r["text"], "the answer it did write must survive"
+
+
+def test_a_spent_budget_is_reported_so_a_caller_can_still_say_so(transport):
+    """Not an error, but not nothing either: the model wanted another search.
+    A caller that found nothing needs to be able to say which of the two it
+    was looking at."""
+    transport["resp"] = _resp(tool_error="max_uses_exceeded")
+    assert C.ask("s", "u")["budget_spent"] is True
+
+
+def test_a_clean_call_did_not_spend_its_budget(transport):
+    transport["resp"] = _resp()
+    assert C.ask("s", "u")["budget_spent"] is False
+
+
+def test_an_unconfigured_deployment_still_reports_no_spent_budget(monkeypatch):
+    """Every early return has to carry the key, or a caller reading it off a
+    transport failure gets a KeyError instead of a diagnosis."""
+    monkeypatch.setattr(C, "_client", lambda timeout: None)
+    r = C.ask("s", "u")
+    assert r["error"]["kind"] == C.ERR_NOT_CONFIGURED
+    assert r["budget_spent"] is False
+
+
+def test_real_starvation_alongside_a_spent_budget_still_errors(transport):
+    """Both codes at once, which is the common shape: the tool rate-limits
+    part-way through and the model burns the rest of its budget retrying. The
+    rate limit is the one that means a query went unanswered, so it wins."""
+    transport["resp"] = _resp(
+        tool_errors=("max_uses_exceeded", "too_many_requests"))
+    r = C.ask("s", "u")
+    assert r["error"]["kind"] == C.ERR_SEARCH_LIMIT
+    assert r["budget_spent"] is True
+    assert "max_uses_exceeded" not in r["error"]["detail"], (
+        "the message names the codes that broke the search, and a spent "
+        "budget is not one of them")
 
 
 def test_a_tool_error_that_is_not_starvation_does_not_fake_a_limit(transport):
@@ -99,9 +166,20 @@ def test_a_tool_error_that_is_not_starvation_does_not_fake_a_limit(transport):
 def test_starvation_outranks_max_tokens_and_empty(transport):
     """A starved call usually still produces prose, so every later check would
     classify it as a good answer. Order matters here, not just presence."""
-    transport["resp"] = _resp(tool_error="max_uses_exceeded",
+    transport["resp"] = _resp(tool_error="unavailable",
                               stop_reason="max_tokens")
     assert C.ask("s", "u")["error"]["kind"] == C.ERR_SEARCH_LIMIT
+
+
+def test_a_spent_budget_does_not_outrank_a_truncated_answer(transport):
+    """The mirror of the test above, and the reason a spent budget is not
+    simply ignored. Budget spent AND the answer cut off mid-sentence is a
+    real failure, and it must still be reported as the truncation it is."""
+    transport["resp"] = _resp(tool_error="max_uses_exceeded",
+                              stop_reason="max_tokens")
+    r = C.ask("s", "u")
+    assert r["error"]["kind"] == C.ERR_MAX_TOKENS
+    assert r["budget_spent"] is True
 
 
 def test_a_clean_call_reports_no_tool_errors(transport):
