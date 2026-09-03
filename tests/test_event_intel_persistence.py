@@ -97,7 +97,8 @@ def _cand(**over):
             # becomes a past date, and a past date is now a gap, so this
             # fixture would have started failing on its own.
             "starts_on": _soon(), "ends_on": _soon(93),
-            "attendees": "600"}
+            "attendees": "600", "format": "in_person",
+            "sources": ["https://pmm.example/about"]}
     base.update(over)
     return base
 

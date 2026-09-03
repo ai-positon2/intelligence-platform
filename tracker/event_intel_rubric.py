@@ -512,6 +512,10 @@ _GAP_CHECKS = (
                 "secondary sources."),
     ("starts_on", "No dates are announced yet, so this cannot be placed in a "
                   "quarter with confidence."),
+    ("format", "Whether this runs in person, online or both was not "
+               "established, so the travel it implies is unknown."),
+    ("sources", "No page was cited for this event, so none of the facts above "
+                "can be checked against the organiser."),
 )
 
 

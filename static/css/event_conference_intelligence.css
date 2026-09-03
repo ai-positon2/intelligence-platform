@@ -1812,6 +1812,41 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-cand .cn .ed { font-size: 12px; font-weight: 500; color: var(--evi-ink-3); }
 .evi-cand .cm { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
 
+/* Format and confidence: two facts that qualify every other fact on the card,
+   so they sit above the score rather than inside the disclosure. "Format not
+   stated" is styled as an absence, not as a value, because an event nobody
+   confirmed is in person is a different thing from one that is. */
+.evi-cand .cflags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.evi-cand .cfl {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 2.5px 8px; border-radius: 999px;
+  color: var(--evi-ink-2); background: var(--evi-panel);
+  border: 1px solid var(--evi-line-2);
+}
+.evi-cand .cfl.mut {
+  color: var(--evi-ink-3); background: transparent;
+  border-style: dashed; border-color: var(--evi-line);
+}
+.evi-cand .cfl.warn {
+  color: var(--evi-warn); background: rgba(251,191,36,.10);
+  border-color: rgba(251,191,36,.28);
+}
+
+/* The pages the confirmation opened. Inside the disclosure with the reasoning,
+   because that is where a reader who wants to check the score is already
+   looking. */
+.evi-cand .csrc {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--evi-line-2);
+  font-size: 11.5px;
+}
+.evi-cand .csrc b { color: var(--evi-ink-2); font-weight: 600; }
+.evi-cand .csrc a {
+  color: var(--evi-ink-3); text-decoration: none;
+  border-bottom: 1px dotted var(--evi-line);
+}
+.evi-cand .csrc a:hover { color: var(--evi-a1); border-bottom-color: currentColor; }
+
 /* The score block. Three bars and the refused-or-granted bonus, never just a
    total: the breakdown IS the audit trail, and hiding it behind a disclosure
    would make the headline the only thing anyone reads. */
