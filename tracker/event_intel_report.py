@@ -51,12 +51,35 @@ def _profile_sentence(profile: dict) -> str:
     return ", ".join(bits) + "."
 
 
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _day(iso: str) -> str:
+    """One date the way a person writes it, or the ISO string unchanged.
+
+    Element 5 is stored as finished text, and it was stored as ISO while the
+    ranked list a few lines below it on the same page rendered the same event
+    as "Jun 8, 2027". Two date formats for one event, in one report.
+    """
+    parts = (iso or "")[:10].split("-")
+    if len(parts) != 3:
+        return iso or ""
+    try:
+        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return iso
+    if not 1 <= m <= 12:
+        return iso
+    return "%s %d, %d" % (_MONTHS[m - 1], d, y)
+
+
 def _fmt_when(c: dict) -> str:
     s = (c.get("starts_on") or "")[:10]
     e = (c.get("ends_on") or "")[:10]
     if s and e and e != s:
-        return "%s to %s" % (s, e)
-    return s or "dates not announced"
+        return "%s to %s" % (_day(s), _day(e))
+    return _day(s) or "dates not announced"
 
 
 # How much of a category's own explanation the summary quotes.
