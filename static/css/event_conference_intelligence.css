@@ -929,7 +929,12 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 .evi-cols .cwrap { padding-top: 12px; }
 .evi-cols .cs {
   position: relative; display: flex; align-items: flex-end;
-  justify-content: space-between; gap: 4px; height: 138px;
+  /* Packed from the left, not spread across the width. `space-between` puts
+     all the slack between the columns, which is invisible at eleven columns
+     and absurd at two: a live report showed one kept event and one cut one
+     as two lonely blocks pinned to opposite edges of an empty band, which
+     reads as a broken chart rather than as two events. */
+  justify-content: flex-start; gap: 5px; height: 138px;
 }
 /* Capped, then spread. Eleven columns filling a 1000px drawer are ninety
    pixels wide each, which reads as a wall of blocks rather than as a
@@ -940,6 +945,10 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   display: flex; align-items: flex-end;
   background: none; border: 0; padding: 0; font: inherit;
 }
+/* A handful of columns get to be wider. The 34px cap exists so that forty
+   columns read as a distribution; at two or three it makes them look like
+   an accident. */
+.evi-cols.few .cx { max-width: 72px; }
 .evi-cols button.cx { cursor: pointer; }
 .evi-cols .cl {
   display: block; width: 100%; border-radius: 3px 3px 1px 1px;
@@ -1663,6 +1672,84 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   * { color: #10162a !important; }
   .evi-table { min-width: 0; font-size: 11px; }
   .evi-src-link::after { content: " (" attr(href) ")"; font-size: 9px; color: #5b6480 !important; }
+
+  /* ── the report has to actually be on the paper ──────────────────────
+     Everything below is one bug, found by printing the page rather than
+     looking at it: three blank pages, at exactly the height of the report
+     that should have been on them.
+
+     `.evi-drawer` draws in with `animation: evi-rise` and
+     `animation-fill-mode: both`, whose `from` keyframe is `opacity: 0`. A
+     print taken before that 220ms animation has run applies the `from`
+     frame and paints nothing, while the element keeps every pixel of its
+     layout height. The existing freeze rule only reached `.evi-anim *`,
+     which is the charts inside the report and not the report itself.
+
+     It is a race, which is why it survived: print a report you have been
+     reading for a while and the animation is long finished. Print one you
+     just opened, or print from anything headless, and the pages come out
+     empty. */
+  .evi-scrim, .evi-scrim *, .evi-drawer, .evi-drawer * {
+    animation: none !important; opacity: 1 !important;
+  }
+  /* And once it is visible it has to be whole. `.evi-drawer` keeps
+     `overflow: hidden` from the screen rule, so the flex body inside it was
+     clipped at the bottom of the first box: a live report ended mid-word in
+     the middle of a sentence, with half a page of white under it. */
+  .evi-drawer { overflow: visible; display: block; }
+  .evi-drawer-body {
+    overflow: visible; flex: none; min-height: 0; max-height: none;
+  }
+  .evi-drawer-head { position: static; }
+
+  /* Gradient text, printed.
+     `background-clip: text` with `color: transparent` paints the letters out
+     of a background, and Chrome's print dialog has background graphics OFF
+     by default. With no background there is nothing to clip, so the words
+     print as nothing: a live PDF read "Know who is        before you book
+     the booth", with the subject of the sentence missing. Solid ink here,
+     which needs no background to exist. */
+  .evi-hero h1 em, .evi-tile .tv {
+    background: none !important;
+    -webkit-background-clip: border-box !important;
+    background-clip: border-box !important;
+    color: #3b3f9e !important;
+  }
+
+  /* What a person is printing.
+     A printed report opened on this page arrived behind two pages of the
+     landing copy: the headline, the three cards explaining the three plays,
+     the intake form and the pricing panel. None of that is the document
+     they meant to send anyone. Hidden only while a report is open, so
+     printing the page itself still prints the page. */
+  body.evi-reading .evi-hero,
+  body.evi-reading .evi-plays,
+  body.evi-reading .evi-card-main,
+  body.evi-reading .evi-costcard,
+  body.evi-reading .evi-runs,
+  body.evi-reading .bg-grid { display: none !important; }
+  /* The scrim is the page now, so it must not reserve the margins the
+     screen gives it, and neither must the emptied page behind it. Without
+     the second rule the report started a third of the way down page one,
+     under the space the hidden landing copy used to pad. */
+  body.evi-reading .evi-scrim { padding: 0; }
+  body.evi-reading .main { padding: 0; min-height: 0; }
+
+  /* Chrome's print dialog leaves "Background graphics" OFF by default, which
+     is how the PDF that started all of this was made. Every fill on the page
+     disappears in that mode, so anything carrying meaning in a fill needs a
+     border to fall back on: a funnel bar, a category bar and a score bar are
+     all shapes whose length IS the number, and with no fill they printed as
+     nothing at all. */
+  .evi-funnel .fb, .evi-bars .bt .fl, .evi-cols .cl, .evi-donut .sg,
+  .evi-ring .vl, .evi-sub .st span {
+    outline: 1px solid #6b6fbf; outline-offset: -1px;
+  }
+  /* The three sub-score bars are two nested divs where only the inner one
+     has a width, so with no fill the whole breakdown printed as three
+     numbers and no bars at all. The track gets a line too, or a 30/40 and a
+     38/40 look identical. */
+  .evi-sub .st { outline: 1px solid #c9cde6; outline-offset: -1px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
