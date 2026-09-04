@@ -607,18 +607,31 @@ def test_the_confirmer_has_room_to_write_its_answer_too():
 
 
 def test_every_searching_stage_has_room_to_write_its_answer():
-    """One guard over all four, because they failed for one reason.
+    """One guard over all five, because they failed for one reason.
 
     With web_search on, the model narrates between search rounds and that
     narration spends the OUTPUT budget alongside the answer. A live run
     truncated a find call at 3000 and two confirm calls at 4000, produced
-    11,754 output tokens from an audit budgeted at 8,000, and used 5,410 of
-    a resolve call's 6,000. Output is the cheap half of a search call; the
-    input side of one of these is 50k to 180k tokens.
+    11,754 output tokens from an audit budgeted at 8,000, used 5,410 of a
+    resolve call's 6,000, and produced 14,601 output tokens from a 4-event
+    SCORE batch budgeted at 8,000. Output is the cheap half of a search call;
+    the input side of one of these is 50k to 180k tokens.
+
+    The scorer's floor is deliberately higher than the rest. It is the only
+    one of these that writes a full answer (three notes plus a two-part
+    description) for MULTIPLE events in a single call, so the same narration
+    overhead sits underneath a JSON answer that scales with the batch size,
+    not with one item. Losing this call is also the most expensive way to
+    lose an event in the whole pipeline: score_all can run several batches
+    concurrently, but when the surviving candidate pool fits in one batch, a
+    single truncated score call discards every survivor of discovery,
+    confirmation and the audit at once. A live run did exactly that and
+    finished with ZERO recommended events despite every earlier stage working.
     """
     import re as _re
     from tracker import event_intel_audit as _A
     from tracker import event_intel_resolve as _RS
+    from tracker import event_intel_scorer as _SC
 
     def _budget(mod, const):
         """The smallest output budget this module can spend.
@@ -649,6 +662,31 @@ def test_every_searching_stage_has_room_to_write_its_answer():
     assert not thin, (
         "these stages cannot write their answer after a full search budget: "
         "%s" % thin)
+
+    # The scorer's own floor, scaled to what it actually has to write. A live
+    # 4-event batch alone needed more than 14,601 tokens (it was truncated, so
+    # the true need is a lower bound, not a ceiling); a batch of BATCH events
+    # cannot be safely held to the single-item floor above.
+    score_budget = _budget(_SC, "SCORE_MAX_TOKENS")
+    per_batch_floor = 9000 + 2500 * (_SC.BATCH - 1)
+    assert score_budget >= per_batch_floor, (
+        "score_batch writes up to %d events per call and cannot be held to "
+        "the single-item floor: %d output tokens is not enough (need >= %d)"
+        % (_SC.BATCH, score_budget, per_batch_floor))
+
+    # Same shape, same guard: event_intel_workroom.draft_batch also writes
+    # three fields per row for up to BATCH rows in one call, with the
+    # web_search tool offered. It hit the same single-batch-loses-everything
+    # risk the scorer's live failure exposed, at HALF the search budget and
+    # DOUBLE the item count, on the budget that had just failed for the
+    # scorer at half this batch size.
+    from tracker import event_intel_workroom as _WR
+    draft_budget = _budget(_WR, "DRAFT_MAX_TOKENS")
+    draft_floor = 9000 + 2500 * (_WR.BATCH - 1)
+    assert draft_budget >= draft_floor, (
+        "draft_batch writes up to %d rows per call and cannot be held to the "
+        "single-item floor: %d output tokens is not enough (need >= %d)"
+        % (_WR.BATCH, draft_budget, draft_floor))
 
 
 def test_a_starved_category_leaves_the_reply_behind_to_read(monkeypatch,
