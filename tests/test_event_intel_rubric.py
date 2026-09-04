@@ -262,6 +262,152 @@ def test_rank_handles_an_empty_input():
     assert out["kept"] == [] and out["excluded"] == [] and out["counts"]["kept"] == 0
 
 
+# ── the second tier ───────────────────────────────────────────────────────
+#
+# The bar at 70 was doing two jobs: deciding what is RECOMMENDED, and
+# deciding what EXISTS. Real clients paid for that. One run returned a single
+# event and another returned none, while events that were real, upcoming,
+# cited and aimed squarely at the client's own buyers sat in the discard pile
+# for being learning-crowd conferences rather than buying-floor ones.
+#
+# So `relevance` (which means exactly "does this event's composition match
+# their ICP") now gates existence, and the bar only ranks. These tests pin
+# both halves: that a well-matched event below the bar becomes an option, and
+# that the gates still refuse anything that is not actually for this client.
+
+
+def _full(name, rel, dm, eng, **over):
+    """A candidate as the scorer really produces one: sub-scores and a total
+    that agree, because the gates read both."""
+    sc = R.score(rel, dm, eng)
+    row = {"name": name, R.DIM_RELEVANCE: rel, R.DIM_DM_ACCESS: dm,
+           R.DIM_ENGAGEMENT: eng, "total": sc["total"], "tier": sc["tier"],
+           "category": R.CAT_VERTICAL_SUMMIT, "starts_on": "2027-06-01",
+           "description": "d", "city": "Boston"}
+    row.update(over)
+    return row
+
+
+def test_an_event_aimed_at_this_client_survives_the_bar_as_an_option():
+    """The regression, stated as the case that caused it. Right audience,
+    conference-shaped, lands in the sixties. It used to be a name and a
+    number in the discard pile."""
+    c = _full("On-ICP learning crowd", 32, 22, 10)
+    assert c["total"] < R.RANK_FLOOR, "fixture no longer reproduces the case"
+    assert R.is_worth_a_look(c)
+    out = R.rank([c])
+    assert out["kept"] == []
+    assert [x["name"] for x in out["worth_a_look"]] == ["On-ICP learning crowd"]
+    assert out["excluded"] == []
+
+
+def test_the_second_tier_carries_whole_rows_not_name_chips():
+    """An option a reader cannot read is not one. `excluded` is a chip on
+    purpose; this list is rendered with the same card the recommendation
+    gets, so it has to arrive with the fields that card needs."""
+    out = R.rank([_full("Considered", 30, 22, 11)])
+    row = out["worth_a_look"][0]
+    for field in ("starts_on", "city", "description", "category",
+                  R.DIM_RELEVANCE, "total"):
+        assert field in row, "%s was dropped, so the card cannot render" % field
+
+
+def test_an_event_for_the_wrong_audience_is_still_cut():
+    """The half of this that keeps the list honest. Widening the list must
+    not mean showing whatever was found."""
+    c = _full("Wrong industry", 10, 26, 13)
+    assert not R.is_worth_a_look(c)
+    out = R.rank([c])
+    assert out["worth_a_look"] == []
+    assert [e["name"] for e in out["excluded"]] == ["Wrong industry"]
+
+
+def test_the_relevance_gate_is_the_line_it_says_it_is():
+    """One point either side of RELEVANCE_GATE, holding the total steady
+    above CONSIDER_FLOOR so only the gate under test can decide."""
+    assert R.is_worth_a_look(_full("At the gate", R.RELEVANCE_GATE, 26, 12))
+    assert not R.is_worth_a_look(
+        _full("Under it", R.RELEVANCE_GATE - 1, 26, 12))
+
+
+def test_the_right_audience_at_an_unworkable_event_is_not_an_option():
+    """Why there are two gates. Relevance alone would offer a hall full of
+    the right people that nobody can be reached in."""
+    c = _full("Keynote hall", 34, 4, 2)
+    assert c[R.DIM_RELEVANCE] >= R.RELEVANCE_GATE
+    assert c["total"] < R.CONSIDER_FLOOR
+    assert not R.is_worth_a_look(c)
+
+
+def test_a_relevance_nobody_scored_is_not_evidence_of_relevance():
+    """The scorer returns None for a dimension it never graded, and this
+    function's whole job is to assert an event IS for this client. Absent is
+    not yes."""
+    assert not R.is_worth_a_look(_full("Ungraded", 30, 22, 11,
+                                       **{R.DIM_RELEVANCE: None}))
+    c = _full("Missing", 30, 22, 11)
+    del c[R.DIM_RELEVANCE]
+    assert not R.is_worth_a_look(c)
+
+
+def test_a_committed_event_below_the_bar_stays_in_the_recommendation():
+    """Money already spent is the most actionable line the analysis has, and
+    it was kept in `kept` and marked long before this tier existed. The new
+    branch must not quietly demote it into a second-tier suggestion."""
+    out = R.rank([_full("Paid for", 30, 22, 11, committed=True)])
+    assert [c["name"] for c in out["kept"]] == ["Paid for"]
+    assert out["worth_a_look"] == []
+    assert [c["name"] for c in out["committed_below_bar"]] == ["Paid for"]
+
+
+def test_a_finished_edition_never_becomes_an_option():
+    """Already-over is checked before merit, and it has to stay that way for
+    the new bucket too: a well-matched conference that ended last month is
+    not something to offer anybody."""
+    out = R.rank([_full("Over already", 32, 24, 11, starts_on="2020-01-01",
+                        ends_on="2020-01-03")],
+                 today=datetime.date(2027, 1, 1))
+    assert out["worth_a_look"] == []
+    assert [f["name"] for f in out["finished"]] == ["Over already"]
+
+
+def test_the_second_tier_is_capped_like_the_list_it_sits_under():
+    """A second tier running to forty rows would bury the recommendation
+    above it."""
+    rows = [_full("e%d" % i, 30, 22, 11) for i in range(20)]
+    out = R.rank(rows, cap=5)
+    assert len(out["worth_a_look"]) == 5
+    assert out["counts"]["worth_a_look"] == 5
+
+
+def test_the_second_tier_is_ordered_by_score_like_the_recommendation():
+    # All three must be BELOW the bar or the top one lands in `kept` and
+    # this stops testing the ordering it claims to test. 67, 64, 56.
+    out = R.rank([_full("low", 26, 20, 10), _full("high", 32, 24, 11),
+                  _full("mid", 30, 23, 11)])
+    assert all(c["total"] < R.RANK_FLOOR for c in out["worth_a_look"])
+    assert [c["name"] for c in out["worth_a_look"]] == ["high", "mid", "low"]
+
+
+def test_nothing_is_padded_into_the_second_tier():
+    """The no-padding rule applies to the new bucket too. Two gates, both
+    measured, and an empty result when nothing clears them."""
+    out = R.rank([_full("nope", 8, 8, 2)], cap=15)
+    assert out["kept"] == [] and out["worth_a_look"] == []
+    assert out["counts"]["worth_a_look"] == 0
+
+
+def test_the_three_buckets_account_for_every_scored_candidate():
+    """The funnel drawn on the page adds these three together and calls the
+    result "scored", so a candidate falling into none of them would make the
+    chart lie about its own containment."""
+    rows = [_full("rec", 36, 34, 18), _full("look", 30, 22, 11),
+            _full("cut", 8, 10, 4)]
+    out = R.rank(rows)
+    assert (len(out["kept"]) + len(out["worth_a_look"]) +
+            len(out["excluded"])) == len(rows)
+
+
 # ── Reporting what could not be measured ──────────────────────────────────
 
 def test_gaps_name_the_unmeasured_fields():

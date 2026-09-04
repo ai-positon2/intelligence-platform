@@ -189,6 +189,30 @@ def test_the_title_uses_a_colon_not_a_dash():
     assert _summary()["title"] == "Northwind: Conference Analysis"
 
 
+def test_the_grading_pass_note_counts_every_event_it_graded():
+    """It used to count the kept list plus the unscored, which is wrong in
+    the same direction the whole agent was wrong: the grading pass sees every
+    candidate, so on a run that graded seven and kept one it printed "The 1
+    events were graded in 2 separate passes"."""
+    s = _summary(scoring_batches=2,
+                 ranked={"kept": [{"name": "K"}],
+                         "worth_a_look": [{"name": "L1"}, {"name": "L2"}],
+                         "excluded": [{"name": "X1"}, {"name": "X2"}],
+                         "counts": {}})
+    note = [n for n in s["notes"] if "separate passes" in n["head"]][0]
+    assert "5 events were graded" in note["head"], note["head"]
+    assert "1 event" not in note["head"]
+
+
+def test_the_grading_pass_note_agrees_with_itself_on_one_event():
+    """"The 1 events" shipped to a client. A count and its verb come from one
+    place now."""
+    s = _summary(scoring_batches=2,
+                 ranked={"kept": [{"name": "K"}], "counts": {}})
+    note = [n for n in s["notes"] if "separate passes" in n["head"]][0]
+    assert "1 event was graded" in note["head"], note["head"]
+
+
 def test_the_methodology_is_the_rubric_as_applied_to_this_client():
     m = _summary()["methodology"]
     assert "40" in m and "110" in m

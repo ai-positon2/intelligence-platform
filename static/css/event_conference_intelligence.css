@@ -881,6 +881,12 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   --evi-f-low: #8b5cf6;
   --evi-f-weak: #64748b;
   --evi-f-na: #4b5675;
+  /* The second tier. Deliberately OFF the cyan-to-violet spectrum the
+     recommendation uses, so it cannot be misread as a weak P2, and
+     deliberately not --evi-warn, because amber on this page means something
+     went wrong and a worth-a-look event is a viable option rather than a
+     problem. Teal reads as "available, not urgent". */
+  --evi-f-look: #2dd4bf;
 }
 :root[data-theme="light"] {
   --evi-f-hi: #0284c7;
@@ -888,6 +894,12 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
   --evi-f-low: #7c3aed;
   --evi-f-weak: #64748b;
   --evi-f-na: #94a3b8;
+  /* Darker than the dark-theme teal, and deliberately not the obvious
+     #0d9488: on this page's light card that scores 3.6:1, under AA and well
+     under the 5.7 and 6.8 the P1 and P2 badges already manage. This is
+     5.2:1, which puts the second tier's badge on the same footing as the
+     two above it. */
+  --evi-f-look: #0f766e;
 }
 .f-hi { --band: var(--evi-f-hi); }
 .f-mid { --band: var(--evi-f-mid); }
@@ -923,7 +935,10 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
    rather than carrying colours of their own. */
 .t-P1 { --band: var(--evi-f-hi); }
 .t-P2 { --band: var(--evi-f-mid); }
-.t-P3 { --band: var(--evi-f-weak); }
+/* P3 is the "worth a look" tier now, not the discard pile, so it is drawn as
+   an option. A column for an event that really was cut carries .t-cut. */
+.t-P3 { --band: var(--evi-f-look); }
+.t-cut { --band: var(--evi-f-weak); }
 .f-ok { --band: var(--evi-ok); }
 .f-warn { --band: var(--evi-warn); }
 .f-bad { --band: var(--evi-bad); }
@@ -2067,6 +2082,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .evi-exec .ex-counts .c-p1::before { background: var(--evi-a1); opacity: 1; }
 .evi-exec .ex-counts .c-p2::before { background: var(--evi-a3); opacity: 1; }
+.evi-exec .ex-counts .c-look::before { background: var(--evi-f-look); opacity: 1; }
 .evi-exec .ex-counts b {
   font-family: 'Bricolage Grotesque', sans-serif;
   font-size: 30px; font-weight: 700; color: var(--evi-ink);
@@ -2074,6 +2090,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .evi-exec .ex-counts .c-p1 b { color: var(--evi-a1); }
 .evi-exec .ex-counts .c-p2 b { color: var(--evi-a3); }
+.evi-exec .ex-counts .c-look b { color: var(--evi-f-look); }
 .evi-exec .ex-counts i {
   font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .09em;
   text-transform: uppercase; color: var(--evi-ink-3); opacity: .8; margin-top: 3px;
@@ -2334,7 +2351,7 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 .evi-cand.t-P1::before { background: linear-gradient(180deg, var(--evi-a1), var(--evi-a2)); }
 .evi-cand.t-P2::before { background: rgba(139,92,246,.5); }
-.evi-cand.t-P3::before { background: var(--evi-line); }
+.evi-cand.t-P3::before { background: color-mix(in srgb, var(--evi-f-look) 60%, transparent); }
 
 .evi-cand .ct { display: flex; flex-direction: column; gap: 4px; }
 .evi-cand .cn {
@@ -2358,6 +2375,35 @@ table.evi-table { width: 100%; border-collapse: separate; border-spacing: 0;
 }
 :root[data-theme="light"] .evi-cand.t-P1 .cn .tier { color: #0369a1; }
 :root[data-theme="light"] .evi-cand.t-P2 .cn .tier { color: #6d28d9; }
+
+/* ── the second tier ───────────────────────────────────────────────────
+   Below the priority bar and above both relevance gates. It gets the same
+   card the recommendation gets, because it is offered as an option and an
+   option a reader cannot read is not one. What separates it visually is the
+   band, the badge and one line saying what it is short on: enough to never
+   be mistaken for a recommendation, not so much that it reads as a reject.
+
+   This exists because the bar was doing two jobs. See RANK_FLOOR in
+   event_intel_rubric.py. */
+.evi-cand.t-P3 .cn .tier {
+  background: color-mix(in srgb, var(--evi-f-look) 16%, transparent);
+  color: var(--evi-f-look);
+}
+.evi-cand.is-look { border-color: color-mix(in srgb, var(--evi-f-look) 26%, var(--evi-line)); }
+.evi-cand .cshort {
+  margin: 12px 0 0; padding: 9px 12px; border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--evi-f-look) 9%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--evi-f-look) 55%, transparent);
+  font-size: 11.5px; line-height: 1.5; color: var(--evi-ink-2);
+}
+.evi-look > h3::after {
+  content: "second tier"; margin-left: 10px; padding: 3px 8px;
+  border-radius: 999px; font-family: system-ui, sans-serif;
+  font-size: 9px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; vertical-align: middle;
+  background: color-mix(in srgb, var(--evi-f-look) 15%, transparent);
+  color: var(--evi-f-look);
+}
 .evi-cand .cn .ed { font-size: 12px; font-weight: 500; color: var(--evi-ink-3); }
 .evi-cand .cm { font-size: 11.5px; color: var(--evi-ink-3); line-height: 1.55; }
 
