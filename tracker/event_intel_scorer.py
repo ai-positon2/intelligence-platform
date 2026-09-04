@@ -40,6 +40,34 @@ logger = logging.getLogger(__name__)
 
 BATCH = 6
 MAX_CONCURRENCY = 3
+# This call runs live search too (rule 4 forbids inventing a figure the
+# rubric needs verified), so it hits the same output-starvation trap as
+# find/confirm/audit/resolve: the model narrates between search rounds and
+# that narration spends the OUTPUT budget alongside the answer. A live run at
+# BATCH=6 hit it hard: a 4-EVENT batch with 6 searches produced 14,601 output
+# tokens against a budget of 8,000 and was truncated mid-JSON. Every other
+# stage's single-item budget (9,000) was raised on evidence that topped out
+# around 6,000-11,000; this call writes THREE scored notes plus a two-part
+# description for every event in the batch, on top of the same narration
+# overhead, so its floor has to scale with BATCH rather than sit at the
+# single-item number.
+#
+# The failure mode here is worse than anywhere else in the pipeline: score_all
+# can run several batches concurrently, but when the whole candidate pool fits
+# in one batch (a small pool, or a client near the floor), that ONE call
+# truncating discards every survivor of discovery, confirmation and the
+# audit in a single stroke. A live run did exactly this: discovery, confirm
+# and the audit all worked, and the run still finished with ZERO recommended
+# events because its only scoring batch was cut off.
+#
+# Verified live after this fix, directly against score_batch with a real
+# 6-event (full BATCH) batch and 6 live searches: stop_reason=end_turn, all 6
+# scored, 22,192 output tokens used. That was against a first attempt of
+# 24,000 -- a 92% fill with no margin for a batch that happens to write
+# longer notes -- so the ceiling is held above the measured number rather
+# than pinned to it. Raising it costs nothing unless a batch actually needs
+# the room: max_tokens is a ceiling, not a charge.
+SCORE_MAX_TOKENS = 32000
 
 _SYSTEM = """You score business events against one client's ICP using a fixed \
 rubric, and you write each event's description. You are grading events you did \
@@ -156,7 +184,7 @@ def score_batch(batch: list[dict], profile: dict) -> dict:
             profile.get("classification"), "Confirm with the client."))
     user = ("Score these %d events and write each description:\n\n%s"
             % (len(batch), "\n".join(_candidate_brief(c) for c in batch)))
-    res = claude_websearch.ask(system, user, max_uses=6, max_tokens=8000)
+    res = claude_websearch.ask(system, user, max_uses=6, max_tokens=SCORE_MAX_TOKENS)
     # Counted on every path out of here, including the two refusals below: a
     # scoring pass whose answer could not be read cost exactly what a
     # readable one cost.

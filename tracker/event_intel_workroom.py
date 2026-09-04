@@ -310,6 +310,22 @@ def is_aggressive(text: str) -> list[str]:
 ICP_FLOOR = 55
 BATCH = 12
 MAX_CONCURRENCY = 3
+# The web_search tool is offered here (max_uses > 0 in the call below), and a
+# model asked to write a specific, non-generic angle for a named company
+# routinely reaches for it to check what the company does. That makes this
+# call's output budget subject to the same trap event_intel_scorer's was
+# found to have live: the model narrates between search rounds, that
+# narration spends the OUTPUT budget alongside the answer, and this call
+# writes THREE fields per company for up to BATCH companies in one call.
+#
+# A live 6-event, 6-search SCORE batch needed 22,192 output tokens against an
+# 8,000 budget and was truncated. This call's batch is twice the size (12
+# companies) and writes comparably sized fields (fit_note, angle, opener), at
+# a smaller search budget (4 vs 6), so the same 8,000 ceiling that failed at
+# half this batch size cannot be trusted here either. Held above what the
+# scorer needed, scaled for double the batch: not yet independently measured
+# live for THIS call, so treat this as a floor to verify, not a proven number.
+DRAFT_MAX_TOKENS = 40000
 
 _SYSTEM = """You are qualifying companies from one event's published roster \
 against one client's ICP, and drafting one opening line for each.
@@ -432,7 +448,7 @@ def draft_batch(rows: list[dict], profile: dict, event: dict,
                          else _COMPETITOR_RULE_OFF))
     user = ("Qualify and draft for these %d companies from the roster:\n\n%s"
             % (len(rows), _roster_brief(rows, notes)))
-    res = claude_websearch.ask(system, user, max_uses=4, max_tokens=8000)
+    res = claude_websearch.ask(system, user, max_uses=4, max_tokens=DRAFT_MAX_TOKENS)
     if res.get("error"):
         return {"drafts": {},
                 "error": "%s: %s" % (res["error"]["kind"], res["error"]["detail"])}
