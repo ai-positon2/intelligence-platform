@@ -404,3 +404,49 @@ def test_a_well_matched_event_below_the_bar_reaches_the_stored_summary(monkeypat
     assert opt["relevance"] >= R.RELEVANCE_GATE
 
     assert (s.get("counts") or {}).get("worth_a_look") == 2, s.get("counts")
+
+
+def test_a_finished_run_records_what_it_cost(monkeypatch):
+    """Cost had never been measured in production at all.
+
+    `claude_websearch.ask` returned `usage` on every reply and nothing
+    accumulated it, so the only figure anyone had for a run was $9.13 from a
+    pipeline design that had since been replaced. The first instrumented run
+    came in at $12.15 across 32 calls, 2.58M input tokens and 201 searches,
+    with a completely different shape.
+
+    Summed through return values rather than a module global on purpose:
+    `run_job` is a thread entry point and two runs can be in flight in one
+    process, so a shared counter would bill one client for another's
+    searches.
+    """
+    from tracker import claude_websearch as CW
+    test_a_well_matched_event_below_the_bar_reaches_the_stored_summary(monkeypatch)
+    runs = S.list_runs(EMAIL)
+    run = S.get_run(runs[0]["id"], EMAIL)
+    spend = (run["summary"] or {}).get("spend")
+    assert spend is not None, "a finished run does not record what it cost"
+    for key in ("calls", "input_tokens", "output_tokens", "searches", "usd",
+                "by_stage"):
+        assert key in spend, "spend is missing %s" % key
+    for stage in ("discover", "score", "audit", "promote"):
+        assert stage in spend["by_stage"], (
+            "%s is unaccounted for, so a stage could grow expensive "
+            "invisibly" % stage)
+    # The arithmetic is the module's, not the test's.
+    assert spend["usd"] == CW.spend_usd(spend)
+
+
+def test_the_recorded_cost_counts_the_calls_that_were_refused(monkeypatch):
+    """The expensive failures are the ones worth seeing. A confirmation
+    discarded after six live searches, a scoring pass whose answer could not
+    be read, an audit that was refused for answering from memory: each cost
+    full price, and each used to be invisible."""
+    from tracker import claude_websearch as CW
+    refused = {"usage": {"input_tokens": 50000, "output_tokens": 3000},
+               "search_count": 6,
+               "error": {"kind": "max_tokens", "detail": "out of room"}}
+    rec = CW.spend_of(refused)
+    assert rec["input_tokens"] == 50000 and rec["searches"] == 6
+    assert CW.spend_usd(rec) > 0, (
+        "a call that failed after six live searches was costed at zero")

@@ -316,8 +316,29 @@ def _run_recommend(run_id: int, email: str, profile: dict) -> None:
         scoring_errors=scored["errors"], interchangeable=interchangeable,
         banned=banned, thin=thin, unscored=scored["unscored"],
         promoted=promoted, scoring_batches=scored.get("batches") or 0)
+    # What the run cost, summed from every stage's own report rather than
+    # from a shared counter: `run_job` is a thread entry point and two runs
+    # can be in flight in one process, so a global would bill one client for
+    # another's searches.
+    #
+    # This exists because the feature had no measured unit cost at all. The
+    # only figure anyone had was $9.13, from a pipeline design that had since
+    # been replaced; the first instrumented run came in at $9.64 with a
+    # completely different shape.
+    spend = event_intel_discover.claude_websearch.spend_sum(
+        found.get("spend"), scored.get("spend"),
+        audit.get("spend"), promoted.get("spend"))
+    spend["usd"] = event_intel_discover.claude_websearch.spend_usd(spend)
+    spend["by_stage"] = {
+        "discover": found.get("spend") or {},
+        "score": scored.get("spend") or {},
+        "audit": audit.get("spend") or {},
+        "promote": promoted.get("spend") or {},
+    }
+
     summary.update({
         "mode": "recommend",
+        "spend": spend,
         "shortfall": found["shortfall"],
         "statuses": found["statuses"],
         "categories_failed": found["categories_failed"],
