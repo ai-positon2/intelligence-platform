@@ -297,8 +297,23 @@ h1 em,h1 .ital,.main-heading em,.heading em,.heading .ital,
 /* ═══ FIX · reveal particle canvas — background on root, body transparent ═══
    Each page's own bg lives on body which was covering the fixed canvas.
    Move a base to the root (pages may override via :root for their gradient),
-   make body transparent, and keep the canvas behind content. ═══ */
+   make body transparent, and keep the canvas behind content.
+
+   The theme goes on `html` itself (five callers, all
+   `documentElement.setAttribute`), so the light ground must be written as
+   `html[data-theme="light"]`, never as a descendant of the themed element.
+   `:root[data-theme="light"] html` and `[data-theme="light"] html` are both
+   unmatchable: :root IS html, and html is never a descendant of anything. That
+   was the shipped selector for a while and light mode silently kept the dark
+   ground everywhere, which measured 1.24:1 on Contact Finder against a 4.5:1
+   requirement. 0,1,1 also beats the plain `html{...}` below on specificity, so
+   it does not depend on staying underneath it.
+
+   Because body is forced transparent HERE, and this file loads AFTER every
+   page stylesheet, a page cannot put its ground on body at all: it has to use
+   `html:root` (0,0,2) to outrank `html{...}`. Three pages do exactly that for
+   their own gradients. Do not "simplify" any of them back onto body. ═══ */
 html{background:#070912}
-:root[data-theme="light"] html,[data-theme="light"] html{background:#eef1f8}
+html[data-theme="light"]{background:#eef1f8}
 body{background:transparent!important}
 #pfx-bg{z-index:-1!important}

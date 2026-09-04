@@ -564,9 +564,17 @@ body.modal-open{overflow:hidden}
   width:32px;height:32px;border-radius:8px;
   background:linear-gradient(135deg,var(--blue),var(--purple));
   display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden
+  font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;
+  position:relative
 }
-.company-avatar img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+/* Absolute, not in flow: the initials sit underneath in the same box, so an
+   image that removes itself on error uncovers them with no reflow. position
+   relative on the parent above is what anchors this. */
+.company-avatar img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;border-radius:8px
+}
+.company-avatar img.ca-fav{object-fit:contain;padding:4px;background:#fff}
 .signal-body{flex:1;min-width:0}
 .signal-company{font-size:12px;font-weight:600;color:var(--text)}
 .signal-type{font-size:10px;color:var(--blue);font-weight:500}
@@ -1882,12 +1890,37 @@ function initials(name) {
   return (name||'?').split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
 
+// DuckDuckGo, and deliberately not one of the services that always answers
+// 200. This one returns 404 for a domain with no icon, which is exactly what
+// lets onerror fire and the initials underneath show through. A service that
+// serves a generated placeholder instead would silently replace every missing
+// logo with its own generic glyph and the initials below would never appear.
+// Same source job_change_alert.html has used since it shipped.
+function faviconUrl(domain) {
+  const d = String(domain || '').trim().toLowerCase()
+    .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].split('?')[0];
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)
+    ? 'https://icons.duckduckgo.com/ip3/' + encodeURIComponent(d) + '.ico'
+    : '';
+}
+
 function avatarHtml(company, size=32) {
-  const sz = `width:${size}px;height:${size}px`;
-  if (company.logo_url) {
-    return `<div class="company-avatar" style="${sz}"><img src="${esc(company.logo_url)}" loading="lazy" onerror="this.parentElement.innerHTML='<span style=\\'font-size:${Math.round(size*.38)}px\\'>${initials(company.name)}</span>'" /></div>`;
-  }
-  return `<div class="company-avatar" style="${sz};font-size:${Math.round(size*.38)}px"><span>${initials(company.name)}</span></div>`;
+  const sz = `width:${size}px;height:${size}px;font-size:${Math.round(size*.38)}px`;
+  // The initials are painted first and STAY in the DOM, so an image layered
+  // over them reveals them again simply by removing itself. The previous
+  // version rebuilt the parent's innerHTML from inside onerror, which meant the
+  // letters were reconstructed as a string at failure time and there was
+  // nowhere to fall through to if a second source were ever added.
+  const inner = `<span>${initials(company.name)}</span>`;
+  const src = company.logo_url || faviconUrl(company.domain);
+  if (!src) return `<div class="company-avatar" style="${sz}">${inner}</div>`;
+  // A favicon is not a logo. It is small, square and usually carries its own
+  // opaque ground, so it gets contain plus padding; cover would crop it to its
+  // centre. Apollo's logo_url images are real logos and keep cover.
+  const cls = company.logo_url ? 'ca-logo' : 'ca-logo ca-fav';
+  return `<div class="company-avatar" style="${sz}">${inner}`
+       + `<img class="${cls}" src="${esc(src)}" loading="lazy" alt="" onerror="this.remove()" />`
+       + `</div>`;
 }
 
 function formatMoney(n) {
