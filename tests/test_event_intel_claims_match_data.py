@@ -352,3 +352,99 @@ def test_the_coverage_verdict_does_not_say_a_category_found_nothing(page_script)
         "the report tells a client this category found nothing, beside a bar "
         "saying it found one")
     assert "did not finish" in html
+
+
+# ── 6. two checks that were allowed to answer from memory ────────────────
+#
+# event_intel_discover refuses a reply that ran no search, in two places, on
+# the stated grounds that "a reply that ran no search is a recollection", and
+# event_intel_recover does the same for a recovered roster. The two calls that
+# decide what comes OFF a client's list, and what goes on in its place, never
+# made the check.
+
+def _ask(monkeypatch, module, payload, search_count):
+    import json as _json
+    from tracker import claude_websearch
+    monkeypatch.setattr(module.claude_websearch, "ask",
+                        lambda system, user, **kw: {
+                            "text": _json.dumps(payload), "error": None,
+                            "search_count": search_count})
+    assert claude_websearch  # imported for the name, not the object
+
+
+def _famous():
+    return [{"name": "Dreamforce", "famous": True,
+             "category": R.CAT_INDUSTRY_FLAGSHIP, "city": "San Francisco"}]
+
+
+_AUDIT_REPLY = {"audits": [{"name": "Dreamforce", "verdict": "cut",
+                            "alternative": "Tiny Vertical Summit",
+                            "alternative_website": "https://tiny.example",
+                            "alternative_note": "Denser.",
+                            "why": "Too broad for this ICP."}]}
+
+
+def test_a_famous_event_is_not_cut_on_a_reply_that_ran_no_search(monkeypatch):
+    """This reply removes real recommendations from a client's list and names
+    what should replace them, and the rule at the top of the audit module is
+    that the alternative "must be a real event found by search". Answered from
+    memory it cuts remembered events and promotes remembered ones."""
+    _ask(monkeypatch, A, _AUDIT_REPLY, search_count=0)
+    out = A.audit_famous(_famous(), PROFILE)
+    assert out["error"], "a recalled audit was accepted as a real one"
+    assert "search" in out["error"]
+    assert not out["cut"], "an event was cut on a verdict nobody checked"
+    # apply_audit already handles a failed audit by cutting nothing, which is
+    # the whole reason this is reported as an error rather than as an empty
+    # set of verdicts.
+    kept = A.apply_audit(_famous(), out)
+    assert [c["name"] for c in kept] == ["Dreamforce"]
+    assert kept[0]["audit_verdict"] == A.VERDICT_UNAUDITED
+
+
+def test_an_audit_that_did_search_is_still_accepted(monkeypatch):
+    """The other half. A check that refuses everything is not a check."""
+    _ask(monkeypatch, A, _AUDIT_REPLY, search_count=3)
+    out = A.audit_famous(_famous(), PROFILE)
+    assert not out["error"], out["error"]
+    assert [c["name"] for c in out["cut"]] == ["Dreamforce"]
+
+
+_RESOLVE_REPLY = {"confidence": "high", "name": "INBOUND", "edition": "2027",
+                  "website": "https://inbound.example", "starts_on": "2027-09-01",
+                  "reasoning": "Found it.", "pages": []}
+
+
+def test_an_event_lookup_that_ran_no_search_is_refused(monkeypatch):
+    """The confident false match is this module's entire subject: the same
+    name is reused every year and unrelated events share words, which is what
+    recall gets wrong. It also confirms the audit's replacements, where the
+    comment promises "the same standard discovery is held to"."""
+    from tracker import event_intel_resolve as RES
+    _ask(monkeypatch, RES, _RESOLVE_REPLY, search_count=0)
+    out = RES.resolve_event("INBOUND")
+    assert not out["ok"], "an event recalled from memory was resolved"
+    assert "recalled" in out["reasoning"], out["reasoning"]
+    assert out["event"] is None
+
+
+def test_an_event_lookup_that_did_search_still_resolves(monkeypatch):
+    from tracker import event_intel_resolve as RES
+    _ask(monkeypatch, RES, _RESOLVE_REPLY, search_count=2)
+    out = RES.resolve_event("INBOUND")
+    assert out["ok"], out["reasoning"]
+    assert out["event"]["name"] == "INBOUND"
+
+
+def test_a_promoted_alternative_cannot_be_confirmed_from_memory(monkeypatch):
+    """The two fixes together. promote_alternatives goes through
+    resolve_event, so a recalled confirmation would put a remembered
+    conference on a client's travel calendar with "confirmed separately"
+    written beside it."""
+    from tracker import event_intel_resolve as RES
+    _ask(monkeypatch, RES, _RESOLVE_REPLY, search_count=0)
+    audit, survivors, pre = _survivors_and_pre_audit()
+    out = A.promote_alternatives(audit, survivors, replaced_from=pre)
+    assert not out["promoted"], "a recalled event reached the list"
+    assert out["unconfirmed"] and "recalled" in out["unconfirmed"][0]["why"]
+    assert RES  # the resolver under test is the real one, not a fake
