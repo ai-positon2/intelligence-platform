@@ -17,10 +17,11 @@
    so a background on body is discarded outright and a bare `:root{...}` here
    loses the later-wins tiebreak to aurora's `html{...}`. `html:root` scores
    0,0,2 against that 0,0,1 and wins regardless of load order. Its own
-   light-mode ground selector (`:root[data-theme="light"] html`) is a dead
-   selector for the same reason ­- :root IS html, so it asks for an html
-   nested inside a light-themed html, which never exists -- so this page
-   defines its own light override instead of relying on it.
+   light-mode ground selector used to be `:root[data-theme="light"] html`,
+   a dead selector for the same reason: :root IS html, so it asked for an html
+   nested inside a light-themed html, which never exists. It is now
+   `html[data-theme="light"]` and works. This page keeps its own light override
+   anyway, because its ground is a gradient and not that file's flat colour.
    background-color is set as its own line, after the gradient shorthand,
    because the shorthand resets background-color to transparent when it only
    lists images -- without it, macOS's rubber-band overscroll bounce paints
